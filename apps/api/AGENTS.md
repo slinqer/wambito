@@ -45,7 +45,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   || user_id, 0))` (every `records` write takes it, so versions commit in order per person), one
   savepoint per change; limits 500 changes, 4 MiB (`hono/body-limit`), 64 KiB body, 100,000 live
   records. `purgeTombstones` (daily, `server.ts`) goes person by person through `withUser`, since
-  `records` has forced RLS. `deps.syncHooks` is a test-only seam.
+  `records` has forced RLS. An update never creates (`not_found`) nor changes `type` (conflict);
+  a hidden id (`id_taken`) is found by a rolled-back insert probe. `deps.syncHooks` is a test-only
+  seam.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

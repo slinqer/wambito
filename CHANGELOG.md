@@ -23,7 +23,7 @@ How to add to it:
 
 ### Added
 
-- `GET`/`POST /v2/sync` (`pullRecords`, `pushRecords`): encrypted records, not yet used by clients. Pull by version (`since`, `limit` 1–1000, `next`, `latest`); push up to 500 changes and 4 MiB, each a new version, a conflict with the current record, or `id_taken`; bodies up to 64 KiB, 100,000 live records per account (409 `record_limit`), tombstones purged after 180 days. Assistants pull with `finance:read` and push with `finance:write`.
+- `GET`/`POST /v2/sync` (`pullRecords`, `pushRecords`): encrypted records, not yet used by clients. Pull by version (`since`, `limit` 1–1000, `next`, `latest`); push up to 500 changes and 4 MiB, each a new version, a conflict with the current record (a stale `baseVersion` or another `type`: a record's type never changes), `id_taken` (someone else's id) or `not_found` (an update of a record the server does not have: resync in full); bodies up to 64 KiB, 100,000 live records per account (409 `record_limit`), tombstones purged after 180 days. Assistants pull with `finance:read` and push with `finance:write`.
 - `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match (ask for it on the first page only).
 - MCP `list_transactions`: `text` and `category` take lists, plus `kind` and `match`; it returns `totals` (count, expense, income), which include pending and to-review movements (pass `status: "paid"` for money already spent).
 

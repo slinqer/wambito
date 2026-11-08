@@ -7,25 +7,34 @@ part of 'push_result.dart';
 // **************************************************************************
 
 const PushResultErrorEnum _$pushResultErrorEnum_idTaken = const PushResultErrorEnum._('idTaken');
+const PushResultErrorEnum _$pushResultErrorEnum_notFound = const PushResultErrorEnum._('notFound');
 
 PushResultErrorEnum _$pushResultErrorEnumValueOf(String name) {
   switch (name) {
     case 'idTaken':
       return _$pushResultErrorEnum_idTaken;
+    case 'notFound':
+      return _$pushResultErrorEnum_notFound;
     default:
       throw ArgumentError(name);
   }
 }
 
 final BuiltSet<PushResultErrorEnum> _$pushResultErrorEnumValues = BuiltSet<PushResultErrorEnum>(
-  const <PushResultErrorEnum>[_$pushResultErrorEnum_idTaken],
+  const <PushResultErrorEnum>[_$pushResultErrorEnum_idTaken, _$pushResultErrorEnum_notFound],
 );
 
 Serializer<PushResultErrorEnum> _$pushResultErrorEnumSerializer = _$PushResultErrorEnumSerializer();
 
 class _$PushResultErrorEnumSerializer implements PrimitiveSerializer<PushResultErrorEnum> {
-  static const Map<String, Object> _toWire = const <String, Object>{'idTaken': 'id_taken'};
-  static const Map<Object, String> _fromWire = const <Object, String>{'id_taken': 'idTaken'};
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'idTaken': 'id_taken',
+    'notFound': 'not_found',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'id_taken': 'idTaken',
+    'not_found': 'notFound',
+  };
 
   @override
   final Iterable<Type> types = const <Type>[PushResultErrorEnum];

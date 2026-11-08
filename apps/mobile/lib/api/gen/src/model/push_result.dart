@@ -20,7 +20,7 @@ part 'push_result.g.dart';
 /// * [id]
 /// * [version]
 /// * [conflict]
-/// * [error]
+/// * [error] - `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
 @BuiltValue()
 abstract class PushResult implements Built<PushResult, PushResultBuilder> {
   /// Any Of [PushApplied], [PushConflict], [PushRejected]
@@ -82,9 +82,12 @@ class _$PushResultSerializer implements PrimitiveSerializer<PushResult> {
   }
 }
 
+/// `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
 class PushResultErrorEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'id_taken')
   static const PushResultErrorEnum idTaken = _$pushResultErrorEnum_idTaken;
+  @BuiltValueEnumConst(wireName: r'not_found')
+  static const PushResultErrorEnum notFound = _$pushResultErrorEnum_notFound;
 
   static Serializer<PushResultErrorEnum> get serializer => _$pushResultErrorEnumSerializer;
 

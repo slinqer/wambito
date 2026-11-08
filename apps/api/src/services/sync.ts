@@ -41,7 +41,10 @@ export interface SyncChangeInput {
 export type PushResult =
   | { id: string; version: number }
   | { id: string; conflict: SyncRecordDto }
-  | { id: string; error: "id_taken" };
+  | { id: string; error: "id_taken" | "not_found" };
+
+/** Thrown inside a probe savepoint to undo the probe's insert. */
+const PROBE_ROLLBACK = Symbol("probe rollback");
 
 export function toSyncRecord(row: RecordRow): SyncRecordDto {
   return {
@@ -109,9 +112,10 @@ const sameBytes = (a: Uint8Array | null, b: Uint8Array | null) =>
  *   (same type, deleted, keyV, encV and body bytes) answers the stored version; anything else is
  *   a conflict carrying the stored record. An id that exists but is not visible (another
  *   person's) is `id_taken`, and nothing about that record is returned.
- * - Otherwise the write applies only when `baseVersion` is the stored version; else a conflict.
- *   A change for an id the person does not have (never uploaded, or a purged tombstone) is
- *   stored as new, unless the id is another person's (`id_taken`).
+ * - Otherwise the write applies only when `baseVersion` is the stored version and `type` is the
+ *   stored type (a record's type never changes); else a conflict. An update for an id the person
+ *   does not have (never uploaded, or a tombstone purged after 180 days) creates nothing and is
+ *   `not_found`, which tells the device to resync in full; another person's id stays `id_taken`.
  *
  * Every write takes a fresh version from `records_version_seq` and sets `updated_at`. Each change
  * runs in its own savepoint. More than MAX_LIVE_RECORDS live records after a change fails the
@@ -179,6 +183,10 @@ async function applyChange(
 
   const [current] = await tx.select().from(records).where(eq(records.id, id)).for("update");
 
+  if (!current && change.baseVersion !== null) {
+    return { id, error: (await existsHidden(tx, id, userId)) ? "id_taken" : "not_found" };
+  }
+
   if (!current) {
     const [inserted] = await tx
       .insert(records)
@@ -201,7 +209,9 @@ async function applyChange(
     return retry ? { id, version: current.version } : { id, conflict: toSyncRecord(current) };
   }
 
-  if (current.version !== change.baseVersion) return { id, conflict: toSyncRecord(current) };
+  if (current.version !== change.baseVersion || current.type !== change.type) {
+    return { id, conflict: toSyncRecord(current) };
+  }
 
   const [updated] = await tx
     .update(records)
@@ -210,6 +220,29 @@ async function applyChange(
     .returning({ version: records.version });
   await addLive(Number(current.deleted) - Number(change.deleted));
   return { id, version: (updated as { version: number }).version };
+}
+
+/**
+ * Whether `id` exists for someone else, which row-level security hides. The API's role cannot read
+ * the row, so it probes: a minimal tombstone insert with `on conflict do nothing`, in a savepoint
+ * that is always rolled back. No row back means the id is taken. The probe spends one sequence
+ * value and leaves nothing behind.
+ */
+async function existsHidden(tx: Tx, id: string, userId: string): Promise<boolean> {
+  try {
+    await tx.transaction(async (probe) => {
+      const [inserted] = await probe
+        .insert(records)
+        .values({ id, userId, type: "settings", deleted: true, keyV: 0, encV: 0, body: null })
+        .onConflictDoNothing({ target: records.id })
+        .returning({ id: records.id });
+      if (inserted) throw PROBE_ROLLBACK;
+    });
+    return true;
+  } catch (error) {
+    if (error === PROBE_ROLLBACK) return false;
+    throw error;
+  }
 }
 
 /**

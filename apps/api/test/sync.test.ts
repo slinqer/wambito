@@ -174,6 +174,39 @@ describe("/v2/sync", () => {
     expect(all.find((r) => r.id === first.id)?.body).toBe(b64("first, edited"));
   });
 
+  test("an update for an id the person does not have is not_found, and creates nothing", async () => {
+    const ghost = create("resurrected", { baseVersion: 1 });
+    const tombstone = create("", { baseVersion: 1, deleted: true, body: null });
+    const results = await push(a, [ghost, tombstone]);
+    expect(results).toEqual([
+      { id: ghost.id, error: "not_found" },
+      { id: tombstone.id, error: "not_found" },
+    ]);
+    const ids = (await pullAll(a)).map((r) => r.id);
+    expect(ids).not.toContain(ghost.id);
+    expect(ids).not.toContain(tombstone.id);
+  });
+
+  test("type is immutable: an update with another type is a conflict", async () => {
+    const change = create("a category", { type: "category" });
+    const [created] = await push(a, [change]);
+    const [changed] = await push(a, [
+      { ...change, type: "transaction", baseVersion: created?.version as number },
+    ]);
+    expect(changed).toEqual({
+      id: change.id,
+      conflict: {
+        id: change.id,
+        type: "category",
+        version: created?.version,
+        deleted: false,
+        keyV: 1,
+        encV: 1,
+        body: b64("a category"),
+      },
+    });
+  });
+
   test("retrying a create is idempotent", async () => {
     const change = create("same");
     const [first] = await push(a, [change]);

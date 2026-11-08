@@ -13,15 +13,16 @@ part 'push_rejected.g.dart';
 ///
 /// Properties:
 /// * [id]
-/// * [error]
+/// * [error] - `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
 @BuiltValue()
 abstract class PushRejected implements Built<PushRejected, PushRejectedBuilder> {
   @BuiltValueField(wireName: r'id')
   String get id;
 
+  /// `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
   @BuiltValueField(wireName: r'error')
   PushRejectedErrorEnum get error;
-  // enum errorEnum {  id_taken,  };
+  // enum errorEnum {  id_taken,  not_found,  };
 
   PushRejected._();
 
@@ -114,9 +115,12 @@ class _$PushRejectedSerializer implements PrimitiveSerializer<PushRejected> {
   }
 }
 
+/// `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
 class PushRejectedErrorEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'id_taken')
   static const PushRejectedErrorEnum idTaken = _$pushRejectedErrorEnum_idTaken;
+  @BuiltValueEnumConst(wireName: r'not_found')
+  static const PushRejectedErrorEnum notFound = _$pushRejectedErrorEnum_notFound;
 
   static Serializer<PushRejectedErrorEnum> get serializer => _$pushRejectedErrorEnumSerializer;
 

@@ -2015,7 +2015,7 @@ class DefaultApi {
   }
 
   /// pushRecords
-  /// Applies each change on its own, in order: &#x60;baseVersion: null&#x60; creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. Each result is the new version, a conflict with the current record, or &#x60;id_taken&#x60; when the id is someone else&#39;s.
+  /// Applies each change on its own, in order: &#x60;baseVersion: null&#x60; creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record&#39;s type never changes). Each result is the new version, a conflict with the current record, &#x60;id_taken&#x60; when the id is someone else&#39;s, or &#x60;not_found&#x60; for an update of a record the server does not have (resync in full).
   ///
   /// Parameters:
   /// * [pushRecords]

@@ -145,7 +145,15 @@ export const PushResult = z
   .union([
     z.object({ id: z.uuid(), version: z.int() }).openapi("PushApplied"),
     z.object({ id: z.uuid(), conflict: SyncRecord }).openapi("PushConflict"),
-    z.object({ id: z.uuid(), error: z.literal("id_taken") }).openapi("PushRejected"),
+    z
+      .object({
+        id: z.uuid(),
+        error: z.enum(["id_taken", "not_found"]).openapi({
+          description:
+            "`id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.",
+        }),
+      })
+      .openapi("PushRejected"),
   ])
   .openapi("PushResult");
 
