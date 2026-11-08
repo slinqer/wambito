@@ -78,6 +78,7 @@ Serializers _$serializers =
           ..add(Problem.serializer)
           ..add(ProblemErrorsInner.serializer)
           ..add(Profile.serializer)
+          ..add(ProfileEncryptionEnum.serializer)
           ..add(PulledRecords.serializer)
           ..add(PushApplied.serializer)
           ..add(PushConflict.serializer)

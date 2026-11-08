@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -18,6 +19,7 @@ part 'profile.g.dart';
 /// * [onboardingCompletedAt]
 /// * [currency]
 /// * [isAnonymous]
+/// * [encryption]
 @BuiltValue()
 abstract class Profile implements Built<Profile, ProfileBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -40,6 +42,10 @@ abstract class Profile implements Built<Profile, ProfileBuilder> {
 
   @BuiltValueField(wireName: r'isAnonymous')
   bool get isAnonymous;
+
+  @BuiltValueField(wireName: r'encryption')
+  ProfileEncryptionEnum get encryption;
+  // enum encryptionEnum {  plain,  preview,  };
 
   Profile._();
 
@@ -83,6 +89,11 @@ class _$ProfileSerializer implements PrimitiveSerializer<Profile> {
     yield serializers.serialize(object.currency, specifiedType: const FullType(String));
     yield r'isAnonymous';
     yield serializers.serialize(object.isAnonymous, specifiedType: const FullType(bool));
+    yield r'encryption';
+    yield serializers.serialize(
+      object.encryption,
+      specifiedType: const FullType(ProfileEncryptionEnum),
+    );
   }
 
   @override
@@ -144,6 +155,13 @@ class _$ProfileSerializer implements PrimitiveSerializer<Profile> {
               serializers.deserialize(value, specifiedType: const FullType(bool)) as bool;
           result.isAnonymous = valueDes;
           break;
+        case r'encryption':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ProfileEncryptionEnum),
+          ) as ProfileEncryptionEnum;
+          result.encryption = valueDes;
+          break;
         default:
           unhandled.add(key);
           unhandled.add(value);
@@ -171,4 +189,18 @@ class _$ProfileSerializer implements PrimitiveSerializer<Profile> {
     );
     return result.build();
   }
+}
+
+class ProfileEncryptionEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'plain')
+  static const ProfileEncryptionEnum plain = _$profileEncryptionEnum_plain;
+  @BuiltValueEnumConst(wireName: r'preview')
+  static const ProfileEncryptionEnum preview = _$profileEncryptionEnum_preview;
+
+  static Serializer<ProfileEncryptionEnum> get serializer => _$profileEncryptionEnumSerializer;
+
+  const ProfileEncryptionEnum._(String name) : super(name);
+
+  static BuiltSet<ProfileEncryptionEnum> get values => _$profileEncryptionEnumValues;
+  static ProfileEncryptionEnum valueOf(String name) => _$profileEncryptionEnumValueOf(name);
 }

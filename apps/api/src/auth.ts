@@ -20,7 +20,7 @@ import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { anonymous, bearer, emailOTP, jwt } from "better-auth/plugins";
-import { apiPathPrefix, type Config } from "./config.ts";
+import { apiPathPrefix, type Config, isPreviewAccount } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
 import { clientHeader } from "./http/client-headers.ts";
@@ -540,7 +540,9 @@ export function createAuth(deps: AppDeps) {
                 : "EUR";
             // Every account starts with the suggested categories, named in the sign-up's language
             // (`x-wambito-locale`, else the browser's), so a person who leaves the welcome halfway
-            // still has them. The welcome then shows them as the person's own.
+            // still has them. The welcome then shows them as the person's own. A preview account
+            // keeps its finances only as encrypted records: the web creates them there instead.
+            if (isPreviewAccount(config, created.id)) return;
             const { locale } = guestDefaults(headers);
             await withUser(deps.db, created.id, async (tx) => {
               await tx.insert(accounts).values({

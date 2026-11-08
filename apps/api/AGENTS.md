@@ -85,6 +85,12 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
+- End-to-end encryption preview (stage 2a): `E2E_PREVIEW_USER_IDS` (comma-separated user ids,
+  unset by default; `isPreviewAccount` in `config.ts`). `GET /v1/me` (every profile answer) says
+  `encryption: "preview" | "plain"`. A preview account's finances live only as records under
+  `/v2`; the user-create hook in `auth.ts` seeds no default account or categories for it (the web
+  creates them as records), so its `/v1` finance tables stay empty. `DELETE /v1/me` still works:
+  `records`, `key_wraps`, `record_purges` and `pairing_requests` cascade from `user`.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

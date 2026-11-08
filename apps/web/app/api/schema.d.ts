@@ -964,6 +964,8 @@ export interface components {
             onboardingCompletedAt: string | null;
             currency: string;
             isAnonymous: boolean;
+            /** @enum {string} */
+            encryption: "plain" | "preview";
         };
         UpdateProfile: {
             timezone?: string;

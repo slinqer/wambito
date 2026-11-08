@@ -144,6 +144,15 @@ const configSchema = z
       .default("")
       .transform((v) => csv(v)),
     /**
+     * Comma-separated user ids in the end-to-end encryption preview (stage 2a): `GET /v1/me` says
+     * `encryption: "preview"` for them, their finances live only as encrypted records (`/v2`), and
+     * sign-up seeds no finance rows for them. Unset or blank: nobody.
+     */
+    E2E_PREVIEW_USER_IDS: z
+      .string()
+      .default("")
+      .transform((v) => csv(v)),
+    /**
      * Optional comma-separated IPs/CIDRs the admin panel answers to (matched against the client
      * address, see `clientIp`). Blank or unset: any address.
      */
@@ -220,6 +229,14 @@ export type Config = z.infer<typeof configSchema>;
  */
 export function apiPathPrefix(config: Pick<Config, "API_URL">): string {
   return new URL(config.API_URL).pathname.replace(/\/+$/, "");
+}
+
+/** Whether the account keeps its finances only as encrypted records (`E2E_PREVIEW_USER_IDS`). */
+export function isPreviewAccount(
+  config: Pick<Config, "E2E_PREVIEW_USER_IDS">,
+  userId: string,
+): boolean {
+  return config.E2E_PREVIEW_USER_IDS.includes(userId);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {

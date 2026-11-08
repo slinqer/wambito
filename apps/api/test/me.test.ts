@@ -44,6 +44,7 @@ test("profile can be read and updated", async () => {
     onboardingCompletedAt: expect.any(String),
     currency: "EUR",
     isAnonymous: false,
+    encryption: "plain",
   });
 });
 

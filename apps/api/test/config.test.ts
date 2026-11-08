@@ -204,6 +204,15 @@ describe("admin settings", () => {
     expect(loadConfig({ ...dev, ADMIN_USER_IDS: "" }).ADMIN_USER_IDS).toEqual([]);
   });
 
+  test("E2E_PREVIEW_USER_IDS is trimmed, empties dropped, unset is []", () => {
+    expect(loadConfig({ ...dev, E2E_PREVIEW_USER_IDS: " a,b ,," }).E2E_PREVIEW_USER_IDS).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(loadConfig(dev).E2E_PREVIEW_USER_IDS).toEqual([]);
+    expect(loadConfig({ ...dev, E2E_PREVIEW_USER_IDS: "" }).E2E_PREVIEW_USER_IDS).toEqual([]);
+  });
+
   test("ADMIN_ALLOWED_IPS takes IPs and CIDRs; blank means none", () => {
     expect(
       loadConfig({ ...dev, ADMIN_ALLOWED_IPS: "1.2.3.4,10.0.0.0/8" }).ADMIN_ALLOWED_IPS,

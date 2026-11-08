@@ -20,6 +20,7 @@ import {
   overEmailLimit,
   sendClaimCode,
 } from "../auth.ts";
+import { isPreviewAccount } from "../config.ts";
 import type { AppDeps } from "../deps.ts";
 import { isUniqueViolation } from "../http/db-errors.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
@@ -40,6 +41,11 @@ const profileDto = z
     currency: z.string(),
     /** A guest: signed up on the app without an email (its `email` is a placeholder until claimed). */
     isAnonymous: z.boolean(),
+    /**
+     * `preview`: the account keeps its finances only as end-to-end encrypted records (`/v2`), and
+     * its `/v1` finance routes stay empty; `plain`: every other account.
+     */
+    encryption: z.enum(["plain", "preview"]),
   })
   .openapi("Profile");
 
@@ -106,6 +112,7 @@ async function profile(deps: AppDeps, userId: string) {
     ...row,
     onboardingCompletedAt: row.onboardingCompletedAt?.toISOString() ?? null,
     currency: account?.currency ?? "EUR",
+    encryption: isPreviewAccount(deps.config, userId) ? ("preview" as const) : ("plain" as const),
   };
 }
 

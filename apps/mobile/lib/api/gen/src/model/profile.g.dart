@@ -6,6 +6,63 @@ part of 'profile.dart';
 // BuiltValueGenerator
 // **************************************************************************
 
+const ProfileEncryptionEnum _$profileEncryptionEnum_plain = const ProfileEncryptionEnum._('plain');
+const ProfileEncryptionEnum _$profileEncryptionEnum_preview = const ProfileEncryptionEnum._(
+  'preview',
+);
+
+ProfileEncryptionEnum _$profileEncryptionEnumValueOf(String name) {
+  switch (name) {
+    case 'plain':
+      return _$profileEncryptionEnum_plain;
+    case 'preview':
+      return _$profileEncryptionEnum_preview;
+    default:
+      throw ArgumentError(name);
+  }
+}
+
+final BuiltSet<ProfileEncryptionEnum> _$profileEncryptionEnumValues =
+    BuiltSet<ProfileEncryptionEnum>(const <ProfileEncryptionEnum>[
+      _$profileEncryptionEnum_plain,
+      _$profileEncryptionEnum_preview,
+    ]);
+
+Serializer<ProfileEncryptionEnum> _$profileEncryptionEnumSerializer =
+    _$ProfileEncryptionEnumSerializer();
+
+class _$ProfileEncryptionEnumSerializer implements PrimitiveSerializer<ProfileEncryptionEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'plain': 'plain',
+    'preview': 'preview',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'plain': 'plain',
+    'preview': 'preview',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[ProfileEncryptionEnum];
+  @override
+  final String wireName = 'ProfileEncryptionEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    ProfileEncryptionEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  ProfileEncryptionEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => ProfileEncryptionEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$Profile extends Profile {
   @override
   final String id;
@@ -21,6 +78,8 @@ class _$Profile extends Profile {
   final String currency;
   @override
   final bool isAnonymous;
+  @override
+  final ProfileEncryptionEnum encryption;
 
   factory _$Profile([void Function(ProfileBuilder)? updates]) =>
       (ProfileBuilder()..update(updates))._build();
@@ -33,6 +92,7 @@ class _$Profile extends Profile {
     this.onboardingCompletedAt,
     required this.currency,
     required this.isAnonymous,
+    required this.encryption,
   }) : super._();
   @override
   Profile rebuild(void Function(ProfileBuilder) updates) => (toBuilder()..update(updates)).build();
@@ -50,7 +110,8 @@ class _$Profile extends Profile {
         locale == other.locale &&
         onboardingCompletedAt == other.onboardingCompletedAt &&
         currency == other.currency &&
-        isAnonymous == other.isAnonymous;
+        isAnonymous == other.isAnonymous &&
+        encryption == other.encryption;
   }
 
   @override
@@ -63,6 +124,7 @@ class _$Profile extends Profile {
     _$hash = $jc(_$hash, onboardingCompletedAt.hashCode);
     _$hash = $jc(_$hash, currency.hashCode);
     _$hash = $jc(_$hash, isAnonymous.hashCode);
+    _$hash = $jc(_$hash, encryption.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -76,7 +138,8 @@ class _$Profile extends Profile {
           ..add('locale', locale)
           ..add('onboardingCompletedAt', onboardingCompletedAt)
           ..add('currency', currency)
-          ..add('isAnonymous', isAnonymous))
+          ..add('isAnonymous', isAnonymous)
+          ..add('encryption', encryption))
         .toString();
   }
 }
@@ -113,6 +176,10 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
   bool? get isAnonymous => _$this._isAnonymous;
   set isAnonymous(bool? isAnonymous) => _$this._isAnonymous = isAnonymous;
 
+  ProfileEncryptionEnum? _encryption;
+  ProfileEncryptionEnum? get encryption => _$this._encryption;
+  set encryption(ProfileEncryptionEnum? encryption) => _$this._encryption = encryption;
+
   ProfileBuilder() {
     Profile._defaults(this);
   }
@@ -127,6 +194,7 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
       _onboardingCompletedAt = $v.onboardingCompletedAt;
       _currency = $v.currency;
       _isAnonymous = $v.isAnonymous;
+      _encryption = $v.encryption;
       _$v = null;
     }
     return this;
@@ -160,6 +228,7 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
             r'Profile',
             'isAnonymous',
           ),
+          encryption: BuiltValueNullFieldError.checkNotNull(encryption, r'Profile', 'encryption'),
         );
     replace(_$result);
     return _$result;

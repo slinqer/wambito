@@ -28,6 +28,7 @@ How to add to it:
 - `POST /v2/pairing`, `GET /v2/pairing?code=`, `POST /v2/pairing/{id}/seal`, `GET /v2/pairing/{id}`, `POST /v2/pairing/{id}/pickup` (`startPairing`, `findPairing`, `sealPairing`, `getPairing`, `pickupPairing`): relay to approve a new device from an unlocked one, opaque bytes only, not yet used by clients. See Changed for the commitment flow.
 - `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match (ask for it on the first page only).
 - MCP `list_transactions`: `text` and `category` take lists, plus `kind` and `match`; it returns `totals` (count, expense, income), which include pending and to-review movements (pass `status: "paid"` for money already spent).
+- `GET /v1/me` (and every profile answer): `encryption`, `"plain"` or `"preview"`. `preview` marks an account in the end-to-end encryption preview (env `E2E_PREVIEW_USER_IDS`, comma-separated user ids, unset by default): its finances live only as encrypted records under `/v2`, its `/v1` finance routes stay empty, and signing up seeds no default account or categories for it (the web creates them as records).
 
 ### Changed
 
