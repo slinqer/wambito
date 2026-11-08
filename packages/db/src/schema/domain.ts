@@ -309,12 +309,17 @@ export const keyWraps = pgTable(
     keyV: smallint("key_v").notNull(),
     wrapped: bytea("wrapped").notNull(),
     publicKey: bytea("public_key"),
+    attestation: bytea("attestation"),
     label: text("label"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   },
   (t) => [
     check("key_wraps_kind", sql`${t.kind} in ('passkey', 'recovery', 'device', 'assistant')`),
+    check(
+      "key_wraps_device_attestation",
+      sql`${t.kind} <> 'device' or (${t.attestation} is not null and octet_length(${t.attestation}) = 32 and ${t.publicKey} is not null and octet_length(${t.publicKey}) = 32)`,
+    ),
     uniqueIndex("key_wraps_one_recovery").on(t.userId).where(sql`${t.kind} = 'recovery'`),
     uniqueIndex("key_wraps_ref").on(t.userId, t.kind, t.ref).where(sql`${t.ref} is not null`),
   ],
@@ -327,12 +332,34 @@ export const pairingRequests = pgTable(
     id: id(),
     userId: userId(),
     code: text("code").notNull(),
-    publicKey: bytea("public_key").notNull(),
+    commitment: bytea("commitment").notNull(),
+    approverKey: bytea("approver_key"),
+    publicKey: bytea("public_key"),
+    keyV: smallint("key_v"),
     sealed: bytea("sealed"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [uniqueIndex("pairing_requests_code").on(t.userId, t.code)],
+  (t) => [
+    uniqueIndex("pairing_requests_code").on(t.userId, t.code),
+    check("pairing_requests_commitment_len", sql`octet_length(${t.commitment}) = 32`),
+    check(
+      "pairing_requests_approver_key_len",
+      sql`${t.approverKey} is null or octet_length(${t.approverKey}) = 32`,
+    ),
+    check(
+      "pairing_requests_public_key_len",
+      sql`${t.publicKey} is null or octet_length(${t.publicKey}) = 32`,
+    ),
+  ],
 );
+
+/** Highest record version whose tombstones were purged, per person: older clients must resync. */
+export const recordPurges = pgTable("record_purges", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  throughVersion: bigint("through_version", { mode: "number" }).notNull(),
+});
 
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [
@@ -347,4 +374,5 @@ export const RLS_TABLES = [
   "records",
   "key_wraps",
   "pairing_requests",
+  "record_purges",
 ] as const;

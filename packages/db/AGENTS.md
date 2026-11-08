@@ -25,6 +25,9 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
 - `records`, `key_wraps`, `pairing_requests` (0010) are the end-to-end encrypted store: `body`/`wrapped`
   are opaque `bytea` (the `bytea` custom type gives `Uint8Array`); `records.version` comes from
   `records_version_seq`, raised on every write with `set version = nextval('records_version_seq')`.
+- `0011` adds the pairing `commitment`/`approver_key`/`key_v` columns, `key_wraps.attestation`
+  (device wraps need it, 32 bytes) and `record_purges` (`user_id` primary key, `through_version`:
+  the highest purged tombstone version, so older clients resync), with RLS like `records`.
 - In production `docker compose run --rm migrate` (`deploy/personal/up.sh`) runs bootstrap +
   migrations.
 
