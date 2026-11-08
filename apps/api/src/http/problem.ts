@@ -27,6 +27,7 @@ const TITLES: Record<number, string> = {
   403: "Forbidden",
   404: "Not Found",
   409: "Conflict",
+  410: "Gone",
   413: "Payload Too Large",
   422: "Unprocessable Content",
   429: "Too Many Requests",
@@ -47,6 +48,26 @@ export function problem(c: Context, error: ApiError): Response {
   });
 }
 
+/**
+ * What may be logged of an unexpected error. A Drizzle query error carries the statement's bound
+ * `params` (opaque encrypted bytes, keys, commitments) in its `message`, `query`, `params`, and
+ * `cause`; those are never logged, only the error's name, the Postgres code and the first line
+ * of the message before the parameters.
+ */
+export function safeLogFields(err: unknown): unknown {
+  const params = (err as { params?: unknown } | null)?.params;
+  const isQueryError =
+    err instanceof Error && (err.name === "DrizzleQueryError" || Array.isArray(params));
+  if (!isQueryError) return err;
+  const cause = (err as { cause?: { code?: unknown; name?: unknown } }).cause;
+  return {
+    name: err.name,
+    message: "database query failed",
+    code: typeof cause?.code === "string" ? cause.code : undefined,
+    causeName: typeof cause?.name === "string" ? cause.name : undefined,
+  };
+}
+
 export function onError(err: Error, c: Context): Response {
   if (err instanceof ApiError) return problem(c, err);
   if (err instanceof HTTPException) {
@@ -55,7 +76,7 @@ export function onError(err: Error, c: Context): Response {
       new ApiError(err.status, err.status === 400 ? "bad_request" : "http_error", err.message),
     );
   }
-  console.error(err);
+  console.error(safeLogFields(err));
   return problem(c, new ApiError(500, "internal_error"));
 }
 

@@ -170,7 +170,13 @@
   "errors": {
     "record_limit": "This account has reached its limit of saved records.",
     "key_version_mismatch": "The data key version changed. Refresh and try again.",
+    "attestation_required": "This device's key is missing its proof. Remove the device and add it again.",
+    "resync_required": "Some deleted items were cleaned up on the server. Your data is being downloaded again.",
     "already_sealed": "This request was already approved.",
+    "already_set": "This step was already done for this request.",
+    "not_ready": "The other device isn't ready yet. Wait a moment and try again.",
+    "commitment_mismatch": "The new device's key doesn't match what it first sent. Start the pairing again.",
+    "approver_mismatch": "The approval didn't come from this device's key. Start the pairing again.",
     "id_taken": "That item can't be saved. Please try again.",
     "payload_too_large": "That is too much to send at once.",
     "recovery_required": "The recovery key can't be removed, only replaced.",

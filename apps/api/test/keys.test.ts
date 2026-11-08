@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { keyWraps, passkey } from "@wambito/db";
-import { eq } from "@wambito/db/orm";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { eq, sql } from "@wambito/db/orm";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { createTestApp, type TestApp } from "./harness.ts";
 import { createSoftPasskey } from "./soft-passkey.ts";
 
@@ -13,6 +13,7 @@ interface KeyWrap {
   keyV: number;
   wrapped: string;
   publicKey: string | null;
+  attestation: string | null;
   label: string | null;
   createdAt: string;
   lastUsedAt: string | null;
@@ -23,6 +24,7 @@ interface WrapInput {
   keyV: number;
   wrapped: string;
   publicKey?: string | null;
+  attestation?: string | null;
   label?: string | null;
 }
 
@@ -54,6 +56,7 @@ const device = (keyV = 1, overrides: Partial<WrapInput> = {}): WrapInput => ({
   keyV,
   wrapped: bytes(80),
   publicKey: bytes(32, 9),
+  attestation: bytes(32, 5),
   label: "Pixel 9",
   ...overrides,
 });
@@ -96,6 +99,7 @@ describe("/v2/keys", () => {
       keyV: 3,
       wrapped: bytes(80),
       publicKey: bytes(32, 9),
+      attestation: bytes(32, 5),
       label: "Pixel 9",
       lastUsedAt: null,
     });
@@ -198,6 +202,30 @@ describe("/v2/keys", () => {
     expect((await put(headers, wrap(clientId))).ref).toBe(clientId);
   });
 
+  test("a device wrap needs a public key and an attestation", async () => {
+    const { headers } = await person();
+    await put(headers, recovery(1));
+    const missing = async (body: unknown) =>
+      expectProblem(await putRaw(headers, randomUUID(), body), 422, "attestation_required");
+
+    await missing({ ...device(), publicKey: undefined });
+    await missing({ ...device(), publicKey: null });
+    await missing({ ...device(), attestation: undefined });
+    await missing({ ...device(), attestation: null });
+    await expectProblem(
+      await rotateRaw(headers, {
+        keyV: 2,
+        wraps: [
+          { id: randomUUID(), ...recovery(2) },
+          { id: randomUUID(), ...device(2, { attestation: null }) },
+        ],
+      }),
+      422,
+      "attestation_required",
+    );
+    expect(await list(headers)).toHaveLength(1);
+  });
+
   test("validates kinds, refs and byte lengths", async () => {
     const { headers } = await person();
     await put(headers, recovery(1));
@@ -205,10 +233,10 @@ describe("/v2/keys", () => {
       expectProblem(await putRaw(headers, randomUUID(), body), 422, "validation_failed");
 
     await invalid({ ...device(), kind: "other" });
-    await invalid({ ...device(), publicKey: undefined });
-    await invalid({ ...device(), publicKey: null });
     await invalid({ ...device(), publicKey: bytes(31) });
     await invalid({ ...device(), publicKey: bytes(33) });
+    await invalid({ ...device(), attestation: bytes(31) });
+    await invalid({ ...device(), attestation: bytes(33) });
     await invalid({ ...device(), ref: null });
     await invalid({ ...device(), wrapped: "" });
     await invalid({ ...device(), wrapped: bytes(1025) });
@@ -216,6 +244,7 @@ describe("/v2/keys", () => {
     await invalid({ ...device(), label: "x".repeat(101) });
     await invalid({ ...recovery(), ref: "something" });
     await invalid({ ...recovery(), publicKey: bytes(32) });
+    await invalid({ ...recovery(), attestation: bytes(32) });
     await expectProblem(await putRaw(headers, "not-a-uuid", device()), 422, "validation_failed");
     // Ids are lower-case UUIDs, as they enter the associated data; never lower-cased for you.
     const upper = randomUUID().toUpperCase();
@@ -503,5 +532,30 @@ describe("/v2/keys", () => {
     // A's keyV is not B's.
     await put(a.headers, device(1));
     expect(await list(a.headers)).toHaveLength(3);
+  });
+
+  test("a database failure logs no wrapped bytes", async () => {
+    const { headers } = await person();
+    const marker = Buffer.from("MARKER-keys-4c1b-do-not-log!!!!!!!!!!!!!!!!!").toString(
+      "base64url",
+    );
+    await t.admin.execute(sql`create or replace function fail_wrap_insert() returns trigger
+      language plpgsql as $$ begin raise exception 'forced failure'; end $$`);
+    await t.admin.execute(sql`create trigger fail_wrap before insert on key_wraps
+      for each row execute function fail_wrap_insert()`);
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+    try {
+      const res = await putRaw(headers, randomUUID(), recovery(1, { wrapped: marker }));
+      expect(res.status).toBe(500);
+      const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+      expect(logged).toContain("database query failed");
+      expect(logged).not.toContain("MARKER-keys");
+      expect(logged).not.toContain(marker);
+    } finally {
+      vi.restoreAllMocks();
+      await t.admin.execute(sql`drop trigger fail_wrap on key_wraps`);
+    }
   });
 });

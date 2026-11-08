@@ -16,15 +16,19 @@ API tests.
   `wambito/v1/wrap/<kind>`, AAD `wambito/v1/wrap/<kind>/<user id>/<key_v>`), `PRF_SALT`.
 - `src/recovery.ts`: recovery secret, 26 Crockford chars + a Luhn mod 32 check character over the
   Crockford alphabet, groups of four.
-- `src/devices.ts`: X25519 device keys, `sealToDevice` / `openFromDevice`; WebCrypto X25519 when
+- `src/devices.ts`: X25519 device keys, `sealToDevice` (optional fixed ephemeral pair) / `openFromDevice` / `openFromPairing` (also checks the
+  blob starts with the approver key); WebCrypto X25519 when
   present, `@noble/curves` otherwise (feature-detected at first use).
 - Device private keys have two forms (`DevicePrivateKey`): a non-extractable WebCrypto `CryptoKey`,
   or, only where WebCrypto lacks X25519, `{ kind: "noble-x25519", raw }`, clone-safe but a raw
   secret the web must protect. `userId` is the account's exact id (Better Auth: `/^[A-Za-z0-9_-]{1,128}$/`, case kept, no `/`); record `id`s are lower-case UUIDs. Both enter the AAD verbatim.
-- `src/pairing.ts`: pairing code and the 6-digit number (async: WebCrypto SHA-256). The API uses
+- `src/pairing.ts`: pairing code, the 6-digit number and `pairingCommitment`
+  (SHA-256(`wambito/v1/pairing-commit` || key); async: WebCrypto SHA-256). The API uses
   `pairingCode` in production (`apps/api/src/services/pairing.ts`), not only in tests.
+- `src/attest.ts`: `deviceAttestation` / `verifyDeviceAttestation` (HMAC under HKDF info
+  `wambito/v1/device-attest`; design: stage 1b spec section 2).
 - `src/validate.ts`: user id, UUID, key version, nonce checks (`bad_input`).
-- `src/bytes.ts`: base64url. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
+- `src/bytes.ts`: base64url, `timingSafeEqual`. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
   `bad_input`).
 
 ## Test
@@ -40,3 +44,8 @@ API tests.
 - Any change to a format (infos, associated data, padding, body layout) needs a new `enc_v` and
   updated test vectors; the Dart implementation must pass the same vectors.
 - No other crypto dependency without a design change (`@noble/curves` is the X25519 fallback).
+- Pairing clients must pin values, or the server can still grind a matching number (stage 1b spec
+  section 1). The approving device keeps the `commitment` it read from `GET /v2/pairing?code=`,
+  read before it posts its key, and never re-reads it. The new device keeps the first
+  `approverKey` it sees, uses that one in `pairingNumber` and `openFromPairing`, and aborts if a
+  later poll shows another. Both devices always compare the number, QR or not.

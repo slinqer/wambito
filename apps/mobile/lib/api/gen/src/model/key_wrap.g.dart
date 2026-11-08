@@ -85,6 +85,8 @@ class _$KeyWrap extends KeyWrap {
   @override
   final String? publicKey;
   @override
+  final String? attestation;
+  @override
   final String? label;
   @override
   final String createdAt;
@@ -101,6 +103,7 @@ class _$KeyWrap extends KeyWrap {
     required this.keyV,
     required this.wrapped,
     this.publicKey,
+    this.attestation,
     this.label,
     required this.createdAt,
     this.lastUsedAt,
@@ -121,6 +124,7 @@ class _$KeyWrap extends KeyWrap {
         keyV == other.keyV &&
         wrapped == other.wrapped &&
         publicKey == other.publicKey &&
+        attestation == other.attestation &&
         label == other.label &&
         createdAt == other.createdAt &&
         lastUsedAt == other.lastUsedAt;
@@ -135,6 +139,7 @@ class _$KeyWrap extends KeyWrap {
     _$hash = $jc(_$hash, keyV.hashCode);
     _$hash = $jc(_$hash, wrapped.hashCode);
     _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jc(_$hash, attestation.hashCode);
     _$hash = $jc(_$hash, label.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, lastUsedAt.hashCode);
@@ -151,6 +156,7 @@ class _$KeyWrap extends KeyWrap {
           ..add('keyV', keyV)
           ..add('wrapped', wrapped)
           ..add('publicKey', publicKey)
+          ..add('attestation', attestation)
           ..add('label', label)
           ..add('createdAt', createdAt)
           ..add('lastUsedAt', lastUsedAt))
@@ -185,6 +191,10 @@ class KeyWrapBuilder implements Builder<KeyWrap, KeyWrapBuilder> {
   String? get publicKey => _$this._publicKey;
   set publicKey(String? publicKey) => _$this._publicKey = publicKey;
 
+  String? _attestation;
+  String? get attestation => _$this._attestation;
+  set attestation(String? attestation) => _$this._attestation = attestation;
+
   String? _label;
   String? get label => _$this._label;
   set label(String? label) => _$this._label = label;
@@ -210,6 +220,7 @@ class KeyWrapBuilder implements Builder<KeyWrap, KeyWrapBuilder> {
       _keyV = $v.keyV;
       _wrapped = $v.wrapped;
       _publicKey = $v.publicKey;
+      _attestation = $v.attestation;
       _label = $v.label;
       _createdAt = $v.createdAt;
       _lastUsedAt = $v.lastUsedAt;
@@ -241,6 +252,7 @@ class KeyWrapBuilder implements Builder<KeyWrap, KeyWrapBuilder> {
           keyV: BuiltValueNullFieldError.checkNotNull(keyV, r'KeyWrap', 'keyV'),
           wrapped: BuiltValueNullFieldError.checkNotNull(wrapped, r'KeyWrap', 'wrapped'),
           publicKey: publicKey,
+          attestation: attestation,
           label: label,
           createdAt: BuiltValueNullFieldError.checkNotNull(createdAt, r'KeyWrap', 'createdAt'),
           lastUsedAt: lastUsedAt,

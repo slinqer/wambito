@@ -5,6 +5,7 @@ import {
   type Db,
   keyWraps,
   pairingRequests,
+  recordPurges,
   records,
   user,
   withUser,
@@ -34,12 +35,14 @@ const wrap = (userId: string, id: string) => ({
   ref: `device-${id}`,
   keyV: 1,
   wrapped: bytes(9, 9),
+  publicKey: new Uint8Array(32).fill(1),
+  attestation: new Uint8Array(32).fill(2),
 });
 const pairing = (userId: string, id: string) => ({
   id,
   userId,
   code: `code-${id}`,
-  publicKey: bytes(7),
+  commitment: new Uint8Array(32).fill(5),
   expiresAt: new Date(Date.now() + 60_000),
 });
 
@@ -61,6 +64,7 @@ beforeAll(async () => {
     await tx.insert(records).values(record("user-b", B));
     await tx.insert(keyWraps).values(wrap("user-b", B));
     await tx.insert(pairingRequests).values(pairing("user-b", B));
+    await tx.insert(recordPurges).values({ userId: "user-b", throughVersion: 5 });
   });
 }, 120_000);
 
@@ -180,5 +184,120 @@ describe("key_wraps", () => {
       ),
     );
     expect(dup).toMatch(/duplicate key/);
+  });
+});
+
+describe("record_purges", () => {
+  test("user A cannot see, update or delete B's row", async () => {
+    expect(await withUser(app.db, "user-a", (tx) => tx.select().from(recordPurges))).toEqual([]);
+    const updated = await withUser(app.db, "user-a", (tx) =>
+      tx
+        .update(recordPurges)
+        .set({ throughVersion: 99 })
+        .where(eq(recordPurges.userId, "user-b"))
+        .returning(),
+    );
+    expect(updated).toEqual([]);
+    const deleted = await withUser(app.db, "user-a", (tx) =>
+      tx.delete(recordPurges).where(eq(recordPurges.userId, "user-b")).returning(),
+    );
+    expect(deleted).toEqual([]);
+    const own = await withUser(app.db, "user-b", (tx) => tx.select().from(recordPurges));
+    expect(own).toEqual([{ userId: "user-b", throughVersion: 5 }]);
+  });
+
+  test("cannot insert for someone else", async () => {
+    const e = await rlsError(
+      withUser(app.db, "user-a", (tx) =>
+        tx.insert(recordPurges).values({ userId: "user-b", throughVersion: 1 }),
+      ),
+    );
+    expect(e).toMatch(/row-level security/);
+  });
+
+  test("has one row per person", async () => {
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(recordPurges).values({ userId: "user-a", throughVersion: 1 }),
+    );
+    const dup = await rlsError(
+      withUser(app.db, "user-a", (tx) =>
+        tx.insert(recordPurges).values({ userId: "user-a", throughVersion: 2 }),
+      ),
+    );
+    expect(dup).toMatch(/duplicate key/);
+  });
+});
+
+describe("key_wraps attestation", () => {
+  const dev = (id: string, extra: Record<string, unknown>) => ({
+    ...wrap("user-a", id),
+    publicKey: new Uint8Array(32).fill(1),
+    attestation: new Uint8Array(32).fill(2),
+    ...extra,
+  });
+  const insert = (v: ReturnType<typeof dev>) =>
+    rlsError(withUser(app.db, "user-a", (tx) => tx.insert(keyWraps).values(v)));
+
+  test("a device wrap needs a 32-byte attestation and a 32-byte public key", async () => {
+    expect(
+      await insert(dev("a0000000-0000-4000-8000-000000000001", { attestation: null })),
+    ).toMatch(/check constraint/);
+    expect(
+      await insert(dev("a0000000-0000-4000-8000-000000000002", { attestation: bytes(1) })),
+    ).toMatch(/check constraint/);
+    expect(await insert(dev("a0000000-0000-4000-8000-000000000003", { publicKey: null }))).toMatch(
+      /check constraint/,
+    );
+    expect(
+      await insert(dev("a0000000-0000-4000-8000-000000000004", { publicKey: bytes(1) })),
+    ).toMatch(/check constraint/);
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(keyWraps).values(dev("a0000000-0000-4000-8000-000000000005", {})),
+    );
+  });
+
+  test("other kinds do not need one", async () => {
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(keyWraps).values({
+        ...wrap("user-a", "a0000000-0000-4000-8000-000000000006"),
+        kind: "passkey",
+        ref: "pk",
+      }),
+    );
+  });
+});
+
+describe("pairing_requests columns", () => {
+  const ins = (id: string, extra: Record<string, unknown>) =>
+    rlsError(
+      withUser(app.db, "user-a", (tx) =>
+        tx.insert(pairingRequests).values({ ...pairing("user-a", id), ...extra }),
+      ),
+    );
+
+  test("commitment is required and 32 bytes", async () => {
+    expect(await ins("b0000000-0000-4000-8000-000000000001", { commitment: bytes(1) })).toMatch(
+      /check constraint/,
+    );
+    expect(await ins("b0000000-0000-4000-8000-000000000002", { commitment: null })).toMatch(
+      /not-null|null value/,
+    );
+  });
+
+  test("approver key and public key are 32 bytes when set", async () => {
+    expect(await ins("b0000000-0000-4000-8000-000000000003", { approverKey: bytes(1) })).toMatch(
+      /check constraint/,
+    );
+    expect(await ins("b0000000-0000-4000-8000-000000000004", { publicKey: bytes(1) })).toMatch(
+      /check constraint/,
+    );
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(pairingRequests).values({
+        ...pairing("user-a", "b0000000-0000-4000-8000-000000000005"),
+        approverKey: new Uint8Array(32).fill(3),
+        publicKey: new Uint8Array(32).fill(4),
+        keyV: 1,
+      }),
+    );
   });
 });

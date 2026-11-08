@@ -58,7 +58,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/{id}",
       operationId: "putKeyWrap",
       description:
-        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's.",
+        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's.",
       request: { params: idParam, body: jsonBody(PutKeyWrap) },
       responses: { 200: jsonResponse(KeyWrap, "The stored wrap"), ...problems(409, 422) },
     }),
@@ -90,7 +90,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/rotate",
       operationId: "rotateKeys",
       description:
-        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Records are re-encrypted through `/v2/sync` afterwards.",
+        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. Records are re-encrypted through `/v2/sync` afterwards.",
       request: { body: jsonBody(RotateKeys) },
       responses: { 200: jsonResponse(KeyWraps, "The new wraps"), ...problems(409, 422) },
     }),

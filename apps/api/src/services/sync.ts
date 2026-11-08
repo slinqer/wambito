@@ -1,4 +1,4 @@
-import { type Db, records, type Tx, user, withUser } from "@wambito/db";
+import { type Db, recordPurges, records, type Tx, user, withUser } from "@wambito/db";
 import { and, asc, eq, gt, lte, sql } from "@wambito/db/orm";
 import type { SyncHooks } from "../deps.ts";
 import { ApiError } from "../http/problem.ts";
@@ -74,12 +74,17 @@ async function lockRecords(tx: Tx, userId: string): Promise<void> {
  * The person's records with a version above `since`, oldest first, at most `limit`. `latest` is
  * read first and caps the page, so a record committed while this runs never makes `latest` skip
  * past one this page did not return.
+ *
+ * `base` is the `latest` the pull cycle started from (0 for a full download; `since` when
+ * omitted). Only the base decides 410 `resync_required`: `0 < base < through_version`. Paging a
+ * full download (`base=0`) never trips it, though its cursors fall below the mark.
  */
 export async function pullRecords(
   db: Db,
   userId: string,
   since: number,
   limit: number,
+  base: number = since,
 ): Promise<{ records: SyncRecordDto[]; next: number | null; latest: number }> {
   return withUser(db, userId, async (tx) => {
     const [top] = await tx
@@ -95,6 +100,22 @@ export async function pullRecords(
       )
       .orderBy(asc(records.version))
       .limit(limit + 1);
+    // Read after the records, not before: a purge that committed before the records snapshot is
+    // then always visible here, so a pull cannot return a page that lacks the purged tombstones
+    // while passing the check (a purge deletes rows and raises the mark in one transaction).
+    if (base > 0) {
+      const [purge] = await tx
+        .select({ through: recordPurges.throughVersion })
+        .from(recordPurges)
+        .where(eq(recordPurges.userId, userId));
+      if (purge && base < purge.through) {
+        throw new ApiError(
+          410,
+          "resync_required",
+          "Deleted records were purged since this version; download everything again",
+        );
+      }
+    }
     const page = rows.slice(0, limit);
     const last = page.at(-1);
     return {
@@ -293,7 +314,18 @@ export async function purgeTombstones(db: Db, now: Date): Promise<number> {
               sql`${records.updatedAt} < ${cutoff.toISOString()}`,
             ),
           )
-          .returning({ id: records.id });
+          .returning({ id: records.id, version: records.version });
+        if (deleted.length === 0) return 0;
+        const through = deleted.reduce((max, row) => Math.max(max, row.version), 0);
+        await tx
+          .insert(recordPurges)
+          .values({ userId: id, throughVersion: through })
+          .onConflictDoUpdate({
+            target: recordPurges.userId,
+            set: {
+              throughVersion: sql`greatest(${recordPurges.throughVersion}, excluded.through_version)`,
+            },
+          });
         return deleted.length;
       });
     }

@@ -11,12 +11,17 @@ part 'pairing_pickup.g.dart';
 /// PairingPickup
 ///
 /// Properties:
-/// * [sealed_] - base64url; null until the other device seals
+/// * [sealed_] - base64url
+/// * [keyV] - The data key version the seal is bound to
 @BuiltValue()
 abstract class PairingPickup implements Built<PairingPickup, PairingPickupBuilder> {
-  /// base64url; null until the other device seals
+  /// base64url
   @BuiltValueField(wireName: r'sealed')
-  String? get sealed_;
+  String get sealed_;
+
+  /// The data key version the seal is bound to
+  @BuiltValueField(wireName: r'keyV')
+  int get keyV;
 
   PairingPickup._();
 
@@ -42,9 +47,9 @@ class _$PairingPickupSerializer implements PrimitiveSerializer<PairingPickup> {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
     yield r'sealed';
-    yield object.sealed_ == null
-        ? null
-        : serializers.serialize(object.sealed_, specifiedType: const FullType.nullable(String));
+    yield serializers.serialize(object.sealed_, specifiedType: const FullType(String));
+    yield r'keyV';
+    yield serializers.serialize(object.keyV, specifiedType: const FullType(int));
   }
 
   @override
@@ -69,12 +74,14 @@ class _$PairingPickupSerializer implements PrimitiveSerializer<PairingPickup> {
       final value = serializedList[i + 1];
       switch (key) {
         case r'sealed':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
+          final valueDes =
+              serializers.deserialize(value, specifiedType: const FullType(String)) as String;
           result.sealed_ = valueDes;
+          break;
+        case r'keyV':
+          final valueDes =
+              serializers.deserialize(value, specifiedType: const FullType(int)) as int;
+          result.keyV = valueDes;
           break;
         default:
           unhandled.add(key);

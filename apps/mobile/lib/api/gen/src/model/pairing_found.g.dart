@@ -10,14 +10,14 @@ class _$PairingFound extends PairingFound {
   @override
   final String id;
   @override
-  final String publicKey;
+  final String commitment;
   @override
   final String expiresAt;
 
   factory _$PairingFound([void Function(PairingFoundBuilder)? updates]) =>
       (PairingFoundBuilder()..update(updates))._build();
 
-  _$PairingFound._({required this.id, required this.publicKey, required this.expiresAt})
+  _$PairingFound._({required this.id, required this.commitment, required this.expiresAt})
     : super._();
   @override
   PairingFound rebuild(void Function(PairingFoundBuilder) updates) =>
@@ -31,7 +31,7 @@ class _$PairingFound extends PairingFound {
     if (identical(other, this)) return true;
     return other is PairingFound &&
         id == other.id &&
-        publicKey == other.publicKey &&
+        commitment == other.commitment &&
         expiresAt == other.expiresAt;
   }
 
@@ -39,7 +39,7 @@ class _$PairingFound extends PairingFound {
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, id.hashCode);
-    _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jc(_$hash, commitment.hashCode);
     _$hash = $jc(_$hash, expiresAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -49,7 +49,7 @@ class _$PairingFound extends PairingFound {
   String toString() {
     return (newBuiltValueToStringHelper(r'PairingFound')
           ..add('id', id)
-          ..add('publicKey', publicKey)
+          ..add('commitment', commitment)
           ..add('expiresAt', expiresAt))
         .toString();
   }
@@ -62,9 +62,9 @@ class PairingFoundBuilder implements Builder<PairingFound, PairingFoundBuilder> 
   String? get id => _$this._id;
   set id(String? id) => _$this._id = id;
 
-  String? _publicKey;
-  String? get publicKey => _$this._publicKey;
-  set publicKey(String? publicKey) => _$this._publicKey = publicKey;
+  String? _commitment;
+  String? get commitment => _$this._commitment;
+  set commitment(String? commitment) => _$this._commitment = commitment;
 
   String? _expiresAt;
   String? get expiresAt => _$this._expiresAt;
@@ -78,7 +78,7 @@ class PairingFoundBuilder implements Builder<PairingFound, PairingFoundBuilder> 
     final $v = _$v;
     if ($v != null) {
       _id = $v.id;
-      _publicKey = $v.publicKey;
+      _commitment = $v.commitment;
       _expiresAt = $v.expiresAt;
       _$v = null;
     }
@@ -103,7 +103,11 @@ class PairingFoundBuilder implements Builder<PairingFound, PairingFoundBuilder> 
         _$v ??
         _$PairingFound._(
           id: BuiltValueNullFieldError.checkNotNull(id, r'PairingFound', 'id'),
-          publicKey: BuiltValueNullFieldError.checkNotNull(publicKey, r'PairingFound', 'publicKey'),
+          commitment: BuiltValueNullFieldError.checkNotNull(
+            commitment,
+            r'PairingFound',
+            'commitment',
+          ),
           expiresAt: BuiltValueNullFieldError.checkNotNull(expiresAt, r'PairingFound', 'expiresAt'),
         );
     replace(_$result);
