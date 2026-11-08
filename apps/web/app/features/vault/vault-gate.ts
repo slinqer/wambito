@@ -12,6 +12,9 @@ import type { UnlockError } from "./Unlock.tsx";
  *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
+ * A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
+ * Two locked kinds have no retry: `unsupported` (the browser cannot keep a device key safely) and
+ * `guest` (a guest's account has keys made elsewhere, and a guest has no recovery key to type).
  */
 
 /** The keys a gate hands from setup or unlock to opening; opaque here. */
@@ -35,7 +38,12 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
    * unlocked, so the first full sync must succeed (a known browser opens on its local data).
    */
   open(keys: K, fresh: boolean): Promise<S>;
+  /** A guest: never shown a recovery key, so an account with keys elsewhere is `locked: guest`. */
+  guest?: boolean;
 }
+
+/** Why the vault is locked; `unsupported` and `guest` have no retry. */
+export type LockedKind = "error" | "offline" | "unsupported" | "guest";
 
 export type VaultGateState<S = unknown> =
   | { status: "checking" }
@@ -44,7 +52,7 @@ export type VaultGateState<S = unknown> =
   | { status: "unlock" }
   | { status: "opening" }
   | { status: "ready"; session: S }
-  | { status: "locked"; kind: "error" | "offline"; retrying: boolean };
+  | { status: "locked"; kind: LockedKind; retrying: boolean };
 
 export interface VaultGate<S = unknown> {
   getState(): VaultGateState<S>;
@@ -57,6 +65,8 @@ export interface VaultGate<S = unknown> {
   unlock(text: string): Promise<UnlockError | null>;
   /** Locked's retry. */
   retry(): void;
+  /** The open vault closed under the app (another tab): check again (reopen, or Unlock). */
+  closed(): void;
 }
 
 const UNLOCK_ERRORS: readonly string[] = [
@@ -71,8 +81,15 @@ const codeOf = (error: unknown): string | undefined =>
     ? error.code
     : undefined;
 
-const lockedKind = (error: unknown): "error" | "offline" =>
-  codeOf(error) === "offline" ? "offline" : "error";
+const lockedKind = (error: unknown): LockedKind => {
+  const code = codeOf(error);
+  if (code === "offline") return "offline";
+  if (code === "unsupported_browser") return "unsupported";
+  return "error";
+};
+
+/** Kinds a retry cannot fix. */
+const FINAL: readonly LockedKind[] = ["unsupported", "guest"];
 
 export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   let state: VaultGateState<S> = { status: "checking" };
@@ -84,6 +101,13 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   const set = (next: VaultGateState<S>) => {
     state = next;
     for (const listener of listeners) listener();
+  };
+
+  /** The account has keys made elsewhere: Unlock, or Locked for a guest (nothing to type). */
+  const hasKeysElsewhere = () => {
+    prepared = null;
+    if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
+    else set({ status: "unlock" });
   };
 
   /** Shows Locked; its retry runs `step`. */
@@ -115,7 +139,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     try {
       prepared = await deps.prepareAccount();
     } catch (error) {
-      if (codeOf(error) === "already_set_up") set({ status: "unlock" });
+      if (codeOf(error) === "already_set_up") hasKeysElsewhere();
       else lock(error, check);
       return;
     }
@@ -131,7 +155,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     try {
       keys = await current.commit();
     } catch (error) {
-      lock(error, commit);
+      // Another tab or device set the account up first: its data key wins, this one is dropped.
+      if (codeOf(error) === "already_set_up") hasKeysElsewhere();
+      else lock(error, commit);
       return;
     }
     prepared = null;
@@ -157,13 +183,20 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
         keys = await deps.unlockWithRecovery(text);
       } catch (error) {
         const code = codeOf(error);
+        if (code === "unsupported_browser") {
+          lock(error, check);
+          return null;
+        }
         return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";
       }
       await open(keys, true);
       return null;
     },
+    closed() {
+      if (state.status === "ready") void check();
+    },
     retry() {
-      if (state.status !== "locked" || state.retrying) return;
+      if (state.status !== "locked" || state.retrying || FINAL.includes(state.kind)) return;
       set({ ...state, retrying: true });
       void again();
     },

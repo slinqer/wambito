@@ -24,6 +24,7 @@ const setup = {
     positions: [1, 6, 14, 26],
     now: new Date("2026-11-08T12:00:00Z"),
     onContinue: fn(),
+    onSignOut: fn(),
     onCopy: fn(async () => {}),
     onSave: fn(),
   },
@@ -41,7 +42,7 @@ export const Show: Story = {
     await expect(canvas.getByText(/ni siquiera Wambito/)).toBeVisible();
     const group = canvas.getByRole("group", { name: "Tu clave de recuperación" });
     await expect(group).toHaveTextContent("7QK2M9XDHT4VR3WBN8YC5FJ6A0Z");
-    for (const name of ["Copiar", "Descargar como .txt", "Ya la guardé"]) {
+    for (const name of ["Copiar", "Descargar como .txt", "Ya la guardé", "Cerrar sesión"]) {
       await expectTarget(canvas.getByRole("button", { name }));
     }
     await userEvent.click(canvas.getByRole("button", { name: "Copiar" }));
@@ -64,22 +65,28 @@ export const ConfirmFourCharacters: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Ya la guardé" }));
     await expect(
-      await canvas.findByRole("heading", { level: 1, name: "Comprueba que la guardaste" }),
+      await canvas.findByRole("heading", { level: 1, name: "Confirma que la guardaste" }),
     ).toBeVisible();
-    await expect(canvas.getByText(/1, 6, 14 y 26/)).toBeVisible();
+    // Each box says where its character is: group of four, then place in the group.
+    await expect(canvas.getByText("Grupo 7")).toBeVisible();
     await expect(canvas.queryByRole("group", { name: "Tu clave de recuperación" })).toBeNull();
     const next = canvas.getByRole("button", { name: "Continuar" });
     await expect(next).toBeDisabled();
     // 1 → 7, 6 → 9, 14 → 3, 26 → 0 (the key without dashes: 7QK2M9XDHT4VR3WBN8YC5FJ6A0Z)
     const wrong = ["7", "9", "3", "1"];
-    const labels = ["Carácter 1", "Carácter 6", "Carácter 14", "Carácter 26"];
+    const labels = [
+      "Grupo 1, carácter 1",
+      "Grupo 2, carácter 2",
+      "Grupo 4, carácter 2",
+      "Grupo 7, carácter 2",
+    ];
     for (const [i, label] of labels.entries()) {
       await userEvent.type(canvas.getByLabelText(label), wrong[i] as string);
     }
     await expect(await canvas.findByRole("alert")).toHaveTextContent("No coinciden");
     await expect(next).toBeDisabled();
-    await userEvent.clear(canvas.getByLabelText("Carácter 26"));
-    await userEvent.type(canvas.getByLabelText("Carácter 26"), "0");
+    await userEvent.clear(canvas.getByLabelText("Grupo 7, carácter 2"));
+    await userEvent.type(canvas.getByLabelText("Grupo 7, carácter 2"), "0");
     await waitFor(() => expect(next).toBeEnabled());
     await expect(canvas.queryByRole("alert")).toBeNull();
     await expectTarget(next);
@@ -99,7 +106,7 @@ export const ConfirmCaseBlind: Story = {
       [3, "k"],
       [4, "2"],
     ] as const) {
-      await userEvent.type(await canvas.findByLabelText(`Carácter ${n}`), c);
+      await userEvent.type(await canvas.findByLabelText(`Grupo 1, carácter ${n}`), c);
     }
     await waitFor(() => expect(canvas.getByRole("button", { name: "Continuar" })).toBeEnabled());
   },

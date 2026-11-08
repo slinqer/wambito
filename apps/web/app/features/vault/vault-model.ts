@@ -24,6 +24,11 @@ export function charsAt(key: string, positions: number[]): string[] {
   return positions.map((n) => chars[n - 1] ?? "");
 }
 
+/** The key is shown in groups of four: where 1-based `position` is, as a group and a character in it. */
+export function groupPosition(position: number): { group: number; char: number } {
+  return { group: Math.ceil(position / 4), char: ((position - 1) % 4) + 1 };
+}
+
 /** Same reading as the parser: case-blind, I and L are 1, O is 0. */
 const normalize = (c: string) => c.trim().toUpperCase().replace(/[IL]/g, "1").replace(/O/g, "0");
 

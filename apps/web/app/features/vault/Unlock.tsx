@@ -10,11 +10,14 @@ export type UnlockError = "bad_recovery_key" | "wrong_recovery_key" | "offline" 
 export interface UnlockProps {
   /** Tries the typed text (any case, spaces or dashes). Resolves to the error, or `null`. */
   onUnlock(text: string): Promise<UnlockError | null>;
+  /** Signs out (and wipes this browser's vault): the way out. */
+  onSignOut(): void;
 }
 
 /** A new browser on an account that has keys: type the recovery key to open the data here. */
-export function Unlock({ onUnlock }: UnlockProps) {
+export function Unlock({ onUnlock, onSignOut }: UnlockProps) {
   const t = useTranslations("vault.unlock");
+  const tVault = useTranslations("vault");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UnlockError | null>(null);
@@ -68,6 +71,9 @@ export function Unlock({ onUnlock }: UnlockProps) {
         </PressButton>
       </form>
       <p className="text-center text-[14px] text-ink-muted">{t("soon")}</p>
+      <PressButton variant="ghost" className="w-full" disabled={busy} onClick={onSignOut}>
+        {tVault("sign_out")}
+      </PressButton>
     </SignInScreen>
   );
 }

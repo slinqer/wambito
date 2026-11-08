@@ -219,7 +219,9 @@
     "too_many_sign_in_attempts": "Demasiadas tentativas seguidas. Espera uns segundos e tenta outra vez.",
     "import_currency_changed": "A moeda da tua conta mudou depois de lermos o ficheiro. Carrega-o outra vez.",
     "guest_cannot_authorize": "Guarda o teu progresso com o teu email antes de ligar um assistente.",
-    "insufficient_scope": "Este assistente não tem permissão para fazer isso."
+    "insufficient_scope": "Este assistente não tem permissão para fazer isso.",
+    "encrypted_account": "Esta conta guarda as finanças cifradas de ponta a ponta; esta parte do Wambito ainda não funciona com ela.",
+    "already_set_up": "Esta conta já tem as suas chaves. Abre-a com a tua chave de recuperação."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -777,6 +779,7 @@
   },
   "vault": {
     "loading": "A abrir os teus dados…",
+    "sign_out": "Terminar sessão",
     "setup": {
       "title": "Guarda a tua chave de recuperação",
       "lead": "É a única forma de voltares aos teus dados se perderes todos os dispositivos e chaves de acesso. Ninguém a pode recuperar por ti, nem sequer o Wambito.",
@@ -789,10 +792,12 @@
       "file_line": "Guarda-a num sítio seguro. Sem ela, ninguém pode recuperar os teus dados.",
       "file_date": "Criada em {date}",
       "confirm_title": "Confirma que a guardaste",
-      "confirm_lead": "Escreve os caracteres {positions} da tua chave.",
+      "confirm_lead": "Escreve estes quatro caracteres da tua chave. Cada um diz em que grupo está e qual é dentro do grupo.",
       "chars_group": "Caracteres a confirmar",
-      "char_label": "Carácter {n}",
-      "mismatch": "Não coincidem. Confere a chave que guardaste.",
+      "group": "Grupo {group}",
+      "char_in_group": "carácter {char}",
+      "char_label": "Grupo {group}, carácter {char}",
+      "mismatch": "Não coincidem. Verifica a chave que guardaste.",
       "show_again": "Ver a chave outra vez",
       "continue": "Continuar"
     },
@@ -815,7 +820,17 @@
       "offline_title": "Estás sem ligação",
       "offline_lead": "Precisamos de ligação para abrir os teus dados neste navegador.",
       "retry": "Tentar outra vez",
-      "retrying": "A tentar outra vez…"
+      "retrying": "A tentar outra vez…",
+      "unsupported_title": "Este navegador não consegue guardar a tua chave",
+      "unsupported_lead": "Para proteger os teus dados, o Wambito precisa de um navegador que guarde a chave de forma segura. Atualiza o navegador ou abre o Wambito noutro.",
+      "guest_title": "Os teus dados não se podem abrir aqui",
+      "guest_lead": "Começaste como convidado noutro navegador ou dispositivo, e os dados só se abrem lá. Volta a esse navegador, ou termina a sessão.",
+      "delete_account": "Eliminar esta conta",
+      "delete_lead": "A conta de convidado e tudo o que tem são eliminados, também no outro navegador. Não se pode anular.",
+      "delete_confirm": "Sim, eliminar",
+      "deleting": "A eliminar…",
+      "delete_failed": "Não conseguimos eliminá-la. Tenta outra vez.",
+      "delete_cancel": "Cancelar"
     }
   }
 }

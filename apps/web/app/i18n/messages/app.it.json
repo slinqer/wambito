@@ -219,7 +219,9 @@
     "too_many_sign_in_attempts": "Troppi tentativi di fila. Aspetta qualche secondo e riprova.",
     "import_currency_changed": "La valuta del tuo account è cambiata dopo la lettura del file. Caricalo di nuovo.",
     "guest_cannot_authorize": "Salva i tuoi progressi con la tua email prima di collegare un assistente.",
-    "insufficient_scope": "Questo assistente non ha il permesso di farlo."
+    "insufficient_scope": "Questo assistente non ha il permesso di farlo.",
+    "encrypted_account": "Questo account conserva le sue finanze con crittografia end-to-end; questa parte di Wambito non funziona ancora con esso.",
+    "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero."
   },
   "sign_in": {
     "meta_title": "Accedi · Wambito",
@@ -777,6 +779,7 @@
   },
   "vault": {
     "loading": "Apertura dei tuoi dati…",
+    "sign_out": "Esci",
     "setup": {
       "title": "Salva la tua chiave di recupero",
       "lead": "È l'unico modo per tornare ai tuoi dati se perdi tutti i dispositivi e le passkey. Nessuno può recuperarla per te, nemmeno Wambito.",
@@ -786,12 +789,14 @@
       "download": "Scarica come .txt",
       "saved": "L'ho salvata",
       "file_title": "Chiave di recupero di Wambito",
-      "file_line": "Conservala in un posto sicuro. Senza di lei, nessuno può recuperare i tuoi dati.",
+      "file_line": "Conservala in un posto sicuro. Senza la chiave, nessuno può recuperare i tuoi dati.",
       "file_date": "Creata il {date}",
       "confirm_title": "Controlla di averla salvata",
-      "confirm_lead": "Scrivi i caratteri {positions} della tua chiave.",
+      "confirm_lead": "Scrivi questi quattro caratteri della tua chiave. Ognuno indica in quale gruppo si trova e in che posizione.",
       "chars_group": "Caratteri da confermare",
-      "char_label": "Carattere {n}",
+      "group": "Gruppo {group}",
+      "char_in_group": "carattere {char}",
+      "char_label": "Gruppo {group}, carattere {char}",
       "mismatch": "Non coincidono. Controlla la chiave che hai salvato.",
       "show_again": "Rivedi la chiave",
       "continue": "Continua"
@@ -815,7 +820,17 @@
       "offline_title": "Sei offline",
       "offline_lead": "Serve una connessione per aprire i tuoi dati in questo browser.",
       "retry": "Riprova",
-      "retrying": "Nuovo tentativo…"
+      "retrying": "Nuovo tentativo…",
+      "unsupported_title": "Questo browser non può conservare la tua chiave",
+      "unsupported_lead": "Per proteggere i tuoi dati, Wambito ha bisogno di un browser che conservi la chiave in modo sicuro. Aggiorna il browser o apri Wambito in un altro.",
+      "guest_title": "Qui non si possono aprire i tuoi dati",
+      "guest_lead": "Hai iniziato come ospite in un altro browser o dispositivo, e i suoi dati si aprono solo lì. Torna a quel browser, oppure esci.",
+      "delete_account": "Elimina questo account",
+      "delete_lead": "L'account ospite e tutto ciò che contiene vengono eliminati, anche nell'altro browser. Non si può annullare.",
+      "delete_confirm": "Sì, eliminalo",
+      "deleting": "Eliminazione…",
+      "delete_failed": "Non siamo riusciti a eliminarlo. Riprova.",
+      "delete_cancel": "Annulla"
     }
   }
 }

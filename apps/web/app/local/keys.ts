@@ -30,7 +30,9 @@ export type KeysErrorCode =
   | "bad_recovery_key"
   | "wrong_recovery_key"
   | "offline"
-  | "server";
+  | "server"
+  /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
+  | "unsupported_browser";
 
 export class KeysError extends Error {
   constructor(
@@ -55,6 +57,8 @@ export interface KeysOptions {
   /** Defaults to the global `fetch`. */
   fetch?: typeof globalThis.fetch;
   baseUrl?: string;
+  /** Makes the device key pair; tests pass the noble fallback's shape. */
+  deviceKeyPair?: typeof generateDeviceKeyPair;
 }
 
 export interface LocalKeys {
@@ -78,9 +82,35 @@ function api(options: KeysOptions) {
     } catch {
       throw new KeysError("offline");
     }
-    if (!response.ok) throw new KeysError("server", response.status);
+    if (!response.ok) {
+      const code = await problemCode(response);
+      if (response.status === 409 && code === "already_set_up") {
+        throw new KeysError("already_set_up", 409);
+      }
+      throw new KeysError("server", response.status);
+    }
     return response;
   };
+}
+
+async function problemCode(response: Response): Promise<string | undefined> {
+  try {
+    const body = (await response.json()) as { code?: unknown };
+    return typeof body.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A device key pair this browser can keep: the private key must be a non-extractable `CryptoKey`.
+ * Without X25519 in WebCrypto, `@wambito/crypto` falls back to raw bytes, which would sit in
+ * IndexedDB readable by any script: refused (`unsupported_browser`), nothing is stored or sent.
+ */
+async function safeDeviceKeyPair(options: KeysOptions) {
+  const pair = await (options.deviceKeyPair ?? generateDeviceKeyPair)();
+  if (!(pair.privateKey instanceof CryptoKey)) throw new KeysError("unsupported_browser");
+  return pair;
 }
 
 async function listWraps(call: ReturnType<typeof api>): Promise<WrapDto[]> {
@@ -88,15 +118,19 @@ async function listWraps(call: ReturnType<typeof api>): Promise<WrapDto[]> {
   return body.wraps;
 }
 
-const putJson = (body: unknown): RequestInit => ({
+const putJson = (body: unknown, headers: Record<string, string> = {}): RequestInit => ({
   method: "PUT",
-  headers: { "content-type": "application/json" },
+  headers: { "content-type": "application/json", ...headers },
   body: JSON.stringify(body),
 });
 
 /** A device key pair and its wrap of DK, made in memory; nothing sent yet. */
-async function prepareDevice(userId: string, dataKey: Uint8Array, keyV: number) {
-  const pair = await generateDeviceKeyPair();
+async function prepareDevice(
+  userId: string,
+  dataKey: Uint8Array,
+  keyV: number,
+  pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
+) {
   const id = uuidv7();
   const wrapped = await sealToDevice(pair.publicKey, { kind: "device", userId, keyV }, dataKey);
   const attestation = await deviceAttestation(dataKey, {
@@ -128,8 +162,9 @@ async function enrollDevice(
   userId: string,
   dataKey: Uint8Array,
   keyV: number,
+  pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
 ): Promise<LocalKeys> {
-  const device = await prepareDevice(userId, dataKey, keyV);
+  const device = await prepareDevice(userId, dataKey, keyV, pair);
   await call(`/v2/keys/${device.id}`, putJson(device.body));
   return keepLocally(userId, dataKey, keyV, device.privateKey);
 }
@@ -175,12 +210,16 @@ export interface PreparedAccount {
  * recovery secret is never shown, which still satisfies the server's first-wrap rule, and the
  * caller commits at once; turning the guest into a real account later replaces that wrap with a
  * recovery key the person keeps. Throws `already_set_up` when the account has wraps: the caller
- * shows Unlock.
+ * shows Unlock. The recovery wrap goes with `If-None-Match: *`: if another setup (another tab or
+ * device) made the account's keys between this check and the commit, `commit()` throws
+ * `already_set_up` too and this data key is dropped. `unsupported_browser` before anything is sent
+ * when the browser cannot keep a device key safely.
  */
 export async function prepareAccount(
   options: KeysOptions & { guest: boolean },
 ): Promise<PreparedAccount> {
   const { userId, guest } = options;
+  const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   if ((await listWraps(call)).length > 0) throw new KeysError("already_set_up");
 
@@ -194,7 +233,7 @@ export async function prepareAccount(
       await wrapDataKey(secret, { kind: "recovery", userId, keyV: FIRST_KEY_V }, dataKey),
     ),
   };
-  const device = await prepareDevice(userId, dataKey, FIRST_KEY_V);
+  const device = await prepareDevice(userId, dataKey, FIRST_KEY_V, pair);
   const recoveryKey = guest ? null : formatRecoveryKey(secret);
   secret.fill(0);
 
@@ -205,7 +244,13 @@ export async function prepareAccount(
   async function run(): Promise<LocalKeys> {
     if (done) return done;
     if (!recoverySent) {
-      await call(`/v2/keys/${recoveryId}`, putJson(recoveryBody));
+      try {
+        // Create-only: of two setups at once, one makes the account's data key.
+        await call(`/v2/keys/${recoveryId}`, putJson(recoveryBody, { "if-none-match": "*" }));
+      } catch (error) {
+        if (error instanceof KeysError && error.code === "already_set_up") dataKey.fill(0);
+        throw error;
+      }
       recoverySent = true;
     }
     await call(`/v2/keys/${device.id}`, putJson(device.body));
@@ -241,23 +286,28 @@ export async function unlockWithRecovery(
   } catch {
     throw new KeysError("bad_recovery_key");
   }
-  const call = api(options);
-  const wrap = (await listWraps(call)).find((w) => w.kind === "recovery");
-  if (!wrap) throw new KeysError("wrong_recovery_key");
-  let dataKey: Uint8Array;
   try {
-    dataKey = await unwrapDataKey(
-      secret,
-      { kind: "recovery", userId, keyV: wrap.keyV },
-      fromBase64Url(wrap.wrapped),
-    );
-  } catch {
-    throw new KeysError("wrong_recovery_key");
-  }
-  try {
-    return await enrollDevice(call, userId, dataKey, wrap.keyV);
+    const pair = await safeDeviceKeyPair(options);
+    const call = api(options);
+    const wrap = (await listWraps(call)).find((w) => w.kind === "recovery");
+    if (!wrap) throw new KeysError("wrong_recovery_key");
+    let dataKey: Uint8Array;
+    try {
+      dataKey = await unwrapDataKey(
+        secret,
+        { kind: "recovery", userId, keyV: wrap.keyV },
+        fromBase64Url(wrap.wrapped),
+      );
+    } catch {
+      throw new KeysError("wrong_recovery_key");
+    }
+    try {
+      return await enrollDevice(call, userId, dataKey, wrap.keyV, pair);
+    } finally {
+      dataKey.fill(0);
+    }
   } finally {
-    dataKey.fill(0);
+    secret.fill(0);
   }
 }
 

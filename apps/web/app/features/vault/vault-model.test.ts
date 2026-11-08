@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { charsAt, confirmationMatches, pickPositions, recoveryFileText } from "./vault-model.ts";
+import {
+  charsAt,
+  confirmationMatches,
+  groupPosition,
+  pickPositions,
+  recoveryFileText,
+} from "./vault-model.ts";
 
 const KEY = "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234";
 
@@ -15,6 +21,19 @@ describe("pickPositions", () => {
         expect(n).toBeLessThanOrEqual(26);
       }
     }
+  });
+});
+
+describe("groupPosition", () => {
+  it("names a position by its group of four and its place in it", () => {
+    expect([1, 4, 5, 6, 14, 26].map(groupPosition)).toEqual([
+      { group: 1, char: 1 },
+      { group: 1, char: 4 },
+      { group: 2, char: 1 },
+      { group: 2, char: 2 },
+      { group: 4, char: 2 },
+      { group: 7, char: 2 },
+    ]);
   });
 });
 

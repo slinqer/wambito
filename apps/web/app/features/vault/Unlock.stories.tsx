@@ -14,7 +14,7 @@ const meta = {
       </MemoryRouter>
     ),
   ],
-  args: { onUnlock: fn(async (): Promise<UnlockError | null> => null) },
+  args: { onUnlock: fn(async (): Promise<UnlockError | null> => null), onSignOut: fn() },
 } satisfies Meta<typeof Unlock>;
 
 export default meta;
@@ -32,8 +32,10 @@ export const Ready: Story = {
       canvas.getByRole("heading", { level: 1, name: "Abre tus datos aquí" }),
     ).toBeVisible();
     await expect(canvas.getByText(/llave de acceso o desde otro dispositivo/)).toBeVisible();
-    // The other ways are announced, not offered.
-    await expect(canvas.getAllByRole("button")).toHaveLength(2);
+    // The other ways are announced, not offered: the screen's own buttons and sign-out only.
+    await expect(canvas.getAllByRole("button")).toHaveLength(3);
+    await userEvent.click(canvas.getByRole("button", { name: "Cerrar sesión" }));
+    await expect(args.onSignOut).toHaveBeenCalledTimes(1);
     await expectTarget(canvas.getByLabelText("Clave de recuperación").parentElement as HTMLElement);
     await expect(canvas.getByRole("button", { name: "Abrir mis datos" })).toBeDisabled();
     await typeKey(canvas, "  7qk2 m9xd-ht4v ");

@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
-import { ApiProvider } from "../../api/ApiProvider.tsx";
+import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
 import { unauthorizedRedirect } from "../../api/client.ts";
 import { useMe } from "../../api/queries.ts";
-import { loadLocalKeys, prepareAccount, unlockWithRecovery } from "../../local/keys.ts";
+import { KeysError, loadLocalKeys, prepareAccount, unlockWithRecovery } from "../../local/keys.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -13,6 +13,8 @@ import {
   type VaultProfile,
   type VaultSession,
 } from "../../local/vault-session.ts";
+import { landingLink } from "../../site/config.ts";
+import { liveSignOut, useSignOut } from "../home/use-sign-out.ts";
 import { ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 import { Locked } from "./Locked.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
@@ -31,13 +33,22 @@ function signInAgain() {
     });
 }
 
+/** A 401 from `/v2/keys` (signed out in another tab, say): sign in again, the gate stays put. */
+function signInAgainOn401<T>(promise: Promise<T>): Promise<T> {
+  return promise.catch((error: unknown) => {
+    if (error instanceof KeysError && error.status === 401) signInAgain();
+    throw error;
+  });
+}
+
 function gateFor(profile: VaultProfile): Gate<VaultSession> {
   const userId = profile.id;
   return createVaultGate({
     loadLocalKeys: () => loadLocalKeys(userId),
-    prepareAccount: () => prepareAccount({ userId, guest: profile.isAnonymous }),
-    unlockWithRecovery: (text) => unlockWithRecovery({ userId, text }),
+    prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
+    unlockWithRecovery: (text) => signInAgainOn401(unlockWithRecovery({ userId, text })),
     open: (keys, fresh) => openVaultSession({ profile, keys, fresh, onUnauthorized: signInAgain }),
+    guest: profile.isAnonymous,
   });
 }
 
@@ -64,6 +75,11 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     gate.start();
   }, [gate, profile.id]);
   const state = useSyncExternalStore(gate.subscribe, gate.getState, gate.getState);
+  const session = state.status === "ready" ? state.session : null;
+  useEffect(() => session?.onClosed(() => gate.closed()), [session, gate]);
+  // The live sign-out: it wipes this browser's vault (the gate remembered the account).
+  const signOut = useSignOut();
+  const deleteAccount = useDeleteLockedAccount();
 
   switch (state.status) {
     case "setup":
@@ -71,12 +87,21 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
         <RecoveryKeySetup
           recoveryKey={state.recoveryKey}
           onContinue={() => void gate.confirmSetup()}
+          onSignOut={() => void signOut()}
         />
       );
     case "unlock":
-      return <Unlock onUnlock={gate.unlock} />;
+      return <Unlock onUnlock={gate.unlock} onSignOut={() => void signOut()} />;
     case "locked":
-      return <Locked kind={state.kind} retrying={state.retrying} onRetry={gate.retry} />;
+      return (
+        <Locked
+          kind={state.kind}
+          retrying={state.retrying}
+          onRetry={gate.retry}
+          onSignOut={() => void signOut()}
+          onDeleteAccount={state.kind === "guest" ? deleteAccount : undefined}
+        />
+      );
     case "ready":
       return (
         <ApiProvider mode="local" fetch={state.session.fetch}>
@@ -87,6 +112,31 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     default:
       return <VaultLoading />;
   }
+}
+
+/**
+ * A guest locked out of its data (it lives in another browser) can still delete the account: the
+ * live `DELETE /v1/me` (the gate is outside the local backend), then the sign-out that wipes this
+ * browser's vault, then the landing. Resolves to false when the delete failed.
+ */
+function useDeleteLockedAccount(): () => Promise<boolean> {
+  const api = useApi();
+  const navigate = useNavigate();
+  return async () => {
+    try {
+      const { error } = await api.DELETE("/v1/me");
+      if (error) return false;
+    } catch {
+      return false;
+    }
+    await liveSignOut().catch(() => {
+      // The account and its sessions are gone already.
+    });
+    const landing = landingLink();
+    if (landing.external) window.location.replace(landing.href);
+    else navigate(landing.href, { replace: true });
+    return true;
+  };
 }
 
 /** Every commit to the vault (the person's or the sync's) marks the cached reads stale. */

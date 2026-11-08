@@ -3,7 +3,12 @@ import { useLocale, useTranslations } from "use-intl";
 import { cx } from "../../ui/cx.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
-import { confirmationMatches, pickPositions, recoveryFileText } from "./vault-model.ts";
+import {
+  confirmationMatches,
+  groupPosition,
+  pickPositions,
+  recoveryFileText,
+} from "./vault-model.ts";
 
 /** Hands the recovery file to the browser's download. */
 export type SaveTextFile = (file: { name: string; content: string }) => void;
@@ -29,6 +34,8 @@ export interface RecoveryKeySetupProps {
   recoveryKey: string;
   /** The person confirmed they kept it: the app goes on. */
   onContinue(): void;
+  /** Signs out (and wipes this browser's vault): nothing was sent yet, so nothing is kept. */
+  onSignOut(): void;
   onCopy?(text: string): Promise<void> | void;
   onSave?: SaveTextFile;
   /** For the file's date; defaults to now. */
@@ -45,12 +52,14 @@ export interface RecoveryKeySetupProps {
 export function RecoveryKeySetup({
   recoveryKey,
   onContinue,
+  onSignOut,
   onCopy = (text) => navigator.clipboard.writeText(text),
   onSave = saveTextFile,
   now,
   positions: given,
 }: RecoveryKeySetupProps) {
   const t = useTranslations("vault.setup");
+  const tVault = useTranslations("vault");
   const locale = useLocale();
   const [positions] = useState(() => given ?? pickPositions());
   const [step, setStep] = useState<"show" | "confirm">("show");
@@ -107,6 +116,9 @@ export function RecoveryKeySetup({
         <PressButton className="w-full" onClick={() => setStep("confirm")}>
           {t("saved")}
         </PressButton>
+        <PressButton variant="ghost" className="w-full" onClick={onSignOut}>
+          {tVault("sign_out")}
+        </PressButton>
       </SignInScreen>
     );
   }
@@ -117,13 +129,7 @@ export function RecoveryKeySetup({
   return (
     <SignInScreen>
       <ScreenTitle>{t("confirm_title")}</ScreenTitle>
-      <p className="text-center text-ink-muted">
-        {t("confirm_lead", {
-          positions: new Intl.ListFormat(locale, { type: "conjunction" }).format(
-            positions.map(String),
-          ),
-        })}
-      </p>
+      <p className="text-center text-ink-muted">{t("confirm_lead")}</p>
       <form
         className="flex w-full flex-col gap-(--space-3)"
         onSubmit={(event) => {
@@ -133,27 +139,36 @@ export function RecoveryKeySetup({
       >
         <fieldset className="m-0 flex min-w-0 justify-center gap-(--space-2) border-0 p-0">
           <legend className="sr-only">{t("chars_group")}</legend>
-          {positions.map((n, i) => (
-            <label key={n} className="flex min-w-0 flex-1 flex-col items-center gap-(--space-1)">
-              <span className="text-[13px] text-ink-muted">{n}</span>
-              <span className={cx("lk-input min-h-11 w-full", mismatch && "border-over")}>
-                <input
-                  aria-label={t("char_label", { n })}
-                  aria-invalid={mismatch || undefined}
-                  aria-describedby={mismatch ? errorId : undefined}
-                  value={typed[i]}
-                  maxLength={1}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  onChange={(event) =>
-                    setTyped((now) => now.map((c, j) => (j === i ? event.target.value : c)))
-                  }
-                  className="min-h-9 w-full min-w-0 border-0 bg-transparent p-0 text-center font-mono text-[20px] font-bold text-ink uppercase outline-none"
-                />
-              </span>
-            </label>
-          ))}
+          {positions.map((n, i) => {
+            const at = groupPosition(n);
+            return (
+              <label key={n} className="flex min-w-0 flex-1 flex-col items-center gap-(--space-1)">
+                <span
+                  aria-hidden="true"
+                  className="text-center text-[12px] leading-tight text-ink-muted"
+                >
+                  <span className="block font-bold text-ink">{t("group", at)}</span>
+                  {t("char_in_group", at)}
+                </span>
+                <span className={cx("lk-input min-h-11 w-full", mismatch && "border-over")}>
+                  <input
+                    aria-label={t("char_label", at)}
+                    aria-invalid={mismatch || undefined}
+                    aria-describedby={mismatch ? errorId : undefined}
+                    value={typed[i]}
+                    maxLength={1}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    onChange={(event) =>
+                      setTyped((now) => now.map((c, j) => (j === i ? event.target.value : c)))
+                    }
+                    className="min-h-9 w-full min-w-0 border-0 bg-transparent p-0 text-center font-mono text-[20px] font-bold text-ink uppercase outline-none"
+                  />
+                </span>
+              </label>
+            );
+          })}
         </fieldset>
         {mismatch && (
           <div className="text-center">

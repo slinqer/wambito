@@ -150,6 +150,105 @@ describe("vault gate", () => {
     expect(gate.getState()).toEqual({ status: "locked", kind: "offline", retrying: false });
   });
 
+  it("a setup that lost the race to another (409 already_set_up on commit) asks for the key", async () => {
+    const commit = vi.fn(async (): Promise<Keys> => {
+      throw fail("already_set_up");
+    });
+    const { gate, deps } = gateWith({
+      prepareAccount: async () => ({ recoveryKey: "ABCD-EFGH", commit }),
+    });
+    gate.start();
+    await settle();
+    await gate.confirmSetup();
+    expect(gate.getState()).toEqual({ status: "unlock" });
+    expect(deps.open).not.toHaveBeenCalled();
+    // the prepared data key is gone: nothing commits it again
+    await gate.confirmSetup();
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a guest whose account has keys elsewhere is locked out here: no recovery key to type", async () => {
+    const { gate, deps } = gateWith({
+      guest: true,
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+    });
+    gate.start();
+    await settle();
+    expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    gate.retry();
+    await settle();
+    expect(gate.getState()).toMatchObject({ status: "locked", kind: "guest" });
+    expect(deps.unlockWithRecovery).not.toHaveBeenCalled();
+  });
+
+  it("a guest that loses the setup race is locked out too", async () => {
+    const { gate } = gateWith({
+      guest: true,
+      prepareAccount: async () => ({
+        recoveryKey: null,
+        commit: async () => {
+          throw fail("already_set_up");
+        },
+      }),
+    });
+    gate.start();
+    await settle();
+    expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+  });
+
+  it("a browser that cannot keep the key safely is locked, with no retry", async () => {
+    const prepareAccount = vi.fn(async () => {
+      throw fail("unsupported_browser");
+    });
+    const { gate } = gateWith({ prepareAccount });
+    gate.start();
+    await settle();
+    expect(gate.getState()).toEqual({ status: "locked", kind: "unsupported", retrying: false });
+    gate.retry();
+    await settle();
+    expect(prepareAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocking in a browser that cannot keep the key safely locks too", async () => {
+    const { gate } = gateWith({
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+      unlockWithRecovery: async () => {
+        throw fail("unsupported_browser");
+      },
+    });
+    gate.start();
+    await settle();
+    expect(await gate.unlock("KEY")).toBeNull();
+    expect(gate.getState()).toEqual({ status: "locked", kind: "unsupported", retrying: false });
+  });
+
+  it("a vault closed under the open app checks again: reopens with kept keys, else Unlock", async () => {
+    let kept: Keys | null = { k: "kept" };
+    const { gate, deps } = gateWith({
+      loadLocalKeys: async () => kept,
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+    });
+    gate.start();
+    await settle();
+    expect(gate.getState().status).toBe("ready");
+
+    gate.closed();
+    await settle();
+    expect(gate.getState()).toEqual({ status: "ready", session: { id: "kept" } });
+    expect(deps.open).toHaveBeenCalledTimes(2);
+
+    kept = null; // another tab signed out and deleted the vault
+    gate.closed();
+    await settle();
+    expect(gate.getState()).toEqual({ status: "unlock" });
+  });
+
   it("starts once", async () => {
     const { gate, deps } = gateWith();
     gate.start();

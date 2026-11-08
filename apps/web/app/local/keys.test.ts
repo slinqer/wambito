@@ -9,8 +9,23 @@ import {
   unwrapDataKey,
   verifyDeviceAttestation,
 } from "@wambito/crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore } from "./encrypted-store.ts";
+
+/** Every recovery secret `parseRecoveryKey` handed out, to check that unlock zeroes it. */
+const parsedSecrets = vi.hoisted(() => [] as Uint8Array[]);
+vi.mock("@wambito/crypto", async (original) => {
+  const crypto = await original<typeof import("@wambito/crypto")>();
+  return {
+    ...crypto,
+    parseRecoveryKey: (text: string) => {
+      const secret = crypto.parseRecoveryKey(text);
+      parsedSecrets.push(secret);
+      return secret;
+    },
+  };
+});
+
 import {
   forgetDevice,
   KeysError,
@@ -40,7 +55,7 @@ interface Wrap {
 /** A fake `/v2/keys` that enforces the rules the tests care about (the real one: `routes/keys.ts`). */
 function fakeKeys() {
   const wraps: Wrap[] = [];
-  const puts: Array<{ id: string; kind: string }> = [];
+  const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const json = (body: unknown, status = 200) =>
@@ -55,7 +70,11 @@ function fakeKeys() {
       const id = match[1] as string;
       expect(id).toBe(id.toLowerCase());
       const body = JSON.parse(String(init.body));
-      puts.push({ id, kind: body.kind });
+      const ifNoneMatch = new Headers(init.headers).get("if-none-match");
+      puts.push({ id, kind: body.kind, ifNoneMatch });
+      if (ifNoneMatch === "*" && wraps.some((w) => w.id !== id)) {
+        return json({ code: "already_set_up" }, 409);
+      }
       if (wraps.length === 0 && body.kind !== "recovery") {
         return json({ code: "recovery_required" }, 422);
       }
@@ -235,6 +254,76 @@ describe("prepareAccount", () => {
   });
 });
 
+describe("two setups at once", () => {
+  it("sends the first recovery wrap create-only (If-None-Match: *), the device wrap plainly", async () => {
+    const api = fakeKeys();
+    await setUpAccount({ userId: newUser(), guest: false, fetch: api.fetch });
+    expect(api.puts.map((p) => [p.kind, p.ifNoneMatch])).toEqual([
+      ["recovery", "*"],
+      ["device", null],
+    ]);
+  });
+
+  it("the setup that loses the race throws already_set_up and keeps nothing", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const first = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    const second = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    await first.commit();
+    await forgetDevice(userId);
+    const err = await second.commit().catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("already_set_up");
+    expect(api.wraps.map((w) => w.kind).sort()).toEqual(["device", "recovery"]);
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});
+
+describe("a browser without X25519 in WebCrypto", () => {
+  // The noble fallback keeps the device private key as raw bytes: never stored on the web.
+  const rawKeyPair = async () => ({
+    publicKey: new Uint8Array(32).fill(1),
+    privateKey: { kind: "noble-x25519" as const, raw: new Uint8Array(32).fill(2) },
+  });
+
+  it("refuses to set up with unsupported_browser, before any request", async () => {
+    const api = fakeKeys();
+    const calls: string[] = [];
+    const spy = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(input));
+      return api.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const userId = newUser();
+    const err = await prepareAccount({
+      userId,
+      guest: false,
+      fetch: spy,
+      deviceKeyPair: rawKeyPair,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("unsupported_browser");
+    expect(calls).toEqual([]);
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+
+  it("refuses to unlock with unsupported_browser, and sends no wrap", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    await forgetDevice(userId);
+    const puts = api.puts.length;
+    const err = await unlockWithRecovery({
+      userId,
+      text: recoveryKey as string,
+      fetch: api.fetch,
+      deviceKeyPair: rawKeyPair,
+    }).catch((e) => e);
+    expect(err.code).toBe("unsupported_browser");
+    expect(api.puts.length).toBe(puts);
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});
+
 describe("loadLocalKeys", () => {
   it("is null in a browser that was never set up", async () => {
     expect(await loadLocalKeys(newUser())).toBeNull();
@@ -275,6 +364,17 @@ describe("unlockWithRecovery", () => {
       expect(err.code).toBe("bad_recovery_key");
     }
     expect(api.puts.length).toBe(puts);
+  });
+
+  it("zeroes the recovery secret once done, whatever the outcome", async () => {
+    const { api, userId, recoveryKey } = await accountWithKey();
+    parsedSecrets.length = 0;
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    await forgetDevice(userId);
+    const stranger = formatRecoveryKey(crypto.getRandomValues(new Uint8Array(16)));
+    await unlockWithRecovery({ userId, text: stranger, fetch: api.fetch }).catch(() => {});
+    expect(parsedSecrets).toHaveLength(2);
+    for (const secret of parsedSecrets) expect(secret.every((b) => b === 0)).toBe(true);
   });
 
   it("rejects a well-formed key of another account with wrong_recovery_key", async () => {

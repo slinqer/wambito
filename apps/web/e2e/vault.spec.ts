@@ -20,6 +20,11 @@ const NAME = "cena vault";
 
 test.describe.configure({ mode: "serial" });
 test.use({ actionTimeout: 10_000 });
+// One preview account for the whole suite (its sign-in codes and its vault would cross between the
+// projects running at once), so it runs on the desktop project only: the whole file is skipped on
+// the phone, and its beforeAll (the reseed) returns there, so it never resets the account under
+// the desktop run.
+test.skip(({ isMobile }) => isMobile, "one preview account per run, desktop only");
 
 const vaultDatabases = (page: Page) =>
   page.evaluate(async () =>
@@ -39,16 +44,19 @@ async function setUpRecoveryKey(page: Page): Promise<string> {
   expect(key).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{3,4})+$/);
   await page.getByRole("button", { name: "Ya la guardé" }).click();
   const plain = key.replaceAll("-", "");
-  const boxes = page.getByRole("textbox", { name: /^Carácter \d+$/ });
+  const boxes = page.getByRole("textbox", { name: /^Grupo \d+, carácter \d+$/ });
   for (const box of await boxes.all()) {
-    const n = Number(/(\d+)$/.exec((await box.getAttribute("aria-label")) ?? "")?.[1]);
-    await box.fill(plain[n - 1] ?? "");
+    const [, group, char] = /^Grupo (\d+), carácter (\d+)$/.exec(
+      (await box.getAttribute("aria-label")) ?? "",
+    ) ?? ["", "0", "0"];
+    await box.fill(plain[(Number(group) - 1) * 4 + Number(char) - 1] ?? "");
   }
   await page.getByRole("button", { name: "Continuar" }).click();
   return key;
 }
 
-test.beforeAll(async () => {
+test.beforeAll(async ({ browser: _ }, testInfo) => {
+  if (testInfo.project.name !== "desktop") return;
   execFileSync(
     "docker",
     ["compose", "exec", "-T", "api", "pnpm", "--filter", "@wambito/api", "seed:e2e-preview"],
@@ -58,11 +66,8 @@ test.beforeAll(async () => {
 
 test("a recovery key, a second browser, an offline edit and a clean sign-out", async ({
   browser,
-}, testInfo) => {
-  // One preview account for the whole suite (its sign-in codes and its vault would cross between
-  // the two projects running at once), so this runs at one size only.
+}) => {
   test.setTimeout(90_000);
-  test.skip(testInfo.project.name !== "desktop", "one preview account per run (see above)");
 
   const open = async () => {
     const context = await browser.newContext({

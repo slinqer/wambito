@@ -219,7 +219,9 @@
     "too_many_sign_in_attempts": "Demasiados intentos seguidos. Espera unos segundos e inténtalo otra vez.",
     "import_currency_changed": "La moneda de tu cuenta cambió después de leer el archivo. Súbelo otra vez.",
     "guest_cannot_authorize": "Guarda tu progreso con tu correo antes de conectar un asistente.",
-    "insufficient_scope": "Este asistente no tiene permiso para hacer eso."
+    "insufficient_scope": "Este asistente no tiene permiso para hacer eso.",
+    "encrypted_account": "Esta cuenta guarda sus finanzas cifradas de extremo a extremo; esta parte de Wambito todavía no funciona con ella.",
+    "already_set_up": "Esta cuenta ya tiene sus claves. Ábrela con tu clave de recuperación."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -777,6 +779,7 @@
   },
   "vault": {
     "loading": "Abriendo tus datos…",
+    "sign_out": "Cerrar sesión",
     "setup": {
       "title": "Guarda tu clave de recuperación",
       "lead": "Es la única forma de volver a tus datos si pierdes todos tus dispositivos y llaves de acceso. Nadie la puede recuperar por ti, ni siquiera Wambito.",
@@ -788,10 +791,12 @@
       "file_title": "Clave de recuperación de Wambito",
       "file_line": "Guárdala en un lugar seguro. Sin ella, nadie puede recuperar tus datos.",
       "file_date": "Creada el {date}",
-      "confirm_title": "Comprueba que la guardaste",
-      "confirm_lead": "Escribe los caracteres {positions} de tu clave.",
+      "confirm_title": "Confirma que la guardaste",
+      "confirm_lead": "Escribe estos cuatro caracteres de tu clave. Cada uno dice en qué grupo está y cuál es dentro del grupo.",
       "chars_group": "Caracteres a confirmar",
-      "char_label": "Carácter {n}",
+      "group": "Grupo {group}",
+      "char_in_group": "carácter {char}",
+      "char_label": "Grupo {group}, carácter {char}",
       "mismatch": "No coinciden. Revisa la clave que guardaste.",
       "show_again": "Ver la clave otra vez",
       "continue": "Continuar"
@@ -815,7 +820,17 @@
       "offline_title": "Sin conexión",
       "offline_lead": "Necesitamos conexión para abrir tus datos en este navegador.",
       "retry": "Reintentar",
-      "retrying": "Reintentando…"
+      "retrying": "Reintentando…",
+      "unsupported_title": "Este navegador no puede guardar tu clave",
+      "unsupported_lead": "Para cuidar tus datos, Wambito necesita un navegador que guarde la clave de forma segura. Actualiza tu navegador o abre Wambito en otro.",
+      "guest_title": "Tus datos no se pueden abrir aquí",
+      "guest_lead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allá. Vuelve a ese navegador, o cierra sesión.",
+      "delete_account": "Eliminar esta cuenta",
+      "delete_lead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
+      "delete_confirm": "Sí, eliminarla",
+      "deleting": "Eliminando…",
+      "delete_failed": "No pudimos eliminarla. Inténtalo de nuevo.",
+      "delete_cancel": "Cancelar"
     }
   }
 }
