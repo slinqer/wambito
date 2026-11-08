@@ -15,90 +15,104 @@ const text = z.string();
 const timestamp = z.string();
 const frequency = z.enum(["monthly", "yearly"]);
 
-export const transactionRecord = z.object({
-  s: z.literal(1),
-  name: text,
-  amount: amountSchema,
-  currency: text,
-  date: isoDateSchema,
-  status: z.enum(["paid", "pending"]),
-  note: text.nullable().default(null),
-  categoryId: z.uuid(),
-  accountId: z.uuid().nullable().default(null),
-  recurrenceId: z.uuid().nullable().default(null),
-  /** The month a recurrence generated it for; one per rule and month, deleted or not. */
-  occurrenceMonth: monthSchema.nullable().default(null),
-  source: z.enum(["app", "web", "widget", "mcp", "import", "recurrence", "capture"]),
-  needsReview: z.boolean().default(false),
-  captureSource: z.enum(CAPTURE_SOURCES).nullable().default(null),
-  capturedAt: timestamp.nullable().default(null),
-  captureMerchantKey: text.nullable().default(null),
-  createdAt: timestamp.optional(),
-  /** Set on create and on every edit; an older record has none (read `createdAt`). */
-  updatedAt: timestamp.optional(),
-}).loose();
+export const transactionRecord = z
+  .object({
+    s: z.literal(1),
+    name: text,
+    amount: amountSchema,
+    currency: text,
+    date: isoDateSchema,
+    status: z.enum(["paid", "pending"]),
+    note: text.nullable().default(null),
+    categoryId: z.uuid(),
+    accountId: z.uuid().nullable().default(null),
+    recurrenceId: z.uuid().nullable().default(null),
+    /** The month a recurrence generated it for; one per rule and month, deleted or not. */
+    occurrenceMonth: monthSchema.nullable().default(null),
+    source: z.enum(["app", "web", "widget", "mcp", "import", "recurrence", "capture"]),
+    needsReview: z.boolean().default(false),
+    captureSource: z.enum(CAPTURE_SOURCES).nullable().default(null),
+    capturedAt: timestamp.nullable().default(null),
+    captureMerchantKey: text.nullable().default(null),
+    createdAt: timestamp.optional(),
+    /** Set on create and on every edit; an older record has none (read `createdAt`). */
+    updatedAt: timestamp.optional(),
+  })
+  .loose();
 
-export const categoryRecord = z.object({
-  s: z.literal(1),
-  name: text,
-  kind: z.enum(["expense", "income"]),
-  icon: text,
-  color: text,
-  sortOrder: z.number().int(),
-  archivedAt: timestamp.nullable().default(null),
-  systemKey: text.nullable().default(null),
-  createdAt: timestamp.optional(),
-}).loose();
+export const categoryRecord = z
+  .object({
+    s: z.literal(1),
+    name: text,
+    kind: z.enum(["expense", "income"]),
+    icon: text,
+    color: text,
+    sortOrder: z.number().int(),
+    archivedAt: timestamp.nullable().default(null),
+    systemKey: text.nullable().default(null),
+    createdAt: timestamp.optional(),
+  })
+  .loose();
 
 /** One entry of the budget history: the amount applies from `effectiveFrom` until a later entry. */
-export const budgetRecord = z.object({
-  s: z.literal(1),
-  categoryId: z.uuid(),
-  amount: budgetAmountSchema,
-  effectiveFrom: monthSchema,
-}).loose();
+export const budgetRecord = z
+  .object({
+    s: z.literal(1),
+    categoryId: z.uuid(),
+    amount: budgetAmountSchema,
+    effectiveFrom: monthSchema,
+  })
+  .loose();
 
-export const recurrenceRecord = z.object({
-  s: z.literal(1),
-  name: text,
-  amount: amountSchema,
-  categoryId: z.uuid(),
-  frequency,
-  dayOfMonth: z.number().int().min(1).max(31),
-  monthOfYear: z.number().int().min(1).max(12).nullable().default(null),
-  startDate: isoDateSchema,
-  endDate: isoDateSchema.nullable().default(null),
-  /**
-   * The rule's revision. An occurrence's id is the UUID v5 of the rule id and `<month>:<rev>`;
-   * dropping the pending occurrences (an edit, an archive) bumps it so they come back under new ids.
-   */
-  rev: z.number().int().min(0).default(0),
-  createdAt: timestamp.optional(),
-}).loose();
+export const recurrenceRecord = z
+  .object({
+    s: z.literal(1),
+    name: text,
+    amount: amountSchema,
+    categoryId: z.uuid(),
+    frequency,
+    dayOfMonth: z.number().int().min(1).max(31),
+    monthOfYear: z.number().int().min(1).max(12).nullable().default(null),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema.nullable().default(null),
+    /**
+     * The rule's revision. An occurrence's id is the UUID v5 of the rule id and `<month>:<rev>`;
+     * dropping the pending occurrences (an edit, an archive) bumps it so they come back under new ids.
+     */
+    rev: z.number().int().min(0).default(0),
+    createdAt: timestamp.optional(),
+  })
+  .loose();
 
 /** The merchant memory: the category last chosen for a merchant (`merchantKey` of its name). */
-export const merchantRecord = z.object({
-  s: z.literal(1),
-  merchantKey: text.min(1),
-  categoryId: z.uuid(),
-}).loose();
+export const merchantRecord = z
+  .object({
+    s: z.literal(1),
+    merchantKey: text.min(1),
+    categoryId: z.uuid(),
+  })
+  .loose();
 
 /** The profile preferences (one per account). */
-export const settingsRecord = z.object({
-  s: z.literal(1),
-  name: text.nullable().default(null),
-  currency: z.enum(SUPPORTED_CURRENCIES),
-  locale: z.enum(["es", "en", "it", "pt"]),
-  timezone: z.string().refine(isValidTimeZone, "Unknown time zone"),
-  onboardingCompletedAt: timestamp.nullable().default(null),
-}).loose();
+export const settingsRecord = z
+  .object({
+    s: z.literal(1),
+    name: text.nullable().default(null),
+    currency: z.enum(SUPPORTED_CURRENCIES),
+    locale: z.enum(["es", "en", "it", "pt"]),
+    timezone: z.string().refine(isValidTimeZone, "Unknown time zone"),
+    onboardingCompletedAt: timestamp.nullable().default(null),
+  })
+  .loose();
 
-export const accountRecord = z.object({
-  s: z.literal(1),
-  name: text,
-  currency: text,
-  isDefault: z.boolean().default(false),
-}).loose();
+export const accountRecord = z
+  .object({
+    s: z.literal(1),
+    name: text,
+    currency: text,
+    isDefault: z.boolean().default(false),
+  })
+  .loose();
 
 export const RECORD_SCHEMAS = {
   transaction: transactionRecord,
@@ -113,7 +127,10 @@ export const RECORD_SCHEMAS = {
 export type RecordType = keyof typeof RECORD_SCHEMAS;
 export const RECORD_TYPES = Object.keys(RECORD_SCHEMAS) as RecordType[];
 
-export type RecordBodies = { [K in RecordType]: z.infer<(typeof RECORD_SCHEMAS)[K]> };
+/** Drops the `[key: string]: unknown` that `.loose()` adds: code names only known fields. */
+type KnownKeys<T> = { [K in keyof T as string extends K ? never : K]: T[K] };
+
+export type RecordBodies = { [K in RecordType]: KnownKeys<z.infer<(typeof RECORD_SCHEMAS)[K]>> };
 export type TransactionRecord = RecordBodies["transaction"];
 export type CategoryRecord = RecordBodies["category"];
 export type BudgetRecord = RecordBodies["budget"];
