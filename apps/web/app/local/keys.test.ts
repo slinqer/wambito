@@ -1,0 +1,221 @@
+import "fake-indexeddb/auto";
+import {
+  formatRecoveryKey,
+  fromBase64Url,
+  openFromDevice,
+  openRecord,
+  parseRecoveryKey,
+  sealRecord,
+  unwrapDataKey,
+  verifyDeviceAttestation,
+} from "@wambito/crypto";
+import { describe, expect, it } from "vitest";
+import { createEncryptedStore } from "./encrypted-store.ts";
+import {
+  forgetDevice,
+  KeysError,
+  loadLocalKeys,
+  setUpAccount,
+  unlockWithRecovery,
+} from "./keys.ts";
+
+interface Wrap {
+  id: string;
+  kind: string;
+  ref: string | null;
+  keyV: number;
+  wrapped: string;
+  publicKey: string | null;
+  attestation: string | null;
+  label: string | null;
+}
+
+/** A fake `/v2/keys` that enforces the rules the tests care about (the real one: `routes/keys.ts`). */
+function fakeKeys() {
+  const wraps: Wrap[] = [];
+  const puts: Array<{ id: string; kind: string }> = [];
+  const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), "http://x");
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+    if (url.pathname === "/api/v2/keys" && (init?.method ?? "GET") === "GET")
+      return json({ wraps });
+    const match = /^\/api\/v2\/keys\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (match && init?.method === "PUT") {
+      const id = match[1] as string;
+      expect(id).toBe(id.toLowerCase());
+      const body = JSON.parse(String(init.body));
+      puts.push({ id, kind: body.kind });
+      if (wraps.length === 0 && body.kind !== "recovery") {
+        return json({ code: "recovery_required" }, 422);
+      }
+      if (body.kind === "device" && (!body.publicKey || !body.attestation)) {
+        return json({ code: "attestation_required" }, 422);
+      }
+      const wrap: Wrap = {
+        id,
+        kind: body.kind,
+        ref: body.ref ?? null,
+        keyV: body.keyV,
+        wrapped: body.wrapped,
+        publicKey: body.publicKey ?? null,
+        attestation: body.attestation ?? null,
+        label: body.label ?? null,
+      };
+      const at = wraps.findIndex(
+        (w) => w.id === id || (w.kind === "recovery" && body.kind === "recovery"),
+      );
+      if (at >= 0) wraps.splice(at, 1);
+      wraps.push(wrap);
+      return json(wrap);
+    }
+    return new Response(null, { status: 404 });
+  };
+  return { fetch: fetch as typeof globalThis.fetch, wraps, puts };
+}
+
+let counter = 0;
+const newUser = () => `user_${++counter}`;
+const REC = "01930000-0000-7000-8000-00000000000a";
+const CTX = (userId: string, id: string) => ({ userId, type: "category" as const, id, keyV: 1 });
+
+describe("setUpAccount", () => {
+  it("puts the recovery wrap first, then an attested device wrap, and keeps only derived keys", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+
+    expect(api.puts.map((p) => p.kind)).toEqual(["recovery", "device"]);
+    expect(recoveryKey).toMatch(/^([0-9A-Z]{4}-){6}[0-9A-Z]{3}$/);
+
+    const recovery = api.wraps.find((w) => w.kind === "recovery");
+    const device = api.wraps.find((w) => w.kind === "device");
+    const dk = await unwrapDataKey(
+      parseRecoveryKey(recoveryKey as string),
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery?.wrapped as string),
+    );
+    expect(device?.publicKey).not.toBeNull();
+    expect(
+      await verifyDeviceAttestation(
+        dk,
+        {
+          userId,
+          wrapId: device?.id as string,
+          publicKey: fromBase64Url(device?.publicKey as string),
+        },
+        fromBase64Url(device?.attestation as string),
+      ),
+    ).toBe(true);
+
+    const local = await loadLocalKeys(userId);
+    expect(local?.keyV).toBe(1);
+    expect(local?.keys.record.extractable).toBe(false);
+    expect(local?.keys.dedupe.extractable).toBe(false);
+    // the stored keys are the ones the data key derives
+    const sealed = await sealRecord(local!.keys, CTX(userId, REC), { s: 1 });
+    expect(sealed.length).toBeGreaterThan(0);
+    const store = await createEncryptedStore(userId);
+    const priv = await store.getKey("device");
+    expect(priv).toBeDefined();
+    expect(
+      await openFromDevice(
+        priv as never,
+        { kind: "device", userId, keyV: 1 },
+        fromBase64Url(device?.wrapped as string),
+      ),
+    ).toEqual(dk);
+    expect(await store.getKey("dk")).toBeUndefined();
+    store.close();
+  });
+
+  it("gives a guest keys and wraps but no recovery key", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const result = await setUpAccount({ userId, guest: true, fetch: api.fetch });
+    expect(result.recoveryKey).toBeNull();
+    expect(await loadLocalKeys(userId)).not.toBeNull();
+    expect(api.puts.map((p) => p.kind)).toEqual(["recovery", "device"]);
+  });
+
+  it("throws already_set_up when the account has wraps, and stores nothing", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const other = newUser();
+    api.wraps.length = 0;
+    await setUpAccount({ userId: other, guest: false, fetch: api.fetch });
+    const second = await setUpAccount({ userId: other, guest: false, fetch: api.fetch }).catch(
+      (e) => e,
+    );
+    expect(second).toBeInstanceOf(KeysError);
+    expect(second.code).toBe("already_set_up");
+  });
+});
+
+describe("loadLocalKeys", () => {
+  it("is null in a browser that was never set up", async () => {
+    expect(await loadLocalKeys(newUser())).toBeNull();
+  });
+});
+
+describe("unlockWithRecovery", () => {
+  async function accountWithKey() {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    await forgetDevice(userId);
+    return { api, userId, recoveryKey: recoveryKey as string };
+  }
+
+  it("opens the recovery wrap, adds a device wrap and stores the same record key", async () => {
+    const { api, userId, recoveryKey } = await accountWithKey();
+    expect(await loadLocalKeys(userId)).toBeNull();
+    const before = api.wraps.length;
+    // tolerant of case, spaces and dashes
+    const messy = ` ${recoveryKey.toLowerCase().replaceAll("-", "  ")} `;
+    const keys = await unlockWithRecovery({ userId, text: messy, fetch: api.fetch });
+    expect(keys.keyV).toBe(1);
+    expect(api.wraps.length).toBe(before + 1);
+    expect(api.wraps.filter((w) => w.kind === "device").length).toBe(2);
+    const sealed = await sealRecord(keys.keys, CTX(userId, REC), { s: 1 });
+    expect(await openRecord((await loadLocalKeys(userId))!.keys, CTX(userId, REC), sealed)).toEqual(
+      { s: 1 },
+    );
+  });
+
+  it("rejects a malformed key with bad_recovery_key before any request", async () => {
+    const { api, userId, recoveryKey } = await accountWithKey();
+    const puts = api.puts.length;
+    const typo = recoveryKey.slice(0, -1) + (recoveryKey.endsWith("0") ? "1" : "0");
+    for (const text of ["", "hello", typo]) {
+      const err = await unlockWithRecovery({ userId, text, fetch: api.fetch }).catch((e) => e);
+      expect(err.code).toBe("bad_recovery_key");
+    }
+    expect(api.puts.length).toBe(puts);
+  });
+
+  it("rejects a well-formed key of another account with wrong_recovery_key", async () => {
+    const { api, userId } = await accountWithKey();
+    const stranger = formatRecoveryKey(crypto.getRandomValues(new Uint8Array(16)));
+    const err = await unlockWithRecovery({ userId, text: stranger, fetch: api.fetch }).catch(
+      (e) => e,
+    );
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("wrong_recovery_key");
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});
+
+describe("forgetDevice", () => {
+  it("removes the keys", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    await forgetDevice(userId);
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});

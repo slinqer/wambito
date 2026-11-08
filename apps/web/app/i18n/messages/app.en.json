@@ -773,5 +773,47 @@
     "taken_lead": "We can't change it to an email another account already uses. Write to privacy@wambito.com.",
     "no_token_title": "The link is incomplete",
     "no_token_lead": "Open the full link from the email we sent you."
+  },
+  "vault": {
+    "setup": {
+      "title": "Save your recovery key",
+      "lead": "It is the only way back to your data if you lose every device and passkey. Nobody can recover it for you, not even Wambito.",
+      "key_label": "Your recovery key",
+      "copy": "Copy",
+      "copied": "Copied",
+      "download": "Download as .txt",
+      "saved": "I saved it",
+      "file_title": "Wambito recovery key",
+      "file_line": "Keep it somewhere safe. Without it, nobody can recover your data.",
+      "file_date": "Created on {date}",
+      "confirm_title": "Check that you saved it",
+      "confirm_lead": "Type characters {positions} of your key.",
+      "chars_group": "Characters to confirm",
+      "char_label": "Character {n}",
+      "mismatch": "They do not match. Check the key you saved.",
+      "show_again": "See the key again",
+      "continue": "Continue"
+    },
+    "unlock": {
+      "title": "Open your data here",
+      "lead": "Your data is encrypted. Type your recovery key to open it in this browser.",
+      "label": "Recovery key",
+      "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "submit": "Open my data",
+      "busy": "Opening…",
+      "error_bad_recovery_key": "That key is not in the right format. Check that you copied all of it.",
+      "error_wrong_recovery_key": "That key does not open this account. Try the one you saved when you created it.",
+      "error_offline": "You are offline. Try again when you are back online.",
+      "error_server": "Something went wrong on our side. Try again.",
+      "soon": "Soon you will be able to open your data with a passkey or from another device."
+    },
+    "locked": {
+      "title": "We could not open your data",
+      "lead": "It is still safe. Try again.",
+      "offline_title": "You are offline",
+      "offline_lead": "We need a connection to open your data in this browser.",
+      "retry": "Try again",
+      "retrying": "Trying again…"
+    }
   }
 }

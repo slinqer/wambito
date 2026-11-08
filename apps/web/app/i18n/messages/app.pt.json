@@ -773,5 +773,47 @@
     "taken_lead": "Não podemos alterá-lo para um email que outra conta já usa. Escreve para privacy@wambito.com.",
     "no_token_title": "A ligação está incompleta",
     "no_token_lead": "Abre a ligação completa do email que te enviámos."
+  },
+  "vault": {
+    "setup": {
+      "title": "Guarda a tua chave de recuperação",
+      "lead": "É a única forma de voltares aos teus dados se perderes todos os dispositivos e chaves de acesso. Ninguém a pode recuperar por ti, nem sequer o Wambito.",
+      "key_label": "A tua chave de recuperação",
+      "copy": "Copiar",
+      "copied": "Copiada",
+      "download": "Transferir como .txt",
+      "saved": "Já a guardei",
+      "file_title": "Chave de recuperação do Wambito",
+      "file_line": "Guarda-a num sítio seguro. Sem ela, ninguém pode recuperar os teus dados.",
+      "file_date": "Criada em {date}",
+      "confirm_title": "Confirma que a guardaste",
+      "confirm_lead": "Escreve os caracteres {positions} da tua chave.",
+      "chars_group": "Caracteres a confirmar",
+      "char_label": "Carácter {n}",
+      "mismatch": "Não coincidem. Confere a chave que guardaste.",
+      "show_again": "Ver a chave outra vez",
+      "continue": "Continuar"
+    },
+    "unlock": {
+      "title": "Abre aqui os teus dados",
+      "lead": "Os teus dados estão cifrados. Escreve a tua chave de recuperação para os abrires neste navegador.",
+      "label": "Chave de recuperação",
+      "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "submit": "Abrir os meus dados",
+      "busy": "A abrir…",
+      "error_bad_recovery_key": "Essa chave não tem o formato certo. Confirma que a copiaste toda.",
+      "error_wrong_recovery_key": "Essa chave não abre esta conta. Experimenta a que guardaste ao criá-la.",
+      "error_offline": "Estás sem ligação. Tenta outra vez quando voltares a estar online.",
+      "error_server": "Algo correu mal do nosso lado. Tenta outra vez.",
+      "soon": "Em breve poderás abrir os teus dados com uma chave de acesso ou a partir de outro dispositivo."
+    },
+    "locked": {
+      "title": "Não conseguimos abrir os teus dados",
+      "lead": "Continuam em segurança. Tenta outra vez.",
+      "offline_title": "Estás sem ligação",
+      "offline_lead": "Precisamos de ligação para abrir os teus dados neste navegador.",
+      "retry": "Tentar outra vez",
+      "retrying": "A tentar outra vez…"
+    }
   }
 }

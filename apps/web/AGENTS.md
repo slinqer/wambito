@@ -26,6 +26,17 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
   `410` resync that re-applies pending edits; the design notes are at the top of the file;
   tests run against a fake `/v2` in `sync.test.ts`). A
+  `keys.ts` (no React; injected `fetch`, `/api`): `setUpAccount({ userId, guest })` (DK + recovery
+  secret + device key pair; PUT the recovery wrap first, then the attested device wrap; keeps only the
+  non-extractable record/dedupe keys and the device private key in the vault's `keys` store, plus
+  meta `keyV`; returns the formatted `recoveryKey`, `null` for a guest, whose recovery secret is
+  discarded unseen because the server wants a recovery wrap first; `KeysError("already_set_up")`
+  when the account has wraps), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
+  `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `loadLocalKeys(userId)`
+  (`null` = locked), `forgetDevice(userId)` (sign-out: `deleteVault`). Screens in
+  `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
+  characters back), `Unlock` (`onUnlock(text) → UnlockError | null`), `Locked` (retry); pure UI,
+  callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
