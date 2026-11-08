@@ -54,11 +54,15 @@ import {
 } from "../services/transactions.ts";
 
 /** A query param that may repeat: Hono hands one value as a string and several as an array. */
-function repeated<T extends z.ZodType>(item: T, max: number) {
+function repeated<T extends z.ZodType>(item: T, max: number, format?: string) {
   return z
     .preprocess((v) => (typeof v === "string" ? [v] : v), z.array(item).max(max))
     .optional()
-    .openapi({ type: "array", items: { type: "string" }, param: { style: "form", explode: true } });
+    .openapi({
+      type: "array",
+      items: { type: "string", ...(format ? { format } : {}) },
+      param: { style: "form", explode: true },
+    });
 }
 
 const idParam = z.object({ id: z.uuid() });
@@ -73,7 +77,7 @@ const listQuery = z
     /** Words the name or the note contains, ignoring case and accents; repeat to match any of them. */
     q: repeated(z.string().trim().min(1).max(100), 10),
     /** Repeat to match any of the categories. */
-    category: repeated(z.uuid(), 20),
+    category: repeated(z.uuid(), 20, "uuid"),
     /** With both text and categories: `all` (default) needs both, `any` either. */
     match: z.enum(["all", "any"]).optional(),
     /** `true` adds `totals` (count and sums of every match, ignoring the cursor) to the page. */
@@ -210,12 +214,19 @@ export function transactionRoutes(deps: AppDeps) {
         const [sums] = await tx
           .select({
             count: sql<number>`count(*)::int`,
-            expense: sql<number>`coalesce(sum(-${transactions.amount}) filter (where ${transactions.amount} < 0), 0)::int`,
-            income: sql<number>`coalesce(sum(${transactions.amount}) filter (where ${transactions.amount} > 0), 0)::int`,
+            expense: sql<string>`coalesce(sum(-${transactions.amount}) filter (where ${transactions.amount} < 0), 0)`,
+            income: sql<string>`coalesce(sum(${transactions.amount}) filter (where ${transactions.amount} > 0), 0)`,
           })
           .from(transactions)
           .where(and(...filters));
-        return { rows, totals: sums };
+        return {
+          rows,
+          totals: sums && {
+            count: sums.count,
+            expense: Number(sums.expense),
+            income: Number(sums.income),
+          },
+        };
       });
       const items = rows.slice(0, q.limit);
       const last = items.at(-1);
