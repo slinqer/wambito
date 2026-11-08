@@ -57,25 +57,25 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
   4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
   `last_used_at`; sessions get 404 there.
-- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; same spec §7.3): relay for
-  approving a new device; opaque bytes (public key in, sealed data key out), never read or logged.
-  The server makes the 8-char code (`pairingCode` from `@wambito/crypto`), unique per person
-  (a collision retries); lookup normalizes the typed code. 10 min TTL read from `deps.now`, max 5
-  open (429). Writes hold `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id,
-  0))`. Pickup deletes the row in the same transaction. `purgeExpiredPairings` runs with the daily
-  tombstone purge (`scheduleTombstonePurge`). Assistant tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
+  approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
+  `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is
+  set) -> `POST /{id}/approver` (once, 409 `already_set`) -> `POST /{id}/reveal` (new device's key;
+  409 `not_ready`/`already_set`, 422 `commitment_mismatch` via `pairingCommitment` from
+  `@wambito/crypto`) -> `POST /{id}/seal` `{sealed, keyV}` (409 `not_ready`/`already_sealed`, 422
+  `approver_mismatch`: first 32 bytes must be the approver key) -> `GET /{id}` returns the full
+  state (null fields until set) and deletes the row when `sealed` is returned. The server makes the
+  8-char code (`pairingCode`), unique per person (a collision retries); lookup normalizes the typed
+  code. 10 min TTL read from `deps.now`, max 5 open (429). Every write holds
+  `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id, 0))`.
+  `purgeExpiredPairings` runs with the daily tombstone purge (`scheduleTombstonePurge`). Assistant
+  tokens get 403 (not in `ASSISTANT_PATHS`).
 - `/v2` rules: record and key-wrap ids are lower-case UUIDs (`lowerCaseUuid` in `http/schemas.ts`,
   the `@wambito/crypto` rule; never lower-cased, upper case is 422); a live record body is at least
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
 - Known gaps (spec §17, open before stage 2):
-  - Pairing number (§7.3): the relay gives the new device no approver key before the seal and
-    `sealToDevice` makes its ephemeral key internally, so the 6-digit comparison cannot happen;
-    without a commitment a server could grind a 6-digit match (~2^20 X25519 ops). Plan: ZRTP-style
-    commit (SHA-256 of the approver's ephemeral key) then reveal; the number comes from the new
-    device's key and the revealed key; needs pairing columns, a reveal endpoint and new
-    `pairingNumber` vectors before the Dart port. The QR path (out of band) is unaffected.
   - Device keys in rotation (§7.5): the rotating device seals the new data key to device public
     keys the server lists; a malicious server could add or swap one. Plan: each device wrap
     carries an attestation (HMAC under a key derived from the data key over user id || wrap id ||

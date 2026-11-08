@@ -6,51 +6,49 @@
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
-part 'pairing_pickup.g.dart';
+part 'pairing_reveal.g.dart';
 
-/// PairingPickup
+/// PairingReveal
 ///
 /// Properties:
-/// * [sealed_] - base64url; null until the other device seals
+/// * [publicKey] - The new device's X25519 public key, 32 bytes, base64url; must match the commitment
 @BuiltValue()
-abstract class PairingPickup implements Built<PairingPickup, PairingPickupBuilder> {
-  /// base64url; null until the other device seals
-  @BuiltValueField(wireName: r'sealed')
-  String? get sealed_;
+abstract class PairingReveal implements Built<PairingReveal, PairingRevealBuilder> {
+  /// The new device's X25519 public key, 32 bytes, base64url; must match the commitment
+  @BuiltValueField(wireName: r'publicKey')
+  String get publicKey;
 
-  PairingPickup._();
+  PairingReveal._();
 
-  factory PairingPickup([void updates(PairingPickupBuilder b)]) = _$PairingPickup;
+  factory PairingReveal([void updates(PairingRevealBuilder b)]) = _$PairingReveal;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(PairingPickupBuilder b) => b;
+  static void _defaults(PairingRevealBuilder b) => b;
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<PairingPickup> get serializer => _$PairingPickupSerializer();
+  static Serializer<PairingReveal> get serializer => _$PairingRevealSerializer();
 }
 
-class _$PairingPickupSerializer implements PrimitiveSerializer<PairingPickup> {
+class _$PairingRevealSerializer implements PrimitiveSerializer<PairingReveal> {
   @override
-  final Iterable<Type> types = const [PairingPickup, _$PairingPickup];
+  final Iterable<Type> types = const [PairingReveal, _$PairingReveal];
 
   @override
-  final String wireName = r'PairingPickup';
+  final String wireName = r'PairingReveal';
 
   Iterable<Object?> _serializeProperties(
     Serializers serializers,
-    PairingPickup object, {
+    PairingReveal object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'sealed';
-    yield object.sealed_ == null
-        ? null
-        : serializers.serialize(object.sealed_, specifiedType: const FullType.nullable(String));
+    yield r'publicKey';
+    yield serializers.serialize(object.publicKey, specifiedType: const FullType(String));
   }
 
   @override
   Object serialize(
     Serializers serializers,
-    PairingPickup object, {
+    PairingReveal object, {
     FullType specifiedType = FullType.unspecified,
   }) {
     return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
@@ -61,20 +59,17 @@ class _$PairingPickupSerializer implements PrimitiveSerializer<PairingPickup> {
     Object serialized, {
     FullType specifiedType = FullType.unspecified,
     required List<Object?> serializedList,
-    required PairingPickupBuilder result,
+    required PairingRevealBuilder result,
     required List<Object?> unhandled,
   }) {
     for (var i = 0; i < serializedList.length; i += 2) {
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'sealed':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
-          result.sealed_ = valueDes;
+        case r'publicKey':
+          final valueDes =
+              serializers.deserialize(value, specifiedType: const FullType(String)) as String;
+          result.publicKey = valueDes;
           break;
         default:
           unhandled.add(key);
@@ -85,12 +80,12 @@ class _$PairingPickupSerializer implements PrimitiveSerializer<PairingPickup> {
   }
 
   @override
-  PairingPickup deserialize(
+  PairingReveal deserialize(
     Serializers serializers,
     Object serialized, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    final result = PairingPickupBuilder();
+    final result = PairingRevealBuilder();
     final serializedList = (serialized as Iterable<Object?>).toList();
     final unhandled = <Object?>[];
     _deserializeProperties(

@@ -1,4 +1,4 @@
-import { pairingCode } from "@wambito/crypto";
+import { pairingCode, pairingCommitment } from "@wambito/crypto";
 import { type Db, pairingRequests, user, withUser } from "@wambito/db";
 import { and, asc, eq, gt, isNull, lte, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
@@ -41,11 +41,11 @@ async function lockPairings(tx: Parameters<Parameters<typeof withUser>[2]>[0], u
   );
 }
 
-/** Opens a request for the new device's public key; 429 past five open ones. */
+/** Opens a request for the new device's key commitment; 429 past five open ones. */
 export async function startPairing(
   db: Db,
   userId: string,
-  publicKey: string,
+  commitment: string,
   now: Date,
 ): Promise<PairingStartedDto> {
   const expiresAt = new Date(now.getTime() + PAIRING_TTL_MS);
@@ -81,7 +81,7 @@ export async function startPairing(
         const [row] = await tx.transaction((sp) =>
           sp
             .insert(pairingRequests)
-            .values({ userId, code, publicKey: Buffer.from(bytes(publicKey)), expiresAt })
+            .values({ userId, code, commitment: Buffer.from(bytes(commitment)), expiresAt })
             .returning({ id: pairingRequests.id }),
         );
         if (!row) throw new Error("pairing insert returned nothing");
@@ -94,7 +94,10 @@ export async function startPairing(
   throw new Error("Could not make a free pairing code");
 }
 
-/** The unsealed, unexpired request with this code; 404 otherwise (also another person's). */
+/**
+ * The request with this code that has no approver key yet and has not expired; 404 otherwise
+ * (also another person's).
+ */
 export async function findPairing(db: Db, userId: string, code: string, now: Date) {
   return withUser(db, userId, async (tx) => {
     const [row] = await tx
@@ -104,69 +107,142 @@ export async function findPairing(db: Db, userId: string, code: string, now: Dat
         and(
           eq(pairingRequests.userId, userId),
           eq(pairingRequests.code, normalizePairingCode(code)),
-          isNull(pairingRequests.sealed),
+          isNull(pairingRequests.approverKey),
           gt(pairingRequests.expiresAt, now),
         ),
       );
     if (!row) throw new ApiError(404, "not_found");
-    return { id: row.id, publicKey: b64(row.publicKey), expiresAt: row.expiresAt.toISOString() };
+    return { id: row.id, commitment: b64(row.commitment), expiresAt: row.expiresAt.toISOString() };
   });
 }
 
-/** Stores the sealed key; 404 for a missing, expired or foreign request, 409 when already sealed. */
+type Tx = Parameters<Parameters<typeof withUser>[2]>[0];
+
+/** Locks the person's pairings and loads one unexpired request of theirs; 404 otherwise. */
+async function loadLocked(tx: Tx, userId: string, id: string, now: Date) {
+  await lockPairings(tx, userId);
+  const [row] = await tx
+    .select()
+    .from(pairingRequests)
+    .where(
+      and(
+        eq(pairingRequests.userId, userId),
+        eq(pairingRequests.id, id.toLowerCase()),
+        gt(pairingRequests.expiresAt, now),
+      ),
+    );
+  if (!row) throw new ApiError(404, "not_found");
+  return row;
+}
+
+const updateRow = (
+  tx: Tx,
+  userId: string,
+  id: string,
+  set: Partial<typeof pairingRequests.$inferInsert>,
+) =>
+  tx
+    .update(pairingRequests)
+    .set(set)
+    .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, id)));
+
+/** Stores the approving device's ephemeral key, once; 409 `already_set` after. */
+export async function setApprover(
+  db: Db,
+  userId: string,
+  id: string,
+  publicKey: string,
+  now: Date,
+): Promise<void> {
+  await withUser(db, userId, async (tx) => {
+    const row = await loadLocked(tx, userId, id, now);
+    if (row.approverKey) throw new ApiError(409, "already_set", "The approver key is already set");
+    await updateRow(tx, userId, row.id, { approverKey: Buffer.from(bytes(publicKey)) });
+  });
+}
+
+/**
+ * Stores the new device's key once it matches the commitment. 409 `not_ready` before the approver
+ * key, 409 `already_set` when revealed, 422 `commitment_mismatch` for a key that does not hash to
+ * the commitment.
+ */
+export async function revealPairing(
+  db: Db,
+  userId: string,
+  id: string,
+  publicKey: string,
+  now: Date,
+): Promise<void> {
+  const key = bytes(publicKey);
+  const hash = Buffer.from(await pairingCommitment(key));
+  await withUser(db, userId, async (tx) => {
+    const row = await loadLocked(tx, userId, id, now);
+    if (!row.approverKey) throw new ApiError(409, "not_ready", "The approver key is not set yet");
+    if (row.publicKey) throw new ApiError(409, "already_set", "The key was already revealed");
+    if (!hash.equals(row.commitment)) {
+      throw new ApiError(422, "commitment_mismatch", "The key does not match the commitment");
+    }
+    await updateRow(tx, userId, row.id, { publicKey: Buffer.from(key) });
+  });
+}
+
+/**
+ * Stores the sealed key. 409 `not_ready` without a revealed key, 409 `already_sealed`, 422
+ * `approver_mismatch` when the blob does not start with the approver key.
+ */
 export async function sealPairing(
   db: Db,
   userId: string,
   id: string,
   sealed: string,
+  keyV: number,
   now: Date,
 ): Promise<void> {
+  const blob = Buffer.from(bytes(sealed));
   await withUser(db, userId, async (tx) => {
-    await lockPairings(tx, userId);
-    const [row] = await tx
-      .select({ sealed: pairingRequests.sealed })
-      .from(pairingRequests)
-      .where(
-        and(
-          eq(pairingRequests.userId, userId),
-          eq(pairingRequests.id, id.toLowerCase()),
-          gt(pairingRequests.expiresAt, now),
-        ),
-      );
-    if (!row) throw new ApiError(404, "not_found");
+    const row = await loadLocked(tx, userId, id, now);
     if (row.sealed) throw new ApiError(409, "already_sealed", "Already sealed");
-    await tx
-      .update(pairingRequests)
-      .set({ sealed: Buffer.from(bytes(sealed)) })
-      .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, id.toLowerCase())));
+    if (!row.approverKey || !row.publicKey) {
+      throw new ApiError(409, "not_ready", "The new device has not revealed its key yet");
+    }
+    if (!blob.subarray(0, row.approverKey.length).equals(row.approverKey)) {
+      throw new ApiError(422, "approver_mismatch", "The sealed key is not from the approver key");
+    }
+    await updateRow(tx, userId, row.id, { sealed: blob, keyV });
   });
 }
 
-/** The sealed key, deleting the request in the same transaction; `null` while unsealed. */
+export interface PairingStateDto {
+  commitment: string;
+  approverKey: string | null;
+  publicKey: string | null;
+  sealed: string | null;
+  keyV: number | null;
+  expiresAt: string;
+}
+
+/** The request's state; a sealed one is deleted in the same transaction (read once). */
 export async function takePairing(
   db: Db,
   userId: string,
   id: string,
   now: Date,
-): Promise<string | null> {
+): Promise<PairingStateDto> {
   return withUser(db, userId, async (tx) => {
-    await lockPairings(tx, userId);
-    const [row] = await tx
-      .select()
-      .from(pairingRequests)
-      .where(
-        and(
-          eq(pairingRequests.userId, userId),
-          eq(pairingRequests.id, id.toLowerCase()),
-          gt(pairingRequests.expiresAt, now),
-        ),
-      );
-    if (!row) throw new ApiError(404, "not_found");
-    if (!row.sealed) return null;
-    await tx
-      .delete(pairingRequests)
-      .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, row.id)));
-    return b64(row.sealed);
+    const row = await loadLocked(tx, userId, id, now);
+    if (row.sealed) {
+      await tx
+        .delete(pairingRequests)
+        .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, row.id)));
+    }
+    return {
+      commitment: b64(row.commitment),
+      approverKey: row.approverKey ? b64(row.approverKey) : null,
+      publicKey: row.publicKey ? b64(row.publicKey) : null,
+      sealed: row.sealed ? b64(row.sealed) : null,
+      keyV: row.keyV,
+      expiresAt: row.expiresAt.toISOString(),
+    };
   });
 }
 

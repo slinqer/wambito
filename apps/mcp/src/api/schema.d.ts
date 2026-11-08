@@ -744,11 +744,45 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The unlocked device finds the new device's request by the typed `code` (case, dashes, spaces and look-alike letters are forgiven). 404 when expired, already sealed, or not the person's. */
+        /** @description The unlocked device finds the new device's request by the typed `code` (case, dashes, spaces and look-alike letters are forgiven) and gets its `commitment`. 404 when expired, when an approver key is already set, or when it is not the person's. */
         get: operations["findPairing"];
         put?: never;
-        /** @description The new device posts its ephemeral public key and shows the returned `code`. At most 5 unexpired requests per person (429 `too_many_pairings`); a request lives 10 minutes. */
+        /** @description The new device posts a commitment to its public key (SHA-256 with a domain tag) and shows the returned `code`. At most 5 unexpired requests per person (429 `too_many_pairings`); a request lives 10 minutes. */
         post: operations["startPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}/approver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The unlocked device posts its ephemeral public key for this pairing, once. 404 when expired or not the person's, 409 `already_set`. */
+        post: operations["setPairingApprover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The new device reveals its public key after it sees the approver key. 404 when expired or not the person's, 409 `not_ready` (no approver key yet) or `already_set`, 422 `commitment_mismatch` when the key does not match the commitment. */
+        post: operations["revealPairing"];
         delete?: never;
         options?: never;
         head?: never;
@@ -764,7 +798,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description The unlocked device posts the data key sealed to the request's public key (up to 1 KiB). 404 when expired or not the person's, 409 `already_sealed`. */
+        /** @description The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version. 404 when expired or not the person's, 409 `not_ready` (no revealed key) or `already_sealed`, 422 `approver_mismatch` when the first 32 bytes of `sealed` are not the approver key. */
         post: operations["sealPairing"];
         delete?: never;
         options?: never;
@@ -779,7 +813,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The new device polls. `sealed` is null until the other device seals; when it is returned the request is deleted in the same transaction, so a second read is 404. */
+        /** @description Both devices poll. Returns `commitment`, `approverKey`, `publicKey`, `sealed`, `keyV` (null until set) and `expiresAt`. When `sealed` is returned the request is deleted in the same transaction, so a later read is 404. */
         get: operations["takePairing"];
         put?: never;
         post?: never;
@@ -1364,23 +1398,42 @@ export interface components {
             expiresAt: string;
         };
         StartPairing: {
-            /** @description The new device's ephemeral X25519 public key, 32 bytes, base64url */
-            publicKey: string;
+            /** @description SHA-256("wambito/v1/pairing-commit" || the new device's X25519 public key), 32 bytes, base64url */
+            commitment: string;
         };
         PairingFound: {
             /** Format: uuid */
             id: string;
             /** @description base64url without padding */
-            publicKey: string;
+            commitment: string;
             expiresAt: string;
         };
-        SealPairing: {
-            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded */
-            sealed: string;
+        PairingApprover: {
+            /** @description The approving device's ephemeral X25519 public key, 32 bytes, base64url */
+            publicKey: string;
         };
-        PairingPickup: {
-            /** @description base64url; null until the other device seals */
+        PairingReveal: {
+            /** @description The new device's X25519 public key, 32 bytes, base64url; must match the commitment */
+            publicKey: string;
+        };
+        SealPairing: {
+            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded; its first 32 bytes are the approver key */
+            sealed: string;
+            /** @description The data key version the seal is bound to */
+            keyV: number;
+        };
+        PairingState: {
+            /** @description base64url */
+            commitment: string;
+            /** @description base64url; null until set */
+            approverKey: string | null;
+            /** @description base64url; null until set */
+            publicKey: string | null;
+            /** @description base64url; null until set */
             sealed: string | null;
+            /** @description null until sealed */
+            keyV: number | null;
+            expiresAt: string;
         };
     };
     responses: never;
@@ -3623,6 +3676,99 @@ export interface operations {
             };
         };
     };
+    setPairingApprover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingApprover"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    revealPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingReveal"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     sealPairing: {
         parameters: {
             query?: never;
@@ -3663,6 +3809,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     takePairing: {
@@ -3676,13 +3831,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The sealed key, or null */
+            /** @description The request's state */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PairingPickup"];
+                    "application/json": components["schemas"]["PairingState"];
                 };
             };
             /** @description Problem */

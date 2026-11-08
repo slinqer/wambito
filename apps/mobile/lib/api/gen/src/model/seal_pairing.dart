@@ -11,12 +11,17 @@ part 'seal_pairing.g.dart';
 /// SealPairing
 ///
 /// Properties:
-/// * [sealed_] - The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded
+/// * [sealed_] - The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded; its first 32 bytes are the approver key
+/// * [keyV] - The data key version the seal is bound to
 @BuiltValue()
 abstract class SealPairing implements Built<SealPairing, SealPairingBuilder> {
-  /// The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded
+  /// The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded; its first 32 bytes are the approver key
   @BuiltValueField(wireName: r'sealed')
   String get sealed_;
+
+  /// The data key version the seal is bound to
+  @BuiltValueField(wireName: r'keyV')
+  int get keyV;
 
   SealPairing._();
 
@@ -43,6 +48,8 @@ class _$SealPairingSerializer implements PrimitiveSerializer<SealPairing> {
   }) sync* {
     yield r'sealed';
     yield serializers.serialize(object.sealed_, specifiedType: const FullType(String));
+    yield r'keyV';
+    yield serializers.serialize(object.keyV, specifiedType: const FullType(int));
   }
 
   @override
@@ -70,6 +77,11 @@ class _$SealPairingSerializer implements PrimitiveSerializer<SealPairing> {
           final valueDes =
               serializers.deserialize(value, specifiedType: const FullType(String)) as String;
           result.sealed_ = valueDes;
+          break;
+        case r'keyV':
+          final valueDes =
+              serializers.deserialize(value, specifiedType: const FullType(int)) as int;
+          result.keyV = valueDes;
           break;
         default:
           unhandled.add(key);

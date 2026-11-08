@@ -294,11 +294,14 @@ export const RotateKeys = z
 /** The longest a sealed data key may be, in bytes (a sealed 32-byte key is far smaller). */
 export const MAX_SEALED_PAIRING = 1024;
 
+const pairingKey = (description: string) =>
+  base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES).openapi({ description });
+
 export const StartPairing = z
   .object({
-    publicKey: base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES).openapi({
-      description: "The new device's ephemeral X25519 public key, 32 bytes, base64url",
-    }),
+    commitment: pairingKey(
+      'SHA-256("wambito/v1/pairing-commit" || the new device\'s X25519 public key), 32 bytes, base64url',
+    ),
   })
   .openapi("StartPairing");
 
@@ -315,24 +318,49 @@ export const PairingStarted = z
 export const PairingFound = z
   .object({
     id: z.uuid(),
-    publicKey: z.string().openapi({ description: "base64url without padding" }),
+    commitment: z.string().openapi({ description: "base64url without padding" }),
     expiresAt: z.string(),
   })
   .openapi("PairingFound");
 
+export const PairingApprover = z
+  .object({
+    publicKey: pairingKey(
+      "The approving device's ephemeral X25519 public key, 32 bytes, base64url",
+    ),
+  })
+  .openapi("PairingApprover");
+
+export const PairingReveal = z
+  .object({
+    publicKey: pairingKey(
+      "The new device's X25519 public key, 32 bytes, base64url; must match the commitment",
+    ),
+  })
+  .openapi("PairingReveal");
+
 export const SealPairing = z
   .object({
     sealed: base64urlBytes(1, MAX_SEALED_PAIRING).openapi({
-      description: `The data key sealed to the new device's public key, base64url, 1–${MAX_SEALED_PAIRING} bytes decoded`,
+      description: `The data key sealed to the new device's public key, base64url, 1–${MAX_SEALED_PAIRING} bytes decoded; its first 32 bytes are the approver key`,
     }),
+    keyV: z
+      .int()
+      .min(0)
+      .max(32767)
+      .openapi({ description: "The data key version the seal is bound to" }),
   })
   .openapi("SealPairing");
 
-export const PairingPickup = z
+const nullableB64 = z.string().nullable().openapi({ description: "base64url; null until set" });
+
+export const PairingState = z
   .object({
-    sealed: z
-      .string()
-      .nullable()
-      .openapi({ description: "base64url; null until the other device seals" }),
+    commitment: z.string().openapi({ description: "base64url" }),
+    approverKey: nullableB64,
+    publicKey: nullableB64,
+    sealed: nullableB64,
+    keyV: z.int().nullable().openapi({ description: "null until sealed" }),
+    expiresAt: z.string(),
   })
-  .openapi("PairingPickup");
+  .openapi("PairingState");
