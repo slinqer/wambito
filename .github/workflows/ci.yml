@@ -83,6 +83,9 @@ jobs:
       # once the API answers (it applies the migrations first, so the tables exist).
       - run: timeout 120 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
       - run: docker compose exec -T api pnpm --filter @wambito/api seed:admin
+      # The encrypted-preview account the vault e2e signs in with (preview-e2e, in
+      # E2E_PREVIEW_USER_IDS by default); the spec resets it again before it runs.
+      - run: docker compose exec -T api pnpm --filter @wambito/api seed:e2e-preview
       # App flows against `pnpm dev` (Playwright starts it) and the stack, at phone and desktop
       # sizes, axe on every screen included.
       - run: pnpm --filter @wambito/web e2e
