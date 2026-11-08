@@ -94,7 +94,10 @@ describe("parseRecord", () => {
   test("a transaction's updatedAt is optional", () => {
     expect(parseRecord("transaction", valid.transaction).ok).toBe(true);
     expect(
-      parseRecord("transaction", { ...(valid.transaction as object), updatedAt: "2026-10-21T10:00:00Z" }),
+      parseRecord("transaction", {
+        ...(valid.transaction as object),
+        updatedAt: "2026-10-21T10:00:00Z",
+      }),
     ).toMatchObject({ ok: true, value: { updatedAt: "2026-10-21T10:00:00Z" } });
   });
 });

@@ -15,7 +15,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/` (the seed over a memory store);
   `app/local/` the local backend: `FinanceStore` (`store.ts`, contract tests in `store-contract.ts`),
   `memory-store.ts`, `backend.ts` (`createLocalBackend`: the `/v1` routes over a store, one store
-  transaction per request), `ids.ts` (UUID v7 and v5);
+  transaction per request), `ids.ts` (UUID v7 and v5), `db.ts` (promise wrapper over IndexedDB:
+  database `wambito-vault-<userId>`, one store per record type plus `outbox`, `meta`,
+  `quarantine`, `keys`; `deleteVault`), `encrypted-store.ts` (`createEncryptedStore(userId)`: a
+  `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
+  transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
+  also the sync helpers `readOutbox`, `ackOutbox`, `getMeta/setMeta`, `quarantine`, `wipeRecords`,
+  `getKey/putKey`). Subscribers fire after every commit that wrote, whatever its origin. A
+  recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
+  bumps its `rev`.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
@@ -39,6 +47,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `ConfirmEmail`, web-only, not in parity.json.
 - Storage: only `readStored/writeStored/removeStored` in `app/lib/stored.ts` (keys
   `wambito.<name>`, `sessionArea()` for session data).
+  Exception: `app/local/` talks to IndexedDB directly (`db.ts`), because the vault needs
+  transactions and CryptoKeys; nothing else in the app touches IndexedDB.
 - i18n: `app/i18n/messages/{es,en,it,pt}.json` public pages, `app.{es,en,it,pt}.json` the rest.
   `messages.test.ts` enforces parity, ICU, PT-PT, no slang in it/pt, no old names. The admin
   panel: `admin.{es,en}.json` only (namespace `admin`, `AdminMessages`; it/pt read en); codes only

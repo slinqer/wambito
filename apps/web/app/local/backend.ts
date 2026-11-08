@@ -170,11 +170,8 @@ const toTxRow = (id: string, b: TxBody, deleted = false): TxRow => ({
   deleted,
 });
 
-const toTransactionDto = ({
-  occurrenceMonth: _o,
-  deleted: _d,
-  ...dto
-}: TxRow): TransactionDto => dto;
+const toTransactionDto = ({ occurrenceMonth: _o, deleted: _d, ...dto }: TxRow): TransactionDto =>
+  dto;
 const toRecurrenceDto = (r: RecurrenceRow): RecurrenceDto => ({
   id: r.id,
   name: r.name,
@@ -422,11 +419,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
           // One per rule and month, deleted or not. A pending occurrence of an older revision
           // that was dropped (a tombstone under another id) does not count.
           const blocked = (byKey.get(`${rule.id}|${month}`) ?? []).some(
-            (t) =>
-              !t.deleted ||
-              t.id === id ||
-              t.status !== "pending" ||
-              t.source !== "recurrence",
+            (t) => !t.deleted || t.id === id || t.status !== "pending" || t.source !== "recurrence",
           );
           if (blocked) continue;
           byKey.set(`${rule.id}|${month}`, [{ id } as TxRow]);

@@ -21,6 +21,9 @@ export interface WriteOptions {
    * the outbox. `"remote"` is the sync engine storing what the server sent: no outbox entry.
    */
   origin?: "local" | "remote";
+  /** Remote writes only: the server version and key version of the copy being stored. */
+  version?: number;
+  keyV?: number;
 }
 
 /** Reads and writes, shared by the store and by the transaction handed to `transaction(fn)`. */

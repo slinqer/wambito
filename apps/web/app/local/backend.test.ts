@@ -109,8 +109,10 @@ describe("createLocalBackend over the memory store", () => {
     ).data;
     const ruleId = rule?.id as string;
     const month = async (m: string) =>
-      ((await ctx.api.GET("/v1/transactions", { params: { query: { month: m } } })).data?.items ?? [])
-        .filter((t) => t.recurrenceId === ruleId);
+      (
+        (await ctx.api.GET("/v1/transactions", { params: { query: { month: m } } })).data?.items ??
+        []
+      ).filter((t) => t.recurrenceId === ruleId);
     return { ...ctx, food, ruleId, month };
   }
 
@@ -123,7 +125,9 @@ describe("createLocalBackend over the memory store", () => {
       body: { amount: -600_000_00 },
     });
     expect((await store.get("recurrence", ruleId))?.body.rev).toBe(1);
-    expect((await store.get("transaction", before?.id as string, { includeDeleted: true }))?.deleted).toBe(true);
+    expect(
+      (await store.get("transaction", before?.id as string, { includeDeleted: true }))?.deleted,
+    ).toBe(true);
     const after = await month("2026-10");
     expect(after.length).toBe(1);
     expect(after[0]?.id).toBe(await uuidv5(ruleId, "2026-10:1"));
