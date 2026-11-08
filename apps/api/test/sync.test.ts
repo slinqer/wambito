@@ -310,17 +310,40 @@ describe("/v2/sync", () => {
       expect(await code(res)).toBe("payload_too_large");
     });
 
-    test("the 100,001st live record", async () => {
+    test("the 100,000th live record is accepted, the 100,001st is not", async () => {
       const { headers, userId } = await t.signIn("full@wambito.test");
       await t.admin.execute(sql`insert into ${records} (id, user_id, type, key_v, enc_v, body)
         select gen_random_uuid(), ${userId}, 'transaction', 1, 1, '\\x00'::bytea
-        from generate_series(1, 100000)`);
-      const res = await pushRaw(headers, [create("one too many")]);
-      expect(res.status).toBe(409);
-      expect(await code(res)).toBe("record_limit");
+        from generate_series(1, 99999)`);
+      const refused = async (changes: Change[]) => {
+        const res = await pushRaw(headers, changes);
+        expect(res.status).toBe(409);
+        expect(await code(res)).toBe("record_limit");
+      };
+
       // A tombstone is not a live record.
       const tombstone = create("", { deleted: true, body: null });
-      expect((await push(headers, [tombstone]))[0]?.version).toBeTypeOf("number");
+      const [buried] = await push(headers, [tombstone]);
+      expect(buried?.version).toBeTypeOf("number");
+
+      const last = create("the 100,000th");
+      const [accepted] = await push(headers, [last]);
+      expect(accepted).toEqual({ id: last.id, version: expect.any(Number) });
+      await refused([create("one too many")]);
+
+      // Bringing a tombstone back to life counts the same way.
+      const revive = {
+        ...tombstone,
+        baseVersion: buried?.version as number,
+        deleted: false,
+        body: b64("back"),
+      };
+      await refused([revive]);
+      const [gone] = await push(headers, [
+        { ...last, baseVersion: accepted?.version as number, deleted: true, body: null },
+      ]);
+      expect(gone?.version).toBeTypeOf("number");
+      expect((await push(headers, [revive]))[0]?.version).toBeTypeOf("number");
     });
   });
 

@@ -130,33 +130,40 @@ export async function pushRecords(
   return withUser(db, userId, async (tx) => {
     await lockRecords(tx, userId);
 
+    // Live records, counted only when a push may add one, and before any of its writes (so the
+    // count never includes a row this push wrote), then kept up to date.
     let live: number | null = null;
-    // Counted once, then kept up to date, only for a push that can add a live record.
-    const addLive = async (count: number) => {
-      if (count <= 0) {
-        if (live !== null) live += count;
-        return;
-      }
-      if (live === null) {
+    const live$ = {
+      async count() {
+        if (live !== null) return;
         const [row] = await tx
           .select({ count: sql<string>`count(*)` })
           .from(records)
           .where(eq(records.deleted, false));
         live = Number(row?.count ?? 0);
-      }
-      live += count;
-      if (live > MAX_LIVE_RECORDS) {
-        throw new ApiError(
-          409,
-          "record_limit",
-          `An account holds at most ${MAX_LIVE_RECORDS} records`,
-        );
-      }
+      },
+      add(count: number) {
+        // A push of deletions only never counts: nothing it does can pass the limit.
+        if (live === null && count <= 0) return;
+        if (live === null) throw new Error("live records were not counted before the write");
+        live += count;
+        if (live > MAX_LIVE_RECORDS) {
+          throw new ApiError(
+            409,
+            "record_limit",
+            `An account holds at most ${MAX_LIVE_RECORDS} records`,
+          );
+        }
+      },
     };
+    if (changes.some((change) => !change.deleted)) await live$.count();
 
     const results: PushResult[] = [];
     for (const change of changes) {
-      results.push(await tx.transaction((sp) => applyChange(sp, userId, change, addLive)));
+      // A savepoint per change keeps its writes together; only conflicts, `id_taken` and
+      // `not_found` are per-change results. An unexpected database error (and `record_limit`)
+      // still aborts the whole push.
+      results.push(await tx.transaction((sp) => applyChange(sp, userId, change, live$.add)));
     }
     await hooks.beforeCommit?.();
     return results;
@@ -167,7 +174,7 @@ async function applyChange(
   tx: Tx,
   userId: string,
   change: SyncChangeInput,
-  addLive: (count: number) => Promise<void>,
+  addLive: (count: number) => void,
 ): Promise<PushResult> {
   const id = change.id.toLowerCase();
   const body = change.body === null ? null : new Uint8Array(Buffer.from(change.body, "base64url"));
@@ -195,7 +202,7 @@ async function applyChange(
       .returning({ version: records.version });
     // The id exists, but row-level security hides it: it is someone else's.
     if (!inserted) return { id, error: "id_taken" };
-    if (!change.deleted) await addLive(1);
+    if (!change.deleted) addLive(1);
     return { id, version: inserted.version };
   }
 
@@ -218,7 +225,7 @@ async function applyChange(
     .set(fields)
     .where(eq(records.id, id))
     .returning({ version: records.version });
-  await addLive(Number(current.deleted) - Number(change.deleted));
+  if (current.deleted !== change.deleted) addLive(change.deleted ? -1 : 1);
   return { id, version: (updated as { version: number }).version };
 }
 
