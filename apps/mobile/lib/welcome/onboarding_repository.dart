@@ -1,3 +1,4 @@
+import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -117,7 +118,11 @@ class ApiOnboardingRepository implements OnboardingRepository {
   @override
   Future<TransactionsPage> categoryTransactions(String categoryId, {String? cursor}) async {
     final page = await _settle(
-      () => _api.listTransactions(category: categoryId, cursor: cursor, limit: 200),
+      () => _api.listTransactions(
+        category: BuiltList<String>([categoryId]),
+        cursor: cursor,
+        limit: 200,
+      ),
     );
     return TransactionsPage(page.items.toList(), page.nextCursor);
   }

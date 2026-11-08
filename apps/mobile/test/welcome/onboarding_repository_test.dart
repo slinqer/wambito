@@ -147,7 +147,7 @@ void main() {
       adapter.reply = {'items': [], 'nextCursor': null};
       await repo.categoryTransactions('c1', cursor: 'next');
       expect(adapter.requests.single.queryParameters, {
-        'category': 'c1',
+        'category': isA<ListParam>().having((p) => p.value, 'value', ['c1']),
         'limit': 200,
         'cursor': 'next',
       });

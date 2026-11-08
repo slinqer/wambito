@@ -80,6 +80,7 @@ Serializers _$serializers =
           ..add(TransactionCaptureSourceEnum.serializer)
           ..add(TransactionList.serializer)
           ..add(TransactionPage.serializer)
+          ..add(TransactionPageTotals.serializer)
           ..add(TransactionSource_Enum.serializer)
           ..add(TransactionStatusEnum.serializer)
           ..add(TransactionSuggestion.serializer)

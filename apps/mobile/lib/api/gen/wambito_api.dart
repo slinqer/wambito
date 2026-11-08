@@ -65,6 +65,7 @@ export 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
 export 'package:wambito/api/gen/src/model/transaction.dart';
 export 'package:wambito/api/gen/src/model/transaction_list.dart';
 export 'package:wambito/api/gen/src/model/transaction_page.dart';
+export 'package:wambito/api/gen/src/model/transaction_page_totals.dart';
 export 'package:wambito/api/gen/src/model/transaction_suggestion.dart';
 export 'package:wambito/api/gen/src/model/transaction_suggestions.dart';
 export 'package:wambito/api/gen/src/model/trend_report.dart';

@@ -1,3 +1,4 @@
+import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -96,7 +97,9 @@ class ApiCategoriesRepository implements CategoriesRepository {
   @override
   Future<bool> hasTransactions(String categoryId) async {
     // The web's one page (200 rows) of the category's transactions: enough to know.
-    final page = await _settle(() => _api.listTransactions(category: categoryId, limit: 200));
+    final page = await _settle(
+      () => _api.listTransactions(category: BuiltList<String>([categoryId]), limit: 200),
+    );
     return page.items.isNotEmpty;
   }
 
