@@ -1,6 +1,7 @@
 import {
   addMonths,
   type BudgetEntry,
+  byCategory as byCategoryReport,
   type CategoryDto,
   costOfLiving,
   createCategorySchema,
@@ -22,6 +23,7 @@ import {
   setBudgetSchema,
   type TransactionDto,
   todayIn,
+  trend as trendReport,
   updateCategorySchema,
   updateProfileSchema,
   updateRecurrenceSchema,
@@ -795,57 +797,28 @@ export function createDemoBackend(seed: DemoSeed, now: () => Date = () => new Da
     const months = rangeParams(params);
     // Reports read their months like the screens do, as the API's reports.ts does.
     for (const month of months) materialize(month);
-    const kind = enumParam(params, "kind", ["expense", "income"] as const) ?? "expense";
-    const status = enumParam(params, "status", ["paid", "pending"] as const);
-    const from = firstDay(months[0] as Month);
-    const to = lastDay(months.at(-1) as Month);
-    const sums = new Map<string, number>();
-    for (const t of live()) {
-      if (t.date < from || t.date > to || (status && t.status !== status)) continue;
-      sums.set(t.categoryId, (sums.get(t.categoryId) ?? 0) + t.amount);
-    }
-    const sign = kind === "expense" ? -1 : 1;
-    const items = state.categories
-      .filter((c) => c.kind === kind && sums.has(c.id))
-      .map((c) => ({
-        categoryId: c.id,
-        name: c.name,
-        icon: c.icon,
-        color: c.color,
-        total: sign * (sums.get(c.id) ?? 0),
-      }))
-      .filter((i) => i.total !== 0)
-      .sort((x, y) => y.total - x.total);
-    const total = items.reduce((acc, i) => acc + i.total, 0);
-    return ok({
-      total,
-      items: items.map((i) => ({
-        ...i,
-        share: total === 0 ? 0 : Math.round((i.total / total) * 10_000) / 10_000,
-      })),
-    });
+    return ok(
+      byCategoryReport({
+        transactions: live(),
+        categories: state.categories,
+        months,
+        kind: enumParam(params, "kind", ["expense", "income"] as const) ?? "expense",
+        status: enumParam(params, "status", ["paid", "pending"] as const),
+      }),
+    );
   }
 
   function trend(params: URLSearchParams): Answer {
     const months = rangeParams(params);
     for (const month of months) materialize(month);
-    const kindOf = new Map(state.categories.map((c) => [c.id, c.kind]));
-    return ok({
-      months: months.map((month) => {
-        const txs = live().filter((t) => inMonth(t, month));
-        const used = new Set(txs.map((t) => t.categoryId));
-        let income = 0;
-        let expenses = 0;
-        for (const t of txs) {
-          if (kindOf.get(t.categoryId) === "income") income += t.amount;
-          else expenses -= t.amount;
-        }
-        const budget = state.categories
-          .filter((c) => c.kind === "expense" && (c.archivedAt === null || used.has(c.id)))
-          .reduce((acc, c) => acc + (effectiveBudget(state.budgets, c.id, month) ?? 0), 0);
-        return { month, income, expenses, budget };
+    return ok(
+      trendReport({
+        transactions: live(),
+        categories: state.categories,
+        budgets: state.budgets,
+        months,
       }),
-    });
+    );
   }
 
   function livingCost(params: URLSearchParams): Answer {

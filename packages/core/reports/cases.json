@@ -1,0 +1,161 @@
+{
+  "$comment": "Shared cases for the report functions (byCategory, trend). Run by packages/core/src/reports.test.ts and by the Dart port. Amounts are signed integer cents (expenses negative). Categories are in tie-break order.",
+  "categories": [
+    {
+      "id": "c-food",
+      "name": "Food",
+      "kind": "expense",
+      "icon": "food",
+      "color": "red",
+      "archivedAt": null
+    },
+    {
+      "id": "c-rent",
+      "name": "Rent",
+      "kind": "expense",
+      "icon": "home",
+      "color": "blue",
+      "archivedAt": null
+    },
+    {
+      "id": "c-old",
+      "name": "Old",
+      "kind": "expense",
+      "icon": "box",
+      "color": "gray",
+      "archivedAt": "2026-08-01T00:00:00Z"
+    },
+    {
+      "id": "c-pay",
+      "name": "Salary",
+      "kind": "income",
+      "icon": "cash",
+      "color": "green",
+      "archivedAt": null
+    }
+  ],
+  "transactions": [
+    { "categoryId": "c-food", "amount": -30000, "date": "2026-09-30", "status": "paid" },
+    { "categoryId": "c-food", "amount": -20000, "date": "2026-10-05", "status": "paid" },
+    { "categoryId": "c-food", "amount": -10000, "date": "2026-10-20", "status": "pending" },
+    { "categoryId": "c-rent", "amount": -80000, "date": "2026-10-01", "status": "paid" },
+    { "categoryId": "c-old", "amount": -5000, "date": "2026-10-10", "status": "paid" },
+    { "categoryId": "c-pay", "amount": 300000, "date": "2026-10-28", "status": "paid" },
+    { "categoryId": "c-pay", "amount": 250000, "date": "2026-09-28", "status": "paid" }
+  ],
+  "budgets": [
+    { "categoryId": "c-food", "amount": 50000, "effectiveFrom": "2026-01" },
+    { "categoryId": "c-food", "amount": 60000, "effectiveFrom": "2026-10" },
+    { "categoryId": "c-rent", "amount": 80000, "effectiveFrom": "2026-01" },
+    { "categoryId": "c-old", "amount": 7000, "effectiveFrom": "2026-01" }
+  ],
+  "byCategory": [
+    {
+      "id": "expenses-october",
+      "months": ["2026-10"],
+      "expect": {
+        "total": 115000,
+        "items": [
+          {
+            "categoryId": "c-rent",
+            "name": "Rent",
+            "icon": "home",
+            "color": "blue",
+            "total": 80000,
+            "share": 0.6957
+          },
+          {
+            "categoryId": "c-food",
+            "name": "Food",
+            "icon": "food",
+            "color": "red",
+            "total": 30000,
+            "share": 0.2609
+          },
+          {
+            "categoryId": "c-old",
+            "name": "Old",
+            "icon": "box",
+            "color": "gray",
+            "total": 5000,
+            "share": 0.0435
+          }
+        ]
+      }
+    },
+    {
+      "id": "expenses-october-paid-only",
+      "months": ["2026-10"],
+      "status": "paid",
+      "expect": {
+        "total": 105000,
+        "items": [
+          {
+            "categoryId": "c-rent",
+            "name": "Rent",
+            "icon": "home",
+            "color": "blue",
+            "total": 80000,
+            "share": 0.7619
+          },
+          {
+            "categoryId": "c-food",
+            "name": "Food",
+            "icon": "food",
+            "color": "red",
+            "total": 20000,
+            "share": 0.1905
+          },
+          {
+            "categoryId": "c-old",
+            "name": "Old",
+            "icon": "box",
+            "color": "gray",
+            "total": 5000,
+            "share": 0.0476
+          }
+        ]
+      }
+    },
+    {
+      "id": "income-two-months",
+      "months": ["2026-09", "2026-10"],
+      "kind": "income",
+      "expect": {
+        "total": 550000,
+        "items": [
+          {
+            "categoryId": "c-pay",
+            "name": "Salary",
+            "icon": "cash",
+            "color": "green",
+            "total": 550000,
+            "share": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "nothing-in-range",
+      "months": ["2026-01"],
+      "expect": { "total": 0, "items": [] }
+    }
+  ],
+  "trend": [
+    {
+      "id": "two-months",
+      "months": ["2026-09", "2026-10"],
+      "expect": {
+        "months": [
+          { "month": "2026-09", "income": 250000, "expenses": 30000, "budget": 130000 },
+          { "month": "2026-10", "income": 300000, "expenses": 115000, "budget": 147000 }
+        ]
+      }
+    },
+    {
+      "id": "empty-month-skips-archived-without-use",
+      "months": ["2026-07"],
+      "expect": { "months": [{ "month": "2026-07", "income": 0, "expenses": 0, "budget": 130000 }] }
+    }
+  ]
+}

@@ -17,6 +17,13 @@ suggested categories, Wambi's messages. No I/O.
   `reviewTransactionsSchema` (1–50 ids), `FALLBACK_CATEGORY_NAMES`, `merchantKey` (the merchant
   memory's key). The privacy policy's `capture` section (`apps/web`, four languages) describes what
   reaches the server: changing these fields means changing it too.
+- `src/records.ts`: zod bodies of the encrypted records (`transaction`, `category`, `budget`,
+  `recurrence`, `merchant`, `settings`, `account`), each `{ s: 1, ...fields }` without `id`,
+  `version` or `deleted` (those live in the envelope); unknown keys are stripped. `RECORD_TYPES`,
+  `parseRecord(type, json)` returns `{ ok, value | error }` and never throws. Changing a body
+  means a new `s` and a Dart change.
+- `src/reports.ts`: pure `byCategory` and `trend` (the web demo and the local backend use them).
+  Shared cases for the Dart port: `reports/cases.json`, run by `src/reports.test.ts`.
 - `quick-capture/cases.json` (+ `cases.schema.json`, `README.md`): shared cases for the phrase
   parser. There is no parser here: `src/quick-capture-cases.test.ts` only validates the file; the
   Dart parser runs every case in `apps/mobile/test/capture/parser_cases_test.dart`.
@@ -27,6 +34,7 @@ suggested categories, Wambi's messages. No I/O.
 
 ## Rules
 
+- Changing `reports/cases.json` changes what the Dart reports must return.
 - Money slang (see root `AGENTS.md`) lives in `quick-capture/`: never change it.
 - Changing `cases.json` changes what the mobile parser must accept: run
   `flutter test test/capture/parser_cases_test.dart` in `apps/mobile` too.
