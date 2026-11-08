@@ -75,7 +75,7 @@ const listQuery = z
     /** Repeat to match any of the categories. */
     category: repeated(z.uuid(), 20),
     /** With both text and categories: `all` (default) needs both, `any` either. */
-    match: z.enum(["all", "any"]).default("all"),
+    match: z.enum(["all", "any"]).optional(),
     /** `true` adds `totals` (count and sums of every match, ignoring the cursor) to the page. */
     totals: z
       .enum(["true", "false"])
