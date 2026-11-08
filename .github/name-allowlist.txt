@@ -103,6 +103,7 @@ deploy/personal/README.md  # history (the steps that move the VPS from the old n
 
 # --- key-alias: the signing key's alias ---
 docs/mobile/release.md  # key-alias, history (and the steps that move the key from its old folder)
+docs/mobile/play.md  # key-alias (the PEPK command that hands the app key to Play App Signing)
 
 # --- docs-rule: the agent maps, which name the money slang and the key alias as rules ---
 AGENTS.md  # docs-rule
