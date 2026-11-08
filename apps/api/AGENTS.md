@@ -107,9 +107,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
-- Client headers `x-wambito-{locale,next,timezone,client,background}`, always read via
+- Client headers `x-wambito-{locale,next,timezone,client,background,user}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
-  session with `disableRefresh` (not counted as activity).
+  session with `disableRefresh` (not counted as activity); `user` on `/v2/*` is the account the
+  client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
+  `src/http/expected-user.ts`, after `requireUser`, before the scopes; sessions and tokens alike).
 - DB: connects as the runtime role (RLS); migrations run as admin (`packages/db`).
 
 ## Run and test (repo root)

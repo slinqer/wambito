@@ -29,6 +29,7 @@ How to add to it:
 - `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match (ask for it on the first page only).
 - MCP `list_transactions`: `text` and `category` take lists, plus `kind` and `match`; it returns `totals` (count, expense, income), which include pending and to-review movements (pass `status: "paid"` for money already spent).
 - `GET /v1/me` (and every profile answer): `encryption`, `"plain"` or `"preview"`. `preview` marks an account in the end-to-end encryption preview (env `E2E_PREVIEW_USER_IDS`, comma-separated user ids, unset by default): its finances live only as encrypted records under `/v2`, and signing up seeds no default account or categories for it (the web creates them as records). Its `/v1` finance routes (transactions, categories and budgets, recurrences, summary, reports, captures, imports, `GET /v1/me/export`) answer 403 `encrypted_account`, for its sessions and assistants' tokens alike, and so does `PATCH /v1/me` with a `currency` (it lives in the records); the account routes stay (`GET`/`PATCH`/`DELETE /v1/me`, the assistants list, claiming an email).
+- Every `/v2` route (sync, keys, pairing) takes an optional `x-wambito-user` header, the id of the account the client means: when the signed-in account (session or assistant token) is another one, it answers 409 `session_changed` before reading or writing anything. The web sends it with its vault's id.
 
 ### Changed
 

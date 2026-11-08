@@ -5,6 +5,7 @@ import { createAuth } from "./auth.ts";
 import { apiPathPrefix } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import type { AppEnv } from "./env.ts";
+import { expectedUser } from "./http/expected-user.ts";
 import { previewOnlyV2 } from "./http/preview.ts";
 import { notFound, onError, validationHook } from "./http/problem.ts";
 import { assistantScopes } from "./http/scopes.ts";
@@ -78,6 +79,8 @@ export function createApp(deps: AppDeps) {
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
   app.use("/v1/*", previewOnlyV2(deps.config));
   app.use("/v2/*", requireUser(auth, deps.config));
+  // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
+  app.use("/v2/*", expectedUser());
   app.use("/v2/*", assistantScopes());
   app.route("/", meRoutes(deps));
   app.route("/", assistantRoutes(deps));
