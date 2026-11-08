@@ -1,7 +1,7 @@
 package com.wambito.app.capture
 
 /**
- * The money of a European Portuguese notification: a decimal comma, thousands separated by a space,
+ * The money of a European Portuguese notification: a decimal comma (or a point, where asked), thousands separated by a space,
  * a no-break space or a narrow no-break space, and the currency as a symbol or a code on either side
  * of the amount. Integer cents, never a float.
  */
@@ -10,9 +10,15 @@ internal object PtAmount {
     private const val CURRENCY = "US\\$|[€$£]|[A-Z]{3}"
 
     /** The money fragment: the groups are the currency before, whole, cents and the currency after. */
-    val PATTERN =
+    val PATTERN = pattern(decimals = ",")
+
+    /**
+     * The money fragment with the decimal separators in [decimals], a regex character class body:
+     * Revolut Pay writes "€9.28" in a Portuguese notification, so its line takes ",." .
+     */
+    fun pattern(decimals: String) =
         "(?:($CURRENCY)[   ]?)?" +
-            "(\\d{1,3}(?:[$SPACES]\\d{3})+|\\d+)(?:,(\\d{2}))?" +
+            "(\\d{1,3}(?:[$SPACES]\\d{3})+|\\d+)(?:[$decimals](\\d{2}))?" +
             "(?:[$SPACES]?($CURRENCY))?"
 
     private val CURRENCIES = mapOf("€" to "EUR", "EUR" to "EUR", "US$" to "USD", "$" to "USD", "USD" to "USD", "£" to "GBP", "GBP" to "GBP")

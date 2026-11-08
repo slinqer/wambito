@@ -34,6 +34,30 @@ class RevolutParserTest {
     }
 
     @Test
+    fun `reads a pt-PT Revolut Pay expense`() {
+        // Revolut Pay: "pagou", the symbol first, a decimal point and "em <merchant>".
+        assertEquals(
+            expense(928, "Loja Sol"),
+            parse("Loja Sol", "💳 pagou €9.28 em Loja Sol\nSaldo de EUR: €787.93"),
+        )
+        assertEquals(expense(928, "Loja Sol"), parse("Loja Sol", "pagou €9.28 em Loja Sol"))
+        assertEquals(expense(928, "Loja Sol"), parse("Loja Sol", "💳 Pagou 9,28 € em Loja Sol"))
+        assertEquals(expense(1200, "Loja Sol"), parse("Loja Sol", "💳 pagou €12 em Loja Sol"))
+        assertEquals(expense(104296, "Loja Sol"), parse("Loja Sol", "💳 pagou €1 042.96 em Loja Sol"))
+        assertEquals(expense(1250, "Loja Sol", "USD"), parse("Loja Sol", "💳 pagou US$12.50 em Loja Sol"))
+    }
+
+    @Test
+    fun `a Revolut Pay line without the merchant or the currency is not read`() {
+        assertNull(parse("Loja Sol", "💳 pagou €9.28"))
+        assertNull(parse("Loja Sol", "💳 pagou 9.28 em Loja Sol"))
+        assertNull(parse("Loja Sol", "💳 pagou €9.2 em Loja Sol"))
+        assertNull(parse("Loja Sol", "💳 pagou €0.00 em Loja Sol"))
+        // The decimal point stays a Revolut Pay thing: "Gastou" keeps the comma.
+        assertNull(parse("Loja Sol", "Gastou 12.50 €"))
+    }
+
+    @Test
     fun `the emoji can vary or be missing`() {
         val expected = expense(1250, "Padaria Lua")
         assertEquals(expected, parse("Padaria Lua", "☕ Gastou 12,50 €\nSaldo de EUR: 3,00 €"))
