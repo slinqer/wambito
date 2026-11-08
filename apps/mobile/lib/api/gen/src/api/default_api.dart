@@ -2518,11 +2518,12 @@ class DefaultApi {
   }
 
   /// putKeyWrap
-  /// Adds the wrap &#x60;id&#x60;, or replaces it. &#x60;keyV&#x60; must be the account&#39;s current key version (any for the first wrap), else 409 &#x60;key_version_mismatch&#x60;. An account&#39;s first wrap is &#x60;recovery&#x60; (any other kind first: 422 &#x60;recovery_required&#x60;). A &#x60;passkey&#x60; wrap&#39;s &#x60;ref&#x60; is one of the person&#39;s passkey credential ids (422 &#x60;unknown_passkey&#x60;); an &#x60;assistant&#x60; wrap&#39;s, an OAuth client the person connected (422 &#x60;unknown_assistant&#x60;); a &#x60;device&#x60; wrap carries its 32-byte public key and a 32-byte &#x60;attestation&#x60; of it (else 422 &#x60;attestation_required&#x60;; other kinds send neither). A new &#x60;recovery&#x60; wrap replaces the old one (whose id cannot take another kind: 409 &#x60;recovery_required&#x60;), and a wrap replaces the one of the same kind and ref. 409 &#x60;id_taken&#x60; when the id is someone else&#39;s.
+  /// Adds the wrap &#x60;id&#x60;, or replaces it. &#x60;keyV&#x60; must be the account&#39;s current key version (any for the first wrap), else 409 &#x60;key_version_mismatch&#x60;. An account&#39;s first wrap is &#x60;recovery&#x60; (any other kind first: 422 &#x60;recovery_required&#x60;). A &#x60;passkey&#x60; wrap&#39;s &#x60;ref&#x60; is one of the person&#39;s passkey credential ids (422 &#x60;unknown_passkey&#x60;); an &#x60;assistant&#x60; wrap&#39;s, an OAuth client the person connected (422 &#x60;unknown_assistant&#x60;); a &#x60;device&#x60; wrap carries its 32-byte public key and a 32-byte &#x60;attestation&#x60; of it (else 422 &#x60;attestation_required&#x60;; other kinds send neither). A new &#x60;recovery&#x60; wrap replaces the old one (whose id cannot take another kind: 409 &#x60;recovery_required&#x60;), and a wrap replaces the one of the same kind and ref. 409 &#x60;id_taken&#x60; when the id is someone else&#39;s. With &#x60;If-None-Match: *&#x60; the wrap is stored only while the account has no other wrap (409 &#x60;already_set_up&#x60;), so two setups at once cannot make two data keys.
   ///
   /// Parameters:
   /// * [id] - A UUID in lower case
   /// * [putKeyWrap]
+  /// * [ifNoneMatch] - `*`: store the wrap only if the account has no wraps yet (other than this id): the first setup's recovery wrap. Else 409 `already_set_up`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2535,6 +2536,7 @@ class DefaultApi {
   Future<Response<KeyWrap>> putKeyWrap({
     required String id,
     required PutKeyWrap putKeyWrap,
+    String? ifNoneMatch,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -2550,7 +2552,10 @@ class DefaultApi {
     );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (ifNoneMatch != null) r'if-none-match': ifNoneMatch,
+        ...?headers,
+      },
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -3417,7 +3422,7 @@ class DefaultApi {
   }
 
   /// updateMe
-  ///
+  /// Updates the profile. &#x60;currency&#x60; is the default account&#39;s; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 &#x60;encrypted_account&#x60;.
   ///
   /// Parameters:
   /// * [updateProfile]

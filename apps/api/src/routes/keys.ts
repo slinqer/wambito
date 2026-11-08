@@ -13,6 +13,12 @@ import {
 } from "../services/keys.ts";
 
 const idParam = z.object({ id: lowerCaseUuid() });
+const firstWrapHeader = z.object({
+  "if-none-match": z.literal("*").optional().openapi({
+    description:
+      "`*`: store the wrap only if the account has no wraps yet (other than this id): the first setup's recovery wrap. Else 409 `already_set_up`.",
+  }),
+});
 
 /**
  * The wrapped copies of the account's data key (spec 2026-11-08 sections 5.2 and 7): one per
@@ -58,13 +64,17 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/{id}",
       operationId: "putKeyWrap",
       description:
-        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's.",
-      request: { params: idParam, body: jsonBody(PutKeyWrap) },
+        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. With `If-None-Match: *` the wrap is stored only while the account has no other wrap (409 `already_set_up`), so two setups at once cannot make two data keys.",
+      request: { params: idParam, headers: firstWrapHeader, body: jsonBody(PutKeyWrap) },
       responses: { 200: jsonResponse(KeyWrap, "The stored wrap"), ...problems(409, 422) },
     }),
     async (c) => {
       const { id } = c.req.valid("param");
-      return c.json(await putKeyWrap(deps.db, c.get("userId"), id, c.req.valid("json")), 200);
+      const onlyFirst = c.req.valid("header")["if-none-match"] === "*";
+      return c.json(
+        await putKeyWrap(deps.db, c.get("userId"), id, c.req.valid("json"), { onlyFirst }),
+        200,
+      );
     },
   );
 
