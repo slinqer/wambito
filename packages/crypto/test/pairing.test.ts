@@ -94,6 +94,16 @@ describe("openFromPairing", () => {
     expect(await openFromDevice(n.privateKey, ctx, sealed)).toEqual(dataKey);
   });
 
+  it("refuses a sealed blob that is not bytes", async () => {
+    const n = await generateDeviceKeyPair();
+    const a = await generateDeviceKeyPair();
+    for (const bad of ["text", null, undefined, [1, 2, 3]]) {
+      await expect(
+        openFromPairing(n.privateKey, ctx, bad as unknown as Uint8Array, a.publicKey),
+      ).rejects.toMatchObject({ code: "bad_input" });
+    }
+  });
+
   it("sealToDevice without an ephemeral still makes a fresh key each time", async () => {
     const n = await generateDeviceKeyPair();
     const s1 = await sealToDevice(n.publicKey, ctx, dataKey);

@@ -165,6 +165,7 @@ export async function openFromPairing(
   approverKey: Uint8Array,
 ): Promise<Uint8Array> {
   assertBytes(approverKey, KEY_BYTES, "approver key");
+  if (!(sealed instanceof Uint8Array)) throw new CryptoError("bad_input", "sealed must be bytes");
   if (!timingSafeEqual(sealed.slice(0, KEY_BYTES), approverKey))
     throw new CryptoError("cannot_open");
   return openFromDevice(privateKey, ctx, sealed);
