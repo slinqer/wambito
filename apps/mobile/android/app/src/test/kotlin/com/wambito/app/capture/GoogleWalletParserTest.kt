@@ -81,9 +81,30 @@ class GoogleWalletParserTest {
         assertNull(parse("PADARIA LUA", "0,00 € $card"))
     }
 
+    // English: the shape another open-source project saw on a phone ("€10.60 with <card> ••1234").
     @Test
-    fun `other languages wait for samples`() {
-        assertNull(parse("PANADERIA LUNA", "12,50 € con la tarjeta Revolut Mastercard ••1234"))
-        assertNull(parse("BAKERY MOON", "€12.50 with Revolut Mastercard ••1234"))
+    fun `reads an English expense`() {
+        assertEquals(expense(1060, "MOON CAFE"), parse("MOON CAFE", "€10.60 with Example Bank Credit Card ••1234"))
+        assertEquals(expense(104296, "MOON CAFE"), parse("MOON CAFE", "€1,042.96 with Revolut Mastercard ••1234"))
+    }
+
+    // Spanish and Italian: not seen anywhere yet; the Portuguese shape in each language.
+    @Test
+    fun `reads a Spanish or an Italian expense`() {
+        assertEquals(
+            expense(123456, "PANADERIA LUNA"),
+            parse("PANADERIA LUNA", "1.234,56 € con la tarjeta Revolut Mastercard ••1234"),
+        )
+        assertEquals(
+            expense(1250, "PANETTERIA LUNA"),
+            parse("PANETTERIA LUNA", "12,50 € con la carta Revolut Mastercard ••1234"),
+        )
+    }
+
+    @Test
+    fun `the card words and the last digits are required in every language`() {
+        assertNull(parse("MOON CAFE", "€10.60 with Example Bank Credit Card"))
+        assertNull(parse("MOON CAFE", "€10.60 Example Bank Credit Card ••1234"))
+        assertNull(parse("PANADERIA LUNA", "12,50 € con la tarjeta"))
     }
 }

@@ -54,9 +54,11 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   (`CaptureHooks` replaces the session and the notifier in tests). The notification text is never
   queued, sent or logged. `CaptureListener` (a `NotificationListenerService`) reads only the packages
   enabled in `CaptureSettings` (prefs `wambito.capture.sources`), hands them to `BankParsers` (`RevolutParser`
-  and `GoogleWalletParser`, European Portuguese expenses only, sharing `PtAmount`; Revolut reads the
-  card line «Gastou 12,50 €» and the Revolut Pay line «pagou €9.28 em …», decimal point allowed there only; income and the other
-  languages return null until samples exist; a parser that throws drops the notification) and queues
+  and `GoogleWalletParser`, expenses only in pt, it, en and es, one strict line per language and
+  payment kind, sharing `Money` (comma or point decimal, any thousands separator); each line says
+  where it comes from: seen on our phone (pt), another project's capture or tests (it, en) or nothing
+  yet (es), so a new language needs a real sample; income returns null until samples exist; a parser
+  that throws drops the notification) and queues
   the result; `CaptureChannel` is `wambito/capture`: `status`,
   `setSource`, `openAccessSettings`, `openAppInfo`, `clearQueue` (on sign-out: items and owner),
   `sendQueued` (`{userId}`, after a sign-in: `adopt` + send), `dismiss` (`{ids}`, confirmed in the
