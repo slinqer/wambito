@@ -31,18 +31,25 @@ function backend(): Promise<Backend> {
   return detected;
 }
 
-/** Where WebCrypto lacks X25519 the private key is these raw bytes inside an opaque object. */
-const NOBLE_RAW = Symbol("wambito.noble.x25519");
-interface NobleKey {
-  [NOBLE_RAW]: Uint8Array;
+/**
+ * A device private key. Normally a non-extractable WebCrypto `CryptoKey`. Only where WebCrypto
+ * lacks X25519 (`@noble/curves` fallback) it is the raw 32-byte scalar in a plain object: that
+ * form survives structured clone (IndexedDB) but is NOT protected, so the web must treat it as a
+ * raw secret.
+ */
+export type DevicePrivateKey = CryptoKey | { kind: "noble-x25519"; raw: Uint8Array };
+
+function nobleKey(raw: Uint8Array): DevicePrivateKey {
+  return { kind: "noble-x25519", raw };
 }
 
-function nobleKey(raw: Uint8Array): CryptoKey {
-  return { [NOBLE_RAW]: raw, type: "private", extractable: false } as unknown as CryptoKey;
-}
-
-function rawOf(key: CryptoKey): Uint8Array | undefined {
-  return (key as unknown as Partial<NobleKey>)[NOBLE_RAW];
+function rawOf(key: unknown): Uint8Array | undefined {
+  if (typeof CryptoKey !== "undefined" && key instanceof CryptoKey) return undefined;
+  const k = key as { kind?: unknown; raw?: unknown } | null;
+  if (k && typeof k === "object" && k.kind === "noble-x25519" && k.raw instanceof Uint8Array) {
+    return k.raw.length === KEY_BYTES ? k.raw : undefined;
+  }
+  throw new CryptoError("bad_input", "not a device private key");
 }
 
 const PKCS8_X25519_PREFIX = Uint8Array.from([
@@ -50,7 +57,7 @@ const PKCS8_X25519_PREFIX = Uint8Array.from([
 ]);
 
 /** A non-extractable X25519 private key from its 32 raw bytes (for test vectors and the Dart port). */
-export async function importDevicePrivateKey(raw: Uint8Array): Promise<CryptoKey> {
+export async function importDevicePrivateKey(raw: Uint8Array): Promise<DevicePrivateKey> {
   assertBytes(raw, KEY_BYTES, "private key");
   if ((await backend()) === "noble") return nobleKey(raw.slice());
   const pkcs8 = new Uint8Array(PKCS8_X25519_PREFIX.length + KEY_BYTES);
@@ -61,7 +68,7 @@ export async function importDevicePrivateKey(raw: Uint8Array): Promise<CryptoKey
 
 export async function generateDeviceKeyPair(): Promise<{
   publicKey: Uint8Array;
-  privateKey: CryptoKey;
+  privateKey: DevicePrivateKey;
 }> {
   if ((await backend()) === "noble") {
     const secret = x25519.utils.randomSecretKey();
@@ -75,9 +82,11 @@ export async function generateDeviceKeyPair(): Promise<{
 }
 
 /** X25519 shared secret of a private key (either kind) and a raw public key. */
-async function ecdh(privateKey: CryptoKey, publicKey: Uint8Array): Promise<Uint8Array> {
+async function ecdh(privateKey: DevicePrivateKey, publicKey: Uint8Array): Promise<Uint8Array> {
   const raw = rawOf(privateKey);
   if (raw) return x25519.getSharedSecret(raw, publicKey);
+  if (!(privateKey instanceof CryptoKey))
+    throw new CryptoError("bad_input", "not a device private key");
   const pub = await subtle.importKey(
     "raw",
     publicKey as BufferSource,
@@ -116,7 +125,7 @@ export async function sealToDevice(
 }
 
 export async function openFromDevice(
-  privateKey: CryptoKey,
+  privateKey: DevicePrivateKey,
   ctx: WrapContext,
   sealed: Uint8Array,
 ): Promise<Uint8Array> {
@@ -133,7 +142,8 @@ export async function openFromDevice(
     );
     if (dataKey.length !== 32) throw new CryptoError("cannot_open");
     return dataKey;
-  } catch {
+  } catch (e) {
+    if (e instanceof CryptoError && e.code === "bad_input") throw e;
     throw new CryptoError("cannot_open");
   }
 }

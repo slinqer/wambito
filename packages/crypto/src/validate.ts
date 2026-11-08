@@ -1,12 +1,13 @@
 import { CryptoError } from "./errors.ts";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Only lower-case canonical UUIDs: they go byte for byte into the associated data. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const NONCE_BYTES = 12;
 
 export function assertUuid(value: unknown, what: string): asserts value is string {
   if (typeof value !== "string" || !UUID.test(value)) {
-    throw new CryptoError("bad_input", `${what} must be a UUID`);
+    throw new CryptoError("bad_input", `${what} must be a lower-case UUID`);
   }
 }
 

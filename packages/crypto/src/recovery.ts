@@ -49,6 +49,7 @@ export function formatRecoveryKey(secret: Uint8Array): string {
 
 export function parseRecoveryKey(input: string): Uint8Array {
   const bad = () => new CryptoError("bad_recovery_key", "that recovery key is not valid");
+  if (typeof input !== "string") throw bad();
   const text = input
     .replace(/[\s-]+/g, "")
     .toUpperCase()

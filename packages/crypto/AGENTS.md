@@ -17,6 +17,9 @@ API tests.
 - `src/recovery.ts`: recovery secret, 26 Crockford chars + mod-37 check, groups of four.
 - `src/devices.ts`: X25519 device keys, `sealToDevice` / `openFromDevice`; WebCrypto X25519 when
   present, `@noble/curves` otherwise (feature-detected at first use).
+- Device private keys have two forms (`DevicePrivateKey`): a non-extractable WebCrypto `CryptoKey`,
+  or, only where WebCrypto lacks X25519, `{ kind: "noble-x25519", raw }`, clone-safe but a raw
+  secret the web must protect. UUIDs in contexts must be lower-case (they enter the AAD verbatim).
 - `src/pairing.ts`: pairing code and the 6-digit number (async: WebCrypto SHA-256).
 - `src/validate.ts`: UUID, key version, nonce checks (`bad_input`).
 - `src/bytes.ts`: base64url. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,

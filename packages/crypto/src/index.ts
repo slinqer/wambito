@@ -1,5 +1,6 @@
 export { fromBase64Url, toBase64Url } from "./bytes.ts";
 export {
+  type DevicePrivateKey,
   generateDeviceKeyPair,
   importDevicePrivateKey,
   openFromDevice,

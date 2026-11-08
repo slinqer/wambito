@@ -37,7 +37,7 @@ describe("device sealing", () => {
 
   it("the private key is not extractable", async () => {
     const pair = await generateDeviceKeyPair();
-    await expect(crypto.subtle.exportKey("pkcs8", pair.privateKey)).rejects.toThrow();
+    await expect(crypto.subtle.exportKey("pkcs8", pair.privateKey as CryptoKey)).rejects.toThrow();
   });
 
   it("another key pair, user, key version or kind cannot open", async () => {
@@ -84,7 +84,7 @@ describe("device sealing", () => {
     const pub = x25519.getPublicKey(raw);
     const dk = generateDataKey();
     const key = await importDevicePrivateKey(raw);
-    await expect(crypto.subtle.exportKey("pkcs8", key)).rejects.toThrow();
+    await expect(crypto.subtle.exportKey("pkcs8", key as CryptoKey)).rejects.toThrow();
     expect(await openFromDevice(key, ctx, await sealToDevice(pub, ctx, dk))).toEqual(dk);
   });
 
@@ -114,5 +114,24 @@ describe("device sealing", () => {
     const toRaw = await sealToDevice(x25519.getPublicKey(raw), ctx, dk);
     __forceX25519Backend("noble");
     expect(await openFromDevice(imported, ctx, toRaw)).toEqual(dk);
+  });
+
+  it("a structured clone of a fallback key still opens a seal; foreign objects are bad_input", async () => {
+    const dk = generateDataKey();
+    __forceX25519Backend("noble");
+    const pair = await generateDeviceKeyPair();
+    const sealed = await sealToDevice(pair.publicKey, ctx, dk);
+    const cloned = structuredClone(pair.privateKey);
+    expect(await openFromDevice(cloned, ctx, sealed)).toEqual(dk);
+    const odd = [
+      {},
+      null,
+      "key",
+      { kind: "noble-x25519", raw: new Uint8Array(5) },
+      { raw: pair.publicKey },
+    ];
+    for (const k of odd) {
+      expect(await code(openFromDevice(k as never, ctx, sealed))).toBe("bad_input");
+    }
   });
 });

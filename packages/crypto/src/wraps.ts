@@ -97,8 +97,9 @@ function checkSecretWrap(secret: Uint8Array, ctx: WrapContext): Uint8Array {
   if (ctx.kind === "device") {
     throw new CryptoError("bad_input", "device wraps use sealToDevice");
   }
-  if (!(secret instanceof Uint8Array) || secret.length === 0) {
-    throw new CryptoError("bad_input", "secret must not be empty");
+  const want = ctx.kind === "recovery" ? 16 : 32;
+  if (!(secret instanceof Uint8Array) || secret.length !== want) {
+    throw new CryptoError("bad_input", `secret must be ${want} bytes for ${ctx.kind}`);
   }
   return aad;
 }

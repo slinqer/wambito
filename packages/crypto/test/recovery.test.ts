@@ -83,6 +83,12 @@ describe("recovery key", () => {
     expect(caught).toBeGreaterThanOrEqual(190);
   });
 
+  it("a non-string is bad_recovery_key", () => {
+    for (const v of [undefined, null, 5, {}]) {
+      expect(code(() => parseRecoveryKey(v as never))).toBe("bad_recovery_key");
+    }
+  });
+
   it("rejects wrong length and foreign characters", () => {
     const t = formatRecoveryKey(newRecoverySecret());
     expect(code(() => parseRecoveryKey(""))).toBe("bad_recovery_key");

@@ -116,14 +116,15 @@ describe("records", () => {
     expect(await openRecord(k, ctx, await sealRecord(k, ctx, v))).toEqual(v);
   });
 
-  it("accepts upper-case UUIDs of any version", async () => {
+  it("rejects upper-case UUIDs", async () => {
     const k = await keys();
-    const c: RecordContext = {
-      ...ctx,
-      userId: U1.toUpperCase(),
-      id: "AAAAAAAA-BBBB-1CCC-8DDD-EEEEEEEEEEEE",
-    };
-    expect(await openRecord(k, c, await sealRecord(k, c, value))).toEqual(value);
+    const upper: RecordContext[] = [
+      { ...ctx, userId: U1.toUpperCase() },
+      { ...ctx, id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee".toUpperCase() },
+    ];
+    for (const c of upper) {
+      expect(((await failure(sealRecord(k, c, value))) as CryptoError).code).toBe("bad_input");
+    }
   });
 
   it("rejects bad input with bad_input", async () => {
