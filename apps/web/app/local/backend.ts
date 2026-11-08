@@ -53,6 +53,8 @@ export interface LocalProfile {
   id: string;
   email: string;
   isAnonymous: boolean;
+  /** What `GET /v1/me` says; default `plain` (the demo). */
+  encryption?: "plain" | "preview";
 }
 
 /** A route this backend refuses with 403 `demo_unavailable`. */
@@ -504,6 +506,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
     onboardingCompletedAt: e.settings.onboardingCompletedAt,
     currency: e.settings.currency,
     isAnonymous: profile.isAnonymous,
+    encryption: profile.encryption ?? "plain",
   });
 
   async function patchMe(e: Env, body: unknown): Promise<Answer> {

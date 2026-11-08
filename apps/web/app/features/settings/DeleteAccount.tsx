@@ -26,11 +26,14 @@ export function DeleteAccount({
   onExport,
   exporting,
   off = false,
+  canExport = true,
 }: {
   email: string;
   signOut: SignOutRequest;
   onExport(format: ExportFormat): void;
   exporting: boolean;
+  /** A preview account has no export yet: the sheet does not offer one. */
+  canExport?: boolean;
   /** The demo: the button is off, with a note saying why. */
   off?: boolean;
 }) {
@@ -102,15 +105,17 @@ export function DeleteAccount({
       <Sheet open={open} onClose={close} title={t("sheet_title")}>
         <div className="flex flex-col gap-(--space-4) pt-(--space-3)">
           <p className="m-0 text-[15px] text-ink">{t("sheet_body")}</p>
-          <PressButton
-            variant="secondary"
-            className="self-start"
-            disabled={exporting}
-            aria-busy={exporting || undefined}
-            onClick={() => onExport("json")}
-          >
-            {t("export_first")}
-          </PressButton>
+          {canExport && (
+            <PressButton
+              variant="secondary"
+              className="self-start"
+              disabled={exporting}
+              aria-busy={exporting || undefined}
+              onClick={() => onExport("json")}
+            >
+              {t("export_first")}
+            </PressButton>
+          )}
           <div className="flex flex-col gap-(--space-1)">
             <label htmlFor={inputId} className="text-[14px] font-bold text-ink">
               {t("confirm_label")}

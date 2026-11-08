@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { intlTag, type Locale } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
@@ -37,12 +37,15 @@ function formatDay(iso: string, locale: Locale, timeZone: string): string {
 export function AssistantsSection({
   timeZone,
   off = false,
+  offNote,
   copy = clipboardCopy,
   origin = typeof window === "undefined" ? "" : window.location.origin,
 }: {
   timeZone: string;
-  /** The demo: the address and the steps only. */
+  /** The demo (and a preview account): the address and the steps only. */
   off?: boolean;
+  /** Shown instead of the list when `off` (a preview account says why). */
+  offNote?: ReactNode;
   copy?: CopyText;
   /** Where the web is served; the page's own origin by default. */
   origin?: string;
@@ -102,7 +105,7 @@ export function AssistantsSection({
           ))}
         </ul>
       </div>
-      {!off && <ConnectedAssistants timeZone={timeZone} />}
+      {off ? offNote : <ConnectedAssistants timeZone={timeZone} />}
     </SettingsSection>
   );
 }

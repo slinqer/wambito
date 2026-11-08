@@ -43,13 +43,14 @@ export function SettingsSection({
 
 /**
  * In the demo, under a setting that can't work there (export, deleting the account, passkeys,
- * import): why its controls are off. Give the controls `aria-describedby={id}`.
+ * import): why its controls are off. With `local`, the same for a preview account's encrypted
+ * vault (export, import, assistants: not available yet). Give the controls `aria-describedby={id}`.
  */
-export function DemoOffNote({ id }: { id: string }) {
+export function DemoOffNote({ id, local = false }: { id: string; local?: boolean }) {
   const t = useTranslations("settings");
   return (
     <p id={id} className="m-0 text-[14px] text-ink-muted">
-      {t("demo_off")}
+      {t(local ? "local_off" : "demo_off")}
     </p>
   );
 }

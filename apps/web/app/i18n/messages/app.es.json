@@ -683,6 +683,7 @@
       "deleting": "Eliminando…"
     },
     "demo_off": "En el demo esto no está disponible. Crea tu cuenta para usarlo.",
+    "local_off": "Todavía no está disponible con el cifrado de extremo a extremo. Llega pronto.",
     "demo_viewing": "Estás viendo el demo de Valentina.",
     "assistants": {
       "title": "Conecta tu asistente",
@@ -775,6 +776,7 @@
     "no_token_lead": "Abre el enlace completo del correo que te enviamos."
   },
   "vault": {
+    "loading": "Abriendo tus datos…",
     "setup": {
       "title": "Guarda tu clave de recuperación",
       "lead": "Es la única forma de volver a tus datos si pierdes todos tus dispositivos y llaves de acceso. Nadie la puede recuperar por ti, ni siquiera Wambito.",

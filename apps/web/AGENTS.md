@@ -26,14 +26,31 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
   `410` resync that re-applies pending edits; the design notes are at the top of the file;
   tests run against a fake `/v2` in `sync.test.ts`). A
-  `keys.ts` (no React; injected `fetch`, `/api`): `setUpAccount({ userId, guest })` (DK + recovery
-  secret + device key pair; PUT the recovery wrap first, then the attested device wrap; keeps only the
-  non-extractable record/dedupe keys and the device private key in the vault's `keys` store, plus
-  meta `keyV`; returns the formatted `recoveryKey`, `null` for a guest, whose recovery secret is
-  discarded unseen because the server wants a recovery wrap first; `KeysError("already_set_up")`
+  `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
+  recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
+  until `commit()`, which the setup screen calls only after the four characters are typed back:
+  PUT the recovery wrap first, then the attested device wrap, then keep only the non-extractable
+  record/dedupe keys and the device private key in the vault's `keys` store, plus meta `keyV`;
+  retry-safe, the same ids on a retry, DK zeroed after success; `recoveryKey` is `null` for a
+  guest, whose recovery secret is never shown and who commits at once; `KeysError("already_set_up")`
   when the account has wraps), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `loadLocalKeys(userId)`
-  (`null` = locked), `forgetDevice(userId)` (sign-out: `deleteVault`). Screens in
+  (`null` = locked), `forgetDevice(userId)` (sign-out: `deleteVault`).
+  `vault-session.ts`: a preview account's open vault, one per tab, shared by `/welcome` and
+  `/app`: `openVaultSession({ profile, keys, fresh })` opens the store, runs a full sync (must
+  succeed when `fresh`; a known browser opens offline), seeds an empty account (settings record
+  from the server profile, currency EUR, and the suggested categories, through the local backend),
+  then `start()`s the engine. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
+  API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
+  sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
+  Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
+  `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
+  (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
+  ready, else `Locked` with a retry of the failed step) and then `<ApiProvider mode="local">`;
+  the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is
+  `live | demo | local`: demo-only behaviour checks `=== "demo"`, live-only `=== "live"`
+  (import); settings shows `settings.local_off` under import, export and the assistants in
+  `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back), `Unlock` (`onUnlock(text) → UnlockError | null`), `Locked` (retry); pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A

@@ -683,6 +683,7 @@
       "deleting": "A eliminar…"
     },
     "demo_off": "Na demo isto não está disponível. Cria a tua conta para o usares.",
+    "local_off": "Ainda não está disponível com a encriptação ponta a ponta. Chega em breve.",
     "demo_viewing": "Estás a ver a demo da Valentina.",
     "assistants": {
       "title": "Liga o teu assistente",
@@ -775,6 +776,7 @@
     "no_token_lead": "Abre a ligação completa do email que te enviámos."
   },
   "vault": {
+    "loading": "A abrir os teus dados…",
     "setup": {
       "title": "Guarda a tua chave de recuperação",
       "lead": "É a única forma de voltares aos teus dados se perderes todos os dispositivos e chaves de acesso. Ninguém a pode recuperar por ti, nem sequer o Wambito.",

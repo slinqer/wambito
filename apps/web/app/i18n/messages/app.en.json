@@ -683,6 +683,7 @@
       "deleting": "Deleting…"
     },
     "demo_off": "Not available in the demo. Create your account to use it.",
+    "local_off": "Not available yet with end-to-end encryption. It is coming soon.",
     "demo_viewing": "You're viewing Valentina's demo.",
     "assistants": {
       "title": "Connect your assistant",
@@ -775,6 +776,7 @@
     "no_token_lead": "Open the full link from the email we sent you."
   },
   "vault": {
+    "loading": "Opening your data…",
     "setup": {
       "title": "Save your recovery key",
       "lead": "It is the only way back to your data if you lose every device and passkey. Nobody can recover it for you, not even Wambito.",
