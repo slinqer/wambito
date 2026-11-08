@@ -32,7 +32,9 @@ export type KeysErrorCode =
   | "offline"
   | "server"
   /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
-  | "unsupported_browser";
+  | "unsupported_browser"
+  /** The signed-in account is not this vault's (409): the app reloads for the new one. */
+  | "session_changed";
 
 export class KeysError extends Error {
   constructor(
@@ -78,7 +80,14 @@ function api(options: KeysOptions) {
   return async (path: string, init?: RequestInit): Promise<Response> => {
     let response: Response;
     try {
-      response = await (options.fetch ?? fetch)(`${baseUrl}${path}`, init);
+      // Names the vault's account: a cookie that now belongs to someone else gets a 409.
+      response = await (options.fetch ?? fetch)(`${baseUrl}${path}`, {
+        ...init,
+        headers: {
+          ...(init?.headers as Record<string, string> | undefined),
+          "x-wambito-user": options.userId,
+        },
+      });
     } catch {
       throw new KeysError("offline");
     }
@@ -86,6 +95,9 @@ function api(options: KeysOptions) {
       const code = await problemCode(response);
       if (response.status === 409 && code === "already_set_up") {
         throw new KeysError("already_set_up", 409);
+      }
+      if (response.status === 409 && code === "session_changed") {
+        throw new KeysError("session_changed", 409);
       }
       throw new KeysError("server", response.status);
     }

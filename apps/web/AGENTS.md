@@ -21,7 +21,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
   also the sync helpers `readOutbox`, `ackOutbox`, `getMeta/setMeta`, `quarantine`, `wipeRecords`,
-  `getKey/putKey`, `parkOutbox`, `restoreSetAside`). Subscribers fire after every commit that
+  `getKey/putKey`, `parkOutbox`, `abandonOutbox`, `adoptServerCopy`, `restoreSetAside`). Subscribers fire after every commit that
   wrote, whatever its origin, and for other tabs' commits too (a BroadcastChannel
   `wambito-vault-<userId>` tells the other tabs of each commit). `close()` (or another tab deleting
   or upgrading the database) closes it for good: every later op rejects with `VaultClosedError`
@@ -33,10 +33,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `410` resync that keeps pending edits (set aside, then re-applied); the design notes are at the
   top of the file; tests run against a fake `/v2` in `sync.test.ts`). A run holds a Web Lock
   `wambito-sync-<userId>` (one sync per user across tabs). A failing outbox entry is parked
-  (back-off 1 min doubling to 6 h; a local write to it clears the park) and never blocks the pull;
+  (back-off 1 min doubling to 6 h; a local write to it clears the park) and never blocks the pull
+  of other ids; its own id stays blocked while it retries, and on the fifth failure it is given up
+  on (`abandoned`, reported in `dropped`): never pushed again, pulls apply the id again (the
+  conflict's copy at once, else the next server edit or a resync) and the entry goes once the
+  server's copy lands; a local write retries it;
   a whole-batch 413/422 is bisected, other 4xx park the batch and the pull still runs; a create
-  conflict takes the server copy. Results carry `parked` (ids; problem `parked`) and a closed
-  store ends a run with `{ ok: false, error: "closed" }` (problem `closed`).
+  conflict takes the server copy (plus the fields the person changed after the create, if they
+  wrote while it was in flight). Results carry `parked` (ids; problem `parked`) and a closed
+  store ends a run with `{ ok: false, error: "closed" }` (problem `closed`). Every `/v2` call
+  (`sync.ts`, `keys.ts`) sends `x-wambito-user: <vault's user id>`; a 409 `session_changed` (the
+  cookie is now another account's) stops the run and `start()`'s triggers (problem
+  `session_changed`; `KeysError("session_changed")` in `keys.ts`).
   `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
   recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
   until `commit()`, which the setup screen calls only after the four characters are typed back:
@@ -59,7 +67,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `/app`: `openVaultSession({ profile, keys, fresh })` opens the store, runs a full sync (must
   succeed when `fresh`; a known browser opens offline), seeds an empty account (settings record
   from the server profile, currency EUR, and the suggested categories, through the local backend),
-  then `start()`s the engine. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
+  then `start()`s the engine; it seeds only after a complete first sync with no set-aside changes
+  waiting. A 409 `session_changed` fails the opening (`VaultOpenError`, even for a known browser)
+  or, later, closes the session and calls `onSessionChanged`. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
   If the store closes under it (another tab), the session stops its sync, drops itself and calls
@@ -71,7 +81,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
-  ready, else `Locked` with a retry of the failed step; Locked kinds `error`, `offline`,
+  ready, else `Locked` with a retry of the failed step; before making or unlocking keys, when the
+  open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
+  (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
+  nothing runs for the old id; Locked kinds `error`, `offline`,
   `unsupported` (no X25519: no retry) and `guest` (a guest whose account has keys elsewhere: no
   recovery key to type, so sign-out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
   the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is

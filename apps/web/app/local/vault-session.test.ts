@@ -26,7 +26,7 @@ const json = (body: unknown, status = 200) =>
 /** An empty `/v2/sync` that takes every push; `mode` makes it fail. */
 function fakeNetwork() {
   const net = {
-    mode: "ok" as "ok" | "offline" | "unauthorized",
+    mode: "ok" as "ok" | "offline" | "unauthorized" | "session_changed",
     pushed: 0,
     live: [] as string[],
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -35,6 +35,9 @@ function fakeNetwork() {
       const url = new URL(request.url);
       if (net.mode === "offline") throw new TypeError("offline");
       if (net.mode === "unauthorized") return json({ code: "unauthenticated" }, 401);
+      if (net.mode === "session_changed" && url.pathname.startsWith("/api/v2/")) {
+        return json({ code: "session_changed" }, 409);
+      }
       if (url.pathname === "/api/v2/sync" && request.method === "GET") {
         return json({ records: [], next: null, latest: net.pushed });
       }
@@ -181,6 +184,124 @@ describe("openVaultSession", () => {
     expect(failed).toBeInstanceOf(VaultOpenError);
     expect(failed.code).toBe("unauthorized");
     expect(onUnauthorized).toHaveBeenCalled();
+  });
+});
+
+describe("seeding", () => {
+  it("does not seed when the first sync failed (a known browser offline)", async () => {
+    const net = fakeNetwork();
+    net.mode = "offline";
+    const profile = profileOf();
+    let store: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: false,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    expect(await store?.list("settings")).toEqual([]);
+    expect(await store?.list("category")).toEqual([]);
+    session.close();
+  });
+
+  it("does not seed over changes a failed resync set aside", async () => {
+    const net = fakeNetwork();
+    net.mode = "offline";
+    const profile = profileOf();
+    const store = await createEncryptedStore(profile.id);
+    await store.put("category", "01930000-0000-7000-8000-0000000000aa", {
+      s: 1,
+      name: "Mine",
+      kind: "expense",
+      icon: "x",
+      color: "#fff",
+      sortOrder: 0,
+      archivedAt: null,
+      systemKey: null,
+    });
+    await store.wipeRecords();
+    const session = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: false,
+      fetch: net.fetch,
+      openStore: async () => store,
+    });
+    expect(await store.list("settings")).toEqual([]);
+    expect((await store.readOutbox(10)).map((e) => e.setAside !== undefined)).toEqual([true]);
+    session.close();
+  });
+});
+
+describe("another account signed in", () => {
+  it("names the vault's account on every sync call", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    const seen: Array<string | null> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://x");
+      if (url.pathname.startsWith("/api/v2/")) {
+        seen.push(new Headers(init?.headers).get("x-wambito-user"));
+      }
+      return net.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const session = await openVaultSession({ profile, keys: await keys(), fresh: true, fetch });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((v) => v === profile.id)).toBe(true);
+    session.close();
+  });
+
+  it("a 409 session_changed on opening fails it, even for a known browser", async () => {
+    const net = fakeNetwork();
+    net.mode = "session_changed";
+    const failed = await openVaultSession({
+      profile: profileOf(),
+      keys: await keys(),
+      fresh: false,
+      fetch: net.fetch,
+    }).catch((e) => e);
+    expect(failed).toBeInstanceOf(VaultOpenError);
+    expect(failed.code).toBe("session_changed");
+  });
+
+  it("a 409 session_changed later closes the session and tells onSessionChanged", async () => {
+    const net = fakeNetwork();
+    const onSessionChanged = vi.fn();
+    let store: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile: profileOf(),
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+      onSessionChanged,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    const closed = vi.fn();
+    session.onClosed(closed);
+    net.mode = "session_changed";
+    // A local write triggers the next sync.
+    const [first] = (await store?.list("category")) ?? [];
+    if (first) await store?.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(onSessionChanged).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    expect(store?.isClosed()).toBe(true);
+    expect(closed).not.toHaveBeenCalled();
+    // the session is gone: the next open makes a new one
+    net.mode = "ok";
+    const again = await openVaultSession({
+      profile: profileOf(),
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+    });
+    expect(again).not.toBe(session);
+    again.close();
   });
 });
 

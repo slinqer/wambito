@@ -398,3 +398,32 @@ describe("forgetDevice", () => {
     expect(await loadLocalKeys(userId)).toBeNull();
   });
 });
+
+describe("the signed-in account", () => {
+  it("every /v2/keys call names the vault's account", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const seen: Array<string | null> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(new Headers(init?.headers).get("x-wambito-user"));
+      return api.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    await setUpAccount({ userId, guest: false, fetch });
+    expect(seen.length).toBeGreaterThan(1);
+    expect(seen.every((v) => v === userId)).toBe(true);
+  });
+
+  it("409 session_changed throws session_changed and stores nothing", async () => {
+    const userId = newUser();
+    const fetch = (async () =>
+      new Response(JSON.stringify({ code: "session_changed" }), {
+        status: 409,
+        headers: { "content-type": "application/json" },
+      })) as typeof globalThis.fetch;
+    await expect(prepareAccount({ userId, guest: false, fetch })).rejects.toMatchObject({
+      code: "session_changed",
+      status: 409,
+    });
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});

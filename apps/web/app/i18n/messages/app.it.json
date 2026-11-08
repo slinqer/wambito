@@ -221,7 +221,8 @@
     "guest_cannot_authorize": "Salva i tuoi progressi con la tua email prima di collegare un assistente.",
     "insufficient_scope": "Questo assistente non ha il permesso di farlo.",
     "encrypted_account": "Questo account conserva le sue finanze con crittografia end-to-end; questa parte di Wambito non funziona ancora con esso.",
-    "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero."
+    "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero.",
+    "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina."
   },
   "sign_in": {
     "meta_title": "Accedi · Wambito",

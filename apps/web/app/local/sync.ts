@@ -7,7 +7,12 @@ import {
   toBase64Url,
 } from "@wambito/crypto";
 import type { OutboxEntry } from "./db.ts";
-import { type EncryptedStore, type SetAsideOutcome, VaultClosedError } from "./encrypted-store.ts";
+import {
+  changedKeys,
+  type EncryptedStore,
+  type SetAsideOutcome,
+  VaultClosedError,
+} from "./encrypted-store.ts";
 
 /**
  * The sync engine: pushes the outbox to `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the
@@ -37,6 +42,14 @@ import { type EncryptedStore, type SetAsideOutcome, VaultClosedError } from "./e
  *   refused with 413/422 (bisected down to the bad changes), or any other 4xx but 401 (the whole
  *   batch, e.g. 409 `key_version_mismatch`). Parks are reported (`parked`, ids only) and never
  *   stop the pull. Offline, 401, 429 and 5xx stop the run as before.
+ * - A parked change still blocks pulls of its id (an edit is not overwritten while it retries).
+ *   On its fifth failure the engine gives up (`abandoned`, reported in `dropped`): it is never
+ *   pushed again, pulls write the id again, and the server's copy replaces it (at once when the
+ *   failure was a conflict, whose copy is at hand; else with the next server edit or resync).
+ * - Every call sends `x-wambito-user` (the vault's account). `409 session_changed` (the cookie is
+ *   now someone else's) stops the run and `start()`'s triggers; the session reloads the app.
+ * - A create that lost to the server's copy while the person kept writing keeps only the fields
+ *   they changed after the create, as an edit of the server's copy.
  * - `410 resync_required`: in the wipe's own commit every pending change is set aside with its
  *   body (outbox kept), the records and cursors go, and the full download runs with `base=0`.
  *   After a complete download the set-aside changes are written again, only their `touched`
@@ -57,6 +70,8 @@ const PUSH_BYTES = 3 * 1024 * 1024;
 const PULL_LIMIT = 1000;
 /** How many times one id may conflict inside one run before it is parked. */
 const MAX_CONFLICTS = 3;
+/** The failure on which a parked change is given up on (`abandoned`). */
+const MAX_ATTEMPTS = 5;
 /** A parked change's back-off: 1 min, doubling, at most 6 hours. */
 const parkDelay = (attempts: number) => Math.min(60_000 * 2 ** (attempts - 1), 6 * 3_600_000);
 
@@ -72,7 +87,9 @@ export type SyncProblemCode =
   /** Changes the engine gave up on for now (see `SyncResult.parked`). */
   | "parked"
   /** The store was closed (another tab deleted the vault, or the session closed it). */
-  | "closed";
+  | "closed"
+  /** The signed-in account is not the vault's (409 `session_changed`): the engine stops. */
+  | "session_changed";
 
 /** Something the UI may want to tell the person. Ids and counts only. */
 export interface SyncProblem {
@@ -90,7 +107,7 @@ export interface SyncResult {
   merged: number;
   /** Ids of records the server had deleted while the person had unsent edits. */
   serverDeleted: string[];
-  /** Ids of changes dropped (`not_found`, `id_taken`). */
+  /** Ids of changes dropped (`not_found`, `id_taken`, or given up on after 5 failures). */
   dropped: string[];
   quarantined: number;
   /** Ids of changes parked in this run (they back off; a local edit retries them at once). */
@@ -196,9 +213,18 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   async function call(path: string, init?: RequestInit): Promise<unknown> {
     let response: Response;
     try {
-      response = await doFetch(`${baseUrl}${path}`, init);
+      response = await doFetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: {
+          ...(init?.headers as Record<string, string> | undefined),
+          "x-wambito-user": userId,
+        },
+      });
     } catch {
       throw new Stop("offline");
+    }
+    if (response.status === 409 && (await problemCode(response)) === "session_changed") {
+      throw new Stop("session_changed", 409);
     }
     if (response.status === 410) throw new ResyncRequired();
     if (response.status === 401) throw new Stop("unauthorized", 401);
@@ -241,6 +267,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   interface Prepared {
     entry: OutboxEntry;
+    /** The plaintext sent (a create conflict keeps only what changed after it). */
+    body: unknown;
     change: Record<string, unknown>;
     size: number;
   }
@@ -258,6 +286,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       : toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body));
     return {
       entry,
+      body: row.body,
       size: (sealed?.length ?? 0) + 200,
       change: {
         id: entry.id,
@@ -272,11 +301,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   async function handleConflict(
-    entry: OutboxEntry,
+    p: Prepared,
     server: WireRecord,
-    created: boolean,
     result: SyncResult,
   ): Promise<void> {
+    const { entry } = p;
+    const created = p.change.baseVersion === null;
     const type = entry.type;
     const row = await store.getRaw(type, entry.id);
     const remote = {
@@ -310,8 +340,24 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       report({ code: "conflict_unreadable", ids: [entry.id] });
       throw new Skip("conflict_unreadable");
     }
-    // Two devices created the same deterministic id: the server's copy wins whole.
-    const merged = mergeBodies(row?.body, opened.body, created ? [] : entry.touched);
+    if (created) {
+      // Two devices created the same deterministic id: the server's copy wins, plus whatever the
+      // person changed after the create (a write made while it was in flight).
+      await store.adoptServerCopy(
+        type,
+        entry.id,
+        entry.seq,
+        { version: server.version, keyV: server.keyV, body: opened.body },
+        (local) => {
+          const touched = changedKeys(p.body, local);
+          const rebased = parseRecord(type, mergeBodies(local, opened.body, touched));
+          return rebased.ok ? { body: rebased.value, touched } : { body: opened.body, touched: [] };
+        },
+      );
+      result.merged += 1;
+      return;
+    }
+    const merged = mergeBodies(row?.body, opened.body, entry.touched);
     const parsed = parseRecord(type, merged);
     // A merge of two valid bodies that is not valid itself: the server's copy is the safe side.
     const next = parsed.ok ? parsed.value : opened.body;
@@ -323,15 +369,38 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     result.merged += 1;
   }
 
-  /** Gives up on `entry` for now; it backs off and is reported. */
-  async function park(entry: OutboxEntry, lastError: string, result: SyncResult) {
+  /**
+   * Gives up on `entry` for now; it backs off and is reported. On its fifth failure, for good: it
+   * is abandoned, and `server` (the conflict's copy, when there is one) replaces it at once.
+   */
+  async function park(
+    entry: OutboxEntry,
+    lastError: string,
+    result: SyncResult,
+    server?: WireRecord,
+  ) {
     const attempts = (entry.park?.attempts ?? 0) + 1;
-    await store.parkOutbox(entry.id, entry.seq, {
-      attempts,
-      lastError,
-      until: now() + parkDelay(attempts),
-    });
-    result.parked.push(entry.id);
+    const park = { attempts, lastError, until: now() + parkDelay(attempts) };
+    if (attempts < MAX_ATTEMPTS) {
+      await store.parkOutbox(entry.id, entry.seq, park);
+      result.parked.push(entry.id);
+      return;
+    }
+    await store.abandonOutbox(entry.id, entry.seq, park);
+    result.dropped.push(entry.id);
+    if (!server) return;
+    const remote = {
+      origin: "remote",
+      version: server.version,
+      keyV: server.keyV,
+      ifSeq: entry.seq,
+    } as const;
+    if (server.deleted) {
+      await store.delete(entry.type, entry.id, remote);
+      return;
+    }
+    const opened = await openWire(server);
+    if (opened.ok) await store.put(entry.type, entry.id, opened.body as never, remote);
   }
 
   async function push(result: SyncResult): Promise<void> {
@@ -339,7 +408,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     /** The seq of each entry this run is done with: it is sent again only after a newer write. */
     const handled = new Map<string, number>();
     const due = (e: OutboxEntry) =>
-      !e.setAside && (!e.park || e.park.until <= now()) && handled.get(e.id) !== e.seq;
+      !e.setAside &&
+      !e.abandoned &&
+      (!e.park || e.park.until <= now()) &&
+      handled.get(e.id) !== e.seq;
 
     async function settle(p: Prepared, r: PushResult | undefined) {
       const { entry } = p;
@@ -353,11 +425,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         const count = (conflicts.get(entry.id) ?? 0) + 1;
         conflicts.set(entry.id, count);
         if (count > MAX_CONFLICTS) {
-          await park(entry, "conflict_limit", result);
+          await park(entry, "conflict_limit", result, r.conflict);
           return;
         }
         try {
-          await handleConflict(entry, r.conflict, p.change.baseVersion === null, result);
+          await handleConflict(p, r.conflict, result);
           // Still pending after the merge: push it again on the server's version.
           handled.delete(entry.id);
         } catch (error) {
@@ -433,7 +505,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       };
       const pending = new Set(
         (await store.readOutbox(Number.MAX_SAFE_INTEGER))
-          .filter((e) => !e.setAside)
+          .filter((e) => !e.setAside && !e.abandoned)
           .map((e) => e.id),
       );
       type Apply = { rec: WireRecord; body: unknown } | { rec: WireRecord; body: null };
@@ -651,6 +723,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           clearTimeout(retry);
           if (result.ok) {
             failures = 0;
+          } else if (result.error === "session_changed") {
+            // Someone else's cookie: never again in this page (the session reloads it).
+            stop();
           } else if (result.error !== "closed") {
             failures += 1;
             const delay = Math.min(2000 * 2 ** (failures - 1), 5 * 60_000);
@@ -678,7 +753,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (typeof window !== "undefined") window.addEventListener("focus", trigger);
     trigger();
 
-    return () => {
+    function stop() {
       stopped = true;
       clearTimeout(debounce);
       clearTimeout(retry);
@@ -688,10 +763,21 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         document.removeEventListener("visibilitychange", onVisibility);
       }
       if (typeof window !== "undefined") window.removeEventListener("focus", trigger);
-    };
+    }
+    return stop;
   }
 
   return { run, start };
+}
+
+/** The problem's `code`, if the body has one. */
+async function problemCode(response: Response): Promise<string | undefined> {
+  try {
+    const body = (await response.clone().json()) as { code?: unknown };
+    return typeof body.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Internal: park this change; the message is the park's `lastError`. */

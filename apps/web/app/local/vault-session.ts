@@ -66,6 +66,11 @@ export interface OpenVaultOptions {
   now?: () => Date;
   /** The session is gone (a 401 from sync): the caller wipes the vault and goes to sign-in. */
   onUnauthorized?: () => void;
+  /**
+   * The cookie now belongs to another account (409 `session_changed` from sync): the session has
+   * stopped and closed; the caller checks who is signed in (and reloads the app for them).
+   */
+  onSessionChanged?: () => void;
   /** The store; tests pass their own. */
   openStore?: (userId: string) => Promise<EncryptedStore>;
 }
@@ -170,6 +175,8 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       },
       unavailable: LOCAL_UNAVAILABLE,
     });
+    /** Set once open: a later 409 `session_changed` closes it. */
+    let opened: VaultSession | undefined;
     const engine = createSyncEngine({
       store,
       fetch: network,
@@ -178,13 +185,21 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       keyV: keys.keyV,
       onError: (problem) => {
         if (problem.code === "unauthorized") options.onUnauthorized?.();
+        if (problem.code === "session_changed" && opened) {
+          opened.close();
+          options.onSessionChanged?.();
+        }
       },
     });
     const first = await engine.run();
-    if (!first.ok && (fresh || first.error === "unauthorized")) {
+    const fatal = first.error === "unauthorized" || first.error === "session_changed";
+    if (!first.ok && (fresh || fatal)) {
       throw new VaultOpenError(first.error ?? "server");
     }
-    await seedIfEmpty(store, profile);
+    // Only on a complete first sync: an empty-looking vault may just be one not downloaded yet
+    // (offline, or a resync whose set-aside changes still wait for their download).
+    const waiting = (await store.readOutbox(Number.MAX_SAFE_INTEGER)).some((e) => e.setAside);
+    if (first.ok && !waiting) await seedIfEmpty(store, profile);
     const stop = engine.start();
     const routed = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : null;
@@ -220,6 +235,7 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       for (const listener of closedListeners) listener();
     });
     if (active?.userId === profile.id) active.session = session;
+    opened = session;
     return session;
   } catch (error) {
     store.close();

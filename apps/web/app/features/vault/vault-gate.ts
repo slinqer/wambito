@@ -15,6 +15,11 @@ import type { UnlockError } from "./Unlock.tsx";
  * A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
  * Two locked kinds have no retry: `unsupported` (the browser cannot keep a device key safely) and
  * `guest` (a guest's account has keys made elsewhere, and a guest has no recovery key to type).
+ *
+ * Another tab may sign in as someone else under this page (one cookie per browser). Before making
+ * or unlocking keys, and when the open vault closes or its sync says `session_changed`, the gate
+ * asks who is signed in; another account (or none) reloads the app for them, so nothing runs for
+ * the old id. The server refuses a `/v2` call for another account (409) as the last guard.
  */
 
 /** The keys a gate hands from setup or unlock to opening; opaque here. */
@@ -40,6 +45,12 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
   open(keys: K, fresh: boolean): Promise<S>;
   /** A guest: never shown a recovery key, so an account with keys elsewhere is `locked: guest`. */
   guest?: boolean;
+  /** The account this gate is for. */
+  userId?: string;
+  /** Who is signed in now (null: no one); throws when it cannot tell (offline). */
+  sessionUserId?(): Promise<string | null>;
+  /** Loads the app again for whoever is signed in now. */
+  reload?(): void;
 }
 
 /** Why the vault is locked; `unsupported` and `guest` have no retry. */
@@ -67,6 +78,8 @@ export interface VaultGate<S = unknown> {
   retry(): void;
   /** The open vault closed under the app (another tab): check again (reopen, or Unlock). */
   closed(): void;
+  /** The sync said another account is signed in (409 `session_changed`): reload or lock. */
+  sessionChanged(): void;
 }
 
 const UNLOCK_ERRORS: readonly string[] = [
@@ -116,14 +129,44 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     set({ status: "locked", kind: lockedKind(error), retrying: false });
   };
 
+  /**
+   * Whether this gate's account is still the signed-in one. When not, reloads the app (the gate
+   * stays on checking until the page goes). Unknown (offline, say): true, the server guards.
+   */
+  async function sameSession(): Promise<boolean> {
+    if (!deps.sessionUserId || deps.userId === undefined) return true;
+    let current: string | null;
+    try {
+      current = await deps.sessionUserId();
+    } catch {
+      return true;
+    }
+    if (current === deps.userId) return true;
+    set({ status: "checking" });
+    deps.reload?.();
+    return false;
+  }
+
+  /** A call was refused with `session_changed`: reload for the new account, else lock (no loop). */
+  async function changed(error: unknown, step: () => Promise<void>): Promise<void> {
+    if (await sameSession()) lock(error, step);
+  }
+
   async function open(keys: K, fresh: boolean): Promise<void> {
     set({ status: "opening" });
     try {
       set({ status: "ready", session: await deps.open(keys, fresh) });
     } catch (error) {
       // The keys are kept now: a retry starts over and finds them.
-      lock(error, check);
+      if (codeOf(error) === "session_changed") await changed(error, check);
+      else lock(error, check);
     }
+  }
+
+  /** Checks again after the open vault went away: first, is it still the same account? */
+  async function recheck(): Promise<void> {
+    set({ status: "checking" });
+    if (await sameSession()) await check();
   }
 
   async function check(): Promise<void> {
@@ -136,10 +179,13 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
       return;
     }
     if (keys) return open(keys, false);
+    // Never make keys for an account that is no longer the signed-in one.
+    if (!(await sameSession())) return;
     try {
       prepared = await deps.prepareAccount();
     } catch (error) {
       if (codeOf(error) === "already_set_up") hasKeysElsewhere();
+      else if (codeOf(error) === "session_changed") await changed(error, check);
       else lock(error, check);
       return;
     }
@@ -157,6 +203,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     } catch (error) {
       // Another tab or device set the account up first: its data key wins, this one is dropped.
       if (codeOf(error) === "already_set_up") hasKeysElsewhere();
+      else if (codeOf(error) === "session_changed") await changed(error, commit);
       else lock(error, commit);
       return;
     }
@@ -178,11 +225,16 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     confirmSetup: () => (state.status === "setup" ? commit() : Promise.resolve()),
     async unlock(text) {
       if (state.status !== "unlock") return null;
+      if (!(await sameSession())) return null;
       let keys: K;
       try {
         keys = await deps.unlockWithRecovery(text);
       } catch (error) {
         const code = codeOf(error);
+        if (code === "session_changed") {
+          await changed(error, check);
+          return null;
+        }
         if (code === "unsupported_browser") {
           lock(error, check);
           return null;
@@ -193,7 +245,10 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
       return null;
     },
     closed() {
-      if (state.status === "ready") void check();
+      if (state.status === "ready") void recheck();
+    },
+    sessionChanged() {
+      if (state.status === "ready") void changed({ code: "session_changed" }, recheck);
     },
     retry() {
       if (state.status !== "locked" || state.retrying || FINAL.includes(state.kind)) return;

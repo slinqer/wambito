@@ -66,6 +66,25 @@ export interface EncryptedStore extends FinanceStore {
    * newer local write replaced it (that write is pushed normally).
    */
   parkOutbox(id: string, seq: number, park: OutboxPark): Promise<void>;
+  /**
+   * The engine gives up on the change read as `seq` for good: stores `park` and `abandoned`, so it
+   * is never pushed again and remote writes of the id go through (and remove the entry). A no-op
+   * when a newer local write replaced it.
+   */
+  abandonOutbox(id: string, seq: number, park: OutboxPark): Promise<void>;
+  /**
+   * A create (pushed as `seq`) lost to the server's copy of the same id. Without a newer local
+   * write, the server's copy replaces the record and the entry goes. With one, the server's copy
+   * becomes the base and `rebase(localBody)` says what to keep: the body and the fields the person
+   * changed after the create (`touched`; none: the entry goes). One commit; notifies subscribers.
+   */
+  adoptServerCopy(
+    type: RecordType,
+    id: string,
+    seq: number,
+    server: { version: number; keyV: number; body: unknown },
+    rebase: (local: unknown) => { body: unknown; touched: string[] },
+  ): Promise<void>;
   getMeta<T = unknown>(key: string): Promise<T | undefined>;
   setMeta(key: string, value: unknown): Promise<void>;
   quarantine(entry: QuarantineEntry): Promise<void>;
@@ -98,7 +117,7 @@ export interface EncryptedStore extends FinanceStore {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The fields whose value differs between two bodies (all of the new body's when there is no old). */
-function changedKeys(prev: unknown, next: unknown): string[] {
+export function changedKeys(prev: unknown, next: unknown): string[] {
   const a = (prev ?? {}) as Record<string, unknown>;
   const b = (next ?? {}) as Record<string, unknown>;
   const out: string[] = [];
@@ -208,7 +227,13 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       if (!opts?.skipIfPending && opts?.ifSeq === undefined) return false;
       const entry = (await request(store(OUTBOX).get(id))) as OutboxEntry | undefined;
       if (opts.ifSeq !== undefined) return entry?.seq !== opts.ifSeq;
-      return entry !== undefined && !entry.setAside;
+      return entry !== undefined && !entry.setAside && !entry.abandoned;
+    }
+
+    /** A remote write landed: an abandoned change of the id is done with. */
+    async function clearAbandoned(id: string) {
+      const entry = (await request(store(OUTBOX).get(id))) as OutboxEntry | undefined;
+      if (entry?.abandoned) await request(store(OUTBOX).delete(id));
     }
 
     return {
@@ -244,6 +269,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         await request(store(type).put(row));
         wrote.value = true;
         if (!remote) await outboxFor(type, id, prev, false, changedKeys(prev?.body, body), body);
+        else await clearAbandoned(id);
       },
       async delete(type: RecordType, id: string, opts?: WriteOptions) {
         const prev = await raw(type, id);
@@ -261,6 +287,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         );
         wrote.value = true;
         if (!remote) await outboxFor(type, id, prev, true, [], prev.body);
+        else await clearAbandoned(id);
       },
       async pendingAside() {
         const all = (await request(store(OUTBOX).getAll())) as OutboxEntry[];
@@ -408,6 +435,41 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
         if (entry?.seq === seq) await request(outbox.put({ ...entry, park }));
       }),
+    abandonOutbox: (id, seq, park) =>
+      short([OUTBOX], "readwrite", async (tx) => {
+        const outbox = tx.objectStore(OUTBOX);
+        const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
+        if (entry?.seq === seq) await request(outbox.put({ ...entry, park, abandoned: true }));
+      }),
+    async adoptServerCopy(type, id, seq, server, rebase) {
+      await short([type, OUTBOX, META], "readwrite", async (tx) => {
+        const outbox = tx.objectStore(OUTBOX);
+        const records = tx.objectStore(type);
+        const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
+        if (!entry) return;
+        const row = (await request(records.get(id))) as StoredRow | undefined;
+        let n = row?.n;
+        if (n === undefined) {
+          n = (((await request(tx.objectStore(META).get("seq"))) as number | undefined) ?? 0) + 1;
+          await request(tx.objectStore(META).put(n, "seq"));
+        }
+        const base = { id, version: server.version, keyV: server.keyV, n };
+        if (entry.seq === seq) {
+          await request(records.put({ ...base, body: server.body, deleted: false }));
+          await request(outbox.delete(id));
+        } else if (entry.deleted) {
+          // Deleted since: the delete is pushed as an edit of the server's copy.
+          await request(records.put({ ...base, body: server.body, deleted: true }));
+          await request(outbox.put({ ...entry, baseVersion: server.version, touched: [] }));
+        } else {
+          const { body, touched } = rebase(row?.body);
+          await request(records.put({ ...base, body, deleted: false }));
+          if (touched.length === 0) await request(outbox.delete(id));
+          else await request(outbox.put({ ...entry, baseVersion: server.version, touched }));
+        }
+      });
+      notify();
+    },
     getMeta: <T>(key: string) =>
       short([META], "readonly", (tx) => request(tx.objectStore(META).get(key))) as Promise<
         T | undefined
@@ -428,6 +490,11 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         const outbox = tx.objectStore(OUTBOX);
         for (const entry of (await request(outbox.getAll())) as OutboxEntry[]) {
           if (entry.setAside) continue;
+          if (entry.abandoned) {
+            // Given up on: the full download brings the server's copy.
+            await request(outbox.delete(entry.id));
+            continue;
+          }
           const row = (await request(tx.objectStore(entry.type).get(entry.id))) as
             | StoredRow
             | undefined;

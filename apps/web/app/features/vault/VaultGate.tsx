@@ -3,7 +3,8 @@ import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react
 import { Navigate, useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
 import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
-import { unauthorizedRedirect } from "../../api/client.ts";
+import { api, unauthorizedRedirect } from "../../api/client.ts";
+import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
 import { KeysError, loadLocalKeys, prepareAccount, unlockWithRecovery } from "../../local/keys.ts";
 import {
@@ -41,15 +42,46 @@ function signInAgainOn401<T>(promise: Promise<T>): Promise<T> {
   });
 }
 
+/** Who is signed in now (the live `GET /v1/me`): null when no one; throws when it cannot tell. */
+async function sessionUserId(): Promise<string | null> {
+  try {
+    const { data } = await api.GET("/v1/me");
+    if (!data) throw new Error("no profile");
+    return data.id;
+  } catch (error) {
+    // Signed out (the client already heads for sign-in); anything else: cannot tell.
+    if (error instanceof ApiProblem && error.status === 401) return null;
+    throw error;
+  }
+}
+
+/** Another account signed in under this page: load the app again, for them (never the old vault). */
+function reloadApp() {
+  window.location.assign("/app");
+}
+
 function gateFor(profile: VaultProfile): Gate<VaultSession> {
   const userId = profile.id;
-  return createVaultGate({
+  // Set below: the open session's sync tells the gate when the cookie changed hands.
+  let gate: Gate<VaultSession> | undefined;
+  gate = createVaultGate({
     loadLocalKeys: () => loadLocalKeys(userId),
     prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
     unlockWithRecovery: (text) => signInAgainOn401(unlockWithRecovery({ userId, text })),
-    open: (keys, fresh) => openVaultSession({ profile, keys, fresh, onUnauthorized: signInAgain }),
+    open: (keys, fresh) =>
+      openVaultSession({
+        profile,
+        keys,
+        fresh,
+        onUnauthorized: signInAgain,
+        onSessionChanged: () => gate?.sessionChanged(),
+      }),
     guest: profile.isAnonymous,
+    userId,
+    sessionUserId,
+    reload: reloadApp,
   });
+  return gate;
 }
 
 /** While the vault opens or syncs for the first time. */

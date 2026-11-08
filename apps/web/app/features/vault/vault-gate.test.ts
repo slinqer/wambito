@@ -256,4 +256,124 @@ describe("vault gate", () => {
     await settle();
     expect(deps.loadLocalKeys).toHaveBeenCalledTimes(1);
   });
+
+  describe("another account signed in (another tab)", () => {
+    /** The gate of `me`, whose cookie now says `signedIn` (null: signed out). */
+    function changedGate(signedIn: () => string | null, overrides = {}) {
+      const reload = vi.fn();
+      const sessionUserId = vi.fn(async () => signedIn());
+      const built = gateWith({ userId: "me", sessionUserId, reload, ...overrides });
+      return { ...built, reload, sessionUserId };
+    }
+
+    it("a vault closed under the app reloads it when the signed-in account changed", async () => {
+      let who: string | null = "me";
+      const { gate, deps, reload } = changedGate(() => who, {
+        loadLocalKeys: vi.fn(async () => ({ k: "kept" })),
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState().status).toBe("ready");
+      who = "someone-else";
+      gate.closed();
+      await settle();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(deps.loadLocalKeys).toHaveBeenCalledTimes(1);
+      expect(deps.open).toHaveBeenCalledTimes(1);
+      expect(gate.getState().status).toBe("checking");
+    });
+
+    it("signed out in another tab: reloads too (the layout sends to sign-in)", async () => {
+      let who: string | null = "me";
+      const { gate, reload } = changedGate(() => who, {
+        loadLocalKeys: async () => ({ k: "kept" }),
+      });
+      gate.start();
+      await settle();
+      who = null;
+      gate.closed();
+      await settle();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("never prepares an account for the old id", async () => {
+      const { gate, deps, reload } = changedGate(() => "someone-else");
+      gate.start();
+      await settle();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+    });
+
+    it("never unlocks for the old id", async () => {
+      let who = "me";
+      const { gate, deps, reload } = changedGate(() => who, {
+        prepareAccount: async () => {
+          throw fail("already_set_up");
+        },
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+      who = "someone-else";
+      expect(await gate.unlock("KEY")).toBeNull();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(deps.unlockWithRecovery).not.toHaveBeenCalled();
+    });
+
+    it("a sync that says session_changed reloads when the id differs", async () => {
+      let who = "me";
+      const { gate, reload } = changedGate(() => who, {
+        loadLocalKeys: async () => ({ k: "kept" }),
+      });
+      gate.start();
+      await settle();
+      who = "someone-else";
+      gate.sessionChanged();
+      await settle();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("an open or a keys call refused with session_changed reloads too", async () => {
+      let who = "me";
+      const { gate, reload } = changedGate(() => who, {
+        loadLocalKeys: async () => ({ k: "kept" }),
+        open: async () => {
+          who = "someone-else";
+          throw fail("session_changed");
+        },
+      });
+      gate.start();
+      await settle();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("session_changed while the same account is signed in locks, without looping", async () => {
+      const { gate, deps, reload } = changedGate(() => "me", {
+        loadLocalKeys: async () => ({ k: "kept" }),
+        open: vi.fn(async () => {
+          throw fail("session_changed");
+        }),
+      });
+      gate.start();
+      await settle();
+      expect(reload).not.toHaveBeenCalled();
+      expect(deps.open).toHaveBeenCalledTimes(1);
+      expect(gate.getState()).toEqual({ status: "locked", kind: "error", retrying: false });
+    });
+
+    it("cannot tell who is signed in (offline): goes on as before", async () => {
+      const { gate, deps, reload } = changedGate(() => "me", {
+        sessionUserId: async () => {
+          throw fail("offline");
+        },
+        loadLocalKeys: async () => ({ k: "kept" }),
+      });
+      gate.start();
+      await settle();
+      gate.closed();
+      await settle();
+      expect(reload).not.toHaveBeenCalled();
+      expect(deps.open).toHaveBeenCalledTimes(2);
+    });
+  });
 });

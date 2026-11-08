@@ -40,6 +40,12 @@ export interface OutboxEntry {
    */
   park?: OutboxPark;
   /**
+   * Set when the engine gave up on this write (refused 5 times): it is never pushed again and no
+   * longer stops pulls from writing the record; the server's copy replaces it, and the entry goes
+   * once that copy is applied. Any local write of the id clears it (and tries again).
+   */
+  abandoned?: true;
+  /**
    * Set by a resync's wipe, in the same commit: the local body at that moment (`null` when there
    * was no row). The change is not pushed while set aside; after the full download it is written
    * again onto the fresh server copy (only the `touched` fields), and this is cleared.

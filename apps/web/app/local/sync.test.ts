@@ -784,3 +784,172 @@ describe("tabs", () => {
     expect(await one.engine.run()).toMatchObject({ ok: false, error: "closed" });
   });
 });
+
+describe("a change refused again and again is given up on", () => {
+  it("after 5 attempts it stops blocking pulls, and a later server edit shows up", async () => {
+    const server = fakeServer();
+    let clock = 1_000_000;
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const problems: Array<{ code: string; ids?: string[] }> = [];
+    const one = createSyncEngine({
+      store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keys: await getKeys(),
+      keyV: 1,
+      now: () => clock,
+      onError: (p) => problems.push(p),
+    });
+    const two = await device(server);
+    await store.put("category", A, category("Food"));
+    await one.run();
+    await two.engine.run();
+
+    // The server refuses one's edit of A, and only it.
+    let refuse = true;
+    intercept(server, (real, input, init) =>
+      refuse && init?.method === "POST" && changeIds(init).includes(A)
+        ? status(422)
+        : real(input, init),
+    );
+    await store.put("category", A, category("Mine"));
+    for (let i = 1; i <= 3; i++) {
+      const r = await one.run();
+      expect(r.parked).toEqual([A]);
+      expect(r.dropped).toEqual([]);
+      clock += 24 * 3_600_000;
+    }
+    // Still retrying (fourth attempt): the other device's edit does not overwrite it.
+    refuse = false;
+    await two.store.put("category", A, category("Two, first"));
+    await two.engine.run();
+    refuse = true;
+    expect((await one.run()).parked).toEqual([A]);
+    expect((await store.get("category", A))?.body.name).toBe("Mine");
+    expect((await store.readOutbox(10))[0]?.abandoned).toBeUndefined();
+    clock += 24 * 3_600_000;
+    // The fifth refusal gives up on it.
+    expect((await one.run()).dropped).toEqual([A]);
+    expect((await store.readOutbox(10))[0]?.abandoned).toBe(true);
+    expect(problems).toContainEqual({ code: "dropped", ids: [A] });
+
+    // Never pushed again, and the next server edit comes in.
+    clock += 24 * 3_600_000;
+    const posts = server.posts;
+    refuse = false;
+    await two.store.put("category", A, category("Two, second"));
+    await two.engine.run();
+    const r = await one.run();
+    expect(r.ok).toBe(true);
+    expect(server.posts).toBe(posts + 1); // two's push only
+    expect((await store.get("category", A))?.body.name).toBe("Two, second");
+    expect(await store.readOutbox(10)).toEqual([]);
+  });
+
+  it("a conflict that keeps losing takes the server's copy when it gives up", async () => {
+    const server = fakeServer();
+    let clock = 1_000_000;
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const one = createSyncEngine({
+      store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keys: await getKeys(),
+      keyV: 1,
+      now: () => clock,
+    });
+    await store.put("category", A, category("a"));
+    await one.run();
+    await store.put("category", A, category("b"));
+    intercept(server, async (real, input, init) => {
+      if (init?.method !== "POST") return real(input, init);
+      const row = server.rows.get(A);
+      if (row) row.version = ++server.counter; // someone else always wins the race
+      return real(input, init);
+    });
+    let last: Awaited<ReturnType<typeof one.run>> | undefined;
+    for (let i = 1; i <= 5; i++) {
+      last = await one.run();
+      clock += 24 * 3_600_000;
+    }
+    expect(last?.dropped).toEqual([A]);
+    expect(await store.readOutbox(10)).toEqual([]);
+    expect((await store.getRaw("category", A))?.version).toBe(server.rows.get(A)?.version);
+    expect((await store.get("category", A))?.body.name).toBe("a");
+  });
+});
+
+describe("the signed-in account", () => {
+  it("sends the vault's user id with every call", async () => {
+    const server = fakeServer();
+    const seen: Array<string | null> = [];
+    intercept(server, (real, input, init) => {
+      seen.push(new Headers(init?.headers).get("x-wambito-user"));
+      return real(input, init);
+    });
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    await one.engine.run();
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    expect(seen.every((v) => v === USER)).toBe(true);
+  });
+
+  it("stops on 409 session_changed, reports it and does not retry", async () => {
+    const server = fakeServer();
+    let calls = 0;
+    intercept(server, () => {
+      calls += 1;
+      return status(409, { code: "session_changed" });
+    });
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    const r = await one.engine.run();
+    expect(r).toMatchObject({ ok: false, error: "session_changed" });
+    expect(one.problems).toContainEqual({ code: "session_changed", status: 409 });
+    expect((await one.store.readOutbox(10))[0]?.park).toBeUndefined();
+    // Its triggers stop too: no retry, no interval, no local write.
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const engine = createSyncEngine({
+      store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keys: await getKeys(),
+      keyV: 1,
+      debounceMs: 5,
+      intervalMs: 10,
+    });
+    calls = 0;
+    const stop = engine.start();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await store.put("category", B, category("b"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    stop();
+    expect(calls).toBe(1);
+  });
+});
+
+describe("a create conflict racing a local write", () => {
+  it("keeps only the fields the person changed after the create", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    const two = await device(server);
+    await two.store.put("category", C, category("Theirs", "#111"));
+    await two.engine.run();
+    await one.store.put("category", C, category("Mine", "#111"));
+    let raced = false;
+    intercept(server, async (real, input, init) => {
+      const res = await real(input, init);
+      if (init?.method === "POST" && !raced) {
+        raced = true;
+        // The person changes the colour while the create is in flight.
+        await one.store.put("category", C, category("Mine", "#999"));
+      }
+      return res;
+    });
+    await one.engine.run();
+    expect(await names(one.store)).toEqual([`${C}:Theirs/#999`]);
+    await two.engine.run();
+    expect(await names(two.store)).toEqual([`${C}:Theirs/#999`]);
+    expect(await one.store.readOutbox(10)).toEqual([]);
+  });
+});

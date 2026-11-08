@@ -221,7 +221,8 @@
     "guest_cannot_authorize": "Save your progress with your email before connecting an assistant.",
     "insufficient_scope": "This assistant isn't allowed to do that.",
     "encrypted_account": "This account keeps its finances end-to-end encrypted; this part of Wambito doesn't work with it yet.",
-    "already_set_up": "This account already has its keys. Open it with your recovery key."
+    "already_set_up": "This account already has its keys. Open it with your recovery key.",
+    "session_changed": "Another account signed in on this browser. Reload the page."
   },
   "sign_in": {
     "meta_title": "Sign in · Wambito",
