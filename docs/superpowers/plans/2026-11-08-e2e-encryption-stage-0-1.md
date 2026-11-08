@@ -253,7 +253,7 @@ git commit -m "feat(crypto): data key, record sealing and dedupe tags"
 - Consumes: tables from Task 5.
 - Produces (OpenAPI operations):
   - `pullRecords`: `GET /v2/sync?since=<int ≥ 0>&limit=<1..1000, default 500>` → `200 { records: SyncRecord[], next: number | null, latest: number }`; `SyncRecord = { id, type, version, deleted, keyV, encV, body: string | null }` (`body` base64url).
-  - `pushRecords`: `POST /v2/sync` `{ changes: Change[] }`, `Change = { id, type, baseVersion: number | null, deleted, keyV, encV, body: string | null }` → `200 { results: ({ id, version } | { id, conflict: SyncRecord })[] }` in request order.
+  - `pushRecords`: `POST /v2/sync` `{ changes: Change[] }`, `Change = { id, type, baseVersion: number | null, deleted, keyV, encV, body: string | null }` → `200 { results: ({ id, version } | { id, conflict: SyncRecord } | { id, error: "id_taken" })[] }` in request order.
   - Errors: `413 payload_too_large` (> 4 MiB), `422 validation_failed` (> 500 changes, body > 64 KiB decoded, `deleted` and `body` inconsistent, unknown type), `409 record_limit` (> 100,000 live records).
   - `purgeTombstones(db, now): Promise<number>` in `services/sync.ts` (deletes `deleted` rows older than 180 days) and `scheduleTombstonePurge({ db })`.
 
@@ -263,7 +263,7 @@ git commit -m "feat(crypto): data key, record sealing and dedupe tags"
   - `a stale baseVersion is a conflict carrying the current record`; other changes in the batch still apply.
   - `retrying a create is idempotent` (same id, same body, `baseVersion: null` → the stored `{ id, version }`); same id with a different body → conflict.
   - `versions are visible in commit order`: two concurrent pushes for one user with a delay injected in the first (a `deps` hook in the service); a pull between them never returns the second version without the first.
-  - `two users never see each other's records`; a create by A with an id that B already owns gets `{ id, conflict: null }` reported as the error `409 id_taken` for that change, never B's record.
+  - `two users never see each other's records`; a create by A with an id that B already owns gets `{ id, error: "id_taken" }` for that change, never B's record.
   - limits: 501 changes, a 64 KiB + 1 body, a request over 4 MiB, the 100,001st live record (insert 100,000 tombstones-free rows with SQL first).
   - scopes: an assistant with `finance:read` can pull and gets `403 insufficient_scope` on push; `finance:write` can push.
   - `purgeTombstones` removes a 181-day-old tombstone and keeps a 179-day-old one and every live record.
