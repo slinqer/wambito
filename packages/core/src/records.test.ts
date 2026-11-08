@@ -46,9 +46,9 @@ describe("parseRecord", () => {
       expect(parseRecord(type, rest).ok).toBe(false);
     });
 
-    test(`${type}: strips unknown keys`, () => {
-      const r = parseRecord(type, { ...(valid[type] as object), future: "x" });
-      expect(r.ok && "future" in r.value).toBe(false);
+    test(`${type}: keeps unknown keys, so a newer client's fields survive`, () => {
+      const r = parseRecord(type, { ...(valid[type] as object), future: { x: 1 } });
+      expect(r).toMatchObject({ ok: true, value: { future: { x: 1 } } });
     });
 
     test(`${type}: never throws on garbage`, () => {

@@ -7,8 +7,9 @@ import { amountSchema, budgetAmountSchema, isoDateSchema, monthSchema } from "./
 /**
  * The plaintext bodies of the encrypted records (spec 4.2, 5.1): what gets sealed is
  * `{ s: 1, ...fields }`. `id`, `version` and `deleted` live in the record envelope, never here.
- * The objects are not strict: unknown keys are stripped, so a newer client's extra fields do not
- * break an older one. `s` is the schema version and is required.
+ * The objects are loose: unknown keys are kept, so a newer client's extra fields do not break an
+ * older one and survive its edits and conflict merges (the merge copies every key it does not
+ * know from the server's copy). `s` is the schema version and is required.
  */
 const text = z.string();
 const timestamp = z.string();
@@ -35,7 +36,7 @@ export const transactionRecord = z.object({
   createdAt: timestamp.optional(),
   /** Set on create and on every edit; an older record has none (read `createdAt`). */
   updatedAt: timestamp.optional(),
-});
+}).loose();
 
 export const categoryRecord = z.object({
   s: z.literal(1),
@@ -47,7 +48,7 @@ export const categoryRecord = z.object({
   archivedAt: timestamp.nullable().default(null),
   systemKey: text.nullable().default(null),
   createdAt: timestamp.optional(),
-});
+}).loose();
 
 /** One entry of the budget history: the amount applies from `effectiveFrom` until a later entry. */
 export const budgetRecord = z.object({
@@ -55,7 +56,7 @@ export const budgetRecord = z.object({
   categoryId: z.uuid(),
   amount: budgetAmountSchema,
   effectiveFrom: monthSchema,
-});
+}).loose();
 
 export const recurrenceRecord = z.object({
   s: z.literal(1),
@@ -73,14 +74,14 @@ export const recurrenceRecord = z.object({
    */
   rev: z.number().int().min(0).default(0),
   createdAt: timestamp.optional(),
-});
+}).loose();
 
 /** The merchant memory: the category last chosen for a merchant (`merchantKey` of its name). */
 export const merchantRecord = z.object({
   s: z.literal(1),
   merchantKey: text.min(1),
   categoryId: z.uuid(),
-});
+}).loose();
 
 /** The profile preferences (one per account). */
 export const settingsRecord = z.object({
@@ -90,14 +91,14 @@ export const settingsRecord = z.object({
   locale: z.enum(["es", "en", "it", "pt"]),
   timezone: z.string().refine(isValidTimeZone, "Unknown time zone"),
   onboardingCompletedAt: timestamp.nullable().default(null),
-});
+}).loose();
 
 export const accountRecord = z.object({
   s: z.literal(1),
   name: text,
   currency: text,
   isDefault: z.boolean().default(false),
-});
+}).loose();
 
 export const RECORD_SCHEMAS = {
   transaction: transactionRecord,
