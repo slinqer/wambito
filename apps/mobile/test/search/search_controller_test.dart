@@ -264,4 +264,53 @@ void main() {
       expect(read().items, isEmpty);
     });
   });
+
+  test('loadMore does nothing while a text debounce is pending', () {
+    fakeAsync((async) {
+      container.listen(searchControllerProvider, (_, _) {});
+      ctl().setKind(SearchKind.expense);
+      repo.calls[0].completer.complete(_page(['a'], next: 'n1'));
+      async.flushMicrotasks();
+      ctl().setText('caf');
+      unawaited(ctl().loadMore());
+      expect(repo.calls, hasLength(1), reason: 'the new text must not page with the old cursor');
+      expect(read().loadingMore, isFalse);
+      async.elapse(searchDebounce);
+      expect(repo.calls, hasLength(2));
+      expect(repo.calls[1].cursor, isNull);
+      expect(repo.calls[1].filters.text, 'caf');
+    });
+  });
+
+  test('retry after a failed refresh repeats the refresh, not loadMore', () {
+    fakeAsync((async) {
+      container.listen(searchControllerProvider, (_, _) {});
+      ctl().setKind(SearchKind.expense);
+      repo.calls[0].completer.complete(_page(['a'], next: 'n1'));
+      async.flushMicrotasks();
+      unawaited(ctl().refresh());
+      repo.calls[1].completer.completeError(const HomeFailure(0));
+      async.flushMicrotasks();
+      expect(read().failure, isNotNull);
+      expect(read().items.map((t) => t.id), ['a']);
+
+      unawaited(ctl().retry());
+      expect(repo.calls, hasLength(3));
+      expect(repo.calls[2].cursor, isNull, reason: 'the first page again');
+      repo.calls[2].completer.complete(_page(['z']));
+      async.flushMicrotasks();
+      expect(read().items.map((t) => t.id), ['z']);
+      expect(read().failure, isNull);
+    });
+  });
+
+  test('the text is cut at 100 characters and the categories at 20', () {
+    fakeAsync((async) {
+      container.listen(searchControllerProvider, (_, _) {});
+      ctl().setText('x' * 150);
+      expect(read().filters.text, hasLength(100));
+      ctl().setCategories({for (var i = 0; i < 30; i++) 'c$i'});
+      expect(read().filters.categoryIds, hasLength(20));
+    });
+  });
 }

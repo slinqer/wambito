@@ -9,6 +9,10 @@ import 'search_repository.dart';
 /// How long typing must pause before the words are searched.
 const searchDebounce = Duration(milliseconds: 300);
 
+/// The longest text the API takes for a search, and the most categories.
+const searchMaxText = 100;
+const searchMaxCategories = 20;
+
 class SearchState {
   const SearchState({
     this.filters = const SearchFilters(),
@@ -67,6 +71,9 @@ class SearchController extends Notifier<SearchState> {
   /// Counts the requests (searches and pages); an answer of an older one is dropped.
   var _generation = 0;
 
+  /// The last failure was a next page (retry loads it again), not a first page.
+  var _pageFailed = false;
+
   @override
   SearchState build() {
     _debounce?.cancel();
@@ -80,6 +87,7 @@ class SearchController extends Notifier<SearchState> {
   }
 
   void setText(String text) {
+    if (text.length > searchMaxText) text = text.substring(0, searchMaxText);
     state = state.copyWith(filters: _filters(text: text));
     _debounce?.cancel();
     if (!state.filters.isSearching) {
@@ -91,7 +99,9 @@ class SearchController extends Notifier<SearchState> {
 
   void setKind(SearchKind kind) => _changed(_filters(kind: kind));
 
-  void setCategories(Set<String> categoryIds) => _changed(_filters(categoryIds: categoryIds));
+  void setCategories(Set<String> categoryIds) => _changed(
+    _filters(categoryIds: categoryIds.take(searchMaxCategories).toSet()),
+  );
 
   void setStatus(SearchStatus status) => _changed(_filters(status: status));
 
@@ -132,6 +142,7 @@ class SearchController extends Notifier<SearchState> {
     _debounce?.cancel();
     final filters = state.filters;
     final seq = ++_generation;
+    _pageFailed = false;
     state = keep
         ? state.copyWith(loading: true, loadingMore: false, failure: () => null)
         : SearchState(filters: filters, loading: true);
@@ -158,8 +169,11 @@ class SearchController extends Notifier<SearchState> {
   Future<void> loadMore() async {
     final cursor = state.nextCursor;
     if (cursor == null || state.loading || state.loadingMore) return;
+    // The words changed and wait for their search: this cursor is of the old ones.
+    if (_debounce?.isActive ?? false) return;
     final filters = state.filters;
     final seq = ++_generation;
+    _pageFailed = false;
     state = state.copyWith(loadingMore: true, failure: () => null);
     try {
       final page = await _repo.search(filters, cursor: cursor);
@@ -171,6 +185,7 @@ class SearchController extends Notifier<SearchState> {
       );
     } catch (error) {
       if (seq != _generation) return;
+      _pageFailed = true;
       state = state.copyWith(
         loadingMore: false,
         failure: () => error is HomeFailure ? error : const HomeFailure(0),
@@ -178,9 +193,9 @@ class SearchController extends Notifier<SearchState> {
     }
   }
 
-  /// After a failure: the page that failed again, or the search when no page had loaded.
+  /// After a failure: the page that failed again, or the search (a first page or a refresh).
   Future<void> retry() {
-    if (state.items.isNotEmpty && state.nextCursor != null) return loadMore();
+    if (_pageFailed) return loadMore();
     return refresh();
   }
 
