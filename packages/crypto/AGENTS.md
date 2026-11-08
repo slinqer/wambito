@@ -27,6 +27,10 @@ API tests.
 
 ## Test
 
+- `test-vectors.json` is shared with the Dart port (stage 3); never edit it by hand. Regenerate with
+  `pnpm --filter @wambito/crypto vectors` (`scripts/gen-vectors.ts`, fixed inputs, deterministic: a
+  rerun must leave `git diff --exit-code packages/crypto/test-vectors.json` clean). `test/vectors.test.ts`
+  checks it. Its `rejects` section lists inputs every implementation must refuse, with the error code.
 - `pnpm vitest run --project @wambito/crypto`; typecheck: `pnpm --filter @wambito/crypto typecheck`.
 
 ## Rules
