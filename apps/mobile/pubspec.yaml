@@ -4,7 +4,7 @@ publish_to: "none"
 
 # The dev build's versionName and base versionCode. Release builds are given theirs from the
 # mobile-v* tag with --build-name and --build-number (scripts/release.sh, docs/mobile/release.md).
-version: 0.0.0-dev+1
+version: 1.0.1+10001
 
 environment:
   sdk: ^3.13.5
