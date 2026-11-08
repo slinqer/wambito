@@ -373,7 +373,13 @@ printf '%s\n' "$fingerprint" >"$dist/ANDROID_CERT_SHA256.txt"
 
 echo
 echo "Done: $dist"
-(cd "$dist" && ls -l wambito-*.apk wambito-*.aab 2>/dev/null | awk '{ print "  " $NF "  " $5 " bytes" }')
+# Only the files this run made (no .aab without --play: a glob that matches nothing fails ls).
+(
+  cd "$dist"
+  built=(wambito-*.apk)
+  [ "$play" -eq 0 ] || built+=("$(basename "$aab")")
+  ls -l "${built[@]}" | awk '{ print "  " $NF "  " $5 " bytes" }'
+)
 if [ "$play" -eq 1 ]; then
   echo
   echo "Upload to Play Console (internal testing first): $aab"
