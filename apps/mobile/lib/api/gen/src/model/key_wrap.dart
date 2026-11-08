@@ -18,6 +18,7 @@ part 'key_wrap.g.dart';
 /// * [keyV]
 /// * [wrapped] - base64url without padding
 /// * [publicKey] - base64url without padding
+/// * [attestation] - `device` only; base64url without padding
 /// * [label]
 /// * [createdAt]
 /// * [lastUsedAt]
@@ -43,6 +44,10 @@ abstract class KeyWrap implements Built<KeyWrap, KeyWrapBuilder> {
   /// base64url without padding
   @BuiltValueField(wireName: r'publicKey')
   String? get publicKey;
+
+  /// `device` only; base64url without padding
+  @BuiltValueField(wireName: r'attestation')
+  String? get attestation;
 
   @BuiltValueField(wireName: r'label')
   String? get label;
@@ -92,6 +97,10 @@ class _$KeyWrapSerializer implements PrimitiveSerializer<KeyWrap> {
     yield object.publicKey == null
         ? null
         : serializers.serialize(object.publicKey, specifiedType: const FullType.nullable(String));
+    yield r'attestation';
+    yield object.attestation == null
+        ? null
+        : serializers.serialize(object.attestation, specifiedType: const FullType.nullable(String));
     yield r'label';
     yield object.label == null
         ? null
@@ -162,6 +171,14 @@ class _$KeyWrapSerializer implements PrimitiveSerializer<KeyWrap> {
           ) as String?;
           if (valueDes == null) continue;
           result.publicKey = valueDes;
+          break;
+        case r'attestation':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.attestation = valueDes;
           break;
         case r'label':
           final valueDes = serializers.deserialize(

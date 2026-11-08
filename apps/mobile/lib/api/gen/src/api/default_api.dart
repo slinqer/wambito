@@ -2204,7 +2204,7 @@ class DefaultApi {
   }
 
   /// pullRecords
-  /// The person&#39;s records with a version above &#x60;since&#x60;, oldest first. &#x60;since&#x3D;0&#x60; downloads everything; follow &#x60;next&#x60; until it is null, then keep &#x60;latest&#x60; for the next pull.
+  /// The person&#39;s records with a version above &#x60;since&#x60;, oldest first. &#x60;since&#x3D;0&#x60; downloads everything; follow &#x60;next&#x60; until it is null, then keep &#x60;latest&#x60; for the next pull. 410 &#x60;resync_required&#x60; when &#x60;since&#x60; is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from &#x60;since&#x3D;0&#x60;.
   ///
   /// Parameters:
   /// * [since]
@@ -2366,7 +2366,7 @@ class DefaultApi {
   }
 
   /// putKeyWrap
-  /// Adds the wrap &#x60;id&#x60;, or replaces it. &#x60;keyV&#x60; must be the account&#39;s current key version (any for the first wrap), else 409 &#x60;key_version_mismatch&#x60;. An account&#39;s first wrap is &#x60;recovery&#x60; (any other kind first: 422 &#x60;recovery_required&#x60;). A &#x60;passkey&#x60; wrap&#39;s &#x60;ref&#x60; is one of the person&#39;s passkey credential ids (422 &#x60;unknown_passkey&#x60;); an &#x60;assistant&#x60; wrap&#39;s, an OAuth client the person connected (422 &#x60;unknown_assistant&#x60;); a &#x60;device&#x60; wrap carries its 32-byte public key. A new &#x60;recovery&#x60; wrap replaces the old one (whose id cannot take another kind: 409 &#x60;recovery_required&#x60;), and a wrap replaces the one of the same kind and ref. 409 &#x60;id_taken&#x60; when the id is someone else&#39;s.
+  /// Adds the wrap &#x60;id&#x60;, or replaces it. &#x60;keyV&#x60; must be the account&#39;s current key version (any for the first wrap), else 409 &#x60;key_version_mismatch&#x60;. An account&#39;s first wrap is &#x60;recovery&#x60; (any other kind first: 422 &#x60;recovery_required&#x60;). A &#x60;passkey&#x60; wrap&#39;s &#x60;ref&#x60; is one of the person&#39;s passkey credential ids (422 &#x60;unknown_passkey&#x60;); an &#x60;assistant&#x60; wrap&#39;s, an OAuth client the person connected (422 &#x60;unknown_assistant&#x60;); a &#x60;device&#x60; wrap carries its 32-byte public key and a 32-byte &#x60;attestation&#x60; of it (else 422 &#x60;attestation_required&#x60;; other kinds send neither). A new &#x60;recovery&#x60; wrap replaces the old one (whose id cannot take another kind: 409 &#x60;recovery_required&#x60;), and a wrap replaces the one of the same kind and ref. 409 &#x60;id_taken&#x60; when the id is someone else&#39;s.
   ///
   /// Parameters:
   /// * [id] - A UUID in lower case
@@ -2781,7 +2781,7 @@ class DefaultApi {
   }
 
   /// rotateKeys
-  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
+  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Device wraps carry an attestation too. Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
   ///
   /// Parameters:
   /// * [rotateKeys]

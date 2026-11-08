@@ -45,7 +45,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   || user_id, 0))` (every `records` write takes it, so versions commit in order per person), one
   savepoint per change; limits 500 changes, 4 MiB (`hono/body-limit`), 64 KiB body, 100,000 live
   records. `purgeTombstones` (daily, `server.ts`) goes person by person through `withUser`, since
-  `records` has forced RLS. An update never creates (`not_found`) nor changes `type` (conflict);
+  `records` has forced RLS; in the same transaction it raises `record_purges.through_version`
+  (per person, `greatest`), and `GET /v2/sync` answers 410 `resync_required` when
+  `0 < since < through_version` (`since=0` never). An update never creates (`not_found`) nor changes `type` (conflict);
   a hidden id (`id_taken`) is found by a rolled-back insert probe. `deps.syncHooks` is a test-only
   seam.
 - `/v2/keys` (`src/routes/keys.ts`, `src/services/keys.ts`; same spec §5.2, §7): wraps of the
@@ -56,7 +58,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
   `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
   4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
-  `last_used_at`; sessions get 404 there.
+  `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
+  (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
+  server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
+  other kinds sending `publicKey` or `attestation` are 422 `validation_failed`).
 - `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
   approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
   `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is
@@ -75,11 +80,6 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
-- Known gaps (spec §17, open before stage 2):
-  - Device keys in rotation (§7.5): the rotating device seals the new data key to device public
-    keys the server lists; a malicious server could add or swap one. Plan: each device wrap
-    carries an attestation (HMAC under a key derived from the data key over user id || wrap id ||
-    public key), verified before sealing; new column and crypto function with vectors first.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

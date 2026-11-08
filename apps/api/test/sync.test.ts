@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { records } from "@wambito/db";
-import { sql } from "@wambito/db/orm";
+import { recordPurges, records } from "@wambito/db";
+import { eq, sql } from "@wambito/db/orm";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import type { SyncHooks } from "../src/deps.ts";
 import { purgeTombstones } from "../src/services/sync.ts";
@@ -411,6 +411,45 @@ describe("/v2/sync", () => {
     expect(ids).toContain(recent);
     expect(ids).toContain(oldLive);
     expect(ids).toHaveLength(before - 1);
+  });
+
+  test("a purge makes older cursors resync, never a full download or a current cursor", async () => {
+    const { headers, userId } = await t.signIn(`purge-${randomUUID()}@wambito.test`);
+    const now = new Date("2026-11-08T12:00:00Z");
+    const old = randomUUID();
+    const keep = randomUUID();
+    await push(headers, [create("keep", { id: keep })]);
+    await t.admin.execute(sql`insert into ${records}
+      (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+      (${old}, ${userId}, 'transaction', true, 1, 1, null, ${new Date(now.getTime() - 181 * 86_400_000).toISOString()}::timestamptz)`);
+    const purged = (await pullAll(headers)).find((r) => r.id === old)?.version ?? 0;
+    expect(purged).toBeGreaterThan(0);
+    const keepVersion = (await pullAll(headers)).find((r) => r.id === keep)?.version ?? 0;
+    expect(keepVersion).toBeGreaterThan(0);
+    expect(keepVersion).toBeLessThan(purged);
+    await push(headers, [create("later")]);
+
+    await purgeTombstones(t.db, now);
+    const [row] = await t.admin.select().from(recordPurges).where(eq(recordPurges.userId, userId));
+    expect(row?.throughVersion).toBe(purged);
+
+    const stale = await t.request("GET", `/v2/sync?since=${keepVersion}`, { headers });
+    expect(stale.status).toBe(410);
+    expect(stale.headers.get("content-type")).toContain("application/problem+json");
+    expect(await stale.json()).toMatchObject({ status: 410, code: "resync_required" });
+    expect((await t.request("GET", "/v2/sync?since=0", { headers })).status).toBe(200);
+    expect((await t.request("GET", `/v2/sync?since=${purged}`, { headers })).status).toBe(200);
+
+    // The mark only grows.
+    await t.admin.execute(sql`insert into ${records}
+      (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+      (${randomUUID()}, ${userId}, 'transaction', true, 1, 1, null, ${new Date(now.getTime() - 200 * 86_400_000).toISOString()}::timestamptz)`);
+    await purgeTombstones(t.db, now);
+    const [again] = await t.admin
+      .select()
+      .from(recordPurges)
+      .where(eq(recordPurges.userId, userId));
+    expect(again?.throughVersion).toBeGreaterThanOrEqual(purged);
   });
 
   test("no request body is logged", async () => {

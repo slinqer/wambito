@@ -17,7 +17,8 @@ part 'rotated_key_wrap.g.dart';
 /// * [ref] - The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery`
 /// * [keyV] - The data key version this wraps
 /// * [wrapped] - The wrapped data key, base64url without padding, 1–1024 bytes decoded
-/// * [publicKey] - `device` only, and required there: its X25519 public key, 32 bytes, base64url
+/// * [publicKey] - `device` only, and required there (422 `attestation_required`): its X25519 public key, 32 bytes, base64url
+/// * [attestation] - `device` only, and required there (422 `attestation_required`): HMAC-SHA256, 32 bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key.
 /// * [label] - Shown in Settings (\"Pixel 9\", \"Firefox on Mac\")
 @BuiltValue()
 abstract class RotatedKeyWrap implements Built<RotatedKeyWrap, RotatedKeyWrapBuilder> {
@@ -41,9 +42,13 @@ abstract class RotatedKeyWrap implements Built<RotatedKeyWrap, RotatedKeyWrapBui
   @BuiltValueField(wireName: r'wrapped')
   String get wrapped;
 
-  /// `device` only, and required there: its X25519 public key, 32 bytes, base64url
+  /// `device` only, and required there (422 `attestation_required`): its X25519 public key, 32 bytes, base64url
   @BuiltValueField(wireName: r'publicKey')
   String? get publicKey;
+
+  /// `device` only, and required there (422 `attestation_required`): HMAC-SHA256, 32 bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key.
+  @BuiltValueField(wireName: r'attestation')
+  String? get attestation;
 
   /// Shown in Settings (\"Pixel 9\", \"Firefox on Mac\")
   @BuiltValueField(wireName: r'label')
@@ -87,6 +92,13 @@ class _$RotatedKeyWrapSerializer implements PrimitiveSerializer<RotatedKeyWrap> 
     if (object.publicKey != null) {
       yield r'publicKey';
       yield serializers.serialize(object.publicKey, specifiedType: const FullType.nullable(String));
+    }
+    if (object.attestation != null) {
+      yield r'attestation';
+      yield serializers.serialize(
+        object.attestation,
+        specifiedType: const FullType.nullable(String),
+      );
     }
     if (object.label != null) {
       yield r'label';
@@ -152,6 +164,14 @@ class _$RotatedKeyWrapSerializer implements PrimitiveSerializer<RotatedKeyWrap> 
           ) as String?;
           if (valueDes == null) continue;
           result.publicKey = valueDes;
+          break;
+        case r'attestation':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.attestation = valueDes;
           break;
         case r'label':
           final valueDes = serializers.deserialize(

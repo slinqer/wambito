@@ -95,6 +95,8 @@ class _$RotatedKeyWrap extends RotatedKeyWrap {
   @override
   final String? publicKey;
   @override
+  final String? attestation;
+  @override
   final String? label;
 
   factory _$RotatedKeyWrap([void Function(RotatedKeyWrapBuilder)? updates]) =>
@@ -107,6 +109,7 @@ class _$RotatedKeyWrap extends RotatedKeyWrap {
     required this.keyV,
     required this.wrapped,
     this.publicKey,
+    this.attestation,
     this.label,
   }) : super._();
   @override
@@ -126,6 +129,7 @@ class _$RotatedKeyWrap extends RotatedKeyWrap {
         keyV == other.keyV &&
         wrapped == other.wrapped &&
         publicKey == other.publicKey &&
+        attestation == other.attestation &&
         label == other.label;
   }
 
@@ -138,6 +142,7 @@ class _$RotatedKeyWrap extends RotatedKeyWrap {
     _$hash = $jc(_$hash, keyV.hashCode);
     _$hash = $jc(_$hash, wrapped.hashCode);
     _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jc(_$hash, attestation.hashCode);
     _$hash = $jc(_$hash, label.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -152,6 +157,7 @@ class _$RotatedKeyWrap extends RotatedKeyWrap {
           ..add('keyV', keyV)
           ..add('wrapped', wrapped)
           ..add('publicKey', publicKey)
+          ..add('attestation', attestation)
           ..add('label', label))
         .toString();
   }
@@ -184,6 +190,10 @@ class RotatedKeyWrapBuilder implements Builder<RotatedKeyWrap, RotatedKeyWrapBui
   String? get publicKey => _$this._publicKey;
   set publicKey(String? publicKey) => _$this._publicKey = publicKey;
 
+  String? _attestation;
+  String? get attestation => _$this._attestation;
+  set attestation(String? attestation) => _$this._attestation = attestation;
+
   String? _label;
   String? get label => _$this._label;
   set label(String? label) => _$this._label = label;
@@ -201,6 +211,7 @@ class RotatedKeyWrapBuilder implements Builder<RotatedKeyWrap, RotatedKeyWrapBui
       _keyV = $v.keyV;
       _wrapped = $v.wrapped;
       _publicKey = $v.publicKey;
+      _attestation = $v.attestation;
       _label = $v.label;
       _$v = null;
     }
@@ -230,6 +241,7 @@ class RotatedKeyWrapBuilder implements Builder<RotatedKeyWrap, RotatedKeyWrapBui
           keyV: BuiltValueNullFieldError.checkNotNull(keyV, r'RotatedKeyWrap', 'keyV'),
           wrapped: BuiltValueNullFieldError.checkNotNull(wrapped, r'RotatedKeyWrap', 'wrapped'),
           publicKey: publicKey,
+          attestation: attestation,
           label: label,
         );
     replace(_$result);

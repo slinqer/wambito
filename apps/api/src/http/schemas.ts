@@ -192,6 +192,8 @@ export const KEY_WRAP_KINDS = ["passkey", "recovery", "device", "assistant"] as 
 export const MAX_WRAPPED = 1024;
 /** A device's X25519 public key, in bytes. */
 export const DEVICE_PUBLIC_KEY_BYTES = 32;
+/** A device wrap's attestation (HMAC-SHA256), in bytes. */
+export const DEVICE_ATTESTATION_BYTES = 32;
 
 /** Unpadded base64url whose decoded length is within `min`..`max` bytes. */
 const base64urlBytes = (min: number, max: number) =>
@@ -221,20 +223,32 @@ const keyWrapFields = {
     .nullable()
     .optional()
     .openapi({
-      description: `\`device\` only, and required there: its X25519 public key, ${DEVICE_PUBLIC_KEY_BYTES} bytes, base64url`,
+      description: `\`device\` only, and required there (422 \`attestation_required\`): its X25519 public key, ${DEVICE_PUBLIC_KEY_BYTES} bytes, base64url`,
+    }),
+  attestation: base64urlBytes(DEVICE_ATTESTATION_BYTES, DEVICE_ATTESTATION_BYTES)
+    .nullable()
+    .optional()
+    .openapi({
+      description: `\`device\` only, and required there (422 \`attestation_required\`): HMAC-SHA256, ${DEVICE_ATTESTATION_BYTES} bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key.`,
     }),
   label: z.string().max(100).nullable().optional().openapi({
     description: 'Shown in Settings ("Pixel 9", "Firefox on Mac")',
   }),
 };
 
-type KeyWrapShape = { kind: string; ref?: string | null; publicKey?: string | null };
+type KeyWrapShape = {
+  kind: string;
+  ref?: string | null;
+  publicKey?: string | null;
+  attestation?: string | null;
+};
 const refByKind = (wrap: KeyWrapShape) => (wrap.kind === "recovery") === (wrap.ref == null);
+// A device wrap missing either is 422 `attestation_required`, decided in the service.
 const publicKeyByKind = (wrap: KeyWrapShape) =>
-  (wrap.kind === "device") === (wrap.publicKey != null);
+  wrap.kind === "device" || (wrap.publicKey == null && wrap.attestation == null);
 const REF_RULE = { message: "`recovery` has no ref; every other kind has one", path: ["ref"] };
 const PUBLIC_KEY_RULE = {
-  message: "`device` has a public key; no other kind has one",
+  message: "Only `device` has a public key and an attestation",
   path: ["publicKey"],
 };
 
@@ -252,6 +266,10 @@ export const KeyWrap = z
     keyV: z.int(),
     wrapped: z.string().openapi({ description: "base64url without padding" }),
     publicKey: z.string().nullable().openapi({ description: "base64url without padding" }),
+    attestation: z
+      .string()
+      .nullable()
+      .openapi({ description: "`device` only; base64url without padding" }),
     label: z.string().nullable(),
     createdAt: z.string(),
     lastUsedAt: z.string().nullable(),

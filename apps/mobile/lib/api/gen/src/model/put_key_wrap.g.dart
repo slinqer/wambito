@@ -84,6 +84,8 @@ class _$PutKeyWrap extends PutKeyWrap {
   @override
   final String? publicKey;
   @override
+  final String? attestation;
+  @override
   final String? label;
 
   factory _$PutKeyWrap([void Function(PutKeyWrapBuilder)? updates]) =>
@@ -95,6 +97,7 @@ class _$PutKeyWrap extends PutKeyWrap {
     required this.keyV,
     required this.wrapped,
     this.publicKey,
+    this.attestation,
     this.label,
   }) : super._();
   @override
@@ -113,6 +116,7 @@ class _$PutKeyWrap extends PutKeyWrap {
         keyV == other.keyV &&
         wrapped == other.wrapped &&
         publicKey == other.publicKey &&
+        attestation == other.attestation &&
         label == other.label;
   }
 
@@ -124,6 +128,7 @@ class _$PutKeyWrap extends PutKeyWrap {
     _$hash = $jc(_$hash, keyV.hashCode);
     _$hash = $jc(_$hash, wrapped.hashCode);
     _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jc(_$hash, attestation.hashCode);
     _$hash = $jc(_$hash, label.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -137,6 +142,7 @@ class _$PutKeyWrap extends PutKeyWrap {
           ..add('keyV', keyV)
           ..add('wrapped', wrapped)
           ..add('publicKey', publicKey)
+          ..add('attestation', attestation)
           ..add('label', label))
         .toString();
   }
@@ -165,6 +171,10 @@ class PutKeyWrapBuilder implements Builder<PutKeyWrap, PutKeyWrapBuilder> {
   String? get publicKey => _$this._publicKey;
   set publicKey(String? publicKey) => _$this._publicKey = publicKey;
 
+  String? _attestation;
+  String? get attestation => _$this._attestation;
+  set attestation(String? attestation) => _$this._attestation = attestation;
+
   String? _label;
   String? get label => _$this._label;
   set label(String? label) => _$this._label = label;
@@ -181,6 +191,7 @@ class PutKeyWrapBuilder implements Builder<PutKeyWrap, PutKeyWrapBuilder> {
       _keyV = $v.keyV;
       _wrapped = $v.wrapped;
       _publicKey = $v.publicKey;
+      _attestation = $v.attestation;
       _label = $v.label;
       _$v = null;
     }
@@ -209,6 +220,7 @@ class PutKeyWrapBuilder implements Builder<PutKeyWrap, PutKeyWrapBuilder> {
           keyV: BuiltValueNullFieldError.checkNotNull(keyV, r'PutKeyWrap', 'keyV'),
           wrapped: BuiltValueNullFieldError.checkNotNull(wrapped, r'PutKeyWrap', 'wrapped'),
           publicKey: publicKey,
+          attestation: attestation,
           label: label,
         );
     replace(_$result);

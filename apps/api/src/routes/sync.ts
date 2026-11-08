@@ -33,14 +33,14 @@ export function syncRoutes(deps: AppDeps) {
       path: "/v2/sync",
       operationId: "pullRecords",
       description:
-        "The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull.",
+        "The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. 410 `resync_required` when `since` is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0`.",
       request: {
         query: z.object({
           since: z.coerce.number().int().min(0),
           limit: z.coerce.number().int().min(1).max(1000).default(500),
         }),
       },
-      responses: { 200: jsonResponse(PulledRecords, "Records"), ...problems(422) },
+      responses: { 200: jsonResponse(PulledRecords, "Records"), ...problems(410, 422) },
     }),
     async (c) => {
       const { since, limit } = c.req.valid("query");

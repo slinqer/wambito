@@ -31,6 +31,8 @@ How to add to it:
 
 ### Changed
 
+- `/v2/keys` (unreleased): a `device` wrap needs a 32-byte `attestation` next to its `publicKey` (`PUT /v2/keys/{id}` and `POST /v2/keys/rotate`; else 422 `attestation_required`), and `GET /v2/keys` returns it (`null` for other kinds). The server stores it and cannot verify it; devices check it before sealing the data key to a device.
+- `GET /v2/sync` (unreleased): 410 `resync_required` when `since` is above 0 but below the newest version of a tombstone the daily purge deleted; the device downloads everything again from `since=0`.
 - Pairing relay (`/v2/pairing`, unreleased): the new device commits first. `POST /v2/pairing` takes `{ commitment }` (SHA-256 of a domain tag and its public key) instead of a public key; `GET /v2/pairing?code=` returns `{ id, commitment, expiresAt }` and is 404 once an approver key is set; new `POST /v2/pairing/{id}/approver` (the approving device's ephemeral key, once: 409 `already_set`) and `POST /v2/pairing/{id}/reveal` (the new device's key, checked against the commitment: 409 `not_ready` or `already_set`, 422 `commitment_mismatch`); `POST /v2/pairing/{id}/seal` takes `{ sealed, keyV }`, needs the revealed key (409 `not_ready`) and a blob that starts with the approver key (422 `approver_mismatch`); `GET /v2/pairing/{id}` returns `{ commitment, approverKey, publicKey, sealed, keyV, expiresAt }` (null until set) and deletes the row when it returns `sealed`.
 - MCP `list_transactions` searches every month when given text or a category and no dates (before, it covered the current month only). Its page line now reads "On this page: N …" so it is not mistaken for the total.
 

@@ -170,6 +170,8 @@
   "errors": {
     "record_limit": "A tua conta atingiu o limite de registos guardados.",
     "key_version_mismatch": "A versão da chave de dados mudou. Atualiza e tenta de novo.",
+    "attestation_required": "Não foi possível verificar a chave deste dispositivo. Recomeça o emparelhamento.",
+    "resync_required": "Alguns itens eliminados foram limpos no servidor. Os teus dados estão a ser descarregados de novo.",
     "already_sealed": "Este pedido já foi aprovado.",
     "already_set": "Este passo já foi feito para este pedido.",
     "not_ready": "O outro dispositivo ainda não está pronto. Espera um momento e tenta de novo.",

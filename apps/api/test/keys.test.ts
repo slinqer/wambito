@@ -13,6 +13,7 @@ interface KeyWrap {
   keyV: number;
   wrapped: string;
   publicKey: string | null;
+  attestation: string | null;
   label: string | null;
   createdAt: string;
   lastUsedAt: string | null;
@@ -23,6 +24,7 @@ interface WrapInput {
   keyV: number;
   wrapped: string;
   publicKey?: string | null;
+  attestation?: string | null;
   label?: string | null;
 }
 
@@ -54,6 +56,7 @@ const device = (keyV = 1, overrides: Partial<WrapInput> = {}): WrapInput => ({
   keyV,
   wrapped: bytes(80),
   publicKey: bytes(32, 9),
+  attestation: bytes(32, 5),
   label: "Pixel 9",
   ...overrides,
 });
@@ -96,6 +99,7 @@ describe("/v2/keys", () => {
       keyV: 3,
       wrapped: bytes(80),
       publicKey: bytes(32, 9),
+      attestation: bytes(32, 5),
       label: "Pixel 9",
       lastUsedAt: null,
     });
@@ -198,6 +202,30 @@ describe("/v2/keys", () => {
     expect((await put(headers, wrap(clientId))).ref).toBe(clientId);
   });
 
+  test("a device wrap needs a public key and an attestation", async () => {
+    const { headers } = await person();
+    await put(headers, recovery(1));
+    const missing = async (body: unknown) =>
+      expectProblem(await putRaw(headers, randomUUID(), body), 422, "attestation_required");
+
+    await missing({ ...device(), publicKey: undefined });
+    await missing({ ...device(), publicKey: null });
+    await missing({ ...device(), attestation: undefined });
+    await missing({ ...device(), attestation: null });
+    await expectProblem(
+      await rotateRaw(headers, {
+        keyV: 2,
+        wraps: [
+          { id: randomUUID(), ...recovery(2) },
+          { id: randomUUID(), ...device(2, { attestation: null }) },
+        ],
+      }),
+      422,
+      "attestation_required",
+    );
+    expect(await list(headers)).toHaveLength(1);
+  });
+
   test("validates kinds, refs and byte lengths", async () => {
     const { headers } = await person();
     await put(headers, recovery(1));
@@ -205,10 +233,10 @@ describe("/v2/keys", () => {
       expectProblem(await putRaw(headers, randomUUID(), body), 422, "validation_failed");
 
     await invalid({ ...device(), kind: "other" });
-    await invalid({ ...device(), publicKey: undefined });
-    await invalid({ ...device(), publicKey: null });
     await invalid({ ...device(), publicKey: bytes(31) });
     await invalid({ ...device(), publicKey: bytes(33) });
+    await invalid({ ...device(), attestation: bytes(31) });
+    await invalid({ ...device(), attestation: bytes(33) });
     await invalid({ ...device(), ref: null });
     await invalid({ ...device(), wrapped: "" });
     await invalid({ ...device(), wrapped: bytes(1025) });
@@ -216,6 +244,7 @@ describe("/v2/keys", () => {
     await invalid({ ...device(), label: "x".repeat(101) });
     await invalid({ ...recovery(), ref: "something" });
     await invalid({ ...recovery(), publicKey: bytes(32) });
+    await invalid({ ...recovery(), attestation: bytes(32) });
     await expectProblem(await putRaw(headers, "not-a-uuid", device()), 422, "validation_failed");
     // Ids are lower-case UUIDs, as they enter the associated data; never lower-cased for you.
     const upper = randomUUID().toUpperCase();

@@ -657,7 +657,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. */
+        /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. 410 `resync_required` when `since` is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0`. */
         get: operations["pullRecords"];
         put?: never;
         /** @description Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, or `not_found` for an update of a record the server does not have (resync in full). */
@@ -710,7 +710,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
+        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
         put: operations["putKeyWrap"];
         post?: never;
         /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. */
@@ -729,7 +729,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Records are re-encrypted through `/v2/sync` afterwards. */
+        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. Records are re-encrypted through `/v2/sync` afterwards. */
         post: operations["rotateKeys"];
         delete?: never;
         options?: never;
@@ -1345,6 +1345,8 @@ export interface components {
             wrapped: string;
             /** @description base64url without padding */
             publicKey: string | null;
+            /** @description `device` only; base64url without padding */
+            attestation: string | null;
             label: string | null;
             createdAt: string;
             lastUsedAt: string | null;
@@ -1361,8 +1363,10 @@ export interface components {
             keyV: number;
             /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
             wrapped: string;
-            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            /** @description `device` only, and required there (422 `attestation_required`): its X25519 public key, 32 bytes, base64url */
             publicKey?: string | null;
+            /** @description `device` only, and required there (422 `attestation_required`): HMAC-SHA256, 32 bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key. */
+            attestation?: string | null;
             /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
             label?: string | null;
         };
@@ -1385,8 +1389,10 @@ export interface components {
             keyV: number;
             /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
             wrapped: string;
-            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            /** @description `device` only, and required there (422 `attestation_required`): its X25519 public key, 32 bytes, base64url */
             publicKey?: string | null;
+            /** @description `device` only, and required there (422 `attestation_required`): HMAC-SHA256, 32 bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key. */
+            attestation?: string | null;
             /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
             label?: string | null;
         };
@@ -3373,6 +3379,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PulledRecords"];
+                };
+            };
+            /** @description Problem */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Problem */

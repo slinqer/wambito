@@ -170,6 +170,8 @@
   "errors": {
     "record_limit": "This account has reached its limit of saved records.",
     "key_version_mismatch": "The data key version changed. Refresh and try again.",
+    "attestation_required": "This device's key couldn't be verified. Start the pairing again.",
+    "resync_required": "Some deleted items were cleaned up on the server. Your data is being downloaded again.",
     "already_sealed": "This request was already approved.",
     "already_set": "This step was already done for this request.",
     "not_ready": "The other device isn't ready yet. Wait a moment and try again.",

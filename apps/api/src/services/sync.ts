@@ -1,4 +1,4 @@
-import { type Db, records, type Tx, user, withUser } from "@wambito/db";
+import { type Db, recordPurges, records, type Tx, user, withUser } from "@wambito/db";
 import { and, asc, eq, gt, lte, sql } from "@wambito/db/orm";
 import type { SyncHooks } from "../deps.ts";
 import { ApiError } from "../http/problem.ts";
@@ -87,6 +87,19 @@ export async function pullRecords(
       .from(records)
       .where(eq(records.userId, userId));
     const latest = Number(top?.latest ?? 0);
+    if (since > 0) {
+      const [purge] = await tx
+        .select({ through: recordPurges.throughVersion })
+        .from(recordPurges)
+        .where(eq(recordPurges.userId, userId));
+      if (purge && since < purge.through) {
+        throw new ApiError(
+          410,
+          "resync_required",
+          "Deleted records were purged since this version; download everything again",
+        );
+      }
+    }
     const rows = await tx
       .select()
       .from(records)
@@ -293,7 +306,18 @@ export async function purgeTombstones(db: Db, now: Date): Promise<number> {
               sql`${records.updatedAt} < ${cutoff.toISOString()}`,
             ),
           )
-          .returning({ id: records.id });
+          .returning({ id: records.id, version: records.version });
+        if (deleted.length === 0) return 0;
+        const through = Math.max(...deleted.map((row) => row.version));
+        await tx
+          .insert(recordPurges)
+          .values({ userId: id, throughVersion: through })
+          .onConflictDoUpdate({
+            target: recordPurges.userId,
+            set: {
+              throughVersion: sql`greatest(${recordPurges.throughVersion}, excluded.through_version)`,
+            },
+          });
         return deleted.length;
       });
     }

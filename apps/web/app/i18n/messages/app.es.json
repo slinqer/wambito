@@ -170,6 +170,8 @@
   "errors": {
     "record_limit": "Esta cuenta alcanzó su límite de registros guardados.",
     "key_version_mismatch": "La versión de la clave de datos cambió. Actualiza e inténtalo de nuevo.",
+    "attestation_required": "No se pudo verificar la clave de este dispositivo. Empieza el emparejamiento de nuevo.",
+    "resync_required": "Se limpiaron elementos eliminados en el servidor. Tus datos se están descargando de nuevo.",
     "already_sealed": "Esta solicitud ya fue aprobada.",
     "already_set": "Este paso ya se hizo para esta solicitud.",
     "not_ready": "El otro dispositivo aún no está listo. Espera un momento e inténtalo de nuevo.",
