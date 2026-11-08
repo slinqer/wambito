@@ -177,7 +177,10 @@
       },
       "mobile": {
         "title": "App para Android e iOS",
-        "body": "Com um widget para registares uma despesa sem abrir a app."
+        "body": "Com um widget para registares uma despesa sem abrir a app.",
+        "cta": "Descarregar para Android",
+        "other": "Outras versões",
+        "ios": "No iOS, em breve."
       },
       "ai": {
         "title": "Com a tua IA",

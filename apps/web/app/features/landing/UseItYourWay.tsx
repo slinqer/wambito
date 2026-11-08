@@ -4,7 +4,7 @@ import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
 import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
-import { appLinkProps } from "./links.ts";
+import { ANDROID_APK_HREF, ANDROID_RELEASE_HREF, appLinkProps } from "./links.ts";
 import { NewTabHint } from "./NewTabHint.tsx";
 
 function Icon({ tone, children }: { tone: "gold" | "candy" | "good"; children: ReactNode }) {
@@ -16,9 +16,10 @@ function Icon({ tone, children }: { tone: "gold" | "candy" | "good"; children: R
 }
 
 /**
- * Where Wambito lives: the web app today ("Empezar"), the Android and iOS app and your AI assistant
- * (Claude or ChatGPT, through MCP) marked as coming soon. In the landing-only release the web app
- * is marked as coming soon too, unless `VITE_APP_URL` says where it lives: then the card opens it.
+ * Where Wambito lives: the web app today ("Empezar"), the Android app as a direct APK download from
+ * the GitHub release (iOS still to come), and your AI assistant (Claude or ChatGPT, through MCP)
+ * marked as coming soon. In the landing-only release the web and Android cards are marked as coming
+ * soon too, unless `VITE_APP_URL` says where the app lives: then they open and download it.
  */
 export function UseItYourWay() {
   const t = useTranslations("landing.ways");
@@ -50,7 +51,7 @@ export function UseItYourWay() {
             )}
           </div>
         </li>
-        <li className="lk-landing-card">
+        <li className={cx("lk-landing-card", !COMING_SOON && "is-live")}>
           <div className="lk-landing-card-head">
             <Icon tone="candy">
               <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
@@ -59,9 +60,29 @@ export function UseItYourWay() {
             <h3>{t("mobile.title")}</h3>
           </div>
           <p>{t("mobile.body")}</p>
-          <div className="lk-landing-card-foot">
-            <span className="lk-landing-soon">{t("soon")}</span>
-          </div>
+          {COMING_SOON ? (
+            <div className="lk-landing-card-foot">
+              <span className="lk-landing-soon">{t("soon")}</span>
+            </div>
+          ) : (
+            <>
+              <p>{t("mobile.ios")}</p>
+              <div className="lk-landing-card-foot lk-landing-capture-foot">
+                <PressLink to={ANDROID_APK_HREF} variant="secondary" size="sm">
+                  {t("mobile.cta")}
+                </PressLink>
+                <a
+                  href={ANDROID_RELEASE_HREF}
+                  target="_blank"
+                  rel="noopener"
+                  className="lk-landing-capture-link"
+                >
+                  {t("mobile.other")}
+                  <NewTabHint target="_blank" />
+                </a>
+              </div>
+            </>
+          )}
         </li>
         <li className="lk-landing-card">
           <div className="lk-landing-card-head">

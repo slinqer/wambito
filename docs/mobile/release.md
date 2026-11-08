@@ -109,6 +109,17 @@ Put it in `deploy/personal/.env`, run `deploy/personal/up.sh`, then `deploy/pers
 
 Install on a phone: `adb install apps/mobile/dist/1.0.0/wambito-1.0.0-arm64-v8a.apk` (nearly every phone since 2017; `armeabi-v7a` is for 32-bit ARM phones). Each APK is about 30 MB; the universal APK would be about 60 MB, about 19 MB of it Vosk's native library for ABIs no phone needs here.
 
+Publish the APKs as a GitHub release on the tag (the landing's "Descargar para Android" links there), from the repo root:
+
+```bash
+d=apps/mobile/dist/X.Y.Z
+gh release create mobile-vX.Y.Z --repo slinqer/wambito --verify-tag --latest \
+  --title "Wambito X.Y.Z (Android)" --notes-file <notes.md> \
+  $d/wambito-X.Y.Z-arm64-v8a.apk $d/wambito-X.Y.Z-armeabi-v7a.apk $d/SHA256SUMS $d/ANDROID_CERT_SHA256.txt
+```
+
+The notes are the `en-US` arm64 changelog, which APK to pick, and the certificate's SHA-256. Once the release is up, and not before (the link would 404), raise `ANDROID_VERSION` in `apps/web/app/features/landing/links.ts` and the two URLs in `apps/web/e2e/landing.spec.ts` and `landing-only-app.spec.ts`; merging that deploys the landing. Mark only `mobile-v*` releases as latest, never `voice-models-*`.
+
 ## Reproducible builds
 
 `scripts/check-reproducible.sh` builds the unsigned release APKs twice from clean on the same commit and compares them with `sha256sum` (and `diffoscope`, if installed, when they differ); `--also-at <new dir>` adds a build from a fresh clone at another path. The result and what it means for F-Droid are in `fdroid.md`.

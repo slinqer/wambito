@@ -177,7 +177,10 @@
       },
       "mobile": {
         "title": "App para Android y iOS",
-        "body": "Con un widget para anotar un gasto sin abrir la app."
+        "body": "Con un widget para anotar un gasto sin abrir la app.",
+        "cta": "Descargar para Android",
+        "other": "Otras versiones",
+        "ios": "En iOS, pronto."
       },
       "ai": {
         "title": "Con tu IA",

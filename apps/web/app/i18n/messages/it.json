@@ -177,7 +177,10 @@
       },
       "mobile": {
         "title": "App per Android e iOS",
-        "body": "Con un widget per annotare una spesa senza aprire l'app."
+        "body": "Con un widget per annotare una spesa senza aprire l'app.",
+        "cta": "Scarica per Android",
+        "other": "Altre versioni",
+        "ios": "Su iOS, presto."
       },
       "ai": {
         "title": "Con la tua IA",

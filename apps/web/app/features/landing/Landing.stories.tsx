@@ -7,6 +7,7 @@ import { Footer } from "./Footer.tsx";
 import { Hero } from "./Hero.tsx";
 import { HowItWorks } from "./HowItWorks.tsx";
 import { Landing } from "./Landing.tsx";
+import { ANDROID_APK_HREF, ANDROID_RELEASE_HREF } from "./links.ts";
 import { NoMoreSpreadsheet } from "./NoMoreSpreadsheet.tsx";
 import { OpenSource } from "./OpenSource.tsx";
 import { SiteHeader } from "./SiteHeader.tsx";
@@ -162,7 +163,7 @@ export const HeroReducedMotion: Story = {
   },
 };
 
-/** Web is live; the Android and iOS app and the AI assistants are coming soon. */
+/** Web is live; Android downloads the APK (iOS is coming); the AI assistants are coming soon. */
 export const UseItYourWaySection: Story = {
   render: () => <UseItYourWay />,
   globals: { theme: "day" },
@@ -172,7 +173,14 @@ export const UseItYourWaySection: Story = {
     const start = canvas.getByRole("link", { name: "Empezar" });
     await expect(start).toHaveAttribute("href", "/sign-in?lang=es");
     await expectTarget(start);
-    await expect(canvas.getAllByText("Pronto")).toHaveLength(2);
+    await expect(canvas.getAllByText("Pronto")).toHaveLength(1);
+    const apk = canvas.getByRole("link", { name: "Descargar para Android" });
+    await expect(apk).toHaveAttribute("href", ANDROID_APK_HREF);
+    await expect(apk).not.toHaveAttribute("target");
+    const all = canvas.getByRole("link", { name: /Otras versiones/ });
+    await expect(all).toHaveAttribute("href", ANDROID_RELEASE_HREF);
+    await expect(all).toHaveAttribute("target", "_blank");
+    await expect(canvas.getByText("En iOS, pronto.")).toBeVisible();
     await expect(canvas.getByText("Claude / ChatGPT")).toBeVisible();
     await expect(canvas.getByRole("heading", { name: "App para Android y iOS" })).toBeVisible();
   },

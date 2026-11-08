@@ -1,6 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
+/** The Android download: the arm64 APK of the mobile release, and the release page. */
+const ANDROID_APK_HREF =
+  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.1/wambito-1.0.1-arm64-v8a.apk";
+const ANDROID_RELEASE_HREF = "https://github.com/slinqer/wambito/releases/tag/mobile-v1.0.1";
+
 /**
  * The landing page as shipped: prerendered HTML served statically (playwright.built.config.ts,
  * `pnpm e2e:landing`), read with JavaScript off unless a test turns it on. Everything a visitor or
@@ -28,6 +33,7 @@ const LOCALES = [
     webCta: "Empezar",
     soon: "Pronto",
     ways: ["En la web", "App para Android y iOS", "Con tu IA"],
+    android: { cta: "Descargar para Android", other: "Otras versiones", ios: "En iOS, pronto." },
     importStep: "Trae tu historial",
     importQuestion: "¿Puedo traer mi historial de otras apps?",
     freeQuestion: "¿Es gratis?",
@@ -67,6 +73,7 @@ const LOCALES = [
     webCta: "Start",
     soon: "Soon",
     ways: ["On the web", "Android & iOS app", "With your AI"],
+    android: { cta: "Download for Android", other: "Other versions", ios: "On iOS, soon." },
     importStep: "Bring your history",
     importQuestion: "Can I bring my history from other apps?",
     freeQuestion: "Is it free?",
@@ -104,6 +111,7 @@ const LOCALES = [
     webCta: "Inizia",
     soon: "Presto",
     ways: ["Sul web", "App per Android e iOS", "Con la tua IA"],
+    android: { cta: "Scarica per Android", other: "Altre versioni", ios: "Su iOS, presto." },
     importStep: "Porta il tuo storico",
     importQuestion: "Posso portare il mio storico da altre app?",
     freeQuestion: "È gratis?",
@@ -146,6 +154,7 @@ const LOCALES = [
     webCta: "Começar",
     soon: "Em breve",
     ways: ["Na web", "App para Android e iOS", "Com a tua IA"],
+    android: { cta: "Descarregar para Android", other: "Outras versões", ios: "No iOS, em breve." },
     importStep: "Traz o teu histórico",
     importQuestion: "Posso trazer o meu histórico de outras apps?",
     freeQuestion: "É grátis?",
@@ -879,7 +888,9 @@ for (const l of LOCALES) {
       expect(box?.height).toBeGreaterThanOrEqual(44);
     });
 
-    test("use it your way: web is live, Android & iOS and AI are coming soon", async ({ page }) => {
+    test("use it your way: web is live, Android downloads the APK, AI is coming soon", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       const [web, mobile, ai] = l.ways.map((name) =>
         page.getByRole("listitem").filter({ has: page.getByRole("heading", { name }) }),
@@ -889,10 +900,17 @@ for (const l of LOCALES) {
         `/sign-in?lang=${l.locale}`,
       );
       await expect(web.getByText(l.soon, { exact: true })).toHaveCount(0);
-      for (const card of [mobile, ai]) {
-        await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
-        await expect(card.getByRole("link")).toHaveCount(0);
-      }
+      await expect(mobile.getByRole("link", { name: l.android.cta, exact: true })).toHaveAttribute(
+        "href",
+        ANDROID_APK_HREF,
+      );
+      const other = mobile.getByRole("link", { name: new RegExp(`^${l.android.other}`) });
+      await expect(other).toHaveAttribute("href", ANDROID_RELEASE_HREF);
+      await expect(other).toHaveAttribute("target", "_blank");
+      await expect(mobile.getByText(l.android.ios, { exact: true })).toBeVisible();
+      await expect(mobile.getByText(l.soon, { exact: true })).toHaveCount(0);
+      await expect(ai.getByText(l.soon, { exact: true })).toBeVisible();
+      await expect(ai.getByRole("link")).toHaveCount(0);
       await expect(ai).toContainText("Claude");
       await expect(ai).toContainText("ChatGPT");
     });
