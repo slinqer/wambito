@@ -59,6 +59,9 @@ Serializers _$serializers =
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
           ..add(ImportStatsRejectedInner.serializer)
+          ..add(KeyWrap.serializer)
+          ..add(KeyWrapKindEnum.serializer)
+          ..add(KeyWraps.serializer)
           ..add(PasskeyAssertion.serializer)
           ..add(PasskeyAssertionAuthenticatorAttachmentEnum.serializer)
           ..add(PasskeyAssertionResponse.serializer)
@@ -77,9 +80,14 @@ Serializers _$serializers =
           ..add(PushRejectedErrorEnum.serializer)
           ..add(PushResult.serializer)
           ..add(PushResults.serializer)
+          ..add(PutKeyWrap.serializer)
+          ..add(PutKeyWrapKindEnum.serializer)
           ..add(Recurrence.serializer)
           ..add(RecurrenceFrequencyEnum.serializer)
           ..add(ReviewTransactions.serializer)
+          ..add(RotateKeys.serializer)
+          ..add(RotatedKeyWrap.serializer)
+          ..add(RotatedKeyWrapKindEnum.serializer)
           ..add(SetBudget.serializer)
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
@@ -143,6 +151,10 @@ Serializers _$serializers =
             () => ListBuilder<CreateTransaction>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(KeyWrap)]),
+            () => ListBuilder<KeyWrap>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [
               const FullType(PasskeyRequestOptionsAllowCredentialsInner),
             ]),
@@ -162,6 +174,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(PushResult)]),
             () => ListBuilder<PushResult>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RotatedKeyWrap)]),
+            () => ListBuilder<RotatedKeyWrap>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

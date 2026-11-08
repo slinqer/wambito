@@ -27,13 +27,17 @@ import 'package:wambito/api/gen/src/model/create_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/delete_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/email_change_confirm.dart';
 import 'package:wambito/api/gen/src/model/file_import.dart';
+import 'package:wambito/api/gen/src/model/key_wrap.dart';
+import 'package:wambito/api/gen/src/model/key_wraps.dart';
 import 'package:wambito/api/gen/src/model/problem.dart';
 import 'package:wambito/api/gen/src/model/profile.dart';
 import 'package:wambito/api/gen/src/model/pulled_records.dart';
 import 'package:wambito/api/gen/src/model/push_records.dart';
 import 'package:wambito/api/gen/src/model/push_results.dart';
+import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
+import 'package:wambito/api/gen/src/model/rotate_keys.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
@@ -871,6 +875,53 @@ class DefaultApi {
     );
   }
 
+  /// deleteKeyWrap
+  /// Removes a wrap. The recovery wrap stays (409 &#x60;recovery_required&#x60;): make a new recovery key to replace it.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> deleteKeyWrap({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/keys/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
   /// deleteMe
   ///
   ///
@@ -1127,6 +1178,73 @@ class DefaultApi {
     }
 
     return Response<JsonObject>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// getAssistantWrap
+  /// For an assistant&#39;s token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [KeyWrap] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<KeyWrap>> getAssistantWrap({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/keys/assistant';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    KeyWrap? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWrap))
+                as KeyWrap;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<KeyWrap>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1664,6 +1782,73 @@ class DefaultApi {
     );
   }
 
+  /// listKeyWraps
+  /// Every wrap of the account&#39;s data key.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [KeyWraps] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<KeyWraps>> listKeyWraps({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/keys';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    KeyWraps? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWraps))
+                as KeyWraps;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<KeyWraps>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// listRecurrences
   ///
   ///
@@ -2099,6 +2284,98 @@ class DefaultApi {
     );
   }
 
+  /// putKeyWrap
+  /// Adds the wrap &#x60;id&#x60;, or replaces it. &#x60;keyV&#x60; must be the account&#39;s current key version (any for the first wrap), else 409 &#x60;key_version_mismatch&#x60;. A &#x60;passkey&#x60; wrap&#39;s &#x60;ref&#x60; is one of the person&#39;s passkey credential ids (422 &#x60;unknown_passkey&#x60;); an &#x60;assistant&#x60; wrap&#39;s, an OAuth client the person connected (422 &#x60;unknown_assistant&#x60;); a &#x60;device&#x60; wrap carries its 32-byte public key. A new &#x60;recovery&#x60; wrap replaces the old one (whose id cannot take another kind: 409 &#x60;recovery_required&#x60;), and a wrap replaces the one of the same kind and ref. 409 &#x60;id_taken&#x60; when the id is someone else&#39;s.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [putKeyWrap]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [KeyWrap] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<KeyWrap>> putKeyWrap({
+    required String id,
+    required PutKeyWrap putKeyWrap,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/keys/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(PutKeyWrap);
+      _bodyData = _serializers.serialize(putKeyWrap, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    KeyWrap? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWrap))
+                as KeyWrap;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<KeyWrap>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// restoreTransaction
   ///
   ///
@@ -2355,6 +2632,91 @@ class DefaultApi {
     );
 
     return _response;
+  }
+
+  /// rotateKeys
+  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
+  ///
+  /// Parameters:
+  /// * [rotateKeys]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [KeyWraps] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<KeyWraps>> rotateKeys({
+    required RotateKeys rotateKeys,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/keys/rotate';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RotateKeys);
+      _bodyData = _serializers.serialize(rotateKeys, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    KeyWraps? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWraps))
+                as KeyWraps;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<KeyWraps>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
   }
 
   /// setCategoryBudget

@@ -668,6 +668,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/keys/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an assistant's token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session. */
+        get: operations["getAssistantWrap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every wrap of the account's data key. */
+        get: operations["listKeyWraps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
+        put: operations["putKeyWrap"];
+        post?: never;
+        /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. */
+        delete: operations["deleteKeyWrap"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Records are re-encrypted through `/v2/sync` afterwards. */
+        post: operations["rotateKeys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1172,6 +1241,59 @@ export interface components {
             baseVersion: number | null;
             /** @description The encrypted record, base64url without padding, at most 65536 bytes decoded; null exactly when deleted */
             body: string | null;
+        };
+        KeyWrap: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            ref: string | null;
+            keyV: number;
+            /** @description base64url without padding */
+            wrapped: string;
+            /** @description base64url without padding */
+            publicKey: string | null;
+            label: string | null;
+            createdAt: string;
+            lastUsedAt: string | null;
+        };
+        KeyWraps: {
+            wraps: components["schemas"]["KeyWrap"][];
+        };
+        PutKeyWrap: {
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            /** @description The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery` */
+            ref?: string | null;
+            /** @description The data key version this wraps */
+            keyV: number;
+            /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
+            wrapped: string;
+            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            publicKey?: string | null;
+            /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
+            label?: string | null;
+        };
+        RotateKeys: {
+            /** @description The new key version: current + 1 */
+            keyV: number;
+            wraps: components["schemas"]["RotatedKeyWrap"][];
+        };
+        RotatedKeyWrap: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            /** @description The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery` */
+            ref?: string | null;
+            /** @description The data key version this wraps */
+            keyV: number;
+            /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
+            wrapped: string;
+            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            publicKey?: string | null;
+            /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
+            label?: string | null;
         };
     };
     responses: never;
@@ -3157,6 +3279,179 @@ export interface operations {
             };
             /** @description Problem */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getAssistantWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The assistant's wrap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWrap"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listKeyWraps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wraps */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWraps"];
+                };
+            };
+        };
+    };
+    putKeyWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutKeyWrap"];
+            };
+        };
+        responses: {
+            /** @description The stored wrap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWrap"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteKeyWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    rotateKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateKeys"];
+            };
+        };
+        responses: {
+            /** @description The new wraps */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWraps"];
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

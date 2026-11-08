@@ -168,3 +168,111 @@ export const PulledRecords = z
     latest: z.int().openapi({ description: "The newest version on the server; 0 when none" }),
   })
   .openapi("PulledRecords");
+
+/** Ways into an account's data key (spec 2026-11-08 section 5.2). */
+export const KEY_WRAP_KINDS = ["passkey", "recovery", "device", "assistant"] as const;
+/** Largest wrapped key, in decoded bytes. */
+export const MAX_WRAPPED = 1024;
+/** A device's X25519 public key, in bytes. */
+export const DEVICE_PUBLIC_KEY_BYTES = 32;
+
+/** Unpadded base64url whose decoded length is within `min`..`max` bytes. */
+const base64urlBytes = (min: number, max: number) =>
+  z
+    .string()
+    .regex(BASE64URL, "Not base64url")
+    .refine((text) => text.length % 4 !== 1, { message: "Not base64url" })
+    .refine(
+      (text) => {
+        const length = decodedLength(text);
+        return length >= min && length <= max;
+      },
+      { message: min === max ? `Not ${min} bytes` : `Not ${min}–${max} bytes` },
+    );
+
+const keyWrapFields = {
+  kind: z.enum(KEY_WRAP_KINDS),
+  ref: z.string().min(1).max(512).nullable().optional().openapi({
+    description:
+      "The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery`",
+  }),
+  keyV: z.int().min(0).max(32767).openapi({ description: "The data key version this wraps" }),
+  wrapped: base64urlBytes(1, MAX_WRAPPED).openapi({
+    description: `The wrapped data key, base64url without padding, 1–${MAX_WRAPPED} bytes decoded`,
+  }),
+  publicKey: base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES)
+    .nullable()
+    .optional()
+    .openapi({
+      description: `\`device\` only, and required there: its X25519 public key, ${DEVICE_PUBLIC_KEY_BYTES} bytes, base64url`,
+    }),
+  label: z.string().max(100).nullable().optional().openapi({
+    description: 'Shown in Settings ("Pixel 9", "Firefox on Mac")',
+  }),
+};
+
+type KeyWrapShape = { kind: string; ref?: string | null; publicKey?: string | null };
+const refByKind = (wrap: KeyWrapShape) => (wrap.kind === "recovery") === (wrap.ref == null);
+const publicKeyByKind = (wrap: KeyWrapShape) =>
+  (wrap.kind === "device") === (wrap.publicKey != null);
+const REF_RULE = { message: "`recovery` has no ref; every other kind has one", path: ["ref"] };
+const PUBLIC_KEY_RULE = {
+  message: "`device` has a public key; no other kind has one",
+  path: ["publicKey"],
+};
+
+export const PutKeyWrap = z
+  .object(keyWrapFields)
+  .refine(refByKind, REF_RULE)
+  .refine(publicKeyByKind, PUBLIC_KEY_RULE)
+  .openapi("PutKeyWrap");
+
+export const KeyWrap = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(KEY_WRAP_KINDS),
+    ref: z.string().nullable(),
+    keyV: z.int(),
+    wrapped: z.string().openapi({ description: "base64url without padding" }),
+    publicKey: z.string().nullable().openapi({ description: "base64url without padding" }),
+    label: z.string().nullable(),
+    createdAt: z.string(),
+    lastUsedAt: z.string().nullable(),
+  })
+  .openapi("KeyWrap");
+
+export const KeyWraps = z.object({ wraps: z.array(KeyWrap) }).openapi("KeyWraps");
+
+export const RotateKeys = z
+  .object({
+    keyV: z.int().min(0).max(32767).openapi({ description: "The new key version: current + 1" }),
+    wraps: z
+      .array(
+        z
+          .object({ id: z.uuid(), ...keyWrapFields })
+          .refine(refByKind, REF_RULE)
+          .refine(publicKeyByKind, PUBLIC_KEY_RULE)
+          .openapi("RotatedKeyWrap"),
+      )
+      .min(1)
+      .max(200),
+  })
+  .refine((body) => body.wraps.every((wrap) => wrap.keyV === body.keyV), {
+    message: "Every wrap carries the new keyV",
+    path: ["wraps"],
+  })
+  .refine(
+    (body) => new Set(body.wraps.map((wrap) => wrap.id.toLowerCase())).size === body.wraps.length,
+    {
+      message: "Wrap ids repeat",
+      path: ["wraps"],
+    },
+  )
+  .refine(
+    (body) => {
+      const refs = body.wraps.filter((w) => w.ref != null).map((w) => `${w.kind}\n${w.ref}`);
+      return new Set(refs).size === refs.length;
+    },
+    { message: "A kind and ref repeat", path: ["wraps"] },
+  )
+  .openapi("RotateKeys");

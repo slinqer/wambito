@@ -48,6 +48,15 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `records` has forced RLS. An update never creates (`not_found`) nor changes `type` (conflict);
   a hidden id (`id_taken`) is found by a rolled-back insert probe. `deps.syncHooks` is a test-only
   seam.
+- `/v2/keys` (`src/routes/keys.ts`, `src/services/keys.ts`; same spec §5.2, §7): wraps of the
+  data key, opaque bytes. Every write holds `pg_advisory_xact_lock(hashtextextended('key_wraps:' ||
+  user_id, 0))`; the current keyV is the max over the account's wraps (any keyV for the first).
+  Passkey wraps' `ref` is the passkey's `credentialID`; `auth.ts` hooks on
+  `/passkey/delete-passkey` (before: read the credential id; after, on success: delete the wrap; two
+  statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
+  `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
+  4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
+  `last_used_at`; sessions get 404 there.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
