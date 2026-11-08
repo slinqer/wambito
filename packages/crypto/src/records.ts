@@ -1,7 +1,14 @@
 import { toBase64Url } from "./bytes.ts";
 import { CryptoError } from "./errors.ts";
 import type { RecordKeys } from "./keys.ts";
-import { assertKeyV, assertNonce, assertUuid, NONCE_BYTES, randomNonce } from "./validate.ts";
+import {
+  assertKeyV,
+  assertNonce,
+  assertUserId,
+  assertUuid,
+  NONCE_BYTES,
+  randomNonce,
+} from "./validate.ts";
 
 export type RecordType =
   | "transaction"
@@ -32,7 +39,7 @@ const PAD_TO = 64;
 const subtle = globalThis.crypto.subtle;
 
 function associatedData(ctx: RecordContext): Uint8Array {
-  assertUuid(ctx.userId, "userId");
+  assertUserId(ctx.userId);
   assertUuid(ctx.id, "id");
   assertKeyV(ctx.keyV);
   if (!RECORD_TYPES.includes(ctx.type)) throw new CryptoError("bad_input", "unknown record type");

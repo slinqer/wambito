@@ -20,8 +20,9 @@ function fixed(seed: number, len: number): Uint8Array {
   return Uint8Array.from({ length: len }, (_, i) => (seed + i) & 255);
 }
 
-const USER = "0194f3a2-7b1c-7d2e-9a4f-3c5b6d7e8f90";
-const USER_2 = "0194f3a2-7b1c-7d2e-9a4f-aabbccddeeff";
+// Better Auth shaped ids (invented): mixed case, case is significant.
+const USER = "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B";
+const USER_2 = "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p";
 const ID_1 = "0194f3a2-8c00-7000-8000-000000000001";
 const ID_2 = "0194f3a2-8c00-7000-8000-000000000002";
 const ID_3 = "0194f3a2-8c00-7000-8000-000000000003";
@@ -176,10 +177,19 @@ const lastChar = okRecovery.slice(-1);
 const changed = okRecovery.slice(0, -1) + (lastChar === "0" ? "1" : "0");
 const rejects = [
   {
-    name: "record with an upper-case user id",
+    name: "record with a user id containing a slash",
     op: "sealRecord",
     dataKey: b64(okRecord.dataKey),
-    ctx: { ...okRecord.ctx, userId: USER.toUpperCase() },
+    ctx: { ...okRecord.ctx, userId: `${USER.slice(0, 10)}/${USER.slice(11)}` },
+    nonce: b64(okRecord.nonce),
+    value: okRecord.value,
+    code: "bad_input",
+  },
+  {
+    name: "record with an upper-case record id",
+    op: "sealRecord",
+    dataKey: b64(okRecord.dataKey),
+    ctx: { ...okRecord.ctx, id: okRecord.ctx.id.toUpperCase() },
     nonce: b64(okRecord.nonce),
     value: okRecord.value,
     code: "bad_input",

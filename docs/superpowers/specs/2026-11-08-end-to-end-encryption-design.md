@@ -93,6 +93,7 @@ wraps of DK kept on the server (table key_wraps), one per way in:
 - `body` = `nonce (12 bytes) || AES-256-GCM ciphertext and tag`.
 - Associated data: `wambito/v1/record/<user id>/<type>/<id>/<key_v>`. The server cannot move a body
   to another record, type or account without the open failing.
+- `<user id>` is the account's id exactly as stored (Better Auth ids: letters, digits, `-` and `_`); record and wrap ids are lower-case UUIDs.
 - Shared test vectors (`packages/crypto/test-vectors.json`): fixed keys, nonces and plaintexts with
   their expected bodies and wraps. The TypeScript and Dart implementations must both pass them, so
   a record written on the web always opens on the phone and the other way round.

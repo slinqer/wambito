@@ -3,11 +3,23 @@ import { CryptoError } from "./errors.ts";
 /** Only lower-case canonical UUIDs: they go byte for byte into the associated data. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+/**
+ * The account's exact id (Better Auth ids: letters, digits, `-`, `_`; case is significant). No `/`,
+ * so the associated data stays unambiguous.
+ */
+const USER_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
 export const NONCE_BYTES = 12;
 
 export function assertUuid(value: unknown, what: string): asserts value is string {
   if (typeof value !== "string" || !UUID.test(value)) {
     throw new CryptoError("bad_input", `${what} must be a lower-case UUID`);
+  }
+}
+
+export function assertUserId(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !USER_ID.test(value)) {
+    throw new CryptoError("bad_input", "userId must be 1 to 128 letters, digits, '-' or '_'");
   }
 }
 

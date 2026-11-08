@@ -66,11 +66,22 @@ describe("device sealing", () => {
     expect(await code(openFromDevice(a.privateKey, ctx, new Uint8Array(32)))).toBe("cannot_open");
   });
 
+  it("takes a Better Auth shaped user id; case is significant", async () => {
+    const a = await generateDeviceKeyPair();
+    const c: WrapContext = { kind: "device", userId: "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe_-", keyV: 1 };
+    const dk = generateDataKey();
+    const sealed = await sealToDevice(a.publicKey, c, dk);
+    expect(await openFromDevice(a.privateKey, c, sealed)).toEqual(dk);
+    const lower = { ...c, userId: c.userId.toLowerCase() };
+    expect(await code(openFromDevice(a.privateKey, lower, sealed))).toBe("cannot_open");
+    expect(await code(sealToDevice(a.publicKey, { ...c, userId: "a/b" }, dk))).toBe("bad_input");
+  });
+
   it("validates its input", async () => {
     const a = await generateDeviceKeyPair();
     const dk = generateDataKey();
     expect(await code(sealToDevice(new Uint8Array(31), ctx, dk))).toBe("bad_input");
-    expect(await code(sealToDevice(a.publicKey, { ...ctx, userId: "x" }, dk))).toBe("bad_input");
+    expect(await code(sealToDevice(a.publicKey, { ...ctx, userId: "x/y" }, dk))).toBe("bad_input");
     expect(await code(sealToDevice(a.publicKey, { ...ctx, keyV: 99999 }, dk))).toBe("bad_input");
     expect(await code(sealToDevice(a.publicKey, { ...ctx, kind: "passkey" }, dk))).toBe(
       "bad_input",

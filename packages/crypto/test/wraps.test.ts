@@ -65,12 +65,28 @@ describe("wraps", () => {
     expect(await code(unwrapDataKey(secret, ctx, w.slice(0, 10)))).toBe("cannot_open");
   });
 
+  it("takes a Better Auth shaped user id; case is significant; no slash", async () => {
+    const ctx: WrapContext = {
+      kind: "passkey",
+      userId: "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe_-",
+      keyV: 1,
+    };
+    const dk = generateDataKey();
+    const w = await wrapDataKey(secret, ctx, dk);
+    expect(await unwrapDataKey(secret, ctx, w)).toEqual(dk);
+    const lower = { ...ctx, userId: ctx.userId.toLowerCase() };
+    expect(await code(unwrapDataKey(secret, lower, w))).toBe("cannot_open");
+    for (const userId of ["a/b", "", "a".repeat(129)]) {
+      expect(await code(wrapDataKey(secret, { ...ctx, userId }, dk))).toBe("bad_input");
+    }
+  });
+
   it("validates its input", async () => {
     const ctx: WrapContext = { kind: "passkey", userId: U1, keyV: 1 };
     const dk = generateDataKey();
     const w = await wrapDataKey(secret, ctx, dk);
     const bad: WrapContext[] = [
-      { ...ctx, userId: "nope" },
+      { ...ctx, userId: "no pe" },
       { ...ctx, keyV: -1 },
       { ...ctx, keyV: 32768 },
       { ...ctx, keyV: 0.5 },

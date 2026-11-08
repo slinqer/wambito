@@ -79,8 +79,7 @@ describe("/v2/pairing", () => {
       expiresAt: started.expiresAt,
     });
 
-    // The crypto context needs a lower-case UUID; use a fixed one (Better Auth ids are not UUIDs).
-    const ctx = { kind: "device" as const, userId: randomUUID(), keyV: 1 };
+    const ctx = { kind: "device" as const, userId: old.userId, keyV: 1 };
     const dataKey = generateDataKey();
     const sealed = await sealToDevice(fresh.publicKey, ctx, dataKey);
     expect((await seal(old.headers, started.id, toBase64Url(sealed))).status).toBe(204);

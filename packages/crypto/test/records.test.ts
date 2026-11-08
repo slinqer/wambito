@@ -116,22 +116,36 @@ describe("records", () => {
     expect(await openRecord(k, ctx, await sealRecord(k, ctx, v))).toEqual(v);
   });
 
-  it("rejects upper-case UUIDs", async () => {
+  it("rejects an upper-case record id", async () => {
     const k = await keys();
-    const upper: RecordContext[] = [
-      { ...ctx, userId: U1.toUpperCase() },
-      { ...ctx, id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee".toUpperCase() },
-    ];
-    for (const c of upper) {
+    const c = { ...ctx, id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee".toUpperCase() };
+    expect(((await failure(sealRecord(k, c, value))) as CryptoError).code).toBe("bad_input");
+  });
+
+  it("takes a Better Auth shaped user id as is, case included", async () => {
+    const k = await keys();
+    const c = { ...ctx, userId: "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe_-" };
+    const body = await sealRecord(k, c, value);
+    expect(await openRecord(k, c, body)).toEqual(value);
+    const lower = { ...c, userId: c.userId.toLowerCase() };
+    expect(((await failure(openRecord(k, lower, body))) as CryptoError).code).toBe("cannot_open");
+  });
+
+  it("rejects a user id with a slash, empty or longer than 128", async () => {
+    const k = await keys();
+    for (const userId of ["a/b", "", "a".repeat(129), "a b", "ñ"]) {
+      const c = { ...ctx, userId };
       expect(((await failure(sealRecord(k, c, value))) as CryptoError).code).toBe("bad_input");
     }
+    const c = { ...ctx, userId: "a".repeat(128) };
+    expect(await openRecord(k, c, await sealRecord(k, c, value))).toEqual(value);
   });
 
   it("rejects bad input with bad_input", async () => {
     const k = await keys();
     const body = await sealRecord(k, ctx, value);
     const badCtx: RecordContext[] = [
-      { ...ctx, userId: "u1" },
+      { ...ctx, userId: "u/1" },
       { ...ctx, id: "r1" },
       { ...ctx, id: `${R1}/x` },
       { ...ctx, keyV: -1 },

@@ -19,9 +19,9 @@ API tests.
   present, `@noble/curves` otherwise (feature-detected at first use).
 - Device private keys have two forms (`DevicePrivateKey`): a non-extractable WebCrypto `CryptoKey`,
   or, only where WebCrypto lacks X25519, `{ kind: "noble-x25519", raw }`, clone-safe but a raw
-  secret the web must protect. UUIDs in contexts must be lower-case (they enter the AAD verbatim).
+  secret the web must protect. `userId` is the account's exact id (Better Auth: `/^[A-Za-z0-9_-]{1,128}$/`, case kept, no `/`); record `id`s are lower-case UUIDs. Both enter the AAD verbatim.
 - `src/pairing.ts`: pairing code and the 6-digit number (async: WebCrypto SHA-256).
-- `src/validate.ts`: UUID, key version, nonce checks (`bad_input`).
+- `src/validate.ts`: user id, UUID, key version, nonce checks (`bad_input`).
 - `src/bytes.ts`: base64url. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
   `bad_input`).
 

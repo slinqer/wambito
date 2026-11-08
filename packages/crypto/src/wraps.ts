@@ -3,7 +3,7 @@ import {
   assertBytes,
   assertKeyV,
   assertNonce,
-  assertUuid,
+  assertUserId,
   NONCE_BYTES,
   randomNonce,
 } from "./validate.ts";
@@ -28,7 +28,7 @@ export const PRF_SALT: Uint8Array = Uint8Array.from(
 
 export function assertWrapContext(ctx: WrapContext): void {
   if (!KINDS.includes(ctx.kind)) throw new CryptoError("bad_input", "unknown wrap kind");
-  assertUuid(ctx.userId, "userId");
+  assertUserId(ctx.userId);
   assertKeyV(ctx.keyV);
 }
 

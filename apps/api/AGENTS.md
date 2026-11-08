@@ -64,7 +64,6 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   open (429). Writes hold `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id,
   0))`. Pickup deletes the row in the same transaction. `purgeExpiredPairings` runs with the daily
   tombstone purge (`scheduleTombstonePurge`). Assistant tokens get 403 (not in `ASSISTANT_PATHS`).
-  Known concern: Better Auth user ids are not UUIDs, but `@wambito/crypto` contexts need one.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
