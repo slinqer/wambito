@@ -94,6 +94,7 @@ wraps of DK kept on the server (table key_wraps), one per way in:
 - Associated data: `wambito/v1/record/<user id>/<type>/<id>/<key_v>`. The server cannot move a body
   to another record, type or account without the open failing.
 - `<user id>` is the account's id exactly as stored (Better Auth ids: letters, digits, `-` and `_`); record and wrap ids are lower-case UUIDs.
+- `enc_v` is not part of the associated data: a new format changes the associated-data layout itself.
 - Shared test vectors (`packages/crypto/test-vectors.json`): fixed keys, nonces and plaintexts with
   their expected bodies and wraps. The TypeScript and Dart implementations must both pass them, so
   a record written on the web always opens on the phone and the other way round.
@@ -113,7 +114,7 @@ wraps of DK kept on the server (table key_wraps), one per way in:
 ```sql
 create table records (
   id          uuid primary key,          -- made by the client (UUID v7)
-  user_id     uuid not null,             -- RLS: tenant_isolation, as today
+  user_id     text not null,             -- Better Auth's id; RLS: tenant_isolation, as today
   type        text not null,             -- transaction, category, budget, recurrence, merchant, settings, account
   version     bigint not null,           -- from a global sequence, raised on every write
   deleted     boolean not null default false,
@@ -140,7 +141,7 @@ create index on records (user_id, version);
 ```sql
 create table key_wraps (
   id          uuid primary key,
-  user_id     uuid not null,             -- RLS
+  user_id     text not null,             -- Better Auth's id; RLS
   kind        text not null,             -- passkey | recovery | device | assistant
   ref         text,                      -- passkey credential id, device id, or OAuth client id
   key_v       smallint not null,
@@ -152,7 +153,8 @@ create table key_wraps (
 );
 ```
 
-One live recovery wrap per account. Deleting a passkey in Better Auth deletes its wrap in the same
+One live recovery wrap per account, and it is the account's first wrap. Deleting a passkey in
+Better Auth removes its wrap in a hook right after the passkey is deleted: two statements, not one
 transaction.
 
 ### 5.3 What leaves the old tables
@@ -413,3 +415,27 @@ Each stage gets its own implementation plan.
 - A local MCP (stdio) that pairs as a device, for people who want no server-side decryption at all.
 - Shared budgets between people (would revisit the sync model).
 - Hiding `type` and record counts.
+
+## 17. Open before stage 2
+
+Found in the review of stage 1; each needs a design change, new columns or new test vectors before
+the clients that depend on it (stage 2 web, stage 3 Dart port).
+
+1. **Pairing number (section 7.3).** As built, the relay gives the new device no key of the
+   approving device before the seal, and `sealToDevice` makes its ephemeral key internally, so the
+   6-digit comparison of step 3 cannot happen. Without a commitment, a server could also grind a
+   6-digit match (about 2^20 X25519 operations). Plan, ZRTP-style: the approving device posts the
+   SHA-256 of its ephemeral public key, then reveals the key; the number is derived from the new
+   device's key and the revealed key. This needs pairing columns, a reveal endpoint and new
+   `pairingNumber` vectors before the Dart port. The QR path (out of band) is unaffected.
+2. **Device keys in rotation (section 7.5).** The rotating device seals the new data key to the
+   device public keys the server lists; a malicious server could add or swap one. Plan: each device
+   wrap carries an attestation, an HMAC under a key derived from the data key over
+   `user id || wrap id || public key`, verified before sealing; a new column and a crypto function
+   with vectors before stage 2.
+
+Also for stage 2:
+
+- A device offline for more than 180 days gets no signal that tombstones were purged: it does a
+  full resync when its last pull is older than 170 days.
+- The sealed pairing blob should carry `keyV` with the data key.

@@ -64,6 +64,22 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   open (429). Writes hold `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id,
   0))`. Pickup deletes the row in the same transaction. `purgeExpiredPairings` runs with the daily
   tombstone purge (`scheduleTombstonePurge`). Assistant tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2` rules: record and key-wrap ids are lower-case UUIDs (`lowerCaseUuid` in `http/schemas.ts`,
+  the `@wambito/crypto` rule; never lower-cased, upper case is 422); a live record body is at least
+  28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
+  statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
+  of RLS.
+- Known gaps (spec §17, open before stage 2):
+  - Pairing number (§7.3): the relay gives the new device no approver key before the seal and
+    `sealToDevice` makes its ephemeral key internally, so the 6-digit comparison cannot happen;
+    without a commitment a server could grind a 6-digit match (~2^20 X25519 ops). Plan: ZRTP-style
+    commit (SHA-256 of the approver's ephemeral key) then reveal; the number comes from the new
+    device's key and the revealed key; needs pairing columns, a reveal endpoint and new
+    `pairingNumber` vectors before the Dart port. The QR path (out of band) is unaffected.
+  - Device keys in rotation (§7.5): the rotating device seals the new data key to device public
+    keys the server lists; a malicious server could add or swap one. Plan: each device wrap
+    carries an attestation (HMAC under a key derived from the data key over user id || wrap id ||
+    public key), verified before sealing; new column and crypto function with vectors first.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
