@@ -216,3 +216,59 @@ describe("createLocalBackend over the memory store", () => {
     expect((await closed.api.GET("/v1/me")).data).toBeTruthy();
   });
 });
+
+describe("POST /v1/transactions/review", () => {
+  async function toReview(
+    store: ReturnType<typeof setup>["store"],
+    api: ReturnType<typeof setup>["api"],
+    food: string,
+    name: string,
+  ) {
+    const id = (
+      await api.POST("/v1/transactions", {
+        body: { name, amount: -5_000_00, categoryId: food, date: "2026-10-21" },
+      })
+    ).data?.id as string;
+    const found = await store.get("transaction", id);
+    if (!found) throw new Error("not saved");
+    await store.transaction((s) => s.put("transaction", id, { ...found.body, needsReview: true }));
+    return id;
+  }
+
+  it("confirms every id at once and answers them in request order", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    const a = await toReview(store, api, food, "A");
+    const b = await toReview(store, api, food, "B");
+    const res = await api.POST("/v1/transactions/review", { body: { ids: [b, a, b] } });
+    expect(res.response.status).toBe(200);
+    expect(res.data?.items.map((t) => [t.id, t.needsReview])).toEqual([
+      [b, false],
+      [a, false],
+      [b, false],
+    ]);
+    expect((await store.get("transaction", a))?.body.needsReview).toBe(false);
+  });
+
+  it("is all or nothing: an unknown or deleted id is 404 and nothing changes", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    const a = await toReview(store, api, food, "A");
+    const gone = await toReview(store, api, food, "Gone");
+    await api.DELETE("/v1/transactions/{id}", { params: { path: { id: gone } } });
+    for (const other of [gone, "0193a000-0000-7000-8000-0000000000ff"]) {
+      const err = await api
+        .POST("/v1/transactions/review", { body: { ids: [a, other] } })
+        .catch((e) => e);
+      expect(err).toMatchObject({ status: 404, code: "not_found" });
+    }
+    expect((await store.get("transaction", a))?.body.needsReview).toBe(true);
+  });
+
+  it("validates like the API (1 to 50 uuids)", async () => {
+    const { api } = setup();
+    await onboard(api);
+    const err = await api.POST("/v1/transactions/review", { body: { ids: [] } }).catch((e) => e);
+    expect(err).toMatchObject({ status: 422 });
+  });
+});

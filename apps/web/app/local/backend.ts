@@ -21,6 +21,7 @@ import {
   occurrences,
   type RecordBodies,
   type RecurrenceDto,
+  reviewTransactionsSchema,
   type SettingsRecord,
   setBudgetSchema,
   type TransactionDto,
@@ -709,6 +710,25 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
     return ok(toTransactionDto(toTxRow(id, next)));
   }
 
+  /**
+   * `POST /v1/transactions/review`, as the API: confirms detected transactions at once, all or
+   * nothing (an unknown or deleted id is 404 and nothing changes), in request order; ids already
+   * confirmed stay as they are. The merchant memory the API learns has no record yet.
+   */
+  async function reviewTransactions(e: Env, body: unknown): Promise<Answer> {
+    const { ids } = valid(reviewTransactionsSchema, body);
+    const unique = [...new Set(ids)];
+    const found = new Map<string, TxBody>();
+    for (const id of unique) found.set(id, (await findLive(e.s, id)).body);
+    for (const [id, before] of found) {
+      if (!before.needsReview) continue;
+      const next: TxBody = { ...before, needsReview: false, updatedAt: stamp() };
+      await e.s.put("transaction", id, next);
+      found.set(id, next);
+    }
+    return ok({ items: ids.map((id) => toTransactionDto(toTxRow(id, found.get(id) as TxBody))) });
+  }
+
   // -- /v1/categories -------------------------------------------------------------------------
 
   async function createCategory(e: Env, body: unknown): Promise<Answer> {
@@ -939,6 +959,9 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       }
     }
     if (path === "/v1/transactions/suggestions" && method === "GET") return suggestions(e, params);
+    if (path === "/v1/transactions/review" && method === "POST") {
+      return reviewTransactions(e, body);
+    }
     let match = at(/^\/v1\/transactions\/([^/]+)$/);
     if (match) {
       const id = idOf(match);
