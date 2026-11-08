@@ -168,6 +168,15 @@
     "search": "Pesquisar"
   },
   "errors": {
+    "record_limit": "Esta conta atingiu o limite de registos guardados.",
+    "key_version_mismatch": "A versão da chave de dados mudou. Atualize e tente novamente.",
+    "already_sealed": "Este pedido já foi aprovado.",
+    "id_taken": "Não foi possível guardar este item. Tente novamente.",
+    "payload_too_large": "É demasiado para enviar de uma só vez.",
+    "recovery_required": "A chave de recuperação não pode ser removida, apenas substituída.",
+    "too_many_pairings": "Demasiados pedidos de dispositivo pendentes. Aguarde alguns minutos e tente novamente.",
+    "unknown_assistant": "Este assistente não está ligado à sua conta.",
+    "unknown_passkey": "Esta chave de acesso não está na sua conta.",
     "generic": "Algo correu mal. Tenta de novo daqui a um momento.",
     "network_error": "Sem ligação. Verifica a tua internet e tenta de novo.",
     "unauthenticated": "Inicia sessão para continuar.",

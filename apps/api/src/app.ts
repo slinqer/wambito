@@ -16,6 +16,7 @@ import { emailChangeRoutes } from "./routes/email-change.ts";
 import { importRoutes } from "./routes/imports.ts";
 import { keyRoutes } from "./routes/keys.ts";
 import { meRoutes } from "./routes/me.ts";
+import { pairingRoutes } from "./routes/pairing.ts";
 import { recurrenceRoutes } from "./routes/recurrences.ts";
 import { reportRoutes } from "./routes/reports.ts";
 import { summaryRoutes } from "./routes/summary.ts";
@@ -86,6 +87,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", importRoutes(deps));
   app.route("/", syncRoutes(deps));
   app.route("/", keyRoutes(deps));
+  app.route("/", pairingRoutes(deps));
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

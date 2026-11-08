@@ -57,6 +57,14 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
   4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
   `last_used_at`; sessions get 404 there.
+- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; same spec §7.3): relay for
+  approving a new device; opaque bytes (public key in, sealed data key out), never read or logged.
+  The server makes the 8-char code (`pairingCode` from `@wambito/crypto`), unique per person
+  (a collision retries); lookup normalizes the typed code. 10 min TTL read from `deps.now`, max 5
+  open (429). Writes hold `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id,
+  0))`. Pickup deletes the row in the same transaction. `purgeExpiredPairings` runs with the daily
+  tombstone purge (`scheduleTombstonePurge`). Assistant tokens get 403 (not in `ASSISTANT_PATHS`).
+  Known concern: Better Auth user ids are not UUIDs, but `@wambito/crypto` contexts need one.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

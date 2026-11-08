@@ -276,3 +276,49 @@ export const RotateKeys = z
     { message: "A kind and ref repeat", path: ["wraps"] },
   )
   .openapi("RotateKeys");
+
+/** The longest a sealed data key may be, in bytes (a sealed 32-byte key is far smaller). */
+export const MAX_SEALED_PAIRING = 1024;
+
+export const StartPairing = z
+  .object({
+    publicKey: base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES).openapi({
+      description: "The new device's ephemeral X25519 public key, 32 bytes, base64url",
+    }),
+  })
+  .openapi("StartPairing");
+
+export const PairingStarted = z
+  .object({
+    id: z.uuid(),
+    code: z
+      .string()
+      .openapi({ description: "8 Crockford base32 characters for the person to type" }),
+    expiresAt: z.string(),
+  })
+  .openapi("PairingStarted");
+
+export const PairingFound = z
+  .object({
+    id: z.uuid(),
+    publicKey: z.string().openapi({ description: "base64url without padding" }),
+    expiresAt: z.string(),
+  })
+  .openapi("PairingFound");
+
+export const SealPairing = z
+  .object({
+    sealed: base64urlBytes(1, MAX_SEALED_PAIRING).openapi({
+      description: `The data key sealed to the new device's public key, base64url, 1–${MAX_SEALED_PAIRING} bytes decoded`,
+    }),
+  })
+  .openapi("SealPairing");
+
+export const PairingPickup = z
+  .object({
+    sealed: z
+      .string()
+      .nullable()
+      .openapi({ description: "base64url; null until the other device seals" }),
+  })
+  .openapi("PairingPickup");

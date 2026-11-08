@@ -53,6 +53,9 @@ import 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
 import 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
+import 'package:wambito/api/gen/src/model/pairing_found.dart';
+import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
+import 'package:wambito/api/gen/src/model/pairing_started.dart';
 import 'package:wambito/api/gen/src/model/passkey_assertion.dart';
 import 'package:wambito/api/gen/src/model/passkey_assertion_response.dart';
 import 'package:wambito/api/gen/src/model/passkey_request_options.dart';
@@ -72,7 +75,9 @@ import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/rotate_keys.dart';
 import 'package:wambito/api/gen/src/model/rotated_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/seal_pairing.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
+import 'package:wambito/api/gen/src/model/start_pairing.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
 import 'package:wambito/api/gen/src/model/sync_change.dart';
@@ -132,6 +137,9 @@ part 'serializers.g.dart';
   ImportStatsRejectedInner,
   KeyWrap,
   KeyWraps,
+  PairingFound,
+  PairingPickup,
+  PairingStarted,
   PasskeyAssertion,
   PasskeyAssertionResponse,
   PasskeyRequestOptions,
@@ -151,7 +159,9 @@ part 'serializers.g.dart';
   ReviewTransactions,
   RotateKeys,
   RotatedKeyWrap,
+  SealPairing,
   SetBudget,
+  StartPairing,
   Summary,
   SummaryCategoriesInner,
   SyncChange,

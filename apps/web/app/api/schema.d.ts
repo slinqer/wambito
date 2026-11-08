@@ -737,6 +737,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/pairing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The unlocked device finds the new device's request by the typed `code` (case, dashes, spaces and look-alike letters are forgiven). 404 when expired, already sealed, or not the person's. */
+        get: operations["findPairing"];
+        put?: never;
+        /** @description The new device posts its ephemeral public key and shows the returned `code`. At most 5 unexpired requests per person (429 `too_many_pairings`); a request lives 10 minutes. */
+        post: operations["startPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}/seal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The unlocked device posts the data key sealed to the request's public key (up to 1 KiB). 404 when expired or not the person's, 409 `already_sealed`. */
+        post: operations["sealPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The new device polls. `sealed` is null until the other device seals; when it is returned the request is deleted in the same transaction, so a second read is 404. */
+        get: operations["takePairing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1294,6 +1346,32 @@ export interface components {
             publicKey?: string | null;
             /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
             label?: string | null;
+        };
+        PairingStarted: {
+            /** Format: uuid */
+            id: string;
+            /** @description 8 Crockford base32 characters for the person to type */
+            code: string;
+            expiresAt: string;
+        };
+        StartPairing: {
+            /** @description The new device's ephemeral X25519 public key, 32 bytes, base64url */
+            publicKey: string;
+        };
+        PairingFound: {
+            /** Format: uuid */
+            id: string;
+            /** @description base64url without padding */
+            publicKey: string;
+            expiresAt: string;
+        };
+        SealPairing: {
+            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded */
+            sealed: string;
+        };
+        PairingPickup: {
+            /** @description base64url; null until the other device seals */
+            sealed: string | null;
         };
     };
     responses: never;
@@ -3461,6 +3539,143 @@ export interface operations {
             };
             /** @description Problem */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    findPairing: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingFound"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartPairing"];
+            };
+        };
+        responses: {
+            /** @description The request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingStarted"];
+                };
+            };
+            /** @description Problem */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    sealPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SealPairing"];
+            };
+        };
+        responses: {
+            /** @description Sealed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    takePairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sealed key, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingPickup"];
+                };
+            };
+            /** @description Problem */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

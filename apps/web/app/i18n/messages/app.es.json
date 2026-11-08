@@ -168,6 +168,15 @@
     "search": "Buscar"
   },
   "errors": {
+    "record_limit": "Esta cuenta alcanzó su límite de registros guardados.",
+    "key_version_mismatch": "La versión de la clave de datos cambió. Actualiza e inténtalo de nuevo.",
+    "already_sealed": "Esta solicitud ya fue aprobada.",
+    "id_taken": "No se puede guardar ese elemento. Inténtalo de nuevo.",
+    "payload_too_large": "Es demasiado para enviar de una sola vez.",
+    "recovery_required": "La clave de recuperación no se puede quitar, solo reemplazar.",
+    "too_many_pairings": "Hay demasiadas solicitudes de dispositivo pendientes. Espera unos minutos e inténtalo de nuevo.",
+    "unknown_assistant": "Ese asistente no está conectado a tu cuenta.",
+    "unknown_passkey": "Esa llave de acceso no está en tu cuenta.",
     "generic": "Algo salió mal. Inténtalo de nuevo en un momento.",
     "network_error": "Sin conexión. Revisa tu internet e inténtalo de nuevo.",
     "unauthenticated": "Inicia sesión para continuar.",

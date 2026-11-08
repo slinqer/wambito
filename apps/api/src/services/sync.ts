@@ -3,6 +3,7 @@ import { and, asc, eq, gt, lte, sql } from "@wambito/db/orm";
 import type { SyncHooks } from "../deps.ts";
 import { ApiError } from "../http/problem.ts";
 import type { RECORD_TYPES } from "../http/schemas.ts";
+import { purgeExpiredPairings } from "./pairing.ts";
 
 type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -294,6 +295,8 @@ export interface TombstonePurgeDeps {
   db: Db;
   /** Replaces `purgeTombstones`; for tests. */
   purge?: (db: Db, now: Date) => Promise<number>;
+  /** Replaces `purgeExpiredPairings`; for tests. */
+  purgePairings?: (db: Db, now: Date) => Promise<number>;
   log?: (message: string) => void;
   logError?: (message: string, error: unknown) => void;
 }
@@ -304,12 +307,16 @@ export interface TombstonePurgeDeps {
  */
 export function scheduleTombstonePurge(deps: TombstonePurgeDeps): () => void {
   const purge = deps.purge ?? purgeTombstones;
+  const purgePairings = deps.purgePairings ?? purgeExpiredPairings;
   const log = deps.log ?? ((message) => console.log(message));
   const logError = deps.logError ?? ((message, error) => console.error(message, error));
 
   const run = async () => {
     try {
-      const count = await purge(deps.db, new Date());
+      const now = new Date();
+      // Expired pairing requests go with the daily purge (spec 2026-11-08 section 7.3).
+      await purgePairings(deps.db, now);
+      const count = await purge(deps.db, now);
       if (count > 0)
         log(`Tombstone purge: deleted ${count} record(s) older than ${TOMBSTONE_DAYS} days`);
     } catch (error) {
