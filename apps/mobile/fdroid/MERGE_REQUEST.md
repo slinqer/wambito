@@ -23,7 +23,7 @@ and checks the permissions against an allowlist.
 
 ## How it is built
 
-- One build entry per ABI (`armeabi-v7a` 100001, `arm64-v8a` 100002 for 1.0.0), `subdir:
+- One build entry per ABI (`armeabi-v7a` 100011, `arm64-v8a` 100012 for 1.0.1), `subdir:
   apps/mobile`, Flutter 3.47.7 from the `flutter` srclib, NDK r28c. `versionCode` is
   `(X*10000 + Y*100 + Z) * 10 + ABI digit`; `UpdateCheckMode: Tags ^mobile-v`, and the tagged
   commit carries the version in `pubspec.yaml` (read by `UpdateCheckData`).
@@ -86,5 +86,5 @@ If a reviewer reads the default server as `NonFreeNet`, we are happy to add it.
 - [x] License AGPL-3.0-only, in the repo (`LICENSE`).
 - [x] `fdroid lint` and `fdroid build` pass locally; `fdroid scanner` reports no problems.
 - [x] Metadata in `fastlane` (en-US, es-ES, it-IT, pt-PT), changelogs per version code.
-- [ ] `fdroid checkupdates` on the real tag (the tag `mobile-v1.0.0` must exist upstream before
+- [ ] `fdroid checkupdates` on the real tag (the tag `mobile-v1.0.1` must exist upstream before
       this merge request).

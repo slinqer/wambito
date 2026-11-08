@@ -1,0 +1,4 @@
+- More precise dictation: when you let go, a second voice model rewrites what you said (Canary; Parakeet in Italian and Portuguese). Optional, offline, on phones with enough memory; downloaded once (150 MB, 480 MB for Parakeet).
+- Notifications of detected expenses come from Wambi and go away once you answer them.
+- An entry saved with no network can be edited, deleted and paid.
+- Dictation fixes: the live text no longer repeats the first words.

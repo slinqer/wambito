@@ -1,0 +1,4 @@
+- Dettato più preciso: quando lasci, un secondo modello vocale riscrive ciò che hai detto (Canary; Parakeet in italiano e portoghese). Facoltativo, senza internet, sui telefoni con memoria sufficiente; si scarica una volta (150 MB, 480 MB Parakeet).
+- Le notifiche delle spese rilevate arrivano da Wambi e spariscono quando rispondi.
+- Un movimento salvato senza rete si può modificare, eliminare e pagare.
+- Correzioni del dettato: il testo dal vivo non ripete più le prime parole.

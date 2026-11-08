@@ -11,9 +11,9 @@ RepoType: git
 Repo: https://github.com/slinqer/wambito.git
 
 Builds:
-  - versionName: 1.0.0
-    versionCode: 100001
-    commit: mobile-v1.0.0
+  - versionName: 1.0.1
+    versionCode: 100011
+    commit: mobile-v1.0.1
     subdir: apps/mobile
     sudo:
       - apt-get update
@@ -52,9 +52,9 @@ Builds:
     ndk: r28c
     timeout: 10800
 
-  - versionName: 1.0.0
-    versionCode: 100002
-    commit: mobile-v1.0.0
+  - versionName: 1.0.1
+    versionCode: 100012
+    commit: mobile-v1.0.1
     subdir: apps/mobile
     sudo:
       - apt-get update
@@ -125,5 +125,5 @@ UpdateCheckData: apps/mobile/pubspec.yaml|version:\s[\d.]+\+(\d+)|.|version:\s([
 VercodeOperation:
   - '%c * 10 + 1'
   - '%c * 10 + 2'
-CurrentVersion: 1.0.0
-CurrentVersionCode: 100002
+CurrentVersion: 1.0.1
+CurrentVersionCode: 100012

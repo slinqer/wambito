@@ -20,9 +20,9 @@ Wambito is built for F-Droid from source on F-Droid's own build server, from the
 ## Open
 
 - After F-Droid publishes the first build, its signing-key fingerprint goes into `ANDROID_CERT_SHA256` next to ours, or App Links and passkeys do not work for F-Droid users (`release.md`; plan Task 10).
-- Not exercised at runtime on a from-source build: live speech recognition and anything on `armeabi-v7a` (installs, signs in and loads a model on an arm64 emulator only; the emulator's microphone hung). Check on a real phone before the first release.
+- Not exercised at runtime on a from-source build: anything on `armeabi-v7a`. The `arm64-v8a` build of `fdroid-build-local.sh` (commit 3371e6b, only its `versionCode` raised to install over a release build, re-signed with the release key) ran on a Samsung S25 Ultra on 2026-11-07: dictation, with Canary refining on release, worked, and `libsherpa-onnx-jni.so` loaded from the APK with no errors.
 - The precise voice model (Canary, Parakeet) is in the `arm64-v8a` build only, with sherpa-onnx and onnxruntime built from source ("The precise voice model" below). The `armeabi-v7a` build has none (`src/noPrecise`); the model does not run on that ABI anyway. About still lists sherpa-onnx, onnxruntime and the models there.
-- The `arm64-v8a` entry now builds onnxruntime too: about 80 minutes on 10 emulated cores on a Mac, on top of the rest. Whether it fits F-Droid's `timeout: 10800` is unmeasured.
+- The `arm64-v8a` entry builds onnxruntime too. The whole entry took about 2 hours in `fdroid-build-local.sh` with `--cpus 4 --memory 7g` on an Apple Silicon Mac (amd64 emulated; onnxruntime 24 min). With `--cpus 10` in 7 GB the Gradle daemon was killed, most likely out of memory. Whether it fits F-Droid's `timeout: 10800` on its own server is unmeasured.
 - F-Droid's build timeout is unverified: the recipe asks for `timeout: 10800`.
 
 ## How the build works
@@ -60,7 +60,7 @@ The Play and GitHub builds take sherpa-onnx 2.0.1 as k2-fsa's prebuilt AAR (`scr
 
 `apps/mobile/fdroid/com.wambito.app.yml` is the source of truth; it is copied to `fdroiddata` when submitting.
 
-- One build per ABI (`versionCode` 100001 and 100002 for 1.0.0), `commit: mobile-v1.0.0`, `subdir: apps/mobile`, `ndk: r28c`, `timeout: 10800`.
+- One build per ABI (`versionCode` 100011 and 100012 for 1.0.1, the first version submitted; 1.0.0 predates the precise model's recipe), `commit: mobile-v1.0.1`, `subdir: apps/mobile`, `ndk: r28c`, `timeout: 10800`.
 - Source libraries (`srclibs`): `flutter@3.47.7` (in `fdroiddata`), and ours in `apps/mobile/fdroid/srclibs/*.yml`: `vosk-api`, `jna`, `kaldi`, `openfst`, `OpenBLAS`, `clapack`. All pinned by commit except `jna@5.18.1` and `flutter@3.47.7`, which are tags.
 - `sudo:` installs the build tools the script needs. `prebuild:` trims JNA's tree (deletes jars its build does not use, links Debian's `ant.jar` and `asm.jar`), runs `flutter pub get --enforce-lockfile` with an in-tree `PUB_CACHE` (removed from the scan by `scandelete:`), installs the SDK platform, and lowers Gradle's heap from `-Xmx8G` to `-Xmx4G` (8 GB killed the daemon in a 6 GB container).
 - **`build:`, not `prebuild:`, runs `build-native-deps.sh`.** F-Droid scans the source between the two, and the AARs the script writes to `android/third_party/m2` would fail that scan. They come from sources that were scanned clean, so the intent holds. Then `flutter build apk --release --split-per-abi` with the switch, `--build-name $$VERSION$$` and `--build-number $(($$VERCODE$$ / 10))`.

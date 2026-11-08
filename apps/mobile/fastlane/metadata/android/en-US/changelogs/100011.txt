@@ -1,0 +1,3 @@
+- Notifications of detected expenses come from Wambi and go away once you answer them.
+- An entry saved with no network can be edited, deleted and paid.
+- Dictation fixes: the live text no longer repeats the first words.
