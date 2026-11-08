@@ -1,0 +1,3 @@
+- Le notifiche delle spese rilevate arrivano da Wambi e spariscono quando rispondi.
+- Un movimento salvato senza rete si può modificare, eliminare e pagare.
+- Correzioni del dettato: il testo dal vivo non ripete più le prime parole.

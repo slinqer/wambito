@@ -1,0 +1,3 @@
+- As notificações de despesas detetadas vêm do Wambi e desaparecem quando respondes.
+- Um movimento guardado sem rede pode ser editado, apagado e pago.
+- Correções do ditado: o texto ao vivo já não repete as primeiras palavras.
