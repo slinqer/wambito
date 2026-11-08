@@ -184,6 +184,51 @@ describe("openVaultSession", () => {
   });
 });
 
+describe("a vault closed under the session", () => {
+  it("drops the session and tells onClosed (another tab deleted or upgraded the vault)", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    let store: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    const closed = vi.fn();
+    session.onClosed(closed);
+    store?.close();
+    expect(closed).toHaveBeenCalledTimes(1);
+    // the next open makes a new session instead of handing back the dead one
+    const again = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: false,
+      fetch: net.fetch,
+    });
+    expect(again).not.toBe(session);
+    again.close();
+  });
+
+  it("closing the session itself does not report a close", async () => {
+    const net = fakeNetwork();
+    const session = await openVaultSession({
+      profile: profileOf(),
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+    });
+    const closed = vi.fn();
+    session.onClosed(closed);
+    session.close();
+    expect(closed).not.toHaveBeenCalled();
+  });
+});
+
 describe("forgetVault", () => {
   it("closes the session and deletes this browser's vault", async () => {
     const net = fakeNetwork();

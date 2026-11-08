@@ -27,6 +27,11 @@ export interface VaultSession {
   fetch: typeof globalThis.fetch;
   /** Called after every commit to the store (the screens refetch). */
   subscribe(listener: () => void): () => void;
+  /**
+   * Called once if the vault closes under the session (another tab deleted or upgraded it): the
+   * sync has stopped and the session is gone; the gate checks again (reopen, or Unlock).
+   */
+  onClosed(listener: () => void): () => void;
   close(): void;
 }
 
@@ -188,16 +193,32 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       const pathname = new URL(url, "http://vault").pathname;
       return isLive(method, pathname) ? network(input, init) : backend.fetch(input, init);
     }) as typeof globalThis.fetch;
+    const closedListeners = new Set<() => void>();
+    let closing = false;
+    const drop = () => {
+      stop();
+      if (active?.session === session) active.session = undefined;
+    };
     const session: VaultSession = {
       userId: profile.id,
       fetch: routed,
       subscribe: (listener) => store.subscribe(listener),
+      onClosed(listener) {
+        closedListeners.add(listener);
+        return () => closedListeners.delete(listener);
+      },
       close() {
-        stop();
+        closing = true;
+        drop();
         store.close();
-        if (active?.session === session) active.session = undefined;
       },
     };
+    // Every store op now rejects with `VaultClosedError`: stop, forget the session, tell the gate.
+    store.onClosed(() => {
+      if (closing) return;
+      drop();
+      for (const listener of closedListeners) listener();
+    });
     if (active?.userId === profile.id) active.session = session;
     return session;
   } catch (error) {
