@@ -829,6 +829,47 @@ void main() {
       expect(month.dy, greaterThan(face.dy), reason: 'under the wordmark and the face');
       expect(month.dx, closeTo(360 / 2, 1), reason: 'centred');
     });
+
+    // 412px (Samsung, Pixel) and up to 480px: the wordmark, the month and the two buttons do not fit
+    // on one row, and the buttons must never wrap to a row of their own under the wordmark; the
+    // month takes the second row instead.
+    for (final width in [412.0, 430.0, 470.0]) {
+      testWidgets(
+        'a ${width.toInt()}px phone keeps the face beside the wordmark, the month under them',
+        (tester) async {
+          await pumpHome(tester, monthWithBudgets(), size: Size(width, 900));
+          expect(tester.takeException(), isNull);
+          final wordmark = tester.getCenter(find.text('Wambito'));
+          final face = tester.getCenter(find.byKey(const Key('home.account')));
+          final month = tester.getCenter(find.text('Octubre'));
+          expect(face.dy, closeTo(wordmark.dy, 1), reason: 'the face on the wordmark row');
+          expect(month.dy, greaterThan(face.dy), reason: 'the month on the next row');
+          expect(month.dx, closeTo(width / 2, 1), reason: 'centred');
+        },
+      );
+    }
+
+    testWidgets('a wide screen (480px and up) has the three on one row', (tester) async {
+      await pumpHome(tester, monthWithBudgets(), size: const Size(480, 900));
+      expect(tester.takeException(), isNull);
+      final wordmark = tester.getCenter(find.text('Wambito'));
+      final face = tester.getCenter(find.byKey(const Key('home.account')));
+      final month = tester.getCenter(find.text('Octubre'));
+      expect(face.dy, closeTo(wordmark.dy, 1));
+      expect(month.dy, closeTo(wordmark.dy, 1));
+    });
+
+    testWidgets('large text moves the month to its own row before the face would wrap', (
+      tester,
+    ) async {
+      await pumpHome(tester, monthWithBudgets(), size: const Size(560, 900), textScale: 1.3);
+      expect(tester.takeException(), isNull);
+      final wordmark = tester.getCenter(find.text('Wambito'));
+      final face = tester.getCenter(find.byKey(const Key('home.account')));
+      final month = tester.getCenter(find.text('Octubre'));
+      expect(face.dy, closeTo(wordmark.dy, 1), reason: 'the face on the wordmark row');
+      expect(month.dy, greaterThan(face.dy), reason: 'the month on the next row');
+    });
   });
 
   group('offline and errors', () {
