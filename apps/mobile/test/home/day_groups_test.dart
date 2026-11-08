@@ -67,4 +67,29 @@ void main() {
       expect(groupByDay([], '2026-10-21'), isEmpty);
     });
   });
+
+  group('groupNewestFirst', () {
+    test('keeps the API order: a newer upcoming day stays on top, nothing moves to the bottom', () {
+      final items = [
+        tx('internet', '2026-10-28', -3990, status: 'pending'),
+        tx('lunch', '2026-10-21', -1240),
+        tx('coffee', '2026-10-21', -120),
+        tx('bus', '2026-10-20', -200),
+        tx('old', '2026-10-08', -200),
+      ];
+      final groups = groupNewestFirst(items, '2026-10-21');
+      expect(groups.map((g) => (g.date, g.when)).toList(), [
+        ('2026-10-28', DayWhen.upcoming),
+        ('2026-10-21', DayWhen.today),
+        ('2026-10-20', DayWhen.yesterday),
+        ('2026-10-08', DayWhen.past),
+      ]);
+      expect(groups[1].items.map((t) => t.id).toList(), ['lunch', 'coffee']);
+      expect(groups[1].total, -1360);
+    });
+
+    test('is empty for no items', () {
+      expect(groupNewestFirst(const [], '2026-10-21'), isEmpty);
+    });
+  });
 }
