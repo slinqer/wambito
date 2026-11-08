@@ -15,9 +15,16 @@ import {
   forgetDevice,
   KeysError,
   loadLocalKeys,
-  setUpAccount,
+  prepareAccount,
   unlockWithRecovery,
 } from "./keys.ts";
+
+/** Prepares and commits at once, as the setup screen does once the person confirmed the key. */
+async function setUpAccount(options: Parameters<typeof prepareAccount>[0]) {
+  const prepared = await prepareAccount(options);
+  await prepared.commit();
+  return { recoveryKey: prepared.recoveryKey };
+}
 
 interface Wrap {
   id: string;
@@ -82,7 +89,7 @@ const newUser = () => `user_${++counter}`;
 const REC = "01930000-0000-7000-8000-00000000000a";
 const CTX = (userId: string, id: string) => ({ userId, type: "category" as const, id, keyV: 1 });
 
-describe("setUpAccount", () => {
+describe("prepareAccount then commit", () => {
   it("puts the recovery wrap first, then an attested device wrap, and keeps only derived keys", async () => {
     const api = fakeKeys();
     const userId = newUser();
@@ -153,6 +160,78 @@ describe("setUpAccount", () => {
     );
     expect(second).toBeInstanceOf(KeysError);
     expect(second.code).toBe("already_set_up");
+  });
+});
+
+describe("prepareAccount", () => {
+  it("sends and stores nothing until commit()", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const prepared = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    expect(prepared.recoveryKey).toMatch(/^([0-9A-Z]{4}-){6}[0-9A-Z]{3}$/);
+    expect(api.puts).toEqual([]);
+    expect(await loadLocalKeys(userId)).toBeNull();
+
+    const keys = await prepared.commit();
+    expect(api.puts.map((p) => p.kind)).toEqual(["recovery", "device"]);
+    expect(keys.keyV).toBe(1);
+    expect(await loadLocalKeys(userId)).not.toBeNull();
+  });
+
+  it("a prepared key that is never committed leaves the account without wraps", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    expect(api.wraps).toEqual([]);
+    // so the next visit prepares again (with a new key) instead of asking for Unlock
+    const again = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    expect(again.recoveryKey).not.toBeNull();
+  });
+
+  it("is retry-safe: a failed device PUT is sent again with the same ids", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    let failDevice = true;
+    const flaky = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (failDevice && init?.method === "PUT" && String(init.body).includes('"device"')) {
+        throw new TypeError("offline");
+      }
+      return api.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const prepared = await prepareAccount({ userId, guest: false, fetch: flaky });
+    const err = await prepared.commit().catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("offline");
+    expect(await loadLocalKeys(userId)).toBeNull();
+    expect(api.wraps.map((w) => w.kind)).toEqual(["recovery"]);
+    const recoveryId = api.wraps[0]?.id;
+
+    failDevice = false;
+    await prepared.commit();
+    expect(api.wraps.map((w) => w.kind).sort()).toEqual(["device", "recovery"]);
+    expect(api.wraps.find((w) => w.kind === "recovery")?.id).toBe(recoveryId);
+    expect(await loadLocalKeys(userId)).not.toBeNull();
+
+    // the wrap the server kept is the one the shown key opens
+    const recovery = api.wraps.find((w) => w.kind === "recovery");
+    await expect(
+      unwrapDataKey(
+        parseRecoveryKey(prepared.recoveryKey as string),
+        { kind: "recovery", userId, keyV: 1 },
+        fromBase64Url(recovery?.wrapped as string),
+      ),
+    ).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  it("a second commit() after success sends nothing", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const prepared = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    const first = await prepared.commit();
+    const puts = api.puts.length;
+    const second = await prepared.commit();
+    expect(api.puts.length).toBe(puts);
+    expect(second.keyV).toBe(first.keyV);
   });
 });
 

@@ -94,6 +94,31 @@ const putJson = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+/** A device key pair and its wrap of DK, made in memory; nothing sent yet. */
+async function prepareDevice(userId: string, dataKey: Uint8Array, keyV: number) {
+  const pair = await generateDeviceKeyPair();
+  const id = uuidv7();
+  const wrapped = await sealToDevice(pair.publicKey, { kind: "device", userId, keyV }, dataKey);
+  const attestation = await deviceAttestation(dataKey, {
+    userId,
+    wrapId: id,
+    publicKey: pair.publicKey,
+  });
+  return {
+    id,
+    privateKey: pair.privateKey,
+    body: {
+      kind: "device",
+      ref: id,
+      keyV,
+      wrapped: toBase64Url(wrapped),
+      publicKey: toBase64Url(pair.publicKey),
+      attestation: toBase64Url(attestation),
+      label: DEVICE_LABEL,
+    },
+  };
+}
+
 /**
  * Adds this browser as a device: a key pair, a wrap of DK sealed to its own public key with an
  * attestation of that key under DK, then the derived keys and the private key kept locally.
@@ -104,27 +129,9 @@ async function enrollDevice(
   dataKey: Uint8Array,
   keyV: number,
 ): Promise<LocalKeys> {
-  const pair = await generateDeviceKeyPair();
-  const id = uuidv7();
-  const wrapped = await sealToDevice(pair.publicKey, { kind: "device", userId, keyV }, dataKey);
-  const attestation = await deviceAttestation(dataKey, {
-    userId,
-    wrapId: id,
-    publicKey: pair.publicKey,
-  });
-  await call(
-    `/v2/keys/${id}`,
-    putJson({
-      kind: "device",
-      ref: id,
-      keyV,
-      wrapped: toBase64Url(wrapped),
-      publicKey: toBase64Url(pair.publicKey),
-      attestation: toBase64Url(attestation),
-      label: DEVICE_LABEL,
-    }),
-  );
-  return keepLocally(userId, dataKey, keyV, pair.privateKey);
+  const device = await prepareDevice(userId, dataKey, keyV);
+  await call(`/v2/keys/${device.id}`, putJson(device.body));
+  return keepLocally(userId, dataKey, keyV, device.privateKey);
 }
 
 async function keepLocally(
@@ -147,35 +154,76 @@ async function keepLocally(
   return { keys, keyV };
 }
 
+/** A new account's keys, made but not yet sent: see `prepareAccount`. */
+export interface PreparedAccount {
+  /** The formatted recovery key to show; `null` for a guest (nothing to show). */
+  recoveryKey: string | null;
+  /**
+   * Sends the recovery wrap, then the device wrap, then keeps the derived keys in this browser.
+   * Retry-safe: after a failure, calling it again sends the same wraps under the same ids. After
+   * success DK is zeroed, and a further call only returns the same keys.
+   */
+  commit(): Promise<LocalKeys>;
+}
+
 /**
- * First run of an account: DK, the recovery secret and this device's key pair. The recovery wrap
- * goes first (the server refuses any other kind first), then the device wrap. A guest has no
- * recovery key to show (spec section 10): its recovery secret is thrown away unseen, which still
- * satisfies the server's first-wrap rule; turning the guest into a real account later replaces
- * that wrap with a recovery key the person keeps. Throws `already_set_up` when the account has
- * wraps: the caller shows Unlock.
+ * First run of an account (spec 7.1): DK, the recovery secret and this device's key pair, all in
+ * memory. Nothing reaches the server until `commit()`, which the setup screen calls only once the
+ * person has typed back four characters of the key, so the account never ends up with a recovery
+ * wrap whose key nobody saw. The recovery wrap goes first (the server refuses any other kind
+ * first), then the device wrap. A guest has no recovery key to show (spec section 10): its
+ * recovery secret is never shown, which still satisfies the server's first-wrap rule, and the
+ * caller commits at once; turning the guest into a real account later replaces that wrap with a
+ * recovery key the person keeps. Throws `already_set_up` when the account has wraps: the caller
+ * shows Unlock.
  */
-export async function setUpAccount(
+export async function prepareAccount(
   options: KeysOptions & { guest: boolean },
-): Promise<{ recoveryKey: string | null }> {
+): Promise<PreparedAccount> {
   const { userId, guest } = options;
   const call = api(options);
   if ((await listWraps(call)).length > 0) throw new KeysError("already_set_up");
 
   const dataKey = generateDataKey();
   const secret = newRecoverySecret();
-  const wrapped = await wrapDataKey(
-    secret,
-    { kind: "recovery", userId, keyV: FIRST_KEY_V },
-    dataKey,
-  );
-  await call(
-    `/v2/keys/${uuidv7()}`,
-    putJson({ kind: "recovery", keyV: FIRST_KEY_V, wrapped: toBase64Url(wrapped) }),
-  );
-  await enrollDevice(call, userId, dataKey, FIRST_KEY_V);
-  dataKey.fill(0);
-  return { recoveryKey: guest ? null : formatRecoveryKey(secret) };
+  const recoveryId = uuidv7();
+  const recoveryBody = {
+    kind: "recovery",
+    keyV: FIRST_KEY_V,
+    wrapped: toBase64Url(
+      await wrapDataKey(secret, { kind: "recovery", userId, keyV: FIRST_KEY_V }, dataKey),
+    ),
+  };
+  const device = await prepareDevice(userId, dataKey, FIRST_KEY_V);
+  const recoveryKey = guest ? null : formatRecoveryKey(secret);
+  secret.fill(0);
+
+  let recoverySent = false;
+  let done: LocalKeys | null = null;
+  let running: Promise<LocalKeys> | null = null;
+
+  async function run(): Promise<LocalKeys> {
+    if (done) return done;
+    if (!recoverySent) {
+      await call(`/v2/keys/${recoveryId}`, putJson(recoveryBody));
+      recoverySent = true;
+    }
+    await call(`/v2/keys/${device.id}`, putJson(device.body));
+    done = await keepLocally(userId, dataKey, FIRST_KEY_V, device.privateKey);
+    dataKey.fill(0);
+    return done;
+  }
+
+  return {
+    recoveryKey,
+    commit() {
+      // One at a time: a double tap shares the call in flight.
+      running ??= run().finally(() => {
+        running = null;
+      });
+      return running;
+    },
+  };
 }
 
 /**
