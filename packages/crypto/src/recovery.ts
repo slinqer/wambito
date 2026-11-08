@@ -1,9 +1,8 @@
 import { CryptoError } from "./errors.ts";
 import { assertBytes } from "./validate.ts";
 
-/** Crockford base32 (no I, L, O, U) and its five extra check symbols. */
+/** Crockford base32 (no I, L, O, U). */
 export const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const CHECK_ALPHABET = `${CROCKFORD}*~$=U`;
 const DATA_CHARS = 26;
 
 export function newRecoverySecret(): Uint8Array {
@@ -16,7 +15,26 @@ function toBigInt(bytes: Uint8Array): bigint {
   return n;
 }
 
-/** 128 bits as 26 base32 characters (the last one carries 3 data bits and 2 zero bits) + check. */
+/**
+ * Luhn mod N check character (N = 32, code points = index in the Crockford alphabet) over the 26
+ * data characters. It is always alphanumeric, catches every single-character error and almost
+ * every swap of two adjacent characters.
+ */
+function luhnCheck(data: string): string {
+  let factor = 2;
+  let sum = 0;
+  for (let i = data.length - 1; i >= 0; i--) {
+    const addend = factor * CROCKFORD.indexOf(data[i] as string);
+    factor = factor === 2 ? 1 : 2;
+    sum += Math.floor(addend / 32) + (addend % 32);
+  }
+  return CROCKFORD[(32 - (sum % 32)) % 32] as string;
+}
+
+/**
+ * 128 bits as 26 base32 characters (the last one carries 3 data bits and 2 zero bits) plus a
+ * Luhn mod 32 check character, in groups of four.
+ */
 export function formatRecoveryKey(secret: Uint8Array): string {
   assertBytes(secret, 16, "recovery secret");
   const value = toBigInt(secret);
@@ -25,7 +43,7 @@ export function formatRecoveryKey(secret: Uint8Array): string {
   for (let i = DATA_CHARS - 1; i >= 0; i--) {
     text += CROCKFORD[Number((padded >> BigInt(i * 5)) & 31n)];
   }
-  text += CHECK_ALPHABET[Number(value % 37n)];
+  text += luhnCheck(text);
   return text.match(/.{1,4}/g)?.join("-") ?? text;
 }
 
@@ -45,7 +63,7 @@ export function parseRecoveryKey(input: string): Uint8Array {
   }
   if ((padded & 3n) !== 0n) throw bad();
   const value = padded >> 2n;
-  if (CHECK_ALPHABET.indexOf(text[DATA_CHARS] as string) !== Number(value % 37n)) throw bad();
+  if (luhnCheck(text.slice(0, DATA_CHARS)) !== text[DATA_CHARS]) throw bad();
   const out = new Uint8Array(16);
   for (let i = 15; i >= 0; i--) {
     out[i] = Number((value >> BigInt((15 - i) * 8)) & 255n);

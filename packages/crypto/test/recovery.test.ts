@@ -6,7 +6,7 @@ import {
   parseRecoveryKey,
 } from "../src/index.ts";
 
-const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ*~$=U";
+const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function code(fn: () => unknown) {
   try {
@@ -24,9 +24,9 @@ describe("recovery key", () => {
     expect(s).not.toEqual(newRecoverySecret());
   });
 
-  it("formats as 26 + 1 characters in groups of four (check may be * ~ $ = U)", () => {
+  it("formats as 26 + 1 characters in groups of four", () => {
     for (let i = 0; i < 20; i++) {
-      expect(formatRecoveryKey(newRecoverySecret())).toMatch(/^([0-9A-Z]{4}-){6}[0-9A-Z*~$=]{3}$/);
+      expect(formatRecoveryKey(newRecoverySecret())).toMatch(/^([0-9A-Z]{4}-){6}[0-9A-Z]{3}$/);
     }
   });
 
@@ -69,6 +69,18 @@ describe("recovery key", () => {
         }
       }
     }
+  });
+
+  it("a swap of two adjacent different characters is caught for at least 95% of keys", () => {
+    let caught = 0;
+    for (let n = 0; n < 200; n++) {
+      const t = formatRecoveryKey(newRecoverySecret()).replace(/-/g, "");
+      let i = Math.floor(Math.random() * 25);
+      while (t[i] === t[i + 1]) i = (i + 1) % 25;
+      const swapped = t.slice(0, i) + t[i + 1] + t[i] + t.slice(i + 2);
+      if (code(() => parseRecoveryKey(swapped)) === "bad_recovery_key") caught++;
+    }
+    expect(caught).toBeGreaterThanOrEqual(190);
   });
 
   it("rejects wrong length and foreign characters", () => {
