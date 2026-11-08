@@ -16,5 +16,27 @@
   "css": { "parser": { "tailwindDirectives": true } },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "preset": "none" } },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "overrides": [
+    {
+      "includes": ["apps/api/**", "apps/mcp/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "window": "The API and MCP run on Node: no browser globals (their tsconfig has the DOM lib only for packages/crypto)",
+                  "document": "The API and MCP run on Node: no browser globals",
+                  "localStorage": "The API and MCP run on Node: no browser globals",
+                  "sessionStorage": "The API and MCP run on Node: no browser globals"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,0 +1,88 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'start_pairing.dart';
+
+// **************************************************************************
+// BuiltValueGenerator
+// **************************************************************************
+
+class _$StartPairing extends StartPairing {
+  @override
+  final String publicKey;
+
+  factory _$StartPairing([void Function(StartPairingBuilder)? updates]) =>
+      (StartPairingBuilder()..update(updates))._build();
+
+  _$StartPairing._({required this.publicKey}) : super._();
+  @override
+  StartPairing rebuild(void Function(StartPairingBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  StartPairingBuilder toBuilder() => StartPairingBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is StartPairing && publicKey == other.publicKey;
+  }
+
+  @override
+  int get hashCode {
+    var _$hash = 0;
+    _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jf(_$hash);
+    return _$hash;
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper(r'StartPairing')..add('publicKey', publicKey)).toString();
+  }
+}
+
+class StartPairingBuilder implements Builder<StartPairing, StartPairingBuilder> {
+  _$StartPairing? _$v;
+
+  String? _publicKey;
+  String? get publicKey => _$this._publicKey;
+  set publicKey(String? publicKey) => _$this._publicKey = publicKey;
+
+  StartPairingBuilder() {
+    StartPairing._defaults(this);
+  }
+
+  StartPairingBuilder get _$this {
+    final $v = _$v;
+    if ($v != null) {
+      _publicKey = $v.publicKey;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(StartPairing other) {
+    _$v = other as _$StartPairing;
+  }
+
+  @override
+  void update(void Function(StartPairingBuilder)? updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  StartPairing build() => _build();
+
+  _$StartPairing _build() {
+    final _$result =
+        _$v ??
+        _$StartPairing._(
+          publicKey: BuiltValueNullFieldError.checkNotNull(publicKey, r'StartPairing', 'publicKey'),
+        );
+    replace(_$result);
+    return _$result;
+  }
+}
+
+// ignore_for_file: deprecated_member_use_from_same_package,type=lint

@@ -1,0 +1,250 @@
+{
+  "_about": "Shared test vectors for packages/crypto (bytes are base64url). The Dart port must pass them byte for byte. Never edit by hand: regenerate with `pnpm --filter @wambito/crypto vectors`.",
+  "records": [
+    {
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "type": "transaction",
+        "id": "0194f3a2-8c00-7000-8000-000000000001",
+        "keyV": 1
+      },
+      "nonce": "AQIDBAUGBwgJCgsM",
+      "value": {
+        "amountCents": -1850000,
+        "note": "almuerzo",
+        "occurredOn": "2026-11-08"
+      },
+      "body": "AQIDBAUGBwgJCgsM42r1eTSTkWOpazh1dIt7ayeIeDrZQm6AVIybM4hV50biyZ6XIBFoFjHD5YEoU2gfZyHk5uS_tz6MpFQog9GotPYd2TPXEINQfQTZMpNO-iGDBf4onks17JDUlsEzGWzQ-URpNVQgACkNDS9CkOyaT4QynLMQA6w9N--izJWQV5iTlA-IenvOj_MluXnDhGTD",
+      "dedupe": {
+        "text": "Almuerzo Corrientazo",
+        "tag": "qdLaQjAX-vBGs5zEUfHWu0V65HHPzNjLEQGvYAiXKGE"
+      }
+    },
+    {
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "type": "category",
+        "id": "0194f3a2-8c00-7000-8000-000000000002",
+        "keyV": 1
+      },
+      "nonce": "ISIjJCUmJygpKiss",
+      "value": {
+        "name": "Café y ñandúes ☕ 食べ物",
+        "emoji": "🥐"
+      },
+      "body": "ISIjJCUmJygpKissWvDGYTTux3f7Gq6k1EaOyp7dcqXpUiZsIu6Ovx2MkD-Ht5uwHylxdmuGEjmNQgVnlT7SMcOB-Gls5sOpD6ndsTCrsFykJ5WiI9g-bm6Sl5E",
+      "dedupe": {
+        "text": "Café y ñandúes",
+        "tag": "2dM1U1Wuj4jTXDJ9JEtElH_WH71xAUhZ5NWs1tDKawU"
+      }
+    },
+    {
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "ctx": {
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "type": "settings",
+        "id": "0194f3a2-8c00-7000-8000-000000000003",
+        "keyV": 32767
+      },
+      "nonce": "QUJDREVGR0hJSktM",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "body": "QUJDREVGR0hJSktMBhI8InquqQBi-gi97TmHnmmEaLWzdr_NjdMlGzAIONbtxxGqYhr7uZbS4SY7QgITwu7O2nPc9LcuTKnMcLd_TDVRh0ymq92Xk8jED1e2XeA",
+      "dedupe": {
+        "text": "",
+        "tag": "ZW7SKnpt2cURO7V0-mjTrqFOWZjHSURVKpCskOTvheI"
+      }
+    },
+    {
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "ctx": {
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "type": "budget",
+        "id": "0194f3a2-8c00-7000-8000-000000000001",
+        "keyV": 0
+      },
+      "nonce": "YWJjZGVmZ2hpamts",
+      "value": {
+        "categoryId": "0194f3a2-8c00-7000-8000-000000000002",
+        "month": "2026-11",
+        "limitCents": 25000000,
+        "tags": []
+      },
+      "body": "YWJjZGVmZ2hpamtsvI1xfBCGz7LC7YhoRrdlnauw8VnREmtDnJ6DQS0YewRqOwX8eMzoTlbLq3CNFaE-_XcR9qtTB68RLk7UW0krsIknjfc8pFdxL669bV0k7p0I5rq-bjSmZmKaPsglafA-1aC04S8a-aF5Hl4wCxR8zjdhVyGatoZZQAf2uC7VEw-nxw4yqPc3eL2mIv5N732Y",
+      "dedupe": {
+        "text": "budget 2026-11",
+        "tag": "ndc86VCZA2pFvlMtCB6rMxpBjnsS4gsrrK9dPHOJiX4"
+      }
+    }
+  ],
+  "wraps": [
+    {
+      "secret": "MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk8",
+      "ctx": {
+        "kind": "passkey",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "nonce": "AgMEBQYHCAkKCwwN",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "wrapped": "AgMEBQYHCAkKCwwNgC7BfSEQA_2HGhEDtHNhHbYSRdK1QTR37wV0I4cHHYtpEKcLNwZy-awJMeqx_Gk6"
+    },
+    {
+      "secret": "UFFSU1RVVldYWVpbXF1eXw",
+      "ctx": {
+        "kind": "recovery",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "nonce": "IiMkJSYnKCkqKywt",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "wrapped": "IiMkJSYnKCkqKywt_EH2yNwAJJiabVOsv66BdrSwG3OKgv5GPOTwK0QXvCoicgUiBFtEql8b9bpfVPP9"
+    },
+    {
+      "secret": "cHFyc3R1dnd4eXp7fH1-f4CBgoOEhYaHiImKi4yNjo8",
+      "ctx": {
+        "kind": "assistant",
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "keyV": 7
+      },
+      "nonce": "QkNERUZHSElKS0xN",
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "wrapped": "QkNERUZHSElKS0xNHMKctgGpz7Dxccwx-kJ8kyWjbcCnkFj2D2m3M7CtOehknirvIBS50XSdLvyoZsXp"
+    }
+  ],
+  "recovery": [
+    {
+      "secret": "AAECAwQFBgcICQoLDA0ODw",
+      "text": "000G-40R4-0M30-E209-185G-R38E-1WR"
+    },
+    {
+      "secret": "8PHy8_T19vf4-fr7_P3-_w",
+      "text": "Y3RZ-5WZM-YQVF-FY7S-ZBXZ-SZFY-ZW6"
+    },
+    {
+      "secret": "AAAAAAAAAAAAAAAAAAAAAA",
+      "text": "0000-0000-0000-0000-0000-0000-000"
+    },
+    {
+      "secret": "_____________________w",
+      "text": "ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZW0"
+    }
+  ],
+  "devices": [
+    {
+      "privateKey": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8",
+      "publicKey": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "ctx": {
+        "kind": "device",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "sealed": "YFpyXSpK3-6xop4X7dYhwbdZPujNvESsbEq24vgF0jwDBAUGBwgJCgsMDQ5R5zDdAzdoeEOmsB5BKm1r-rrxPWsQ8daCaW52zrZ6hl72AVzlz9wvocfPDl4XqwI",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8"
+    },
+    {
+      "privateKey": "sLGys7S1tre4ubq7vL2-v8DBwsPExcbHyMnKy8zNzs8",
+      "publicKey": "Pz5fbYaSbJwSjPhFgVdPloQNmO5atTsew7duK7JblF4",
+      "ctx": {
+        "kind": "device",
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "keyV": 3
+      },
+      "sealed": "3CzKMejkO72R3_fkdcyjNH60eBB9W9dlq6SuSjDDXUQjJCUmJygpKissLS5QFzfmivmlqp07aJgn-t20C7o48Sr7rz1_rDGBlwp-fr7ZEqGrPUJeHeDsFxl8vnI",
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8"
+    }
+  ],
+  "pairing": [
+    {
+      "a": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "b": "Pz5fbYaSbJwSjPhFgVdPloQNmO5atTsew7duK7JblF4",
+      "number": "391236"
+    },
+    {
+      "a": "Pz5fbYaSbJwSjPhFgVdPloQNmO5atTsew7duK7JblF4",
+      "b": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "number": "391236"
+    },
+    {
+      "a": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "b": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "number": "013775"
+    }
+  ],
+  "rejects": [
+    {
+      "name": "record with a user id containing a slash",
+      "op": "sealRecord",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2/pR8wYb5NcHd7JfA1sUe4B",
+        "type": "transaction",
+        "id": "0194f3a2-8c00-7000-8000-000000000001",
+        "keyV": 1
+      },
+      "nonce": "AQIDBAUGBwgJCgsM",
+      "value": {
+        "amountCents": -1850000,
+        "note": "almuerzo",
+        "occurredOn": "2026-11-08"
+      },
+      "code": "bad_input"
+    },
+    {
+      "name": "record with an upper-case record id",
+      "op": "sealRecord",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "type": "transaction",
+        "id": "0194F3A2-8C00-7000-8000-000000000001",
+        "keyV": 1
+      },
+      "nonce": "AQIDBAUGBwgJCgsM",
+      "value": {
+        "amountCents": -1850000,
+        "note": "almuerzo",
+        "occurredOn": "2026-11-08"
+      },
+      "code": "bad_input"
+    },
+    {
+      "name": "record with an 11-byte nonce",
+      "op": "sealRecord",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "type": "transaction",
+        "id": "0194f3a2-8c00-7000-8000-000000000001",
+        "keyV": 1
+      },
+      "nonce": "AQIDBAUGBwgJCgs",
+      "value": {
+        "amountCents": -1850000,
+        "note": "almuerzo",
+        "occurredOn": "2026-11-08"
+      },
+      "code": "bad_input"
+    },
+    {
+      "name": "recovery key with one character changed",
+      "op": "parseRecoveryKey",
+      "text": "000G-40R4-0M30-E209-185G-R38E-1W0",
+      "code": "bad_recovery_key"
+    },
+    {
+      "name": "recovery wrap with a 15-byte secret",
+      "op": "wrapDataKey",
+      "secret": "UFFSU1RVVldYWVpbXF1e",
+      "ctx": {
+        "kind": "recovery",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "nonce": "IiMkJSYnKCkqKywt",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "code": "bad_input"
+    }
+  ]
+}

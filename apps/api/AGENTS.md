@@ -39,6 +39,47 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - `src/routes/email-change.ts`: public `POST /v1/email-change/confirm` (mounted before
   `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP in the
   `rate_limit` table (key `email-change-confirm|<ip>`).
+- `GET`/`POST /v2/sync` (`src/routes/sync.ts`, `src/services/sync.ts`; spec
+  `docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md` §5–6): opaque encrypted
+  records, never read or logged. A push holds `pg_advisory_xact_lock(hashtextextended('records:'
+  || user_id, 0))` (every `records` write takes it, so versions commit in order per person), one
+  savepoint per change; limits 500 changes, 4 MiB (`hono/body-limit`), 64 KiB body, 100,000 live
+  records. `purgeTombstones` (daily, `server.ts`) goes person by person through `withUser`, since
+  `records` has forced RLS. An update never creates (`not_found`) nor changes `type` (conflict);
+  a hidden id (`id_taken`) is found by a rolled-back insert probe. `deps.syncHooks` is a test-only
+  seam.
+- `/v2/keys` (`src/routes/keys.ts`, `src/services/keys.ts`; same spec §5.2, §7): wraps of the
+  data key, opaque bytes. Every write holds `pg_advisory_xact_lock(hashtextextended('key_wraps:' ||
+  user_id, 0))`; the current keyV is the max over the account's wraps (any keyV for the first).
+  Passkey wraps' `ref` is the passkey's `credentialID`; `auth.ts` hooks on
+  `/passkey/delete-passkey` (before: read the credential id; after, on success: delete the wrap; two
+  statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
+  `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
+  4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
+  `last_used_at`; sessions get 404 there.
+- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; same spec §7.3): relay for
+  approving a new device; opaque bytes (public key in, sealed data key out), never read or logged.
+  The server makes the 8-char code (`pairingCode` from `@wambito/crypto`), unique per person
+  (a collision retries); lookup normalizes the typed code. 10 min TTL read from `deps.now`, max 5
+  open (429). Writes hold `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id,
+  0))`. Pickup deletes the row in the same transaction. `purgeExpiredPairings` runs with the daily
+  tombstone purge (`scheduleTombstonePurge`). Assistant tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2` rules: record and key-wrap ids are lower-case UUIDs (`lowerCaseUuid` in `http/schemas.ts`,
+  the `@wambito/crypto` rule; never lower-cased, upper case is 422); a live record body is at least
+  28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
+  statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
+  of RLS.
+- Known gaps (spec §17, open before stage 2):
+  - Pairing number (§7.3): the relay gives the new device no approver key before the seal and
+    `sealToDevice` makes its ephemeral key internally, so the 6-digit comparison cannot happen;
+    without a commitment a server could grind a 6-digit match (~2^20 X25519 ops). Plan: ZRTP-style
+    commit (SHA-256 of the approver's ephemeral key) then reveal; the number comes from the new
+    device's key and the revealed key; needs pairing columns, a reveal endpoint and new
+    `pairingNumber` vectors before the Dart port. The QR path (out of band) is unaffected.
+  - Device keys in rotation (§7.5): the rotating device seals the new data key to device public
+    keys the server lists; a malicious server could add or swap one. Plan: each device wrap
+    carries an attestation (HMAC under a key derived from the data key over user id || wrap id ||
+    public key), verified before sealing; new column and crypto function with vectors first.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

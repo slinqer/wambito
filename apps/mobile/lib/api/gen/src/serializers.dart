@@ -51,6 +51,11 @@ import 'package:wambito/api/gen/src/model/import_stats.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
 import 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
+import 'package:wambito/api/gen/src/model/key_wrap.dart';
+import 'package:wambito/api/gen/src/model/key_wraps.dart';
+import 'package:wambito/api/gen/src/model/pairing_found.dart';
+import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
+import 'package:wambito/api/gen/src/model/pairing_started.dart';
 import 'package:wambito/api/gen/src/model/passkey_assertion.dart';
 import 'package:wambito/api/gen/src/model/passkey_assertion_response.dart';
 import 'package:wambito/api/gen/src/model/passkey_request_options.dart';
@@ -58,11 +63,25 @@ import 'package:wambito/api/gen/src/model/passkey_request_options_allow_credenti
 import 'package:wambito/api/gen/src/model/problem.dart';
 import 'package:wambito/api/gen/src/model/problem_errors_inner.dart';
 import 'package:wambito/api/gen/src/model/profile.dart';
+import 'package:wambito/api/gen/src/model/pulled_records.dart';
+import 'package:wambito/api/gen/src/model/push_applied.dart';
+import 'package:wambito/api/gen/src/model/push_conflict.dart';
+import 'package:wambito/api/gen/src/model/push_records.dart';
+import 'package:wambito/api/gen/src/model/push_rejected.dart';
+import 'package:wambito/api/gen/src/model/push_result.dart';
+import 'package:wambito/api/gen/src/model/push_results.dart';
+import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
+import 'package:wambito/api/gen/src/model/rotate_keys.dart';
+import 'package:wambito/api/gen/src/model/rotated_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/seal_pairing.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
+import 'package:wambito/api/gen/src/model/start_pairing.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
+import 'package:wambito/api/gen/src/model/sync_change.dart';
+import 'package:wambito/api/gen/src/model/sync_record.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
 import 'package:wambito/api/gen/src/model/transaction_list.dart';
 import 'package:wambito/api/gen/src/model/transaction_page.dart';
@@ -116,6 +135,11 @@ part 'serializers.g.dart';
   ImportStatsAverageMonthlySpendingInner,
   ImportStatsAverageWindow,
   ImportStatsRejectedInner,
+  KeyWrap,
+  KeyWraps,
+  PairingFound,
+  PairingPickup,
+  PairingStarted,
   PasskeyAssertion,
   PasskeyAssertionResponse,
   PasskeyRequestOptions,
@@ -123,11 +147,25 @@ part 'serializers.g.dart';
   Problem,
   ProblemErrorsInner,
   Profile,
+  PulledRecords,
+  PushApplied,
+  PushConflict,
+  PushRecords,
+  PushRejected,
+  PushResult,
+  PushResults,
+  PutKeyWrap,
   Recurrence,
   ReviewTransactions,
+  RotateKeys,
+  RotatedKeyWrap,
+  SealPairing,
   SetBudget,
+  StartPairing,
   Summary,
   SummaryCategoriesInner,
+  SyncChange,
+  SyncRecord,
   Transaction,
   TransactionList,
   TransactionPage,
@@ -144,8 +182,48 @@ part 'serializers.g.dart';
 Serializers serializers =
     (_$serializers.toBuilder()
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(RotatedKeyWrap)]),
+            () => ListBuilder<RotatedKeyWrap>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltMap, [FullType(String), FullType(String)]),
             () => MapBuilder<String, String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(PushResult)]),
+            () => ListBuilder<PushResult>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ProblemErrorsInner)]),
+            () => ListBuilder<ProblemErrorsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SyncChange)]),
+            () => ListBuilder<SyncChange>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(Transaction)]),
+            () => ListBuilder<Transaction>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminUserPasskeysInner)]),
+            () => ListBuilder<AdminUserPasskeysInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(TransactionSuggestion)]),
+            () => ListBuilder<TransactionSuggestion>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(CostOfLivingReportCategoriesInner)]),
+            () => ListBuilder<CostOfLivingReportCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(KeyWrap)]),
+            () => ListBuilder<KeyWrap>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SyncRecord)]),
+            () => ListBuilder<SyncRecord>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(PasskeyRequestOptionsAllowCredentialsInner)]),
@@ -164,32 +242,12 @@ Serializers serializers =
             () => ListBuilder<Recurrence>(),
           )
           ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(ProblemErrorsInner)]),
-            () => ListBuilder<ProblemErrorsInner>(),
-          )
-          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AdminMetricsWeeklyInner)]),
             () => ListBuilder<AdminMetricsWeeklyInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Category)]),
             () => ListBuilder<Category>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(Transaction)]),
-            () => ListBuilder<Transaction>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(AdminUserPasskeysInner)]),
-            () => ListBuilder<AdminUserPasskeysInner>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(TransactionSuggestion)]),
-            () => ListBuilder<TransactionSuggestion>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, [FullType(CostOfLivingReportCategoriesInner)]),
-            () => ListBuilder<CostOfLivingReportCategoriesInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SummaryCategoriesInner)]),

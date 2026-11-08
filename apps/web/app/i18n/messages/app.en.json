@@ -168,6 +168,15 @@
     "search": "Search"
   },
   "errors": {
+    "record_limit": "This account has reached its limit of saved records.",
+    "key_version_mismatch": "The data key version changed. Refresh and try again.",
+    "already_sealed": "This request was already approved.",
+    "id_taken": "That item can't be saved. Please try again.",
+    "payload_too_large": "That is too much to send at once.",
+    "recovery_required": "The recovery key can't be removed, only replaced.",
+    "too_many_pairings": "Too many pending device requests. Wait a few minutes and try again.",
+    "unknown_assistant": "That assistant isn't connected to your account.",
+    "unknown_passkey": "That passkey isn't on your account.",
     "generic": "Something went wrong. Please try again in a moment.",
     "network_error": "No connection. Check your internet and try again.",
     "unauthenticated": "Sign in to continue.",

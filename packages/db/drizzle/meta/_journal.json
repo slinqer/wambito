@@ -71,6 +71,13 @@
       "when": 1793873780807,
       "tag": "0009_automatic_capture",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794144294477,
+      "tag": "0010_end_to_end_records",
+      "breakpoints": true
     }
   ]
 }

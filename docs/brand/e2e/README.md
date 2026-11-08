@@ -1,0 +1,5 @@
+- `wambi-e2e-step1.webp` — Wambi locks receipts and coins in a chest on the phone; the only key hangs from the phone (passkey). Caption: «Tus gastos se guardan bajo llave desde tu celular. Tú tienes la llave.»
+- `wambi-e2e-step2.webp` — The locked chest crosses internet clouds and cables; a snooper sees only scribbles. Caption: «Tus gastos viajan protegidos. Si alguien se mete a mirar, solo ve garabatos.»
+- `wambi-e2e-step3.webp` — A server shelf stores locked chests and shrugs with empty hands because it has no key. Caption: «Guardamos tu cofre, pero no tenemos la llave para abrirlo.»
+- `wambi-e2e-step4.webp` — A fingerprint touch unlocks the chest on a laptop; a paper recovery card offers another way in, and Wambi celebrates. Caption: «Abre tus gastos con tu huella o tu tarjeta de recuperación. Tú tienes el control.»
+- `wambi-e2e-step5.webp` — After a person taps a check button, Wambi lends a temporary key to a friendly assistant; a smaller vignette shows Wambi changing the lock when the assistant is disconnected. Caption: «El asistente entra solo si tú le das permiso. Cuando lo desconectas, cambiamos la cerradura.»

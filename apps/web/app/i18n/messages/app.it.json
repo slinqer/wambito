@@ -168,6 +168,15 @@
     "search": "Cerca"
   },
   "errors": {
+    "record_limit": "Questo account ha raggiunto il limite di registri salvati.",
+    "key_version_mismatch": "La versione della chiave dati è cambiata. Aggiorna e riprova.",
+    "already_sealed": "Questa richiesta è già stata approvata.",
+    "id_taken": "Impossibile salvare questo elemento. Riprova.",
+    "payload_too_large": "È troppo da inviare in una volta.",
+    "recovery_required": "La chiave di recupero non può essere rimossa, solo sostituita.",
+    "too_many_pairings": "Troppe richieste di dispositivo in attesa. Aspetta qualche minuto e riprova.",
+    "unknown_assistant": "Questo assistente non è collegato al tuo account.",
+    "unknown_passkey": "Questa passkey non è nel tuo account.",
     "generic": "Qualcosa è andato storto. Riprova tra un momento.",
     "network_error": "Nessuna connessione. Controlla internet e riprova.",
     "unauthenticated": "Accedi per continuare.",

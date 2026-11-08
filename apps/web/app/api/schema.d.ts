@@ -650,6 +650,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. */
+        get: operations["pullRecords"];
+        put?: never;
+        /** @description Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, or `not_found` for an update of a record the server does not have (resync in full). */
+        post: operations["pushRecords"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an assistant's token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session. */
+        get: operations["getAssistantWrap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every wrap of the account's data key. */
+        get: operations["listKeyWraps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
+        put: operations["putKeyWrap"];
+        post?: never;
+        /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. */
+        delete: operations["deleteKeyWrap"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/keys/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Records are re-encrypted through `/v2/sync` afterwards. */
+        post: operations["rotateKeys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The unlocked device finds the new device's request by the typed `code` (case, dashes, spaces and look-alike letters are forgiven). 404 when expired, already sealed, or not the person's. */
+        get: operations["findPairing"];
+        put?: never;
+        /** @description The new device posts its ephemeral public key and shows the returned `code`. At most 5 unexpired requests per person (429 `too_many_pairings`); a request lives 10 minutes. */
+        post: operations["startPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}/seal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The unlocked device posts the data key sealed to the request's public key (up to 1 KiB). 404 when expired or not the person's, 409 `already_sealed`. */
+        post: operations["sealPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The new device polls. `sealed` is null until the other device seals; when it is returned the request is deleted in the same transaction, so a second read is 404. */
+        get: operations["takePairing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1092,6 +1231,156 @@ export interface components {
         };
         ConfirmImport: {
             adoptFileCurrency?: boolean;
+        };
+        PulledRecords: {
+            records: components["schemas"]["SyncRecord"][];
+            /** @description The `since` of the next page; null when this page reaches `latest` */
+            next: number | null;
+            /** @description The newest version on the server; 0 when none */
+            latest: number;
+        };
+        SyncRecord: {
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
+            id: string;
+            /** @enum {string} */
+            type: "transaction" | "category" | "budget" | "recurrence" | "merchant" | "settings" | "account";
+            deleted: boolean;
+            /** @description The data key version of `body` */
+            keyV: number;
+            /** @description The record format version */
+            encV: number;
+            version: number;
+            /** @description The encrypted record, base64url without padding; null when deleted */
+            body: string | null;
+        };
+        PushResults: {
+            results: components["schemas"]["PushResult"][];
+        };
+        PushResult: components["schemas"]["PushApplied"] | components["schemas"]["PushConflict"] | components["schemas"]["PushRejected"];
+        PushApplied: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        PushConflict: {
+            /** Format: uuid */
+            id: string;
+            conflict: components["schemas"]["SyncRecord"];
+        };
+        PushRejected: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
+             * @enum {string}
+             */
+            error: "id_taken" | "not_found";
+        };
+        PushRecords: {
+            changes: components["schemas"]["SyncChange"][];
+        };
+        SyncChange: {
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
+            id: string;
+            /** @enum {string} */
+            type: "transaction" | "category" | "budget" | "recurrence" | "merchant" | "settings" | "account";
+            deleted: boolean;
+            /** @description The data key version of `body` */
+            keyV: number;
+            /** @description The record format version */
+            encV: number;
+            /** @description The version this change was made on; null creates the record */
+            baseVersion: number | null;
+            /** @description The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted */
+            body: string | null;
+        };
+        KeyWrap: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            ref: string | null;
+            keyV: number;
+            /** @description base64url without padding */
+            wrapped: string;
+            /** @description base64url without padding */
+            publicKey: string | null;
+            label: string | null;
+            createdAt: string;
+            lastUsedAt: string | null;
+        };
+        KeyWraps: {
+            wraps: components["schemas"]["KeyWrap"][];
+        };
+        PutKeyWrap: {
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            /** @description The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery` */
+            ref?: string | null;
+            /** @description The data key version this wraps */
+            keyV: number;
+            /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
+            wrapped: string;
+            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            publicKey?: string | null;
+            /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
+            label?: string | null;
+        };
+        RotateKeys: {
+            /** @description The new key version: current + 1 */
+            keyV: number;
+            wraps: components["schemas"]["RotatedKeyWrap"][];
+        };
+        RotatedKeyWrap: {
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
+            id: string;
+            /** @enum {string} */
+            kind: "passkey" | "recovery" | "device" | "assistant";
+            /** @description The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery` */
+            ref?: string | null;
+            /** @description The data key version this wraps */
+            keyV: number;
+            /** @description The wrapped data key, base64url without padding, 1–1024 bytes decoded */
+            wrapped: string;
+            /** @description `device` only, and required there: its X25519 public key, 32 bytes, base64url */
+            publicKey?: string | null;
+            /** @description Shown in Settings ("Pixel 9", "Firefox on Mac") */
+            label?: string | null;
+        };
+        PairingStarted: {
+            /** Format: uuid */
+            id: string;
+            /** @description 8 Crockford base32 characters for the person to type */
+            code: string;
+            expiresAt: string;
+        };
+        StartPairing: {
+            /** @description The new device's ephemeral X25519 public key, 32 bytes, base64url */
+            publicKey: string;
+        };
+        PairingFound: {
+            /** Format: uuid */
+            id: string;
+            /** @description base64url without padding */
+            publicKey: string;
+            expiresAt: string;
+        };
+        SealPairing: {
+            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded */
+            sealed: string;
+        };
+        PairingPickup: {
+            /** @description base64url; null until the other device seals */
+            sealed: string | null;
         };
     };
     responses: never;
@@ -3000,6 +3289,401 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    pullRecords: {
+        parameters: {
+            query?: {
+                since?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PulledRecords"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    pushRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushRecords"];
+            };
+        };
+        responses: {
+            /** @description One result per change, in request order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushResults"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getAssistantWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The assistant's wrap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWrap"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listKeyWraps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wraps */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWraps"];
+                };
+            };
+        };
+    };
+    putKeyWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID in lower case */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutKeyWrap"];
+            };
+        };
+        responses: {
+            /** @description The stored wrap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWrap"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteKeyWrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID in lower case */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    rotateKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateKeys"];
+            };
+        };
+        responses: {
+            /** @description The new wraps */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyWraps"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    findPairing: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingFound"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartPairing"];
+            };
+        };
+        responses: {
+            /** @description The request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingStarted"];
+                };
+            };
+            /** @description Problem */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    sealPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SealPairing"];
+            };
+        };
+        responses: {
+            /** @description Sealed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    takePairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sealed key, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingPickup"];
+                };
             };
             /** @description Problem */
             404: {

@@ -59,6 +59,12 @@ Serializers _$serializers =
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
           ..add(ImportStatsRejectedInner.serializer)
+          ..add(KeyWrap.serializer)
+          ..add(KeyWrapKindEnum.serializer)
+          ..add(KeyWraps.serializer)
+          ..add(PairingFound.serializer)
+          ..add(PairingPickup.serializer)
+          ..add(PairingStarted.serializer)
           ..add(PasskeyAssertion.serializer)
           ..add(PasskeyAssertionAuthenticatorAttachmentEnum.serializer)
           ..add(PasskeyAssertionResponse.serializer)
@@ -69,13 +75,32 @@ Serializers _$serializers =
           ..add(Problem.serializer)
           ..add(ProblemErrorsInner.serializer)
           ..add(Profile.serializer)
+          ..add(PulledRecords.serializer)
+          ..add(PushApplied.serializer)
+          ..add(PushConflict.serializer)
+          ..add(PushRecords.serializer)
+          ..add(PushRejected.serializer)
+          ..add(PushRejectedErrorEnum.serializer)
+          ..add(PushResult.serializer)
+          ..add(PushResults.serializer)
+          ..add(PutKeyWrap.serializer)
+          ..add(PutKeyWrapKindEnum.serializer)
           ..add(Recurrence.serializer)
           ..add(RecurrenceFrequencyEnum.serializer)
           ..add(ReviewTransactions.serializer)
+          ..add(RotateKeys.serializer)
+          ..add(RotatedKeyWrap.serializer)
+          ..add(RotatedKeyWrapKindEnum.serializer)
+          ..add(SealPairing.serializer)
           ..add(SetBudget.serializer)
+          ..add(StartPairing.serializer)
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
           ..add(SummaryCategoriesInnerStateEnum.serializer)
+          ..add(SyncChange.serializer)
+          ..add(SyncChangeTypeEnum.serializer)
+          ..add(SyncRecord.serializer)
+          ..add(SyncRecordTypeEnum.serializer)
           ..add(Transaction.serializer)
           ..add(TransactionCaptureSourceEnum.serializer)
           ..add(TransactionList.serializer)
@@ -131,6 +156,10 @@ Serializers _$serializers =
             () => ListBuilder<CreateTransaction>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(KeyWrap)]),
+            () => ListBuilder<KeyWrap>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [
               const FullType(PasskeyRequestOptionsAllowCredentialsInner),
             ]),
@@ -146,6 +175,14 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(ProblemErrorsInner)]),
             () => ListBuilder<ProblemErrorsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(PushResult)]),
+            () => ListBuilder<PushResult>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RotatedKeyWrap)]),
+            () => ListBuilder<RotatedKeyWrap>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),
@@ -180,6 +217,14 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SummaryCategoriesInner)]),
             () => ListBuilder<SummaryCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SyncChange)]),
+            () => ListBuilder<SyncChange>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SyncRecord)]),
+            () => ListBuilder<SyncRecord>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Transaction)]),

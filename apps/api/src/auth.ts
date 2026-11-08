@@ -9,6 +9,7 @@ import {
   categories,
   emailThrottle,
   oauthRefreshToken,
+  passkey as passkeyTable,
   schema,
   user as userTable,
   verification,
@@ -24,6 +25,13 @@ import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
 import { clientHeader } from "./http/client-headers.ts";
 import { stampGuestActivity } from "./services/guest-cleanup.ts";
+import { deletePasskeyWraps } from "./services/keys.ts";
+
+/**
+ * The passkey a `/passkey/delete-passkey` request is deleting, from its before hook to its after
+ * hook, keyed by that request's auth context (one object per request, shared by both hooks).
+ */
+const passkeysBeingDeleted = new WeakMap<object, { userId: string; credentialId: string }>();
 
 export const OAUTH_SCOPES = ["finance:read", "finance:write", "offline_access"] as const;
 /** An assistant's access token lives 15 minutes; revoking it leaves at most that much access. */
@@ -403,6 +411,19 @@ export function createAuth(deps: AppDeps) {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // Deleting a passkey deletes its wrap of the data key (spec 2026-11-08 section 5.2). The
+        // row is gone after the endpoint, so its credential id is read here and the wrap is
+        // deleted by the after hook, only when the delete succeeded.
+        if (ctx.path === "/passkey/delete-passkey") {
+          const id = (ctx.body as { id?: unknown } | undefined)?.id;
+          if (typeof id !== "string") return;
+          const [found] = await deps.db
+            .select({ userId: passkeyTable.userId, credentialId: passkeyTable.credentialID })
+            .from(passkeyTable)
+            .where(eq(passkeyTable.id, id));
+          if (found) passkeysBeingDeleted.set(ctx.context, found);
+          return;
+        }
         // Guest sign-up is open whatever the allowlist says (spec §4.1); only GUEST_SIGNUP closes it.
         if (ctx.path === "/sign-in/anonymous") {
           if (config.GUEST_SIGNUP === false) throw guestSignupDisabled();
@@ -430,6 +451,20 @@ export function createAuth(deps: AppDeps) {
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/passkey/delete-passkey") {
+          const deleted = passkeysBeingDeleted.get(ctx.context);
+          passkeysBeingDeleted.delete(ctx.context);
+          const returned = ctx.context.returned as { status?: unknown } | undefined;
+          const owner = ctx.context.session?.user.id;
+          // The endpoint checked the passkey is the session's; a refused delete returns an error.
+          if (!deleted || returned?.status !== true || owner !== deleted.userId) return;
+          // Not in the passkey delete's transaction (Better Auth's adapter runs its own): between
+          // the two statements, or if this one fails, the wrap outlives its passkey. It then opens
+          // nothing (the passkey can no longer sign in to give its PRF), and the person can still
+          // delete it with DELETE /v2/keys/{id}.
+          await deletePasskeyWraps(deps.db, deleted.userId, [deleted.credentialId]);
+          return;
+        }
         // A guest cannot connect an assistant (main spec, Guest mode): the consent screen offers to
         // save their progress instead. Checked after the endpoint, the only point where a bearer
         // session is resolved; the code it minted is never handed out, and the API would refuse a

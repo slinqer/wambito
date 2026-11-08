@@ -24,6 +24,19 @@ The app still talks about money the Colombian way: in Colombia we call money **l
 - **Connect your assistant:** an MCP server so you can ask your AI to log expenses, prepare reports, or adjust your budget.
 - **No passwords:** sign in with a magic link or a code sent to your email, or with a passkey.
 
+## Coming: end-to-end encryption
+
+🚧 **In progress, not active yet.** Today your data travels encrypted (HTTPS) and the backups are encrypted, but the server can read your movements. We are changing that before the public release in Google Play and F-Droid:
+
+How it will work:
+
+| | | | | |
+|:-:|:-:|:-:|:-:|:-:|
+| <img src="docs/brand/e2e/wambi-e2e-step1.webp" alt="Wambi locks receipts and coins in a chest on the phone; the key hangs from the phone." width="160"> | <img src="docs/brand/e2e/wambi-e2e-step2.webp" alt="The locked chest travels between clouds; a snooper with a magnifying glass sees only scribbles." width="160"> | <img src="docs/brand/e2e/wambi-e2e-step3.webp" alt="A server shelf full of locked chests, with no key." width="160"> | <img src="docs/brand/e2e/wambi-e2e-step4.webp" alt="A fingerprint touch opens the chest on a laptop; a recovery card is the other way in." width="160"> | <img src="docs/brand/e2e/wambi-e2e-step5.webp" alt="After the person taps allow, Wambi lends a temporary key to an assistant robot; when it is disconnected, Wambi changes the lock." width="160"> |
+| **Locked on your device.** Each phone or browser will encrypt your movements with a key only you hold. | **Unreadable on the way.** Anyone in the middle will see scribbles. | **The server will keep chests, not keys.** It will store and sync encrypted records; its database and backups will reveal no name, amount or note. | **Your key will open it anywhere.** A passkey touch, your recovery key, or approval from another of your devices. | **Assistants only if you say so.** Connecting Claude or ChatGPT will lend them a key while connected; disconnecting will change the lock. |
+
+What the server will still see: your email, how many records you have and when they change. Losing every passkey **and** the recovery key means losing the data: nobody else can open it, not even us. The design is in [`docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md`](docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md).
+
 ## Status
 
 🚧 In development. Stage 1 (backend: API, auth, Budge import) is built; web, mobile (Android and iOS), MCP and celebrations (streaks, achievements) come next. The design is in [`docs/superpowers/specs/2026-10-20-lukas-design.md`](docs/superpowers/specs/2026-10-20-lukas-design.md).

@@ -22,6 +22,9 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
   moved to the bootstrap in part 2b).
 - `admin_audit` is append-only: the app role has no UPDATE/DELETE on it, `grantAppRole` revokes them
   (only when the table exists, so a restore drill on a dump from before 0008 still grants).
+- `records`, `key_wraps`, `pairing_requests` (0010) are the end-to-end encrypted store: `body`/`wrapped`
+  are opaque `bytea` (the `bytea` custom type gives `Uint8Array`); `records.version` comes from
+  `records_version_seq`, raised on every write with `set version = nextval('records_version_seq')`.
 - In production `docker compose run --rm migrate` (`deploy/personal/up.sh`) runs bootstrap +
   migrations.
 

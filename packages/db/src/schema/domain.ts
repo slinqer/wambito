@@ -3,6 +3,8 @@ import {
   bigint,
   boolean,
   char,
+  check,
+  customType,
   date,
   index,
   integer,
@@ -10,6 +12,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -17,6 +20,13 @@ import {
 } from "drizzle-orm/pg-core";
 import { v7 as uuidv7 } from "uuid";
 import { session, user } from "./auth.ts";
+
+/** Postgres `bytea` as a plain `Uint8Array` (the driver hands back a Buffer; it is copied out). */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+  fromDriver: (value) => new Uint8Array(value),
+  toDriver: (value) => value,
+});
 
 const id = () =>
   uuid("id")
@@ -262,6 +272,68 @@ export const emailChange = pgTable("email_change", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+/**
+ * End-to-end encrypted records (spec 2026-11-08 section 5.1). The server stores `body` as opaque
+ * bytes. `id` is made by the client; `version` comes from `records_version_seq` and is raised on
+ * every write with `set version = nextval('records_version_seq')`.
+ */
+export const records = pgTable(
+  "records",
+  {
+    id: uuid("id").primaryKey(),
+    userId: userId(),
+    type: text("type").notNull(),
+    version: bigint("version", { mode: "number" })
+      .notNull()
+      .default(sql`nextval('records_version_seq')`),
+    deleted: boolean("deleted").notNull().default(false),
+    keyV: smallint("key_v").notNull(),
+    encV: smallint("enc_v").notNull(),
+    body: bytea("body"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("records_user_version").on(t.userId, t.version),
+    check("records_deleted_body", sql`${t.deleted} = (${t.body} is null)`),
+  ],
+);
+
+/** Copies of the data key wrapped by a passkey, the recovery key, a device or an assistant. */
+export const keyWraps = pgTable(
+  "key_wraps",
+  {
+    id: id(),
+    userId: userId(),
+    kind: text("kind").notNull(),
+    ref: text("ref"),
+    keyV: smallint("key_v").notNull(),
+    wrapped: bytea("wrapped").notNull(),
+    publicKey: bytea("public_key"),
+    label: text("label"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [
+    check("key_wraps_kind", sql`${t.kind} in ('passkey', 'recovery', 'device', 'assistant')`),
+    uniqueIndex("key_wraps_one_recovery").on(t.userId).where(sql`${t.kind} = 'recovery'`),
+    uniqueIndex("key_wraps_ref").on(t.userId, t.kind, t.ref).where(sql`${t.ref} is not null`),
+  ],
+);
+
+/** A new device waiting to be approved by a signed-in one. */
+export const pairingRequests = pgTable(
+  "pairing_requests",
+  {
+    id: id(),
+    userId: userId(),
+    code: text("code").notNull(),
+    publicKey: bytea("public_key").notNull(),
+    sealed: bytea("sealed"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex("pairing_requests_code").on(t.userId, t.code)],
+);
+
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [
   "accounts",
@@ -272,4 +344,7 @@ export const RLS_TABLES = [
   "transactions",
   "merchant_categories",
   "idempotency_keys",
+  "records",
+  "key_wraps",
+  "pairing_requests",
 ] as const;

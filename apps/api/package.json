@@ -21,6 +21,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@simplewebauthn/server": "13.3.3",
     "@wambito/core": "workspace:*",
+    "@wambito/crypto": "workspace:*",
     "@wambito/db": "workspace:*",
     "@wambito/importers": "workspace:*",
     "better-auth": "^1.7.11",

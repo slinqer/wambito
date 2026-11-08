@@ -1,0 +1,17 @@
+{
+  "name": "@wambito/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "vectors": "node --experimental-strip-types scripts/gen-vectors.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0"
+  }
+}
