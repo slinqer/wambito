@@ -12,6 +12,10 @@ import { expect, type Page, test } from "@playwright/test";
 
 const SITE = process.env.VITE_SITE_URL ?? "https://landing-only.example.test";
 const APP = process.env.VITE_APP_URL ?? "https://app.example.test";
+/** The Android download: the arm64 APK of the mobile release. */
+const ANDROID_APK_HREF =
+  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.1/wambito-1.0.1-arm64-v8a.apk";
+
 const CLIENT = fileURLToPath(new URL("../build/client/", import.meta.url));
 
 const LOCALES = [
@@ -24,7 +28,9 @@ const LOCALES = [
     webCta: "Empezar",
     webTitle: "En la web",
     soon: "Pronto",
-    others: ["App para Android y iOS", "Con tu IA"],
+    androidTitle: "App para Android y iOS",
+    androidCta: "Descargar para Android",
+    others: ["Con tu IA"],
     closingBody:
       "Crea tu cuenta con tu correo en menos de un minuto. Wambito se encarga de que sea divertido.",
     comingSoon: [/Muy pronto/, /Síguelo en GitHub/, /en construcción/],
@@ -39,7 +45,9 @@ const LOCALES = [
     webCta: "Start",
     webTitle: "On the web",
     soon: "Soon",
-    others: ["Android & iOS app", "With your AI"],
+    androidTitle: "Android & iOS app",
+    androidCta: "Download for Android",
+    others: ["With your AI"],
     closingBody:
       "Create your account with your email in under a minute. Wambito takes care of making it fun.",
     comingSoon: [/Coming soon/, /Follow on GitHub/, /being built in the open/],
@@ -107,7 +115,7 @@ for (const l of LOCALES) {
       await expect(nav.getByRole("button").last()).toBeVisible();
     });
 
-    test("the web card is a link to the app, not a badge; the other cards stay soon", async ({
+    test("the web card is a link to the app, not a badge; Android downloads the APK, the AI card stays soon", async ({
       page,
     }) => {
       await page.goto(l.path);
@@ -120,6 +128,12 @@ for (const l of LOCALES) {
         await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
         await expect(card.getByRole("link")).toHaveCount(0);
       }
+      const android = ways.filter({ has: page.getByRole("heading", { name: l.androidTitle }) });
+      await expect(android.getByRole("link", { name: l.androidCta, exact: true })).toHaveAttribute(
+        "href",
+        ANDROID_APK_HREF,
+      );
+      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(0);
     });
 
     test("nothing still says coming soon, and no link points at GitHub's 'follow' CTA", async ({

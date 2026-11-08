@@ -177,7 +177,10 @@
       },
       "mobile": {
         "title": "Android & iOS app",
-        "body": "With a widget to log an expense without opening the app."
+        "body": "With a widget to log an expense without opening the app.",
+        "cta": "Download for Android",
+        "other": "Other versions",
+        "ios": "On iOS, soon."
       },
       "ai": {
         "title": "With your AI",
