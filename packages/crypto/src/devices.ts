@@ -1,4 +1,5 @@
 import { x25519 } from "@noble/curves/ed25519.js";
+import { timingSafeEqual } from "./bytes.ts";
 import { CryptoError } from "./errors.ts";
 import { assertBytes, NONCE_BYTES, randomNonce } from "./validate.ts";
 import {
@@ -99,27 +100,32 @@ async function ecdh(privateKey: DevicePrivateKey, publicKey: Uint8Array): Promis
   );
 }
 
-/** Sealed = ephemeral public key (32) || nonce (12) || AES-256-GCM ciphertext and tag. */
+/**
+ * Sealed = ephemeral public key (32) || nonce (12) || AES-256-GCM ciphertext and tag. The ephemeral
+ * pair is made here unless the caller passes one (pairing: the approver's key behind the number).
+ */
 export async function sealToDevice(
   publicKey: Uint8Array,
   ctx: WrapContext,
   dataKey: Uint8Array,
+  ephemeral?: { publicKey: Uint8Array; privateKey: DevicePrivateKey },
 ): Promise<Uint8Array> {
   assertBytes(publicKey, KEY_BYTES, "public key");
   assertBytes(dataKey, 32, "data key");
   assertWrapContext(ctx);
   if (ctx.kind !== "device") throw new CryptoError("bad_input", "kind must be device");
   const aad = wrapAssociatedData(ctx);
-  const ephemeral = await generateDeviceKeyPair();
+  if (ephemeral) assertBytes(ephemeral.publicKey, KEY_BYTES, "ephemeral public key");
+  const eph = ephemeral ?? (await generateDeviceKeyPair());
   let shared: Uint8Array;
   try {
-    shared = await ecdh(ephemeral.privateKey, publicKey);
+    shared = await ecdh(eph.privateKey, publicKey);
   } catch {
     throw new CryptoError("bad_input", "not a valid public key");
   }
   const sealed = await gcmSeal(await deriveWrapKey(shared, "device"), aad, dataKey, randomNonce());
   const out = new Uint8Array(KEY_BYTES + sealed.length);
-  out.set(ephemeral.publicKey);
+  out.set(eph.publicKey);
   out.set(sealed, KEY_BYTES);
   return out;
 }
@@ -146,4 +152,21 @@ export async function openFromDevice(
     if (e instanceof CryptoError && e.code === "bad_input") throw e;
     throw new CryptoError("cannot_open");
   }
+}
+
+/**
+ * `openFromDevice` for pairing: refuses (`cannot_open`) a blob whose first 32 bytes, the ephemeral
+ * key, are not the approver key both devices saw behind the number.
+ */
+export async function openFromPairing(
+  privateKey: DevicePrivateKey,
+  ctx: WrapContext,
+  sealed: Uint8Array,
+  approverKey: Uint8Array,
+): Promise<Uint8Array> {
+  assertBytes(approverKey, KEY_BYTES, "approver key");
+  if (!(sealed instanceof Uint8Array)) throw new CryptoError("bad_input", "sealed must be bytes");
+  if (!timingSafeEqual(sealed.slice(0, KEY_BYTES), approverKey))
+    throw new CryptoError("cannot_open");
+  return openFromDevice(privateKey, ctx, sealed);
 }

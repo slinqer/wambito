@@ -8,12 +8,12 @@ part of 'start_pairing.dart';
 
 class _$StartPairing extends StartPairing {
   @override
-  final String publicKey;
+  final String commitment;
 
   factory _$StartPairing([void Function(StartPairingBuilder)? updates]) =>
       (StartPairingBuilder()..update(updates))._build();
 
-  _$StartPairing._({required this.publicKey}) : super._();
+  _$StartPairing._({required this.commitment}) : super._();
   @override
   StartPairing rebuild(void Function(StartPairingBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -24,29 +24,29 @@ class _$StartPairing extends StartPairing {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is StartPairing && publicKey == other.publicKey;
+    return other is StartPairing && commitment == other.commitment;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, publicKey.hashCode);
+    _$hash = $jc(_$hash, commitment.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(r'StartPairing')..add('publicKey', publicKey)).toString();
+    return (newBuiltValueToStringHelper(r'StartPairing')..add('commitment', commitment)).toString();
   }
 }
 
 class StartPairingBuilder implements Builder<StartPairing, StartPairingBuilder> {
   _$StartPairing? _$v;
 
-  String? _publicKey;
-  String? get publicKey => _$this._publicKey;
-  set publicKey(String? publicKey) => _$this._publicKey = publicKey;
+  String? _commitment;
+  String? get commitment => _$this._commitment;
+  set commitment(String? commitment) => _$this._commitment = commitment;
 
   StartPairingBuilder() {
     StartPairing._defaults(this);
@@ -55,7 +55,7 @@ class StartPairingBuilder implements Builder<StartPairing, StartPairingBuilder> 
   StartPairingBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _publicKey = $v.publicKey;
+      _commitment = $v.commitment;
       _$v = null;
     }
     return this;
@@ -78,7 +78,11 @@ class StartPairingBuilder implements Builder<StartPairing, StartPairingBuilder> 
     final _$result =
         _$v ??
         _$StartPairing._(
-          publicKey: BuiltValueNullFieldError.checkNotNull(publicKey, r'StartPairing', 'publicKey'),
+          commitment: BuiltValueNullFieldError.checkNotNull(
+            commitment,
+            r'StartPairing',
+            'commitment',
+          ),
         );
     replace(_$result);
     return _$result;

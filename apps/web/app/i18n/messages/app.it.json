@@ -170,7 +170,13 @@
   "errors": {
     "record_limit": "Questo account ha raggiunto il limite di registri salvati.",
     "key_version_mismatch": "La versione della chiave dati è cambiata. Aggiorna e riprova.",
+    "attestation_required": "Alla chiave di questo dispositivo manca la sua prova. Rimuovi il dispositivo e aggiungilo di nuovo.",
+    "resync_required": "Alcuni elementi eliminati sono stati ripuliti sul server. I tuoi dati vengono scaricati di nuovo.",
     "already_sealed": "Questa richiesta è già stata approvata.",
+    "already_set": "Questo passaggio è già stato eseguito per questa richiesta.",
+    "not_ready": "L'altro dispositivo non è ancora pronto. Aspetta un momento e riprova.",
+    "commitment_mismatch": "La chiave del nuovo dispositivo non corrisponde a quella inviata all'inizio. Ricomincia l'abbinamento.",
+    "approver_mismatch": "L'approvazione non proviene dalla chiave di questo dispositivo. Ricomincia l'abbinamento.",
     "id_taken": "Impossibile salvare questo elemento. Riprova.",
     "payload_too_large": "È troppo da inviare in una volta.",
     "recovery_required": "La chiave di recupero non può essere rimossa, solo sostituita.",

@@ -138,3 +138,31 @@ release_sha256() {
     shasum -a 256 "$1" | cut -d' ' -f1
   fi
 }
+
+# --- The Play bundle (release.sh --play, docs/mobile/release.md "The Play bundle") ---------------
+# The AAB takes the universal digit: base * 10 + 0, below the same release's split APKs and above
+# every earlier release's.
+
+# release_aab_name <versionName>: the signed bundle's file name.
+release_aab_name() {
+  [ -n "${1:-}" ] || { echo "release_aab_name needs a versionName" >&2; return 1; }
+  echo "wambito-$1.aab"
+}
+
+# release_aab_base_apk <aab> <out.apk>: the bundle's base manifest and resource table, at the root of
+# a zip: a proto-format APK, which `aapt2 dump badging|permissions` read like any APK (no bundletool).
+release_aab_base_apk() {
+  local work
+  work="$(mktemp -d)"
+  if ! unzip -q -o "${1:-}" base/manifest/AndroidManifest.xml base/resources.pb -d "$work" 2>/dev/null; then
+    rm -rf "$work"
+    echo "not an app bundle (no base/manifest/AndroidManifest.xml and base/resources.pb): ${1:-}" >&2
+    return 1
+  fi
+  rm -f "${2:-}"
+  mv "$work/base/manifest/AndroidManifest.xml" "$work/base/resources.pb" "$work/"
+  local ok=0
+  (cd "$work" && zip -q -X base.apk AndroidManifest.xml resources.pb) && mv "$work/base.apk" "${2:-}" || ok=1
+  rm -rf "$work"
+  return "$ok"
+}

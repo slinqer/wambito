@@ -168,5 +168,32 @@ expect_fail "pubspec with the right name, wrong code" bash -c "source '$HERE/rel
 expect_fail "pubspec with no version line" bash -c "source '$HERE/release-lib.sh'; printf 'name: wambito\n' >'$pubspec_dir/none.yaml'; release_check_pubspec mobile-v1.2.3 '$pubspec_dir/none.yaml'"
 expect "the committed pubspec is at the dev version" "0.0.0-dev+1" "$(release_pubspec_version "$HERE/../pubspec.yaml")"
 
+# --- the Play bundle (release.sh --play) ------------------------------------------------------------
+# The AAB takes the scheme's universal digit: base * 10 + 0.
+expect "aab name" "wambito-1.0.1.aab" "$(release_aab_name 1.0.1)"
+expect "aab name of a dev build" "wambito-0.0.0-dev.abc1234.aab" "$(release_aab_name 0.0.0-dev.abc1234)"
+expect_fail "aab name empty" release_aab_name ""
+expect "aab code 1.0.1" "100010" "$(release_version_code mobile-v1.0.1 universal)"
+# The next release's AAB outranks this release's APKs: someone on the founder's APK moves to Play then.
+checks=$((checks + 1))
+if [ "$(release_version_code mobile-v1.0.2 universal)" -le "$(release_version_code mobile-v1.0.1 arm64-v8a)" ]; then
+  echo "FAIL the next release's AAB must outrank this release's arm64 APK"
+  failures=$((failures + 1))
+fi
+
+# The bundle's base module as a proto-format APK, which aapt2 reads (badging, permissions) like any APK.
+work="$(mktemp -d)"
+mkdir -p "$work/aab/base/manifest" "$work/aab/base/dex"
+printf 'manifest' >"$work/aab/base/manifest/AndroidManifest.xml"
+printf 'table' >"$work/aab/base/resources.pb"
+printf 'code' >"$work/aab/base/dex/classes.dex"
+(cd "$work/aab" && zip -q -r ../app.aab base)
+release_aab_base_apk "$work/app.aab" "$work/base.apk" >/dev/null 2>&1
+expect "base apk made" "0" "$?"
+expect "base apk entries" "AndroidManifest.xml resources.pb" "$(unzip -Z1 "$work/base.apk" 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')"
+expect "base apk manifest is the bundle's" "manifest" "$(unzip -p "$work/base.apk" AndroidManifest.xml 2>/dev/null)"
+expect_fail "not a bundle" release_aab_base_apk "$work/base.apk" "$work/other.apk"
+rm -rf "$work"
+
 echo "$((checks - failures))/$checks checks passed"
 [ "$failures" -eq 0 ]

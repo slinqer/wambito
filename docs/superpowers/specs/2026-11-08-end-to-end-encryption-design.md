@@ -439,3 +439,7 @@ Also for stage 2:
 - A device offline for more than 180 days gets no signal that tombstones were purged: it does a
   full resync when its last pull is older than 170 days.
 - The sealed pairing blob should carry `keyV` with the data key.
+
+**Settled by stage 1b.** All four items are designed and built in
+`docs/superpowers/specs/2026-11-08-e2e-stage-1b-design.md`, which replaces section 7.3 and the
+170-day rule above.

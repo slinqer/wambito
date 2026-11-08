@@ -7,9 +7,13 @@ import { x25519 } from "@noble/curves/ed25519.js";
 import {
   toBase64Url as b64,
   deriveRecordKeys,
+  deviceAttestation,
   formatRecoveryKey,
+  importDevicePrivateKey,
+  pairingCommitment,
   pairingNumber,
   sealRecord,
+  sealToDevice,
   wrapDataKey,
 } from "../src/index.ts";
 import { dedupeTag } from "../src/records.ts";
@@ -170,6 +174,72 @@ for (const [a, c] of [
   pairing.push({ a: b64(a), b: b64(c), number: await pairingNumber(a, c) });
 }
 
+// Pairing with a commitment: N is the new device, A the approver's ephemeral pair. `sealed` comes
+// from the public sealToDevice with A as the given ephemeral key; its nonce is random, so the file
+// stores one fixed result made here with a fixed nonce (same bytes as sealToDevice would produce).
+const approvalInputs = [
+  {
+    newPriv: fixed(0xd0, 32),
+    approverPriv: fixed(0xe0, 32),
+    nonce: fixed(0x04, 12),
+    dataKey: dataKeyA,
+    ctx: { kind: "device", userId: USER, keyV: 1 },
+  },
+  {
+    newPriv: fixed(0x05, 32),
+    approverPriv: fixed(0x15, 32),
+    nonce: fixed(0x24, 12),
+    dataKey: dataKeyB,
+    ctx: { kind: "device", userId: USER_2, keyV: 4 },
+  },
+] as const;
+const approvals = [];
+for (const p of approvalInputs) {
+  const newPub = x25519.getPublicKey(p.newPriv);
+  const approverPub = x25519.getPublicKey(p.approverPriv);
+  const inner = await gcmSeal(
+    await deriveWrapKey(x25519.getSharedSecret(p.approverPriv, newPub), "device"),
+    wrapAssociatedData(p.ctx),
+    p.dataKey,
+    p.nonce,
+  );
+  const sealed = new Uint8Array(32 + inner.length);
+  sealed.set(approverPub);
+  sealed.set(inner, 32);
+  // The public API with a given ephemeral must agree on everything but the random nonce.
+  const viaApi = await sealToDevice(newPub, p.ctx, p.dataKey, {
+    publicKey: approverPub,
+    privateKey: await importDevicePrivateKey(p.approverPriv),
+  });
+  if (b64(viaApi.slice(0, 32)) !== b64(approverPub)) throw new Error("ephemeral not used");
+  approvals.push({
+    newPrivateKey: b64(p.newPriv),
+    newPublicKey: b64(newPub),
+    commitment: b64(await pairingCommitment(newPub)),
+    approverPrivateKey: b64(p.approverPriv),
+    approverPublicKey: b64(approverPub),
+    number: await pairingNumber(newPub, approverPub),
+    ctx: p.ctx,
+    sealed: b64(sealed),
+    dataKey: b64(p.dataKey),
+  });
+}
+
+const attestationInputs = [
+  { dataKey: dataKeyA, userId: USER, wrapId: ID_1, publicKey: keyA },
+  { dataKey: dataKeyB, userId: USER_2, wrapId: ID_3, publicKey: keyB },
+];
+const attestations = [];
+for (const a of attestationInputs) {
+  attestations.push({
+    dataKey: b64(a.dataKey),
+    userId: a.userId,
+    wrapId: a.wrapId,
+    publicKey: b64(a.publicKey),
+    attestation: b64(await deviceAttestation(a.dataKey, a)),
+  });
+}
+
 // Inputs every implementation must refuse.
 const okRecord = recordInputs[0];
 const okRecovery = recovery[0]?.text ?? "";
@@ -218,6 +288,15 @@ const rejects = [
     dataKey: b64(dataKeyA),
     code: "bad_input",
   },
+  {
+    name: "pairing blob sealed with a different ephemeral key than the approver key",
+    op: "openFromPairing",
+    privateKey: approvals[0]?.newPrivateKey,
+    ctx: approvals[0]?.ctx,
+    sealed: approvals[0]?.sealed,
+    approverKey: b64(keyA),
+    code: "cannot_open",
+  },
 ];
 
 const out = {
@@ -228,6 +307,8 @@ const out = {
   recovery,
   devices,
   pairing,
+  approvals,
+  attestations,
   rejects,
 };
 writeFileSync(

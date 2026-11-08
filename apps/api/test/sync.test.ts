@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { records } from "@wambito/db";
-import { sql } from "@wambito/db/orm";
+import { recordPurges, records } from "@wambito/db";
+import { eq, sql } from "@wambito/db/orm";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import type { SyncHooks } from "../src/deps.ts";
 import { purgeTombstones } from "../src/services/sync.ts";
@@ -411,6 +411,85 @@ describe("/v2/sync", () => {
     expect(ids).toContain(recent);
     expect(ids).toContain(oldLive);
     expect(ids).toHaveLength(before - 1);
+  });
+
+  test("a purge makes older cursors resync, never a full download or a current cursor", async () => {
+    const { headers, userId } = await t.signIn(`purge-${randomUUID()}@wambito.test`);
+    const now = new Date("2026-11-08T12:00:00Z");
+    const old = randomUUID();
+    const keep = randomUUID();
+    await push(headers, [create("keep", { id: keep })]);
+    await t.admin.execute(sql`insert into ${records}
+      (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+      (${old}, ${userId}, 'transaction', true, 1, 1, null, ${new Date(now.getTime() - 181 * 86_400_000).toISOString()}::timestamptz)`);
+    const purged = (await pullAll(headers)).find((r) => r.id === old)?.version ?? 0;
+    expect(purged).toBeGreaterThan(0);
+    const keepVersion = (await pullAll(headers)).find((r) => r.id === keep)?.version ?? 0;
+    expect(keepVersion).toBeGreaterThan(0);
+    expect(keepVersion).toBeLessThan(purged);
+    await push(headers, [create("later")]);
+
+    await purgeTombstones(t.db, now);
+    const [row] = await t.admin.select().from(recordPurges).where(eq(recordPurges.userId, userId));
+    expect(row?.throughVersion).toBe(purged);
+
+    const stale = await t.request("GET", `/v2/sync?since=${keepVersion}`, { headers });
+    expect(stale.status).toBe(410);
+    expect(stale.headers.get("content-type")).toContain("application/problem+json");
+    expect(await stale.json()).toMatchObject({ status: 410, code: "resync_required" });
+    expect((await t.request("GET", "/v2/sync?since=0", { headers })).status).toBe(200);
+    expect((await t.request("GET", `/v2/sync?since=${purged}`, { headers })).status).toBe(200);
+
+    // The mark only grows.
+    await t.admin.execute(sql`insert into ${records}
+      (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+      (${randomUUID()}, ${userId}, 'transaction', true, 1, 1, null, ${new Date(now.getTime() - 200 * 86_400_000).toISOString()}::timestamptz)`);
+    await purgeTombstones(t.db, now);
+    const [again] = await t.admin
+      .select()
+      .from(recordPurges)
+      .where(eq(recordPurges.userId, userId));
+    expect(again?.throughVersion).toBeGreaterThanOrEqual(purged);
+  });
+
+  test("a paged download from 0 completes past the purge mark; a stale base gets 410", async () => {
+    const { headers, userId } = await t.signIn(`paging-${randomUUID()}@wambito.test`);
+    const now = new Date("2026-11-08T12:00:00Z");
+    await push(headers, [create("p1"), create("p2"), create("p3")]);
+    await t.admin.execute(sql`insert into ${records}
+      (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+      (${randomUUID()}, ${userId}, 'transaction', true, 1, 1, null, ${new Date(now.getTime() - 181 * 86_400_000).toISOString()}::timestamptz)`);
+    await push(headers, [create("p4"), create("p5")]);
+    await purgeTombstones(t.db, now);
+    const [row] = await t.admin.select().from(recordPurges).where(eq(recordPurges.userId, userId));
+    const through = row?.throughVersion ?? 0;
+    expect(through).toBeGreaterThan(0);
+
+    // A full download paged one record at a time never sees 410, though later cursors are below
+    // the mark.
+    let since = 0;
+    let pages = 0;
+    for (;;) {
+      const res = await t.request("GET", `/v2/sync?since=${since}&limit=1&base=0`, { headers });
+      expect(res.status).toBe(200);
+      const page = (await res.json()) as { next: number | null };
+      pages++;
+      if (page.next === null) break;
+      since = page.next;
+    }
+    expect(pages).toBeGreaterThan(1);
+    // The same mid-download cursor with no base is its own base: stale.
+    const noBase = await t.request("GET", `/v2/sync?since=${through - 1}`, { headers });
+    expect(noBase.status).toBe(through > 1 ? 410 : 200);
+
+    // A stale base is refused even when the cursor is above the mark.
+    const stale = await t.request("GET", `/v2/sync?since=${through + 1}&base=1&limit=1`, {
+      headers,
+    });
+    expect(stale.status).toBe(410);
+    expect(await stale.json()).toMatchObject({ code: "resync_required" });
+    const ok = await t.request("GET", `/v2/sync?since=${through}&base=${through}`, { headers });
+    expect(ok.status).toBe(200);
   });
 
   test("no request body is logged", async () => {

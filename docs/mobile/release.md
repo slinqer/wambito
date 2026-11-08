@@ -120,6 +120,48 @@ gh release create mobile-vX.Y.Z --repo slinqer/wambito --verify-tag --latest \
 
 The notes are the `en-US` arm64 changelog, which APK to pick, and the certificate's SHA-256. Once the release is up, and not before (the link would 404), raise `ANDROID_VERSION` in `apps/web/app/features/landing/links.ts` and the two URLs in `apps/web/e2e/landing.spec.ts` and `landing-only-app.spec.ts`; merging that deploys the landing. Mark only `mobile-v*` releases as latest, never `voice-models-*`.
 
+## The Play bundle
+
+Google Play takes an Android App Bundle (AAB), not APKs. `release.sh --play` builds it in the same run, after the APKs, from the same commit:
+
+| | |
+|---|---|
+| file | `apps/mobile/dist/<versionName>/wambito-<versionName>.aab`, listed in `SHA256SUMS` |
+| versionCode | `base * 10 + 0`, the scheme's universal digit: `100010` for `mobile-v1.0.1` |
+| signed by | the **upload key**, with `jarsigner` (`apksigner` does not sign bundles) |
+
+Play App Signing re-signs what Play installs with the app key (alias `lukitas`), which the founder hands to Play once, encrypted with Play's PEPK tool (`docs/mobile/play.md`). So a phone with the APK from GitHub and a phone with the Play build carry the same signature, `ANDROID_CERT_SHA256` needs no new fingerprint for Play, and someone who installed the APK can later update from Play. The AAB's code is below its own release's split APKs (`100011`, `100012`) and above every earlier release's, so that move happens with the next release.
+
+The upload key is a second key, never the app key: `release.sh --play` refuses a bundle signed with the same certificate as the APKs (`the bundle is signed with the app key`). A lost or leaked upload key can be reset by the Play account owner; the app key cannot. Make it once, like the app key, and back it up the same way (password manager and offline copy):
+
+```sh
+export JAVA_HOME=~/development/jdk/jdk-17.0.21+9/Contents/Home
+"$JAVA_HOME/bin/keytool" -genkeypair \
+  -keystore ~/.wambito-signing/wambito-upload.p12 -storetype PKCS12 \
+  -alias upload -keyalg RSA -keysize 4096 -validity 10000 \
+  -dname "CN=Wambito upload, O=Slinqer S.A.S."
+chmod 600 ~/.wambito-signing/wambito-upload.p12
+```
+
+The build, in a real terminal (the `read -rs` lines keep the passwords out of the history), on the tagged release commit as above:
+
+```sh
+export PATH="$HOME/development/flutter/bin:$PATH"
+export WAMBITO_KEYSTORE=~/.wambito-signing/wambito-release.p12
+export WAMBITO_KEY_ALIAS=lukitas
+printf 'Keystore password: '; read -rs WAMBITO_KEYSTORE_PASSWORD; echo; export WAMBITO_KEYSTORE_PASSWORD
+export WAMBITO_UPLOAD_KEYSTORE=~/.wambito-signing/wambito-upload.p12
+export WAMBITO_UPLOAD_KEY_ALIAS=upload
+printf 'Upload keystore password: '; read -rs WAMBITO_UPLOAD_KEYSTORE_PASSWORD; echo; export WAMBITO_UPLOAD_KEYSTORE_PASSWORD
+apps/mobile/scripts/release.sh --play
+```
+
+`WAMBITO_UPLOAD_KEY_PASSWORD` is the upload key's own password, left unset for a PKCS12 keystore. The four upload variables are never printed, like the app key's. Without `--play` nothing changes: no bundle, and the upload variables are not needed.
+
+What `--play` adds: an unsigned `flutter build appbundle --release --target-platform android-arm,android-arm64` with the tag's version; `jarsigner` signs it and verifies it; the bundle's certificate must be the upload keystore's and not the APKs'; `aapt2` reads back the package, versionCode and versionName from the bundle's base module (repackaged as a proto-format APK, no bundletool needed), and its permissions go through `check-permissions.sh`. It writes `UPLOAD_CERT_SHA256.txt` next to the bundle: the upload certificate Play Console shows under App integrity must be this one.
+
+CI runs `release.sh --play` too, with two throwaway keys, after the plain run, and checks that the same key for both is refused.
+
 ## Reproducible builds
 
 `scripts/check-reproducible.sh` builds the unsigned release APKs twice from clean on the same commit and compares them with `sha256sum` (and `diffoscope`, if installed, when they differ); `--also-at <new dir>` adds a build from a fresh clone at another path. The result and what it means for F-Droid are in `fdroid.md`.

@@ -37,3 +37,16 @@ export async function pairingNumber(a: Uint8Array, b: Uint8Array): Promise<strin
   const n = new DataView(hash.buffer).getUint32(0) % 1_000_000;
   return String(n).padStart(6, "0");
 }
+
+/**
+ * The new device's commitment: SHA-256("wambito/v1/pairing-commit" || its public key). It sends this
+ * first and reveals the key last, so the server cannot choose the approver key after seeing it.
+ */
+export async function pairingCommitment(publicKey: Uint8Array): Promise<Uint8Array> {
+  assertBytes(publicKey, 32, "public key");
+  const label = new TextEncoder().encode("wambito/v1/pairing-commit");
+  const input = new Uint8Array(label.length + 32);
+  input.set(label);
+  input.set(publicKey, label.length);
+  return new Uint8Array(await subtle.digest("SHA-256", input));
+}

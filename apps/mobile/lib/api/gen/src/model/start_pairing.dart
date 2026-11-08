@@ -11,12 +11,12 @@ part 'start_pairing.g.dart';
 /// StartPairing
 ///
 /// Properties:
-/// * [publicKey] - The new device's ephemeral X25519 public key, 32 bytes, base64url
+/// * [commitment] - SHA-256(\"wambito/v1/pairing-commit\" || the new device's X25519 public key), 32 bytes, base64url
 @BuiltValue()
 abstract class StartPairing implements Built<StartPairing, StartPairingBuilder> {
-  /// The new device's ephemeral X25519 public key, 32 bytes, base64url
-  @BuiltValueField(wireName: r'publicKey')
-  String get publicKey;
+  /// SHA-256(\"wambito/v1/pairing-commit\" || the new device's X25519 public key), 32 bytes, base64url
+  @BuiltValueField(wireName: r'commitment')
+  String get commitment;
 
   StartPairing._();
 
@@ -41,8 +41,8 @@ class _$StartPairingSerializer implements PrimitiveSerializer<StartPairing> {
     StartPairing object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'publicKey';
-    yield serializers.serialize(object.publicKey, specifiedType: const FullType(String));
+    yield r'commitment';
+    yield serializers.serialize(object.commitment, specifiedType: const FullType(String));
   }
 
   @override
@@ -66,10 +66,10 @@ class _$StartPairingSerializer implements PrimitiveSerializer<StartPairing> {
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'publicKey':
+        case r'commitment':
           final valueDes =
               serializers.deserialize(value, specifiedType: const FullType(String)) as String;
-          result.publicKey = valueDes;
+          result.commitment = valueDes;
           break;
         default:
           unhandled.add(key);

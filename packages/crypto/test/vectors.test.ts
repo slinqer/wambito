@@ -4,17 +4,21 @@ import {
   CryptoError,
   dedupeTag,
   deriveRecordKeys,
+  deviceAttestation,
   formatRecoveryKey,
   fromBase64Url,
   importDevicePrivateKey,
   openFromDevice,
+  openFromPairing,
   openRecord,
+  pairingCommitment,
   pairingNumber,
   parseRecoveryKey,
   type RecordContext,
   sealRecord,
   toBase64Url,
   unwrapDataKey,
+  verifyDeviceAttestation,
   type WrapContext,
   wrapDataKey,
 } from "../src/index.ts";
@@ -47,6 +51,24 @@ const vectors = JSON.parse(
     dataKey: string;
   }[];
   pairing: { a: string; b: string; number: string }[];
+  approvals: {
+    newPrivateKey: string;
+    newPublicKey: string;
+    commitment: string;
+    approverPrivateKey: string;
+    approverPublicKey: string;
+    number: string;
+    ctx: WrapContext;
+    sealed: string;
+    dataKey: string;
+  }[];
+  attestations: {
+    dataKey: string;
+    userId: string;
+    wrapId: string;
+    publicKey: string;
+    attestation: string;
+  }[];
   rejects: Record<string, unknown>[];
 };
 
@@ -106,6 +128,27 @@ describe("shared test vectors", () => {
     }
   });
 
+  it("approvals: commitment, number, and the sealed blob open under the approver key", async () => {
+    expect(vectors.approvals.length).toBeGreaterThanOrEqual(2);
+    for (const p of vectors.approvals) {
+      expect(toBase64Url(await pairingCommitment(b(p.newPublicKey)))).toBe(p.commitment);
+      expect(await pairingNumber(b(p.newPublicKey), b(p.approverPublicKey))).toBe(p.number);
+      const key = await importDevicePrivateKey(b(p.newPrivateKey));
+      expect(await openFromPairing(key, p.ctx, b(p.sealed), b(p.approverPublicKey))).toEqual(
+        b(p.dataKey),
+      );
+    }
+  });
+
+  it("attestations: the HMAC is exact and verifies", async () => {
+    expect(vectors.attestations.length).toBeGreaterThanOrEqual(2);
+    for (const a of vectors.attestations) {
+      const input = { userId: a.userId, wrapId: a.wrapId, publicKey: b(a.publicKey) };
+      expect(toBase64Url(await deviceAttestation(b(a.dataKey), input))).toBe(a.attestation);
+      expect(await verifyDeviceAttestation(b(a.dataKey), input, b(a.attestation))).toBe(true);
+    }
+  });
+
   it("rejects: every input is refused with the expected code", async () => {
     for (const r of vectors.rejects as { op: string; code: string; [k: string]: any }[]) {
       let got = "none";
@@ -115,6 +158,13 @@ describe("shared test vectors", () => {
           await sealRecord(keys, r.ctx, r.value, b(r.nonce));
         } else if (r.op === "wrapDataKey") {
           await wrapDataKey(b(r.secret), r.ctx, b(r.dataKey), b(r.nonce));
+        } else if (r.op === "openFromPairing") {
+          await openFromPairing(
+            await importDevicePrivateKey(b(r.privateKey)),
+            r.ctx,
+            b(r.sealed),
+            b(r.approverKey),
+          );
         } else if (r.op === "parseRecoveryKey") {
           parseRecoveryKey(r.text);
         } else {

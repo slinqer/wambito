@@ -12,7 +12,7 @@ part 'pairing_found.g.dart';
 ///
 /// Properties:
 /// * [id]
-/// * [publicKey] - base64url without padding
+/// * [commitment] - base64url without padding
 /// * [expiresAt]
 @BuiltValue()
 abstract class PairingFound implements Built<PairingFound, PairingFoundBuilder> {
@@ -20,8 +20,8 @@ abstract class PairingFound implements Built<PairingFound, PairingFoundBuilder> 
   String get id;
 
   /// base64url without padding
-  @BuiltValueField(wireName: r'publicKey')
-  String get publicKey;
+  @BuiltValueField(wireName: r'commitment')
+  String get commitment;
 
   @BuiltValueField(wireName: r'expiresAt')
   String get expiresAt;
@@ -51,8 +51,8 @@ class _$PairingFoundSerializer implements PrimitiveSerializer<PairingFound> {
   }) sync* {
     yield r'id';
     yield serializers.serialize(object.id, specifiedType: const FullType(String));
-    yield r'publicKey';
-    yield serializers.serialize(object.publicKey, specifiedType: const FullType(String));
+    yield r'commitment';
+    yield serializers.serialize(object.commitment, specifiedType: const FullType(String));
     yield r'expiresAt';
     yield serializers.serialize(object.expiresAt, specifiedType: const FullType(String));
   }
@@ -83,10 +83,10 @@ class _$PairingFoundSerializer implements PrimitiveSerializer<PairingFound> {
               serializers.deserialize(value, specifiedType: const FullType(String)) as String;
           result.id = valueDes;
           break;
-        case r'publicKey':
+        case r'commitment':
           final valueDes =
               serializers.deserialize(value, specifiedType: const FullType(String)) as String;
-          result.publicKey = valueDes;
+          result.commitment = valueDes;
           break;
         case r'expiresAt':
           final valueDes =

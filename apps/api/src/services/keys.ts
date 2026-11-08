@@ -14,6 +14,7 @@ export interface KeyWrapDto {
   keyV: number;
   wrapped: string;
   publicKey: string | null;
+  attestation: string | null;
   label: string | null;
   createdAt: string;
   lastUsedAt: string | null;
@@ -26,6 +27,7 @@ export interface KeyWrapInput {
   keyV: number;
   wrapped: string;
   publicKey?: string | null;
+  attestation?: string | null;
   label?: string | null;
 }
 
@@ -41,6 +43,7 @@ export function toKeyWrap(row: KeyWrapRow): KeyWrapDto {
     keyV: row.keyV,
     wrapped: b64(row.wrapped),
     publicKey: row.publicKey === null ? null : b64(row.publicKey),
+    attestation: row.attestation === null ? null : b64(row.attestation),
     label: row.label,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
@@ -58,7 +61,7 @@ async function lockWraps(tx: Tx, userId: string): Promise<void> {
 }
 
 /** The account's current key version: the highest over its wraps; null when it has none. */
-async function currentKeyV(tx: Tx, userId: string): Promise<number | null> {
+export async function currentKeyV(tx: Tx, userId: string): Promise<number | null> {
   const [row] = await tx
     .select({ keyV: sql<number | null>`max(${keyWraps.keyV})` })
     .from(keyWraps)
@@ -103,8 +106,20 @@ const values = (userId: string, id: string, wrap: KeyWrapInput) => ({
   keyV: wrap.keyV,
   wrapped: bytes(wrap.wrapped),
   publicKey: wrap.publicKey == null ? null : bytes(wrap.publicKey),
+  attestation: wrap.attestation == null ? null : bytes(wrap.attestation),
   label: wrap.label ?? null,
 });
+
+/** A device wrap carries its public key and the attestation of it; the server cannot check it. */
+function checkAttestation(wrap: KeyWrapInput): void {
+  if (wrap.kind === "device" && (wrap.publicKey == null || wrap.attestation == null)) {
+    throw new ApiError(
+      422,
+      "attestation_required",
+      "A device wrap needs its public key and an attestation",
+    );
+  }
+}
 
 const keyVersionMismatch = (current: number, expected: number) =>
   new ApiError(
@@ -145,6 +160,7 @@ export async function putKeyWrap(
   id: string,
   wrap: KeyWrapInput,
 ): Promise<KeyWrapDto> {
+  checkAttestation(wrap);
   return withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
     const current = await currentKeyV(tx, userId);
@@ -219,6 +235,7 @@ export async function rotateKeys(
   if (wraps.filter((wrap) => wrap.kind === "recovery").length !== 1) {
     throw new ApiError(422, "recovery_required", "A rotation carries exactly one recovery wrap");
   }
+  for (const wrap of wraps) checkAttestation(wrap);
   return withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
     const current = await currentKeyV(tx, userId);

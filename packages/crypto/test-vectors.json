@@ -172,6 +172,54 @@
       "number": "013775"
     }
   ],
+  "approvals": [
+    {
+      "newPrivateKey": "0NHS09TV1tfY2drb3N3e3-Dh4uPk5ebn6Onq6-zt7u8",
+      "newPublicKey": "az7mdGNYPL49wI_p0HZcJmb_UhDdUnydhwXkSSfIDVU",
+      "commitment": "xfIVHjspFUYO9MgFmSQnw3aBY8LCcWAHpXPHMRVxzjI",
+      "approverPrivateKey": "4OHi4-Tl5ufo6err7O3u7_Dx8vP09fb3-Pn6-_z9_v8",
+      "approverPublicKey": "c2hF1U6H3gnWuxFKpwQsUKSgFb2ZAdGgAm9ZVlM6FRk",
+      "number": "275808",
+      "ctx": {
+        "kind": "device",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "sealed": "c2hF1U6H3gnWuxFKpwQsUKSgFb2ZAdGgAm9ZVlM6FRkEBQYHCAkKCwwNDg9WoaEeanm-mAH_nyyq6YSJY5ND65N_C9vvE4P__l0__2b2qaTJUcBxVmjyN-q72uo",
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8"
+    },
+    {
+      "newPrivateKey": "BQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQ",
+      "newPublicKey": "YJC4c2IZGSXvydz8wDvZ4XBm6fehtB0PZEE7pgdVhxw",
+      "commitment": "QenimJsBT5o_DfgP466QQgtU9ZOpIzLYPZ8JTeb4Rmo",
+      "approverPrivateKey": "FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ",
+      "approverPublicKey": "rWX3iUE1YLl8xo0LnLI-lrtD_S9xpsmVLXVzBkt2dCM",
+      "number": "686867",
+      "ctx": {
+        "kind": "device",
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "keyV": 4
+      },
+      "sealed": "rWX3iUE1YLl8xo0LnLI-lrtD_S9xpsmVLXVzBkt2dCMkJSYnKCkqKywtLi-_bfVSUELRwu7KEyLocU1jh1kiRL3V5hixtFlLPFTmvzRms11palCY_rWjXbcjPKI",
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8"
+    }
+  ],
+  "attestations": [
+    {
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+      "wrapId": "0194f3a2-8c00-7000-8000-000000000001",
+      "publicKey": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "attestation": "Qb-NDwsht-YC9R2TYxVd3O7-ZmG8ALNDvDDx-jd74xM"
+    },
+    {
+      "dataKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+      "wrapId": "0194f3a2-8c00-7000-8000-000000000003",
+      "publicKey": "Pz5fbYaSbJwSjPhFgVdPloQNmO5atTsew7duK7JblF4",
+      "attestation": "YjSQpKoIZhUYjQ3GIvxINke06kcqDeqgp2617YA_XMY"
+    }
+  ],
   "rejects": [
     {
       "name": "record with a user id containing a slash",
@@ -245,6 +293,19 @@
       "nonce": "IiMkJSYnKCkqKywt",
       "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
       "code": "bad_input"
+    },
+    {
+      "name": "pairing blob sealed with a different ephemeral key than the approver key",
+      "op": "openFromPairing",
+      "privateKey": "0NHS09TV1tfY2drb3N3e3-Dh4uPk5ebn6Onq6-zt7u8",
+      "ctx": {
+        "kind": "device",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "sealed": "c2hF1U6H3gnWuxFKpwQsUKSgFb2ZAdGgAm9ZVlM6FRkEBQYHCAkKCwwNDg9WoaEeanm-mAH_nyyq6YSJY5ND65N_C9vvE4P__l0__2b2qaTJUcBxVmjyN-q72uo",
+      "approverKey": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "code": "cannot_open"
     }
   ]
 }

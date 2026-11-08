@@ -192,6 +192,8 @@ export const KEY_WRAP_KINDS = ["passkey", "recovery", "device", "assistant"] as 
 export const MAX_WRAPPED = 1024;
 /** A device's X25519 public key, in bytes. */
 export const DEVICE_PUBLIC_KEY_BYTES = 32;
+/** A device wrap's attestation (HMAC-SHA256), in bytes. */
+export const DEVICE_ATTESTATION_BYTES = 32;
 
 /** Unpadded base64url whose decoded length is within `min`..`max` bytes. */
 const base64urlBytes = (min: number, max: number) =>
@@ -221,20 +223,32 @@ const keyWrapFields = {
     .nullable()
     .optional()
     .openapi({
-      description: `\`device\` only, and required there: its X25519 public key, ${DEVICE_PUBLIC_KEY_BYTES} bytes, base64url`,
+      description: `\`device\` only, and required there (422 \`attestation_required\`): its X25519 public key, ${DEVICE_PUBLIC_KEY_BYTES} bytes, base64url`,
+    }),
+  attestation: base64urlBytes(DEVICE_ATTESTATION_BYTES, DEVICE_ATTESTATION_BYTES)
+    .nullable()
+    .optional()
+    .openapi({
+      description: `\`device\` only, and required there (422 \`attestation_required\`): HMAC-SHA256, ${DEVICE_ATTESTATION_BYTES} bytes, base64url, under a key derived from the data key over user id, wrap id and public key. The server stores it and cannot check it; devices verify it before sealing the data key to this key.`,
     }),
   label: z.string().max(100).nullable().optional().openapi({
     description: 'Shown in Settings ("Pixel 9", "Firefox on Mac")',
   }),
 };
 
-type KeyWrapShape = { kind: string; ref?: string | null; publicKey?: string | null };
+type KeyWrapShape = {
+  kind: string;
+  ref?: string | null;
+  publicKey?: string | null;
+  attestation?: string | null;
+};
 const refByKind = (wrap: KeyWrapShape) => (wrap.kind === "recovery") === (wrap.ref == null);
+// A device wrap missing either is 422 `attestation_required`, decided in the service.
 const publicKeyByKind = (wrap: KeyWrapShape) =>
-  (wrap.kind === "device") === (wrap.publicKey != null);
+  wrap.kind === "device" || (wrap.publicKey == null && wrap.attestation == null);
 const REF_RULE = { message: "`recovery` has no ref; every other kind has one", path: ["ref"] };
 const PUBLIC_KEY_RULE = {
-  message: "`device` has a public key; no other kind has one",
+  message: "Only `device` has a public key and an attestation",
   path: ["publicKey"],
 };
 
@@ -252,6 +266,10 @@ export const KeyWrap = z
     keyV: z.int(),
     wrapped: z.string().openapi({ description: "base64url without padding" }),
     publicKey: z.string().nullable().openapi({ description: "base64url without padding" }),
+    attestation: z
+      .string()
+      .nullable()
+      .openapi({ description: "`device` only; base64url without padding" }),
     label: z.string().nullable(),
     createdAt: z.string(),
     lastUsedAt: z.string().nullable(),
@@ -294,11 +312,14 @@ export const RotateKeys = z
 /** The longest a sealed data key may be, in bytes (a sealed 32-byte key is far smaller). */
 export const MAX_SEALED_PAIRING = 1024;
 
+const pairingKey = (description: string) =>
+  base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES).openapi({ description });
+
 export const StartPairing = z
   .object({
-    publicKey: base64urlBytes(DEVICE_PUBLIC_KEY_BYTES, DEVICE_PUBLIC_KEY_BYTES).openapi({
-      description: "The new device's ephemeral X25519 public key, 32 bytes, base64url",
-    }),
+    commitment: pairingKey(
+      'SHA-256("wambito/v1/pairing-commit" || the new device\'s X25519 public key), 32 bytes, base64url',
+    ),
   })
   .openapi("StartPairing");
 
@@ -315,24 +336,56 @@ export const PairingStarted = z
 export const PairingFound = z
   .object({
     id: z.uuid(),
-    publicKey: z.string().openapi({ description: "base64url without padding" }),
+    commitment: z.string().openapi({ description: "base64url without padding" }),
     expiresAt: z.string(),
   })
   .openapi("PairingFound");
 
+export const PairingApprover = z
+  .object({
+    publicKey: pairingKey(
+      "The approving device's ephemeral X25519 public key, 32 bytes, base64url",
+    ),
+  })
+  .openapi("PairingApprover");
+
+export const PairingReveal = z
+  .object({
+    publicKey: pairingKey(
+      "The new device's X25519 public key, 32 bytes, base64url; must match the commitment",
+    ),
+  })
+  .openapi("PairingReveal");
+
 export const SealPairing = z
   .object({
     sealed: base64urlBytes(1, MAX_SEALED_PAIRING).openapi({
-      description: `The data key sealed to the new device's public key, base64url, 1–${MAX_SEALED_PAIRING} bytes decoded`,
+      description: `The data key sealed to the new device's public key, base64url, 1–${MAX_SEALED_PAIRING} bytes decoded; its first 32 bytes are the approver key`,
     }),
+    keyV: z
+      .int()
+      .min(0)
+      .max(32767)
+      .openapi({ description: "The data key version the seal is bound to" }),
   })
   .openapi("SealPairing");
 
+const nullableB64 = z.string().nullable().openapi({ description: "base64url; null until set" });
+
+export const PairingState = z
+  .object({
+    commitment: z.string().openapi({ description: "base64url" }),
+    approverKey: nullableB64,
+    publicKey: nullableB64,
+    sealed: nullableB64,
+    keyV: z.int().nullable().openapi({ description: "null until sealed" }),
+    expiresAt: z.string(),
+  })
+  .openapi("PairingState");
+
 export const PairingPickup = z
   .object({
-    sealed: z
-      .string()
-      .nullable()
-      .openapi({ description: "base64url; null until the other device seals" }),
+    sealed: z.string().openapi({ description: "base64url" }),
+    keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
   })
   .openapi("PairingPickup");
