@@ -207,6 +207,7 @@ describe("list_transactions", () => {
       income: { amount: 0, formatted: "$0" },
     });
     expect(text.split("\n")[0]).toBe("3 movimientos · gastos $45.000 · ingresos $0");
+    expect(text.split("\n")[1]).toBe("En esta página: 2 movimientos; hay más, pasa nextCursor.");
   });
 
   it("words the totals line in the person's language", async () => {

@@ -58,7 +58,7 @@ const PHRASES: Record<Locale, Phrases> = {
       `${p.month}: ingresos ${p.income}, gastos ${p.spent}, presupuesto ${p.budget}, quedan ${p.remaining}.`,
     budgetLine: (p) => `${p.name}: ${p.spent} de ${p.budget} (${STATES.es[p.state]})`,
     transactions: (n, more) =>
-      `${plural(n, "movimiento", "movimientos")}${more ? " (hay más: pasa nextCursor)" : ""}.`,
+      `En esta página: ${plural(n, "movimiento", "movimientos")}${more ? "; hay más, pasa nextCursor" : ""}.`,
     totals: (p) =>
       `${plural(p.count, "movimiento", "movimientos")} · gastos ${p.expense} · ingresos ${p.income}`,
     byCategory: (p) =>
@@ -95,7 +95,7 @@ const PHRASES: Record<Locale, Phrases> = {
       `${p.month}: income ${p.income}, spent ${p.spent}, budget ${p.budget}, ${p.remaining} left.`,
     budgetLine: (p) => `${p.name}: ${p.spent} of ${p.budget} (${STATES.en[p.state]})`,
     transactions: (n, more) =>
-      `${plural(n, "transaction", "transactions")}${more ? " (more: pass nextCursor)" : ""}.`,
+      `On this page: ${plural(n, "transaction", "transactions")}${more ? "; there are more, pass nextCursor" : ""}.`,
     totals: (p) =>
       `${plural(p.count, "transaction", "transactions")} · spent ${p.expense} · income ${p.income}`,
     byCategory: (p) =>
@@ -132,7 +132,7 @@ const PHRASES: Record<Locale, Phrases> = {
       `${p.month}: entrate ${p.income}, spese ${p.spent}, budget ${p.budget}, restano ${p.remaining}.`,
     budgetLine: (p) => `${p.name}: ${p.spent} su ${p.budget} (${STATES.it[p.state]})`,
     transactions: (n, more) =>
-      `${plural(n, "movimento", "movimenti")}${more ? " (ce ne sono altri: passa nextCursor)" : ""}.`,
+      `In questa pagina: ${plural(n, "movimento", "movimenti")}${more ? "; ce ne sono altri, passa nextCursor" : ""}.`,
     totals: (p) =>
       `${plural(p.count, "movimento", "movimenti")} · spese ${p.expense} · entrate ${p.income}`,
     byCategory: (p) =>
@@ -169,7 +169,7 @@ const PHRASES: Record<Locale, Phrases> = {
       `${p.month}: receitas ${p.income}, despesas ${p.spent}, orçamento ${p.budget}, faltam ${p.remaining}.`,
     budgetLine: (p) => `${p.name}: ${p.spent} de ${p.budget} (${STATES.pt[p.state]})`,
     transactions: (n, more) =>
-      `${plural(n, "movimento", "movimentos")}${more ? " (há mais: passa nextCursor)" : ""}.`,
+      `Nesta página: ${plural(n, "movimento", "movimentos")}${more ? "; há mais, passa nextCursor" : ""}.`,
     totals: (p) =>
       `${plural(p.count, "movimento", "movimentos")} · despesas ${p.expense} · receitas ${p.income}`,
     byCategory: (p) =>
