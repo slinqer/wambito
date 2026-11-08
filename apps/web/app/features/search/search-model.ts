@@ -47,18 +47,20 @@ export interface SearchApiQuery {
   kind?: "expense" | "income";
   category?: string[];
   status?: "paid" | "pending";
-  totals: "true";
+  totals?: "true";
+  cursor?: string;
   limit: 50;
 }
 
-export function toApiQuery(f: SearchFilters): SearchApiQuery {
+/** The list query for one page: the totals cover every match, so only the first page asks for them. */
+export function toApiQuery(f: SearchFilters, cursor: string | null = null): SearchApiQuery {
   const text = f.text.trim();
   return {
     ...(text !== "" ? { q: [text] } : {}),
     ...(f.kind !== "all" ? { kind: f.kind } : {}),
     ...(f.categoryIds.length > 0 ? { category: f.categoryIds } : {}),
     ...(f.status !== "all" ? { status: f.status } : {}),
-    totals: "true",
+    ...(cursor ? { cursor } : { totals: "true" as const }),
     limit: 50,
   };
 }

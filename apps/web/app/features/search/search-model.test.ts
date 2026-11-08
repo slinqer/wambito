@@ -60,4 +60,10 @@ describe("toApiQuery", () => {
       limit: 50,
     });
   });
+
+  it("asks for the totals only on the first page and sends the cursor on later ones", () => {
+    const later = toApiQuery({ ...emptyFilters, text: "cafe" }, "2026-10-01|abc");
+    expect(later).toEqual({ q: ["cafe"], cursor: "2026-10-01|abc", limit: 50 });
+    expect(later).not.toHaveProperty("totals");
+  });
 });

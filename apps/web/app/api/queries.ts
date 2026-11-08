@@ -141,7 +141,6 @@ const SEARCH_KEY = ["transactions", "search"] as const;
  */
 export function useTransactionSearch(filters: SearchFilters) {
   const api = useApi();
-  const query = toApiQuery(filters);
   return useInfiniteQuery({
     queryKey: [...SEARCH_KEY, filtersToParams(filters).toString()],
     enabled: isSearching(filters),
@@ -149,7 +148,7 @@ export function useTransactionSearch(filters: SearchFilters) {
     queryFn: async ({ pageParam, signal }): Promise<TransactionList> =>
       dataOf(
         await api.GET("/v1/transactions", {
-          params: { query: { ...query, ...(pageParam ? { cursor: pageParam } : {}) } },
+          params: { query: toApiQuery(filters, pageParam) },
           signal,
         }),
       ),
