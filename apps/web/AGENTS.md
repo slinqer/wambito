@@ -12,7 +12,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   build dir `WAMBITO_BUILD_DIR` or `build`), `vite.config.ts` (mascot chunk named `mascot-*`).
 - `app/routes/*` thin route modules; `app/features/<feature>/` screens, models, stories;
   `app/ui/` shared components; `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
-  the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/`;
+  the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/` (the seed over a memory store);
+  `app/local/` the local backend: `FinanceStore` (`store.ts`, contract tests in `store-contract.ts`),
+  `memory-store.ts`, `backend.ts` (`createLocalBackend`: the `/v1` routes over a store, one store
+  transaction per request), `ids.ts` (UUID v7 and v5);
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),

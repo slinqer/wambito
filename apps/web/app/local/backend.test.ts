@@ -1,0 +1,134 @@
+import { describe, expect, it } from "vitest";
+import { createApiClient } from "../api/client.ts";
+import { createLocalBackend, DEMO_UNAVAILABLE } from "./backend.ts";
+import { uuidv5 } from "./ids.ts";
+import { createMemoryStore } from "./memory-store.ts";
+
+const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const NOW = new Date("2026-10-21T18:00:00Z");
+
+function setup(options: { unavailable?: typeof DEMO_UNAVAILABLE } = {}) {
+  const store = createMemoryStore();
+  const backend = createLocalBackend({ store, now: () => new Date(NOW), ...options });
+  const api = createApiClient({ fetch: backend.fetch, baseUrl: "http://local.test/api" });
+  return { store, api };
+}
+
+async function onboard(api: ReturnType<typeof setup>["api"]) {
+  await api.PATCH("/v1/me", {
+    body: { currency: "COP", locale: "es", timezone: "America/Bogota", onboardingCompleted: true },
+  });
+  const { data: food } = await api.POST("/v1/categories", {
+    body: { name: "Food", kind: "expense", icon: "fork", color: "#f90" },
+  });
+  return { food: food?.id as string };
+}
+
+describe("createLocalBackend over the memory store", () => {
+  it("starts as a fresh account and keeps its settings as a record", async () => {
+    const { api, store } = setup();
+    expect((await api.GET("/v1/me")).data).toMatchObject({ onboardingCompletedAt: null });
+    await onboard(api);
+    const [settings] = await store.list("settings");
+    expect(settings?.id).toMatch(V7);
+    expect(settings?.body).toMatchObject({ currency: "COP", timezone: "America/Bogota" });
+    expect((await api.GET("/v1/me")).data).toMatchObject({ currency: "COP", locale: "es" });
+  });
+
+  it("makes records with lower-case UUID v7 ids, written through the store", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    expect(food).toMatch(V7);
+    const created = await api.POST("/v1/transactions", {
+      body: { name: "Lunch", amount: -18_000_00, categoryId: food, date: "2026-10-21" },
+    });
+    const id = created.data?.id as string;
+    expect(id).toMatch(V7);
+    expect(id > food).toBe(true);
+    const stored = await store.get("transaction", id);
+    expect(stored?.body).toMatchObject({ s: 1, name: "Lunch", currency: "COP", source: "app" });
+  });
+
+  it("deletes to a tombstone and restores", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    const id = (
+      await api.POST("/v1/transactions", {
+        body: { name: "Lunch", amount: -1_000_00, categoryId: food, date: "2026-10-21" },
+      })
+    ).data?.id as string;
+    await api.DELETE("/v1/transactions/{id}", { params: { path: { id } } });
+    expect(await store.get("transaction", id)).toBeUndefined();
+    expect((await store.get("transaction", id, { includeDeleted: true }))?.deleted).toBe(true);
+    await api.POST("/v1/transactions/{id}/restore", { params: { path: { id } } });
+    expect((await store.get("transaction", id))?.deleted).toBe(false);
+  });
+
+  it("names a recurrence's occurrences by UUID v5 of the rule and the month", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    const rule = (
+      await api.POST("/v1/recurrences", {
+        body: {
+          name: "Rent",
+          amount: -500_000_00,
+          categoryId: food,
+          frequency: "monthly",
+          dayOfMonth: 5,
+          startDate: "2026-09-05",
+        },
+      })
+    ).data;
+    const { data } = await api.GET("/v1/transactions", { params: { query: { month: "2026-10" } } });
+    const occurrence = data?.items.find((t) => t.recurrenceId === rule?.id);
+    expect(occurrence?.status).toBe("pending");
+    expect(occurrence?.id).toBe(await uuidv5(rule?.id as string, "2026-10"));
+    expect((await store.get("transaction", occurrence?.id as string))?.body).toMatchObject({
+      occurrenceMonth: "2026-10",
+      source: "recurrence",
+    });
+    // Reading again makes no second one.
+    const again = await api.GET("/v1/transactions", { params: { query: { month: "2026-10" } } });
+    expect(again.data?.items.filter((t) => t.recurrenceId === rule?.id).length).toBe(1);
+  });
+
+  it("leaves the store untouched when a request is refused", async () => {
+    const { api, store } = setup();
+    const { food } = await onboard(api);
+    const before = await store.list("transaction", { includeDeleted: true });
+    await expect(
+      api.POST("/v1/transactions", {
+        body: {
+          name: "Bad",
+          amount: -1_00,
+          categoryId: "01930000-0000-7000-8000-0000000000ff",
+          date: "2026-10-21",
+        },
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(await store.list("transaction", { includeDeleted: true })).toEqual(before);
+    expect(food).toBeTruthy();
+  });
+
+  it("notifies the store's subscribers after a write, not after a read", async () => {
+    const { api, store } = setup();
+    let calls = 0;
+    store.subscribe(() => calls++);
+    await api.GET("/v1/categories");
+    expect(calls).toBe(0);
+    await onboard(api);
+    expect(calls).toBeGreaterThan(0);
+  });
+
+  it("answers 403 demo_unavailable only for the routes it is told to", async () => {
+    const open = setup();
+    await expect(open.api.GET("/v1/me/export" as never)).rejects.not.toMatchObject({ status: 403 });
+    const closed = setup({ unavailable: DEMO_UNAVAILABLE });
+    await expect(closed.api.GET("/v1/me/export" as never)).rejects.toMatchObject({
+      status: 403,
+      code: "demo_unavailable",
+    });
+    await expect(closed.api.DELETE("/v1/me")).rejects.toMatchObject({ status: 403 });
+    expect((await closed.api.GET("/v1/me")).data).toBeTruthy();
+  });
+});
