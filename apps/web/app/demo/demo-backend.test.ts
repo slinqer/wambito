@@ -529,3 +529,96 @@ describe("a new category with a budget", () => {
     ).rejects.toMatchObject({ status: 422, code: "budget_category_not_expense" });
   });
 });
+
+describe("GET /api/v1/transactions searches like the API", () => {
+  type Page = {
+    items: TransactionDto[];
+    totals?: { count: number; expense: number; income: number };
+  };
+  async function search(api: ApiClient, query: Record<string, unknown>): Promise<Page> {
+    const { data, error } = await api.GET("/v1/transactions", {
+      params: { query: { limit: 200, ...query } as never },
+    });
+    if (!data) throw new Error(`search failed: ${JSON.stringify(error)}`);
+    return data;
+  }
+
+  it("q folds accents and case: cafe finds Café", async () => {
+    const { api } = demo();
+    const { items } = await search(api, { q: ["cafe"] });
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.some((t) => t.name === "Café")).toBe(true);
+    for (const t of items) expect(`${t.name} ${t.note ?? ""}`.toLowerCase()).toMatch(/caf/);
+  });
+
+  it("several q terms find a movement that has any of them", async () => {
+    const { api } = demo();
+    const a = await search(api, { q: ["cafe"] });
+    const b = await search(api, { q: ["taxi"] });
+    const both = await search(api, { q: ["cafe", "taxi"] });
+    expect(b.items.length).toBeGreaterThan(0);
+    expect(both.items.length).toBe(new Set([...a.items, ...b.items].map((t) => t.id)).size);
+  });
+
+  it("kind keeps spending or income only", async () => {
+    const { api } = demo();
+    const income = await search(api, { kind: "income" });
+    const expense = await search(api, { kind: "expense" });
+    expect(income.items.length).toBeGreaterThan(0);
+    expect(income.items.every((t) => t.amount > 0)).toBe(true);
+    expect(expense.items.every((t) => t.amount < 0)).toBe(true);
+  });
+
+  it("category takes a list", async () => {
+    const { api } = demo();
+    const { data } = await api.GET("/v1/categories");
+    const [c1, c2] = (data ?? []).filter((c) => c.kind === "expense");
+    const ids = [c1?.id, c2?.id] as string[];
+    const { items } = await search(api, { category: ids });
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((t) => ids.includes(t.categoryId))).toBe(true);
+    expect(new Set(items.map((t) => t.categoryId)).size).toBe(2);
+  });
+
+  it("match=any joins terms and categories; all intersects them", async () => {
+    const { api } = demo();
+    const { data } = await api.GET("/v1/categories");
+    const transport = (data ?? []).find((c) => c.kind === "expense");
+    const q = await search(api, { q: ["cafe"] });
+    const c = await search(api, { category: [transport?.id] });
+    const any = await search(api, { q: ["cafe"], category: [transport?.id], match: "any" });
+    const all = await search(api, { q: ["cafe"], category: [transport?.id] });
+    expect(any.items.length).toBe(new Set([...q.items, ...c.items].map((t) => t.id)).size);
+    expect(all.items.length).toBeLessThanOrEqual(any.items.length);
+  });
+
+  it("totals cover every match, not the page", async () => {
+    const { api } = demo();
+    const full = await search(api, { kind: "expense", totals: "true" });
+    const paged = await search(api, { kind: "expense", totals: "true", limit: 2 });
+    expect(paged.items).toHaveLength(2);
+    expect(paged.totals).toEqual(full.totals);
+    expect(full.totals?.count).toBe(full.items.length);
+    expect(full.totals?.expense).toBe(-full.items.reduce((s, t) => s + t.amount, 0));
+    expect(full.totals?.income).toBe(0);
+    expect((await search(api, {})).totals).toBeUndefined();
+  });
+
+  it("rejects too many terms or categories, a long term, a bad kind or match with 422", async () => {
+    const { api } = demo();
+    const id = "00000000-0000-4000-8000-000000000001";
+    const bad = [
+      { q: Array.from({ length: 11 }, (_, i) => `t${i}`) },
+      { q: ["x".repeat(101)] },
+      { category: Array.from({ length: 21 }, () => id) },
+      { category: ["nope"] },
+      { kind: "other" },
+      { match: "some" },
+    ];
+    for (const query of bad) {
+      await expect(
+        api.GET("/v1/transactions", { params: { query: query as never } }),
+      ).rejects.toMatchObject({ status: 422 });
+    }
+  });
+});

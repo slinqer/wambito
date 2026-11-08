@@ -27,6 +27,37 @@ function dayBefore(date: IsoDate): IsoDate {
 }
 
 /**
+ * Transactions by day in the API's order (newest first), as a search lists them: a future pending
+ * day stays above older days when it is newer, nothing is moved to the bottom.
+ */
+export function groupNewestFirst(items: TransactionDto[], today: IsoDate): DayGroup[] {
+  const yesterday = dayBefore(today);
+  const groups: DayGroup[] = [];
+  for (const tx of items) {
+    const last = groups.at(-1);
+    if (last && last.date === tx.date) {
+      last.items.push(tx);
+      last.total += tx.amount;
+      continue;
+    }
+    groups.push({
+      date: tx.date,
+      when:
+        tx.date === today
+          ? "today"
+          : tx.date > today
+            ? "upcoming"
+            : tx.date === yesterday
+              ? "yesterday"
+              : "past",
+      total: tx.amount,
+      items: [tx],
+    });
+  }
+  return groups;
+}
+
+/**
  * A month's transactions by day, as home lists them: today on top, then the days gone by (newest
  * first), then the days still to come at the bottom (the nearest first, where the pending ones are).
  */

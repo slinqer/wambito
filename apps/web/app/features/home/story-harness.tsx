@@ -4,9 +4,11 @@ import {
   firstDay,
   lastDay,
   type MonthSummary,
+  matchesMovementSearch,
   monthOf,
   monthSummary,
   monthsBetween,
+  movementTotals,
   type TransactionDto,
   todayIn,
 } from "@wambito/core";
@@ -705,14 +707,40 @@ function homeFetch({
     }
     if (path === "/api/v1/transactions" && request.method === "GET") {
       const month = url.searchParams.get("month");
-      const category = url.searchParams.get("category");
-      const items = transactions
+      const sp = url.searchParams;
+      const terms = sp.getAll("q");
+      const categoryIds = sp.getAll("category");
+      const kind = sp.get("kind");
+      const match = sp.get("match");
+      const status = sp.get("status");
+      if (
+        terms.length > 10 ||
+        terms.some((t) => t.length > 100) ||
+        categoryIds.length > 20 ||
+        (kind !== null && kind !== "expense" && kind !== "income") ||
+        (match !== null && match !== "all" && match !== "any")
+      ) {
+        return Response.json({ code: "validation_failed" }, { status: 422 });
+      }
+      const rows = transactions
         .filter((t) => !month || monthOf(t.date) === month)
-        .filter((t) => !category || t.categoryId === category)
-        .filter((t) => url.searchParams.get("needsReview") !== "true" || t.needsReview)
-        .sort(newestFirst)
-        .slice(0, Number(url.searchParams.get("limit") ?? 50));
-      return Response.json({ items, nextCursor: null });
+        .filter((t) => sp.get("needsReview") !== "true" || t.needsReview)
+        .filter((t) =>
+          matchesMovementSearch(t, {
+            ...(terms.length > 0 ? { terms } : {}),
+            ...(categoryIds.length > 0 ? { categoryIds } : {}),
+            ...(kind ? { kind } : {}),
+            ...(status === "paid" || status === "pending" ? { status } : {}),
+            ...(match ? { match } : {}),
+          }),
+        )
+        .sort(newestFirst);
+      const items = rows.slice(0, Number(sp.get("limit") ?? 50));
+      return Response.json({
+        items,
+        nextCursor: null,
+        ...(sp.get("totals") === "true" ? { totals: movementTotals(rows) } : {}),
+      });
     }
     if (path === "/api/v1/transactions" && request.method === "POST") {
       if (createDelayMs) await sleep(createDelayMs);

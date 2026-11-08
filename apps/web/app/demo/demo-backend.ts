@@ -11,9 +11,12 @@ import {
   isMonth,
   lastDay,
   type Month,
+  type MovementSearch,
+  matchesMovementSearch,
   monthOf,
   monthSummary,
   monthsBetween,
+  movementTotals,
   occurrences,
   type RecurrenceDto,
   setBudgetSchema,
@@ -341,6 +344,24 @@ function enumParam<T extends string>(params: URLSearchParams, name: string, valu
   return raw as T;
 }
 
+/** The search params of the list, validated like the API: repeated `q` and `category`, `kind`, `match`. */
+function searchParams(params: URLSearchParams): MovementSearch {
+  const terms = params.getAll("q");
+  if (terms.length > 10) throw invalid("q", "At most 10 terms");
+  if (terms.some((t) => t.length > 100)) throw invalid("q", "At most 100 characters per term");
+  const categoryIds = params.getAll("category");
+  if (categoryIds.length > 20) throw invalid("category", "At most 20 categories");
+  if (categoryIds.some((c) => !UUID.test(c))) throw invalid("category", "Invalid UUID");
+  const kind = enumParam(params, "kind", ["expense", "income"] as const);
+  const match = enumParam(params, "match", ["all", "any"] as const);
+  return {
+    ...(terms.length > 0 ? { terms } : {}),
+    ...(categoryIds.length > 0 ? { categoryIds } : {}),
+    ...(kind ? { kind } : {}),
+    ...(match ? { match } : {}),
+  };
+}
+
 const MAX_MONTHS = 36;
 
 function rangeParams(params: URLSearchParams): Month[] {
@@ -505,8 +526,7 @@ export function createDemoBackend(seed: DemoSeed, now: () => Date = () => new Da
 
   function listTransactions(params: URLSearchParams): Answer {
     const month = monthParam(params, "month");
-    const category = params.get("category");
-    if (category !== null && !UUID.test(category)) throw invalid("category", "Invalid UUID");
+    const search = searchParams(params);
     const status = enumParam(params, "status", ["paid", "pending"] as const);
     const needsReview = enumParam(params, "needsReview", ["true", "false"] as const);
     const cursor = params.get("cursor");
@@ -517,17 +537,21 @@ export function createDemoBackend(seed: DemoSeed, now: () => Date = () => new Da
       .filter(
         (t) =>
           (!month || inMonth(t, month)) &&
-          (category === null || t.categoryId === category) &&
-          (!status || t.status === status) &&
-          (needsReview !== "true" || t.needsReview) &&
-          (!after || t.date < after.date || (t.date === after.date && t.id < after.id)),
+          matchesMovementSearch(t, { ...search, ...(status ? { status } : {}) }) &&
+          (needsReview !== "true" || t.needsReview),
       )
       .sort(byNewest);
-    const items = rows.slice(0, limit);
+    // Totals cover every match, whatever the cursor.
+    const totals = params.get("totals") === "true" ? movementTotals(rows) : undefined;
+    const rest = rows.filter(
+      (t) => !after || t.date < after.date || (t.date === after.date && t.id < after.id),
+    );
+    const items = rest.slice(0, limit);
     const last = items.at(-1);
     return ok({
       items: items.map(toTransactionDto),
-      nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
+      nextCursor: rest.length > limit && last ? encodeCursor(last) : null,
+      ...(totals ? { totals } : {}),
     });
   }
 
