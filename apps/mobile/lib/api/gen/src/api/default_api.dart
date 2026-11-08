@@ -1816,8 +1816,11 @@ class DefaultApi {
   /// * [month]
   /// * [from]
   /// * [to]
+  /// * [kind]
   /// * [q]
   /// * [category]
+  /// * [match]
+  /// * [totals]
   /// * [status]
   /// * [needsReview]
   /// * [cursor]
@@ -1835,8 +1838,11 @@ class DefaultApi {
     String? month,
     String? from,
     String? to,
-    String? q,
-    String? category,
+    String? kind,
+    BuiltList<String>? q,
+    BuiltList<String>? category,
+    String? match,
+    String? totals,
     String? status,
     String? needsReview,
     String? cursor,
@@ -1861,9 +1867,25 @@ class DefaultApi {
         r'month': encodeQueryParameter(_serializers, month, const FullType(String)),
       if (from != null) r'from': encodeQueryParameter(_serializers, from, const FullType(String)),
       if (to != null) r'to': encodeQueryParameter(_serializers, to, const FullType(String)),
-      if (q != null) r'q': encodeQueryParameter(_serializers, q, const FullType(String)),
+      if (kind != null) r'kind': encodeQueryParameter(_serializers, kind, const FullType(String)),
+      if (q != null)
+        r'q': encodeCollectionQueryParameter<String>(
+          _serializers,
+          q,
+          const FullType(BuiltList, [FullType(String)]),
+          format: ListFormat.multi,
+        ),
       if (category != null)
-        r'category': encodeQueryParameter(_serializers, category, const FullType(String)),
+        r'category': encodeCollectionQueryParameter<String>(
+          _serializers,
+          category,
+          const FullType(BuiltList, [FullType(String)]),
+          format: ListFormat.multi,
+        ),
+      if (match != null)
+        r'match': encodeQueryParameter(_serializers, match, const FullType(String)),
+      if (totals != null)
+        r'totals': encodeQueryParameter(_serializers, totals, const FullType(String)),
       if (status != null)
         r'status': encodeQueryParameter(_serializers, status, const FullType(String)),
       if (needsReview != null)

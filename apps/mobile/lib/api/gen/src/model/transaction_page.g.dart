@@ -11,11 +11,13 @@ class _$TransactionPage extends TransactionPage {
   final BuiltList<Transaction> items;
   @override
   final String? nextCursor;
+  @override
+  final TransactionPageTotals? totals;
 
   factory _$TransactionPage([void Function(TransactionPageBuilder)? updates]) =>
       (TransactionPageBuilder()..update(updates))._build();
 
-  _$TransactionPage._({required this.items, this.nextCursor}) : super._();
+  _$TransactionPage._({required this.items, this.nextCursor, this.totals}) : super._();
   @override
   TransactionPage rebuild(void Function(TransactionPageBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,7 +28,10 @@ class _$TransactionPage extends TransactionPage {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is TransactionPage && items == other.items && nextCursor == other.nextCursor;
+    return other is TransactionPage &&
+        items == other.items &&
+        nextCursor == other.nextCursor &&
+        totals == other.totals;
   }
 
   @override
@@ -34,6 +39,7 @@ class _$TransactionPage extends TransactionPage {
     var _$hash = 0;
     _$hash = $jc(_$hash, items.hashCode);
     _$hash = $jc(_$hash, nextCursor.hashCode);
+    _$hash = $jc(_$hash, totals.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -42,7 +48,8 @@ class _$TransactionPage extends TransactionPage {
   String toString() {
     return (newBuiltValueToStringHelper(r'TransactionPage')
           ..add('items', items)
-          ..add('nextCursor', nextCursor))
+          ..add('nextCursor', nextCursor)
+          ..add('totals', totals))
         .toString();
   }
 }
@@ -58,6 +65,10 @@ class TransactionPageBuilder implements Builder<TransactionPage, TransactionPage
   String? get nextCursor => _$this._nextCursor;
   set nextCursor(String? nextCursor) => _$this._nextCursor = nextCursor;
 
+  TransactionPageTotalsBuilder? _totals;
+  TransactionPageTotalsBuilder get totals => _$this._totals ??= TransactionPageTotalsBuilder();
+  set totals(TransactionPageTotalsBuilder? totals) => _$this._totals = totals;
+
   TransactionPageBuilder() {
     TransactionPage._defaults(this);
   }
@@ -67,6 +78,7 @@ class TransactionPageBuilder implements Builder<TransactionPage, TransactionPage
     if ($v != null) {
       _items = $v.items.toBuilder();
       _nextCursor = $v.nextCursor;
+      _totals = $v.totals?.toBuilder();
       _$v = null;
     }
     return this;
@@ -88,12 +100,21 @@ class TransactionPageBuilder implements Builder<TransactionPage, TransactionPage
   _$TransactionPage _build() {
     _$TransactionPage _$result;
     try {
-      _$result = _$v ?? _$TransactionPage._(items: items.build(), nextCursor: nextCursor);
+      _$result =
+          _$v ??
+          _$TransactionPage._(
+            items: items.build(),
+            nextCursor: nextCursor,
+            totals: _totals?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'items';
         items.build();
+
+        _$failedField = 'totals';
+        _totals?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'TransactionPage', _$failedField, e.toString());
       }

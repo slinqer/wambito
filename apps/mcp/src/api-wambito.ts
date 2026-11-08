@@ -59,9 +59,19 @@ export function apiWambito(baseUrl: string, token: string, fetchImpl?: typeof fe
         api.GET("/v1/transactions", {
           params: {
             query: {
-              ...q,
+              month: q.month,
+              from: q.from,
+              to: q.to,
+              kind: q.kind,
+              q: q.q,
+              category: q.categoryIds,
+              match: q.match,
+              totals: q.totals === undefined ? undefined : q.totals ? "true" : "false",
+              status: q.status,
               needsReview:
                 q.needsReview === undefined ? undefined : q.needsReview ? "true" : "false",
+              cursor: q.cursor,
+              limit: q.limit,
             },
           },
         }),

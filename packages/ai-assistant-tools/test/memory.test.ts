@@ -61,9 +61,9 @@ describe("MemoryWambito", () => {
       (await wambito.listTransactions({ from: "2026-10-01", to: "2026-10-01", limit: 10 })).items,
     ).toHaveLength(1);
     expect(
-      (await wambito.listTransactions({ categoryId: comida.id, limit: 10 })).items,
+      (await wambito.listTransactions({ categoryIds: [comida.id], limit: 10 })).items,
     ).toHaveLength(2);
-    expect((await wambito.listTransactions({ q: "ALMÚ", limit: 10 })).items).toHaveLength(1);
+    expect((await wambito.listTransactions({ q: ["ALMÚ"], limit: 10 })).items).toHaveLength(1);
   });
 
   it("replays a batch sent again with the same key", async () => {

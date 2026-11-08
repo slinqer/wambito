@@ -5,6 +5,7 @@ export * from "./currencies.ts";
 export * from "./dates.ts";
 export * from "./default-currency.ts";
 export * from "./money.ts";
+export * from "./movement-search.ts";
 export * from "./recurrence.ts";
 export * from "./schemas.ts";
 export * from "./suggested-categories.ts";

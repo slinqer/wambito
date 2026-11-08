@@ -8,6 +8,9 @@ suggested categories, Wambi's messages. No I/O.
 - `src/index.ts` re-exports everything.
 - `src/money.ts`, `src/currencies.ts`, `src/default-currency.ts`: integer cents, never floats.
 - `src/budget.ts`, `src/recurrence.ts`, `src/summary.ts`, `src/dates.ts`, `src/schemas.ts` (zod).
+- `src/movement-search.ts`: the shared movement matcher and totals (`matchesMovementSearch`,
+  `movementTotals`) used by the MCP in-memory backend and the web demo/stories, and the fold table
+  (`FOLD_FROM`/`FOLD_TO`, `foldText`) the API's SQL search uses.
 - `src/wambi-message.ts`: `wambiMessage`, the rule-based lines of the mascot.
 - `src/capture.ts` (+ `src/capture-sources.ts`): automatic capture from bank notifications:
   `CAPTURE_SOURCES` (`revolut`, `google_wallet`), `createCaptureSchema` (`POST /v1/captures`),

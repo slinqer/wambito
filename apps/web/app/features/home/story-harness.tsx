@@ -4,9 +4,11 @@ import {
   firstDay,
   lastDay,
   type MonthSummary,
+  matchesMovementSearch,
   monthOf,
   monthSummary,
   monthsBetween,
+  movementTotals,
   type TransactionDto,
   todayIn,
 } from "@wambito/core";
@@ -25,6 +27,7 @@ import { CategoriesRedirect } from "../categories/CategoriesRedirect.tsx";
 import { CategoryDetail } from "../categories/CategoryDetail.tsx";
 import { Insights } from "../insights/Insights.tsx";
 import { RecurringPage } from "../recurring/RecurringPage.tsx";
+import { Search } from "../search/Search.tsx";
 import type { PasskeyItem, PasskeysApi } from "../settings/passkeys.ts";
 import { Settings } from "../settings/Settings.tsx";
 import { AppShell } from "./AppShell.tsx";
@@ -286,6 +289,8 @@ export interface HomeApiOptions {
   data?: "sample" | "empty" | "no-categories" | "october";
   /** Creating a transaction answers 503 (after `createDelayMs`). */
   failCreate?: boolean;
+  /** A search (any filter on the transactions list) answers 503. */
+  failSearch?: boolean;
   /** How long a create takes, in ms. */
   createDelayMs?: number;
   /** Transporte is archived, with a taxi ride in it today (sample data only). */
@@ -367,6 +372,7 @@ function homeFetch({
   currency = "EUR",
   data = "sample",
   failCreate = false,
+  failSearch = false,
   createDelayMs = 0,
   archivedCategory = false,
   archivedUnused = false,
@@ -705,14 +711,43 @@ function homeFetch({
     }
     if (path === "/api/v1/transactions" && request.method === "GET") {
       const month = url.searchParams.get("month");
-      const category = url.searchParams.get("category");
-      const items = transactions
+      const sp = url.searchParams;
+      if (failSearch && sp.get("totals") === "true") {
+        return Response.json({ code: "internal_error" }, { status: 503 });
+      }
+      const terms = sp.getAll("q");
+      const categoryIds = sp.getAll("category");
+      const kind = sp.get("kind");
+      const match = sp.get("match");
+      const status = sp.get("status");
+      if (
+        terms.length > 10 ||
+        terms.some((t) => t.length > 100) ||
+        categoryIds.length > 20 ||
+        (kind !== null && kind !== "expense" && kind !== "income") ||
+        (match !== null && match !== "all" && match !== "any")
+      ) {
+        return Response.json({ code: "validation_failed" }, { status: 422 });
+      }
+      const rows = transactions
         .filter((t) => !month || monthOf(t.date) === month)
-        .filter((t) => !category || t.categoryId === category)
-        .filter((t) => url.searchParams.get("needsReview") !== "true" || t.needsReview)
-        .sort(newestFirst)
-        .slice(0, Number(url.searchParams.get("limit") ?? 50));
-      return Response.json({ items, nextCursor: null });
+        .filter((t) => sp.get("needsReview") !== "true" || t.needsReview)
+        .filter((t) =>
+          matchesMovementSearch(t, {
+            ...(terms.length > 0 ? { terms } : {}),
+            ...(categoryIds.length > 0 ? { categoryIds } : {}),
+            ...(kind ? { kind } : {}),
+            ...(status === "paid" || status === "pending" ? { status } : {}),
+            ...(match ? { match } : {}),
+          }),
+        )
+        .sort(newestFirst);
+      const items = rows.slice(0, Number(sp.get("limit") ?? 50));
+      return Response.json({
+        items,
+        nextCursor: null,
+        ...(sp.get("totals") === "true" ? { totals: movementTotals(rows) } : {}),
+      });
     }
     if (path === "/api/v1/transactions" && request.method === "POST") {
       if (createDelayMs) await sleep(createDelayMs);
@@ -862,6 +897,7 @@ export function HomeStage({
                 <Route path="/app/categories/:id" element={shell(<CategoryDetail />)} />
                 <Route path="/app/recurring" element={shell(<RecurringPage />)} />
                 <Route path="/app/insights" element={shell(<Insights />)} />
+                <Route path="/app/search" element={shell(<Search />)} />
                 <Route
                   path="/app/settings"
                   element={shell(

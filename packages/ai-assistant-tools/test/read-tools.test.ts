@@ -162,6 +162,82 @@ describe("list_transactions", () => {
     expect(await names({ month: "2026-09" })).toEqual(["Bus"]);
   });
 
+  it("finds a movement of months ago by text alone, and keeps the current month without text", async () => {
+    const { ctx } = setup({
+      transactions: (c) => [
+        transaction(c.comida, -500000, "2026-10-20", { name: "Pan" }),
+        transaction(c.comida, -700000, "2026-08-05", { name: "Café" }),
+      ],
+    });
+    const names = async (input: object) =>
+      (await call("list_transactions", input, ctx)).structured.items.map(
+        (t: { name: string }) => t.name,
+      );
+    expect(await names({ text: "cafe" })).toEqual(["Café"]);
+    expect(await names({})).toEqual(["Pan"]);
+    expect(await names({ category: "comida" })).toEqual(["Pan", "Café"]);
+  });
+
+  it("unites words and categories with match any, and totals every match", async () => {
+    const { ctx } = setup({
+      transactions: (c) => [
+        transaction(c.comida, -1500000, "2026-10-20", { name: "Almuerzo" }),
+        transaction(c.comida, -1500000, "2026-10-19", { name: "Corrientazo" }),
+        transaction(c.rapida, -1500000, "2026-10-18", { name: "Hamburguesa" }),
+        transaction(c.salario, 900000, "2026-10-17", { name: "Almuerzo pagado" }),
+        transaction(c.transporte, -300000, "2026-10-16", { name: "Taxi" }),
+      ],
+    });
+    const { structured, text } = await call(
+      "list_transactions",
+      {
+        category: ["Comida", "rápida"],
+        text: ["almuerzo", "corrientazo"],
+        match: "any",
+        kind: "expense",
+        limit: 2,
+      },
+      ctx,
+    );
+    expect(structured.items).toHaveLength(2);
+    expect(structured.nextCursor).toEqual(expect.any(String));
+    expect(structured.totals).toEqual({
+      count: 3,
+      expense: { amount: 45000, formatted: "$45.000" },
+      income: { amount: 0, formatted: "$0" },
+    });
+    expect(text.split("\n")[0]).toBe("3 movimientos · gastos $45.000 · ingresos $0");
+    expect(text.split("\n")[1]).toBe("En esta página: 2 movimientos; hay más, pasa nextCursor.");
+  });
+
+  it("words the totals line in the person's language", async () => {
+    for (const [locale, words] of [
+      ["en", ["1 transaction", "spent", "income"]],
+      ["it", ["1 movimento", "spese", "entrate"]],
+      ["pt", ["1 movimento", "despesas", "receitas"]],
+    ] as const) {
+      const { ctx } = setup({
+        profile: { locale },
+        transactions: (c) => [transaction(c.comida, -1500000, "2026-10-20")],
+      });
+      const { text, structured } = await call("list_transactions", {}, ctx);
+      const { expense, income } = structured.totals;
+      expect(text.split("\n")[0]).toBe(
+        `${words[0]} · ${words[1]} ${expense.formatted} · ${words[2]} ${income.formatted}`,
+      );
+    }
+  });
+
+  it("refuses an unknown category in the list like a single one", async () => {
+    const { ctx } = setup({ transactions: () => [] });
+    const one = await call("list_transactions", { category: "Nada" }, ctx).catch((e) => e);
+    const many = await call("list_transactions", { category: ["Comida", "Nada"] }, ctx).catch(
+      (e) => e,
+    );
+    expect(one).toBeInstanceOf(Error);
+    expect(many.message).toBe(one.message);
+  });
+
   it("marks detected transactions to review, with their origin, and filters them", async () => {
     const detected = { source: "capture" as const, needsReview: true };
     const { ctx } = setup({

@@ -1,4 +1,4 @@
-import { addMonths } from "@wambito/core";
+import { addMonths, movementTotals } from "@wambito/core";
 import { z } from "zod";
 import { phrases, quote } from "../text.ts";
 import { defineTool, READ_ONLY } from "../tool.ts";
@@ -19,6 +19,11 @@ import {
   toTransactionOutput,
   transactionOutput,
 } from "./shared.ts";
+
+const textInput = z.string().trim().min(1).max(100);
+
+const toList = <T>(value: T | T[] | undefined): T[] =>
+  value === undefined ? [] : Array.isArray(value) ? value : [value];
 
 /** A list page: the API's limit is 200; the model gets at most 100 to keep answers small. */
 const PAGE_LIMIT = 100;
@@ -109,21 +114,28 @@ export const getMonthOverview = defineTool({
 export const listTransactions = defineTool({
   name: "list_transactions",
   title: "List transactions",
-  description: `Transactions (movements), newest first, for a month or a date range, optionally filtered by category, text or status. Defaults to the current month when neither month nor from/to is given. Pages hold up to ${PAGE_LIMIT}; pass nextCursor back to get the next page. Use it to find the id of a transaction before changing or deleting it.`,
+  description: `Transactions (movements), newest first, optionally filtered by category, words, kind or status; the answer also holds the count and the sums of every match (totals), not only of the page. Without text, category, month or from/to it covers the current month only; with text or category and no dates it searches every month. text and category take one value or a list: with match "all" (default) a movement must fit the words and the categories, with "any" either is enough. Pages hold up to ${PAGE_LIMIT}; pass nextCursor back to get the next page. Use it to find the id of a transaction before changing or deleting it. To answer how much was spent on something, list the categories first, then send the matching categories and the words, synonyms and brands for it with match: "any", and use totals instead of adding items up. Totals include pending and to-review movements; for money already spent, pass status: "paid".`,
   scope: "finance:read",
   annotations: READ_ONLY,
   input: z.object({
     month: monthInput.optional(),
     from: dateInput.optional().describe("First day included, YYYY-MM-DD"),
     to: dateInput.optional().describe("Last day included, YYYY-MM-DD"),
-    category: categoryInput.optional(),
-    text: z
-      .string()
-      .trim()
-      .min(1)
-      .max(100)
+    category: z
+      .union([categoryInput, z.array(categoryInput).min(1).max(20)])
       .optional()
-      .describe("Matches the name or the note, ignoring case and accents"),
+      .describe("One category or a list (up to 20), by name or id as list_categories shows them"),
+    text: z
+      .union([textInput, z.array(textInput).min(1).max(10)])
+      .optional()
+      .describe(
+        "One word or a list (up to 10): matches the name or the note, ignoring case and accents. Send synonyms and brands as separate words",
+      ),
+    kind: z.enum(["expense", "income"]).optional().describe("Only expenses or only income"),
+    match: z
+      .enum(["all", "any"])
+      .optional()
+      .describe("all (default): the words and the categories must both fit; any: either is enough"),
     status: z
       .enum(["paid", "pending"])
       .optional()
@@ -141,36 +153,63 @@ export const listTransactions = defineTool({
       .string()
       .nullable()
       .describe("Pass it as cursor for the next page; null at the end"),
+    totals: z
+      .object({
+        count: z.number().int(),
+        expense: moneyOutput.describe("Sum of the matching expenses, positive"),
+        income: moneyOutput.describe("Sum of the matching income"),
+      })
+      .describe("Over every match, not only this page"),
   }),
   async handler(input, { wambito, now }) {
     const profile = await wambito.profile();
     if (input.from && input.to && input.from > input.to) throw invalid("from must not be after to");
     const categories = await wambito.listCategories();
+    const texts = toList(input.text);
+    const refs = toList(input.category);
     const ranged = input.month !== undefined || input.from !== undefined || input.to !== undefined;
+    const searching = texts.length > 0 || refs.length > 0;
     const page = await wambito.listTransactions({
-      month: ranged ? input.month : currentMonth(profile, now()),
+      month: ranged || searching ? input.month : currentMonth(profile, now()),
       from: input.from,
       to: input.to,
-      categoryId: input.category
-        ? findCategory(input.category, categories, { archived: true }).id
+      categoryIds: refs.length
+        ? refs.map((ref) => findCategory(ref, categories, { archived: true }).id)
         : undefined,
+      kind: input.kind,
+      match: input.match,
       status: input.status,
       needsReview: input.needsReview,
-      q: input.text,
+      q: texts.length ? texts : undefined,
       cursor: input.cursor,
       limit: input.limit,
+      totals: true,
     });
     const names = byId(categories);
     const items = page.items.map((tx) => toTransactionOutput(tx, names, profile));
+    const totals = page.totals ?? movementTotals(page.items);
+    const structuredTotals = {
+      count: totals.count,
+      expense: money(totals.expense, profile),
+      income: money(totals.income, profile),
+    };
     const p = phrases(profile.locale);
     const lines = [
+      p.totals({
+        count: totals.count,
+        expense: structuredTotals.expense.formatted,
+        income: structuredTotals.income.formatted,
+      }),
       p.transactions(items.length, page.nextCursor !== null),
       ...items.map(
         (t) =>
           `${t.date} ${quote(t.name)} ${t.kind === "expense" ? "-" : "+"}${t.formatted} ${quote(t.category)}${t.status === "pending" ? ` (${p.pending})` : ""}${t.needsReview ? ` (${p.toReview})` : ""}${t.captureSource ? ` (${p.fromSource(t.captureSource)})` : ""} [${t.id}]`,
       ),
     ];
-    return { structured: { items, nextCursor: page.nextCursor }, text: lines.join("\n") };
+    return {
+      structured: { items, nextCursor: page.nextCursor, totals: structuredTotals },
+      text: lines.join("\n"),
+    };
   },
 });
 

@@ -11,6 +11,8 @@ import {
 export interface TransactionList {
   items: TransactionDto[];
   nextCursor: string | null;
+  /** Only with `totals=true`: every match, in positive cents. */
+  totals?: { count: number; expense: number; income: number } | undefined;
 }
 
 /**

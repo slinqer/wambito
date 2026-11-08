@@ -76,17 +76,22 @@ export function HomeHeader({ month, onMonth, max, signOut: request }: HomeHeader
       <div className="order-last flex w-full justify-center min-[400px]:order-none min-[400px]:w-auto">
         <MonthPicker month={month} onChange={onMonth} max={max} />
       </div>
-      <button
-        ref={button}
-        type="button"
-        className="lk-avatar"
-        aria-label={t("home.account")}
-        aria-expanded={open}
-        aria-controls={menuId}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span aria-hidden="true">🙂</span>
-      </button>
+      <div className="flex items-center gap-(--space-2)">
+        <Link to={appPath("/search")} className="lk-avatar" aria-label={t("nav.search")}>
+          <span aria-hidden="true">🔍</span>
+        </Link>
+        <button
+          ref={button}
+          type="button"
+          className="lk-avatar"
+          aria-label={t("home.account")}
+          aria-expanded={open}
+          aria-controls={menuId}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span aria-hidden="true">🙂</span>
+        </button>
+      </div>
       {/* Above home's sticky tabs (z-20, later in the page), which once hid its lower half. */}
       <div
         ref={panel}

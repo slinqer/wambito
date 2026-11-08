@@ -507,6 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           month: home.month ?? data.month,
                           onMonth: (month) => unawaited(_controller.showMonth(month)),
                           max: current,
+                          onSearch: () => unawaited(context.push<void>('/search')),
                           menu: widget.menu,
                         ),
                         if (shown != null) ...[

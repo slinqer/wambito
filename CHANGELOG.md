@@ -21,6 +21,19 @@ How to add to it:
 
 ## Unreleased
 
+### Added
+
+- `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match (ask for it on the first page only).
+- MCP `list_transactions`: `text` and `category` take lists, plus `kind` and `match`; it returns `totals` (count, expense, income), which include pending and to-review movements (pass `status: "paid"` for money already spent).
+
+### Changed
+
+- MCP `list_transactions` searches every month when given text or a category and no dates (before, it covered the current month only). Its page line now reads "On this page: N …" so it is not mistaken for the total.
+
+### Fixed
+
+- MCP `list_transactions` category filter: it was sent as `categoryId` and the API ignored it.
+
 ## 1.0.0 - 2026-11-05
 
 The first numbered version: what the server offers today.

@@ -164,7 +164,8 @@
     "categories": "Categorie",
     "settings": "Impostazioni",
     "add": "Aggiungi",
-    "soon": "Presto"
+    "soon": "Presto",
+    "search": "Cerca"
   },
   "errors": {
     "generic": "Qualcosa è andato storto. Riprova tra un momento.",
@@ -495,6 +496,27 @@
       "body": "Non verrà più annotato da solo, e i suoi movimenti in sospeso da questo mese in poi vengono cancellati. Quello che hai già pagato resta.",
       "confirm": "Sì, elimina"
     }
+  },
+  "search": {
+    "meta_title": "Cerca · Wambito",
+    "title": "Cerca",
+    "placeholder": "Cerca per nome o nota",
+    "kind": "Tipo",
+    "kind_all": "Tutti",
+    "kind_expense": "Spese",
+    "kind_income": "Entrate",
+    "category": "Categoria",
+    "category_count": "Categoria · {count}",
+    "done": "Fatto",
+    "results": "Risultati",
+    "status": "Stato",
+    "status_all": "Tutti",
+    "status_paid": "Pagati",
+    "status_pending": "In sospeso",
+    "hint": "Cerca per nome, nota, categoria…",
+    "none": "Non ho trovato niente con «{text}»",
+    "none_filters": "Non ho trovato niente con questi filtri",
+    "totals": "{count, plural, one {# movimento} other {# movimenti}} · spese {expense} · entrate {income}"
   },
   "insights": {
     "meta_title": "Analisi · Wambito",

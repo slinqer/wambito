@@ -1,6 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  FOLD_FROM,
+  FOLD_TO,
   firstDay,
+  foldText,
   isIsoDate,
   isoDateSchema,
   lastDay,
@@ -14,10 +17,12 @@ import {
   type Column,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   or,
   type SQL,
@@ -48,6 +53,18 @@ import {
   toTransactionDto,
 } from "../services/transactions.ts";
 
+/** A query param that may repeat: Hono hands one value as a string and several as an array. */
+function repeated<T extends z.ZodType>(item: T, max: number, format?: string) {
+  return z
+    .preprocess((v) => (typeof v === "string" ? [v] : v), z.array(item).max(max))
+    .optional()
+    .openapi({
+      type: "array",
+      items: { type: "string", ...(format ? { format } : {}) },
+      param: { style: "form", explode: true },
+    });
+}
+
 const idParam = z.object({ id: z.uuid() });
 const listQuery = z
   .object({
@@ -55,9 +72,19 @@ const listQuery = z
     /** First and last day to include (YYYY-MM-DD), each optional; with `month`, both narrow it. */
     from: isoDateSchema.optional(),
     to: isoDateSchema.optional(),
-    /** Text the name or the note contains, ignoring case. */
-    q: z.string().trim().min(1).max(100).optional(),
-    category: z.uuid().optional(),
+    /** `expense`: only negative amounts; `income`: only positive ones. */
+    kind: z.enum(["expense", "income"]).optional(),
+    /** Words the name or the note contains, ignoring case and accents; repeat to match any of them. */
+    q: repeated(z.string().trim().min(1).max(100), 10),
+    /** Repeat to match any of the categories. */
+    category: repeated(z.uuid(), 20, "uuid"),
+    /** With both text and categories: `all` (default) needs both, `any` either. */
+    match: z.enum(["all", "any"]).optional(),
+    /** `true` adds `totals` (count and sums of every match, ignoring the cursor) to the page. */
+    totals: z
+      .enum(["true", "false"])
+      .transform((v) => v === "true")
+      .optional(),
     status: z.enum(["paid", "pending"]).optional(),
     /** `true`: only detected transactions waiting for review; `false`: only the rest. */
     needsReview: z
@@ -80,17 +107,22 @@ const TransactionSuggestion = z
   .object({ name: z.string(), categoryId: z.uuid() })
   .openapi("TransactionSuggestion");
 const TransactionPage = z
-  .object({ items: z.array(Transaction), nextCursor: z.string().nullable() })
+  .object({
+    items: z.array(Transaction),
+    nextCursor: z.string().nullable(),
+    totals: z
+      .object({
+        count: z.number().int(),
+        expense: z.number().int().describe("Cents, positive"),
+        income: z.number().int().describe("Cents, positive"),
+      })
+      .optional()
+      .describe("Only with `totals=true`: every match, not just this page"),
+  })
   .openapi("TransactionPage");
 const TransactionList = z.object({ items: z.array(Transaction) }).openapi("TransactionList");
 
-/** Accented letters the text search folds, and what they fold to (Spanish, Italian, Portuguese). */
-const ACCENTED = "áàâãäéèêëíìîïóòôõöúùûüñç";
-const PLAIN = "aaaaaeeeeiiiiooooouuuunc";
-/** Lower case without accents, so "almuerzo" finds "Almuérzo". */
-const foldText = (text: string) =>
-  [...text.toLowerCase()].map((ch) => PLAIN[ACCENTED.indexOf(ch)] ?? ch).join("");
-const foldColumn = (column: Column) => sql`translate(lower(${column}), ${ACCENTED}, ${PLAIN})`;
+const foldColumn = (column: Column) => sql`translate(lower(${column}), ${FOLD_FROM}, ${FOLD_TO})`;
 
 const encodeCursor = (row: TransactionRow) =>
   Buffer.from(`${row.date}|${row.id}`).toString("base64url");
@@ -138,32 +170,63 @@ export function transactionRoutes(deps: AppDeps) {
         );
       if (q.from) filters.push(gte(transactions.date, q.from));
       if (q.to) filters.push(lte(transactions.date, q.to));
-      if (q.q) {
-        const pattern = `%${foldText(q.q).replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
-        filters.push(
-          or(
-            sql`${foldColumn(transactions.name)} like ${pattern}`,
-            sql`${foldColumn(transactions.note)} like ${pattern}`,
-          ),
-        );
+      const textCondition = q.q?.length
+        ? or(
+            ...q.q.map((term) => {
+              const pattern = `%${foldText(term).replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+              return or(
+                sql`${foldColumn(transactions.name)} like ${pattern}`,
+                sql`${foldColumn(transactions.note)} like ${pattern}`,
+              );
+            }),
+          )
+        : undefined;
+      const categoryCondition = q.category?.length
+        ? inArray(transactions.categoryId, q.category)
+        : undefined;
+      if (q.match === "any" && textCondition && categoryCondition) {
+        filters.push(or(textCondition, categoryCondition));
+      } else {
+        filters.push(textCondition, categoryCondition);
       }
-      if (q.category) filters.push(eq(transactions.categoryId, q.category));
+      if (q.kind)
+        filters.push(
+          q.kind === "expense" ? lt(transactions.amount, 0) : gt(transactions.amount, 0),
+        );
       if (q.status) filters.push(eq(transactions.status, q.status));
       if (q.needsReview !== undefined) filters.push(eq(transactions.needsReview, q.needsReview));
+      const pageFilters = [...filters];
       if (q.cursor) {
         const { date, id } = decodeCursor(q.cursor);
-        filters.push(
+        pageFilters.push(
           sql`(${transactions.date}, ${transactions.id}) < (${date}::date, ${id}::uuid)`,
         );
       }
-      const rows = await withUser(deps.db, user.id, async (tx) => {
+      const { rows, totals } = await withUser(deps.db, user.id, async (tx) => {
         if (q.month) await materializeRecurrences(tx, user.id, q.month, currentMonth(deps, user));
-        return tx
+        const rows = await tx
           .select()
           .from(transactions)
-          .where(and(...filters))
+          .where(and(...pageFilters))
           .orderBy(desc(transactions.date), desc(transactions.id))
           .limit(q.limit + 1);
+        if (!q.totals) return { rows, totals: undefined };
+        const [sums] = await tx
+          .select({
+            count: sql<number>`count(*)::int`,
+            expense: sql<string>`coalesce(sum(-${transactions.amount}) filter (where ${transactions.amount} < 0), 0)`,
+            income: sql<string>`coalesce(sum(${transactions.amount}) filter (where ${transactions.amount} > 0), 0)`,
+          })
+          .from(transactions)
+          .where(and(...filters));
+        return {
+          rows,
+          totals: sums && {
+            count: sums.count,
+            expense: Number(sums.expense),
+            income: Number(sums.income),
+          },
+        };
       });
       const items = rows.slice(0, q.limit);
       const last = items.at(-1);
@@ -171,6 +234,7 @@ export function transactionRoutes(deps: AppDeps) {
         {
           items: items.map(toTransactionDto),
           nextCursor: rows.length > q.limit && last ? encodeCursor(last) : null,
+          ...(totals ? { totals } : {}),
         },
         200,
       );

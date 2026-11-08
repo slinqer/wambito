@@ -840,6 +840,14 @@ export interface components {
         TransactionPage: {
             items: components["schemas"]["Transaction"][];
             nextCursor: string | null;
+            /** @description Only with `totals=true`: every match, not just this page */
+            totals?: {
+                count: number;
+                /** @description Cents, positive */
+                expense: number;
+                /** @description Cents, positive */
+                income: number;
+            };
         };
         Transaction: {
             /** Format: uuid */
@@ -2238,8 +2246,11 @@ export interface operations {
                 month?: string;
                 from?: string;
                 to?: string;
-                q?: string;
-                category?: string;
+                kind?: "expense" | "income";
+                q?: string[];
+                category?: string[];
+                match?: "all" | "any";
+                totals?: "true" | "false";
                 status?: "paid" | "pending";
                 needsReview?: "true" | "false";
                 cursor?: string;

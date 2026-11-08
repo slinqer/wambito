@@ -7,6 +7,12 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { monthOf, type TransactionDto } from "@wambito/core";
+import {
+  filtersToParams,
+  isSearching,
+  type SearchFilters,
+  toApiQuery,
+} from "../features/search/search-model.ts";
 import { useApi } from "./ApiProvider.tsx";
 import { ApiProblem } from "./errors.ts";
 import {
@@ -101,7 +107,7 @@ export const TRANSACTIONS_PAGE = 200;
  */
 function useTransactionPages(
   queryKey: readonly unknown[],
-  query: { month: string; category?: string; needsReview?: "true" },
+  query: { month: string; category?: string[]; needsReview?: "true" },
 ) {
   const api = useApi();
   return useInfiniteQuery({
@@ -122,6 +128,35 @@ function useTransactionPages(
       ),
     getNextPageParam: (last) => last.nextCursor,
     select: (data: TransactionPages) => data.pages.flatMap((page) => page.items),
+  });
+}
+
+/** Searches live under their own prefix, so `settle` refreshes them after any write. */
+const SEARCH_KEY = ["transactions", "search"] as const;
+
+/**
+ * Movements matching the filters, across every month, newest first, 50 a page. `data` is the rows
+ * fetched so far; the first page's `totals` (count, expense, income) cover every match. Off while
+ * nothing is being searched.
+ */
+export function useTransactionSearch(filters: SearchFilters) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: [...SEARCH_KEY, filtersToParams(filters).toString()],
+    enabled: isSearching(filters),
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }): Promise<TransactionList> =>
+      dataOf(
+        await api.GET("/v1/transactions", {
+          params: { query: toApiQuery(filters, pageParam) },
+          signal,
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor,
+    select: (data: TransactionPages) => ({
+      items: data.pages.flatMap((page) => page.items),
+      totals: data.pages[0]?.totals,
+    }),
   });
 }
 
@@ -280,6 +315,7 @@ async function applyOptimistic(
 
 function settle(qc: QueryClient, months: string[]) {
   for (const queryKey of keysFor(months)) void qc.invalidateQueries({ queryKey });
+  void qc.invalidateQueries({ queryKey: SEARCH_KEY });
   void qc.invalidateQueries({ queryKey: queryKeys.reports() });
   // Names you used before (and their usual category) change with every write.
   void qc.invalidateQueries({ queryKey: ["suggestions"] });
@@ -504,7 +540,7 @@ export type RecurrencePatch = JsonBody<"/v1/recurrences/{id}", "patch">;
 export function useCategoryTransactions(month: string, categoryId: string) {
   return useTransactionPages([...queryKeys.transactions(month), "category", categoryId], {
     month,
-    category: categoryId,
+    category: [categoryId],
   });
 }
 

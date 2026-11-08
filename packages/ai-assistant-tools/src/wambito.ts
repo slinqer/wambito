@@ -3,6 +3,8 @@ import type {
   CreateCategory,
   CreateRecurrence,
   CreateTransaction,
+  MovementKind,
+  MovementTotals,
   monthSummaryDto,
   RecurrenceDto,
   SetBudget,
@@ -22,18 +24,26 @@ export interface Profile {
   currency: string;
 }
 
-/** A page of transactions. `from`/`to` are inclusive dates (YYYY-MM-DD); `q` matches name or note. */
+/**
+ * A page of transactions. `from`/`to` are inclusive dates (YYYY-MM-DD). `q` are words matched
+ * against name or note and `categoryIds` categories; `match` says whether both groups must hold
+ * ("all", the default) or either ("any"); `kind` and `status` always apply. `totals` asks for the
+ * count and sums of every match, not only of the page.
+ */
 export interface TransactionQuery {
   month?: string;
   from?: string;
   to?: string;
-  categoryId?: string;
+  categoryIds?: string[];
+  kind?: MovementKind;
+  match?: "all" | "any";
   status?: "paid" | "pending";
   /** true: only detected transactions the person has not confirmed yet. */
   needsReview?: boolean;
-  q?: string;
+  q?: string[];
   cursor?: string;
   limit: number;
+  totals?: boolean;
 }
 
 /**
@@ -51,7 +61,7 @@ export interface Wambito {
   /** Live transactions, newest first (date, then id). */
   listTransactions(
     q: TransactionQuery,
-  ): Promise<{ items: TransactionDto[]; nextCursor: string | null }>;
+  ): Promise<{ items: TransactionDto[]; nextCursor: string | null; totals?: MovementTotals }>;
   /** Totals per category over months `from`..`to` (inclusive), positive, largest first. */
   categoryReport(r: {
     from: string;

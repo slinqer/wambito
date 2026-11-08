@@ -40,9 +40,9 @@ test("add, list, delete and restore round-trip, saved as mcp", async () => {
   expect(saved.replayed).toBe(false);
   expect(saved.items[0]).toMatchObject({ name: "Almuerzo", source: "mcp" });
   const id = saved.items[0]?.id ?? "";
-  expect((await wambito.listTransactions({ q: "almu", limit: 10 })).items.map((i) => i.id)).toEqual(
-    [id],
-  );
+  expect(
+    (await wambito.listTransactions({ q: ["almu"], limit: 10 })).items.map((i) => i.id),
+  ).toEqual([id]);
   await wambito.deleteTransactions([id]);
   expect((await wambito.listTransactions({ month: "2026-10", limit: 10 })).items).toEqual([]);
   await wambito.restoreTransaction(id);
@@ -56,7 +56,7 @@ test("the same batch with the same key is a replay and saves nothing", async () 
   await wambito.addTransactions(batch, "key-2");
   const again = await wambito.addTransactions(batch, "key-2");
   expect(again.replayed).toBe(true);
-  expect((await wambito.listTransactions({ q: "taxi", limit: 10 })).items).toHaveLength(1);
+  expect((await wambito.listTransactions({ q: ["taxi"], limit: 10 })).items).toHaveLength(1);
 });
 
 test("an API problem becomes a ToolError with its code", async () => {
@@ -65,4 +65,56 @@ test("an API problem becomes a ToolError with its code", async () => {
     .catch((e: unknown) => e);
   expect(error).toBeInstanceOf(ToolError);
   expect((error as ToolError).code).toBe("not_found");
+});
+
+test("list_transactions sends repeated words and categories, kind, match and totals", async () => {
+  const urls: URL[] = [];
+  const spy = (async (input: string | URL | Request, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(String(input), init);
+    urls.push(new URL(request.url));
+    return Response.json({
+      items: [],
+      nextCursor: null,
+      totals: { count: 0, expense: 0, income: 0 },
+    });
+  }) as typeof fetch;
+  const probe = apiWambito("http://api.test", "token", spy);
+  const other = "00000000-0000-4000-8000-000000000002";
+  const result = await probe.listTransactions({
+    from: "2026-01-01",
+    to: "2026-02-01",
+    categoryIds: [categoryId, other],
+    kind: "expense",
+    match: "any",
+    status: "paid",
+    needsReview: true,
+    q: ["almuerzo", "corrientazo"],
+    limit: 25,
+    totals: true,
+  });
+  expect(result.totals).toEqual({ count: 0, expense: 0, income: 0 });
+  const params = urls[0]?.searchParams;
+  expect(params?.getAll("q")).toEqual(["almuerzo", "corrientazo"]);
+  expect(params?.getAll("category")).toEqual([categoryId, other]);
+  expect(params?.has("categoryId")).toBe(false);
+  expect(Object.fromEntries(params ?? [])).toMatchObject({
+    from: "2026-01-01",
+    to: "2026-02-01",
+    kind: "expense",
+    match: "any",
+    status: "paid",
+    needsReview: "true",
+    totals: "true",
+    limit: "25",
+  });
+});
+
+test("the category filter reaches the API and finds the movement", async () => {
+  const items = await wambito.listTransactions({ categoryIds: [categoryId], limit: 10 });
+  expect(items.items.length).toBeGreaterThan(0);
+  const none = await wambito.listTransactions({
+    categoryIds: ["00000000-0000-4000-8000-000000000009"],
+    limit: 10,
+  });
+  expect(none.items).toEqual([]);
 });

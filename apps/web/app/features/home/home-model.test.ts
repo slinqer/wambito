@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   feedbackForSave,
   groupByDay,
+  groupNewestFirst,
   homeWambiLine,
   orderByUse,
   overallState,
@@ -296,5 +297,24 @@ describe("reviewMark", () => {
 
   it("still marks one whose source is unknown", () => {
     expect(reviewMark(detected("c", null))).toBe("other");
+  });
+});
+
+describe("groupNewestFirst", () => {
+  it("keeps the API order: a future pending day stays above older days", () => {
+    const items = [
+      tx("c", "2026-10-25", -100, "pending"),
+      tx("b", "2026-10-21", -200),
+      tx("a", "2026-10-20", -300),
+      tx("a2", "2026-10-20", -50),
+    ];
+    const groups = groupNewestFirst(items, "2026-10-21");
+    expect(groups.map((g) => [g.date, g.when])).toEqual([
+      ["2026-10-25", "upcoming"],
+      ["2026-10-21", "today"],
+      ["2026-10-20", "yesterday"],
+    ]);
+    expect(groups[2]?.total).toBe(-350);
+    expect(groups[2]?.items.map((i) => i.id)).toEqual(["a", "a2"]);
   });
 });

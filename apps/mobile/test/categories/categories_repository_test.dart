@@ -134,7 +134,10 @@ void main() {
   test('a category has transactions when one page of them is not empty', () async {
     final (repo, adapter) = _make();
     expect(await repo.hasTransactions('c1'), isFalse);
-    expect(adapter.requests.single.queryParameters, {'category': 'c1', 'limit': 200});
+    expect(adapter.requests.single.queryParameters, {
+      'category': isA<ListParam>().having((p) => p.value, 'value', ['c1']),
+      'limit': 200,
+    });
     adapter.transactions = [
       {
         'id': 't1',

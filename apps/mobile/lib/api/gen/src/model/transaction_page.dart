@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
+import 'package:wambito/api/gen/src/model/transaction_page_totals.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -15,6 +16,7 @@ part 'transaction_page.g.dart';
 /// Properties:
 /// * [items]
 /// * [nextCursor]
+/// * [totals]
 @BuiltValue()
 abstract class TransactionPage implements Built<TransactionPage, TransactionPageBuilder> {
   @BuiltValueField(wireName: r'items')
@@ -22,6 +24,9 @@ abstract class TransactionPage implements Built<TransactionPage, TransactionPage
 
   @BuiltValueField(wireName: r'nextCursor')
   String? get nextCursor;
+
+  @BuiltValueField(wireName: r'totals')
+  TransactionPageTotals? get totals;
 
   TransactionPage._();
 
@@ -55,6 +60,13 @@ class _$TransactionPageSerializer implements PrimitiveSerializer<TransactionPage
     yield object.nextCursor == null
         ? null
         : serializers.serialize(object.nextCursor, specifiedType: const FullType.nullable(String));
+    if (object.totals != null) {
+      yield r'totals';
+      yield serializers.serialize(
+        object.totals,
+        specifiedType: const FullType(TransactionPageTotals),
+      );
+    }
   }
 
   @override
@@ -92,6 +104,14 @@ class _$TransactionPageSerializer implements PrimitiveSerializer<TransactionPage
           ) as String?;
           if (valueDes == null) continue;
           result.nextCursor = valueDes;
+          break;
+        case r'totals':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(TransactionPageTotals),
+          ) as TransactionPageTotals?;
+          if (valueDes == null) continue;
+          result.totals.replace(valueDes);
           break;
         default:
           unhandled.add(key);

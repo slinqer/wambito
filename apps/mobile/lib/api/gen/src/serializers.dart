@@ -66,6 +66,7 @@ import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
 import 'package:wambito/api/gen/src/model/transaction_list.dart';
 import 'package:wambito/api/gen/src/model/transaction_page.dart';
+import 'package:wambito/api/gen/src/model/transaction_page_totals.dart';
 import 'package:wambito/api/gen/src/model/transaction_suggestion.dart';
 import 'package:wambito/api/gen/src/model/transaction_suggestions.dart';
 import 'package:wambito/api/gen/src/model/trend_report.dart';
@@ -130,6 +131,7 @@ part 'serializers.g.dart';
   Transaction,
   TransactionList,
   TransactionPage,
+  TransactionPageTotals,
   TransactionSuggestion,
   TransactionSuggestions,
   TrendReport,

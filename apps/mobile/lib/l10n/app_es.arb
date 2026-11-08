@@ -3728,5 +3728,54 @@
         "type": "String"
       }
     }
+  },
+  "searchTitle": "Buscar",
+  "searchPlaceholder": "Busca por nombre o nota",
+  "searchKind": "Tipo",
+  "searchKindAll": "Todos",
+  "searchKindExpense": "Gastos",
+  "searchKindIncome": "Ingresos",
+  "searchCategory": "Categoría",
+  "searchCategoryCount": "Categoría · {count}",
+  "searchDone": "Listo",
+  "searchResults": "Resultados",
+  "searchStatus": "Estado",
+  "searchStatusAll": "Todos",
+  "searchStatusPaid": "Pagados",
+  "searchStatusPending": "Pendientes",
+  "searchHint": "Busca por nombre, nota, categoría…",
+  "searchNone": "No encontré nada con «{text}»",
+  "searchNoneFilters": "No encontré nada con esos filtros",
+  "searchTotals": "{count, plural, =1{1 movimiento} other{{count} movimientos}} · gastos {expense} · ingresos {income}",
+  "@searchTitle": {
+    "description": "Search: the screen title, and the name of the magnifier button at the top of home."
+  },
+  "@searchCategoryCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@searchNone": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchTotals": {
+    "description": "Search: the totals over every match.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "expense": {
+        "type": "String"
+      },
+      "income": {
+        "type": "String"
+      }
+    }
   }
 }

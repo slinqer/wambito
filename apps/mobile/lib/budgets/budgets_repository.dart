@@ -1,3 +1,4 @@
+import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -52,7 +53,7 @@ class ApiBudgetsRepository implements BudgetsRepository {
     final page = await _settle(
       () => _api.listTransactions(
         month: month,
-        category: categoryId,
+        category: BuiltList<String>([categoryId]),
         cursor: cursor,
         limit: transactionsPageSize,
       ),
