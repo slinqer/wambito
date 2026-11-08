@@ -26,8 +26,8 @@ export interface SearchableMovement {
 }
 
 export function matchesMovementSearch(tx: SearchableMovement, s: MovementSearch): boolean {
-  if (s.kind === "expense" && !(tx.amount < 0)) return false;
-  if (s.kind === "income" && !(tx.amount > 0)) return false;
+  if (s.kind === "expense" && tx.amount >= 0) return false;
+  if (s.kind === "income" && tx.amount <= 0) return false;
   if (s.status && tx.status !== s.status) return false;
 
   const terms = (s.terms ?? []).map((t) => foldText(t.trim())).filter((t) => t !== "");

@@ -52,6 +52,18 @@ describe("matchesMovementSearch", () => {
     );
     expect(matchesMovementSearch(tx(), { status: "paid" })).toBe(true);
   });
+  it("trims terms and ignores blank ones", () => {
+    expect(matchesMovementSearch(tx(), { terms: [" cafe "] })).toBe(true);
+    expect(matchesMovementSearch(tx(), { terms: ["  "] })).toBe(true);
+  });
+  it("defaults to match all", () => {
+    expect(matchesMovementSearch(tx(), { terms: ["cafe"], categoryIds: ["other"] })).toBe(false);
+    expect(matchesMovementSearch(tx(), { terms: ["cafe"], categoryIds: ["cat-food"] })).toBe(true);
+  });
+  it("a zero amount is neither expense nor income", () => {
+    expect(matchesMovementSearch(tx({ amount: 0 }), { kind: "expense" })).toBe(false);
+    expect(matchesMovementSearch(tx({ amount: 0 }), { kind: "income" })).toBe(false);
+  });
   it("an empty search matches everything", () => {
     expect(matchesMovementSearch(tx(), {})).toBe(true);
     expect(matchesMovementSearch(tx(), { terms: [], categoryIds: [] })).toBe(true);
