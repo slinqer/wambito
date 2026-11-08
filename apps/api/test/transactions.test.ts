@@ -85,6 +85,155 @@ describe("transactions", () => {
     expect(backwards.status).toBe(422);
   });
 
+  describe("movement search filters", () => {
+    let h: { authorization: string };
+    let catA: string;
+    let catB: string;
+    const names = async (query: string) => (await page(query, h)).items.map((i) => i.name);
+
+    beforeAll(async () => {
+      h = (await t.signIn("movsearch@wambito.test")).headers;
+      catA = await category(h, "CatA");
+      catB = await category(h, "CatB");
+      const add = (name: string, amount: number, date: string, categoryId: string) =>
+        create({ name, amount, date, categoryId }, h);
+      await add("Almuerzo", -1000, "2026-08-01", catA);
+      await add("Corrientazo", -2000, "2026-09-02", catB);
+      await add("Cafe", -300, "2026-09-03", catA);
+      await add("Café Bogotá", -400, "2026-10-04", catB);
+      await add("Almuerzo trabajo", -500, "2026-10-05", catB);
+      await add("Sueldo", 9000, "2026-08-10", catA);
+      await add("Sueldo extra", 1000, "2026-10-10", catB);
+      await add("Descuento 50%", -100, "2026-10-11", catB);
+      await add("a_b", -100, "2026-10-12", catB);
+      await add("axb", -100, "2026-10-13", catB);
+      const other = (await t.signIn("movother@wambito.test")).headers;
+      const otherCat = await category(other, "Otra");
+      await create(
+        { name: "Almuerzo ajeno", amount: -7777, date: "2026-10-01", categoryId: otherCat },
+        other,
+      );
+      await create(
+        { name: "Sueldo ajeno", amount: 7777, date: "2026-10-01", categoryId: otherCat },
+        other,
+      );
+    });
+
+    test("kind filters by the sign of the amount, across months, newest first", async () => {
+      expect(await names("?kind=expense&q=almuerzo")).toEqual(["Almuerzo trabajo", "Almuerzo"]);
+      expect(await names("?kind=income")).toEqual(["Sueldo extra", "Sueldo"]);
+      expect(await names("?kind=income&q=sueldo")).toEqual(["Sueldo extra", "Sueldo"]);
+      expect(await names("?kind=income&q=almuerzo")).toEqual([]);
+    });
+
+    test("several q terms match any of them", async () => {
+      expect(await names("?q=almuerzo&q=corrientazo")).toEqual([
+        "Almuerzo trabajo",
+        "Corrientazo",
+        "Almuerzo",
+      ]);
+    });
+
+    test("several categories match any of them", async () => {
+      const both = await names(`?category=${catA}&category=${catB}`);
+      expect(both).toHaveLength(10);
+      expect(await names(`?category=${catA}`)).toEqual(["Cafe", "Sueldo", "Almuerzo"]);
+    });
+
+    test("match=any ORs text and category, match=all ANDs them", async () => {
+      const any = await names(`?match=any&category=${catA}&q=almuerzo`);
+      expect(any).toEqual(["Almuerzo trabajo", "Cafe", "Sueldo", "Almuerzo"]);
+      expect(await names(`?match=all&category=${catA}&q=almuerzo`)).toEqual(["Almuerzo"]);
+      expect(await names(`?category=${catA}&q=almuerzo`)).toEqual(["Almuerzo"]);
+    });
+
+    test("totals cover every match, on every page, and are absent unless asked", async () => {
+      const first = await page("?kind=expense&q=almuerzo&q=cafe&limit=2&totals=true", h);
+      expect(first.items).toHaveLength(2);
+      expect(first.nextCursor).not.toBeNull();
+      const totals = { count: 4, expense: 2200, income: 0 };
+      expect((first as unknown as { totals: unknown }).totals).toEqual(totals);
+      const second = await page(
+        `?kind=expense&q=almuerzo&q=cafe&limit=2&totals=true&cursor=${first.nextCursor}`,
+        h,
+      );
+      expect((second as unknown as { totals: unknown }).totals).toEqual(totals);
+      const mixed = await page("?totals=true&limit=1", h);
+      expect((mixed as unknown as { totals: unknown }).totals).toEqual({
+        count: 10,
+        expense: 4500,
+        income: 10000,
+      });
+      expect(await page("?limit=1", h)).not.toHaveProperty("totals");
+      expect(await page("?limit=1&totals=false", h)).not.toHaveProperty("totals");
+    });
+
+    test("wildcards are text and a single word still finds accents", async () => {
+      expect(await names("?q=50%25")).toEqual(["Descuento 50%"]);
+      expect(await names("?q=a_b")).toEqual(["a_b"]);
+      expect(await names("?q=cafe")).toEqual(["Café Bogotá", "Cafe"]);
+    });
+
+    test("too many terms, long terms, too many categories and bad enums are 422", async () => {
+      const terms = (n: number) => Array.from({ length: n }, (_, i) => `q=t${i}`).join("&");
+      const cats = Array.from({ length: 21 }, () => `category=${catA}`).join("&");
+      for (const query of [
+        `?${terms(11)}`,
+        `?q=${"x".repeat(101)}`,
+        `?${cats}`,
+        "?kind=other",
+        "?match=some",
+      ]) {
+        const res = await t.request("GET", `/v1/transactions${query}`, { headers: h });
+        expect(res.status, query).toBe(422);
+        expect(await res.json(), query).toMatchObject({ code: "validation_failed" });
+      }
+      expect((await t.request("GET", `/v1/transactions?${terms(10)}`, { headers: h })).status).toBe(
+        200,
+      );
+    });
+
+    test("other users' rows never show in items or totals", async () => {
+      expect(await names("?q=ajeno")).toEqual([]);
+      const res = (await page("?totals=true&kind=income", h)) as unknown as {
+        totals: { income: number };
+      };
+      expect(res.totals.income).toBe(10000);
+    });
+
+    test("a request without month makes no pending recurrence rows", async () => {
+      await t.request("POST", "/v1/recurrences", {
+        headers: h,
+        body: {
+          name: "Rent",
+          amount: -5000,
+          categoryId: catA,
+          frequency: "monthly",
+          startDate: "2026-01-01",
+        },
+      });
+      expect(await names("?q=rent")).toEqual([]);
+    });
+
+    test("the OpenAPI document declares q and category as exploded form arrays", async () => {
+      const doc = (await (await t.request("GET", "/openapi.json")).json()) as {
+        paths: Record<
+          string,
+          { get?: { operationId?: string; parameters?: Record<string, unknown>[] } }
+        >;
+      };
+      const params = doc.paths["/v1/transactions"]?.get?.parameters ?? [];
+      for (const name of ["q", "category"]) {
+        const p = params.find((x) => x.name === name) as
+          | { schema: { type: string }; style?: string; explode?: boolean }
+          | undefined;
+        expect(p?.schema.type, name).toBe("array");
+        expect(p?.style, name).toBe("form");
+        expect(p?.explode, name).toBe(true);
+      }
+    });
+  });
+
   test("edit, delete and restore", async () => {
     let res = await t.request("PATCH", `/v1/transactions/${cinema.id}`, {
       headers: a,

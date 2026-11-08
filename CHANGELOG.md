@@ -21,6 +21,10 @@ How to add to it:
 
 ## Unreleased
 
+### Added
+
+- `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match.
+
 ## 1.0.0 - 2026-11-05
 
 The first numbered version: what the server offers today.
