@@ -3,7 +3,7 @@
 # certificate's SHA-256 for ANDROID_CERT_SHA256 (deploy/personal). Run on the founder's Mac;
 # the key lives nowhere else (spec section 8). docs/mobile/release.md has the whole procedure.
 #
-#   apps/mobile/scripts/release.sh [--tag mobile-vX.Y.Z] [--out <dir>] [--no-clean] [--allow-dirty]
+#   apps/mobile/scripts/release.sh [--tag mobile-vX.Y.Z] [--out <dir>] [--no-clean] [--allow-dirty] [--play]
 #
 # The signing material comes only from the environment, never from a file in the repo:
 #   WAMBITO_KEYSTORE            path of the keystore (.p12 / .jks)
@@ -20,6 +20,13 @@
 #
 # Output: <out>/<versionName>/wambito-<versionName>-<abi>.apk for arm64-v8a and armeabi-v7a, with
 # SHA256SUMS and ANDROID_CERT_SHA256.txt. <out> defaults to apps/mobile/dist, which is git-ignored.
+# --play also builds the Android App Bundle for Google Play (wambito-<versionName>.aab, versionCode
+# base * 10 + 0), signed with jarsigner by the UPLOAD key, never the app key (Play re-signs with the
+# app key, which the founder gave Play App Signing once; docs/mobile/play.md). Four more variables:
+#   WAMBITO_UPLOAD_KEYSTORE, WAMBITO_UPLOAD_KEY_ALIAS, WAMBITO_UPLOAD_KEYSTORE_PASSWORD and
+#   WAMBITO_UPLOAD_KEY_PASSWORD (left out, the upload keystore's password).
+# The bundle's manifest is read back with aapt2 for its version and permissions.
+#
 # Exit codes: 0 done, 1 a check failed, 2 missing input or tool.
 set +x
 unset BASH_XTRACEFD
@@ -32,7 +39,8 @@ source "$HERE/release-lib.sh"
 
 ABIS=(arm64-v8a armeabi-v7a)
 PACKAGE="com.wambito.app"
-SECRET_NAMES=(WAMBITO_KEYSTORE WAMBITO_KEY_ALIAS WAMBITO_KEYSTORE_PASSWORD WAMBITO_KEY_PASSWORD)
+SECRET_NAMES=(WAMBITO_KEYSTORE WAMBITO_KEY_ALIAS WAMBITO_KEYSTORE_PASSWORD WAMBITO_KEY_PASSWORD
+  WAMBITO_UPLOAD_KEYSTORE WAMBITO_UPLOAD_KEY_ALIAS WAMBITO_UPLOAD_KEYSTORE_PASSWORD WAMBITO_UPLOAD_KEY_PASSWORD)
 
 die() {
   echo "release.sh: $1" >&2
@@ -55,9 +63,10 @@ redact() {
     }'
 }
 
-# A child process without tracing and without the passwords (only apksigner and keytool get them).
+# A child process without tracing and without the passwords (only apksigner, jarsigner and keytool get them).
 without_secrets() {
-  env -u SHELLOPTS -u BASH_ENV -u WAMBITO_KEYSTORE_PASSWORD -u WAMBITO_KEY_PASSWORD -u WAMBITO_KEYSTORE -u WAMBITO_KEY_ALIAS "$@"
+  env -u SHELLOPTS -u BASH_ENV -u WAMBITO_KEYSTORE_PASSWORD -u WAMBITO_KEY_PASSWORD -u WAMBITO_KEYSTORE -u WAMBITO_KEY_ALIAS \
+    -u WAMBITO_UPLOAD_KEYSTORE_PASSWORD -u WAMBITO_UPLOAD_KEY_PASSWORD -u WAMBITO_UPLOAD_KEYSTORE -u WAMBITO_UPLOAD_KEY_ALIAS "$@"
 }
 with_secrets() {
   env -u SHELLOPTS -u BASH_ENV "$@"
@@ -79,12 +88,14 @@ out_root="$MOBILE/dist"
 tag_arg=""
 clean=1
 allow_dirty=0
+play=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --tag) tag_arg="${2:-}"; shift 2 ;;
     --out) out_root="${2:-}"; shift 2 ;;
     --no-clean) clean=0; shift ;;
     --allow-dirty) allow_dirty=1; shift ;;
+    --play) play=1; shift ;;
     -h | --help) sed -n '2,/^set +x/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown argument: $1" 2 ;;
   esac
@@ -102,6 +113,19 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 [ -f "$WAMBITO_KEYSTORE" ] && [ -r "$WAMBITO_KEYSTORE" ] || die "the file WAMBITO_KEYSTORE names does not exist or is not readable" 2
 export WAMBITO_KEY_PASSWORD="${WAMBITO_KEY_PASSWORD:-$WAMBITO_KEYSTORE_PASSWORD}"
+if [ "$play" -eq 1 ]; then
+  missing=()
+  for name in WAMBITO_UPLOAD_KEYSTORE WAMBITO_UPLOAD_KEY_ALIAS WAMBITO_UPLOAD_KEYSTORE_PASSWORD; do
+    if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+  done
+  if [ ${#missing[@]} -gt 0 ]; then
+    echo "release.sh: --play needs ${missing[*]} in your shell too (docs/mobile/play.md, 'The upload key')." >&2
+    exit 2
+  fi
+  [ -f "$WAMBITO_UPLOAD_KEYSTORE" ] && [ -r "$WAMBITO_UPLOAD_KEYSTORE" ] ||
+    die "the file WAMBITO_UPLOAD_KEYSTORE names does not exist or is not readable" 2
+  export WAMBITO_UPLOAD_KEY_PASSWORD="${WAMBITO_UPLOAD_KEY_PASSWORD:-$WAMBITO_UPLOAD_KEYSTORE_PASSWORD}"
+fi
 
 # --- Tools -----------------------------------------------------------------------------------------
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -129,6 +153,24 @@ if [ -z "$java_bin" ] || [ "$(java_major "$java_bin")" -lt 17 ] 2>/dev/null; the
 fi
 [ -n "$java_bin" ] && [ "$(java_major "$java_bin")" -ge 17 ] 2>/dev/null ||
   die "Java 17 or newer is needed for apksigner: set JAVA_HOME (docs/mobile/setup.md)" 2
+if [ "$play" -eq 1 ]; then
+  # The bundle is signed and read with the same JDK's tools.
+  jdk_bin="$(dirname "$java_bin")"
+  for tool in jarsigner keytool; do
+    [ -x "$jdk_bin/$tool" ] || die "--play needs $tool next to $java_bin (a full JDK 17)" 2
+  done
+  # Before building anything: the upload key must not be the app key (checked again on the bundle).
+  keystore_fingerprint() { # <keystore> <alias> <password variable>
+    with_secrets "$jdk_bin/keytool" -list -v -keystore "$1" -alias "$2" -storepass:env "$3" 2>/dev/null |
+      sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1
+  }
+  app_key="$(keystore_fingerprint "$WAMBITO_KEYSTORE" "$WAMBITO_KEY_ALIAS" WAMBITO_KEYSTORE_PASSWORD)"
+  upload_key="$(keystore_fingerprint "$WAMBITO_UPLOAD_KEYSTORE" "$WAMBITO_UPLOAD_KEY_ALIAS" WAMBITO_UPLOAD_KEYSTORE_PASSWORD)"
+  [ -n "$upload_key" ] || die "keytool cannot read the upload key (is the upload alias, or its password, wrong?)" 1
+  if [ -n "$app_key" ] && [ "$app_key" = "$upload_key" ]; then
+    die "the upload key is the app key, so the bundle would be signed with the app key: use a separate upload key (docs/mobile/play.md)" 1
+  fi
+fi
 
 # --- The version -------------------------------------------------------------------------------
 cd "$MOBILE"
@@ -261,15 +303,81 @@ fi
 
 release_is_fingerprint "$fingerprint" || die "internal error: '$fingerprint' is not the fingerprint format" 1
 
+# --- The Play bundle (--play) --------------------------------------------------------------------
+if [ "$play" -eq 1 ]; then
+  bundle_out="$MOBILE/build/app/outputs/bundle/release/app-release.aab"
+  rm -f "$bundle_out"
+  # Unsigned like the APKs (WAMBITO_UNSIGNED_RELEASE); no split: Play splits the bundle per device.
+  without_secrets env WAMBITO_UNSIGNED_RELEASE=1 flutter build appbundle --release \
+    --target-platform android-arm,android-arm64 --build-name "$version_name" --build-number "$base_code"
+  [ -f "$bundle_out" ] || die "Flutter did not produce $bundle_out" 1
+  aab="$dist/$(release_aab_name "$version_name")"
+
+  signed_ok=1
+  with_secrets "$jdk_bin/jarsigner" -keystore "$WAMBITO_UPLOAD_KEYSTORE" \
+    -storepass:env WAMBITO_UPLOAD_KEYSTORE_PASSWORD -keypass:env WAMBITO_UPLOAD_KEY_PASSWORD \
+    -sigalg SHA256withRSA -digestalg SHA-256 -signedjar "$aab" "$bundle_out" "$WAMBITO_UPLOAD_KEY_ALIAS" 2>&1 |
+    redact >"$dist/.jarsigner.log" || signed_ok=0
+  if [ "$signed_ok" -ne 1 ] || [ ! -f "$aab" ]; then
+    cat "$dist/.jarsigner.log" >&2
+    rm -f "$dist/.jarsigner.log"
+    die "jarsigner did not sign the bundle (is the upload alias, or a password, wrong?)" 1
+  fi
+  rm -f "$dist/.jarsigner.log"
+
+  verified="$(without_secrets "$jdk_bin/jarsigner" -verify "$aab" 2>&1)" || die "jarsigner does not verify the bundle:
+$verified" 1
+  grep -q '^jar verified' <<<"$verified" || die "jarsigner does not verify the bundle:
+$verified" 1
+
+  # The bundle's certificate is the upload keystore's, and it is not the app key: Play App Signing
+  # keeps the two apart, and a leaked upload key can be reset while the app key cannot.
+  upload_fingerprint="$(release_format_fingerprint "$(without_secrets "$jdk_bin/keytool" -printcert -jarfile "$aab" 2>/dev/null |
+    sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | sort -u)" 2>/dev/null || true)"
+  [ -n "$upload_fingerprint" ] || die "could not read the bundle's certificate" 1
+  listing="$(with_secrets "$jdk_bin/keytool" -list -v -keystore "$WAMBITO_UPLOAD_KEYSTORE" -alias "$WAMBITO_UPLOAD_KEY_ALIAS" \
+    -storepass:env WAMBITO_UPLOAD_KEYSTORE_PASSWORD 2>&1)" || die "keytool cannot read the upload key:
+$(printf '%s\n' "$listing" | redact)" 1
+  from_upload="$(printf '%s\n' "$listing" | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1)"
+  [ "$(release_format_fingerprint "$from_upload")" = "$upload_fingerprint" ] ||
+    die "the bundle's certificate is not the upload keystore's" 1
+  if [ "$upload_fingerprint" = "$fingerprint" ]; then
+    rm -f "$aab"
+    die "the bundle is signed with the app key: use a separate upload key (docs/mobile/play.md)" 1
+  fi
+
+  # Its manifest, read by aapt2 from the base module (a proto-format APK): the version of the scheme,
+  # and the permissions check, as for the APKs.
+  base_apk="$(mktemp -d)/base.apk"
+  release_aab_base_apk "$aab" "$base_apk" || die "could not read the bundle's base module" 1
+  badging="$("$build_tools/aapt2" dump badging "$base_apk" | sed -n 1p)"
+  expected_code="$(if [ -n "$tag" ]; then release_version_code "$tag" universal; else release_dev_version_code universal; fi)"
+  case "$badging" in
+    "package: name='$PACKAGE' versionCode='$expected_code' versionName='$version_name' "*) ;;
+    *) die "the bundle says '$badging', expected versionCode $expected_code and versionName $version_name" 1 ;;
+  esac
+  "$HERE/check-permissions.sh" --apk "$base_apk" >/dev/null || die "check-permissions.sh refuses the bundle (run it on its base module for the details)" 1
+  rm -rf "$(dirname "$base_apk")"
+  printf '%s\n' "$upload_fingerprint" >"$dist/UPLOAD_CERT_SHA256.txt"
+  echo "Signed and verified: $(basename "$aab") (versionCode $expected_code, upload key $upload_fingerprint)"
+fi
+
 (
   cd "$dist"
-  for apk in wambito-*.apk; do printf '%s  %s\n' "$(release_sha256 "$apk")" "$apk"; done >SHA256SUMS
+  for file in wambito-*.apk wambito-*.aab; do
+    [ -e "$file" ] || continue
+    printf '%s  %s\n' "$(release_sha256 "$file")" "$file"
+  done >SHA256SUMS
 )
 printf '%s\n' "$fingerprint" >"$dist/ANDROID_CERT_SHA256.txt"
 
 echo
 echo "Done: $dist"
-(cd "$dist" && ls -l wambito-*.apk | awk '{ print "  " $NF "  " $5 " bytes" }')
+(cd "$dist" && ls -l wambito-*.apk wambito-*.aab 2>/dev/null | awk '{ print "  " $NF "  " $5 " bytes" }')
+if [ "$play" -eq 1 ]; then
+  echo
+  echo "Upload to Play Console (internal testing first): $aab"
+fi
 echo
 echo "Put this in deploy/personal/.env, then run deploy/personal/up.sh:"
 echo "ANDROID_CERT_SHA256=$fingerprint"

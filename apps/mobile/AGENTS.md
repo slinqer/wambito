@@ -146,6 +146,11 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
     `gradle-wrapper.properties`.
 - Release self-tests: `scripts/test-release.sh`, `scripts/check-fastlane.sh` (changelog ≤500 bytes,
   same version codes in all four locales), `scripts/check-permissions.sh`.
+- Google Play: `scripts/release.sh --play` also builds `wambito-<version>.aab` (versionCode base × 10 + 0),
+  signed with `jarsigner` by the upload key (`WAMBITO_UPLOAD_KEYSTORE`, `_KEY_ALIAS`, `_KEYSTORE_PASSWORD`,
+  `_KEY_PASSWORD`), never the app key (refused); read back with `aapt2` (the base module
+  as a proto APK, `release_aab_base_apk`). Play App Signing holds the app key (handed over once with PEPK), so the
+  Play build shares the APK's signature. Console forms and steps: `docs/mobile/play.md`.
 
 ## Traps
 

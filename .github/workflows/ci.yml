@@ -325,6 +325,31 @@ jobs:
             -dname "CN=Wambito CI throwaway" -storepass:env WAMBITO_KEYSTORE_PASSWORD
           scripts/release.sh --out "$RUNNER_TEMP/dist"
           rm -f "$WAMBITO_KEYSTORE"
+      # The Play bundle (release.sh --play): a second throwaway key as the upload key, the AAB signed
+      # with jarsigner and read back with aapt2; then the app key as upload key must be refused.
+      - name: scripts/release.sh --play, with throwaway keys
+        run: |
+          keys="$RUNNER_TEMP/play-keys"
+          mkdir -p "$keys"
+          WAMBITO_KEYSTORE_PASSWORD="$(openssl rand -hex 16)"
+          echo "::add-mask::$WAMBITO_KEYSTORE_PASSWORD"
+          export WAMBITO_KEYSTORE_PASSWORD WAMBITO_UPLOAD_KEYSTORE_PASSWORD="$WAMBITO_KEYSTORE_PASSWORD"
+          for alias in ci-app ci-upload; do
+            keytool -genkeypair -keystore "$keys/$alias.p12" -storetype PKCS12 \
+              -alias "$alias" -keyalg RSA -keysize 2048 -validity 2 \
+              -dname "CN=Wambito CI throwaway $alias" -storepass:env WAMBITO_KEYSTORE_PASSWORD
+          done
+          export WAMBITO_KEYSTORE="$keys/ci-app.p12" WAMBITO_KEY_ALIAS=ci-app
+          export WAMBITO_UPLOAD_KEYSTORE="$keys/ci-upload.p12" WAMBITO_UPLOAD_KEY_ALIAS=ci-upload
+          scripts/release.sh --play --no-clean --out "$RUNNER_TEMP/dist-play"
+          aab="$(ls "$RUNNER_TEMP"/dist-play/*/wambito-*.aab)"
+          grep -q "  $(basename "$aab")\$" "$(dirname "$aab")/SHA256SUMS"
+          export WAMBITO_UPLOAD_KEYSTORE="$keys/ci-app.p12" WAMBITO_UPLOAD_KEY_ALIAS=ci-app
+          if scripts/release.sh --play --no-clean --out "$RUNNER_TEMP/dist-same" 2>"$keys/same.log"; then
+            echo "release.sh --play signed the bundle with the app key"; exit 1
+          fi
+          grep -q "signed with the app key" "$keys/same.log"
+          rm -rf "$keys"
       # The release APK release.sh just signed asks for INTERNET and for no permission nobody chose,
       # and About can list a licence for every Dart package (Flutter collects them into NOTICES.Z).
       - name: The release APK's permissions and licences
