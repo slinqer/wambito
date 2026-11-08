@@ -67,13 +67,14 @@ export function HomeHeader({ month, onMonth, max, signOut: request }: HomeHeader
   }, [open]);
 
   return (
-    // Under 400px the three do not fit on one row (360px phones are common): the month gets its
-    // own centred row under the logo and the avatar.
+    // The logo, the month and the two buttons need about 470px on one row, so under 480px (every
+    // phone, 412px included) the month gets its own centred row under the logo and the buttons,
+    // which never wrap to a row of their own.
     <header className="relative flex flex-wrap items-center justify-between gap-x-(--space-2)">
       <span className="lk-logo inline-flex min-h-11 items-center lg:invisible">
         {t("app.name")}
       </span>
-      <div className="order-last flex w-full justify-center min-[400px]:order-none min-[400px]:w-auto">
+      <div className="order-last flex w-full justify-center min-[480px]:order-none min-[480px]:w-auto">
         <MonthPicker month={month} onChange={onMonth} max={max} />
       </div>
       <div className="flex items-center gap-(--space-2)">

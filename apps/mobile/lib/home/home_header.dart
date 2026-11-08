@@ -11,10 +11,11 @@ import '../ui/month_picker.dart';
 import '../ui/pressable.dart';
 
 /// Home's header: the wordmark, the month (earlier ones browsable, never past [max]) and the face
-/// button, which opens the account menu ([menu]: the entries under it, as [HomeMenuLink]s). Under
-/// 400px the three do not fit on one row: the month gets its own centred row under the wordmark
-/// and the button. At 412px they do not fit either, so the button wraps to a row of its own, as it
-/// does on the web (the month's name has `min-w-[7.5em]`).
+/// button, which opens the account menu ([menu]: the entries under it, as [HomeMenuLink]s). The
+/// wordmark, the month and the two buttons need about 470px on one row, so under 480px (every
+/// phone) the month gets its own centred row under the wordmark and the buttons, as on the web
+/// (`min-[480px]`). Large text needs more room: the width is compared with 480px scaled like text,
+/// so the buttons never wrap to a row of their own.
 ///
 /// The menu is a disclosure: its button says whether it is open, a tap outside (or Back) closes it.
 class HomeHeader extends StatefulWidget {
@@ -50,8 +51,8 @@ class _HomeHeaderState extends State<HomeHeader> {
   final _avatarKey = GlobalKey();
   var _open = false;
 
-  /// The web's `min-[400px]`, a width of the viewport.
-  static const _wide = 400.0;
+  /// The web's `min-[480px]`, a width of the viewport (scaled with the text here).
+  static const _wide = 480.0;
 
   /// A finger came down at [position] with the menu open: anywhere but on the face button closes
   /// it (the button toggles it itself, as the web's `pointerdown` listener leaves it to).
@@ -77,7 +78,7 @@ class _HomeHeaderState extends State<HomeHeader> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final wide = MediaQuery.sizeOf(context).width >= _wide;
+    final wide = MediaQuery.sizeOf(context).width >= MediaQuery.textScalerOf(context).scale(_wide);
     final picker = MonthPicker(month: widget.month, onChange: widget.onMonth, max: widget.max);
     // `<div className="flex items-center gap-(--space-2)">` with the search link and the face button.
     final avatar = Row(
