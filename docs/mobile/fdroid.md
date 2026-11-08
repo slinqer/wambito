@@ -19,6 +19,7 @@ Wambito is built for F-Droid from source on F-Droid's own build server, from the
 
 ## Open
 
+- Inclusion waits on F-Droid's policy that an app is maintained for more than 3 months: [fdroid/fdroiddata!56356](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/56356) was closed for that on 2026-11-08, with no objection to the recipe or the build. The repo's first commit is from 2026-10-20, so resubmit from about 2027-01-20: in the fork's `com.wambito.app` branch, move the recipe to the latest release tag (full commit hash, version codes, `CurrentVersion`), then reopen the MR or open a new one.
 - After F-Droid publishes the first build, its signing-key fingerprint goes into `ANDROID_CERT_SHA256` next to ours, or App Links and passkeys do not work for F-Droid users (`release.md`; plan Task 10).
 - Not exercised at runtime on a from-source build: anything on `armeabi-v7a`. The `arm64-v8a` build of `fdroid-build-local.sh` (commit 3371e6b, only its `versionCode` raised to install over a release build, re-signed with the release key) ran on a Samsung S25 Ultra on 2026-11-07: dictation, with Canary refining on release, worked, and `libsherpa-onnx-jni.so` loaded from the APK with no errors.
 - The precise voice model (Canary, Parakeet) is in the `arm64-v8a` build only, with sherpa-onnx and onnxruntime built from source ("The precise voice model" below). The `armeabi-v7a` build has none (`src/noPrecise`); the model does not run on that ABI anyway. About still lists sherpa-onnx, onnxruntime and the models there.
@@ -60,7 +61,7 @@ The Play and GitHub builds take sherpa-onnx 2.0.1 as k2-fsa's prebuilt AAR (`scr
 
 `apps/mobile/fdroid/com.wambito.app.yml` is the source of truth; it is copied to `fdroiddata` when submitting.
 
-- One build per ABI (`versionCode` 100011 and 100012 for 1.0.1, the first version submitted; 1.0.0 predates the precise model's recipe), `commit: mobile-v1.0.1`, `subdir: apps/mobile`, `ndk: r28c`, `timeout: 10800`.
+- One build per ABI (`versionCode` 100011 and 100012 for 1.0.1, the first version submitted; 1.0.0 predates the precise model's recipe), `commit:` the full hash of the `mobile-v1.0.1` tag's commit (fdroiddata asks for a hash, not a tag), `AuthorName: Slinqer`, `subdir: apps/mobile`, `ndk: r28c`, `timeout: 10800`.
 - Source libraries (`srclibs`): `flutter@3.47.7` (in `fdroiddata`), and ours in `apps/mobile/fdroid/srclibs/*.yml`: `vosk-api`, `jna`, `kaldi`, `openfst`, `OpenBLAS`, `clapack`. All pinned by commit except `jna@5.18.1` and `flutter@3.47.7`, which are tags.
 - `sudo:` installs the build tools the script needs. `prebuild:` trims JNA's tree (deletes jars its build does not use, links Debian's `ant.jar` and `asm.jar`), runs `flutter pub get --enforce-lockfile` with an in-tree `PUB_CACHE` (removed from the scan by `scandelete:`), installs the SDK platform, and lowers Gradle's heap from `-Xmx8G` to `-Xmx4G` (8 GB killed the daemon in a 6 GB container).
 - **`build:`, not `prebuild:`, runs `build-native-deps.sh`.** F-Droid scans the source between the two, and the AARs the script writes to `android/third_party/m2` would fail that scan. They come from sources that were scanned clean, so the intent holds. Then `flutter build apk --release --split-per-abi` with the switch, `--build-name $$VERSION$$` and `--build-number $(($$VERCODE$$ / 10))`.
@@ -68,6 +69,8 @@ The Play and GitHub builds take sherpa-onnx 2.0.1 as k2-fsa's prebuilt AAR (`scr
 - **The pubspec version at release tags.** `UpdateCheckData` reads `apps/mobile/pubspec.yaml`. The tagged commit, and only it, carries `version: X.Y.Z+<base code>`; `main` keeps `0.0.0-dev+1`, which the pattern skips. `release.sh` refuses a tag whose pubspec differs (`release.md`).
 
 ### Changing the recipe after F-Droid publishes
+
+Submitted to fdroiddata on 2026-11-08 as 1.0.1 (closed the same day by the 3-month policy, see Open): [fdroid/fdroiddata!56356](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/56356), from a fork of fdroiddata, with the 27 srclibs in `apps/mobile/fdroid/srclibs/`. The repo's recipe is the submitted file, in `fdroid rewritemeta`'s layout (fdroiddata's CI fails on any other); run `fdroid rewritemeta com.wambito.app` and `fdroid lint com.wambito.app` in a checkout of fdroiddata before copying a change there.
 
 Once the merge request lands, the live recipe is fdroiddata's copy, not the one in this repo. `AutoUpdateMode: Version` only adds build entries with a new version name, version code and commit; it copies `srclibs`, `ndk`, the SDK platform and the `build:` flags unchanged. So a change to Flutter's version (`apps/mobile/.flutter-version`), a srclib revision, the NDK, the SDK platform or `build-native-deps.sh`'s flags needs its own merge request on fdroiddata, opened before tagging the release that needs it; otherwise F-Droid builds the new tag with the old recipe, or fails. `scripts/check-fdroid-recipe.sh` (CI) keeps the repo's copy in step with `.flutter-version` and `build-native-deps.sh` (Flutter version, srclib revisions, NDK), so the repo copy is what to copy into that merge request. It cannot see fdroiddata.
 

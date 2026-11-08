@@ -1,6 +1,7 @@
 Categories:
   - Finance Manager
 License: AGPL-3.0-only
+AuthorName: Slinqer
 WebSite: https://wambito.com
 SourceCode: https://github.com/slinqer/wambito
 IssueTracker: https://github.com/slinqer/wambito/issues
@@ -13,12 +14,13 @@ Repo: https://github.com/slinqer/wambito.git
 Builds:
   - versionName: 1.0.1
     versionCode: 100011
-    commit: mobile-v1.0.1
+    commit: 24756bb89aa61a822f690b2f904bfacb74199c84
+    timeout: 10800
     subdir: apps/mobile
     sudo:
       - apt-get update
-      - apt-get install -y --no-install-recommends ant autoconf automake cmake g++ gcc libasm-java
-        libltdl-dev libtool make python3 texinfo
+      - apt-get install -y --no-install-recommends ant autoconf automake cmake g++
+        gcc libasm-java libltdl-dev libtool make python3 texinfo
     output: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
     srclibs:
       - flutter@3.47.7
@@ -45,21 +47,22 @@ Builds:
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - scripts/build-native-deps.sh --abi armeabi-v7a --ndk $$NDK$$ --work /tmp/wambito-native-deps
-        --vosk-src $$vosk-api$$ --jna-src $$jna$$ --kaldi-src $$kaldi$$ --openfst-src $$openfst$$
-        --openblas-src $$OpenBLAS$$ --clapack-src $$clapack$$
-      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform android-arm
-        --build-name $$VERSION$$ --build-number $(($$VERCODE$$ / 10)) -P wambito.nativeFromSource=true
+        --vosk-src $$vosk-api$$ --jna-src $$jna$$ --kaldi-src $$kaldi$$ --openfst-src
+        $$openfst$$ --openblas-src $$OpenBLAS$$ --clapack-src $$clapack$$
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform
+        android-arm --build-name $$VERSION$$ --build-number $(($$VERCODE$$ / 10))
+        -P wambito.nativeFromSource=true
     ndk: r28c
-    timeout: 10800
 
   - versionName: 1.0.1
     versionCode: 100012
-    commit: mobile-v1.0.1
+    commit: 24756bb89aa61a822f690b2f904bfacb74199c84
+    timeout: 10800
     subdir: apps/mobile
     sudo:
       - apt-get update
-      - apt-get install -y --no-install-recommends ant autoconf automake cmake g++ gcc libasm-java
-        libltdl-dev libtool make ninja-build python3 texinfo
+      - apt-get install -y --no-install-recommends ant autoconf automake cmake g++
+        gcc libasm-java libltdl-dev libtool make ninja-build python3 texinfo
     output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
     srclibs:
       - flutter@3.47.7
@@ -110,20 +113,20 @@ Builds:
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - scripts/build-native-deps.sh --abi arm64-v8a --ndk $$NDK$$ --work /tmp/wambito-native-deps
-        --vosk-src $$vosk-api$$ --jna-src $$jna$$ --kaldi-src $$kaldi$$ --openfst-src $$openfst$$
-        --openblas-src $$OpenBLAS$$ --clapack-src $$clapack$$
-      - scripts/build-sherpa-onnx.sh --ndk $$NDK$$ --srclibs $$sherpa-onnx$$/.. --work /tmp/wambito-sherpa-onnx
-      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform android-arm64
-        --build-name $$VERSION$$ --build-number $(($$VERCODE$$ / 10)) -P wambito.nativeFromSource=true
-        -P wambito.preciseFromSource=true
+        --vosk-src $$vosk-api$$ --jna-src $$jna$$ --kaldi-src $$kaldi$$ --openfst-src
+        $$openfst$$ --openblas-src $$OpenBLAS$$ --clapack-src $$clapack$$
+      - scripts/build-sherpa-onnx.sh --ndk $$NDK$$ --srclibs $$sherpa-onnx$$/.. --work
+        /tmp/wambito-sherpa-onnx
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform
+        android-arm64 --build-name $$VERSION$$ --build-number $(($$VERCODE$$ / 10))
+        -P wambito.nativeFromSource=true -P wambito.preciseFromSource=true
     ndk: r28c
-    timeout: 10800
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^mobile-v
-UpdateCheckData: apps/mobile/pubspec.yaml|version:\s[\d.]+\+(\d+)|.|version:\s([\d.]+)\+
 VercodeOperation:
   - '%c * 10 + 1'
   - '%c * 10 + 2'
+UpdateCheckData: apps/mobile/pubspec.yaml|version:\s[\d.]+\+(\d+)|.|version:\s([\d.]+)\+
 CurrentVersion: 1.0.1
 CurrentVersionCode: 100012
