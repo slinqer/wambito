@@ -63,6 +63,16 @@ describe("transactions", () => {
     expect((await page("?status=pending")).items.map((i) => i.name)).toEqual(["concert"]);
   });
 
+  test("an upper-case accented name is found by its plain lower-case word", async () => {
+    const { headers } = await t.signIn("upper@wambito.test");
+    const comida = await category(headers, "Comida");
+    await create({ name: "CAFÉ", amount: -500, date: "2026-10-02", categoryId: comida }, headers);
+    await create({ name: "PIÑATA", amount: -500, date: "2026-10-03", categoryId: comida }, headers);
+    const names = async (query: string) => (await page(query, headers)).items.map((i) => i.name);
+    expect(await names("?q=cafe")).toEqual(["CAFÉ"]);
+    expect(await names("?q=pinata")).toEqual(["PIÑATA"]);
+  });
+
   test("list filters by a date range and by text, ignoring case and accents", async () => {
     const { headers } = await t.signIn("search@wambito.test");
     const comida = await category(headers, "Comida");
