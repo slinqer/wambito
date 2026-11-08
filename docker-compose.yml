@@ -48,6 +48,9 @@ services:
       # The admin panel's admins (`ADMIN_USER_IDS`): in development the seeded `dev-admin`
       # (admin@wambito.test, `pnpm --filter @wambito/api seed:admin`); override it from the shell.
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-dev-admin}
+      # End-to-end encryption preview (stage 2a): user ids whose finances live only as encrypted
+      # records (`GET /v1/me` `encryption: "preview"`). Unset: nobody; set it from the shell.
+      E2E_PREVIEW_USER_IDS: ${E2E_PREVIEW_USER_IDS:-}
     ports:
       - "3000:3000"
     depends_on:
