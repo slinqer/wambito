@@ -3,7 +3,7 @@ import type { AppDeps } from "../deps.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
 import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
-import { KeyWrap, KeyWraps, PutKeyWrap, RotateKeys } from "../http/schemas.ts";
+import { KeyWrap, KeyWraps, lowerCaseUuid, PutKeyWrap, RotateKeys } from "../http/schemas.ts";
 import {
   deleteKeyWrap,
   listKeyWraps,
@@ -12,7 +12,7 @@ import {
   useAssistantWrap,
 } from "../services/keys.ts";
 
-const idParam = z.object({ id: z.uuid() });
+const idParam = z.object({ id: lowerCaseUuid() });
 
 /**
  * The wrapped copies of the account's data key (spec 2026-11-08 sections 5.2 and 7): one per
@@ -58,7 +58,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/{id}",
       operationId: "putKeyWrap",
       description:
-        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's.",
+        "Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's.",
       request: { params: idParam, body: jsonBody(PutKeyWrap) },
       responses: { 200: jsonResponse(KeyWrap, "The stored wrap"), ...problems(409, 422) },
     }),

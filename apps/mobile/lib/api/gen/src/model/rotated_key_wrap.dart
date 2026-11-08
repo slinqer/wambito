@@ -12,7 +12,7 @@ part 'rotated_key_wrap.g.dart';
 /// RotatedKeyWrap
 ///
 /// Properties:
-/// * [id]
+/// * [id] - A UUID in lower case
 /// * [kind]
 /// * [ref] - The passkey's credential id (base64url), the device id, or the assistant's OAuth client id; none for `recovery`
 /// * [keyV] - The data key version this wraps
@@ -21,6 +21,7 @@ part 'rotated_key_wrap.g.dart';
 /// * [label] - Shown in Settings (\"Pixel 9\", \"Firefox on Mac\")
 @BuiltValue()
 abstract class RotatedKeyWrap implements Built<RotatedKeyWrap, RotatedKeyWrapBuilder> {
+  /// A UUID in lower case
   @BuiltValueField(wireName: r'id')
   String get id;
 

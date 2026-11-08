@@ -12,15 +12,16 @@ part 'sync_change.g.dart';
 /// SyncChange
 ///
 /// Properties:
-/// * [id]
+/// * [id] - A UUID in lower case
 /// * [type]
 /// * [deleted]
 /// * [keyV] - The data key version of `body`
 /// * [encV] - The record format version
 /// * [baseVersion] - The version this change was made on; null creates the record
-/// * [body] - The encrypted record, base64url without padding, at most 65536 bytes decoded; null exactly when deleted
+/// * [body] - The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted
 @BuiltValue()
 abstract class SyncChange implements Built<SyncChange, SyncChangeBuilder> {
+  /// A UUID in lower case
   @BuiltValueField(wireName: r'id')
   String get id;
 
@@ -43,7 +44,7 @@ abstract class SyncChange implements Built<SyncChange, SyncChangeBuilder> {
   @BuiltValueField(wireName: r'baseVersion')
   int? get baseVersion;
 
-  /// The encrypted record, base64url without padding, at most 65536 bytes decoded; null exactly when deleted
+  /// The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted
   @BuiltValueField(wireName: r'body')
   String? get body;
 

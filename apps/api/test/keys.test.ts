@@ -86,6 +86,8 @@ describe("/v2/keys", () => {
     const { headers } = await person();
     expect(await list(headers)).toEqual([]);
 
+    const first = await put(headers, recovery(3));
+    expect(first).toMatchObject({ kind: "recovery", ref: null, keyV: 3, wrapped: bytes(48) });
     const id = randomUUID();
     const stored = await put(headers, device(3), id);
     expect(stored).toMatchObject({
@@ -98,7 +100,23 @@ describe("/v2/keys", () => {
       lastUsedAt: null,
     });
     expect(Date.parse(stored.createdAt)).not.toBeNaN();
-    expect(await list(headers)).toEqual([stored]);
+    expect(await list(headers)).toEqual([first, stored]);
+  });
+
+  test("an account's first wrap must be its recovery wrap", async () => {
+    const { email, headers, userId } = await person();
+    const { clientId } = await t.authorize(email, { headers });
+    const key = await createSoftPasskey(t.admin, userId, "localhost");
+    for (const wrap of [
+      device(1),
+      { kind: "passkey", ref: key.credentialId, keyV: 1, wrapped: bytes(60) },
+      { kind: "assistant", ref: clientId, keyV: 1, wrapped: bytes(60) },
+    ]) {
+      await expectProblem(await putRaw(headers, randomUUID(), wrap), 422, "recovery_required");
+    }
+    expect(await list(headers)).toEqual([]);
+    await put(headers, recovery(1));
+    await put(headers, device(1));
   });
 
   test("a wrap must use the account's current keyV", async () => {
@@ -119,11 +137,12 @@ describe("/v2/keys", () => {
 
   test("PUT on an existing id replaces that wrap", async () => {
     const { headers } = await person();
+    const kept = await put(headers, recovery(1));
     const id = randomUUID();
     const first = await put(headers, device(1), id);
     const second = await put(headers, device(1, { ref: first.ref, label: "Firefox on Mac" }), id);
     expect(second.label).toBe("Firefox on Mac");
-    expect(await list(headers)).toEqual([second]);
+    expect(await list(headers)).toEqual([kept, second]);
   });
 
   test("a new recovery wrap replaces the existing one", async () => {
@@ -148,6 +167,7 @@ describe("/v2/keys", () => {
       keyV: 1,
       wrapped: bytes(60),
     });
+    await put(headers, recovery(1));
 
     await expectProblem(await putRaw(headers, randomUUID(), wrap("nope")), 422, "unknown_passkey");
     await expectProblem(
@@ -161,6 +181,7 @@ describe("/v2/keys", () => {
 
   test("an assistant wrap needs an OAuth client the person consented to", async () => {
     const { email, headers } = await person();
+    await put(headers, recovery(1));
     const stranger = await t.registerAssistant("Stranger");
     const wrap = (ref: string): WrapInput => ({
       kind: "assistant",
@@ -179,6 +200,7 @@ describe("/v2/keys", () => {
 
   test("validates kinds, refs and byte lengths", async () => {
     const { headers } = await person();
+    await put(headers, recovery(1));
     const invalid = async (body: unknown) =>
       expectProblem(await putRaw(headers, randomUUID(), body), 422, "validation_failed");
 
@@ -195,6 +217,14 @@ describe("/v2/keys", () => {
     await invalid({ ...recovery(), ref: "something" });
     await invalid({ ...recovery(), publicKey: bytes(32) });
     await expectProblem(await putRaw(headers, "not-a-uuid", device()), 422, "validation_failed");
+    // Ids are lower-case UUIDs, as they enter the associated data; never lower-cased for you.
+    const upper = randomUUID().toUpperCase();
+    await expectProblem(await putRaw(headers, upper, device()), 422, "validation_failed");
+    await expectProblem(
+      await t.request("DELETE", `/v2/keys/${upper}`, { headers }),
+      422,
+      "validation_failed",
+    );
 
     await put(headers, device(1, { wrapped: bytes(1024), label: "x".repeat(100) }));
     await put(headers, device(1, { wrapped: bytes(1) }));
@@ -281,6 +311,49 @@ describe("/v2/keys", () => {
       expect(await list(headers)).toEqual([kept]);
     });
 
+    test("a wrap id that is not a lower-case UUID", async () => {
+      const { headers } = await person();
+      const kept = await put(headers, recovery(1));
+      await expectProblem(
+        await rotateRaw(headers, {
+          keyV: 2,
+          wraps: [{ id: randomUUID().toUpperCase(), ...recovery(2) }],
+        }),
+        422,
+        "validation_failed",
+      );
+      expect(await list(headers)).toEqual([kept]);
+    });
+
+    test("one person's rotation leaves another's wraps untouched", async () => {
+      const a = await person();
+      const b = await person();
+      const aWraps = [await put(a.headers, recovery(1)), await put(a.headers, device(1))];
+      const bWraps = [await put(b.headers, recovery(1)), await put(b.headers, device(1))];
+      const byId = (x: KeyWrap, y: KeyWrap) => x.id.localeCompare(y.id);
+
+      const rotated = await rotateRaw(a.headers, {
+        keyV: 2,
+        wraps: [{ id: randomUUID(), ...recovery(2) }],
+      });
+      expect(rotated.status).toBe(200);
+      expect((await list(b.headers)).sort(byId)).toEqual([...bWraps].sort(byId));
+
+      const back = await rotateRaw(b.headers, {
+        keyV: 2,
+        wraps: [{ id: randomUUID(), ...recovery(2) }],
+      });
+      expect(back.status).toBe(200);
+      const aNow = await list(a.headers);
+      expect(aNow).toHaveLength(1);
+      expect(aNow[0]?.keyV).toBe(2);
+      expect(aWraps.map((w) => w.id)).not.toContain(aNow[0]?.id);
+      // Each rotation replaced only its own person's wraps.
+      const all = await t.admin.select({ id: keyWraps.id, userId: keyWraps.userId }).from(keyWraps);
+      expect(all.filter((w) => w.userId === a.userId)).toHaveLength(1);
+      expect(all.filter((w) => w.userId === b.userId)).toHaveLength(1);
+    });
+
     test("every wrap carries the new keyV and passes the same checks as PUT", async () => {
       const { headers } = await person();
       const kept = await put(headers, recovery(1));
@@ -321,6 +394,7 @@ describe("/v2/keys", () => {
       keyV: 1,
       wrapped: bytes(60),
     });
+    const recoveryWrap = await put(headers, recovery(1));
     await put(headers, wrap(gone.credentialId));
     const keptWrap = await put(headers, wrap(kept.credentialId));
     const [row] = await t.admin
@@ -335,14 +409,14 @@ describe("/v2/keys", () => {
       body: { id: passkeyId },
     });
     expect(refused.status).not.toBe(200);
-    expect(await list(headers)).toHaveLength(2);
+    expect(await list(headers)).toHaveLength(3);
 
     const res = await t.request("POST", "/auth/passkey/delete-passkey", {
       headers,
       body: { id: passkeyId },
     });
     expect(res.status, await res.clone().text()).toBe(200);
-    expect(await list(headers)).toEqual([keptWrap]);
+    expect(await list(headers)).toEqual([recoveryWrap, keptWrap]);
   });
 
   describe("assistants", () => {
@@ -415,6 +489,7 @@ describe("/v2/keys", () => {
   test("row-level security: one person never sees nor touches another's wraps", async () => {
     const a = await person();
     const b = await person();
+    await put(a.headers, recovery(1));
     const theirs = await put(a.headers, device(1));
     await put(b.headers, recovery(7));
 
@@ -427,6 +502,6 @@ describe("/v2/keys", () => {
     await expectProblem(await putRaw(b.headers, theirs.id, device(7)), 409, "id_taken");
     // A's keyV is not B's.
     await put(a.headers, device(1));
-    expect(await list(a.headers)).toHaveLength(2);
+    expect(await list(a.headers)).toHaveLength(3);
   });
 });

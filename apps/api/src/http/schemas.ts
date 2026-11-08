@@ -88,6 +88,8 @@ export const RECORD_TYPES = [
 
 /** Largest record body, in decoded bytes. */
 export const MAX_RECORD_BODY = 64 * 1024;
+/** Smallest live record body, in decoded bytes: a sealed record's nonce (12) and tag (16). */
+export const MIN_RECORD_BODY = 12 + 16;
 /** Changes per `POST /v2/sync`. */
 export const MAX_SYNC_CHANGES = 500;
 
@@ -95,8 +97,20 @@ const BASE64URL = /^[A-Za-z0-9_-]*$/;
 /** Decoded size of an unpadded base64url string, without decoding it. */
 const decodedLength = (text: string) => Math.floor((text.length * 3) / 4);
 
+/**
+ * Only lower-case canonical UUIDs, the same rule as `@wambito/crypto`: record and key-wrap ids
+ * enter the associated data byte for byte, so the server never changes their case.
+ */
+const LOWER_CASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** A record or key-wrap id: a lower-case UUID; anything else (upper case included) is 422. */
+export const lowerCaseUuid = () =>
+  z
+    .string()
+    .regex(LOWER_CASE_UUID, "Not a lower-case UUID")
+    .openapi({ format: "uuid", description: "A UUID in lower case" });
+
 const recordFields = {
-  id: z.uuid(),
+  id: lowerCaseUuid(),
   type: z.enum(RECORD_TYPES),
   deleted: z.boolean(),
   keyV: z.int().min(0).max(32767).openapi({ description: "The data key version of `body`" }),
@@ -126,9 +140,12 @@ export const SyncChange = z
       .refine((body) => decodedLength(body) <= MAX_RECORD_BODY, {
         message: `Over ${MAX_RECORD_BODY} bytes`,
       })
+      .refine((body) => decodedLength(body) >= MIN_RECORD_BODY, {
+        message: `Under ${MIN_RECORD_BODY} bytes`,
+      })
       .nullable()
       .openapi({
-        description: `The encrypted record, base64url without padding, at most ${MAX_RECORD_BODY} bytes decoded; null exactly when deleted`,
+        description: `The encrypted record, base64url without padding, ${MIN_RECORD_BODY}–${MAX_RECORD_BODY} bytes decoded (at least a nonce and a tag); null exactly when deleted`,
       }),
   })
   .refine((change) => change.deleted === (change.body === null), {
@@ -249,7 +266,7 @@ export const RotateKeys = z
     wraps: z
       .array(
         z
-          .object({ id: z.uuid(), ...keyWrapFields })
+          .object({ id: lowerCaseUuid(), ...keyWrapFields })
           .refine(refByKind, REF_RULE)
           .refine(publicKeyByKind, PUBLIC_KEY_RULE)
           .openapi("RotatedKeyWrap"),
@@ -261,13 +278,10 @@ export const RotateKeys = z
     message: "Every wrap carries the new keyV",
     path: ["wraps"],
   })
-  .refine(
-    (body) => new Set(body.wraps.map((wrap) => wrap.id.toLowerCase())).size === body.wraps.length,
-    {
-      message: "Wrap ids repeat",
-      path: ["wraps"],
-    },
-  )
+  .refine((body) => new Set(body.wraps.map((wrap) => wrap.id)).size === body.wraps.length, {
+    message: "Wrap ids repeat",
+    path: ["wraps"],
+  })
   .refine(
     (body) => {
       const refs = body.wraps.filter((w) => w.ref != null).map((w) => `${w.kind}\n${w.ref}`);

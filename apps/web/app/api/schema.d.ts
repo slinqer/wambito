@@ -710,7 +710,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
+        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key. A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
         put: operations["putKeyWrap"];
         post?: never;
         /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. */
@@ -1240,7 +1240,10 @@ export interface components {
             latest: number;
         };
         SyncRecord: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
             id: string;
             /** @enum {string} */
             type: "transaction" | "category" | "budget" | "recurrence" | "merchant" | "settings" | "account";
@@ -1280,7 +1283,10 @@ export interface components {
             changes: components["schemas"]["SyncChange"][];
         };
         SyncChange: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
             id: string;
             /** @enum {string} */
             type: "transaction" | "category" | "budget" | "recurrence" | "merchant" | "settings" | "account";
@@ -1291,7 +1297,7 @@ export interface components {
             encV: number;
             /** @description The version this change was made on; null creates the record */
             baseVersion: number | null;
-            /** @description The encrypted record, base64url without padding, at most 65536 bytes decoded; null exactly when deleted */
+            /** @description The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted */
             body: string | null;
         };
         KeyWrap: {
@@ -1332,7 +1338,10 @@ export interface components {
             wraps: components["schemas"]["RotatedKeyWrap"][];
         };
         RotatedKeyWrap: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A UUID in lower case
+             */
             id: string;
             /** @enum {string} */
             kind: "passkey" | "recovery" | "device" | "assistant";
@@ -3429,6 +3438,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description A UUID in lower case */
                 id: string;
             };
             cookie?: never;
@@ -3473,6 +3483,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description A UUID in lower case */
                 id: string;
             };
             cookie?: never;

@@ -12,7 +12,7 @@ part 'sync_record.g.dart';
 /// SyncRecord
 ///
 /// Properties:
-/// * [id]
+/// * [id] - A UUID in lower case
 /// * [type]
 /// * [deleted]
 /// * [keyV] - The data key version of `body`
@@ -21,6 +21,7 @@ part 'sync_record.g.dart';
 /// * [body] - The encrypted record, base64url without padding; null when deleted
 @BuiltValue()
 abstract class SyncRecord implements Built<SyncRecord, SyncRecordBuilder> {
+  /// A UUID in lower case
   @BuiltValueField(wireName: r'id')
   String get id;
 

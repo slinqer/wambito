@@ -1,5 +1,5 @@
 import { type Db, keyWraps, oauthConsent, passkey, type Tx, withUser } from "@wambito/db";
-import { and, asc, eq, inArray, ne, sql } from "@wambito/db/orm";
+import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
 
@@ -58,10 +58,17 @@ async function lockWraps(tx: Tx, userId: string): Promise<void> {
 }
 
 /** The account's current key version: the highest over its wraps; null when it has none. */
-async function currentKeyV(tx: Tx): Promise<number | null> {
-  const [row] = await tx.select({ keyV: sql<number | null>`max(${keyWraps.keyV})` }).from(keyWraps);
+async function currentKeyV(tx: Tx, userId: string): Promise<number | null> {
+  const [row] = await tx
+    .select({ keyV: sql<number | null>`max(${keyWraps.keyV})` })
+    .from(keyWraps)
+    .where(eq(keyWraps.userId, userId));
   return row?.keyV == null ? null : Number(row.keyV);
 }
+
+/** One of `userId`'s wraps: every statement names the person too, on top of row-level security. */
+const own = (userId: string, ...conditions: (SQL | undefined)[]) =>
+  and(eq(keyWraps.userId, userId), ...conditions);
 
 /**
  * A passkey wrap's ref must be one of the person's passkey credential ids; an assistant wrap's, an
@@ -118,6 +125,7 @@ export async function listKeyWraps(db: Db, userId: string): Promise<KeyWrapDto[]
     const rows = await tx
       .select()
       .from(keyWraps)
+      .where(own(userId))
       .orderBy(asc(keyWraps.createdAt), asc(keyWraps.id));
     return rows.map(toKeyWrap);
   });
@@ -125,7 +133,8 @@ export async function listKeyWraps(db: Db, userId: string): Promise<KeyWrapDto[]
 
 /**
  * Adds wrap `id`, or replaces it when it is already the person's. The wrap must carry the
- * account's current keyV (any keyV for the first wrap). It also replaces the wrap it would
+ * account's current keyV (any keyV for the first wrap), and an account's first wrap is its
+ * recovery wrap (422 `recovery_required`). It also replaces the wrap it would
  * otherwise duplicate: the recovery wrap (one per account), or the wrap of the same kind and ref.
  * The recovery wrap's id cannot take another kind (409 `recovery_required`). An id that is someone
  * else's is 409 `id_taken`.
@@ -136,31 +145,37 @@ export async function putKeyWrap(
   id: string,
   wrap: KeyWrapInput,
 ): Promise<KeyWrapDto> {
-  const key = id.toLowerCase();
   return withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
-    const current = await currentKeyV(tx);
+    const current = await currentKeyV(tx, userId);
     if (current !== null && wrap.keyV !== current) throw keyVersionMismatch(current, current);
+    if (current === null && wrap.kind !== "recovery") {
+      throw new ApiError(
+        422,
+        "recovery_required",
+        "An account's first wrap is its recovery wrap; make the recovery key first",
+      );
+    }
     await checkRef(tx, userId, wrap);
 
-    const row = values(userId, key, wrap);
+    const row = values(userId, id, wrap);
     const duplicate =
       wrap.kind === "recovery"
         ? eq(keyWraps.kind, "recovery")
         : and(eq(keyWraps.kind, wrap.kind), eq(keyWraps.ref, row.ref ?? ""));
-    await tx.delete(keyWraps).where(and(ne(keyWraps.id, key), duplicate));
+    await tx.delete(keyWraps).where(own(userId, ne(keyWraps.id, id), duplicate));
 
     const [existing] = await tx
       .select({ id: keyWraps.id, kind: keyWraps.kind })
       .from(keyWraps)
-      .where(eq(keyWraps.id, key));
+      .where(own(userId, eq(keyWraps.id, id)));
     if (existing?.kind === "recovery" && wrap.kind !== "recovery") throw recoveryRequired();
     if (existing) {
       const { id: _id, userId: _userId, ...fields } = row;
       const [updated] = await tx
         .update(keyWraps)
         .set(fields)
-        .where(eq(keyWraps.id, key))
+        .where(own(userId, eq(keyWraps.id, id)))
         .returning();
       return toKeyWrap(updated as KeyWrapRow);
     }
@@ -182,10 +197,10 @@ export async function deleteKeyWrap(db: Db, userId: string, id: string): Promise
     const [found] = await tx
       .select({ kind: keyWraps.kind })
       .from(keyWraps)
-      .where(eq(keyWraps.id, id.toLowerCase()));
+      .where(own(userId, eq(keyWraps.id, id)));
     if (!found) throw new ApiError(404, "not_found");
     if (found.kind === "recovery") throw recoveryRequired();
-    await tx.delete(keyWraps).where(eq(keyWraps.id, id.toLowerCase()));
+    await tx.delete(keyWraps).where(own(userId, eq(keyWraps.id, id)));
   });
 }
 
@@ -206,12 +221,12 @@ export async function rotateKeys(
   }
   return withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
-    const current = await currentKeyV(tx);
+    const current = await currentKeyV(tx, userId);
     if (current !== null && keyV !== current + 1) throw keyVersionMismatch(current, current + 1);
     for (const wrap of wraps) await checkRef(tx, userId, wrap);
 
-    await tx.delete(keyWraps);
-    const rows = wraps.map((wrap) => values(userId, wrap.id.toLowerCase(), wrap));
+    await tx.delete(keyWraps).where(own(userId));
+    const rows = wraps.map((wrap) => values(userId, wrap.id, wrap));
     const inserted = await tx
       .insert(keyWraps)
       .values(rows)
@@ -236,7 +251,7 @@ export async function useAssistantWrap(
     const [row] = await tx
       .update(keyWraps)
       .set({ lastUsedAt: sql`now()` })
-      .where(and(eq(keyWraps.kind, "assistant"), eq(keyWraps.ref, clientId)))
+      .where(own(userId, eq(keyWraps.kind, "assistant"), eq(keyWraps.ref, clientId)))
       .returning();
     return row ? toKeyWrap(row) : null;
   });
@@ -256,6 +271,6 @@ export async function deletePasskeyWraps(
     await lockWraps(tx, userId);
     await tx
       .delete(keyWraps)
-      .where(and(eq(keyWraps.kind, "passkey"), inArray(keyWraps.ref, credentialIds)));
+      .where(own(userId, eq(keyWraps.kind, "passkey"), inArray(keyWraps.ref, credentialIds)));
   });
 }

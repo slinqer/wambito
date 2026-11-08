@@ -45,7 +45,8 @@ afterEach(() => {
 });
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const b64 = (text: string) => Buffer.from(text).toString("base64url");
+/** A body as the test writes it: at least 28 bytes, the smallest sealed record (nonce + tag). */
+const b64 = (text: string) => Buffer.from(text.padEnd(28, "~")).toString("base64url");
 
 function create(body: string, overrides: Partial<Change> = {}): Change {
   return {
@@ -294,6 +295,33 @@ describe("/v2/sync", () => {
         { ...create("x"), body: "not base64url!" },
       ]) {
         const res = await pushRaw(a, [change]);
+        expect(res.status).toBe(422);
+        expect(await code(res)).toBe("validation_failed");
+      }
+    });
+
+    test("a live body under 28 bytes decoded (nonce + tag)", async () => {
+      const ok = create("");
+      ok.body = Buffer.alloc(28, 3).toString("base64url");
+      expect((await push(a, [ok]))[0]?.version).toBeTypeOf("number");
+      for (const body of ["", Buffer.alloc(27, 3).toString("base64url")]) {
+        const res = await pushRaw(a, [{ ...create(""), body }]);
+        expect(res.status).toBe(422);
+        expect(await code(res)).toBe("validation_failed");
+      }
+      // An update is held to the same minimum.
+      const record = create("to update");
+      const [created] = await push(a, [record]);
+      const short = Buffer.alloc(12).toString("base64url");
+      const res = await pushRaw(a, [
+        { ...record, baseVersion: created?.version as number, body: short },
+      ]);
+      expect(res.status).toBe(422);
+    });
+
+    test("an id that is not a lower-case UUID", async () => {
+      for (const id of [randomUUID().toUpperCase(), "not-a-uuid"]) {
+        const res = await pushRaw(a, [create("x", { id })]);
         expect(res.status).toBe(422);
         expect(await code(res)).toBe("validation_failed");
       }

@@ -84,12 +84,15 @@ export async function pullRecords(
   return withUser(db, userId, async (tx) => {
     const [top] = await tx
       .select({ latest: sql<string>`coalesce(max(${records.version}), 0)` })
-      .from(records);
+      .from(records)
+      .where(eq(records.userId, userId));
     const latest = Number(top?.latest ?? 0);
     const rows = await tx
       .select()
       .from(records)
-      .where(and(gt(records.version, since), lte(records.version, latest)))
+      .where(
+        and(eq(records.userId, userId), gt(records.version, since), lte(records.version, latest)),
+      )
       .orderBy(asc(records.version))
       .limit(limit + 1);
     const page = rows.slice(0, limit);
@@ -140,7 +143,7 @@ export async function pushRecords(
         const [row] = await tx
           .select({ count: sql<string>`count(*)` })
           .from(records)
-          .where(eq(records.deleted, false));
+          .where(and(eq(records.userId, userId), eq(records.deleted, false)));
         live = Number(row?.count ?? 0);
       },
       add(count: number) {
@@ -177,7 +180,8 @@ async function applyChange(
   change: SyncChangeInput,
   addLive: (count: number) => void,
 ): Promise<PushResult> {
-  const id = change.id.toLowerCase();
+  // A lower-case UUID already (the route's schema): it is never changed, as it is in the AAD.
+  const { id } = change;
   const body = change.body === null ? null : new Uint8Array(Buffer.from(change.body, "base64url"));
   const fields = {
     type: change.type,
@@ -189,7 +193,11 @@ async function applyChange(
     updatedAt: sql`now()`,
   };
 
-  const [current] = await tx.select().from(records).where(eq(records.id, id)).for("update");
+  const [current] = await tx
+    .select()
+    .from(records)
+    .where(and(eq(records.userId, userId), eq(records.id, id)))
+    .for("update");
 
   if (!current && change.baseVersion !== null) {
     return { id, error: (await existsHidden(tx, id, userId)) ? "id_taken" : "not_found" };
@@ -224,7 +232,7 @@ async function applyChange(
   const [updated] = await tx
     .update(records)
     .set(fields)
-    .where(eq(records.id, id))
+    .where(and(eq(records.userId, userId), eq(records.id, id)))
     .returning({ version: records.version });
   if (current.deleted !== change.deleted) addLive(change.deleted ? -1 : 1);
   return { id, version: (updated as { version: number }).version };
@@ -279,7 +287,11 @@ export async function purgeTombstones(db: Db, now: Date): Promise<number> {
         const deleted = await tx
           .delete(records)
           .where(
-            and(eq(records.deleted, true), sql`${records.updatedAt} < ${cutoff.toISOString()}`),
+            and(
+              eq(records.userId, id),
+              eq(records.deleted, true),
+              sql`${records.updatedAt} < ${cutoff.toISOString()}`,
+            ),
           )
           .returning({ id: records.id });
         return deleted.length;
