@@ -69,6 +69,14 @@ Serializers _$serializers =
           ..add(Problem.serializer)
           ..add(ProblemErrorsInner.serializer)
           ..add(Profile.serializer)
+          ..add(PulledRecords.serializer)
+          ..add(PushApplied.serializer)
+          ..add(PushConflict.serializer)
+          ..add(PushRecords.serializer)
+          ..add(PushRejected.serializer)
+          ..add(PushRejectedErrorEnum.serializer)
+          ..add(PushResult.serializer)
+          ..add(PushResults.serializer)
           ..add(Recurrence.serializer)
           ..add(RecurrenceFrequencyEnum.serializer)
           ..add(ReviewTransactions.serializer)
@@ -76,6 +84,10 @@ Serializers _$serializers =
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
           ..add(SummaryCategoriesInnerStateEnum.serializer)
+          ..add(SyncChange.serializer)
+          ..add(SyncChangeTypeEnum.serializer)
+          ..add(SyncRecord.serializer)
+          ..add(SyncRecordTypeEnum.serializer)
           ..add(Transaction.serializer)
           ..add(TransactionCaptureSourceEnum.serializer)
           ..add(TransactionList.serializer)
@@ -148,6 +160,10 @@ Serializers _$serializers =
             () => ListBuilder<ProblemErrorsInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(PushResult)]),
+            () => ListBuilder<PushResult>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),
             () => ListBuilder<String>(),
           )
@@ -180,6 +196,14 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SummaryCategoriesInner)]),
             () => ListBuilder<SummaryCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SyncChange)]),
+            () => ListBuilder<SyncChange>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SyncRecord)]),
+            () => ListBuilder<SyncRecord>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Transaction)]),

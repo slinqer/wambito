@@ -18,6 +18,7 @@ import { meRoutes } from "./routes/me.ts";
 import { recurrenceRoutes } from "./routes/recurrences.ts";
 import { reportRoutes } from "./routes/reports.ts";
 import { summaryRoutes } from "./routes/summary.ts";
+import { syncRoutes } from "./routes/sync.ts";
 import { transactionRoutes } from "./routes/transactions.ts";
 
 export type { AppDeps } from "./deps.ts";
@@ -71,6 +72,8 @@ export function createApp(deps: AppDeps) {
   app.route("/", emailChangeRoutes(deps));
   app.use("/v1/*", requireUser(auth, deps.config));
   app.use("/v1/*", assistantScopes());
+  app.use("/v2/*", requireUser(auth, deps.config));
+  app.use("/v2/*", assistantScopes());
   app.route("/", meRoutes(deps));
   app.route("/", assistantRoutes(deps));
   app.route("/", categoryRoutes(deps));
@@ -80,6 +83,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", summaryRoutes(deps));
   app.route("/", reportRoutes(deps));
   app.route("/", importRoutes(deps));
+  app.route("/", syncRoutes(deps));
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

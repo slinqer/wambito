@@ -5,6 +5,7 @@ import { eq } from "@wambito/db/orm";
 import { startTestDatabase } from "@wambito/db/testing";
 import { createApp } from "../src/app.ts";
 import type { Config } from "../src/config.ts";
+import type { SyncHooks } from "../src/deps.ts";
 import { MemoryMailer } from "../src/mailer.ts";
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
@@ -44,7 +45,12 @@ export async function createTestApp(
   {
     now,
     fetchClientMetadata,
-  }: { now?: () => Date; fetchClientMetadata?: ClientMetadataResourceFetch } = {},
+    syncHooks,
+  }: {
+    now?: () => Date;
+    fetchClientMetadata?: ClientMetadataResourceFetch;
+    syncHooks?: SyncHooks;
+  } = {},
 ) {
   const database = await startTestDatabase();
   const app$ = createDb(database.appUrl);
@@ -56,7 +62,14 @@ export async function createTestApp(
     DATABASE_ADMIN_URL: database.adminUrl,
     ...overrides,
   };
-  const app = createApp({ config, db: app$.db, mailer, now, fetchClientMetadata });
+  const app = createApp({
+    config,
+    db: app$.db,
+    mailer,
+    now,
+    fetchClientMetadata,
+    syncHooks,
+  });
 
   // Distinct fake client IPs (behind a trusted 10.x proxy) keep the per-IP auth rate limit out of
   // unrelated tests.

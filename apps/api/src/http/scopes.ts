@@ -13,6 +13,9 @@ const ASSISTANT_PATHS = [
   /^\/v1\/recurrences(\/|$)/,
   /^\/v1\/summary$/,
   /^\/v1\/reports\//,
+  // Encrypted records: GET pulls (finance:read), POST pushes (finance:write). Nothing else under
+  // /v2 (keys, pairing) is reachable by an assistant here.
+  /^\/v2\/sync$/,
 ];
 
 /**
@@ -24,7 +27,7 @@ export function assistantScopes() {
   return createMiddleware<AppEnv>(async (c, next) => {
     const grant = c.get("grant");
     if (grant.kind === "oauth") {
-      const path = c.req.path.replace(/^.*?(?=\/v1\/)/, "");
+      const path = c.req.path.replace(/^.*?(?=\/v[12]\/)/, "");
       const read = c.req.method === "GET" || c.req.method === "HEAD";
       const reachable = ASSISTANT_PATHS.some((p) => p.test(path)) || (read && path === "/v1/me");
       const needed = read ? "finance:read" : "finance:write";

@@ -4,6 +4,7 @@ import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { type Mailer, ResendMailer, SmtpMailer } from "./mailer.ts";
 import { scheduleGuestCleanup } from "./services/guest-cleanup.ts";
+import { scheduleTombstonePurge } from "./services/sync.ts";
 
 const config = loadConfig(process.env);
 // Development applies migrations itself; elsewhere they are a separate step with the owner role
@@ -29,3 +30,6 @@ serve({ fetch: app.fetch, port: config.PORT }, ({ port }) => {
 // Guests idle for over 60 days are deleted once a day (spec §4.4). Always the real clock: the
 // pinned E2E clock would misjudge real session times.
 scheduleGuestCleanup({ db });
+// Deleted records older than 180 days are purged once a day (spec 2026-11-08 section 5.1), on the
+// real clock too.
+scheduleTombstonePurge({ db });

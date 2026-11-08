@@ -39,6 +39,13 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - `src/routes/email-change.ts`: public `POST /v1/email-change/confirm` (mounted before
   `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP in the
   `rate_limit` table (key `email-change-confirm|<ip>`).
+- `GET`/`POST /v2/sync` (`src/routes/sync.ts`, `src/services/sync.ts`; spec
+  `docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md` §5–6): opaque encrypted
+  records, never read or logged. A push holds `pg_advisory_xact_lock(hashtextextended('records:'
+  || user_id, 0))` (every `records` write takes it, so versions commit in order per person), one
+  savepoint per change; limits 500 changes, 4 MiB (`hono/body-limit`), 64 KiB body, 100,000 live
+  records. `purgeTombstones` (daily, `server.ts`) goes person by person through `withUser`, since
+  `records` has forced RLS. `deps.syncHooks` is a test-only seam.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

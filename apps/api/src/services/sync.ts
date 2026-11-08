@@ -1,0 +1,284 @@
+import { type Db, records, type Tx, user, withUser } from "@wambito/db";
+import { and, asc, eq, gt, lte, sql } from "@wambito/db/orm";
+import type { SyncHooks } from "../deps.ts";
+import { ApiError } from "../http/problem.ts";
+import type { RECORD_TYPES } from "../http/schemas.ts";
+
+type RecordType = (typeof RECORD_TYPES)[number];
+
+/** Live (not deleted) records one account may hold (spec 2026-11-08 section 5.1). */
+export const MAX_LIVE_RECORDS = 100_000;
+/** Tombstones older than this are purged; a device away for longer does a full resync. */
+export const TOMBSTONE_DAYS = 180;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Users whose tombstones are purged per page of the purge. */
+const PURGE_PAGE = 500;
+
+type RecordRow = typeof records.$inferSelect;
+
+/** A record as it travels: `body` is base64url, null once deleted. */
+export interface SyncRecordDto {
+  id: string;
+  type: RecordType;
+  version: number;
+  deleted: boolean;
+  keyV: number;
+  encV: number;
+  body: string | null;
+}
+
+export interface SyncChangeInput {
+  id: string;
+  type: RecordType;
+  baseVersion: number | null;
+  deleted: boolean;
+  keyV: number;
+  encV: number;
+  /** base64url, already checked by the route's schema. */
+  body: string | null;
+}
+
+export type PushResult =
+  | { id: string; version: number }
+  | { id: string; conflict: SyncRecordDto }
+  | { id: string; error: "id_taken" };
+
+export function toSyncRecord(row: RecordRow): SyncRecordDto {
+  return {
+    id: row.id,
+    // Only ever written from a validated change.
+    type: row.type as RecordType,
+    version: row.version,
+    deleted: row.deleted,
+    keyV: row.keyV,
+    encV: row.encV,
+    body: row.body === null ? null : Buffer.from(row.body).toString("base64url"),
+  };
+}
+
+/**
+ * Takes the transaction-level lock on one person's records. Every write to `records` takes it
+ * first, so writes for one person run one at a time: a version (from the global sequence) is then
+ * never committed after a higher one of the same person, and a device that pulled up to `latest`
+ * cannot miss a record committed later with a lower version.
+ */
+async function lockRecords(tx: Tx, userId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`records:${userId}`}, 0))`);
+}
+
+/**
+ * The person's records with a version above `since`, oldest first, at most `limit`. `latest` is
+ * read first and caps the page, so a record committed while this runs never makes `latest` skip
+ * past one this page did not return.
+ */
+export async function pullRecords(
+  db: Db,
+  userId: string,
+  since: number,
+  limit: number,
+): Promise<{ records: SyncRecordDto[]; next: number | null; latest: number }> {
+  return withUser(db, userId, async (tx) => {
+    const [top] = await tx
+      .select({ latest: sql<string>`coalesce(max(${records.version}), 0)` })
+      .from(records);
+    const latest = Number(top?.latest ?? 0);
+    const rows = await tx
+      .select()
+      .from(records)
+      .where(and(gt(records.version, since), lte(records.version, latest)))
+      .orderBy(asc(records.version))
+      .limit(limit + 1);
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      records: page.map(toSyncRecord),
+      next: rows.length > limit && last ? last.version : null,
+      latest,
+    };
+  });
+}
+
+const sameBytes = (a: Uint8Array | null, b: Uint8Array | null) =>
+  a === null || b === null ? a === b : Buffer.from(a).equals(Buffer.from(b));
+
+/**
+ * Applies `changes` in order, each on its own (a conflict never rejects the others), in one
+ * transaction that holds the person's records lock. Per change:
+ *
+ * - `baseVersion: null` creates. If the id is already the person's, a retry of the same create
+ *   (same type, deleted, keyV, encV and body bytes) answers the stored version; anything else is
+ *   a conflict carrying the stored record. An id that exists but is not visible (another
+ *   person's) is `id_taken`, and nothing about that record is returned.
+ * - Otherwise the write applies only when `baseVersion` is the stored version; else a conflict.
+ *   A change for an id the person does not have (never uploaded, or a purged tombstone) is
+ *   stored as new, unless the id is another person's (`id_taken`).
+ *
+ * Every write takes a fresh version from `records_version_seq` and sets `updated_at`. Each change
+ * runs in its own savepoint. More than MAX_LIVE_RECORDS live records after a change fails the
+ * whole push with 409 `record_limit`.
+ */
+export async function pushRecords(
+  db: Db,
+  userId: string,
+  changes: SyncChangeInput[],
+  hooks: SyncHooks = {},
+): Promise<PushResult[]> {
+  return withUser(db, userId, async (tx) => {
+    await lockRecords(tx, userId);
+
+    let live: number | null = null;
+    // Counted once, then kept up to date, only for a push that can add a live record.
+    const addLive = async (count: number) => {
+      if (count <= 0) {
+        if (live !== null) live += count;
+        return;
+      }
+      if (live === null) {
+        const [row] = await tx
+          .select({ count: sql<string>`count(*)` })
+          .from(records)
+          .where(eq(records.deleted, false));
+        live = Number(row?.count ?? 0);
+      }
+      live += count;
+      if (live > MAX_LIVE_RECORDS) {
+        throw new ApiError(
+          409,
+          "record_limit",
+          `An account holds at most ${MAX_LIVE_RECORDS} records`,
+        );
+      }
+    };
+
+    const results: PushResult[] = [];
+    for (const change of changes) {
+      results.push(await tx.transaction((sp) => applyChange(sp, userId, change, addLive)));
+    }
+    await hooks.beforeCommit?.();
+    return results;
+  });
+}
+
+async function applyChange(
+  tx: Tx,
+  userId: string,
+  change: SyncChangeInput,
+  addLive: (count: number) => Promise<void>,
+): Promise<PushResult> {
+  const id = change.id.toLowerCase();
+  const body = change.body === null ? null : new Uint8Array(Buffer.from(change.body, "base64url"));
+  const fields = {
+    type: change.type,
+    deleted: change.deleted,
+    keyV: change.keyV,
+    encV: change.encV,
+    body,
+    version: sql`nextval('records_version_seq')`,
+    updatedAt: sql`now()`,
+  };
+
+  const [current] = await tx.select().from(records).where(eq(records.id, id)).for("update");
+
+  if (!current) {
+    const [inserted] = await tx
+      .insert(records)
+      .values({ id, userId, ...fields })
+      .onConflictDoNothing({ target: records.id })
+      .returning({ version: records.version });
+    // The id exists, but row-level security hides it: it is someone else's.
+    if (!inserted) return { id, error: "id_taken" };
+    if (!change.deleted) await addLive(1);
+    return { id, version: inserted.version };
+  }
+
+  if (change.baseVersion === null) {
+    const retry =
+      current.type === change.type &&
+      current.deleted === change.deleted &&
+      current.keyV === change.keyV &&
+      current.encV === change.encV &&
+      sameBytes(current.body, body);
+    return retry ? { id, version: current.version } : { id, conflict: toSyncRecord(current) };
+  }
+
+  if (current.version !== change.baseVersion) return { id, conflict: toSyncRecord(current) };
+
+  const [updated] = await tx
+    .update(records)
+    .set(fields)
+    .where(eq(records.id, id))
+    .returning({ version: records.version });
+  await addLive(Number(current.deleted) - Number(change.deleted));
+  return { id, version: (updated as { version: number }).version };
+}
+
+/**
+ * Deletes every tombstone (deleted record) last written more than 180 days before `now`, and
+ * returns how many it deleted. Live records are never touched.
+ *
+ * `records` is under forced row-level security and the API's role has no way around it, so the
+ * purge goes person by person: it pages through `user` (not under row-level security, as the
+ * guest cleanup reads it) and deletes each person's old tombstones in a `withUser` transaction
+ * that takes that person's records lock, like a push.
+ */
+export async function purgeTombstones(db: Db, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - TOMBSTONE_DAYS * DAY_MS);
+  let total = 0;
+  let after = "";
+  for (;;) {
+    const people = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(gt(user.id, after))
+      .orderBy(asc(user.id))
+      .limit(PURGE_PAGE);
+    for (const { id } of people) {
+      total += await withUser(db, id, async (tx) => {
+        await lockRecords(tx, id);
+        const deleted = await tx
+          .delete(records)
+          .where(
+            and(eq(records.deleted, true), sql`${records.updatedAt} < ${cutoff.toISOString()}`),
+          )
+          .returning({ id: records.id });
+        return deleted.length;
+      });
+    }
+    const last = people.at(-1);
+    if (!last || people.length < PURGE_PAGE) return total;
+    after = last.id;
+  }
+}
+
+export interface TombstonePurgeDeps {
+  db: Db;
+  /** Replaces `purgeTombstones`; for tests. */
+  purge?: (db: Db, now: Date) => Promise<number>;
+  log?: (message: string) => void;
+  logError?: (message: string, error: unknown) => void;
+}
+
+/**
+ * Runs the purge now and then once a day, until the returned function is called. A failure is
+ * logged and the next day's run goes on. The timer does not keep the process alive.
+ */
+export function scheduleTombstonePurge(deps: TombstonePurgeDeps): () => void {
+  const purge = deps.purge ?? purgeTombstones;
+  const log = deps.log ?? ((message) => console.log(message));
+  const logError = deps.logError ?? ((message, error) => console.error(message, error));
+
+  const run = async () => {
+    try {
+      const count = await purge(deps.db, new Date());
+      if (count > 0)
+        log(`Tombstone purge: deleted ${count} record(s) older than ${TOMBSTONE_DAYS} days`);
+    } catch (error) {
+      logError("Tombstone purge failed", error);
+    }
+  };
+
+  const timer = setInterval(run, DAY_MS);
+  timer.unref();
+  void run();
+  return () => clearInterval(timer);
+}

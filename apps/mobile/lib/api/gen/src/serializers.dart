@@ -58,11 +58,20 @@ import 'package:wambito/api/gen/src/model/passkey_request_options_allow_credenti
 import 'package:wambito/api/gen/src/model/problem.dart';
 import 'package:wambito/api/gen/src/model/problem_errors_inner.dart';
 import 'package:wambito/api/gen/src/model/profile.dart';
+import 'package:wambito/api/gen/src/model/pulled_records.dart';
+import 'package:wambito/api/gen/src/model/push_applied.dart';
+import 'package:wambito/api/gen/src/model/push_conflict.dart';
+import 'package:wambito/api/gen/src/model/push_records.dart';
+import 'package:wambito/api/gen/src/model/push_rejected.dart';
+import 'package:wambito/api/gen/src/model/push_result.dart';
+import 'package:wambito/api/gen/src/model/push_results.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
+import 'package:wambito/api/gen/src/model/sync_change.dart';
+import 'package:wambito/api/gen/src/model/sync_record.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
 import 'package:wambito/api/gen/src/model/transaction_list.dart';
 import 'package:wambito/api/gen/src/model/transaction_page.dart';
@@ -123,11 +132,20 @@ part 'serializers.g.dart';
   Problem,
   ProblemErrorsInner,
   Profile,
+  PulledRecords,
+  PushApplied,
+  PushConflict,
+  PushRecords,
+  PushRejected,
+  PushResult,
+  PushResults,
   Recurrence,
   ReviewTransactions,
   SetBudget,
   Summary,
   SummaryCategoriesInner,
+  SyncChange,
+  SyncRecord,
   Transaction,
   TransactionList,
   TransactionPage,
@@ -164,6 +182,10 @@ Serializers serializers =
             () => ListBuilder<Recurrence>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(PushResult)]),
+            () => ListBuilder<PushResult>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ProblemErrorsInner)]),
             () => ListBuilder<ProblemErrorsInner>(),
           )
@@ -174,6 +196,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Category)]),
             () => ListBuilder<Category>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SyncChange)]),
+            () => ListBuilder<SyncChange>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Transaction)]),
@@ -226,6 +252,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ImportStatsAverageMonthlySpendingInner)]),
             () => ListBuilder<ImportStatsAverageMonthlySpendingInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SyncRecord)]),
+            () => ListBuilder<SyncRecord>(),
           )
           ..add(const OneOfSerializer())
           ..add(const AnyOfSerializer())
