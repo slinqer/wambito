@@ -21,8 +21,8 @@ Wambito is built for F-Droid from source on F-Droid's own build server, from the
 
 - After F-Droid publishes the first build, its signing-key fingerprint goes into `ANDROID_CERT_SHA256` next to ours, or App Links and passkeys do not work for F-Droid users (`release.md`; plan Task 10).
 - Not exercised at runtime on a from-source build: live speech recognition and anything on `armeabi-v7a` (installs, signs in and loads a model on an arm64 emulator only; the emulator's microphone hung). Check on a real phone before the first release.
-- No Canary (precise voice model) on F-Droid yet: its runtime, sherpa-onnx, is a prebuilt AAR from a GitHub release, which F-Droid does not accept. The from-source build leaves it out (`src/noPrecise`, no dependency), so F-Droid users get Vosk only. Building sherpa-onnx from source is the way in.
-- About lists sherpa-onnx, onnxruntime and the Canary model on the F-Droid build too, which ships none of them until the F-Droid build of Canary is done (`docs/superpowers/specs/2026-11-05-voice-canary-design.md`, section 6).
+- The precise voice model (Canary, Parakeet) is in the `arm64-v8a` build only, with sherpa-onnx and onnxruntime built from source ("The precise voice model" below). The `armeabi-v7a` build has none (`src/noPrecise`); the model does not run on that ABI anyway. About still lists sherpa-onnx, onnxruntime and the models there.
+- The `arm64-v8a` entry now builds onnxruntime too: about 80 minutes on 10 emulated cores on a Mac, on top of the rest. Whether it fits F-Droid's `timeout: 10800` is unmeasured.
 - F-Droid's build timeout is unverified: the recipe asks for `timeout: 10800`.
 
 ## How the build works
@@ -37,6 +37,16 @@ The prebuilt native code in the APK comes from two Maven artifacts: `com.alphace
   - Nothing prebuilt from either tree is used: JNA's `lib/native/*.jar` are deleted first. JNA is dual-licensed (Apache-2.0 or LGPL-2.1); About says so, and the `com.sun.jna.**` ProGuard keeps stay.
   - The recipe passes a fixed `--work /tmp/wambito-native-deps`, so `libvosk.so` embeds the same paths on every build.
 - The Gradle property `-Pwambito.nativeFromSource=true` (`android/app/build.gradle.kts`) makes the app take those `-src` artifacts. It is off by default, so CI's x86_64 emulator keeps voice. With it set (`-P`, or `env 'ORG_GRADLE_PROJECT_wambito.nativeFromSource=true' scripts/check-no-google.sh`), `check-no-google.sh` resolves the from-source classpath and `check-licenses.sh` reads the licences from the local POMs. `scripts/test-native-switch.sh` tests the switch in CI.
+
+### The precise voice model
+
+The Play and GitHub builds take sherpa-onnx 2.0.1 as k2-fsa's prebuilt AAR (`scripts/fetch-sherpa-onnx.sh`). F-Droid's `arm64-v8a` build makes the same two native libraries itself, `scripts/build-sherpa-onnx.sh`, from the spike's recipe (`docs/superpowers/reports/2026-11-06-sherpa-onnx-from-source-spike.md`):
+
+- A host `protoc` from the pinned protobuf, then onnxruntime 1.28.2 with its own `tools/ci_build/build.py` (API 26, the app's `minSdk`), then sherpa-onnx's JNI library against it, without TTS or speaker diarization. Output: `android/third_party/sherpa-onnx-src` (git-ignored): `jniLibs/arm64-v8a/{libonnxruntime.so,libsherpa-onnx-jni.so}`, `kotlin/` (the Kotlin API, the files k2-fsa's AAR is compiled from) and `SOURCES`.
+- **No network.** Every source is a git checkout at a pinned commit, the `pin` lines at the top of the script: onnxruntime, sherpa-onnx and the 22 libraries their CMake would download. In the recipe each is a srclib; the script finds them all through `--srclibs $$sherpa-onnx$$/..` (F-Droid's `build/srclib`). onnxruntime reads its dependencies from `cmake/deps.txt` and patches some of them, so the script packs each checkout into a local tar and writes that tar's path and SHA-1 into deps.txt; any URL left there is made unusable, so an unknown dependency fails the build. sherpa-onnx takes its own as `FETCHCONTENT_SOURCE_DIR_<NAME>`, with `FETCHCONTENT_FULLY_DISCONNECTED`. It was run with `docker run --network none` in F-Droid's image.
+- Three of the srclibs (`onnxruntime`, `abseil-cpp`, `cpuinfo`) already exist in fdroiddata with the same repository and are reused; the other 21 are in `apps/mobile/fdroid/srclibs/`.
+- The switch `-Pwambito.preciseFromSource=true` (only with `wambito.nativeFromSource`) adds `kotlin/` to the sources, `jniLibs/` to the native libraries and `src/precise` instead of `src/noPrecise`. It adds no dependency, so `gradle-fdroid.lockfile` serves both entries.
+- `scripts/check-fdroid-recipe.sh` checks that the `arm64-v8a` entry lists every pinned source at its commit, runs the script and builds with the switch, that the `armeabi-v7a` entry does none of it, and that every srclib file names the pinned repository.
 
 ### The two lockfiles
 
@@ -96,6 +106,7 @@ Not yet measured: a different machine or Linux, which is what F-Droid runs. The 
 | `libflutter.so` | the Flutter engine, from the `flutter@3.47.7` srclib |
 | `libapp.so` | our Dart code, AOT-compiled in the build |
 | `libdartjni.so` | the `jni` pub package (via `flutter_secure_storage`), built by CMake in the build |
+| `libonnxruntime.so`, `libsherpa-onnx-jni.so` | `arm64-v8a` only: onnxruntime and sherpa-onnx, built by `scripts/build-sherpa-onnx.sh` |
 
 ## Voice models and the server
 

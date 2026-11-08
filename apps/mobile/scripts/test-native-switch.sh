@@ -12,6 +12,14 @@
 #       JNA 5.18.1 (the stub Vosk POM asks for it, as Maven's does: the switch must exclude it),
 #       and no sherpa-onnx even though its stub is in the same repository (the F-Droid build has no
 #       precise model).
+# and then the second switch, wambito.preciseFromSource (the arm64-v8a F-Droid build's precise voice
+# model, from scripts/build-sherpa-onnx.sh's android/third_party/sherpa-onnx-src):
+#   (d) without wambito.nativeFromSource: the build stops and says it needs it;
+#   (e) with both and no sherpa-onnx-src: the build stops and says to run build-sherpa-onnx.sh;
+#   (f) with both and a stub sherpa-onnx-src: still no sherpa-onnx dependency (the runtime comes as
+#       sources and native libraries, not as an artifact, so gradle-fdroid.lockfile serves both
+#       F-Droid entries), and the main source set takes src/precise and the stub's Kotlin and
+#       jniLibs, where (c) takes src/noPrecise and neither.
 # The copy leaves out android/third_party, so a real one is never touched. It keeps the committed
 # lockfiles, so Gradle resolves against them: (a) app/gradle.lockfile, (c) app/gradle-fdroid.lockfile,
 # which the stubs satisfy because they carry the same coordinates and dependencies as the real -src
@@ -133,8 +141,71 @@ name="(c) with the property and stub -src artifacts, 0.3.75-src and 5.18.1-src, 
 if list -Pwambito.nativeFromSource=true && has 'com.alphacephei:vosk-android:0.3.75-src' &&
   has 'net.java.dev.jna:jna:5.18.1-src' && ! plain_jna && ! has 'sherpa'; then pass "$name"; else fail "$name"; fi
 
+# sources [gradle args...]: the main source set's Java/Kotlin and jniLibs folders into
+# $WORK/out.txt, through a task an init script adds to :app (AGP has no listing of its own).
+cat >"$WORK/source-dirs.gradle" <<'GRADLE'
+allprojects { p ->
+  if (p.path == ':app') {
+    p.afterEvaluate {
+      p.tasks.register('wambitoSourceDirs') {
+        doLast {
+          def main = p.android.sourceSets.getByName('main')
+          main.java.srcDirs.each { println "java ${it}" }
+          main.jniLibs.srcDirs.each { println "jniLibs ${it}" }
+        }
+      }
+    }
+  }
+}
+GRADLE
+sources() {
+  local status=0
+  (cd android && ./gradlew --no-daemon --quiet --console=plain --init-script "$WORK/source-dirs.gradle" \
+    :app:wambitoSourceDirs "$@") >"$WORK/out.txt" 2>&1 || status=$?
+  return "$status"
+}
+name="(c) the main source set takes src/noPrecise, no sherpa-onnx-src"
+if sources -Pwambito.nativeFromSource=true && has 'src/noPrecise/kotlin' && ! has 'src/precise/kotlin' &&
+  ! has 'sherpa-onnx-src'; then pass "$name"; else fail "$name"; fi
+
+name="(d) wambito.preciseFromSource alone stops and says it needs wambito.nativeFromSource"
+status=0
+list -Pwambito.preciseFromSource=true || status=$?
+if [ "$status" -ne 0 ] && has 'wambito.preciseFromSource needs wambito.nativeFromSource'; then
+  pass "$name"
+else
+  fail "$name (exit $status)"
+fi
+
+name="(e) both switches and no sherpa-onnx-src, the build stops and says what to run"
+status=0
+list -Pwambito.nativeFromSource=true -Pwambito.preciseFromSource=true || status=$?
+if [ "$status" -ne 0 ] && has 'run apps/mobile/scripts/build-sherpa-onnx.sh first'; then
+  pass "$name"
+else
+  fail "$name (exit $status)"
+fi
+
+# A stub of what build-sherpa-onnx.sh writes.
+precise="$COPY/android/third_party/sherpa-onnx-src"
+mkdir -p "$precise/jniLibs/arm64-v8a" "$precise/kotlin/com/k2fsa/sherpa/onnx"
+printf 'stub\n' >"$precise/jniLibs/arm64-v8a/libsherpa-onnx-jni.so"
+printf 'package com.k2fsa.sherpa.onnx\n' >"$precise/kotlin/com/k2fsa/sherpa/onnx/Stub.kt"
+printf 'stub\n' >"$precise/SOURCES"
+name="(f) both switches and a stub sherpa-onnx-src, no sherpa-onnx dependency"
+if list -Pwambito.nativeFromSource=true -Pwambito.preciseFromSource=true &&
+  has 'com.alphacephei:vosk-android:0.3.75-src' && ! has 'sherpa'; then pass "$name"; else fail "$name"; fi
+name="(f) and the main source set takes src/precise and the stub's Kotlin and jniLibs"
+if sources -Pwambito.nativeFromSource=true -Pwambito.preciseFromSource=true &&
+  has 'src/precise/kotlin' && ! has 'src/noPrecise/kotlin' &&
+  has 'third_party/sherpa-onnx-src/kotlin' && has 'third_party/sherpa-onnx-src/jniLibs'; then
+  pass "$name"
+else
+  fail "$name"
+fi
+
 if [ "$failures" -ne 0 ]; then
   echo "$failures check(s) failed."
   exit 1
 fi
-echo "The wambito.nativeFromSource switch behaved."
+echo "The wambito.nativeFromSource and wambito.preciseFromSource switches behaved."

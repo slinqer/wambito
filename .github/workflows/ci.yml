@@ -234,10 +234,13 @@ jobs:
       - run: scripts/check-fastlane.sh
       # build-native-deps.sh's arguments (--abi), checked before it needs its tools or sources.
       - run: scripts/test-build-native-deps-args.sh
+      # build-sherpa-onnx.sh (the precise model from source, F-Droid arm64-v8a): its arguments and
+      # its pinned sources' format.
+      - run: scripts/test-build-sherpa-onnx-args.sh
       # fetch-sherpa-onnx.sh (the precise voice model's runtime) refuses a file with the wrong SHA-256.
       - run: scripts/test-fetch-sherpa-onnx.sh
-      # The F-Droid recipe still agrees with .flutter-version and build-native-deps.sh's pinned
-      # revisions and NDK, and gradle-fdroid.lockfile is gradle.lockfile with the two -src lines
+      # The F-Droid recipe still agrees with .flutter-version, build-native-deps.sh's and
+      # build-sherpa-onnx.sh's pinned revisions and NDK, and gradle-fdroid.lockfile is gradle.lockfile with the two -src lines
       # (docs/mobile/fdroid.md). Their test shows each fails on a deliberate mismatch.
       - run: scripts/test-fdroid-checks.sh
       - run: scripts/check-fdroid-recipe.sh

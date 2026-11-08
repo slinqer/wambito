@@ -11,6 +11,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MOBILE="$(cd "$DIR/.." && pwd)"
 RECIPE="$MOBILE/fdroid/com.wambito.app.yml"
 DEPS="$DIR/build-native-deps.sh"
+SHERPA="$DIR/build-sherpa-onnx.sh"
+SRCLIBS="$MOBILE/fdroid/srclibs"
 FLUTTER="$MOBILE/.flutter-version"
 LOCK="$MOBILE/android/app/gradle.lockfile"
 FLOCK="$MOBILE/android/app/gradle-fdroid.lockfile"
@@ -36,7 +38,10 @@ expect() {
   fi
 }
 
-recipe_check() { RECIPE="$1" DEPS="$2" FLUTTER_VERSION_FILE="$3" "$DIR/check-fdroid-recipe.sh"; }
+recipe_check() {
+  RECIPE="$1" DEPS="$2" FLUTTER_VERSION_FILE="$3" SHERPA="${4:-$SHERPA}" SRCLIBS="${5:-$SRCLIBS}" \
+    "$DIR/check-fdroid-recipe.sh"
+}
 lock_check() { LOCK="$1" FDROID_LOCK="$2" "$DIR/check-fdroid-lock.sh"; }
 
 # --- the recipe ---
@@ -62,6 +67,36 @@ expect "recipe: drift in only one build entry is caught" 1 "openfst" \
 sed 's/^    ndk: r28c$/    ndk: r27/' "$RECIPE" >"$WORK/recipe-ndk.yml"
 expect "recipe: an NDK that differs is caught" 1 "ndk" \
   recipe_check "$WORK/recipe-ndk.yml" "$DEPS" "$FLUTTER"
+
+# The precise model's sources: in the arm64-v8a entry only, at build-sherpa-onnx.sh's revisions.
+sed 's/^\(pin kissfft \)febd4c/\1000000/' "$SHERPA" >"$WORK/sherpa-rev.sh"
+expect "recipe: a sherpa-onnx source revision that differs is caught" 1 "kissfft" \
+  recipe_check "$RECIPE" "$DEPS" "$FLUTTER" "$WORK/sherpa-rev.sh"
+
+grep -v '^      - re2@' "$RECIPE" >"$WORK/recipe-no-re2.yml"
+expect "recipe: a source missing from the arm64-v8a entry is caught" 1 "re2" \
+  recipe_check "$WORK/recipe-no-re2.yml" "$DEPS" "$FLUTTER"
+
+awk '/^      - clapack@/ && !done { print; print "      - kissfft@febd4caeed32e33ad8b2e0bb5ea77542c40f18ec"; done = 1; next } { print }' \
+  "$RECIPE" >"$WORK/recipe-v7a-kissfft.yml"
+expect "recipe: a sherpa-onnx source in the armeabi-v7a entry is caught" 1 "armeabi-v7a" \
+  recipe_check "$WORK/recipe-v7a-kissfft.yml" "$DEPS" "$FLUTTER"
+
+sed 's/ -P wambito\.preciseFromSource=true//' "$RECIPE" >"$WORK/recipe-no-precise.yml"
+expect "recipe: an arm64-v8a build without the precise switch is caught" 1 "wambito.preciseFromSource" \
+  recipe_check "$WORK/recipe-no-precise.yml" "$DEPS" "$FLUTTER"
+
+cp -R "$SRCLIBS" "$WORK/srclibs"
+printf 'RepoType: git\nRepo: https://github.com/example/kissfft.git\n' >"$WORK/srclibs/kissfft.yml"
+expect "recipe: a srclib file whose repository differs is caught" 1 "kissfft" \
+  recipe_check "$RECIPE" "$DEPS" "$FLUTTER" "$SHERPA" "$WORK/srclibs"
+rm "$WORK/srclibs/kissfft.yml"
+expect "recipe: a missing srclib file is caught" 1 "kissfft" \
+  recipe_check "$RECIPE" "$DEPS" "$FLUTTER" "$SHERPA" "$WORK/srclibs"
+
+sed 's/^NDK_VERSION=28.2.13676358/NDK_VERSION=27.0.12077973/' "$SHERPA" >"$WORK/sherpa-ndk.sh"
+expect "recipe: a build-sherpa-onnx.sh NDK that differs is caught" 1 "NDK" \
+  recipe_check "$RECIPE" "$DEPS" "$FLUTTER" "$WORK/sherpa-ndk.sh"
 
 # --- the lock ---
 expect "lock: committed locks agree" 0 "equals" lock_check "$LOCK" "$FLOCK"

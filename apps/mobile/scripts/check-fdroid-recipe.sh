@@ -8,8 +8,15 @@
 #   - each srclib revision (vosk-api, kaldi, openfst, OpenBLAS, clapack) equals the *_REV pinned in
 #     scripts/build-native-deps.sh, and jna@<tag> equals JNA_VERSION without "-src";
 #   - ndk: is the NDK release build-native-deps.sh names in its NDK_VERSION line's comment (the app's
-#     own NDK is flutter.ndkVersion, set by the Flutter SDK and not readable without it).
-# Text only, so it runs anywhere in a second. The three files can be named for tests.
+#     own NDK is flutter.ndkVersion, set by the Flutter SDK and not readable without it), and
+#     scripts/build-sherpa-onnx.sh's NDK_VERSION is the same;
+# and, for the precise voice model (sherpa-onnx from source, arm64-v8a only):
+#   - the arm64-v8a entry lists every source pinned in build-sherpa-onnx.sh ("pin <name> <commit>")
+#     as <name>@<commit>, runs build-sherpa-onnx.sh and builds with -P wambito.preciseFromSource=true;
+#     the armeabi-v7a entry does none of it;
+#   - every one of those sources has fdroid/srclibs/<name>.yml naming its git URL, except the ones
+#     fdroiddata already has (FDROIDDATA_SRCLIBS below), which the merge request reuses.
+# Text only, so it runs anywhere in a second. The files can be named for tests.
 #
 # Usage, from anywhere: apps/mobile/scripts/check-fdroid-recipe.sh
 # Exit codes: 0 they agree, 1 they differ.
@@ -20,6 +27,11 @@ MOBILE="$(cd "$DIR/.." && pwd)"
 RECIPE="${RECIPE:-$MOBILE/fdroid/com.wambito.app.yml}"
 DEPS="${DEPS:-$DIR/build-native-deps.sh}"
 FLUTTER_VERSION_FILE="${FLUTTER_VERSION_FILE:-$MOBILE/.flutter-version}"
+SHERPA="${SHERPA:-$DIR/build-sherpa-onnx.sh}"
+SRCLIBS="${SRCLIBS:-$MOBILE/fdroid/srclibs}"
+# fdroiddata's own srclibs with the same repository (checked when this was written): reused as
+# they are, so the repo has no file of its own for them.
+FDROIDDATA_SRCLIBS=" onnxruntime abseil-cpp cpuinfo "
 failures=0
 problem() {
   echo "$1" >&2
@@ -62,8 +74,44 @@ elif [ "$(grep -c . <<<"$ndks")" -ne "$entries" ] || [ -n "$(grep -vxF -- "$ndk_
   problem "recipe: ndk must be $ndk_release (NDK_VERSION in build-native-deps.sh) in all $entries build entries; found: $(tr '\n' ' ' <<<"$ndks")"
 fi
 
+sherpa_ndk="$(sed -n 's/^NDK_VERSION=\([^[:space:]]*\).*/\1/p' "$SHERPA")"
+[ -n "$sherpa_ndk" ] && [ "$sherpa_ndk" = "$(dep_value NDK_VERSION)" ] ||
+  problem "build-sherpa-onnx.sh's NDK_VERSION ($sherpa_ndk) is not build-native-deps.sh's ($(dep_value NDK_VERSION))."
+
+# entry <abi>: the build entry whose output is the <abi> APK, as text.
+entry() {
+  awk -v abi="$1" '/^  - versionName:/ { if (text ~ "app-" abi "-release.apk") print text; text = "" }
+    /^[A-Za-z]/ { if (text ~ "app-" abi "-release.apk") print text; text = ""; next }
+    { text = text $0 "\n" } END { if (text ~ "app-" abi "-release.apk") print text }' "$RECIPE" | sed 's/\\n/\n/g'
+}
+arm64="$(entry arm64-v8a)"
+v7a="$(entry armeabi-v7a)"
+[ -n "$arm64" ] || problem "recipe: no build entry for app-arm64-v8a-release.apk."
+[ -n "$v7a" ] || problem "recipe: no build entry for app-armeabi-v7a-release.apk."
+pins="$(sed -n 's/^pin \([^[:space:]]*\) \([0-9a-f]\{40\}\) \([^[:space:]]*\) .*/\1 \2 \3/p' "$SHERPA")"
+[ "$(grep -c . <<<"$pins")" -ge 2 ] || problem "could not read the pinned sources of build-sherpa-onnx.sh."
+while read -r name rev url; do
+  [ -n "$name" ] || continue
+  grep -qxF -- "      - $name@$rev" <<<"$arm64" ||
+    problem "recipe: the arm64-v8a entry must list $name@$rev (build-sherpa-onnx.sh)."
+  ! grep -q -- "^      - $name@" <<<"$v7a" ||
+    problem "recipe: the armeabi-v7a entry must not list $name (the precise model is arm64-v8a only)."
+  case "$FDROIDDATA_SRCLIBS" in *" $name "*) continue ;; esac
+  if [ ! -f "$SRCLIBS/$name.yml" ]; then
+    problem "srclibs: no $name.yml for $name ($url)."
+  elif ! grep -qxF "Repo: $url.git" "$SRCLIBS/$name.yml"; then
+    problem "srclibs: $name.yml must say Repo: $url.git"
+  fi
+done <<<"$pins"
+grep -q 'scripts/build-sherpa-onnx.sh' <<<"$arm64" ||
+  problem "recipe: the arm64-v8a entry must run scripts/build-sherpa-onnx.sh."
+grep -q -- '-P wambito.preciseFromSource=true' <<<"$arm64" ||
+  problem "recipe: the arm64-v8a entry must build with -P wambito.preciseFromSource=true."
+! grep -q -e 'build-sherpa-onnx' -e 'wambito.preciseFromSource' <<<"$v7a" ||
+  problem "recipe: the armeabi-v7a entry must not build the precise model."
+
 if [ "$failures" -gt 0 ]; then
   echo "The F-Droid recipe has drifted from the repo: fix it here, and open the same change as a merge request on fdroiddata before tagging." >&2
   exit 1
 fi
-echo "The F-Droid recipe agrees with .flutter-version and build-native-deps.sh in all $entries build entries."
+echo "The F-Droid recipe agrees with .flutter-version, build-native-deps.sh and build-sherpa-onnx.sh in all $entries build entries."

@@ -59,7 +59,7 @@ Builds:
     sudo:
       - apt-get update
       - apt-get install -y --no-install-recommends ant autoconf automake cmake g++ gcc libasm-java
-        libltdl-dev libtool make python3 texinfo
+        libltdl-dev libtool make ninja-build python3 texinfo
     output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
     srclibs:
       - flutter@3.47.7
@@ -69,6 +69,30 @@ Builds:
       - openfst@18e94e63870ebcf79ebb42b7035cd3cb626ec090
       - OpenBLAS@0b678b19dc03f2a999d6e038814c4c50b9640a4e
       - clapack@f4e1647de96343fb20eea08a9d4f0e0d04c31c51
+      - onnxruntime@33ca9628233dc8f002435e868d4c2e9f82766ca1
+      - sherpa-onnx@af2d8d81dbfa61c4cea4c568da78f3982edca005
+      - abseil-cpp@987c57f325f7fa8472fa84e1f885f7534d391b0d
+      - hinnant-date@6e921e1b1d21e84a5c82416ba7ecd98e33a436d0
+      - eigen-mirror@1d8b82b0740839c0de7f1242a3585e3390ff5f33
+      - flatbuffers@0100f6a5779831fa7a651e4b67ef389a8752bd9b
+      - GSL@249146590e322123cd0b378b1f364d6069717687
+      - kleidiai@4d2725c91ffcb1ae674196b98660d69d4084bf4f
+      - mp11@0a0b5fb001ce0233ae3a6f99d849c0649e5a7361
+      - nlohmann-json-3.11@9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03
+      - onnx@2bb50465112feca9003e1ed654d77f01ff1415ca
+      - protobuf@f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c
+      - cpuinfo@4628dc060ce4e82345dc166bbac875609db4ff69
+      - re2@6dcd83d60f7944926bfd308cc13979fc53dd69ca
+      - SafeInt@4cafc9196c4da9c817992b20f5253ef967685bf8
+      - kaldi-native-fbank@95032e2223c73addc965bb84d2d1b11498eda4e9
+      - kissfft@febd4caeed32e33ad8b2e0bb5ea77542c40f18ec
+      - utf8proc@79cdd5ab40c79afa559f689ffc13b76812dee1ac
+      - kaldi-decoder@62fda2d74246a90db9570e46fb16b012f813fae7
+      - kaldifst@ab5bdd013bdf13921e6aeee77db5722ebf9955fb
+      - openfst-csukuangfj@f702a6317d600ac953fdbb4978674c3a28b6115c
+      - eigen@bc3b39870ecb690a623a3f49149a358b95c5781d
+      - simple-sentencepiece@62dd423df1d51da5ea06f1c3a046fc04f01b4f39
+      - nlohmann-json@55f93686c01528224f448c19128836e7df245f72
     prebuild:
       - rm -rf $$jna$$/dist $$jna$$/lib/test/*.jar $$jna$$/test/com/sun/jna/data
       - rm -f $$jna$$/lib/bsh.jar $$jna$$/lib/checkstyle-8.17-all.jar $$jna$$/lib/clover.jar
@@ -88,8 +112,10 @@ Builds:
       - scripts/build-native-deps.sh --abi arm64-v8a --ndk $$NDK$$ --work /tmp/wambito-native-deps
         --vosk-src $$vosk-api$$ --jna-src $$jna$$ --kaldi-src $$kaldi$$ --openfst-src $$openfst$$
         --openblas-src $$OpenBLAS$$ --clapack-src $$clapack$$
+      - scripts/build-sherpa-onnx.sh --ndk $$NDK$$ --srclibs $$sherpa-onnx$$/.. --work /tmp/wambito-sherpa-onnx
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform android-arm64
         --build-name $$VERSION$$ --build-number $(($$VERCODE$$ / 10)) -P wambito.nativeFromSource=true
+        -P wambito.preciseFromSource=true
     ndk: r28c
     timeout: 10800
 

@@ -41,10 +41,14 @@ const _libffi = 'assets/licenses/libffi-mit.txt';
 // Creative Commons' legal code of CC BY 4.0, onnxruntime v1.28.2's LICENSE (the version inside
 // libonnxruntime.so, from its strings and sherpa-onnx's cmake/onnxruntime-android-*.cmake), and
 // the texts of what is linked in: nlohmann/json v3.12.0, utf8proc v2.12.0, hclust-cpp (fastcluster),
-// darts-clone 0.32 (the header simple-sentencepiece v0.7 includes), Protocol Buffers and RE2 (inside
-// libonnxruntime.so). The Apache-2.0 ones (kaldi-native-fbank 1.22.4, kaldi-decoder 0.3.0, kaldifst
-// 1.8.0, OpenFst 1.8.5, simple-sentencepiece 0.7; Abseil and ONNX) use the Apache text. A test pins
-// sherpa-onnx 2.0.1: upgrading it means checking the AAR's libraries and these entries again.
+// darts-clone 0.32 (the header simple-sentencepiece v0.7 includes), kissfft (which kaldi-native-fbank
+// v1.22.4 links), Eigen (in both libraries), and inside libonnxruntime.so Protocol Buffers, RE2,
+// cpuinfo, SafeInt, GSL, date and Boost.Mp11 (the deps of onnxruntime v1.28.2's cmake/deps.txt its
+// Android build compiles in). The Apache-2.0 ones (kaldi-native-fbank 1.22.4, kaldi-decoder 0.3.0,
+// kaldifst 1.8.0, OpenFst 1.8.5, simple-sentencepiece 0.7; Abseil, ONNX, FlatBuffers and KleidiAI)
+// use the Apache text. A test pins sherpa-onnx 2.0.1: upgrading it means checking the AAR's
+// libraries and these entries again (docs/superpowers/reports/2026-11-06-sherpa-onnx-from-source-spike.md
+// lists how they were found).
 const _ccBy = 'assets/licenses/cc-by-4.0.txt';
 const _onnxruntime = 'assets/licenses/onnxruntime-mit.txt';
 const _nlohmann = 'assets/licenses/nlohmann-json-mit.txt';
@@ -53,6 +57,13 @@ const _fastcluster = 'assets/licenses/fastcluster-bsd-2-clause.txt';
 const _darts = 'assets/licenses/darts-clone-bsd-2-clause.txt';
 const _protobuf = 'assets/licenses/protobuf-bsd-3-clause.txt';
 const _re2 = 'assets/licenses/re2-bsd-3-clause.txt';
+const _cpuinfo = 'assets/licenses/cpuinfo-bsd-2-clause.txt';
+const _safeint = 'assets/licenses/safeint-mit.txt';
+const _gsl = 'assets/licenses/gsl-mit.txt';
+const _date = 'assets/licenses/date-mit.txt';
+const _boost = 'assets/licenses/boost-1.0.txt';
+const _eigen = 'assets/licenses/eigen-mpl-2.0.txt';
+const _kissfft = 'assets/licenses/kissfft-bsd-3-clause.txt';
 
 // The fonts and the licence file each ships (assets/fonts, pubspec.yaml; scripts/check-licenses.sh
 // checks every font has one). Both are SIL OFL 1.1, from Google Fonts' repository.
@@ -132,10 +143,18 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
     yield LicenseEntryWithLineBreaks([
       'Abseil',
       'ONNX',
+      'FlatBuffers',
+      'KleidiAI',
     ], '${l10n.licenseNoticeOrtApache}\n\n$apache');
     for (final (name, notice, asset) in [
       ('Protocol Buffers', l10n.licenseNoticeProtobuf, _protobuf),
       ('RE2', l10n.licenseNoticeRe2, _re2),
+      ('cpuinfo', l10n.licenseNoticeCpuinfo, _cpuinfo),
+      ('SafeInt', l10n.licenseNoticeSafeint, _safeint),
+      ('GSL', l10n.licenseNoticeGsl, _gsl),
+      ('date', l10n.licenseNoticeDate, _date),
+      ('Boost.Mp11', l10n.licenseNoticeMp11, _boost),
+      ('Eigen', l10n.licenseNoticeEigen, _eigen),
     ]) {
       yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
     }
@@ -151,6 +170,7 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       ('utf8proc 2.12.0', l10n.licenseNoticeUtf8proc, _utf8proc),
       ('fastcluster (hclust-cpp)', l10n.licenseNoticeFastcluster, _fastcluster),
       ('darts-clone 0.32', l10n.licenseNoticeDarts, _darts),
+      ('kissfft', l10n.licenseNoticeKissfft, _kissfft),
     ]) {
       yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
     }

@@ -5,7 +5,8 @@
 # or submitted anywhere: the commit is copied into a scratch bare repository, tagged there
 # mobile-v<version> (a test tag that exists nowhere else), and a scratch fdroiddata holds the
 # recipe, pointed at that repository and tag, and the srclibs (apps/mobile/fdroid/srclibs, plus
-# fdroiddata's own flutter.yml). In the container, like fdroiddata's CI "fdroid build" job:
+# fdroiddata's own flutter.yml, onnxruntime.yml, abseil-cpp.yml and cpuinfo.yml). In the
+# container, like fdroiddata's CI "fdroid build" job:
 #   1. `fdroid lint com.wambito.app`, on the recipe as committed;
 #   2. `fdroid fetchsrclibs` and `fdroid build --verbose --test --on-server --no-tarball
 #      com.wambito.app:<code>`, once per build entry (one per ABI), as the user vagrant; each build
@@ -100,6 +101,12 @@ mkdir -p "$data/metadata" "$data/srclibs" "$data/config" "$data/lint/metadata" "
 cp "$RECIPE" "$data/lint/metadata/$APPID.yml"
 cp "$SRCLIBS"/*.yml "$data/srclibs/"
 printf 'RepoType: git\nRepo: https://github.com/flutter/flutter.git\n' >"$data/srclibs/flutter.yml"
+# fdroiddata's own srclibs the arm64-v8a entry reuses for the precise model (check-fdroid-recipe.sh's
+# FDROIDDATA_SRCLIBS), as fdroiddata has them.
+for name in onnxruntime abseil-cpp cpuinfo; do
+  curl -fsSL "https://gitlab.com/fdroid/fdroiddata/-/raw/master/srclibs/$name.yml" >"$data/srclibs/$name.yml" ||
+    die "could not fetch fdroiddata's srclibs/$name.yml."
+done
 cp -R "$data/srclibs" "$data/lint/srclibs"
 awk -v tag="$tag" -v version="$version" -v base="$base" '
   /^Repo: / { print "Repo: /home/vagrant/wambito.git"; next }

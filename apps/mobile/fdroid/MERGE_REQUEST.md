@@ -3,8 +3,9 @@
 Title: `New app: Wambito (com.wambito.app)`
 
 Text for the merge request description. The recipe is `apps/mobile/fdroid/com.wambito.app.yml`; the
-source libraries it needs are `apps/mobile/fdroid/srclibs/*.yml` (none of them exists in
-fdroiddata). Copy the recipe to `metadata/com.wambito.app.yml` and the srclibs to `srclibs/`.
+source libraries it needs are `apps/mobile/fdroid/srclibs/*.yml`, plus fdroiddata's own
+`onnxruntime`, `abseil-cpp` and `cpuinfo`, reused as they are. Copy the recipe to
+`metadata/com.wambito.app.yml` and the srclibs to `srclibs/`.
 
 ---
 
@@ -32,6 +33,13 @@ and checks the permissions against an allowlist.
   `scripts/build-native-deps.sh` and the Gradle switch `-Pwambito.nativeFromSource=true`. It runs
   in `build:` rather than `prebuild:` because the AARs it writes would otherwise be in the tree
   that the scanner reads between the two; their sources are scanned.
+- The `arm64-v8a` entry also has the precise voice model's runtime: onnxruntime 1.28.2 and
+  sherpa-onnx 2.0.1's JNI library, built in `build:` by `scripts/build-sherpa-onnx.sh` from 24
+  srclibs pinned by commit (onnxruntime, sherpa-onnx and the 22 libraries their CMake would
+  download). Nothing is downloaded during the build: onnxruntime's `cmake/deps.txt` is pointed at
+  tars of those checkouts, and any URL left in it is made unusable. The switch
+  `-Pwambito.preciseFromSource=true` adds the libraries and sherpa-onnx's Kotlin API sources. The
+  `armeabi-v7a` entry has none of this.
 - Gradle dependencies are locked (`gradle-fdroid.lockfile` for this build) and the Gradle wrapper
   jar is the official one for Gradle 9.3.1 (SHA-256 `b3a875dd...42ec13`).
 - Tested locally with fdroidserver in the `buildserver` image: `fdroid lint`, `fdroid build`
@@ -47,7 +55,10 @@ microphone button, after an opt-in screen that shows the size, the app downloads
 person's language (Spanish, English, Italian or Portuguese; Vosk small models, 30 to 50 MB). They
 are data, not code, published by Alpha Cephei under Apache-2.0. The app downloads them from the
 `voice-models-v1` release of the same GitHub repository and checks each file's SHA-256 (compiled
-into the app) before unzipping or loading it; a mismatch is discarded. The person can delete the
+into the app) before unzipping or loading it; a mismatch is discarded. On `arm64-v8a` phones with
+enough memory it also offers a more precise model in the same way (NVIDIA's Canary or Parakeet,
+CC BY 4.0, converted to ONNX by the sherpa-onnx project; 150 or 478 MB), from the
+`voice-models-v2` release. The person can delete the
 model in Settings. Nothing else is downloaded or executed at runtime.
 
 ## Network and the default server

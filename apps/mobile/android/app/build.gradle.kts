@@ -165,20 +165,45 @@ if (nativeFromSource) {
     // sherpa-onnx (the precise voice model's runtime, Apache-2.0) is not on Maven Central: its AAR
     // comes from k2-fsa's GitHub release, checked and installed in the same local repository by
     // scripts/fetch-sherpa-onnx.sh (docs/mobile/setup.md). That repository serves only it. The
-    // F-Droid build has none of this (above): no sherpa-onnx, so no precise model there yet.
+    // F-Droid build never takes it (above): its arm64-v8a build has sherpa-onnx built from source
+    // instead (below), its armeabi-v7a build none.
     repositories.exclusiveContent {
         forRepository { repositories.maven { url = uri("../third_party/m2") } }
         filter { includeVersion("com.k2fsa.sherpa.onnx", "sherpa-onnx", "2.0.1") }
     }
 }
 
-// Code that uses sherpa-onnx's classes cannot sit in src/main: the F-Droid build does not have them.
-// It lives in src/precise/kotlin (compiled only without the switch); src/noPrecise/kotlin holds its
-// stand-ins (with the switch). Both define voice.PreciseRuntime, so src/main can ask whether the
-// precise runtime is linked in.
-android.sourceSets.getByName("main").java.srcDir(
-    if (nativeFromSource) "src/noPrecise/kotlin" else "src/precise/kotlin",
-)
+// The precise voice model in the F-Droid build: scripts/build-sherpa-onnx.sh builds sherpa-onnx's JNI
+// library and onnxruntime from source, for arm64-v8a only, into android/third_party/sherpa-onnx-src
+// (git-ignored), with the Kotlin API k2-fsa's AAR is compiled from. -Pwambito.preciseFromSource=true
+// (with wambito.nativeFromSource) compiles those sources and packs those libraries. Not an artifact:
+// the dependency graph, and so gradle-fdroid.lockfile, is the same with it and without it.
+val preciseFromSource = project.findProperty("wambito.preciseFromSource")?.toString()?.toBoolean() == true
+val sherpaFromSource = rootProject.file("third_party/sherpa-onnx-src")
+if (preciseFromSource) {
+    if (!nativeFromSource) {
+        throw GradleException("wambito.preciseFromSource needs wambito.nativeFromSource")
+    }
+    if (!sherpaFromSource.resolve("SOURCES").isFile) {
+        throw GradleException(
+            "wambito.preciseFromSource is set but android/third_party has no sherpa-onnx-src: " +
+                "run apps/mobile/scripts/build-sherpa-onnx.sh first",
+        )
+    }
+}
+
+// Code that uses sherpa-onnx's classes cannot sit in src/main: the F-Droid build without
+// wambito.preciseFromSource does not have them. It lives in src/precise/kotlin (compiled when
+// sherpa-onnx is in the build); src/noPrecise/kotlin holds its stand-ins (when it is not). Both
+// define voice.PreciseRuntime, so src/main can ask whether the precise runtime is linked in.
+android.sourceSets.getByName("main") {
+    val precise = !nativeFromSource || preciseFromSource
+    java.srcDir(if (precise) "src/precise/kotlin" else "src/noPrecise/kotlin")
+    if (preciseFromSource) {
+        java.srcDir(sherpaFromSource.resolve("kotlin"))
+        jniLibs.srcDir(sherpaFromSource.resolve("jniLibs"))
+    }
+}
 
 // Every dependency version of the app is pinned by a lockfile, so F-Droid and CI resolve the same
 // graph: app/gradle.lockfile, and app/gradle-fdroid.lockfile for the from-source graph above. A

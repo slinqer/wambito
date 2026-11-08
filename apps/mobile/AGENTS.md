@@ -106,18 +106,28 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
     a dot, so `export` and a bare `NAME=value` prefix do not work) takes
     those artifacts. ARM only, so off for the x86_64 emulator. `scripts/test-native-switch.sh`
     (CI) tests it.
+  - The precise model on F-Droid (arm64-v8a only): `scripts/build-sherpa-onnx.sh --ndk <NDK 28.2.13676358>
+    [--srclibs <dir>] [--work <dir>]` builds onnxruntime 1.28.2 and sherpa-onnx 2.0.1's JNI library
+    from 24 pinned git checkouts (no network; about 80 min emulated) into
+    `android/third_party/sherpa-onnx-src` (`jniLibs/`, the AAR's Kotlin API in `kotlin/`, `SOURCES`).
+    `-Pwambito.preciseFromSource=true` (only with `wambito.nativeFromSource`) compiles and packs them
+    with `src/precise` instead of `src/noPrecise`; no artifact, so the lockfiles do not change.
+    `scripts/test-build-sherpa-onnx-args.sh` (CI) tests its arguments and pins; `test-native-switch.sh`
+    the switch.
   - `scripts/package-canary.sh [--model canary|parakeet] [--check]` builds a precise model's zip for the voice-models-v2 release from sherpa-onnx's archive (not committed; prints its size and SHA-256; publish the zip from one run and pin that hash, `--check` proves reproducibility on one machine).
-  - sherpa-onnx 2.0.1 (the precise voice model's runtime; Play and GitHub builds only):
+  - sherpa-onnx 2.0.1 (the precise voice model's runtime) for the Play and GitHub builds:
     `scripts/fetch-sherpa-onnx.sh` downloads its AAR, checks the pinned SHA-256 and installs it in
     `android/third_party/m2`; run it before any Gradle or `flutter build` (CI and `release.sh` do).
     `scripts/test-fetch-sherpa-onnx.sh` (CI) tests it offline. Code that uses `com.k2fsa.sherpa.onnx`
-    goes in `android/app/src/precise/kotlin`, never in `src/main`: the switch swaps that folder for
-    `src/noPrecise/kotlin` (stand-ins), and both define `voice.PreciseRuntime.linked`. Adds ~31 MB
+    goes in `android/app/src/precise/kotlin`, never in `src/main`: the F-Droid armeabi-v7a build swaps
+    that folder for `src/noPrecise/kotlin` (stand-ins), and both define `voice.PreciseRuntime.linked`. Adds ~31 MB
     to the arm64 APK. `docs/mobile/setup.md` has the details.
   - Recipe: `fdroid/com.wambito.app.yml` is the source of truth, copied to fdroiddata when
     submitting; one build per ABI, srclibs in `fdroid/srclibs/*.yml`, natives built in `build:`
     (after F-Droid's source scan). Change it together with the revisions in `build-native-deps.sh`
-    (`scripts/check-fdroid-recipe.sh`, CI, fails on drift from them and `.flutter-version`). After
+    and `build-sherpa-onnx.sh` (`scripts/check-fdroid-recipe.sh`, CI, fails on drift from them and
+    `.flutter-version`; the arm64-v8a entry lists the 24 sherpa-onnx sources, three of them
+    fdroiddata's own srclibs). After
     submission fdroiddata's copy is the live one: such changes need their own fdroiddata merge
     request before tagging (`docs/mobile/fdroid.md`).
     `UpdateCheckData` reads `pubspec.yaml`'s version at a `mobile-v*` tag (`docs/mobile/release.md`).

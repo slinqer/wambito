@@ -265,6 +265,13 @@ void main() {
       ('darts-clone 0.32', 'Copyright (c) 2008-2014, Susumu Yata'),
       ('Protocol Buffers', 'Copyright 2008 Google Inc.'),
       ('RE2', 'Copyright (c) 2009 The RE2 Authors'),
+      ('cpuinfo', 'Copyright (c) 2019 Google LLC'),
+      ('SafeInt', 'Copyright (c) 2018 Microsoft'),
+      ('GSL', 'Copyright (c) 2015 Microsoft Corporation'),
+      ('date', 'Copyright (c) 2015, 2016, 2017 Howard Hinnant'),
+      ('Boost.Mp11', 'Boost Software License - Version 1.0'),
+      ('Eigen', 'Mozilla Public License Version 2.0'),
+      ('kissfft', 'Copyright (c) 2003-2010 Mark Borgerding'),
     ]) {
       test('$name is listed with its own published text', () async {
         for (final language in ['es', 'en']) {
@@ -289,7 +296,7 @@ void main() {
               'OpenFst 1.8.5',
               'simple-sentencepiece 0.7',
             ],
-            ['Abseil', 'ONNX'],
+            ['Abseil', 'ONNX', 'FlatBuffers', 'KleidiAI'],
           ]) {
             final entry = entries.singleWhere((e) => e.packages.contains(group.first));
             expect(entry.packages, group, reason: language);
@@ -308,6 +315,28 @@ void main() {
         (await _extras('en')).singleWhere((e) => e.packages.contains('utf8proc 2.12.0')),
       );
       expect(jni, contains('libsherpa-onnx-jni.so'));
+    });
+
+    test('each library says which native library carries it', () async {
+      final entries = await _extras('en');
+      String notice(String name) =>
+          _text(entries.singleWhere((e) => e.packages.contains(name))).split('\n\n').first;
+      for (final name in ['cpuinfo', 'SafeInt', 'GSL', 'date', 'Boost.Mp11', 'FlatBuffers']) {
+        expect(notice(name), contains('libonnxruntime.so'), reason: name);
+        expect(notice(name), isNot(contains('libsherpa-onnx-jni.so')), reason: name);
+      }
+      expect(notice('kissfft'), contains('libsherpa-onnx-jni.so'));
+      expect(notice('kissfft'), contains('kaldi-native-fbank'));
+      // Eigen is in both: onnxruntime's and sherpa-onnx's own copy.
+      expect(
+        notice('Eigen'),
+        allOf(contains('libonnxruntime.so'), contains('libsherpa-onnx-jni.so')),
+      );
+      // nlohmann/json too: 3.12.0 in sherpa-onnx, 3.11.3 in onnxruntime.
+      expect(
+        notice('nlohmann/json 3.12.0'),
+        allOf(contains('libonnxruntime.so'), contains('3.11.3')),
+      );
     });
 
     test('those versions are the sherpa-onnx of the build', () async {
@@ -374,6 +403,13 @@ void main() {
           'darts-clone-bsd-2-clause.txt',
           'protobuf-bsd-3-clause.txt',
           're2-bsd-3-clause.txt',
+          'cpuinfo-bsd-2-clause.txt',
+          'safeint-mit.txt',
+          'gsl-mit.txt',
+          'date-mit.txt',
+          'boost-1.0.txt',
+          'eigen-mpl-2.0.txt',
+          'kissfft-bsd-3-clause.txt',
         ]),
       );
       final shown = [for (final e in await _extras()) _text(e)].join('\n');
