@@ -44,3 +44,8 @@ API tests.
 - Any change to a format (infos, associated data, padding, body layout) needs a new `enc_v` and
   updated test vectors; the Dart implementation must pass the same vectors.
 - No other crypto dependency without a design change (`@noble/curves` is the X25519 fallback).
+- Pairing clients must pin values, or the server can still grind a matching number (stage 1b spec
+  section 1). The approving device keeps the `commitment` it read from `GET /v2/pairing?code=`,
+  read before it posts its key, and never re-reads it. The new device keeps the first
+  `approverKey` it sees, uses that one in `pairingNumber` and `openFromPairing`, and aborts if a
+  later poll shows another. Both devices always compare the number, QR or not.
