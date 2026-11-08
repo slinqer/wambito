@@ -33,18 +33,22 @@ export function syncRoutes(deps: AppDeps) {
       path: "/v2/sync",
       operationId: "pullRecords",
       description:
-        "The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. 410 `resync_required` when `since` is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0`.",
+        "The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. `base` is the `latest` the cycle started from (0 for a full download, so paging one never fails; defaults to `since`). 410 `resync_required` when `0 < base` and `base` is below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0&base=0`.",
       request: {
         query: z.object({
           since: z.coerce.number().int().min(0),
           limit: z.coerce.number().int().min(1).max(1000).default(500),
+          base: z.coerce.number().int().min(0).optional().openapi({
+            description:
+              "The `latest` this pull cycle started from (0 for a full download); defaults to `since`",
+          }),
         }),
       },
       responses: { 200: jsonResponse(PulledRecords, "Records"), ...problems(410, 422) },
     }),
     async (c) => {
-      const { since, limit } = c.req.valid("query");
-      return c.json(await pullRecords(deps.db, c.get("userId"), since, limit), 200);
+      const { since, limit, base } = c.req.valid("query");
+      return c.json(await pullRecords(deps.db, c.get("userId"), since, limit, base), 200);
     },
   );
 

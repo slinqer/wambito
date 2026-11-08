@@ -61,7 +61,7 @@ async function lockWraps(tx: Tx, userId: string): Promise<void> {
 }
 
 /** The account's current key version: the highest over its wraps; null when it has none. */
-async function currentKeyV(tx: Tx, userId: string): Promise<number | null> {
+export async function currentKeyV(tx: Tx, userId: string): Promise<number | null> {
   const [row] = await tx
     .select({ keyV: sql<number | null>`max(${keyWraps.keyV})` })
     .from(keyWraps)

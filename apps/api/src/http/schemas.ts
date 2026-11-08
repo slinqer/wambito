@@ -382,3 +382,10 @@ export const PairingState = z
     expiresAt: z.string(),
   })
   .openapi("PairingState");
+
+export const PairingPickup = z
+  .object({
+    sealed: z.string().openapi({ description: "base64url" }),
+    keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
+  })
+  .openapi("PairingPickup");

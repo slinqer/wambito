@@ -31,6 +31,7 @@ import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
 import 'package:wambito/api/gen/src/model/pairing_found.dart';
+import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
 import 'package:wambito/api/gen/src/model/pairing_reveal.dart';
 import 'package:wambito/api/gen/src/model/pairing_started.dart';
 import 'package:wambito/api/gen/src/model/pairing_state.dart';
@@ -1563,6 +1564,80 @@ class DefaultApi {
     );
   }
 
+  /// getPairing
+  /// Both devices poll. Returns &#x60;commitment&#x60;, &#x60;approverKey&#x60;, &#x60;publicKey&#x60;, &#x60;sealed&#x60;, &#x60;keyV&#x60; (null until set) and &#x60;expiresAt&#x60;. Never deletes the request; the new device takes the sealed key with &#x60;POST /v2/pairing/{id}/pickup&#x60;.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [PairingState] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<PairingState>> getPairing({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/pairing/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    PairingState? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(PairingState))
+                as PairingState;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<PairingState>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// getSummary
   ///
   ///
@@ -2203,12 +2278,87 @@ class DefaultApi {
     );
   }
 
+  /// pickupPairing
+  /// The new device takes the sealed data key and its &#x60;keyV&#x60;; the request is deleted in the same transaction, so a second pickup is 404. 409 &#x60;not_ready&#x60; while the approving device has not sealed; 404 when unknown, expired or not the person&#39;s.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [PairingPickup] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<PairingPickup>> pickupPairing({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/pairing/{id}/pickup'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    PairingPickup? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(PairingPickup))
+                as PairingPickup;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<PairingPickup>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// pullRecords
-  /// The person&#39;s records with a version above &#x60;since&#x60;, oldest first. &#x60;since&#x3D;0&#x60; downloads everything; follow &#x60;next&#x60; until it is null, then keep &#x60;latest&#x60; for the next pull. 410 &#x60;resync_required&#x60; when &#x60;since&#x60; is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from &#x60;since&#x3D;0&#x60;.
+  /// The person&#39;s records with a version above &#x60;since&#x60;, oldest first. &#x60;since&#x3D;0&#x60; downloads everything; follow &#x60;next&#x60; until it is null, then keep &#x60;latest&#x60; for the next pull. &#x60;base&#x60; is the &#x60;latest&#x60; the cycle started from (0 for a full download, so paging one never fails; defaults to &#x60;since&#x60;). 410 &#x60;resync_required&#x60; when &#x60;0 &lt; base&#x60; and &#x60;base&#x60; is below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from &#x60;since&#x3D;0&amp;base&#x3D;0&#x60;.
   ///
   /// Parameters:
   /// * [since]
   /// * [limit]
+  /// * [base_] - The `latest` this pull cycle started from (0 for a full download); defaults to `since`
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2221,6 +2371,7 @@ class DefaultApi {
   Future<Response<PulledRecords>> pullRecords({
     int? since,
     int? limit = 500,
+    int? base_,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -2239,6 +2390,7 @@ class DefaultApi {
     final _queryParameters = <String, dynamic>{
       if (since != null) r'since': encodeQueryParameter(_serializers, since, const FullType(int)),
       if (limit != null) r'limit': encodeQueryParameter(_serializers, limit, const FullType(int)),
+      if (base_ != null) r'base': encodeQueryParameter(_serializers, base_, const FullType(int)),
     };
 
     final _response = await _dio.request<Object>(
@@ -2866,7 +3018,7 @@ class DefaultApi {
   }
 
   /// sealPairing
-  /// The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version. 404 when expired or not the person&#39;s, 409 &#x60;not_ready&#x60; (no revealed key) or &#x60;already_sealed&#x60;, 422 &#x60;approver_mismatch&#x60; when the first 32 bytes of &#x60;sealed&#x60; are not the approver key.
+  /// The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version, which must be the account&#39;s current one (409 &#x60;key_version_mismatch&#x60;). 404 when expired or not the person&#39;s, 409 &#x60;not_ready&#x60; (no revealed key) or &#x60;already_sealed&#x60;, 422 &#x60;approver_mismatch&#x60; when the first 32 bytes of &#x60;sealed&#x60; are not the approver key.
   ///
   /// Parameters:
   /// * [id]
@@ -3161,80 +3313,6 @@ class DefaultApi {
     }
 
     return Response<PairingStarted>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// takePairing
-  /// Both devices poll. Returns &#x60;commitment&#x60;, &#x60;approverKey&#x60;, &#x60;publicKey&#x60;, &#x60;sealed&#x60;, &#x60;keyV&#x60; (null until set) and &#x60;expiresAt&#x60;. When &#x60;sealed&#x60; is returned the request is deleted in the same transaction, so a later read is 404.
-  ///
-  /// Parameters:
-  /// * [id]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [PairingState] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<PairingState>> takePairing({
-    required String id,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/v2/pairing/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
-    );
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    PairingState? _responseData;
-
-    try {
-      final rawResponse = _response.data;
-      _responseData = rawResponse == null
-          ? null
-          : _serializers.deserialize(rawResponse, specifiedType: const FullType(PairingState))
-                as PairingState;
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<PairingState>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

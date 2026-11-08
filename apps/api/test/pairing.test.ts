@@ -63,6 +63,17 @@ const reveal = (headers: Headers, id: string, publicKey: unknown) =>
 const seal = (headers: Headers, id: string, sealed: unknown, keyV: unknown = 1) =>
   t.request("POST", `/v2/pairing/${id}/seal`, { headers, body: { sealed, keyV } });
 const take = (headers: Headers, id: string) => t.request("GET", `/v2/pairing/${id}`, { headers });
+const pickup = (headers: Headers, id: string) =>
+  t.request("POST", `/v2/pairing/${id}/pickup`, { headers });
+
+/** Gives the account a recovery wrap at `keyV`, so a seal for that version is accepted. */
+async function withKeys(headers: Headers, keyV: number) {
+  const res = await t.request("PUT", `/v2/keys/${randomUUID()}`, {
+    headers,
+    body: { kind: "recovery", ref: null, keyV, wrapped: bytes(48) },
+  });
+  expect(res.status, await res.clone().text()).toBe(200);
+}
 const commitmentOf = async (publicKey: Uint8Array) =>
   toBase64Url(await pairingCommitment(publicKey));
 
@@ -83,6 +94,7 @@ async function expectProblem(res: Response, status: number, code: string) {
 describe("/v2/pairing", () => {
   test("the whole flow: commit, approver key, reveal, seal, the new device opens it", async () => {
     const old = await person();
+    await withKeys(old.headers, 3);
     const fresh = await generateDeviceKeyPair();
     const eph = await generateDeviceKeyPair();
     const started = await start(old.headers, await commitmentOf(fresh.publicKey));
@@ -127,19 +139,22 @@ describe("/v2/pairing", () => {
       "already_sealed",
     );
 
-    const picked = (await (await take(old.headers, started.id)).json()) as State;
+    // Polling after the seal shows it and never consumes it.
+    for (let i = 0; i < 2; i++) {
+      const polled = (await (await take(old.headers, started.id)).json()) as State;
+      expect(polled.sealed).not.toBeNull();
+      expect(polled.keyV).toBe(3);
+    }
+    const taken = await pickup(old.headers, started.id);
+    expect(taken.status).toBe(200);
+    const picked = (await taken.json()) as { sealed: string; keyV: number };
     expect(picked.keyV).toBe(3);
-    expect(picked.sealed).not.toBeNull();
     expect(
-      await openFromPairing(
-        fresh.privateKey,
-        ctx,
-        fromBase64Url(picked.sealed as string),
-        eph.publicKey,
-      ),
+      await openFromPairing(fresh.privateKey, ctx, fromBase64Url(picked.sealed), eph.publicKey),
     ).toEqual(dataKey);
 
     // Picked up once, and the row is gone.
+    await expectProblem(await pickup(old.headers, started.id), 404, "not_found");
     await expectProblem(await take(old.headers, started.id), 404, "not_found");
     const left = await t.admin.select().from(pairingRequests).where(sql`id = ${started.id}`);
     expect(left).toHaveLength(0);
@@ -169,6 +184,8 @@ describe("/v2/pairing", () => {
 
     // Seal needs the revealed key.
     await expectProblem(await seal(headers, started.id, blob(ephB64)), 409, "not_ready");
+    // Nothing to pick up before the seal.
+    await expectProblem(await pickup(headers, started.id), 409, "not_ready");
 
     expect((await reveal(headers, started.id, freshB64)).status).toBe(204);
     await expectProblem(await reveal(headers, started.id, freshB64), 409, "already_set");
@@ -207,6 +224,7 @@ describe("/v2/pairing", () => {
     await expectProblem(await reveal(b.headers, started.id, key), 404, "not_found");
     await expectProblem(await seal(b.headers, started.id, bytes(100)), 404, "not_found");
     await expectProblem(await take(b.headers, started.id), 404, "not_found");
+    await expectProblem(await pickup(b.headers, started.id), 404, "not_found");
     expect((await find(a.headers, started.code)).status).toBe(200);
   });
 
@@ -222,6 +240,7 @@ describe("/v2/pairing", () => {
       await expectProblem(await reveal(headers, started.id, key), 404, "not_found");
       await expectProblem(await seal(headers, started.id, bytes(100)), 404, "not_found");
       await expectProblem(await take(headers, started.id), 404, "not_found");
+      await expectProblem(await pickup(headers, started.id), 404, "not_found");
     } finally {
       clock = real;
     }
@@ -296,16 +315,90 @@ describe("/v2/pairing", () => {
     expect(logError).toHaveBeenCalledWith("Pairing purge failed", expect.any(Error));
   });
 
-  test("two concurrent takes of a sealed request: one gets the blob, the other 404", async () => {
+  test("two concurrent pickups of a sealed request: one gets the blob, the other 404", async () => {
     const { headers } = await person();
+    await withKeys(headers, 2);
     const { started, fresh, eph } = await approved(headers);
     expect((await reveal(headers, started.id, toBase64Url(fresh.publicKey))).status).toBe(204);
     const blob = toBase64Url(Buffer.concat([eph.publicKey, Buffer.alloc(48, 5)]));
     expect((await seal(headers, started.id, blob, 2)).status).toBe(204);
-    const results = await Promise.all([take(headers, started.id), take(headers, started.id)]);
+    const results = await Promise.all([pickup(headers, started.id), pickup(headers, started.id)]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 404]);
     const ok = results.find((r) => r.status === 200);
-    expect(((await ok?.json()) as State).sealed).toBe(blob);
+    expect(await ok?.json()).toEqual({ sealed: blob, keyV: 2 });
+  });
+
+  test("a seal for another key version is 409 key_version_mismatch", async () => {
+    const { headers } = await person();
+    await withKeys(headers, 2);
+    const { started, fresh, eph } = await approved(headers);
+    expect((await reveal(headers, started.id, toBase64Url(fresh.publicKey))).status).toBe(204);
+    const blob = toBase64Url(Buffer.concat([eph.publicKey, Buffer.alloc(48, 5)]));
+    await expectProblem(await seal(headers, started.id, blob, 1), 409, "key_version_mismatch");
+    await expectProblem(await seal(headers, started.id, blob, 3), 409, "key_version_mismatch");
+    expect((await seal(headers, started.id, blob, 2)).status).toBe(204);
+    // An account with no wraps has no key version to seal for.
+    const bare = await person();
+    const second = await approved(bare.headers);
+    expect(
+      (await reveal(bare.headers, second.started.id, toBase64Url(second.fresh.publicKey))).status,
+    ).toBe(204);
+    const bareBlob = toBase64Url(Buffer.concat([second.eph.publicKey, Buffer.alloc(48, 5)]));
+    await expectProblem(
+      await seal(bare.headers, second.started.id, bareBlob, 1),
+      409,
+      "key_version_mismatch",
+    );
+  });
+
+  test("two concurrent approver calls: one stores, the other is 409 already_set", async () => {
+    const { headers } = await person();
+    const started = await start(headers);
+    const results = await Promise.all([
+      approver(headers, started.id, bytes(32, 1)),
+      approver(headers, started.id, bytes(32, 2)),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([204, 409]);
+    const lost = results.find((r) => r.status === 409);
+    expect(((await lost?.json()) as { code: string }).code).toBe("already_set");
+  });
+
+  test("a seal on an expired request is 404", async () => {
+    const { headers } = await person();
+    await withKeys(headers, 1);
+    const { started, fresh, eph } = await approved(headers);
+    expect((await reveal(headers, started.id, toBase64Url(fresh.publicKey))).status).toBe(204);
+    const real = clock;
+    clock = new Date(real.getTime() + 11 * 60_000);
+    try {
+      const blob = toBase64Url(Buffer.concat([eph.publicKey, Buffer.alloc(48, 5)]));
+      await expectProblem(await seal(headers, started.id, blob, 1), 404, "not_found");
+    } finally {
+      clock = real;
+    }
+  });
+
+  test("a database failure logs no request bytes", async () => {
+    const { headers } = await person();
+    const marker = Buffer.from("MARKER-pairing-9d2e-do-not-log!!").toString("base64url");
+    await t.admin.execute(sql`create or replace function fail_pairing_insert() returns trigger
+      language plpgsql as $$ begin raise exception 'forced failure'; end $$`);
+    await t.admin.execute(sql`create trigger fail_pairing before insert on pairing_requests
+      for each row execute function fail_pairing_insert()`);
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+    try {
+      const res = await startRaw(headers, { commitment: marker });
+      expect(res.status).toBe(500);
+      const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+      expect(logged).toContain("database query failed");
+      expect(logged).not.toContain("MARKER-pairing");
+      expect(logged).not.toContain(marker);
+    } finally {
+      vi.restoreAllMocks();
+      await t.admin.execute(sql`drop trigger fail_pairing on pairing_requests`);
+    }
   });
 
   test("assistant tokens get 403 on every route", async () => {
@@ -321,6 +414,7 @@ describe("/v2/pairing", () => {
         await reveal(h, started.id, bytes(32)),
         await seal(h, started.id, bytes(100)),
         await take(h, started.id),
+        await pickup(h, started.id),
       ]) {
         await expectProblem(res, 403, "insufficient_scope");
       }

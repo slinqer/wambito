@@ -170,7 +170,7 @@
   "errors": {
     "record_limit": "Questo account ha raggiunto il limite di registri salvati.",
     "key_version_mismatch": "La versione della chiave dati è cambiata. Aggiorna e riprova.",
-    "attestation_required": "Non è stato possibile verificare la chiave di questo dispositivo. Ricomincia l'abbinamento.",
+    "attestation_required": "Alla chiave di questo dispositivo manca la sua prova. Rimuovi il dispositivo e aggiungilo di nuovo.",
     "resync_required": "Alcuni elementi eliminati sono stati ripuliti sul server. I tuoi dati vengono scaricati di nuovo.",
     "already_sealed": "Questa richiesta è già stata approvata.",
     "already_set": "Questo passaggio è già stato eseguito per questa richiesta.",

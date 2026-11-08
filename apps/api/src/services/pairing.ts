@@ -2,6 +2,7 @@ import { pairingCode, pairingCommitment } from "@wambito/crypto";
 import { type Db, pairingRequests, user, withUser } from "@wambito/db";
 import { and, asc, eq, gt, isNull, lte, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
+import { currentKeyV } from "./keys.ts";
 
 /** A pairing request lives this long (spec 2026-11-08 section 7.3). */
 export const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -188,7 +189,8 @@ export async function revealPairing(
 
 /**
  * Stores the sealed key. 409 `not_ready` without a revealed key, 409 `already_sealed`, 422
- * `approver_mismatch` when the blob does not start with the approver key.
+ * `approver_mismatch` when the blob does not start with the approver key, 409
+ * `key_version_mismatch` when `keyV` is not the account's current key version.
  */
 export async function sealPairing(
   db: Db,
@@ -208,6 +210,14 @@ export async function sealPairing(
     if (!blob.subarray(0, row.approverKey.length).equals(row.approverKey)) {
       throw new ApiError(422, "approver_mismatch", "The sealed key is not from the approver key");
     }
+    const current = await currentKeyV(tx, userId);
+    if (current !== keyV) {
+      throw new ApiError(
+        409,
+        "key_version_mismatch",
+        `The account's key version is ${current ?? "unset"}; the seal is for ${keyV}`,
+      );
+    }
     await updateRow(tx, userId, row.id, { sealed: blob, keyV });
   });
 }
@@ -221,8 +231,8 @@ export interface PairingStateDto {
   expiresAt: string;
 }
 
-/** The request's state; a sealed one is deleted in the same transaction (read once). */
-export async function takePairing(
+/** The request's state. Never deletes: polling is safe to repeat. */
+export async function readPairing(
   db: Db,
   userId: string,
   id: string,
@@ -230,11 +240,6 @@ export async function takePairing(
 ): Promise<PairingStateDto> {
   return withUser(db, userId, async (tx) => {
     const row = await loadLocked(tx, userId, id, now);
-    if (row.sealed) {
-      await tx
-        .delete(pairingRequests)
-        .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, row.id)));
-    }
     return {
       commitment: b64(row.commitment),
       approverKey: row.approverKey ? b64(row.approverKey) : null,
@@ -243,6 +248,28 @@ export async function takePairing(
       keyV: row.keyV,
       expiresAt: row.expiresAt.toISOString(),
     };
+  });
+}
+
+/**
+ * Hands the sealed key to the new device and deletes the row in the same transaction. 409
+ * `not_ready` while unsealed; 404 when unknown, expired or not the person's.
+ */
+export async function pickupPairing(
+  db: Db,
+  userId: string,
+  id: string,
+  now: Date,
+): Promise<{ sealed: string; keyV: number }> {
+  return withUser(db, userId, async (tx) => {
+    const row = await loadLocked(tx, userId, id, now);
+    if (!row.sealed || row.keyV === null) {
+      throw new ApiError(409, "not_ready", "The approving device has not sealed the key yet");
+    }
+    await tx
+      .delete(pairingRequests)
+      .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, row.id)));
+    return { sealed: b64(row.sealed), keyV: row.keyV };
   });
 }
 

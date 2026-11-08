@@ -54,6 +54,7 @@ export 'package:wambito/api/gen/src/model/key_wrap.dart';
 export 'package:wambito/api/gen/src/model/key_wraps.dart';
 export 'package:wambito/api/gen/src/model/pairing_approver.dart';
 export 'package:wambito/api/gen/src/model/pairing_found.dart';
+export 'package:wambito/api/gen/src/model/pairing_pickup.dart';
 export 'package:wambito/api/gen/src/model/pairing_reveal.dart';
 export 'package:wambito/api/gen/src/model/pairing_started.dart';
 export 'package:wambito/api/gen/src/model/pairing_state.dart';

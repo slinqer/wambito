@@ -55,6 +55,7 @@ import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
 import 'package:wambito/api/gen/src/model/pairing_found.dart';
+import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
 import 'package:wambito/api/gen/src/model/pairing_reveal.dart';
 import 'package:wambito/api/gen/src/model/pairing_started.dart';
 import 'package:wambito/api/gen/src/model/pairing_state.dart';
@@ -141,6 +142,7 @@ part 'serializers.g.dart';
   KeyWraps,
   PairingApprover,
   PairingFound,
+  PairingPickup,
   PairingReveal,
   PairingStarted,
   PairingState,

@@ -657,7 +657,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. 410 `resync_required` when `since` is above 0 but below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0`. */
+        /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. `base` is the `latest` the cycle started from (0 for a full download, so paging one never fails; defaults to `since`). 410 `resync_required` when `0 < base` and `base` is below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0&base=0`. */
         get: operations["pullRecords"];
         put?: never;
         /** @description Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, or `not_found` for an update of a record the server does not have (resync in full). */
@@ -798,7 +798,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version. 404 when expired or not the person's, 409 `not_ready` (no revealed key) or `already_sealed`, 422 `approver_mismatch` when the first 32 bytes of `sealed` are not the approver key. */
+        /** @description The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version, which must be the account's current one (409 `key_version_mismatch`). 404 when expired or not the person's, 409 `not_ready` (no revealed key) or `already_sealed`, 422 `approver_mismatch` when the first 32 bytes of `sealed` are not the approver key. */
         post: operations["sealPairing"];
         delete?: never;
         options?: never;
@@ -813,10 +813,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Both devices poll. Returns `commitment`, `approverKey`, `publicKey`, `sealed`, `keyV` (null until set) and `expiresAt`. When `sealed` is returned the request is deleted in the same transaction, so a later read is 404. */
-        get: operations["takePairing"];
+        /** @description Both devices poll. Returns `commitment`, `approverKey`, `publicKey`, `sealed`, `keyV` (null until set) and `expiresAt`. Never deletes the request; the new device takes the sealed key with `POST /v2/pairing/{id}/pickup`. */
+        get: operations["getPairing"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/pairing/{id}/pickup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The new device takes the sealed data key and its `keyV`; the request is deleted in the same transaction, so a second pickup is 404. 409 `not_ready` while the approving device has not sealed; 404 when unknown, expired or not the person's. */
+        post: operations["pickupPairing"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1440,6 +1457,12 @@ export interface components {
             /** @description null until sealed */
             keyV: number | null;
             expiresAt: string;
+        };
+        PairingPickup: {
+            /** @description base64url */
+            sealed: string;
+            /** @description The data key version the seal is bound to */
+            keyV: number;
         };
     };
     responses: never;
@@ -3365,6 +3388,8 @@ export interface operations {
             query?: {
                 since?: number | null;
                 limit?: number;
+                /** @description The `latest` this pull cycle started from (0 for a full download); defaults to `since` */
+                base?: number | null;
             };
             header?: never;
             path?: never;
@@ -3835,7 +3860,7 @@ export interface operations {
             };
         };
     };
-    takePairing: {
+    getPairing: {
         parameters: {
             query?: never;
             header?: never;
@@ -3857,6 +3882,46 @@ export interface operations {
             };
             /** @description Problem */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    pickupPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sealed key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingPickup"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

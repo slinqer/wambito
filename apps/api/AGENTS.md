@@ -47,7 +47,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   records. `purgeTombstones` (daily, `server.ts`) goes person by person through `withUser`, since
   `records` has forced RLS; in the same transaction it raises `record_purges.through_version`
   (per person, `greatest`), and `GET /v2/sync` answers 410 `resync_required` when
-  `0 < since < through_version` (`since=0` never). An update never creates (`not_found`) nor changes `type` (conflict);
+  `0 < base < through_version`, where `base` is the optional query param for the `latest` a pull
+  cycle started from (defaults to `since`; a full download pages with `base=0`, which never fails).
+  The purge mark is read after the records query in the same pull. An update never creates (`not_found`) nor changes `type` (conflict);
   a hidden id (`id_taken`) is found by a rolled-back insert probe. `deps.syncHooks` is a test-only
   seam.
 - `/v2/keys` (`src/routes/keys.ts`, `src/services/keys.ts`; same spec §5.2, §7): wraps of the
@@ -68,8 +70,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   set) -> `POST /{id}/approver` (once, 409 `already_set`) -> `POST /{id}/reveal` (new device's key;
   409 `not_ready`/`already_set`, 422 `commitment_mismatch` via `pairingCommitment` from
   `@wambito/crypto`) -> `POST /{id}/seal` `{sealed, keyV}` (409 `not_ready`/`already_sealed`, 422
-  `approver_mismatch`: first 32 bytes must be the approver key) -> `GET /{id}` returns the full
-  state (null fields until set) and deletes the row when `sealed` is returned. The server makes the
+  `approver_mismatch`: first 32 bytes must be the approver key; 409 `key_version_mismatch` unless
+  `keyV` is the account's current key version) -> `GET /{id}` returns the full state (null fields
+  until set), never deletes -> `POST /{id}/pickup` returns `{sealed, keyV}` and deletes the row in
+  one transaction (409 `not_ready` while unsealed). Unexpected DB errors are logged without bound
+  params (`safeLogFields` in `http/problem.ts`). The server makes the
   8-char code (`pairingCode`), unique per person (a collision retries); lookup normalizes the typed
   code. 10 min TTL read from `deps.now`, max 5 open (429). Every write holds
   `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id, 0))`.

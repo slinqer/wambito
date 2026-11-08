@@ -5,6 +5,7 @@ import { router } from "../http/router.ts";
 import {
   PairingApprover,
   PairingFound,
+  PairingPickup,
   PairingReveal,
   PairingStarted,
   PairingState,
@@ -13,11 +14,12 @@ import {
 } from "../http/schemas.ts";
 import {
   findPairing,
+  pickupPairing,
+  readPairing,
   revealPairing,
   sealPairing,
   setApprover,
   startPairing,
-  takePairing,
 } from "../services/pairing.ts";
 import { nowOf } from "../services/time.ts";
 
@@ -27,7 +29,7 @@ const idParam = z.object({ id: z.uuid() });
  * Approving a new device from an unlocked one (stage 1b spec section 1). The server relays opaque
  * bytes: the new device's key commitment, the approver's ephemeral key, the new device's revealed
  * key (checked against the commitment) and the sealed data key. Rows live 10 minutes and are
- * deleted on pickup. Assistants cannot reach any of it (scopes.ts).
+ * deleted by the pickup. Assistants cannot reach any of it (scopes.ts).
  */
 export function pairingRoutes(deps: AppDeps) {
   const app = router();
@@ -116,7 +118,7 @@ export function pairingRoutes(deps: AppDeps) {
       path: "/v2/pairing/{id}/seal",
       operationId: "sealPairing",
       description:
-        "The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version. 404 when expired or not the person's, 409 `not_ready` (no revealed key) or `already_sealed`, 422 `approver_mismatch` when the first 32 bytes of `sealed` are not the approver key.",
+        "The unlocked device posts the data key sealed to the revealed key (up to 1 KiB) with the key version, which must be the account's current one (409 `key_version_mismatch`). 404 when expired or not the person's, 409 `not_ready` (no revealed key) or `already_sealed`, 422 `approver_mismatch` when the first 32 bytes of `sealed` are not the approver key.",
       request: { params: idParam, body: jsonBody(SealPairing) },
       responses: { 204: { description: "Sealed" }, ...problems(404, 409, 422) },
     }),
@@ -138,15 +140,32 @@ export function pairingRoutes(deps: AppDeps) {
     createRoute({
       method: "get",
       path: "/v2/pairing/{id}",
-      operationId: "takePairing",
+      operationId: "getPairing",
       description:
-        "Both devices poll. Returns `commitment`, `approverKey`, `publicKey`, `sealed`, `keyV` (null until set) and `expiresAt`. When `sealed` is returned the request is deleted in the same transaction, so a later read is 404.",
+        "Both devices poll. Returns `commitment`, `approverKey`, `publicKey`, `sealed`, `keyV` (null until set) and `expiresAt`. Never deletes the request; the new device takes the sealed key with `POST /v2/pairing/{id}/pickup`.",
       request: { params: idParam },
       responses: { 200: jsonResponse(PairingState, "The request's state"), ...problems(404) },
     }),
     async (c) =>
       c.json(
-        await takePairing(deps.db, c.get("userId"), c.req.valid("param").id, nowOf(deps)),
+        await readPairing(deps.db, c.get("userId"), c.req.valid("param").id, nowOf(deps)),
+        200,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/v2/pairing/{id}/pickup",
+      operationId: "pickupPairing",
+      description:
+        "The new device takes the sealed data key and its `keyV`; the request is deleted in the same transaction, so a second pickup is 404. 409 `not_ready` while the approving device has not sealed; 404 when unknown, expired or not the person's.",
+      request: { params: idParam },
+      responses: { 200: jsonResponse(PairingPickup, "The sealed key"), ...problems(404, 409) },
+    }),
+    async (c) =>
+      c.json(
+        await pickupPairing(deps.db, c.get("userId"), c.req.valid("param").id, nowOf(deps)),
         200,
       ),
   );

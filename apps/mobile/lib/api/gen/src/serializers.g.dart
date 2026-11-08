@@ -64,6 +64,7 @@ Serializers _$serializers =
           ..add(KeyWraps.serializer)
           ..add(PairingApprover.serializer)
           ..add(PairingFound.serializer)
+          ..add(PairingPickup.serializer)
           ..add(PairingReveal.serializer)
           ..add(PairingStarted.serializer)
           ..add(PairingState.serializer)

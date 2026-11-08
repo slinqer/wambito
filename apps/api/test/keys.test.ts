@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { keyWraps, passkey } from "@wambito/db";
-import { eq } from "@wambito/db/orm";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { eq, sql } from "@wambito/db/orm";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { createTestApp, type TestApp } from "./harness.ts";
 import { createSoftPasskey } from "./soft-passkey.ts";
 
@@ -532,5 +532,30 @@ describe("/v2/keys", () => {
     // A's keyV is not B's.
     await put(a.headers, device(1));
     expect(await list(a.headers)).toHaveLength(3);
+  });
+
+  test("a database failure logs no wrapped bytes", async () => {
+    const { headers } = await person();
+    const marker = Buffer.from("MARKER-keys-4c1b-do-not-log!!!!!!!!!!!!!!!!!").toString(
+      "base64url",
+    );
+    await t.admin.execute(sql`create or replace function fail_wrap_insert() returns trigger
+      language plpgsql as $$ begin raise exception 'forced failure'; end $$`);
+    await t.admin.execute(sql`create trigger fail_wrap before insert on key_wraps
+      for each row execute function fail_wrap_insert()`);
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+    try {
+      const res = await putRaw(headers, randomUUID(), recovery(1, { wrapped: marker }));
+      expect(res.status).toBe(500);
+      const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+      expect(logged).toContain("database query failed");
+      expect(logged).not.toContain("MARKER-keys");
+      expect(logged).not.toContain(marker);
+    } finally {
+      vi.restoreAllMocks();
+      await t.admin.execute(sql`drop trigger fail_wrap on key_wraps`);
+    }
   });
 });
