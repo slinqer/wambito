@@ -141,7 +141,7 @@ create table key_wraps (
   id          uuid primary key,
   user_id     uuid not null,             -- RLS
   kind        text not null,             -- passkey | recovery | device | assistant
-  ref         text,                      -- passkey credential id, device id, or OAuth consent id
+  ref         text,                      -- passkey credential id, device id, or OAuth client id
   key_v       smallint not null,
   wrapped     bytea not null,
   public_key  bytea,                     -- device kind: the device's X25519 public key
@@ -181,7 +181,7 @@ All under `/v2`, documented in the OpenAPI, with `requireUser` as today.
 - Pairing relay (section 7.3): `POST /v2/pairing`, `GET /v2/pairing/{id}`,
   `POST /v2/pairing/{id}/seal`. Rows expire after 10 minutes and are deleted on pickup.
 - OAuth scopes: `finance:read` may only `GET /v2/sync`; `finance:write` may also `POST`. Both may
-  read `GET /v2/keys/assistant`, which returns only the wrap of the consent the token belongs to.
+  read `GET /v2/keys/assistant`, which returns only the wrap whose `ref` is the token's OAuth client.
   Neither can list, add or delete wraps, rotate, or use pairing.
 
 Conflict handling on the client: download the current record, merge field by field (a field the
