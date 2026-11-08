@@ -84,7 +84,7 @@ void main() {
     expect(q.containsKey('cursor'), isFalse);
     expect(page.items.single.name, 'Arriendo');
     expect(page.nextCursor, 'abc');
-    expect((page.totals.count, page.totals.expense, page.totals.income), (12, 340000, 5000));
+    expect((page.totals!.count, page.totals!.expense, page.totals!.income), (12, 340000, 5000));
   });
 
   test('omits what is "all" or empty and sends the cursor when given', () async {
@@ -104,10 +104,10 @@ void main() {
     expect(q['kind'], ['income']);
   });
 
-  test('totals fall back to zero when the server sends none', () async {
+  test('totals are null when the server sends none', () async {
     adapter.withTotals = false;
     final page = await repo.search(const SearchFilters(text: 'x'));
-    expect((page.totals.count, page.totals.expense, page.totals.income), (0, 0, 0));
+    expect(page.totals, isNull);
   });
 
   test('a failed call becomes a HomeFailure', () async {

@@ -59,7 +59,9 @@ class SearchPage {
 
   final List<Transaction> items;
   final String? nextCursor;
-  final SearchTotals totals;
+
+  /// Null when the server sent none.
+  final SearchTotals? totals;
 }
 
 abstract interface class SearchRepository {
@@ -90,11 +92,9 @@ class ApiSearchRepository implements SearchRepository {
       return SearchPage(
         items: page.items.toList(),
         nextCursor: page.nextCursor,
-        totals: SearchTotals(
-          count: t?.count ?? 0,
-          expense: t?.expense ?? 0,
-          income: t?.income ?? 0,
-        ),
+        totals: t == null
+            ? null
+            : SearchTotals(count: t.count, expense: t.expense, income: t.income),
       );
     } on DioException catch (error) {
       throw HomeFailure.fromDio(error);
