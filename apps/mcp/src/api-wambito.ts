@@ -60,6 +60,7 @@ export function apiWambito(baseUrl: string, token: string, fetchImpl?: typeof fe
           params: {
             query: {
               ...q,
+              q: q.q === undefined ? undefined : [q.q],
               needsReview:
                 q.needsReview === undefined ? undefined : q.needsReview ? "true" : "false",
             },

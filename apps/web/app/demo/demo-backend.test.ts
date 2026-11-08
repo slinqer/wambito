@@ -298,7 +298,7 @@ describe("GET /api/v1/transactions pages like the API", () => {
     const { api } = demo();
     const category = await firstExpenseCategory(api);
     const { data: first } = await api.GET("/v1/transactions", {
-      params: { query: { month: "2026-10", category, limit: 1 } },
+      params: { query: { month: "2026-10", category: [category], limit: 1 } },
     });
     expect(first?.items).toHaveLength(1);
     expect(first?.items[0]?.categoryId).toBe(category);

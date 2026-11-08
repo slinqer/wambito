@@ -132,7 +132,7 @@ export async function countCategoryTransactions(
   do {
     const page = dataOf(
       await api.GET("/v1/transactions", {
-        params: { query: { category: categoryId, limit: 200, ...(cursor ? { cursor } : {}) } },
+        params: { query: { category: [categoryId], limit: 200, ...(cursor ? { cursor } : {}) } },
       }),
     );
     count += page.items.length;

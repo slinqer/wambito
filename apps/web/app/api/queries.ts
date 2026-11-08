@@ -101,7 +101,7 @@ export const TRANSACTIONS_PAGE = 200;
  */
 function useTransactionPages(
   queryKey: readonly unknown[],
-  query: { month: string; category?: string; needsReview?: "true" },
+  query: { month: string; category?: string[]; needsReview?: "true" },
 ) {
   const api = useApi();
   return useInfiniteQuery({
@@ -504,7 +504,7 @@ export type RecurrencePatch = JsonBody<"/v1/recurrences/{id}", "patch">;
 export function useCategoryTransactions(month: string, categoryId: string) {
   return useTransactionPages([...queryKeys.transactions(month), "category", categoryId], {
     month,
-    category: categoryId,
+    category: [categoryId],
   });
 }
 
