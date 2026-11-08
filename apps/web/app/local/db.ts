@@ -34,6 +34,25 @@ export interface OutboxEntry {
   touched: string[];
   /** Bumped by every local write: the engine acks only the write it read. */
   seq: number;
+  /**
+   * Set by the engine when this write keeps failing (rejected, unreadable conflict, no result):
+   * it is not pushed again before `until`. Any local write of the id clears it.
+   */
+  park?: OutboxPark;
+  /**
+   * Set by a resync's wipe, in the same commit: the local body at that moment (`null` when there
+   * was no row). The change is not pushed while set aside; after the full download it is written
+   * again onto the fresh server copy (only the `touched` fields), and this is cleared.
+   */
+  setAside?: { body: unknown };
+}
+
+export interface OutboxPark {
+  attempts: number;
+  /** A short code (`rejected_422`, `conflict_unreadable`, ...), never a body. */
+  lastError: string;
+  /** Epoch ms before which the engine does not push it again. */
+  until: number;
 }
 
 /** A record that failed to open or validate: counted, never shown, never overwritten. */

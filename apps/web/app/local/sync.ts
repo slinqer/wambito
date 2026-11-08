@@ -7,7 +7,7 @@ import {
   toBase64Url,
 } from "@wambito/crypto";
 import type { OutboxEntry } from "./db.ts";
-import type { EncryptedStore } from "./encrypted-store.ts";
+import { type EncryptedStore, type SetAsideOutcome, VaultClosedError } from "./encrypted-store.ts";
 
 /**
  * The sync engine: pushes the outbox to `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the
@@ -18,19 +18,35 @@ import type { EncryptedStore } from "./encrypted-store.ts";
  *
  * - A run pushes first, then pulls, so a pulled record rarely has a pending local change.
  * - A pulled record whose id has a pending outbox entry is NOT applied (the cursor still moves
- *   past it). The push's conflict path fetches the server's current copy and merges field by
- *   field, so nothing the person typed is overwritten and nothing the server sent is lost.
+ *   past it). The check is repeated inside the apply transaction (`skipIfPending`), so an edit
+ *   made while the page was being opened is not overwritten either. The push's conflict path
+ *   fetches the server's current copy and merges field by field, so nothing the person typed is
+ *   overwritten and nothing the server sent is lost. Conflict writes use `ifSeq`: a newer local
+ *   write wins over the merge, and is pushed (and merged) again.
+ * - A conflict on a create (`baseVersion: null`) only happens for deterministic ids (recurrence
+ *   occurrences, seeded records): the server's copy is taken whole and nothing is pushed.
  * - The base version of a push is always the row's `version` (0 means never pushed: a create).
  *   A conflict merge stores the merged body at the server's version without touching the outbox
  *   entry, so the entry stays pending and its next push is based on that version.
  * - A local delete beats a concurrent server edit (the delete is pushed again on the new
  *   version). A server delete beats a local edit; the id is reported in `serverDeleted`.
  * - `not_found` and `id_taken` drop the entry (reported in `dropped`).
- * - `410 resync_required`: the pending local changes are set aside, the records are wiped, the
- *   full download runs with `base=0`, and the set-aside changes are written again as local
- *   writes (so they diff against the fresh server copy and push as ordinary edits).
+ * - A change that keeps failing is parked (persisted on its outbox entry, with attempts and a
+ *   short error code) and not pushed again until its back-off ends or the person edits it:
+ *   an unreadable conflict copy, a fourth conflict in one run, no result for it, a whole batch
+ *   refused with 413/422 (bisected down to the bad changes), or any other 4xx but 401 (the whole
+ *   batch, e.g. 409 `key_version_mismatch`). Parks are reported (`parked`, ids only) and never
+ *   stop the pull. Offline, 401, 429 and 5xx stop the run as before.
+ * - `410 resync_required`: in the wipe's own commit every pending change is set aside with its
+ *   body (outbox kept), the records and cursors go, and the full download runs with `base=0`.
+ *   After a complete download the set-aside changes are written again, only their `touched`
+ *   fields onto the fresh copy. If the download fails the set-aside entries wait (they are not
+ *   pushed) and the next run's full download restores them.
  * - Commits made by the engine never trigger a run; commits made by the person while a run is in
- *   flight are picked up by a follow-up pass.
+ *   flight are picked up by a follow-up pass (only for writes newer than the run's start, so a
+ *   change left pending never loops).
+ * - Runs take the Web Lock `wambito-sync-<userId>` when the browser has it, so two tabs never
+ *   sync the same vault at once.
  */
 
 /** The record format version this client reads and writes. */
@@ -39,8 +55,10 @@ const PUSH_BATCH = 500;
 /** Stay under the server's 4 MiB request limit. */
 const PUSH_BYTES = 3 * 1024 * 1024;
 const PULL_LIMIT = 1000;
-/** How many times one id may conflict inside one run before it is left for the next. */
+/** How many times one id may conflict inside one run before it is parked. */
 const MAX_CONFLICTS = 3;
+/** A parked change's back-off: 1 min, doubling, at most 6 hours. */
+const parkDelay = (attempts: number) => Math.min(60_000 * 2 ** (attempts - 1), 6 * 3_600_000);
 
 export type SyncProblemCode =
   | "offline"
@@ -50,7 +68,11 @@ export type SyncProblemCode =
   | "dropped"
   | "server_deleted"
   | "quarantined"
-  | "conflict_unreadable";
+  | "conflict_unreadable"
+  /** Changes the engine gave up on for now (see `SyncResult.parked`). */
+  | "parked"
+  /** The store was closed (another tab deleted the vault, or the session closed it). */
+  | "closed";
 
 /** Something the UI may want to tell the person. Ids and counts only. */
 export interface SyncProblem {
@@ -71,6 +93,8 @@ export interface SyncResult {
   /** Ids of changes dropped (`not_found`, `id_taken`). */
   dropped: string[];
   quarantined: number;
+  /** Ids of changes parked in this run (they back off; a local edit retries them at once). */
+  parked: string[];
   resynced: boolean;
   error?: SyncProblemCode;
 }
@@ -178,7 +202,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     if (response.status === 410) throw new ResyncRequired();
     if (response.status === 401) throw new Stop("unauthorized", 401);
-    if (response.status === 409 || response.status >= 500)
+    if (response.status === 429 || response.status >= 500)
       throw new Stop("server", response.status);
     if (!response.ok) throw new Stop("rejected", response.status);
     return response.json();
@@ -250,16 +274,19 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   async function handleConflict(
     entry: OutboxEntry,
     server: WireRecord,
+    created: boolean,
     result: SyncResult,
   ): Promise<void> {
     const type = entry.type;
     const row = await store.getRaw(type, entry.id);
+    const remote = {
+      origin: "remote",
+      version: server.version,
+      keyV: server.keyV,
+      ifSeq: entry.seq,
+    } as const;
     if (server.deleted) {
-      await store.delete(type, entry.id, {
-        origin: "remote",
-        version: server.version,
-        keyV: server.keyV,
-      });
+      await store.delete(type, entry.id, remote);
       await store.ackOutbox(entry.id, server.version, entry.seq);
       if (!entry.deleted) {
         result.serverDeleted.push(entry.id);
@@ -267,17 +294,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
       return;
     }
-    if (entry.deleted) {
+    if (entry.deleted && !created) {
       // The person's delete wins: keep the server's copy as the base and push the delete again.
-      await store.put(type, entry.id, row?.body as never, {
-        origin: "remote",
-        version: server.version,
-        keyV: server.keyV,
-      });
-      await store.delete(type, entry.id, {
-        origin: "remote",
-        version: server.version,
-        keyV: server.keyV,
+      await store.transaction(async (tx) => {
+        await tx.put(type, entry.id, row?.body as never, remote);
+        await tx.delete(type, entry.id, remote);
       });
       result.merged += 1;
       return;
@@ -287,13 +308,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       await quarantine(server, opened.reason);
       result.quarantined += 1;
       report({ code: "conflict_unreadable", ids: [entry.id] });
-      throw new Skip();
+      throw new Skip("conflict_unreadable");
     }
-    const merged = mergeBodies(row?.body, opened.body, entry.touched);
+    // Two devices created the same deterministic id: the server's copy wins whole.
+    const merged = mergeBodies(row?.body, opened.body, created ? [] : entry.touched);
     const parsed = parseRecord(type, merged);
     // A merge of two valid bodies that is not valid itself: the server's copy is the safe side.
     const next = parsed.ok ? parsed.value : opened.body;
-    const remote = { origin: "remote", version: server.version, keyV: server.keyV } as const;
     await store.put(type, entry.id, next as never, remote);
     if (canonical(next) === canonical(opened.body)) {
       // Nothing of ours differs from the server's copy (two devices made the same record).
@@ -302,15 +323,89 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     result.merged += 1;
   }
 
+  /** Gives up on `entry` for now; it backs off and is reported. */
+  async function park(entry: OutboxEntry, lastError: string, result: SyncResult) {
+    const attempts = (entry.park?.attempts ?? 0) + 1;
+    await store.parkOutbox(entry.id, entry.seq, {
+      attempts,
+      lastError,
+      until: now() + parkDelay(attempts),
+    });
+    result.parked.push(entry.id);
+  }
+
   async function push(result: SyncResult): Promise<void> {
     const conflicts = new Map<string, number>();
+    /** The seq of each entry this run is done with: it is sent again only after a newer write. */
+    const handled = new Map<string, number>();
+    const due = (e: OutboxEntry) =>
+      !e.setAside && (!e.park || e.park.until <= now()) && handled.get(e.id) !== e.seq;
+
+    async function settle(p: Prepared, r: PushResult | undefined) {
+      const { entry } = p;
+      handled.set(entry.id, entry.seq);
+      if (!r) {
+        await park(entry, "no_result", result);
+      } else if ("version" in r) {
+        await store.ackOutbox(entry.id, r.version, entry.seq);
+        result.pushed += 1;
+      } else if ("conflict" in r) {
+        const count = (conflicts.get(entry.id) ?? 0) + 1;
+        conflicts.set(entry.id, count);
+        if (count > MAX_CONFLICTS) {
+          await park(entry, "conflict_limit", result);
+          return;
+        }
+        try {
+          await handleConflict(entry, r.conflict, p.change.baseVersion === null, result);
+          // Still pending after the merge: push it again on the server's version.
+          handled.delete(entry.id);
+        } catch (error) {
+          if (!(error instanceof Skip)) throw error;
+          await park(entry, error.message, result);
+        }
+      } else {
+        // id_taken / not_found: the server will never take this change.
+        const row = await store.getRaw(entry.type, entry.id);
+        await store.ackOutbox(entry.id, row?.version ?? 0, entry.seq);
+        result.dropped.push(entry.id);
+      }
+    }
+
+    /** Sends a batch; a refused one is bisected (413/422) or parked whole (other 4xx). */
+    async function send(batch: Prepared[]): Promise<void> {
+      let response: { results: PushResult[] };
+      try {
+        response = (await call("/v2/sync", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ changes: batch.map((p) => p.change) }),
+        })) as { results: PushResult[] };
+      } catch (error) {
+        if (!(error instanceof Stop) || error.code !== "rejected") throw error;
+        const code = `rejected_${error.status}`;
+        if ((error.status === 413 || error.status === 422) && batch.length > 1) {
+          const half = Math.ceil(batch.length / 2);
+          await send(batch.slice(0, half));
+          await send(batch.slice(half));
+          return;
+        }
+        for (const p of batch) {
+          handled.set(p.entry.id, p.entry.seq);
+          await park(p.entry, code, result);
+        }
+        return;
+      }
+      const byId = new Map((response.results ?? []).map((r) => [r.id, r]));
+      for (const p of batch) await settle(p, byId.get(p.entry.id));
+    }
+
     for (;;) {
-      const all = await store.readOutbox(Number.MAX_SAFE_INTEGER);
-      const due = all.filter((e) => (conflicts.get(e.id) ?? 0) < MAX_CONFLICTS);
-      if (due.length === 0) return;
+      const pending = (await store.readOutbox(Number.MAX_SAFE_INTEGER)).filter(due);
+      if (pending.length === 0) return;
       const batch: Prepared[] = [];
       let bytes = 0;
-      for (const entry of due) {
+      for (const entry of pending) {
         if (batch.length >= PUSH_BATCH) break;
         const prepared = await prepare(entry);
         if (!prepared) continue;
@@ -319,33 +414,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         batch.push(prepared);
       }
       if (batch.length === 0) continue;
-      const response = (await call("/v2/sync", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ changes: batch.map((p) => p.change) }),
-      })) as { results: PushResult[] };
-      const byId = new Map(response.results.map((r) => [r.id, r]));
-      for (const { entry } of batch) {
-        const r = byId.get(entry.id);
-        if (!r) continue;
-        if ("version" in r) {
-          await store.ackOutbox(entry.id, r.version, entry.seq);
-          result.pushed += 1;
-        } else if ("conflict" in r) {
-          conflicts.set(entry.id, (conflicts.get(entry.id) ?? 0) + 1);
-          try {
-            await handleConflict(entry, r.conflict, result);
-          } catch (error) {
-            if (!(error instanceof Skip)) throw error;
-            conflicts.set(entry.id, MAX_CONFLICTS);
-          }
-        } else {
-          // id_taken / not_found: the server will never take this change.
-          const row = await store.getRaw(entry.type, entry.id);
-          await store.ackOutbox(entry.id, row?.version ?? 0, entry.seq);
-          result.dropped.push(entry.id);
-        }
-      }
+      await send(batch);
     }
   }
 
@@ -362,7 +431,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         next: number | null;
         latest: number;
       };
-      const pending = new Set((await store.readOutbox(Number.MAX_SAFE_INTEGER)).map((e) => e.id));
+      const pending = new Set(
+        (await store.readOutbox(Number.MAX_SAFE_INTEGER))
+          .filter((e) => !e.setAside)
+          .map((e) => e.id),
+      );
       type Apply = { rec: WireRecord; body: unknown } | { rec: WireRecord; body: null };
       const apply: Apply[] = [];
       let quarantined = 0;
@@ -385,7 +458,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       if (apply.length > 0) {
         await store.transaction(async (tx) => {
           for (const { rec, body } of apply) {
-            const remote = { origin: "remote", version: rec.version, keyV: rec.keyV } as const;
+            // Checked again here: the person may have written it since `pending` was read.
+            const remote = {
+              origin: "remote",
+              version: rec.version,
+              keyV: rec.keyV,
+              skipIfPending: true,
+            } as const;
             const type = rec.type as RecordType;
             if (body === null) await tx.delete(type, rec.id, remote);
             else await tx.put(type, rec.id, body as never, remote);
@@ -401,25 +480,44 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     await store.setMeta("latest", latest);
     await store.setMeta("base", latest);
+    // A resync's set-aside changes, once a whole download has landed.
+    const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
+    if (outbox.some((e) => e.setAside)) await restoreSetAside(result);
   }
 
   /** The server purged tombstones we may have missed: download everything again. */
   async function resync(result: SyncResult): Promise<void> {
-    const setAside: Array<{ entry: OutboxEntry; body: unknown }> = [];
-    for (const entry of await store.readOutbox(Number.MAX_SAFE_INTEGER)) {
-      const row = await store.getRaw(entry.type, entry.id);
-      if (row) setAside.push({ entry, body: row.body });
-    }
+    // Sets the pending changes aside in the same commit, so a failed download loses nothing.
     await store.wipeRecords();
-    await store.setMeta("latest", 0);
-    await store.setMeta("base", 0);
-    await pull(result);
-    // Written again as ordinary local edits: they diff against the fresh server copy.
-    for (const { entry, body } of setAside) {
-      if (entry.deleted) await store.delete(entry.type, entry.id);
-      else await store.put(entry.type, entry.id, body as never);
-    }
     result.resynced = true;
+    await pull(result);
+  }
+
+  /** Writes the set-aside changes again onto the fresh copies: only their touched fields. */
+  async function restoreSetAside(result: SyncResult): Promise<void> {
+    const serverDeleted: string[] = [];
+    await store.restoreSetAside((entry, fresh): SetAsideOutcome => {
+      const live = fresh && !fresh.deleted ? fresh : undefined;
+      if (entry.deleted) return live ? { delete: true } : { drop: true };
+      const aside = entry.setAside?.body;
+      if (aside === null || aside === undefined) return { drop: true };
+      if (entry.baseVersion === null) {
+        // Never pushed: a create, unless the server has the id (a deterministic id): theirs wins.
+        return fresh ? { drop: true } : { put: aside };
+      }
+      if (!live) {
+        // The server deleted it: the deletion wins, and the person is told.
+        serverDeleted.push(entry.id);
+        return { drop: true };
+      }
+      const merged = mergeBodies(aside, live.body, entry.touched);
+      const parsed = parseRecord(entry.type, merged);
+      return parsed.ok ? { put: parsed.value } : { drop: true };
+    });
+    if (serverDeleted.length > 0) {
+      result.serverDeleted.push(...serverDeleted);
+      report({ code: "server_deleted", ids: serverDeleted });
+    }
   }
 
   // ---- run -----------------------------------------------------------------------------------
@@ -433,6 +531,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       serverDeleted: [],
       dropped: [],
       quarantined: 0,
+      parked: [],
       resynced: false,
     };
     try {
@@ -453,11 +552,16 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         result.ok = false;
         result.error = error.code;
         report({ code: error.code, status: error.status });
+      } else if (error instanceof VaultClosedError || store.isClosed()) {
+        result.ok = false;
+        result.error = "closed";
+        report({ code: "closed" });
       } else {
         throw error;
       }
     }
     if (result.dropped.length > 0) report({ code: "dropped", ids: result.dropped });
+    if (result.parked.length > 0) report({ code: "parked", ids: [...new Set(result.parked)] });
     return result;
   }
 
@@ -465,6 +569,38 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   let again = false;
   /** True while a run is in flight: its own commits must not schedule another. */
   let running = false;
+
+  /** One run's passes as one result: counts added, ids joined, `ok`/`error` of the last. */
+  function combine(a: SyncResult | undefined, b: SyncResult): SyncResult {
+    if (!a) return b;
+    return {
+      ...b,
+      pushed: a.pushed + b.pushed,
+      pulled: a.pulled + b.pulled,
+      merged: a.merged + b.merged,
+      quarantined: a.quarantined + b.quarantined,
+      serverDeleted: [...a.serverDeleted, ...b.serverDeleted],
+      dropped: [...a.dropped, ...b.dropped],
+      parked: [...a.parked, ...b.parked],
+      resynced: a.resynced || b.resynced,
+    };
+  }
+
+  /** The store's write counter: outbox entries above it were written after this point. */
+  async function mark(): Promise<number> {
+    try {
+      return (await store.getMeta<number>("seq")) ?? 0;
+    } catch {
+      return Number.MAX_SAFE_INTEGER; // closed: `once` reports it
+    }
+  }
+
+  /** Another tab's run of the same vault waits for ours (Web Locks), where the browser has them. */
+  function locked<R>(fn: () => Promise<R>): Promise<R> {
+    const locks = (globalThis.navigator as Navigator | undefined)?.locks;
+    if (!locks?.request) return fn();
+    return locks.request(`wambito-sync-${userId}`, fn) as Promise<R>;
+  }
 
   function run(): Promise<SyncResult> {
     if (current) {
@@ -474,14 +610,21 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     current = (async () => {
       running = true;
       try {
-        let last: SyncResult;
-        do {
-          again = false;
-          last = await once();
-          // Anything the person wrote during the run is still pending: one more pass.
-          if (last.ok && !again && (await store.readOutbox(1)).length > 0) again = true;
-        } while (again && last.ok);
-        return last;
+        return await locked(async () => {
+          let last: SyncResult | undefined;
+          do {
+            again = false;
+            const start = await mark();
+            last = combine(last, await once());
+            // Only what the person wrote during the run gets one more pass: a change left
+            // pending (parked, set aside, waiting) waits for the next trigger.
+            if (last.ok && !again) {
+              const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
+              if (outbox.some((e) => e.seq > start)) again = true;
+            }
+          } while (again && last.ok);
+          return last;
+        });
       } finally {
         running = false;
         current = null;
@@ -508,7 +651,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           clearTimeout(retry);
           if (result.ok) {
             failures = 0;
-          } else {
+          } else if (result.error !== "closed") {
             failures += 1;
             const delay = Math.min(2000 * 2 ** (failures - 1), 5 * 60_000);
             retry = setTimeout(trigger, delay);
@@ -551,5 +694,5 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   return { run, start };
 }
 
-/** Internal: leave this change for a later run. */
+/** Internal: park this change; the message is the park's `lastError`. */
 class Skip extends Error {}

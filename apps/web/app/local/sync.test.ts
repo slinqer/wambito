@@ -8,7 +8,7 @@ import {
   sealRecord,
   toBase64Url,
 } from "@wambito/crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import type { RecordBodies } from "./store.ts";
 import { createSyncEngine } from "./sync.ts";
@@ -430,5 +430,357 @@ describe("runs", () => {
     // one's own pull applied B without scheduling pushes
     expect(server.posts).toBe(posts + 1);
     stop();
+  });
+});
+
+// ---- review fixes ------------------------------------------------------------------------------
+
+type Fetch = typeof fetch;
+/** Replaces the server's fetch with `fn`, which gets the real one to call. */
+function intercept(
+  server: Server,
+  fn: (real: Fetch, input: string, init?: RequestInit) => unknown,
+) {
+  const real = server.fetch;
+  server.fetch = ((input: string, init?: RequestInit) => fn(real, input, init)) as Fetch;
+}
+const status = (code: number, body: unknown = { code: "x" }) =>
+  new Response(JSON.stringify(body), {
+    status: code,
+    headers: { "content-type": "application/json" },
+  });
+const changeIds = (init?: RequestInit) =>
+  (JSON.parse(String(init?.body)) as { changes: Array<{ id: string }> }).changes.map((c) => c.id);
+
+async function sealedBy(k: RecordKeys, id: string, body: unknown) {
+  return toBase64Url(await sealRecord(k, { userId: USER, type: "category", id, keyV: 1 }, body));
+}
+
+describe("runs never loop and park what keeps failing", () => {
+  it("parks a change whose conflict copy cannot be opened, and the run ends", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    await one.engine.run();
+    const other = await deriveRecordKeys(generateDataKey());
+    const row = server.rows.get(A);
+    if (row) {
+      row.version = ++server.counter;
+      row.body = await sealedBy(other, A, category("x"));
+    }
+    await one.store.put("category", A, category("mine"));
+    const r = await one.engine.run();
+    expect(r.ok).toBe(true);
+    expect(r.parked).toEqual([A]);
+    expect(one.problems).toContainEqual({ code: "parked", ids: [A] });
+    const [entry] = await one.store.readOutbox(10);
+    expect(entry?.park).toMatchObject({ attempts: 1, lastError: "conflict_unreadable" });
+    // Backing off: the next run does not send it again.
+    const posts = server.posts;
+    await one.engine.run();
+    expect(server.posts).toBe(posts);
+  });
+
+  it("parks a change the server gave no result for", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    intercept(server, async (real, input, init) => {
+      if (init?.method !== "POST") return real(input, init);
+      const res = (await (await real(input, init)).json()) as { results: unknown[] };
+      return status(200, { results: res.results.filter((x) => (x as { id: string }).id !== B) });
+    });
+    await one.store.put("category", A, category("a"));
+    await one.store.put("category", B, category("b"));
+    const r = await one.engine.run();
+    expect(r.ok).toBe(true);
+    expect(r.parked).toEqual([B]);
+    expect((await one.store.readOutbox(10)).map((e) => [e.id, e.park?.lastError])).toEqual([
+      [B, "no_result"],
+    ]);
+  });
+
+  it("parks a change that conflicts on every push", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    await one.engine.run();
+    await one.store.put("category", A, category("b"));
+    intercept(server, async (real, input, init) => {
+      if (init?.method !== "POST") return real(input, init);
+      const row = server.rows.get(A);
+      if (row) row.version = ++server.counter; // someone else always wins the race
+      return real(input, init);
+    });
+    const r = await one.engine.run();
+    expect(r.ok).toBe(true);
+    expect(r.parked).toEqual([A]);
+    expect((await one.store.readOutbox(10))[0]?.park?.lastError).toBe("conflict_limit");
+  });
+
+  it("tries a parked change again after its back-off, or as soon as the person edits it", async () => {
+    const server = fakeServer();
+    let clock = 1_000_000;
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const engine = createSyncEngine({
+      store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keys: await getKeys(),
+      keyV: 1,
+      now: () => clock,
+    });
+    let reject = true;
+    intercept(server, (real, input, init) =>
+      init?.method === "POST" && reject ? status(422) : real(input, init),
+    );
+    await store.put("category", A, category("a"));
+    expect((await engine.run()).parked).toEqual([A]);
+    reject = false;
+    expect((await engine.run()).pushed).toBe(0);
+    clock += 24 * 60 * 60 * 1000;
+    expect((await engine.run()).pushed).toBe(1);
+    reject = true;
+    await store.put("category", A, category("a2"));
+    await engine.run();
+    reject = false;
+    await store.put("category", A, category("a3"));
+    expect((await engine.run()).pushed).toBe(1);
+    expect(await store.readOutbox(10)).toEqual([]);
+  });
+});
+
+describe("one bad change does not block the others", () => {
+  it("bisects a batch the server rejects whole and parks only the bad change", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    const two = await device(server);
+    await two.store.put("category", C, category("from two"));
+    await two.engine.run();
+    intercept(server, (real, input, init) =>
+      init?.method === "POST" && changeIds(init).includes(B) ? status(422) : real(input, init),
+    );
+    await one.store.put("category", A, category("a"));
+    await one.store.put("category", B, category("b"));
+    const r = await one.engine.run();
+    expect(r).toMatchObject({ ok: true, pushed: 1, parked: [B] });
+    expect(server.rows.has(A)).toBe(true);
+    expect((await one.store.readOutbox(10))[0]).toMatchObject({
+      id: B,
+      park: { lastError: "rejected_422" },
+    });
+    // The pull still ran.
+    expect((await one.store.get("category", C))?.body.name).toBe("from two");
+  });
+
+  it("parks the batch on 409 key_version_mismatch and still pulls", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    const two = await device(server);
+    await two.store.put("category", C, category("from two"));
+    await two.engine.run();
+    intercept(server, (real, input, init) =>
+      init?.method === "POST" ? status(409, { code: "key_version_mismatch" }) : real(input, init),
+    );
+    await one.store.put("category", A, category("a"));
+    const r = await one.engine.run();
+    expect(r).toMatchObject({ ok: true, parked: [A] });
+    expect((await one.store.readOutbox(10))[0]?.park?.lastError).toBe("rejected_409");
+    expect((await one.store.get("category", C))?.body.name).toBe("from two");
+  });
+
+  it("still stops on a server error, keeping the change unparked", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    intercept(server, (real, input, init) =>
+      init?.method === "POST" ? status(503) : real(input, init),
+    );
+    await one.store.put("category", A, category("a"));
+    expect(await one.engine.run()).toMatchObject({ ok: false, error: "server" });
+    expect((await one.store.readOutbox(10))[0]?.park).toBeUndefined();
+  });
+});
+
+describe("pulls never overwrite or lose local edits", () => {
+  it("does not apply a pulled record over a local write made while the page was opened", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    await one.engine.run();
+    const twoStore = await createEncryptedStore(`device-${++counter}`);
+    await twoStore.put("category", A, category("a"), { origin: "remote", version: 1, keyV: 1 });
+    await twoStore.setMeta("latest", 1);
+    await one.store.put("category", A, category("server edit"));
+    await one.engine.run();
+    // Between the decrypt and the apply, the person edits A on device two.
+    let injected = false;
+    const sneaky = {
+      ...twoStore,
+      transaction: (async (fn: Parameters<EncryptedStore["transaction"]>[0]) => {
+        if (!injected) {
+          injected = true;
+          await twoStore.put("category", A, category("typed meanwhile"));
+        }
+        return twoStore.transaction(fn);
+      }) as EncryptedStore["transaction"],
+    } satisfies EncryptedStore;
+    const engine = createSyncEngine({
+      store: sneaky,
+      fetch: (input, init) =>
+        // Only the pull: the push of the injected write comes in a later run.
+        init?.method === "POST"
+          ? Promise.reject(new TypeError("offline"))
+          : server.fetch(input, init),
+      userId: USER,
+      keys: await getKeys(),
+      keyV: 1,
+    });
+    await engine.run();
+    expect(injected).toBe(true);
+    expect((await twoStore.get("category", A))?.body.name).toBe("typed meanwhile");
+    expect((await twoStore.readOutbox(10)).map((e) => e.id)).toEqual([A]);
+  });
+
+  it("takes the server's copy of a deterministic id both devices created (paid beats pending)", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    const two = await device(server);
+    const occurrence = (status: "paid" | "pending"): RecordBodies["transaction"] => ({
+      s: 1,
+      name: "Rent",
+      amount: -80000,
+      currency: "COP",
+      date: "2026-11-01",
+      status,
+      note: null,
+      categoryId: A,
+      accountId: null,
+      recurrenceId: B,
+      occurrenceMonth: "2026-11",
+      source: "recurrence",
+      needsReview: false,
+      captureSource: null,
+      capturedAt: null,
+      captureMerchantKey: null,
+    });
+    await one.store.put("transaction", C, occurrence("paid"));
+    await one.engine.run();
+    const version = server.rows.get(C)?.version;
+    await two.store.put("transaction", C, occurrence("pending"));
+    const posts = server.posts;
+    const r = await two.engine.run();
+    expect(r.ok).toBe(true);
+    expect(server.posts).toBe(posts + 1);
+    expect(server.rows.get(C)?.version).toBe(version);
+    expect((await two.store.get("transaction", C))?.body.status).toBe("paid");
+    expect(await two.store.readOutbox(10)).toEqual([]);
+  });
+
+  it("carries fields it does not know through a conflict merge", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    await one.store.put("category", A, category("a"));
+    await one.engine.run();
+    // A newer client adds a field this one does not know.
+    const row = server.rows.get(A);
+    if (row) {
+      row.version = ++server.counter;
+      row.body = await sealedBy(await getKeys(), A, { ...category("a"), future: { x: 1 } });
+    }
+    await one.store.put("category", A, category("renamed"));
+    await one.engine.run();
+    const opened = await openRecord(
+      await getKeys(),
+      { userId: USER, type: "category", id: A, keyV: 1 },
+      fromBase64Url(server.rows.get(A)?.body ?? ""),
+    );
+    expect(opened).toMatchObject({ name: "renamed", future: { x: 1 } });
+  });
+});
+
+describe("resync keeps pending edits", () => {
+  async function stale() {
+    const server = fakeServer();
+    const one = await device(server);
+    const two = await device(server);
+    await one.store.put("category", A, category("a", "#111"));
+    await one.store.put("category", B, category("b"));
+    await one.engine.run();
+    await two.engine.run();
+    await one.store.delete("category", B);
+    await one.store.put("category", A, category("renamed", "#111"));
+    await one.store.put("category", C, category("c"));
+    await one.engine.run();
+    server.purge();
+    return { server, one, two };
+  }
+
+  it("re-applies only the touched fields onto the fresh server copy", async () => {
+    const { server, two } = await stale();
+    await two.store.put("category", A, category("a", "#999"));
+    let rejected = false;
+    intercept(server, (real, input, init) => {
+      if (init?.method === "POST" && !rejected) {
+        rejected = true;
+        return status(422);
+      }
+      return real(input, init);
+    });
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: true, resynced: true });
+    expect(await names(two.store)).toEqual([`${A}:renamed/#999`, `${C}:c/#fff`]);
+    await two.engine.run();
+    expect(await two.store.readOutbox(10)).toEqual([]);
+  });
+
+  it("keeps the edit when the pull fails mid-resync, and recovers it on a later run", async () => {
+    const { server, one, two } = await stale();
+    await two.store.put("category", A, category("a", "#999"));
+    server.pullLimit = 1;
+    let rejectPush = true;
+    let breakPage = true;
+    intercept(server, (real, input, init) => {
+      if (init?.method === "POST" && rejectPush) {
+        rejectPush = false;
+        return status(422);
+      }
+      // The second page of the full download fails.
+      if (init?.method !== "POST" && input.includes("base=0") && !input.includes("since=0")) {
+        if (breakPage) {
+          breakPage = false;
+          throw new TypeError("Failed to fetch");
+        }
+      }
+      return real(input, init);
+    });
+    expect(await two.engine.run()).toMatchObject({ ok: false, error: "offline" });
+    expect((await two.store.readOutbox(10)).map((e) => e.id)).toEqual([A]);
+    const r = await two.engine.run();
+    expect(r.ok).toBe(true);
+    expect(await names(two.store)).toEqual([`${A}:renamed/#999`, `${C}:c/#fff`]);
+    expect(await two.store.readOutbox(10)).toEqual([]);
+    await one.engine.run();
+    expect(await names(one.store)).toEqual([`${A}:renamed/#999`, `${C}:c/#fff`]);
+  });
+});
+
+describe("tabs", () => {
+  it("runs under a Web Lock named for the account when the browser has them", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    const request = vi.fn((_name: string, fn: () => Promise<unknown>) => fn());
+    vi.stubGlobal("navigator", { locks: { request } });
+    try {
+      expect((await one.engine.run()).ok).toBe(true);
+      expect(request).toHaveBeenCalledWith(`wambito-sync-${USER}`, expect.any(Function));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("stops with `closed` when the vault was closed", async () => {
+    const server = fakeServer();
+    const one = await device(server);
+    one.store.close();
+    expect(await one.engine.run()).toMatchObject({ ok: false, error: "closed" });
   });
 });

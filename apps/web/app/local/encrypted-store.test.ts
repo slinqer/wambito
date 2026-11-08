@@ -8,7 +8,7 @@ import {
 } from "@wambito/crypto";
 import { describe, expect, it, vi } from "vitest";
 import { deleteVault, vaultName } from "./db.ts";
-import { createEncryptedStore } from "./encrypted-store.ts";
+import { createEncryptedStore, VaultClosedError } from "./encrypted-store.ts";
 import type { RecordBodies } from "./store.ts";
 import { storeContract } from "./store-contract.ts";
 
@@ -141,7 +141,7 @@ describe("meta, quarantine, wipe", () => {
     expect(await store.quarantineCount()).toBe(2);
   });
 
-  it("wipes records, outbox, quarantine and the cursors, but not the keys or userId", async () => {
+  it("wipes records, quarantine and the cursors, but not the keys, userId or outbox", async () => {
     const store = await fresh();
     const listener = vi.fn();
     await store.put("category", "a", category("A"));
@@ -154,7 +154,6 @@ describe("meta, quarantine, wipe", () => {
     store.subscribe(listener);
     await store.wipeRecords();
     expect(await store.list("category", { includeDeleted: true })).toEqual([]);
-    expect(await store.readOutbox(10)).toEqual([]);
     expect(await store.quarantineCount()).toBe(0);
     expect(await store.getMeta("latest")).toBeUndefined();
     expect(await store.getMeta("base")).toBeUndefined();
@@ -162,6 +161,151 @@ describe("meta, quarantine, wipe", () => {
     expect(await store.getMeta("userId")).toBe("u");
     expect(await store.getKey("k")).toBe("kept");
     expect(listener).toHaveBeenCalledTimes(1);
+    // The pending change is set aside with its body, in the same commit as the wipe.
+    expect(await store.readOutbox(10)).toMatchObject([
+      { id: "a", setAside: { body: category("A") } },
+    ]);
+  });
+
+  it("keeps a set-aside body up to date with writes made before it is restored", async () => {
+    const store = await fresh();
+    await store.put("category", "a", category("A"), { origin: "remote", version: 3, keyV: 1 });
+    await store.put("category", "a", category("A", "#111"));
+    await store.wipeRecords();
+    await store.put("category", "a", category("A2", "#111"));
+    const [entry] = await store.readOutbox(10);
+    expect(entry?.setAside?.body).toMatchObject({ name: "A2", color: "#111" });
+    expect([...(entry?.touched ?? [])]).toEqual(expect.arrayContaining(["color", "name"]));
+  });
+
+  it("restores set-aside changes in one commit, as the resolver decides", async () => {
+    const store = await fresh();
+    await store.put("category", "a", category("A", "#111"));
+    await store.put("category", "b", category("B"));
+    await store.put("category", "c", category("C"));
+    await store.wipeRecords();
+    await store.put("category", "a", category("Server A"), {
+      origin: "remote",
+      version: 9,
+      keyV: 1,
+    });
+    await store.put("category", "b", category("Server B"), {
+      origin: "remote",
+      version: 10,
+      keyV: 1,
+    });
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const seen: Array<[string, number | undefined]> = [];
+    await store.restoreSetAside((entry, fresh) => {
+      seen.push([entry.id, fresh?.version]);
+      if (entry.id === "a") return { put: { ...category("Server A"), color: "#111" } };
+      if (entry.id === "b") return { delete: true };
+      return { drop: true };
+    });
+    expect(seen.sort()).toEqual([
+      ["a", 9],
+      ["b", 10],
+      ["c", undefined],
+    ]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    const outbox = await store.readOutbox(10);
+    expect(outbox.map((e) => [e.id, e.baseVersion, e.deleted, e.setAside])).toEqual([
+      ["a", 9, false, undefined],
+      ["b", 10, true, undefined],
+    ]);
+    expect((await store.get("category", "a"))?.body).toMatchObject({
+      name: "Server A",
+      color: "#111",
+    });
+    expect(await store.get("category", "b")).toBeUndefined();
+    expect(await store.get("category", "c")).toBeUndefined();
+  });
+});
+
+describe("pending ids and parked changes", () => {
+  it("a remote write with skipIfPending leaves a record with a pending change alone", async () => {
+    const store = await fresh();
+    await store.put("category", "a", category("Local"));
+    await store.transaction(async (tx) => {
+      const remote = { origin: "remote", version: 4, keyV: 1, skipIfPending: true } as const;
+      await tx.put("category", "a", category("Server"), remote);
+      await tx.put("category", "b", category("Server B"), remote);
+      await tx.delete("category", "a", remote);
+    });
+    expect(await store.getRaw("category", "a")).toMatchObject({
+      version: 0,
+      deleted: false,
+      body: { name: "Local" },
+    });
+    expect((await store.getRaw("category", "b"))?.version).toBe(4);
+  });
+
+  it("a remote write with ifSeq applies only while the outbox entry is that write", async () => {
+    const store = await fresh();
+    await store.put("category", "a", category("Local"));
+    const [read] = await store.readOutbox(1);
+    const seq = read?.seq ?? 0;
+    await store.put("category", "a", category("Merged"), {
+      origin: "remote",
+      version: 2,
+      ifSeq: seq,
+    });
+    expect(await store.getRaw("category", "a")).toMatchObject({
+      version: 2,
+      body: { name: "Merged" },
+    });
+    await store.put("category", "a", category("Newer"));
+    await store.put("category", "a", category("Stale"), {
+      origin: "remote",
+      version: 3,
+      ifSeq: seq,
+    });
+    expect(await store.getRaw("category", "a")).toMatchObject({
+      version: 2,
+      body: { name: "Newer" },
+    });
+  });
+
+  it("parks only the write that was read, and a later local write clears the park", async () => {
+    const store = await fresh();
+    await store.put("category", "a", category("A"));
+    const [read] = await store.readOutbox(1);
+    const park = { attempts: 1, lastError: "rejected_422", until: 1000 };
+    await store.parkOutbox("a", read?.seq ?? 0, park);
+    expect((await store.readOutbox(1))[0]?.park).toEqual(park);
+    await store.put("category", "a", category("A2"));
+    expect((await store.readOutbox(1))[0]?.park).toBeUndefined();
+    await store.parkOutbox("a", read?.seq ?? 0, park);
+    expect((await store.readOutbox(1))[0]?.park).toBeUndefined();
+  });
+});
+
+describe("other tabs", () => {
+  it("notifies a store open on the same vault in another tab after a commit", async () => {
+    const userId = `tabs-${++counter}`;
+    const one = await createEncryptedStore(userId);
+    const two = await createEncryptedStore(userId);
+    const listener = vi.fn();
+    two.subscribe(listener);
+    await one.put("category", "a", category("A"));
+    await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+    expect((await two.get("category", "a"))?.body.name).toBe("A");
+    one.close();
+    two.close();
+  });
+
+  it("closes when another tab deletes the vault, then rejects with VaultClosedError", async () => {
+    const userId = `closing-${++counter}`;
+    const store = await createEncryptedStore(userId);
+    const closed = vi.fn();
+    store.onClosed(closed);
+    await store.put("category", "a", category("A"));
+    await deleteVault(userId);
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(store.isClosed()).toBe(true);
+    await expect(store.list("category")).rejects.toBeInstanceOf(VaultClosedError);
+    await expect(store.readOutbox(1)).rejects.toBeInstanceOf(VaultClosedError);
   });
 });
 

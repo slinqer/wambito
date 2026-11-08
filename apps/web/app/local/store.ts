@@ -24,6 +24,17 @@ export interface WriteOptions {
   /** Remote writes only: the server version and key version of the copy being stored. */
   version?: number;
   keyV?: number;
+  /**
+   * Remote writes only: skip the write when the id has a pending local change (an outbox entry
+   * that is not set aside). Checked inside the write's own transaction, so a local edit made
+   * while a pulled page was being opened is never overwritten.
+   */
+  skipIfPending?: boolean;
+  /**
+   * Remote writes only: apply only while the id's outbox entry is the local write numbered `seq`
+   * (the one the engine merged); a newer local write makes it a no-op.
+   */
+  ifSeq?: number;
 }
 
 /** Reads and writes, shared by the store and by the transaction handed to `transaction(fn)`. */
