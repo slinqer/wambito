@@ -37,6 +37,15 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   the add sheet's edit flow, whose save adds `needsReview: false` (`TransactionPatch.confirming`) so it
   confirms and teaches in one PATCH. Rows carry the mark "por revisar · de Revolut" (`reviewMarkOf`).
   Tests fake the server with `test/review/fakes.dart` (`pumpHome`/`pumpSettingsApp` override it).
+- `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
+  magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
+  holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,
+  only the latest request lands, `loadMore` waits for a pending debounce, `retry` repeats what failed
+  (a page or the first page/refresh); text capped at 100 characters, categories at 20.
+  `SearchRepository` (`search_repository.dart`) is `GET /v1/transactions` with `totals=true`; the
+  totals line hides when the server sends none. The screen uses home's categories (archived too),
+  loads the next page when the end is near, and after `openEditSheet` (replaceable in tests with
+  `searchOpenEditProvider`) calls `refresh()`. Tests: `test/search/` (fake repository through the provider).
 - Deep links `wambito://{add,capture,due,progress,home,review}` (`lib/launch/launch_links.dart`);
   `wambito://review` and `wambito://review/<id>` (one segment, `launchReviewIdOf`) push `/review` or
   `/review/<id>` over home, which opens that transaction in the editor.

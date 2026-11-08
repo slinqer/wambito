@@ -99,9 +99,8 @@ class SearchController extends Notifier<SearchState> {
 
   void setKind(SearchKind kind) => _changed(_filters(kind: kind));
 
-  void setCategories(Set<String> categoryIds) => _changed(
-    _filters(categoryIds: categoryIds.take(searchMaxCategories).toSet()),
-  );
+  void setCategories(Set<String> categoryIds) =>
+      _changed(_filters(categoryIds: categoryIds.take(searchMaxCategories).toSet()));
 
   void setStatus(SearchStatus status) => _changed(_filters(status: status));
 

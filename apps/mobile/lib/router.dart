@@ -14,6 +14,7 @@ import 'insights/insights_screen.dart';
 import 'progress/progress_screen.dart';
 import 'recurring/recurring_screen.dart';
 import 'review/review_screen.dart';
+import 'search/search_screen.dart';
 import 'settings/about_screen.dart';
 import 'settings/home_actions.dart';
 import 'settings/settings_screen.dart';
@@ -136,6 +137,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
       GoRoute(path: '/progress', builder: (context, state) => const ProgressScreen()),
       GoRoute(
         path: '/settings',

@@ -30,6 +30,7 @@ class WebTextField extends StatefulWidget {
     this.maxLines = 1,
     this.inputMinHeight = 36,
     this.enableSuggestions = false,
+    this.leading,
     this.onSubmitted,
     this.onChanged,
   });
@@ -59,6 +60,9 @@ class WebTextField extends StatefulWidget {
   /// Whether the keyboard's suggestion strip shows. Off for a code or an address; on for a sentence
   /// the person types. Autocorrect stays off either way: it must never rewrite an amount.
   final bool enableSuggestions;
+
+  /// Something before the text inside the box (the search field's 🔍), 8px from it.
+  final Widget? leading;
   final ValueChanged<String>? onSubmitted;
   final ValueChanged<String>? onChanged;
 
@@ -122,51 +126,65 @@ class _WebTextFieldState extends State<WebTextField> {
           child: Semantics(
             label: widget.label,
             textField: true,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                if (widget.controller.text.isEmpty)
-                  IgnorePointer(
-                    child: ExcludeSemantics(
-                      child: Text(
-                        widget.placeholder,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: text.copyWith(color: colors.inkMuted, fontWeight: FontWeight.w400),
+            child: _withLeading(
+              Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  if (widget.controller.text.isEmpty)
+                    IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: Text(
+                          widget.placeholder,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.copyWith(color: colors.inkMuted, fontWeight: FontWeight.w400),
+                        ),
                       ),
                     ),
+                  EditableText(
+                    key: widget.fieldKey,
+                    controller: widget.controller,
+                    focusNode: widget.focusNode,
+                    style: text.copyWith(color: colors.ink),
+                    cursorColor: colors.ink,
+                    backgroundCursorColor: colors.inkMuted,
+                    selectionColor: colors.brand.withValues(alpha: 0.4),
+                    // The phone's own selection: a long press shows its menu, with "Pegar".
+                    selectionControls: materialTextSelectionHandleControls,
+                    contextMenuBuilder: (context, state) =>
+                        AdaptiveTextSelectionToolbar.editableText(editableTextState: state),
+                    maxLines: widget.maxLines,
+                    inputFormatters: widget.inputFormatters,
+                    // The box around it takes the taps and the long press (the field's own are rudimentary).
+                    rendererIgnoresPointer: true,
+                    readOnly: widget.readOnly,
+                    autofocus: widget.autofocus,
+                    keyboardType: widget.keyboardType,
+                    textInputAction: widget.textInputAction,
+                    autofillHints: widget.autofillHints,
+                    autocorrect: false,
+                    enableSuggestions: widget.enableSuggestions,
+                    onSubmitted: widget.onSubmitted,
+                    onChanged: widget.onChanged,
                   ),
-                EditableText(
-                  key: widget.fieldKey,
-                  controller: widget.controller,
-                  focusNode: widget.focusNode,
-                  style: text.copyWith(color: colors.ink),
-                  cursorColor: colors.ink,
-                  backgroundCursorColor: colors.inkMuted,
-                  selectionColor: colors.brand.withValues(alpha: 0.4),
-                  // The phone's own selection: a long press shows its menu, with "Pegar".
-                  selectionControls: materialTextSelectionHandleControls,
-                  contextMenuBuilder: (context, state) =>
-                      AdaptiveTextSelectionToolbar.editableText(editableTextState: state),
-                  maxLines: widget.maxLines,
-                  inputFormatters: widget.inputFormatters,
-                  // The box around it takes the taps and the long press (the field's own are rudimentary).
-                  rendererIgnoresPointer: true,
-                  readOnly: widget.readOnly,
-                  autofocus: widget.autofocus,
-                  keyboardType: widget.keyboardType,
-                  textInputAction: widget.textInputAction,
-                  autofillHints: widget.autofillHints,
-                  autocorrect: false,
-                  enableSuggestions: widget.enableSuggestions,
-                  onSubmitted: widget.onSubmitted,
-                  onChanged: widget.onChanged,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _withLeading(Widget field) {
+    final leading = widget.leading;
+    if (leading == null) return field;
+    return Row(
+      spacing: 8,
+      children: [
+        leading,
+        Expanded(child: field),
+      ],
     );
   }
 }

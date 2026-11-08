@@ -23,6 +23,7 @@ class HomeHeader extends StatefulWidget {
     required this.month,
     required this.onMonth,
     required this.max,
+    required this.onSearch,
     this.menu,
   });
 
@@ -32,6 +33,9 @@ class HomeHeader extends StatefulWidget {
 
   /// The latest month to show: the current one in the person's time zone.
   final String max;
+
+  /// The magnifier beside the face button: opens the search.
+  final VoidCallback onSearch;
 
   /// What the menu holds, called with a function that closes it. Null: no menu.
   final Widget Function(BuildContext context, VoidCallback close)? menu;
@@ -75,11 +79,26 @@ class _HomeHeaderState extends State<HomeHeader> {
     final l10n = AppLocalizations.of(context);
     final wide = MediaQuery.sizeOf(context).width >= _wide;
     final picker = MonthPicker(month: widget.month, onChange: widget.onMonth, max: widget.max);
-    final avatar = _Avatar(
-      key: _avatarKey,
-      label: l10n.homeAccount,
-      open: _open,
-      onPressed: widget.menu == null ? null : () => _setOpen(!_open),
+    // `<div className="flex items-center gap-(--space-2)">` with the search link and the face button.
+    final avatar = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: WambitoTokens.space2,
+      children: [
+        _Avatar(
+          buttonKey: const Key('home.search'),
+          glyph: '🔍',
+          label: l10n.searchTitle,
+          onPressed: widget.onSearch,
+        ),
+        _Avatar(
+          key: _avatarKey,
+          buttonKey: const Key('home.account'),
+          glyph: '🙂',
+          label: l10n.homeAccount,
+          open: _open,
+          onPressed: widget.menu == null ? null : () => _setOpen(!_open),
+        ),
+      ],
     );
     return OverlayPortal(
       controller: _portal,
@@ -142,13 +161,25 @@ class LkWordmark extends StatelessWidget {
   }
 }
 
-/// The face button (`.lk-avatar`): a 44px round button that sinks 3px into a 1px edge, like the
+/// A round button of the header (`.lk-avatar`): the face button and the magnifier. A 44px round button that sinks 3px into a 1px edge, like the
 /// month picker's arrows.
 class _Avatar extends StatelessWidget {
-  const _Avatar({super.key, required this.label, required this.open, required this.onPressed});
+  const _Avatar({
+    super.key,
+    required this.buttonKey,
+    required this.glyph,
+    required this.label,
+    this.open,
+    required this.onPressed,
+  });
 
+  /// Finds the button (tests).
+  final Key buttonKey;
+  final String glyph;
   final String label;
-  final bool open;
+
+  /// Whether the menu it opens is open; null for a button that opens none.
+  final bool? open;
   final VoidCallback? onPressed;
 
   @override
@@ -160,7 +191,7 @@ class _Avatar extends StatelessWidget {
       container: true,
       expanded: open,
       child: Pressable(
-        key: const Key('home.account'),
+        key: buttonKey,
         onPressed: onPressed,
         label: label,
         builder: (context, state) {
@@ -175,7 +206,7 @@ class _Avatar extends StatelessWidget {
             ),
             ringRadius: state.focusVisible ? radius : null,
             ringColor: colors.focus,
-            child: const ExcludeSemantics(child: Text('🙂', style: LkText.avatarGlyph)),
+            child: ExcludeSemantics(child: Text(glyph, style: LkText.avatarGlyph)),
           );
         },
       ),

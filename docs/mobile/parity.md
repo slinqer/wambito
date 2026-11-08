@@ -288,6 +288,12 @@ when the app's picture changes. The web shots are regenerated only when the web 
   - **Text height.** A paragraph whose line is 22.5px (15px at 1.5: the confirm sheet's words, the budget card's "Sin
     presupuesto en…") is `CssLines`, as the other fractional lines are: without it every line is a half pixel taller
     than the web's and the sheet is 3px short at the top.
+- **Search (`/search`, the web's `search-search--*`).** The app has the screen and tests it as widgets
+  (`apps/mobile/test/search/search_screen_test.dart`, copy from the web's `search.*` messages, camelCase `search*` keys in the
+  ARBs); there is no parity pair yet. Known differences: the magnifier in home's header is the web's second `.lk-avatar`
+  (`home.search`, named "Buscar"); the field's 🔍 is inside the box (`WebTextField.leading`); the next page loads when
+  the end of the page is near, where the web shows a "Ver más movimientos" button; a failure of the first search or of a
+  page is a failure row with Reintentar (the web's alert), and the filters are not kept in the address.
 - **Recurring payments (`manage-recurring--*`).** The page at `/recurring` and its sheets (new, edit, the delete question).
   The pairs are `recurring-list`, `recurring-empty`, `recurring-pesos`, `recurring-new-sheet`, `recurring-edit-sheet`,
   `recurring-delete-sheet`, `recurring-new-sheet-yearly` (day only) and the three "after a save" pictures
