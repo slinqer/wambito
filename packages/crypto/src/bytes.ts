@@ -14,3 +14,11 @@ export function fromBase64Url(text: string): Uint8Array {
   const bin = atob(std + "=".repeat((4 - (std.length % 4)) % 4));
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
+
+/** Constant-time equality for byte strings (false at once only when the lengths differ). */
+export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return diff === 0;
+}

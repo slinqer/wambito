@@ -16,15 +16,19 @@ API tests.
   `wambito/v1/wrap/<kind>`, AAD `wambito/v1/wrap/<kind>/<user id>/<key_v>`), `PRF_SALT`.
 - `src/recovery.ts`: recovery secret, 26 Crockford chars + a Luhn mod 32 check character over the
   Crockford alphabet, groups of four.
-- `src/devices.ts`: X25519 device keys, `sealToDevice` / `openFromDevice`; WebCrypto X25519 when
+- `src/devices.ts`: X25519 device keys, `sealToDevice` (optional fixed ephemeral pair) / `openFromDevice` / `openFromPairing` (also checks the
+  blob starts with the approver key); WebCrypto X25519 when
   present, `@noble/curves` otherwise (feature-detected at first use).
 - Device private keys have two forms (`DevicePrivateKey`): a non-extractable WebCrypto `CryptoKey`,
   or, only where WebCrypto lacks X25519, `{ kind: "noble-x25519", raw }`, clone-safe but a raw
   secret the web must protect. `userId` is the account's exact id (Better Auth: `/^[A-Za-z0-9_-]{1,128}$/`, case kept, no `/`); record `id`s are lower-case UUIDs. Both enter the AAD verbatim.
-- `src/pairing.ts`: pairing code and the 6-digit number (async: WebCrypto SHA-256). The API uses
+- `src/pairing.ts`: pairing code, the 6-digit number and `pairingCommitment`
+  (SHA-256(`wambito/v1/pairing-commit` || key); async: WebCrypto SHA-256). The API uses
   `pairingCode` in production (`apps/api/src/services/pairing.ts`), not only in tests.
+- `src/attest.ts`: `deviceAttestation` / `verifyDeviceAttestation` (HMAC under HKDF info
+  `wambito/v1/device-attest`; design: stage 1b spec section 2).
 - `src/validate.ts`: user id, UUID, key version, nonce checks (`bad_input`).
-- `src/bytes.ts`: base64url. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
+- `src/bytes.ts`: base64url, `timingSafeEqual`. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
   `bad_input`).
 
 ## Test

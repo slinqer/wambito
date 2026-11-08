@@ -1,14 +1,20 @@
+export {
+  type DeviceAttestationInput,
+  deviceAttestation,
+  verifyDeviceAttestation,
+} from "./attest.ts";
 export { fromBase64Url, toBase64Url } from "./bytes.ts";
 export {
   type DevicePrivateKey,
   generateDeviceKeyPair,
   importDevicePrivateKey,
   openFromDevice,
+  openFromPairing,
   sealToDevice,
 } from "./devices.ts";
 export { CryptoError, type CryptoErrorCode } from "./errors.ts";
 export { deriveRecordKeys, generateDataKey, type RecordKeys } from "./keys.ts";
-export { pairingCode, pairingNumber } from "./pairing.ts";
+export { pairingCode, pairingCommitment, pairingNumber } from "./pairing.ts";
 export {
   dedupeTag,
   openRecord,
