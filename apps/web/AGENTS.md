@@ -21,7 +21,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
   also the sync helpers `readOutbox`, `ackOutbox`, `getMeta/setMeta`, `quarantine`, `wipeRecords`,
-  `getKey/putKey`). Subscribers fire after every commit that wrote, whatever its origin. A
+  `getKey/putKey`). Subscribers fire after every commit that wrote, whatever its origin.
+  `sync.ts` (`createSyncEngine({ store, fetch, userId, keys, keyV, onError })` → `run()` /
+  `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
+  `410` resync that re-applies pending edits; the design notes are at the top of the file;
+  tests run against a fake `/v2` in `sync.test.ts`). A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
