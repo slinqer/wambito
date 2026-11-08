@@ -11,7 +11,7 @@ interface BankParser {
 }
 
 /**
- * The parsers by source: Revolut and Google Wallet, European Portuguese expenses for now. A parser
+ * The parsers by source: Revolut and Google Wallet, expenses in pt, it, en and es for now. A parser
  * that throws drops the notification instead of crashing the listener. Nothing here logs: the
  * notification is never logged.
  */
