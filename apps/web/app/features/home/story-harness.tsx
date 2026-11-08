@@ -27,6 +27,7 @@ import { CategoriesRedirect } from "../categories/CategoriesRedirect.tsx";
 import { CategoryDetail } from "../categories/CategoryDetail.tsx";
 import { Insights } from "../insights/Insights.tsx";
 import { RecurringPage } from "../recurring/RecurringPage.tsx";
+import { Search } from "../search/Search.tsx";
 import type { PasskeyItem, PasskeysApi } from "../settings/passkeys.ts";
 import { Settings } from "../settings/Settings.tsx";
 import { AppShell } from "./AppShell.tsx";
@@ -288,6 +289,8 @@ export interface HomeApiOptions {
   data?: "sample" | "empty" | "no-categories" | "october";
   /** Creating a transaction answers 503 (after `createDelayMs`). */
   failCreate?: boolean;
+  /** A search (any filter on the transactions list) answers 503. */
+  failSearch?: boolean;
   /** How long a create takes, in ms. */
   createDelayMs?: number;
   /** Transporte is archived, with a taxi ride in it today (sample data only). */
@@ -369,6 +372,7 @@ function homeFetch({
   currency = "EUR",
   data = "sample",
   failCreate = false,
+  failSearch = false,
   createDelayMs = 0,
   archivedCategory = false,
   archivedUnused = false,
@@ -708,6 +712,9 @@ function homeFetch({
     if (path === "/api/v1/transactions" && request.method === "GET") {
       const month = url.searchParams.get("month");
       const sp = url.searchParams;
+      if (failSearch && sp.get("totals") === "true") {
+        return Response.json({ code: "internal_error" }, { status: 503 });
+      }
       const terms = sp.getAll("q");
       const categoryIds = sp.getAll("category");
       const kind = sp.get("kind");
@@ -890,6 +897,7 @@ export function HomeStage({
                 <Route path="/app/categories/:id" element={shell(<CategoryDetail />)} />
                 <Route path="/app/recurring" element={shell(<RecurringPage />)} />
                 <Route path="/app/insights" element={shell(<Insights />)} />
+                <Route path="/app/search" element={shell(<Search />)} />
                 <Route
                   path="/app/settings"
                   element={shell(

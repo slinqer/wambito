@@ -23,7 +23,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Desktop navigation: the five sections as links and a primary "Agregar". */
+/** Desktop navigation: the six sections as links and a primary "Agregar". */
 export const Home: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
@@ -31,6 +31,7 @@ export const Home: Story = {
     const links = within(nav).getAllByRole("link");
     await expect(links.map((l) => [l.textContent, l.getAttribute("href")])).toEqual([
       ["Inicio", "/app"],
+      ["Buscar", "/app/search"],
       ["Análisis", "/app/insights"],
       ["Recurrentes", "/app/recurring"],
       ["Categorías", "/app"],

@@ -164,7 +164,8 @@
     "categories": "Categorias",
     "settings": "Definições",
     "add": "Adicionar",
-    "soon": "Em breve"
+    "soon": "Em breve",
+    "search": "Pesquisar"
   },
   "errors": {
     "generic": "Algo correu mal. Tenta de novo daqui a um momento.",
@@ -495,6 +496,27 @@
       "body": "Deixa de ser registado sozinho, e os pendentes deste mês em diante são apagados. O que já pagaste fica.",
       "confirm": "Sim, eliminar"
     }
+  },
+  "search": {
+    "meta_title": "Pesquisar · Wambito",
+    "title": "Pesquisar",
+    "placeholder": "Pesquise por nome ou nota",
+    "kind": "Tipo",
+    "kind_all": "Todos",
+    "kind_expense": "Despesas",
+    "kind_income": "Receitas",
+    "category": "Categoria",
+    "category_count": "Categoria · {count}",
+    "done": "Concluído",
+    "results": "Resultados",
+    "status": "Estado",
+    "status_all": "Todos",
+    "status_paid": "Pagos",
+    "status_pending": "Pendentes",
+    "hint": "Pesquise por nome, nota, categoria…",
+    "none": "Não encontrei nada com «{text}»",
+    "none_filters": "Não encontrei nada com esses filtros",
+    "totals": "{count, plural, one {# movimento} other {# movimentos}} · despesas {expense} · receitas {income}"
   },
   "insights": {
     "meta_title": "Análise · Wambito",

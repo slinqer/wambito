@@ -3,7 +3,7 @@ import { useTranslations } from "use-intl";
 import { PressButton } from "./PressButton.tsx";
 
 export interface SidebarProps {
-  /** The current section: `home`, `insights`, `recurring`, `categories` or `settings`. */
+  /** The current section: `home`, `search`, `insights`, `recurring`, `categories` or `settings`. */
   current: string;
   /** Opens the add sheet. */
   onAdd(): void;
@@ -15,6 +15,7 @@ export interface SidebarProps {
 
 const LINKS = [
   { key: "home", to: "" },
+  { key: "search", to: "/search" },
   { key: "insights", to: "/insights" },
   { key: "recurring", to: "/recurring" },
   // Categories are managed in home's Categorías tab: the link opens home on it.
@@ -23,7 +24,7 @@ const LINKS = [
 ] as const;
 
 /**
- * Desktop navigation, in place of the bottom bar: the wordmark, the five sections (the current
+ * Desktop navigation, in place of the bottom bar: the wordmark, the six sections (the current
  * one raised) and a primary "Agregar" that opens the add sheet.
  */
 export function Sidebar({ current, onAdd, soon = [], base = "/app" }: SidebarProps) {

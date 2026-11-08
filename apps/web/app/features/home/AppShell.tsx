@@ -11,7 +11,7 @@ import {
 } from "../add-transaction/TransactionSheetProvider.tsx";
 import { useAppPath } from "./app-path.ts";
 
-const SECTIONS = new Set(["insights", "recurring", "categories", "settings"]);
+const SECTIONS = new Set(["search", "insights", "recurring", "categories", "settings"]);
 
 /**
  * The navigation's section for a path: `/app/categories/…` is Categorías, and so on. The demo's

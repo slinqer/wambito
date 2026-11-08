@@ -164,7 +164,8 @@
     "categories": "Categories",
     "settings": "Settings",
     "add": "Add",
-    "soon": "Soon"
+    "soon": "Soon",
+    "search": "Search"
   },
   "errors": {
     "generic": "Something went wrong. Please try again in a moment.",
@@ -495,6 +496,27 @@
       "body": "It won't be added by itself anymore, and its pending ones from this month on are removed. What you already paid stays.",
       "confirm": "Yes, delete"
     }
+  },
+  "search": {
+    "meta_title": "Search · Wambito",
+    "title": "Search",
+    "placeholder": "Search by name or note",
+    "kind": "Type",
+    "kind_all": "All",
+    "kind_expense": "Expenses",
+    "kind_income": "Income",
+    "category": "Category",
+    "category_count": "Category · {count}",
+    "done": "Done",
+    "results": "Results",
+    "status": "Status",
+    "status_all": "All",
+    "status_paid": "Paid",
+    "status_pending": "Pending",
+    "hint": "Search by name, note, category…",
+    "none": "I found nothing for «{text}»",
+    "none_filters": "I found nothing with those filters",
+    "totals": "{count, plural, one {# movement} other {# movements}} · expenses {expense} · income {income}"
   },
   "insights": {
     "meta_title": "Insights · Wambito",
