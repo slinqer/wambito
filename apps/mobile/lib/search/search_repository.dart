@@ -83,7 +83,7 @@ class ApiSearchRepository implements SearchRepository {
         category: f.categoryIds.isEmpty ? null : BuiltList<String>(f.categoryIds),
         kind: f.kind == SearchKind.all ? null : f.kind.name,
         status: f.status == SearchStatus.all ? null : f.status.name,
-        totals: 'true',
+        totals: cursor == null ? 'true' : null,
         cursor: cursor,
         limit: transactionsPageSize,
       )).data;

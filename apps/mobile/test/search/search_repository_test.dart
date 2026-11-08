@@ -92,6 +92,7 @@ void main() {
     final q = adapter.requests.single.uri.queryParametersAll;
     expect(q['q'], ['cafe']);
     expect(q['cursor'], ['abc']);
+    expect(q.containsKey('totals'), isFalse);
     expect(q.containsKey('category'), isFalse);
     expect(q.containsKey('kind'), isFalse);
     expect(q.containsKey('status'), isFalse);
