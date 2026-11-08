@@ -6,10 +6,15 @@ import {
   generateDataKey,
   openRecord,
   type RecordContext,
+  type RecordType,
   sealRecord,
 } from "../src/index.ts";
 
-const ctx: RecordContext = { userId: "u1", type: "transaction", id: "r1", keyV: 1 };
+const U1 = "0194f3a2-7b1c-7d2e-9a4f-3c5b6d7e8f90";
+const U2 = "0194f3a2-7b1c-7d2e-9a4f-3c5b6d7e8f91";
+const R1 = "11111111-2222-4333-8444-555555555555";
+const R2 = "11111111-2222-4333-8444-555555555556";
+const ctx: RecordContext = { userId: U1, type: "transaction", id: R1, keyV: 1 };
 const value = { s: 1, name: "Almuerzo", amount: 1800000, note: "piña colada ñandú" };
 
 async function keys(fill = 7, extractable = false) {
@@ -62,9 +67,9 @@ describe("records", () => {
     const k = await keys();
     const body = await sealRecord(k, ctx, value);
     const others: RecordContext[] = [
-      { ...ctx, userId: "u2" },
+      { ...ctx, userId: U2 },
       { ...ctx, type: "budget" },
-      { ...ctx, id: "r2" },
+      { ...ctx, id: R2 },
       { ...ctx, keyV: 2 },
     ];
     for (const other of others) {
@@ -103,5 +108,49 @@ describe("records", () => {
     expect(t).not.toBe(await dedupeTag(b, "revolut|1800|2026-11-08"));
     expect(t).not.toBe(await dedupeTag(a, "other"));
     expect(t).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("round-trips trailing spaces and multibyte text", async () => {
+    const k = await keys();
+    const v = { note: "ñ   " };
+    expect(await openRecord(k, ctx, await sealRecord(k, ctx, v))).toEqual(v);
+  });
+
+  it("accepts upper-case UUIDs of any version", async () => {
+    const k = await keys();
+    const c: RecordContext = {
+      ...ctx,
+      userId: U1.toUpperCase(),
+      id: "AAAAAAAA-BBBB-1CCC-8DDD-EEEEEEEEEEEE",
+    };
+    expect(await openRecord(k, c, await sealRecord(k, c, value))).toEqual(value);
+  });
+
+  it("rejects bad input with bad_input", async () => {
+    const k = await keys();
+    const body = await sealRecord(k, ctx, value);
+    const badCtx: RecordContext[] = [
+      { ...ctx, userId: "u1" },
+      { ...ctx, id: "r1" },
+      { ...ctx, id: `${R1}/x` },
+      { ...ctx, keyV: -1 },
+      { ...ctx, keyV: 32768 },
+      { ...ctx, keyV: 1.5 },
+      { ...ctx, keyV: Number.NaN },
+      { ...ctx, type: "other" as RecordType },
+    ];
+    for (const c of badCtx) {
+      expect(((await failure(sealRecord(k, c, value))) as CryptoError).code).toBe("bad_input");
+      expect(((await failure(openRecord(k, c, body))) as CryptoError).code).toBe("bad_input");
+    }
+    for (const keyV of [0, 32767]) {
+      const c = { ...ctx, keyV };
+      expect(await openRecord(k, c, await sealRecord(k, c, value))).toEqual(value);
+    }
+    const nonce = (n: number) => sealRecord(k, ctx, value, new Uint8Array(n));
+    expect(((await failure(nonce(11))) as CryptoError).code).toBe("bad_input");
+    expect(((await failure(nonce(13))) as CryptoError).code).toBe("bad_input");
+    expect(((await failure(sealRecord(k, ctx, undefined))) as CryptoError).code).toBe("bad_input");
+    expect(((await failure(sealRecord(k, ctx, () => 1))) as CryptoError).code).toBe("bad_input");
   });
 });

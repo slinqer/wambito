@@ -12,6 +12,13 @@ API tests.
   `wambito/v1/record` and `wambito/v1/dedupe`; non-extractable by default).
 - `src/records.ts`: `sealRecord` / `openRecord` (AES-256-GCM, associated data
   `wambito/v1/record/<user id>/<type>/<id>/<key_v>`, JSON padded to 64 bytes), `dedupeTag`.
+- `src/wraps.ts`: `wrapDataKey` / `unwrapDataKey` (kinds passkey, recovery, assistant; HKDF info
+  `wambito/v1/wrap/<kind>`, AAD `wambito/v1/wrap/<kind>/<user id>/<key_v>`), `PRF_SALT`.
+- `src/recovery.ts`: recovery secret, 26 Crockford chars + mod-37 check, groups of four.
+- `src/devices.ts`: X25519 device keys, `sealToDevice` / `openFromDevice`; WebCrypto X25519 when
+  present, `@noble/curves` otherwise (feature-detected at first use).
+- `src/pairing.ts`: pairing code and the 6-digit number (async: WebCrypto SHA-256).
+- `src/validate.ts`: UUID, key version, nonce checks (`bad_input`).
 - `src/bytes.ts`: base64url. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
   `bad_input`).
 
@@ -23,4 +30,4 @@ API tests.
 
 - Any change to a format (infos, associated data, padding, body layout) needs a new `enc_v` and
   updated test vectors; the Dart implementation must pass the same vectors.
-- No other crypto dependency without a design change.
+- No other crypto dependency without a design change (`@noble/curves` is the X25519 fallback).
