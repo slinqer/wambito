@@ -97,6 +97,7 @@ async function seedStore(
         monthOfYear: null,
         startDate: `${first}-${pad(r.dayOfMonth)}`,
         endDate: null,
+        rev: 0,
         createdAt: since,
       };
       rules.push(rule);

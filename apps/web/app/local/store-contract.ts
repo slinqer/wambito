@@ -142,12 +142,5 @@ export function storeContract(name: string, make: () => FinanceStore | Promise<F
       await store.transaction(async (tx) => tx.list("category"));
       expect(listener).not.toHaveBeenCalled();
     });
-
-    it("purges: the record is gone, tombstone included", async () => {
-      const store = await make();
-      await store.put("category", "a", category("A"));
-      await store.delete("category", "a", { purge: true });
-      expect(await store.get("category", "a", { includeDeleted: true })).toBeUndefined();
-    });
   });
 }

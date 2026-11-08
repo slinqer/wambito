@@ -1,5 +1,4 @@
 import type {
-  DeleteOptions,
   FinanceStore,
   ReadOptions,
   RecordBodies,
@@ -11,8 +10,8 @@ import type {
 
 type Entry = { body: unknown; deleted: boolean };
 type Table = Map<string, Entry>;
-/** A transaction's pending changes: an entry, or `null` for a purged id. */
-type Overlay = Map<RecordType, Map<string, Entry | null>>;
+/** A transaction's pending changes. */
+type Overlay = Map<RecordType, Map<string, Entry>>;
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -39,7 +38,7 @@ export function createMemoryStore(): FinanceStore {
     };
     const lookup = (type: RecordType, id: string): Entry | undefined => {
       const o = overlay.get(type);
-      if (o?.has(id)) return o.get(id) ?? undefined;
+      if (o?.has(id)) return o.get(id);
       return table(type).get(id);
     };
     return {
@@ -51,7 +50,7 @@ export function createMemoryStore(): FinanceStore {
       async list<T extends RecordType>(type: T, opts?: ReadOptions) {
         const o = overlay.get(type);
         const out: StoredRecord<T>[] = [];
-        const add = (id: string, entry: Entry | null | undefined) => {
+        const add = (id: string, entry: Entry | undefined) => {
           if (!entry || (entry.deleted && !opts?.includeDeleted)) return;
           out.push({ id, body: clone(entry.body), deleted: entry.deleted } as StoredRecord<T>);
         };
@@ -67,10 +66,10 @@ export function createMemoryStore(): FinanceStore {
       ) {
         staged(type).set(id, { body: clone(body), deleted: false });
       },
-      async delete(type: RecordType, id: string, opts?: DeleteOptions) {
+      async delete(type: RecordType, id: string, _opts?: WriteOptions) {
         const entry = lookup(type, id);
         if (!entry) return;
-        staged(type).set(id, opts?.purge ? null : { body: entry.body, deleted: true });
+        staged(type).set(id, { body: entry.body, deleted: true });
       },
     };
   }
@@ -81,8 +80,7 @@ export function createMemoryStore(): FinanceStore {
       const t = table(type);
       for (const [id, entry] of changes) {
         changed = true;
-        if (entry === null) t.delete(id);
-        else t.set(id, entry);
+        t.set(id, entry);
       }
     }
     return changed;

@@ -64,7 +64,7 @@ describe("createLocalBackend over the memory store", () => {
     expect((await store.get("transaction", id))?.deleted).toBe(false);
   });
 
-  it("names a recurrence's occurrences by UUID v5 of the rule and the month", async () => {
+  it("names a recurrence's occurrences by UUID v5 of the rule, the month and the revision", async () => {
     const { api, store } = setup();
     const { food } = await onboard(api);
     const rule = (
@@ -82,7 +82,7 @@ describe("createLocalBackend over the memory store", () => {
     const { data } = await api.GET("/v1/transactions", { params: { query: { month: "2026-10" } } });
     const occurrence = data?.items.find((t) => t.recurrenceId === rule?.id);
     expect(occurrence?.status).toBe("pending");
-    expect(occurrence?.id).toBe(await uuidv5(rule?.id as string, "2026-10"));
+    expect(occurrence?.id).toBe(await uuidv5(rule?.id as string, "2026-10:0"));
     expect((await store.get("transaction", occurrence?.id as string))?.body).toMatchObject({
       occurrenceMonth: "2026-10",
       source: "recurrence",
@@ -90,6 +90,86 @@ describe("createLocalBackend over the memory store", () => {
     // Reading again makes no second one.
     const again = await api.GET("/v1/transactions", { params: { query: { month: "2026-10" } } });
     expect(again.data?.items.filter((t) => t.recurrenceId === rule?.id).length).toBe(1);
+  });
+
+  async function ruleWithOctober() {
+    const ctx = setup();
+    const { food } = await onboard(ctx.api);
+    const rule = (
+      await ctx.api.POST("/v1/recurrences", {
+        body: {
+          name: "Rent",
+          amount: -500_000_00,
+          categoryId: food,
+          frequency: "monthly",
+          dayOfMonth: 5,
+          startDate: "2026-09-05",
+        },
+      })
+    ).data;
+    const ruleId = rule?.id as string;
+    const month = async (m: string) =>
+      ((await ctx.api.GET("/v1/transactions", { params: { query: { month: m } } })).data?.items ?? [])
+        .filter((t) => t.recurrenceId === ruleId);
+    return { ...ctx, food, ruleId, month };
+  }
+
+  it("bumps the rule's rev on an edit: the pending occurrences are tombstoned and come back under new ids", async () => {
+    const { api, store, ruleId, month } = await ruleWithOctober();
+    const [before] = await month("2026-10");
+    expect((await store.get("recurrence", ruleId))?.body.rev).toBe(0);
+    await api.PATCH("/v1/recurrences/{id}", {
+      params: { path: { id: ruleId } },
+      body: { amount: -600_000_00 },
+    });
+    expect((await store.get("recurrence", ruleId))?.body.rev).toBe(1);
+    expect((await store.get("transaction", before?.id as string, { includeDeleted: true }))?.deleted).toBe(true);
+    const after = await month("2026-10");
+    expect(after.length).toBe(1);
+    expect(after[0]?.id).toBe(await uuidv5(ruleId, "2026-10:1"));
+    expect(after[0]?.amount).toBe(-600_000_00);
+  });
+
+  it("keeps a deleted occurrence deleted across an edit", async () => {
+    const { api, ruleId, month } = await ruleWithOctober();
+    const [occ] = await month("2026-10");
+    await api.DELETE("/v1/transactions/{id}", { params: { path: { id: occ?.id as string } } });
+    expect(await month("2026-10")).toEqual([]);
+    await api.PATCH("/v1/recurrences/{id}", {
+      params: { path: { id: ruleId } },
+      body: { amount: -600_000_00 },
+    });
+    expect(await month("2026-10")).toEqual([]);
+  });
+
+  it("keeps a paid occurrence and makes no second one after an edit", async () => {
+    const { api, ruleId, month } = await ruleWithOctober();
+    const [occ] = await month("2026-10");
+    await api.PATCH("/v1/transactions/{id}", {
+      params: { path: { id: occ?.id as string } },
+      body: { status: "paid" },
+    });
+    await api.PATCH("/v1/recurrences/{id}", {
+      params: { path: { id: ruleId } },
+      body: { amount: -600_000_00 },
+    });
+    const rows = await month("2026-10");
+    expect(rows.map((t) => t.id)).toEqual([occ?.id]);
+  });
+
+  it("stamps updatedAt on create and on PATCH", async () => {
+    const { api, store, food } = await ruleWithOctober();
+    const id = (
+      await api.POST("/v1/transactions", {
+        body: { name: "Lunch", amount: -1_000_00, categoryId: food, date: "2026-10-21" },
+      })
+    ).data?.id as string;
+    expect((await store.get("transaction", id))?.body.updatedAt).toBe(NOW.toISOString());
+    const patched = await api.PATCH("/v1/transactions/{id}", {
+      params: { path: { id } },
+      body: { name: "Dinner" },
+    });
+    expect(patched.data?.updatedAt).toBe(NOW.toISOString());
   });
 
   it("leaves the store untouched when a request is refused", async () => {

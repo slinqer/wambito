@@ -33,6 +33,8 @@ export const transactionRecord = z.object({
   capturedAt: timestamp.nullable().default(null),
   captureMerchantKey: text.nullable().default(null),
   createdAt: timestamp.optional(),
+  /** Set on create and on every edit; an older record has none (read `createdAt`). */
+  updatedAt: timestamp.optional(),
 });
 
 export const categoryRecord = z.object({
@@ -65,6 +67,11 @@ export const recurrenceRecord = z.object({
   monthOfYear: z.number().int().min(1).max(12).nullable().default(null),
   startDate: isoDateSchema,
   endDate: isoDateSchema.nullable().default(null),
+  /**
+   * The rule's revision. An occurrence's id is the UUID v5 of the rule id and `<month>:<rev>`;
+   * dropping the pending occurrences (an edit, an archive) bumps it so they come back under new ids.
+   */
+  rev: z.number().int().min(0).default(0),
   createdAt: timestamp.optional(),
 });
 

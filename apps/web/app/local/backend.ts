@@ -147,9 +147,10 @@ type TxBody = RecordBodies["transaction"];
 /** A transaction as the screens and the core reports read it. */
 interface TxRow extends TransactionDto {
   occurrenceMonth: Month | null;
+  deleted: boolean;
 }
 
-const toTxRow = (id: string, b: TxBody): TxRow => ({
+const toTxRow = (id: string, b: TxBody, deleted = false): TxRow => ({
   id,
   name: b.name,
   amount: b.amount,
@@ -163,13 +164,17 @@ const toTxRow = (id: string, b: TxBody): TxRow => ({
   source: b.source,
   needsReview: b.needsReview,
   captureSource: b.captureSource,
-  // The record has no update time: both stamps are its creation.
   createdAt: b.createdAt ?? "",
-  updatedAt: b.createdAt ?? "",
+  updatedAt: b.updatedAt ?? b.createdAt ?? "",
   occurrenceMonth: b.occurrenceMonth,
+  deleted,
 });
 
-const toTransactionDto = ({ occurrenceMonth: _o, ...dto }: TxRow): TransactionDto => dto;
+const toTransactionDto = ({
+  occurrenceMonth: _o,
+  deleted: _d,
+  ...dto
+}: TxRow): TransactionDto => dto;
 const toRecurrenceDto = (r: RecurrenceRow): RecurrenceDto => ({
   id: r.id,
   name: r.name,
@@ -190,7 +195,7 @@ const rows = async <T extends RecordType>(
   (await s.list(type, opts)).map((r) => ({ ...r.body, id: r.id }) as unknown as Row<T>);
 
 const txRows = async (s: StoreOps, opts?: ReadOptions): Promise<TxRow[]> =>
-  (await s.list("transaction", opts)).map((r) => toTxRow(r.id, r.body));
+  (await s.list("transaction", opts)).map((r) => toTxRow(r.id, r.body, r.deleted));
 
 /** A row back to its record body: the `id` is the envelope's. */
 function bodyOf<T extends RecordType>(row: Row<T>): RecordBodies[T] {
@@ -401,20 +406,31 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
     const rules = await rows(e.s, "recurrence");
     if (rules.length === 0) return;
     const categories = new Map((await rows(e.s, "category")).map((c) => [c.id, c]));
-    // Deleted occurrences count: one per rule and month, deleted or not.
-    const made = new Set(
-      (await txRows(e.s, { includeDeleted: true })).flatMap((t) =>
-        t.recurrenceId && t.occurrenceMonth ? [`${t.recurrenceId}|${t.occurrenceMonth}`] : [],
-      ),
-    );
+    const existing = await txRows(e.s, { includeDeleted: true });
+    const byKey = new Map<string, TxRow[]>();
+    for (const t of existing) {
+      if (!t.recurrenceId || !t.occurrenceMonth) continue;
+      const key = `${t.recurrenceId}|${t.occurrenceMonth}`;
+      byKey.set(key, [...(byKey.get(key) ?? []), t]);
+    }
     for (const month of wanted) {
       for (const rule of rules) {
         const category = categories.get(rule.categoryId);
         if (!category || category.archivedAt !== null) continue;
         for (const date of occurrences(rule, month)) {
-          if (made.has(`${rule.id}|${month}`)) continue;
-          made.add(`${rule.id}|${month}`);
-          await e.s.put("transaction", await uuidv5(rule.id, month), {
+          const id = await uuidv5(rule.id, `${month}:${rule.rev}`);
+          // One per rule and month, deleted or not. A pending occurrence of an older revision
+          // that was dropped (a tombstone under another id) does not count.
+          const blocked = (byKey.get(`${rule.id}|${month}`) ?? []).some(
+            (t) =>
+              !t.deleted ||
+              t.id === id ||
+              t.status !== "pending" ||
+              t.source !== "recurrence",
+          );
+          if (blocked) continue;
+          byKey.set(`${rule.id}|${month}`, [{ id } as TxRow]);
+          await e.s.put("transaction", id, {
             s: 1,
             name: rule.name,
             amount: rule.amount,
@@ -432,25 +448,54 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
             capturedAt: null,
             captureMerchantKey: null,
             createdAt: stamp(),
+            updatedAt: stamp(),
           });
         }
       }
     }
   }
 
-  /** Unpaid, not dismissed pending rows of these rules, from a month (by occurrence) or a date on. */
+  /**
+   * Unpaid, not dismissed pending rows of these rules, from a month (by occurrence) or a date on,
+   * go (a normal delete). The rules then move to the next revision, so the occurrences made again
+   * get new ids; the occurrences the person had deleted move with them and stay deleted.
+   * `bump: false` is for rules that are going away.
+   */
   async function dropPending(
     s: StoreOps,
     ids: string[],
     from: { fromMonth: Month } | { fromDate: string },
+    bump = true,
   ) {
-    for (const t of await txRows(s)) {
-      if (!t.recurrenceId || !ids.includes(t.recurrenceId) || t.status !== "pending") continue;
+    const all = await txRows(s, { includeDeleted: true });
+    const kept: TxRow[] = [];
+    for (const t of all) {
+      if (!t.recurrenceId || !ids.includes(t.recurrenceId)) continue;
+      if (t.deleted) {
+        if (t.status === "pending" && t.source === "recurrence" && t.occurrenceMonth) kept.push(t);
+        continue;
+      }
+      if (t.status !== "pending") continue;
       const later =
         "fromMonth" in from
           ? (t.occurrenceMonth ?? monthOf(t.date)) >= from.fromMonth
           : t.date >= from.fromDate;
-      if (later) await s.delete("transaction", t.id, { purge: true });
+      if (later) await s.delete("transaction", t.id);
+    }
+    if (!bump) return;
+    for (const id of ids) {
+      const rule = await s.get("recurrence", id);
+      if (!rule) continue;
+      const rev = rule.body.rev + 1;
+      await s.put("recurrence", id, { ...rule.body, rev });
+      for (const t of kept) {
+        if (t.recurrenceId !== id || !t.occurrenceMonth) continue;
+        const moved = await uuidv5(id, `${t.occurrenceMonth}:${rev}`);
+        const old = await s.get("transaction", t.id, { includeDeleted: true });
+        if (!old) continue;
+        await s.put("transaction", moved, old.body);
+        await s.delete("transaction", moved);
+      }
     }
   }
 
@@ -628,6 +673,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
         monthOfYear: input.repeat.frequency === "yearly" ? Number(input.date.slice(5, 7)) : null,
         startDate: input.date,
         endDate: input.repeat.endDate ?? null,
+        rev: 0,
         createdAt: at,
       });
     }
@@ -650,6 +696,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       capturedAt: null,
       captureMerchantKey: null,
       createdAt: at,
+      updatedAt: at,
     };
     await e.s.put("transaction", id, record);
     const payload = toTransactionDto(toTxRow(id, record));
@@ -661,7 +708,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
     const input = valid(updateTransactionSchema, body);
     const found = await findLive(e.s, id);
     if (input.categoryId) await requireActiveCategory(e.s, input.categoryId);
-    const next: TxBody = { ...found.body, ...input };
+    const next: TxBody = { ...found.body, ...input, updatedAt: stamp() };
     await e.s.put("transaction", id, next);
     return ok(toTransactionDto(toTxRow(id, next)));
   }
@@ -761,6 +808,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       monthOfYear: input.monthOfYear ?? null,
       startDate: input.startDate,
       endDate: input.endDate ?? null,
+      rev: 0,
       createdAt: stamp(),
     };
     await e.s.put("recurrence", id, record);
@@ -784,7 +832,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
 
   async function deleteRecurrence(e: Env, id: string): Promise<Answer> {
     await findRecurrence(e.s, id);
-    await dropPending(e.s, [id], { fromMonth: e.month });
+    await dropPending(e.s, [id], { fromMonth: e.month }, false);
     await e.s.delete("recurrence", id);
     // The rows it made stay, no longer tied to a rule (deleted ones too).
     for (const t of await e.s.list("transaction", { includeDeleted: true })) {

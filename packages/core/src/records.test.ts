@@ -78,4 +78,23 @@ describe("parseRecord", () => {
   test("an unknown type is an error, not a throw", () => {
     expect(parseRecord("nope" as "account", {}).ok).toBe(false);
   });
+
+  test("a recurrence's rev defaults to 0 and must be a non-negative integer", () => {
+    expect(parseRecord("recurrence", valid.recurrence)).toMatchObject({
+      ok: true,
+      value: { rev: 0 },
+    });
+    expect(parseRecord("recurrence", { ...(valid.recurrence as object), rev: 3 })).toMatchObject({
+      ok: true,
+      value: { rev: 3 },
+    });
+    expect(parseRecord("recurrence", { ...(valid.recurrence as object), rev: -1 }).ok).toBe(false);
+  });
+
+  test("a transaction's updatedAt is optional", () => {
+    expect(parseRecord("transaction", valid.transaction).ok).toBe(true);
+    expect(
+      parseRecord("transaction", { ...(valid.transaction as object), updatedAt: "2026-10-21T10:00:00Z" }),
+    ).toMatchObject({ ok: true, value: { updatedAt: "2026-10-21T10:00:00Z" } });
+  });
 });

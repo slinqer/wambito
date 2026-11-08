@@ -23,15 +23,6 @@ export interface WriteOptions {
   origin?: "local" | "remote";
 }
 
-export interface DeleteOptions extends WriteOptions {
-  /**
-   * Forget the record instead of leaving a tombstone. For derived rows that nobody asked to
-   * delete (the pending occurrences of an edited recurrence). A store that must sync the removal
-   * may keep a tombstone anyway.
-   */
-  purge?: boolean;
-}
-
 /** Reads and writes, shared by the store and by the transaction handed to `transaction(fn)`. */
 export interface StoreOps {
   get<T extends RecordType>(
@@ -49,7 +40,7 @@ export interface StoreOps {
     opts?: WriteOptions,
   ): Promise<void>;
   /** A no-op for an id the store does not know. */
-  delete(type: RecordType, id: string, opts?: DeleteOptions): Promise<void>;
+  delete(type: RecordType, id: string, opts?: WriteOptions): Promise<void>;
 }
 
 /**
