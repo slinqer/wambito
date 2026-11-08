@@ -500,7 +500,7 @@
   "search": {
     "meta_title": "Pesquisar · Wambito",
     "title": "Pesquisar",
-    "placeholder": "Pesquise por nome ou nota",
+    "placeholder": "Pesquisa por nome ou nota",
     "kind": "Tipo",
     "kind_all": "Todos",
     "kind_expense": "Despesas",
@@ -513,7 +513,7 @@
     "status_all": "Todos",
     "status_paid": "Pagos",
     "status_pending": "Pendentes",
-    "hint": "Pesquise por nome, nota, categoria…",
+    "hint": "Pesquisa por nome, nota, categoria…",
     "none": "Não encontrei nada com «{text}»",
     "none_filters": "Não encontrei nada com esses filtros",
     "totals": "{count, plural, one {# movimento} other {# movimentos}} · despesas {expense} · receitas {income}"
