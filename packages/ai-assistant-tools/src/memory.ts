@@ -7,9 +7,12 @@ import {
   effectiveBudget,
   firstDay,
   lastDay,
+  type MovementTotals,
+  matchesMovementSearch,
   monthOf,
   monthSummary,
   monthsBetween,
+  movementTotals,
   type RecurrenceDto,
   type SetBudget,
   type TransactionDto,
@@ -133,34 +136,39 @@ export class MemoryWambito implements Wambito {
 
   async listTransactions(
     q: TransactionQuery,
-  ): Promise<{ items: TransactionDto[]; nextCursor: string | null }> {
-    const needle = q.q ? normalizeName(q.q) : "";
+  ): Promise<{ items: TransactionDto[]; nextCursor: string | null; totals?: MovementTotals }> {
     const [afterDate, afterId] = q.cursor ? q.cursor.split("|") : [];
+    const search = {
+      terms: q.q,
+      categoryIds: q.categoryIds,
+      kind: q.kind,
+      status: q.status,
+      match: q.match,
+    };
     const matches = this.live()
       .filter(
         (t) =>
           (!q.month || monthOf(t.date) === q.month) &&
           (!q.from || t.date >= q.from) &&
           (!q.to || t.date <= q.to) &&
-          (!q.categoryId || t.categoryId === q.categoryId) &&
-          (!q.status || t.status === q.status) &&
           (q.needsReview === undefined || t.needsReview === q.needsReview) &&
-          (!needle ||
-            normalizeName(t.name).includes(needle) ||
-            normalizeName(t.note ?? "").includes(needle)),
+          matchesMovementSearch(t, search),
       )
-      .sort((a, b) => (a.date === b.date ? b.id.localeCompare(a.id) : b.date.localeCompare(a.date)))
-      .filter(
-        (t) =>
-          afterDate === undefined ||
-          t.date < afterDate ||
-          (t.date === afterDate && t.id < (afterId ?? "")),
+      .sort((a, b) =>
+        a.date === b.date ? b.id.localeCompare(a.id) : b.date.localeCompare(a.date),
       );
-    const items = matches.slice(0, q.limit);
+    const page = matches.filter(
+      (t) =>
+        afterDate === undefined ||
+        t.date < afterDate ||
+        (t.date === afterDate && t.id < (afterId ?? "")),
+    );
+    const items = page.slice(0, q.limit);
     const last = items.at(-1);
     return {
       items: items.map((t) => ({ ...t })),
-      nextCursor: matches.length > q.limit && last ? `${last.date}|${last.id}` : null,
+      nextCursor: page.length > q.limit && last ? `${last.date}|${last.id}` : null,
+      ...(q.totals ? { totals: movementTotals(matches) } : {}),
     };
   }
 

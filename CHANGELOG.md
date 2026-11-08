@@ -24,6 +24,7 @@ How to add to it:
 ### Added
 
 - `GET /v1/transactions`: `kind` (expense/income), `q` and `category` may repeat, `match=all|any`, `totals=true` adds the count and sums of every match.
+- MCP `list_transactions`: `text` and `category` take lists, plus `kind` and `match`; with text or a category and no dates it searches every month; it returns `totals` (count, expense, income). The category filter now works (it was never sent to the API).
 
 ## 1.0.0 - 2026-11-05
 

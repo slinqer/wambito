@@ -14,6 +14,7 @@ interface Phrases {
   }): string;
   budgetLine(p: { name: string; spent: string; budget: string; state: State }): string;
   transactions(count: number, more: boolean): string;
+  totals(p: { count: number; expense: string; income: string }): string;
   byCategory(p: { from: string; to: string; total: string; income: boolean }): string;
   trend(p: { month: string; income: string; expenses: string }): string;
   categories(count: number): string;
@@ -58,6 +59,8 @@ const PHRASES: Record<Locale, Phrases> = {
     budgetLine: (p) => `${p.name}: ${p.spent} de ${p.budget} (${STATES.es[p.state]})`,
     transactions: (n, more) =>
       `${plural(n, "movimiento", "movimientos")}${more ? " (hay más: pasa nextCursor)" : ""}.`,
+    totals: (p) =>
+      `${plural(p.count, "movimiento", "movimientos")} · gastos ${p.expense} · ingresos ${p.income}`,
     byCategory: (p) =>
       `${p.income ? "Ingresos" : "Gastos"} de ${p.from} a ${p.to}: ${p.total} en total.`,
     trend: (p) => `${p.month}: ingresos ${p.income}, gastos ${p.expenses}`,
@@ -93,6 +96,8 @@ const PHRASES: Record<Locale, Phrases> = {
     budgetLine: (p) => `${p.name}: ${p.spent} of ${p.budget} (${STATES.en[p.state]})`,
     transactions: (n, more) =>
       `${plural(n, "transaction", "transactions")}${more ? " (more: pass nextCursor)" : ""}.`,
+    totals: (p) =>
+      `${plural(p.count, "transaction", "transactions")} · spent ${p.expense} · income ${p.income}`,
     byCategory: (p) =>
       `${p.income ? "Income" : "Spending"} from ${p.from} to ${p.to}: ${p.total} in total.`,
     trend: (p) => `${p.month}: income ${p.income}, spent ${p.expenses}`,
@@ -128,6 +133,8 @@ const PHRASES: Record<Locale, Phrases> = {
     budgetLine: (p) => `${p.name}: ${p.spent} su ${p.budget} (${STATES.it[p.state]})`,
     transactions: (n, more) =>
       `${plural(n, "movimento", "movimenti")}${more ? " (ce ne sono altri: passa nextCursor)" : ""}.`,
+    totals: (p) =>
+      `${plural(p.count, "movimento", "movimenti")} · spese ${p.expense} · entrate ${p.income}`,
     byCategory: (p) =>
       `${p.income ? "Entrate" : "Spese"} da ${p.from} a ${p.to}: ${p.total} in totale.`,
     trend: (p) => `${p.month}: entrate ${p.income}, spese ${p.expenses}`,
@@ -163,6 +170,8 @@ const PHRASES: Record<Locale, Phrases> = {
     budgetLine: (p) => `${p.name}: ${p.spent} de ${p.budget} (${STATES.pt[p.state]})`,
     transactions: (n, more) =>
       `${plural(n, "movimento", "movimentos")}${more ? " (há mais: passa nextCursor)" : ""}.`,
+    totals: (p) =>
+      `${plural(p.count, "movimento", "movimentos")} · despesas ${p.expense} · receitas ${p.income}`,
     byCategory: (p) =>
       `${p.income ? "Receitas" : "Despesas"} de ${p.from} a ${p.to}: ${p.total} no total.`,
     trend: (p) => `${p.month}: receitas ${p.income}, despesas ${p.expenses}`,
