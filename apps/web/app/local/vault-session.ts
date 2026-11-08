@@ -2,6 +2,7 @@ import { SUGGESTED_CATEGORIES } from "@wambito/core";
 import { isLocale, type Locale } from "../i18n/format.ts";
 import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
+import { uuidv5 } from "./ids.ts";
 import { forgetDevice, type LocalKeys } from "./keys.ts";
 import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 
@@ -84,37 +85,50 @@ export function rememberPreviewAccount(userId: string): void {
 const isLive = (method: string, pathname: string) =>
   LIVE_ROUTES.some((r) => r.method === method && pathname.endsWith(`/api${r.path}`));
 
+/** The namespace of the seeded records' ids; the account's own namespace is made from it. */
+const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";
+
 /**
  * Creates the account's first records when it has none after the first sync: the settings (from
  * the server's profile, the web's default currency EUR) and the suggested categories in the
  * person's language, as sign-up does on the server for a plain account. The welcome then works as
  * for anyone.
+ *
+ * Two devices can seed at once (both see an empty account), so the ids are UUID v5 of the account
+ * and the record's name, and the content comes from the server's profile only (no clock, no
+ * browser zone): both devices write the same records, and the sync keeps one copy of each.
  */
-async function seedIfEmpty(
-  store: EncryptedStore,
-  local: typeof globalThis.fetch,
-  profile: VaultProfile,
-): Promise<void> {
+async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promise<void> {
   if ((await store.list("settings")).length > 0) return;
   const locale: Locale = isLocale(profile.locale) ? profile.locale : "es";
-  const send = async (method: string, path: string, body: unknown) => {
-    const response = await local(`http://vault/api${path}`, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+  const namespace = await uuidv5(SEED_NAMESPACE, profile.id);
+  const settingsId = await uuidv5(namespace, "settings");
+  const categories = await Promise.all(
+    SUGGESTED_CATEGORIES.map(async (suggestion, sortOrder) => ({
+      id: await uuidv5(namespace, `category:${suggestion.key}`),
+      body: {
+        s: 1 as const,
+        name: suggestion.names[locale],
+        kind: suggestion.kind,
+        icon: suggestion.glyph,
+        color: suggestion.tint,
+        sortOrder,
+        archivedAt: null,
+        systemKey: null,
+      },
+    })),
+  );
+  await store.transaction(async (tx) => {
+    await tx.put("settings", settingsId, {
+      s: 1,
+      name: null,
+      currency: "EUR",
+      locale,
+      timezone: profile.timezone,
+      onboardingCompletedAt: null,
     });
-    if (!response.ok) throw new VaultOpenError("server");
-  };
-  await send("PATCH", "/v1/me", { timezone: profile.timezone, locale, currency: "EUR" });
-  for (const [sortOrder, suggestion] of SUGGESTED_CATEGORIES.entries()) {
-    await send("POST", "/v1/categories", {
-      name: suggestion.names[locale],
-      kind: suggestion.kind,
-      icon: suggestion.glyph,
-      color: suggestion.tint,
-      sortOrder,
-    });
-  }
+    for (const { id, body } of categories) await tx.put("category", id, body);
+  });
 }
 
 /**
@@ -165,7 +179,7 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
     if (!first.ok && (fresh || first.error === "unauthorized")) {
       throw new VaultOpenError(first.error ?? "server");
     }
-    await seedIfEmpty(store, backend.fetch, profile);
+    await seedIfEmpty(store, profile);
     const stop = engine.start();
     const routed = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : null;

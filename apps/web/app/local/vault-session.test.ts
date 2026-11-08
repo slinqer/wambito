@@ -1,7 +1,9 @@
 import "fake-indexeddb/auto";
+import { SUGGESTED_CATEGORIES } from "@wambito/core";
 import { deriveRecordKeys, generateDataKey } from "@wambito/crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createEncryptedStore } from "./encrypted-store.ts";
+import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
+import { uuidv5 } from "./ids.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -90,6 +92,40 @@ describe("openVaultSession", () => {
       fetch: net.fetch,
     });
     expect(again).toBe(session);
+  });
+
+  it("gives the seeded records ids made from the account, so two devices seed the same ones", async () => {
+    const profile = profileOf();
+    let opened: EncryptedStore | undefined;
+    await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: true,
+      fetch: fakeNetwork().fetch,
+      openStore: async (userId) => {
+        opened = await createEncryptedStore(userId);
+        return opened;
+      },
+    });
+    const store = opened as EncryptedStore;
+    const [settings] = await store.list("settings");
+    const categories = await store.list("category");
+    expect(settings?.body).toMatchObject({
+      timezone: "America/Bogota",
+      locale: "es",
+      currency: "EUR",
+    });
+    // The ids are the same on every device for this account, and differ between accounts.
+    const namespace = await uuidv5("6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10", profile.id);
+    expect(settings?.id).toBe(await uuidv5(namespace, "settings"));
+    expect(categories.length).toBeGreaterThan(3);
+    const ids = new Set(categories.map((c) => c.id));
+    expect(ids.size).toBe(categories.length);
+    for (const { id, body } of categories) {
+      expect(body.createdAt).toBeUndefined();
+      const key = SUGGESTED_CATEGORIES.find((c) => c.names.es === body.name)?.key;
+      expect(id).toBe(await uuidv5(namespace, `category:${key}`));
+    }
   });
 
   it("refuses what a preview account cannot do yet, and sends deleting the account to the API", async () => {
