@@ -100,6 +100,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
 - e2e: `E2E_NOW=2026-10-21T15:00:00Z docker compose up -d --build` (value from
   `e2e/helpers.ts`), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
   `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).
+- e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
+  seed:admin` (`dev-admin`, admin spec) and `seed:e2e-preview` (`preview-e2e`,
+  preview@wambito.test, the encrypted-preview account; `E2E_PREVIEW_USER_IDS` defaults to it in
+  `docker-compose.yml`). `vault.spec.ts` runs `seed:e2e-preview` itself in `beforeAll`, which
+  deletes and recreates the user (no records, key wraps or finance rows), so it needs the stack up
+  and `docker` on the PATH; it runs on the desktop project only (one shared account). CI seeds it
+  too.
 
 ## Landing builds
 
