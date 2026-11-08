@@ -182,6 +182,29 @@ describe("/v2/pairing", () => {
     expect(purgePairings).toHaveBeenCalledTimes(1);
   });
 
+  test("a failing pairing purge does not skip the tombstone purge", async () => {
+    const purge = vi.fn(async () => 0);
+    const purgePairings = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const logError = vi.fn();
+    const stop = scheduleTombstonePurge({ db: t.db, purge, purgePairings, logError });
+    await vi.waitFor(() => expect(purge).toHaveBeenCalled());
+    stop();
+    expect(logError).toHaveBeenCalledWith("Pairing purge failed", expect.any(Error));
+  });
+
+  test("two concurrent takes of a sealed request: one gets the blob, the other 404", async () => {
+    const { headers } = await person();
+    const started = await start(headers);
+    const blob = bytes(80, 5);
+    expect((await seal(headers, started.id, blob)).status).toBe(204);
+    const results = await Promise.all([take(headers, started.id), take(headers, started.id)]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 404]);
+    const ok = results.find((r) => r.status === 200);
+    expect(await ok?.json()).toEqual({ sealed: blob });
+  });
+
   test("assistant tokens get 403 on every route", async () => {
     const { email, headers } = await person();
     const started = await start(headers);

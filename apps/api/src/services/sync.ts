@@ -312,11 +312,15 @@ export function scheduleTombstonePurge(deps: TombstonePurgeDeps): () => void {
   const logError = deps.logError ?? ((message, error) => console.error(message, error));
 
   const run = async () => {
+    // Expired pairing requests go with the daily purge (spec 2026-11-08 section 7.3); each purge
+    // has its own try so a failure of one does not skip the other.
     try {
-      const now = new Date();
-      // Expired pairing requests go with the daily purge (spec 2026-11-08 section 7.3).
-      await purgePairings(deps.db, now);
-      const count = await purge(deps.db, now);
+      await purgePairings(deps.db, new Date());
+    } catch (error) {
+      logError("Pairing purge failed", error);
+    }
+    try {
+      const count = await purge(deps.db, new Date());
       if (count > 0)
         log(`Tombstone purge: deleted ${count} record(s) older than ${TOMBSTONE_DAYS} days`);
     } catch (error) {

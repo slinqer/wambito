@@ -58,7 +58,12 @@ export async function startPairing(
         const open = await tx
           .select({ n: sql<number>`count(*)::int` })
           .from(pairingRequests)
-          .where(sql`${pairingRequests.expiresAt} > ${nowIso}::timestamptz`);
+          .where(
+            and(
+              eq(pairingRequests.userId, userId),
+              sql`${pairingRequests.expiresAt} > ${nowIso}::timestamptz`,
+            ),
+          );
         if ((open[0]?.n ?? 0) >= MAX_OPEN_PAIRINGS) {
           throw new ApiError(429, "too_many_pairings", "Too many open pairing requests");
         }
@@ -67,6 +72,7 @@ export async function startPairing(
           .delete(pairingRequests)
           .where(
             and(
+              eq(pairingRequests.userId, userId),
               eq(pairingRequests.code, code),
               sql`${pairingRequests.expiresAt} <= ${nowIso}::timestamptz`,
             ),
@@ -96,6 +102,7 @@ export async function findPairing(db: Db, userId: string, code: string, now: Dat
       .from(pairingRequests)
       .where(
         and(
+          eq(pairingRequests.userId, userId),
           eq(pairingRequests.code, normalizePairingCode(code)),
           isNull(pairingRequests.sealed),
           gt(pairingRequests.expiresAt, now),
@@ -119,13 +126,19 @@ export async function sealPairing(
     const [row] = await tx
       .select({ sealed: pairingRequests.sealed })
       .from(pairingRequests)
-      .where(and(eq(pairingRequests.id, id.toLowerCase()), gt(pairingRequests.expiresAt, now)));
+      .where(
+        and(
+          eq(pairingRequests.userId, userId),
+          eq(pairingRequests.id, id.toLowerCase()),
+          gt(pairingRequests.expiresAt, now),
+        ),
+      );
     if (!row) throw new ApiError(404, "not_found");
     if (row.sealed) throw new ApiError(409, "already_sealed", "Already sealed");
     await tx
       .update(pairingRequests)
       .set({ sealed: Buffer.from(bytes(sealed)) })
-      .where(eq(pairingRequests.id, id.toLowerCase()));
+      .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, id.toLowerCase())));
   });
 }
 
@@ -141,10 +154,18 @@ export async function takePairing(
     const [row] = await tx
       .select()
       .from(pairingRequests)
-      .where(and(eq(pairingRequests.id, id.toLowerCase()), gt(pairingRequests.expiresAt, now)));
+      .where(
+        and(
+          eq(pairingRequests.userId, userId),
+          eq(pairingRequests.id, id.toLowerCase()),
+          gt(pairingRequests.expiresAt, now),
+        ),
+      );
     if (!row) throw new ApiError(404, "not_found");
     if (!row.sealed) return null;
-    await tx.delete(pairingRequests).where(eq(pairingRequests.id, row.id));
+    await tx
+      .delete(pairingRequests)
+      .where(and(eq(pairingRequests.userId, userId), eq(pairingRequests.id, row.id)));
     return b64(row.sealed);
   });
 }
@@ -168,7 +189,7 @@ export async function purgeExpiredPairings(db: Db, now: Date): Promise<number> {
         await lockPairings(tx, id);
         const deleted = await tx
           .delete(pairingRequests)
-          .where(lte(pairingRequests.expiresAt, now))
+          .where(and(eq(pairingRequests.userId, id), lte(pairingRequests.expiresAt, now)))
           .returning({ id: pairingRequests.id });
         return deleted.length;
       });
