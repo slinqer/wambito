@@ -68,7 +68,7 @@ Do the key move below (its own section) once, before the first build from these 
 
 **Precondition for any `mobile-v*` tag: the Canary model must be published.** Eligible phones download it from the release `voice-models-v2`, so that release must exist with `sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8.zip` (es/en) and `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.zip` (it/pt), each built by ONE run of `apps/mobile/scripts/package-canary.sh` (`--model parakeet` for the second), whose sizes and SHA-256 equal the values pinned in `apps/mobile/lib/capture/models_download.dart` (Canary: 150137764 bytes, SHA-256 `65bf6fb27f22c506b217d1847c2a61ad0d8a734eed6a6842d4e735dfed10776b`; Parakeet: 477666406 bytes, SHA-256 `f7f4d4f9a04ef10d77a99eb9ad3c1a616393c031cbf0232febfac51dc3bd937d`). Otherwise every eligible phone gets a 404 (or a failed check) on the precise model. Check it before tagging: `gh release view voice-models-v2 --repo slinqer/wambito` (each asset's size, and its digest against the SHA-256 above). If a rebuilt zip differs, the pins change in the app first, never the other way round.
 
-Before this, on `main`: for each release after `mobile-v1.0.0`, add and commit the new `<versionCode>.txt` changelogs (both codes, all four locales, `scripts/check-fastlane.sh` checks them) and push `main`. The release commit below is cut from `main`, and F-Droid reads the changelogs at the tag, so they must already be there.
+Before this, on `main`: for each release after `mobile-v1.0.0`, add and commit the new `<versionCode>.txt` changelogs (both codes, all five locales, `scripts/check-fastlane.sh` checks them) and push `main`. The release commit below is cut from `main`, and F-Droid reads the changelogs at the tag, so they must already be there.
 
 ```sh
 cd ~/projects/wambito
@@ -85,7 +85,7 @@ printf 'Keystore password: '; read -rs WAMBITO_KEYSTORE_PASSWORD; echo; export W
 apps/mobile/scripts/release.sh
 ```
 
-(The F-Droid changelogs in `apps/mobile/fastlane/metadata/android/*/changelogs` are named for `mobile-v1.0.0`'s version codes, 100001 and 100002. For another first version, rename them; `release.sh` warns when a tagged build has none. For each later release, add `<versionCode>.txt` for both codes in all four locales, on `main`, before the release commit.)
+(The F-Droid changelogs in `apps/mobile/fastlane/metadata/android/*/changelogs` are named for `mobile-v1.0.0`'s version codes, 100001 and 100002. For another first version, rename them; `release.sh` warns when a tagged build has none. For each later release, add `<versionCode>.txt` for both codes in all five locales, on `main`, before the release commit.)
 
 Once the APK is checked, publish the tag (it is local until then): `git push origin mobile-v1.0.0`. For the first F-Droid submission, push the tag before opening the fdroiddata merge request (`apps/mobile/fdroid/MERGE_REQUEST.md`), which needs it to exist upstream. For a later release, if Flutter, the NDK, the SDK platform, a srclib revision or `build-native-deps.sh`'s flags changed since the last one, open a merge request on fdroiddata with the updated recipe first: its copy is the live one and auto update only bumps versions (`docs/mobile/fdroid.md`, "Changing the recipe after F-Droid publishes").
 

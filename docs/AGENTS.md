@@ -23,6 +23,9 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   webp:alpha-quality=100`) in `apps/web/public/wambi` and `apps/mobile/assets/wambi`. Make a new
   scene the same way and add it only if on-model (same face, gold, purple limbs, pink sneakers; no
   text, letters, numbers or logos).
+  `wambi-store-{home,add,voice,review,budget,insights,feature}.webp`: Wambi's poses for the store
+  listing images, made the same way; `apps/mobile/tool/store_shots/compose.cjs` uses them
+  (`docs/mobile/play.md`).
   `docs/brand/e2e/wambi-e2e-step{1..5}.webp`: the end-to-end encryption scenes (same Codex method,
   1024 px masters), used by the root `README.md`; `docs/brand/e2e/README.md` lists each scene and a
   Spanish caption for the apps.

@@ -42,6 +42,10 @@ apps/mobile/test/tooling/android_strings_test.dart          # money
 apps/mobile/test/ui/amount_field_test.dart                  # money
 apps/mobile/fastlane/metadata/android/es-ES/changelogs/*    # money
 apps/mobile/fastlane/metadata/android/es-ES/full_description.txt  # money
+apps/mobile/fastlane/metadata/android/es-419/changelogs/*    # money
+apps/mobile/fastlane/metadata/android/es-419/full_description.txt  # money
+apps/mobile/tool/store_shots/compose.cjs  # money
+apps/mobile/tool/store_shots/shots_test.dart  # money
 apps/web/app/features/landing/money-words.ts               # money
 apps/web/app/features/landing/money-words.test.ts          # money
 apps/web/app/features/landing/MoneyHeadline.tsx            # money

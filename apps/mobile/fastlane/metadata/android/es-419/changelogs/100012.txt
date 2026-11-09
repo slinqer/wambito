@@ -1,0 +1,4 @@
+- Dictado más preciso: al soltar, un segundo modelo de voz reescribe lo que dijiste (Canary; Parakeet en italiano y portugués). Opcional, sin internet, en teléfonos con memoria suficiente; se descarga una vez (150 MB, 480 MB Parakeet).
+- Las notificaciones de gastos detectados las firma Wambi y se van al responderlas.
+- Un movimiento guardado sin red se puede editar, borrar y pagar.
+- Arreglos del dictado: el texto en vivo ya no repite las primeras palabras.

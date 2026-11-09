@@ -1,0 +1,8 @@
+Primera versión.
+- Anota gastos con el teclado numérico, o dilo en una frase: «15 mil en almuerzo y 3 lukas en uber».
+- Dictado en tu teléfono, sin internet (modelo de voz de unos 40 MB, una sola vez).
+- Cuánto llevas gastado este mes y tus movimientos por día.
+- Widget y mosaico de ajustes rápidos.
+- Prueba sin correo y agrégalo después.
+- En español e inglés, de noche o de día.
+- Ahora se llama Wambito: vuelve a poner el widget de inicio.

@@ -10,7 +10,7 @@ The founder's guide for putting `com.wambito.app` on Google Play, published by S
 
 ## Once: the app and its keys
 
-1. **Create the app**: name `Wambito`, default language Spanish (Latin America `es-419`, or Spain `es-ES`, which is what the fastlane folder uses), App, Free. Accept the declarations.
+1. **Create the app**: name `Wambito`, default language Spanish (Latin America, `es-419`), App, Free. Accept the declarations.
 2. **The upload key**: make it as `release.md` shows (`~/.wambito-signing/wambito-upload.p12`, alias `upload`) and back it up like the app key.
 3. **Play App Signing with the app key** (Test and release → Setup → App integrity → App signing; Play offers it at the first upload too): choose **Use a different key**, then **Export and upload a key from Java keystore**. Download Play's `pepk.jar` and `encryption_public_key.pem` from that page and run, in a real terminal (PEPK asks for the passwords itself):
 
@@ -35,7 +35,17 @@ Because Play signs with the app key, App Links and passkeys work for the Play bu
 
 ## The store listing
 
-From `apps/mobile/fastlane/metadata/android/<locale>/`: `title.txt`, `short_description.txt`, `full_description.txt`, `images/icon.png` (512×512), `images/featureGraphic.png` (1024×500) and `images/phoneScreenshots/`. Add the translations (Main store listing → Manage translations) for `en-US`, `it-IT` and `pt-PT`.
+From `apps/mobile/fastlane/metadata/android/<locale>/`: `title.txt`, `short_description.txt`, `full_description.txt`, `images/icon.png` (512×512, in `en-US`), `images/featureGraphic.jpg` (1024×500) and the six `images/phoneScreenshots/*.jpg` (1080×1920). The default listing is `es-419`; add the translations (Main store listing → Manage translations) for `es-ES`, `en-US`, `it-IT` and `pt-PT`. Play picks a listing by the phone's language, not its country, so the money in each set of pictures is the one its language's people mostly use: `es-419` pesos (shot as `es-CO`), `es-ES`, `it-IT` and `pt-PT` euros, `en-US` dollars. `scripts/check-fastlane.sh` checks all of it.
+
+To make the pictures again (after a change to the screens the pictures show), with the root dev stack up and the AOSP emulator running, never a real phone:
+
+```sh
+apps/mobile/tool/store_shots/run.sh            # raw screenshots, all five languages, ~4 min each
+node apps/mobile/tool/store_shots/compose.cjs  # the listing images, with Wambi and the captions
+apps/mobile/scripts/check-fastlane.sh
+```
+
+`run.sh` signs a guest in on the emulator, seeds invented movements and budgets through the API, and pins the emulator's language and time zone per locale (the currency follows them). `compose.cjs` holds the captions (`WORDS`) and frames each screenshot on the night plum with a pose from `docs/brand/wambi-store-*.webp`; the feature graphic is Wambi and the logo, no words, the same in every listing. Look at all the images before committing them: the founder approves a new set.
 
 - App category: **Finance**. Tags: budgeting, expense tracker.
 - Contact email `hola@wambito.com`; website `https://wambito.com`.

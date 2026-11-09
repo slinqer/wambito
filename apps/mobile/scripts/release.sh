@@ -278,7 +278,7 @@ $(grep -i -E 'certificate|digest' <<<"$report" || echo '(none)')" 1
   esac
 
   if [ -n "$tag" ]; then
-    for locale in es-ES en-US it-IT pt-PT; do
+    for locale in es-419 es-ES en-US it-IT pt-PT; do
       [ -f "$MOBILE/fastlane/metadata/android/$locale/changelogs/$expected_code.txt" ] ||
         echo "release.sh: no F-Droid changelog for versionCode $expected_code in fastlane/metadata/android/$locale/changelogs" >&2
     done
