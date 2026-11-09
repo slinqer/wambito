@@ -173,6 +173,7 @@ void main() {
       'onboardingCompletedAt': null,
       'currency': 'COP',
       'isAnonymous': true,
+      'encryption': 'plain',
     });
     expect(await api.isGuest('tok'), isTrue);
     expect(last().headers['Authorization'], 'Bearer tok');
@@ -187,6 +188,7 @@ void main() {
       'onboardingCompletedAt': null,
       'currency': 'COP',
       'isAnonymous': false,
+      'encryption': 'plain',
     });
     expect(await api.accountId('tok'), 'u1');
     expect(last().headers['Authorization'], 'Bearer tok');
@@ -206,6 +208,7 @@ void main() {
         ...base,
         'onboardingCompletedAt': null,
         'isAnonymous': false,
+        'encryption': 'plain',
       });
       final standing = await api.standing('tok');
       expect(standing.guest, isFalse);
@@ -218,6 +221,7 @@ void main() {
         ...base,
         'onboardingCompletedAt': '2026-10-21T10:00:00.000Z',
         'isAnonymous': false,
+        'encryption': 'plain',
       });
       expect((await api.standing('tok')).onboardingPending, isFalse);
     });
@@ -227,6 +231,7 @@ void main() {
         ...base,
         'onboardingCompletedAt': null,
         'isAnonymous': true,
+        'encryption': 'plain',
       });
       final standing = await api.standing('tok');
       expect(standing.guest, isTrue);
@@ -238,6 +243,7 @@ void main() {
         ...base,
         'onboardingCompletedAt': '2026-10-21T10:00:00.000Z',
         'isAnonymous': false,
+        'encryption': 'plain',
       });
       await api.completeOnboarding('tok');
       expect(last().method, 'PATCH');
@@ -348,6 +354,7 @@ void main() {
       'onboardingCompletedAt': null,
       'currency': 'COP',
       'isAnonymous': false,
+      'encryption': 'plain',
     });
 
     await api.claimSend('tok', 'ana@correo.com');

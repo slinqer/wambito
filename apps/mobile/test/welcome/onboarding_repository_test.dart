@@ -50,6 +50,7 @@ const _profile = {
   'onboardingCompletedAt': null,
   'currency': 'EUR',
   'isAnonymous': false,
+  'encryption': 'plain',
 };
 
 const _category = {

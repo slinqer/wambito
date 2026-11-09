@@ -48,6 +48,7 @@ class _Adapter implements HttpClientAdapter {
         'onboardingCompletedAt': null,
         'currency': 'COP',
         'isAnonymous': true,
+        'encryption': 'plain',
       },
       ('GET', '/v1/summary') => {
         'month': '2026-10',
