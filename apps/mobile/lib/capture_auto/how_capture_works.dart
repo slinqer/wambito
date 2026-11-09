@@ -186,7 +186,9 @@ class _HowFooter extends StatelessWidget {
           child: CssParagraph(
             l10n.autoCaptureHowDisclosure,
             key: last ? const Key('autoCapture.how.disclosure') : null,
-            style: LkText.body.copyWith(color: colors.ink),
+            // Three lines, what is read and what leaves the phone: the label's size keeps them
+            // within the room a short phone has under the steps.
+            style: LkText.label.copyWith(color: colors.ink),
           ),
         ),
         if (!last)

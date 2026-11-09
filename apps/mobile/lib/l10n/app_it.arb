@@ -751,7 +751,7 @@
   "autoCaptureHowNext": "Avanti",
   "autoCaptureHowDone": "Capito",
   "autoCaptureHowStepOf": "Passo {step} di {total}",
-  "autoCaptureHowDisclosure": "Wambito legge le notifiche delle app che attivi. Il testo non lascia mai il tuo telefono.",
+  "autoCaptureHowDisclosure": "Wambito legge le notifiche delle app che attivi. Solo importo, esercente, data e app lasciano il tuo telefono.",
   "autoCaptureHowPayTitle": "Paghi come sempre",
   "autoCaptureHowPayBody": "Usi la tua banca come al solito e ti arriva la sua notifica.",
   "autoCaptureHowReadsTitle": "Wambito la legge sul tuo telefono",

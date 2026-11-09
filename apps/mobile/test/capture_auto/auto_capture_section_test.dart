@@ -57,7 +57,7 @@ void main() {
     expect(fake.callsNamed('openAccessSettings'), isEmpty);
 
     await _toLastStep(t);
-    expect(said('El texto nunca sale de tu teléfono'), findsOneWidget);
+    expect(said('salen de tu teléfono'), findsOneWidget);
     await t.tap(find.byKey(const Key('autoCapture.explainer.confirm')));
     await t.pumpAndSettle();
 

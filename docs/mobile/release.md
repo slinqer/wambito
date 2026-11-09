@@ -160,6 +160,8 @@ apps/mobile/scripts/release.sh --play
 
 What `--play` adds: an unsigned `flutter build appbundle --release --target-platform android-arm,android-arm64` with the tag's version; `jarsigner` signs it and verifies it; the bundle's certificate must be the upload keystore's and not the APKs'; `aapt2` reads back the package, versionCode and versionName from the bundle's base module (repackaged as a proto-format APK, no bundletool needed), and its permissions go through `check-permissions.sh`. It writes `UPLOAD_CERT_SHA256.txt` next to the bundle: the upload certificate Play Console shows under App integrity must be this one.
 
+The first release built with `--play` is `mobile-v1.0.2`: `mobile-v1.0.0` and `mobile-v1.0.1` were tagged before it existed, so Play starts at 1.0.2 (`play.md`).
+
 CI runs `release.sh --play` too, with two throwaway keys, after the plain run, and checks that the same key for both is refused.
 
 ## Reproducible builds

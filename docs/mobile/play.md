@@ -61,7 +61,7 @@ apps/mobile/scripts/check-fastlane.sh
 - **News app**: No. **Government app**: No. **Health**: none. **COVID-19**: not a COVID app.
 - **Financial features**: the app offers **personal finance: budgeting / expense tracking**. It offers none of: loans, banking, payments or transfers, crypto, insurance, investing, credit scores. It does not hold or move money.
 - **Account deletion**: the app lets people create an account, so Play asks for a link: `https://wambito.com/delete-account`, and deletion is also in the app (Settings → Eliminar mi cuenta).
-- **Permissions declarations**: none of the declared-permission groups apply (no SMS, call log, location, all-files access, accessibility, exact alarms, foreground service or package visibility). The notification listener needs no declaration form, but its prominent disclosure must stay in the app (`lib/capture_auto/how_capture_works.dart`, the footer above «Activar acceso»).
+- **Permissions declarations**: none of the declared-permission groups apply (no SMS, call log, location, all-files access, accessibility, exact alarms, foreground service or package visibility). The notification listener needs no declaration form, but its prominent disclosure must stay in the app (`lib/capture_auto/how_capture_works.dart`, the footer above «Activar acceso», `autoCaptureHowDisclosure` in the ARBs): what is read (the notifications of the apps the person turns on) and what leaves the phone (only the amount, merchant, date and app), right before the button that opens Android's access screen. `test/l10n/capture_copy_test.dart` holds it to that in all four languages; a reviewer can see it with automatic capture switched on for the first time.
 
 ### Data safety
 
@@ -81,7 +81,7 @@ The voice models are downloaded from the project's GitHub releases when the pers
 
 ## Each release
 
-1. On the tagged release commit, `release.sh --play` (`release.md`). It writes the APKs and `wambito-<version>.aab`.
+1. On the tagged release commit, `release.sh --play` (`release.md`). The first bundle is `mobile-v1.0.2`: earlier tags have no `--play`, nor the disclosure above. It writes the APKs and `wambito-<version>.aab`.
 2. **Internal testing** first (Test and release → Testing → Internal testing): create a release, upload the `.aab`, paste the release notes from `fastlane/metadata/android/<locale>/changelogs/<APK code>.txt` (the AAB's own code, base × 10, has no changelog file of its own), add testers by email list, roll out.
 3. Install from the testers' link on a phone, and check: sign in by magic link (the link opens the app), a passkey, voice (and the precise model download), the widget, automatic capture's disclosure.
 4. Promote the same release to **Production** (staged rollout if wanted). The first production review takes a few days.

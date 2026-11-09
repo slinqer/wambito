@@ -99,8 +99,8 @@ void main() {
     expect(find.text('Hoy y lo que viene'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        'Wambito lee las notificaciones de las apps que actives. El texto nunca sale de tu '
-        'teléfono.',
+        'Wambito lee las notificaciones de las apps que actives. Solo el monto, el comercio, la '
+        'fecha y la app salen de tu teléfono.',
       ),
       findsOneWidget,
     );
