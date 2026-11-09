@@ -751,7 +751,7 @@
   "autoCaptureHowNext": "Seguinte",
   "autoCaptureHowDone": "Entendido",
   "autoCaptureHowStepOf": "Passo {step} de {total}",
-  "autoCaptureHowDisclosure": "O Wambito lê as notificações das apps que ativares. O texto nunca sai do teu telemóvel.",
+  "autoCaptureHowDisclosure": "O Wambito lê as notificações das apps que ativares. Só o valor, o comerciante, a data e a app saem do teu telemóvel.",
   "autoCaptureHowPayTitle": "Pagas como sempre",
   "autoCaptureHowPayBody": "Usas o teu banco como de costume e recebes a notificação dele.",
   "autoCaptureHowReadsTitle": "O Wambito lê-a no teu telemóvel",

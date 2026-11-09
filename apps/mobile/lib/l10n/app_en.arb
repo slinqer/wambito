@@ -1948,7 +1948,7 @@
   "autoCaptureHowNext": "Next",
   "autoCaptureHowDone": "Got it",
   "autoCaptureHowStepOf": "Step {step} of {total}",
-  "autoCaptureHowDisclosure": "Wambito reads the notifications of the apps you turn on. The text never leaves your phone.",
+  "autoCaptureHowDisclosure": "Wambito reads the notifications of the apps you turn on. Only the amount, merchant, date and app leave your phone.",
   "autoCaptureHowPayTitle": "You pay as usual",
   "autoCaptureHowPayBody": "You use your bank as usual and get its notification.",
   "autoCaptureHowReadsTitle": "Wambito reads it on your phone",

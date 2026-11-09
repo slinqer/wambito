@@ -3595,7 +3595,7 @@
       "total": {"type": "int", "example": "5"}
     }
   },
-  "autoCaptureHowDisclosure": "Wambito lee las notificaciones de las apps que actives. El texto nunca sale de tu teléfono.",
+  "autoCaptureHowDisclosure": "Wambito lee las notificaciones de las apps que actives. Solo el monto, el comercio, la fecha y la app salen de tu teléfono.",
   "@autoCaptureHowDisclosure": {
     "description": "How it works: short prominent disclosure under the steps, what is read and that the text stays on the phone. Names no language."
   },

@@ -94,6 +94,23 @@ void main() {
     }
   });
 
+  test('the disclosure says what is read and that only the amount, merchant, date and app leave',
+      () {
+    // Google Play's prominent disclosure before notification access: what is read, what is sent.
+    const sent = {
+      'es': ['Solo', 'monto', 'comercio', 'fecha', 'app', 'salen de tu teléfono'],
+      'en': ['Only', 'amount', 'merchant', 'date', 'app', 'leave your phone'],
+      'it': ['Solo', 'importo', 'esercente', 'data', 'app', 'lasciano il tuo telefono'],
+      'pt': ['Só', 'valor', 'comerciante', 'data', 'app', 'saem do teu telemóvel'],
+    };
+    for (final locale in _locales) {
+      final disclosure = _arb(locale)['autoCaptureHowDisclosure'] as String;
+      for (final word in sent[locale]!) {
+        expect(disclosure, contains(word), reason: '$locale: $word');
+      }
+    }
+  });
+
   test('the notice declares its placeholders', () {
     final meta = _arb('es')['@autoCaptureHowNotice'] as Map<String, dynamic>;
     expect((meta['placeholders'] as Map).keys.toSet(), {'amount', 'merchant', 'category'});
