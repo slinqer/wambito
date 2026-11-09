@@ -107,6 +107,8 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   `dart run tool/parity/compose.dart --max 2 [id]`.
 - Kotlin: `cd android && JAVA_HOME=<JDK 17> ./gradlew :app:testDebugUnitTest --console=plain`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
+- Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
+  `node tool/store_shots/compose.cjs`.
 - F-Droid (`docs/mobile/fdroid.md` explains the whole build):
   - `scripts/build-native-deps.sh --vosk-src <dir> --jna-src <dir> --ndk <NDK 28.2.13676358>
     [--abi <one ABI>] [--work <dir>]` builds Vosk and JNA from source (Linux x86_64 only, a
@@ -155,8 +157,8 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
     (CI, text only) checks that the second is the first with the two `-src` substitutions and no sherpa-onnx line.
   - The Gradle wrapper jar is committed: the official one for the version in
     `gradle-wrapper.properties`.
-- Release self-tests: `scripts/test-release.sh`, `scripts/check-fastlane.sh` (changelog ≤500 bytes,
-  same version codes in all four locales), `scripts/check-permissions.sh`.
+- Release self-tests: `scripts/test-release.sh`, `scripts/check-fastlane.sh` (the five listings: texts,
+  changelog ≤500 bytes with the same version codes in all, screenshots and feature graphic), `scripts/check-permissions.sh`.
 - Google Play: `scripts/release.sh --play` also builds `wambito-<version>.aab` (versionCode base × 10 + 0),
   signed with `jarsigner` by the upload key (`WAMBITO_UPLOAD_KEYSTORE`, `_KEY_ALIAS`, `_KEYSTORE_PASSWORD`,
   `_KEY_PASSWORD`), never the app key (refused); read back with `aapt2` (the base module

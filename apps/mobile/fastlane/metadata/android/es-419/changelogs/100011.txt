@@ -1,0 +1,3 @@
+- Las notificaciones de gastos detectados las firma Wambi y se van al responderlas.
+- Un movimiento guardado sin red se puede editar, borrar y pagar.
+- Arreglos del dictado: el texto en vivo ya no repite las primeras palabras.
