@@ -21,6 +21,7 @@ export const TEST_CONFIG = {
   GUEST_SIGNUP: true,
   TRUSTED_PROXIES: ["10.0.0.0/8"],
   ADMIN_USER_IDS: [],
+  E2E_PREVIEW_USER_IDS: [] as string[],
   MCP_URL: "http://localhost:3001/mcp",
 };
 

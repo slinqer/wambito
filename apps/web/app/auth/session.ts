@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { ApiProblem } from "../api/errors.ts";
+import { deleteStaleVaults } from "../local/stale-vaults.ts";
 import { authClient } from "./auth-client.ts";
 import { DEFAULT_NEXT, safeNext, signInPath } from "./next.ts";
 
@@ -24,6 +25,11 @@ export interface GuardDeps {
   /** The current user, or null when signed out. */
   getSession(): Promise<SessionUser | null>;
   mode(): "live" | "demo";
+  /**
+   * A load found nobody signed in: the live guards delete every vault left in the browser (a
+   * session that ended outside the sign-out leaves its vault behind). Failures are ignored.
+   */
+  onSignedOut?(): Promise<void> | void;
 }
 
 interface SessionResult {
@@ -55,6 +61,7 @@ export function sessionUserFrom({ data, error }: SessionResult): SessionUser | n
 const liveDeps: GuardDeps = {
   getSession: async () => sessionUserFrom(await authClient.getSession()),
   mode: () => "live",
+  onSignedOut: () => deleteStaleVaults(null),
 };
 
 const isOnboarded = (user: SessionUser) => user.onboardingCompletedAt != null;
@@ -73,7 +80,15 @@ export function createGuards(deps: GuardDeps) {
   /** The signed-in user, or null (the demo always has one). */
   async function currentUser(): Promise<SessionUser | null> {
     if (deps.mode() === "demo") return DEMO_USER;
-    return deps.getSession();
+    const user = await deps.getSession();
+    if (!user) {
+      try {
+        await deps.onSignedOut?.();
+      } catch {
+        // Next time.
+      }
+    }
+    return user;
   }
 
   /** Signed in: returns the user. Signed out: sends them to sign-in, and back to `next` after. */

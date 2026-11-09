@@ -17,6 +17,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { OCTOBER_2026 } from "../../../../../packages/core/test/fixtures/october-2026.ts";
 import { exposeStoryFetch } from "../../../.storybook/parity.ts";
 import { ApiProvider } from "../../api/ApiProvider.tsx";
+import type { ApiMode } from "../../api/scope.ts";
 import type { PasskeyOutcome } from "../../auth/passkey.ts";
 import { AppMessages } from "../../i18n/AppMessages.tsx";
 import type { Locale } from "../../i18n/format.ts";
@@ -851,6 +852,8 @@ export interface HomeStageProps extends HomeApiOptions {
   onSave?(filename: string, blob: Blob): void;
   /** Receives what settings copies (the assistants' address) instead of the clipboard. */
   onCopy?(text: string): Promise<void>;
+  /** The provider's mode; `local` shows a preview account's app. Default `live`. */
+  mode?: ApiMode;
 }
 
 /**
@@ -866,6 +869,7 @@ export function HomeStage({
   passkeys: passkeysProp,
   onSave = () => {},
   onCopy = async () => {},
+  mode,
   ...api
 }: HomeStageProps) {
   // The toolbar's language, held here so settings can switch it (the toolbar's provider can't).
@@ -889,7 +893,7 @@ export function HomeStage({
           >
             Recargar (stand-in)
           </button>
-          <ApiProvider key={reloads} fetch={fetchImpl}>
+          <ApiProvider key={reloads} fetch={fetchImpl} {...(mode ? { mode } : {})}>
             <ToastProvider>
               <Routes>
                 <Route path="/app" element={shell(<Home signOut={signOut} />)} />

@@ -211,3 +211,45 @@ describe("demoGuards", () => {
     expect(await demoGuards.requireOnboarded()).toEqual(DEMO_USER);
   });
 });
+
+describe("signed-out loads", () => {
+  it("tell onSignedOut, so the browser's leftover vaults go", async () => {
+    let calls = 0;
+    const { requireSession, redirectIfSignedIn } = createGuards({
+      getSession: async () => null,
+      mode: () => "live",
+      onSignedOut: async () => {
+        calls += 1;
+      },
+    });
+    await redirectOf(() => requireSession("/app"));
+    await redirectIfSignedIn({ request: new Request("http://x/sign-in") });
+    expect(calls).toBe(2);
+  });
+
+  it("a signed-in load does not", async () => {
+    let calls = 0;
+    const { requireSession } = createGuards({
+      getSession: async () => user("2026-01-01"),
+      mode: () => "live",
+      onSignedOut: () => {
+        calls += 1;
+      },
+    });
+    await requireSession("/app");
+    expect(calls).toBe(0);
+  });
+
+  it("a failing cleanup never blocks the guard", async () => {
+    const { redirectIfSignedIn } = createGuards({
+      getSession: async () => null,
+      mode: () => "live",
+      onSignedOut: async () => {
+        throw new Error("blocked");
+      },
+    });
+    await expect(redirectIfSignedIn({ request: new Request("http://x/sign-in") })).resolves.toBe(
+      null,
+    );
+  });
+});

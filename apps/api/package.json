@@ -9,6 +9,7 @@
     "start": "tsx --env-file-if-exists=../../.env src/server.ts",
     "seed": "tsx --env-file-if-exists=../../.env src/scripts/seed.ts",
     "seed:admin": "tsx --env-file-if-exists=../../.env src/scripts/seed-admin.ts",
+    "seed:e2e-preview": "tsx --env-file-if-exists=../../.env src/scripts/seed-e2e-preview.ts",
     "auth:generate": "auth generate --config src/scripts/auth-cli.ts --adapter drizzle --dialect postgresql --output ../../packages/db/src/schema/auth.ts -y",
     "build": "esbuild src/server.ts ../../packages/db/src/scripts/bootstrap.ts --bundle --platform=node --target=node22 --format=esm --outdir=dist --entry-names=[name] --legal-comments=none --banner:js=\"import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);\"",
     "start:prod": "node dist/server.js"

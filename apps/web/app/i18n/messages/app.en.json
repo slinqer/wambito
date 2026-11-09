@@ -219,7 +219,10 @@
     "too_many_sign_in_attempts": "Too many tries in a row. Wait a few seconds and try again.",
     "import_currency_changed": "Your account's currency changed after the file was read. Upload it again.",
     "guest_cannot_authorize": "Save your progress with your email before connecting an assistant.",
-    "insufficient_scope": "This assistant isn't allowed to do that."
+    "insufficient_scope": "This assistant isn't allowed to do that.",
+    "encrypted_account": "This account keeps its finances end-to-end encrypted; this part of Wambito doesn't work with it yet.",
+    "already_set_up": "This account already has its keys. Open it with your recovery key.",
+    "session_changed": "Another account signed in on this browser. Reload the page."
   },
   "sign_in": {
     "meta_title": "Sign in · Wambito",
@@ -683,6 +686,7 @@
       "deleting": "Deleting…"
     },
     "demo_off": "Not available in the demo. Create your account to use it.",
+    "local_off": "Not available yet with end-to-end encryption. It is coming soon.",
     "demo_viewing": "You're viewing Valentina's demo.",
     "assistants": {
       "title": "Connect your assistant",
@@ -773,5 +777,61 @@
     "taken_lead": "We can't change it to an email another account already uses. Write to privacy@wambito.com.",
     "no_token_title": "The link is incomplete",
     "no_token_lead": "Open the full link from the email we sent you."
+  },
+  "vault": {
+    "loading": "Opening your data…",
+    "sign_out": "Sign out",
+    "setup": {
+      "title": "Save your recovery key",
+      "lead": "It is the only way back to your data if you lose every device and passkey. Nobody can recover it for you, not even Wambito.",
+      "key_label": "Your recovery key",
+      "copy": "Copy",
+      "copied": "Copied",
+      "download": "Download as .txt",
+      "saved": "I saved it",
+      "file_title": "Wambito recovery key",
+      "file_line": "Keep it somewhere safe. Without it, nobody can recover your data.",
+      "file_date": "Created on {date}",
+      "confirm_title": "Check that you saved it",
+      "confirm_lead": "Type these four characters of your key. Each one says which group it is in and where in the group.",
+      "chars_group": "Characters to confirm",
+      "group": "Group {group}",
+      "char_in_group": "character {char}",
+      "char_label": "Group {group}, character {char}",
+      "mismatch": "They do not match. Check the key you saved.",
+      "show_again": "See the key again",
+      "continue": "Continue"
+    },
+    "unlock": {
+      "title": "Open your data here",
+      "lead": "Your data is encrypted. Type your recovery key to open it in this browser.",
+      "label": "Recovery key",
+      "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "submit": "Open my data",
+      "busy": "Opening…",
+      "error_bad_recovery_key": "That key is not in the right format. Check that you copied all of it.",
+      "error_wrong_recovery_key": "That key does not open this account. Try the one you saved when you created it.",
+      "error_offline": "You are offline. Try again when you are back online.",
+      "error_server": "Something went wrong on our side. Try again.",
+      "soon": "Soon you will be able to open your data with a passkey or from another device."
+    },
+    "locked": {
+      "title": "We could not open your data",
+      "lead": "It is still safe. Try again.",
+      "offline_title": "You are offline",
+      "offline_lead": "We need a connection to open your data in this browser.",
+      "retry": "Try again",
+      "retrying": "Trying again…",
+      "unsupported_title": "This browser can't keep your key",
+      "unsupported_lead": "To protect your data, Wambito needs a browser that keeps the key safely. Update your browser or open Wambito in another one.",
+      "guest_title": "Your data can't be opened here",
+      "guest_lead": "You started as a guest in another browser or device, and its data only opens there. Go back to that browser, or sign out.",
+      "delete_account": "Delete this account",
+      "delete_lead": "The guest account and everything in it are deleted, in the other browser too. This can't be undone.",
+      "delete_confirm": "Yes, delete it",
+      "deleting": "Deleting…",
+      "delete_failed": "We couldn't delete it. Try again.",
+      "delete_cancel": "Cancel"
+    }
   }
 }

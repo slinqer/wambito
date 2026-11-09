@@ -212,6 +212,21 @@ export async function signUpNewUser(page: Page, { lang = "es" as Lang } = {}) {
   return email;
 }
 
+/**
+ * Signs an existing user in through the sign-in page (their old emails in Mailpit are skipped, so
+ * the code read is the new one). Dismisses the passkey offer; lands on the page sign-in goes to.
+ */
+export async function signInExisting(page: Page, email: string, { lang = "es" as Lang } = {}) {
+  const old = (await mailsTo(email.toLowerCase())).map((m) => m.ID);
+  await page.goto(`/sign-in?lang=${lang}`);
+  const words = SIGN_IN_WORDS[lang];
+  await page.getByRole("textbox", { name: words.email }).fill(email);
+  await page.getByRole("button", { name: words.sendCode }).click();
+  const mail = await readSignInMail(email, { skip: old });
+  await page.getByRole("textbox", { name: words.digit1 }).fill(mail.code);
+  await skipPasskeyOffer(page, { lang });
+}
+
 const BUDGE_SAMPLE = fileURLToPath(
   new URL("../../../packages/importers/test/fixtures/budge-sample.csv", import.meta.url),
 );

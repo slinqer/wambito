@@ -16,6 +16,7 @@ export const auth = createAuth({
     GUEST_SIGNUP: true,
     TRUSTED_PROXIES: [],
     ADMIN_USER_IDS: [],
+    E2E_PREVIEW_USER_IDS: [],
   },
   db: {} as never,
   mailer: { send: async () => {} },

@@ -3,7 +3,7 @@ import { monthOf, type SupportedCurrency, todayIn } from "@wambito/core";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useTranslations } from "use-intl";
-import { useApi } from "../../api/ApiProvider.tsx";
+import { useApi, useApiMode } from "../../api/ApiProvider.tsx";
 import { ApiProblem, problemMessage, type Translator } from "../../api/errors.ts";
 import { queryKeys, useCategories, useMe } from "../../api/queries.ts";
 import { feedback } from "../../feedback/feedback.ts";
@@ -62,6 +62,9 @@ export function Welcome({ languages, timeZone }: WelcomeProps) {
   const step = stepFromParam(params.step);
   const navigate = useNavigate();
   const api = useApi();
+  // A preview account's vault has no import yet: the welcome goes from the currency to the
+  // categories (and back).
+  const canImport = useApiMode() === "live";
   const queryClient = useQueryClient();
   const { locale, setLocale } = useLocale();
   const me = useMe();
@@ -168,6 +171,7 @@ export function Welcome({ languages, timeZone }: WelcomeProps) {
   if (hasTransactions.error && hasTransactions.data === undefined) throw hasTransactions.error;
 
   if (step === null) return <Navigate to={stepPath("welcome")} replace />;
+  if (step === "import" && !canImport) return <Navigate to={stepPath("categories")} replace />;
   const selected = categoriesStep.selected;
   if (!me.data || !categoriesQuery.data || !draft || currency === null || !selected || !drafts) {
     return <div className="lk-screen min-h-dvh" aria-busy="true" />;
@@ -182,7 +186,13 @@ export function Welcome({ languages, timeZone }: WelcomeProps) {
     return <Navigate to={stepPath("categories")} replace />;
   }
 
-  const go = (to: StepId | null) => {
+  const go = (target: StepId | null) => {
+    const to =
+      target === "import" && !canImport
+        ? step === "categories"
+          ? "currency"
+          : "categories"
+        : target;
     if (!to) return;
     setError(null);
     navigate(stepPath(to));

@@ -219,7 +219,10 @@
     "too_many_sign_in_attempts": "Demasiados intentos seguidos. Espera unos segundos e inténtalo otra vez.",
     "import_currency_changed": "La moneda de tu cuenta cambió después de leer el archivo. Súbelo otra vez.",
     "guest_cannot_authorize": "Guarda tu progreso con tu correo antes de conectar un asistente.",
-    "insufficient_scope": "Este asistente no tiene permiso para hacer eso."
+    "insufficient_scope": "Este asistente no tiene permiso para hacer eso.",
+    "encrypted_account": "Esta cuenta guarda sus finanzas cifradas de extremo a extremo; esta parte de Wambito todavía no funciona con ella.",
+    "already_set_up": "Esta cuenta ya tiene sus claves. Ábrela con tu clave de recuperación.",
+    "session_changed": "Se inició sesión con otra cuenta en este navegador. Recarga la página."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -683,6 +686,7 @@
       "deleting": "Eliminando…"
     },
     "demo_off": "En el demo esto no está disponible. Crea tu cuenta para usarlo.",
+    "local_off": "Todavía no está disponible con el cifrado de extremo a extremo. Llega pronto.",
     "demo_viewing": "Estás viendo el demo de Valentina.",
     "assistants": {
       "title": "Conecta tu asistente",
@@ -773,5 +777,61 @@
     "taken_lead": "No podemos cambiarlo a un email que otra cuenta ya usa. Escríbenos a privacy@wambito.com.",
     "no_token_title": "Falta el enlace",
     "no_token_lead": "Abre el enlace completo del correo que te enviamos."
+  },
+  "vault": {
+    "loading": "Abriendo tus datos…",
+    "sign_out": "Cerrar sesión",
+    "setup": {
+      "title": "Guarda tu clave de recuperación",
+      "lead": "Es la única forma de volver a tus datos si pierdes todos tus dispositivos y llaves de acceso. Nadie la puede recuperar por ti, ni siquiera Wambito.",
+      "key_label": "Tu clave de recuperación",
+      "copy": "Copiar",
+      "copied": "Copiada",
+      "download": "Descargar como .txt",
+      "saved": "Ya la guardé",
+      "file_title": "Clave de recuperación de Wambito",
+      "file_line": "Guárdala en un lugar seguro. Sin ella, nadie puede recuperar tus datos.",
+      "file_date": "Creada el {date}",
+      "confirm_title": "Confirma que la guardaste",
+      "confirm_lead": "Escribe estos cuatro caracteres de tu clave. Cada uno dice en qué grupo está y cuál es dentro del grupo.",
+      "chars_group": "Caracteres a confirmar",
+      "group": "Grupo {group}",
+      "char_in_group": "carácter {char}",
+      "char_label": "Grupo {group}, carácter {char}",
+      "mismatch": "No coinciden. Revisa la clave que guardaste.",
+      "show_again": "Ver la clave otra vez",
+      "continue": "Continuar"
+    },
+    "unlock": {
+      "title": "Abre tus datos aquí",
+      "lead": "Tus datos están cifrados. Escribe tu clave de recuperación para abrirlos en este navegador.",
+      "label": "Clave de recuperación",
+      "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "submit": "Abrir mis datos",
+      "busy": "Abriendo…",
+      "error_bad_recovery_key": "Esa clave no tiene el formato correcto. Revisa que la copiaste completa.",
+      "error_wrong_recovery_key": "Esa clave no abre esta cuenta. Prueba con la que guardaste al crearla.",
+      "error_offline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
+      "error_server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+      "soon": "Pronto podrás abrir tus datos con una llave de acceso o desde otro dispositivo."
+    },
+    "locked": {
+      "title": "No pudimos abrir tus datos",
+      "lead": "Siguen a salvo. Inténtalo de nuevo.",
+      "offline_title": "Sin conexión",
+      "offline_lead": "Necesitamos conexión para abrir tus datos en este navegador.",
+      "retry": "Reintentar",
+      "retrying": "Reintentando…",
+      "unsupported_title": "Este navegador no puede guardar tu clave",
+      "unsupported_lead": "Para cuidar tus datos, Wambito necesita un navegador que guarde la clave de forma segura. Actualiza tu navegador o abre Wambito en otro.",
+      "guest_title": "Tus datos no se pueden abrir aquí",
+      "guest_lead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allá. Vuelve a ese navegador, o cierra sesión.",
+      "delete_account": "Eliminar esta cuenta",
+      "delete_lead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
+      "delete_confirm": "Sí, eliminarla",
+      "deleting": "Eliminando…",
+      "delete_failed": "No pudimos eliminarla. Inténtalo de nuevo.",
+      "delete_cancel": "Cancelar"
+    }
   }
 }

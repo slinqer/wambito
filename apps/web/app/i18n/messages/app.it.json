@@ -219,7 +219,10 @@
     "too_many_sign_in_attempts": "Troppi tentativi di fila. Aspetta qualche secondo e riprova.",
     "import_currency_changed": "La valuta del tuo account è cambiata dopo la lettura del file. Caricalo di nuovo.",
     "guest_cannot_authorize": "Salva i tuoi progressi con la tua email prima di collegare un assistente.",
-    "insufficient_scope": "Questo assistente non ha il permesso di farlo."
+    "insufficient_scope": "Questo assistente non ha il permesso di farlo.",
+    "encrypted_account": "Questo account conserva le sue finanze con crittografia end-to-end; questa parte di Wambito non funziona ancora con esso.",
+    "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero.",
+    "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina."
   },
   "sign_in": {
     "meta_title": "Accedi · Wambito",
@@ -683,6 +686,7 @@
       "deleting": "Eliminazione…"
     },
     "demo_off": "Nella demo questo non è disponibile. Crea il tuo account per usarlo.",
+    "local_off": "Non è ancora disponibile con la crittografia end-to-end. Arriva presto.",
     "demo_viewing": "Stai guardando la demo di Valentina.",
     "assistants": {
       "title": "Collega il tuo assistente",
@@ -773,5 +777,61 @@
     "taken_lead": "Non possiamo cambiarla con un'email che un altro account usa già. Scrivi a privacy@wambito.com.",
     "no_token_title": "Il link è incompleto",
     "no_token_lead": "Apri il link completo dell'email che ti abbiamo inviato."
+  },
+  "vault": {
+    "loading": "Apertura dei tuoi dati…",
+    "sign_out": "Esci",
+    "setup": {
+      "title": "Salva la tua chiave di recupero",
+      "lead": "È l'unico modo per tornare ai tuoi dati se perdi tutti i dispositivi e le passkey. Nessuno può recuperarla per te, nemmeno Wambito.",
+      "key_label": "La tua chiave di recupero",
+      "copy": "Copia",
+      "copied": "Copiata",
+      "download": "Scarica come .txt",
+      "saved": "L'ho salvata",
+      "file_title": "Chiave di recupero di Wambito",
+      "file_line": "Conservala in un posto sicuro. Senza la chiave, nessuno può recuperare i tuoi dati.",
+      "file_date": "Creata il {date}",
+      "confirm_title": "Controlla di averla salvata",
+      "confirm_lead": "Scrivi questi quattro caratteri della tua chiave. Ognuno indica in quale gruppo si trova e in che posizione.",
+      "chars_group": "Caratteri da confermare",
+      "group": "Gruppo {group}",
+      "char_in_group": "carattere {char}",
+      "char_label": "Gruppo {group}, carattere {char}",
+      "mismatch": "Non coincidono. Controlla la chiave che hai salvato.",
+      "show_again": "Rivedi la chiave",
+      "continue": "Continua"
+    },
+    "unlock": {
+      "title": "Apri qui i tuoi dati",
+      "lead": "I tuoi dati sono cifrati. Scrivi la tua chiave di recupero per aprirli in questo browser.",
+      "label": "Chiave di recupero",
+      "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "submit": "Apri i miei dati",
+      "busy": "Apertura…",
+      "error_bad_recovery_key": "Quella chiave non ha il formato giusto. Controlla di averla copiata tutta.",
+      "error_wrong_recovery_key": "Quella chiave non apre questo account. Prova con quella che hai salvato alla creazione.",
+      "error_offline": "Sei offline. Riprova quando torni online.",
+      "error_server": "Qualcosa è andato storto da parte nostra. Riprova.",
+      "soon": "Presto potrai aprire i tuoi dati con una passkey o da un altro dispositivo."
+    },
+    "locked": {
+      "title": "Non siamo riusciti ad aprire i tuoi dati",
+      "lead": "Sono ancora al sicuro. Riprova.",
+      "offline_title": "Sei offline",
+      "offline_lead": "Serve una connessione per aprire i tuoi dati in questo browser.",
+      "retry": "Riprova",
+      "retrying": "Nuovo tentativo…",
+      "unsupported_title": "Questo browser non può conservare la tua chiave",
+      "unsupported_lead": "Per proteggere i tuoi dati, Wambito ha bisogno di un browser che conservi la chiave in modo sicuro. Aggiorna il browser o apri Wambito in un altro.",
+      "guest_title": "Qui non si possono aprire i tuoi dati",
+      "guest_lead": "Hai iniziato come ospite in un altro browser o dispositivo, e i suoi dati si aprono solo lì. Torna a quel browser, oppure esci.",
+      "delete_account": "Elimina questo account",
+      "delete_lead": "L'account ospite e tutto ciò che contiene vengono eliminati, anche nell'altro browser. Non si può annullare.",
+      "delete_confirm": "Sì, eliminalo",
+      "deleting": "Eliminazione…",
+      "delete_failed": "Non siamo riusciti a eliminarlo. Riprova.",
+      "delete_cancel": "Annulla"
+    }
   }
 }

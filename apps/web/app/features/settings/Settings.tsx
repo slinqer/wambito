@@ -38,7 +38,8 @@ export interface SettingsProps {
  * email to the founder); and deleting the account. Reached from the avatar menu (phones) and the sidebar (wide screens). In the demo
  * (`/demo/settings`, spec §2.6b) passkeys, import, export and deleting the account are off, each
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
- * steps there, and lists nothing.
+ * steps there, and lists nothing. A preview account (`local` mode) has import, export and the
+ * assistants' list off with a "not available yet" note; passkeys and deleting the account work.
  */
 export function Settings({
   passkeys = livePasskeys,
@@ -52,9 +53,14 @@ export function Settings({
   if (!me) throw new Error("Settings renders inside AppShell, which waits for the profile");
   const exporter = useExport(save);
   const appPath = useAppPath();
-  const demo = useApiMode() === "demo";
+  const mode = useApiMode();
+  const demo = mode === "demo";
+  // A preview account's vault: no export, import or assistants yet (passkeys and deleting the
+  // account work: they are the account's, not its finances).
+  const local = mode === "local";
   const dataOffId = useId();
-  const dataOff = demo ? dataOffId : undefined;
+  const assistantsOffId = useId();
+  const dataOff = demo || local ? dataOffId : undefined;
 
   return (
     <ManageFrame>
@@ -73,7 +79,7 @@ export function Settings({
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">
             <SettingLabel label={t("data.import_title")} hint={t("data.import_lead")} />
-            {demo ? (
+            {demo || local ? (
               <PressButton
                 variant="secondary"
                 className="self-start"
@@ -95,7 +101,7 @@ export function Settings({
                 <PressButton
                   key={format}
                   variant="secondary"
-                  disabled={demo || exporter.busy !== null}
+                  disabled={demo || local || exporter.busy !== null}
                   aria-describedby={dataOff}
                   aria-busy={exporter.busy === format || undefined}
                   onClick={() => void exporter.run(format)}
@@ -105,9 +111,14 @@ export function Settings({
               ))}
             </div>
           </div>
-          {demo && <DemoOffNote id={dataOffId} />}
+          {(demo || local) && <DemoOffNote id={dataOffId} local={local} />}
         </SettingsSection>
-        <AssistantsSection timeZone={me.timezone} off={demo} {...(copy ? { copy } : {})} />
+        <AssistantsSection
+          timeZone={me.timezone}
+          off={demo || local}
+          offNote={local ? <DemoOffNote id={assistantsOffId} local /> : undefined}
+          {...(copy ? { copy } : {})}
+        />
         <FeedbackSection />
         <DeleteAccount
           email={me.email}
@@ -115,6 +126,7 @@ export function Settings({
           onExport={(format) => void exporter.run(format)}
           exporting={exporter.busy !== null}
           off={demo}
+          canExport={!local}
         />
       </main>
     </ManageFrame>

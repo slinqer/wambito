@@ -241,6 +241,7 @@ export interface paths {
         delete: operations["deleteMe"];
         options?: never;
         head?: never;
+        /** @description Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 `encrypted_account`. */
         patch: operations["updateMe"];
         trace?: never;
     };
@@ -710,7 +711,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. */
+        /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. With `If-None-Match: *` the wrap is stored only while the account has no other wrap (409 `already_set_up`), so two setups at once cannot make two data keys. */
         put: operations["putKeyWrap"];
         post?: never;
         /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. */
@@ -964,6 +965,8 @@ export interface components {
             onboardingCompletedAt: string | null;
             currency: string;
             isAnonymous: boolean;
+            /** @enum {string} */
+            encryption: "plain" | "preview";
         };
         UpdateProfile: {
             timezone?: string;
@@ -2238,6 +2241,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Problem */
@@ -3529,7 +3541,10 @@ export interface operations {
     putKeyWrap: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description `*`: store the wrap only if the account has no wraps yet (other than this id): the first setup's recovery wrap. Else 409 `already_set_up`. */
+                "if-none-match"?: "*";
+            };
             path: {
                 /** @description A UUID in lower case */
                 id: string;

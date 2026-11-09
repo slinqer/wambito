@@ -20,9 +20,11 @@ import {
   overEmailLimit,
   sendClaimCode,
 } from "../auth.ts";
+import { isPreviewAccount } from "../config.ts";
 import type { AppDeps } from "../deps.ts";
 import { isUniqueViolation } from "../http/db-errors.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
+import { encryptedAccount } from "../http/preview.ts";
 import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
 import { UpdateProfile } from "../http/schemas.ts";
@@ -40,6 +42,11 @@ const profileDto = z
     currency: z.string(),
     /** A guest: signed up on the app without an email (its `email` is a placeholder until claimed). */
     isAnonymous: z.boolean(),
+    /**
+     * `preview`: the account keeps its finances only as end-to-end encrypted records (`/v2`), and
+     * its `/v1` finance routes stay empty; `plain`: every other account.
+     */
+    encryption: z.enum(["plain", "preview"]),
   })
   .openapi("Profile");
 
@@ -106,6 +113,7 @@ async function profile(deps: AppDeps, userId: string) {
     ...row,
     onboardingCompletedAt: row.onboardingCompletedAt?.toISOString() ?? null,
     currency: account?.currency ?? "EUR",
+    encryption: isPreviewAccount(deps.config, userId) ? ("preview" as const) : ("plain" as const),
   };
 }
 
@@ -193,12 +201,16 @@ export function meRoutes(deps: AppDeps) {
       method: "patch",
       path: "/v1/me",
       operationId: "updateMe",
+      description:
+        "Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 `encrypted_account`.",
       request: { body: jsonBody(UpdateProfile) },
-      responses: { 200: jsonResponse(profileDto, "Updated profile"), ...problems(409, 422) },
+      responses: { 200: jsonResponse(profileDto, "Updated profile"), ...problems(403, 409, 422) },
     }),
     async (c) => {
       const { onboardingCompleted, currency, ...fields } = c.req.valid("json");
       const userId = c.get("userId");
+      // A preview account's currency lives in its settings record.
+      if (currency && isPreviewAccount(deps.config, userId)) throw encryptedAccount();
       const set = {
         ...fields,
         // Stamp completion once; later calls keep the first timestamp.

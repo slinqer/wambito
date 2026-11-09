@@ -2,8 +2,12 @@ import type { QueryClient } from "@tanstack/react-query";
 import { type ApiClient, createApiClient } from "./client.ts";
 import { createQueryClient } from "./query-client.ts";
 
-/** `live` talks to the real API; `demo` runs on an in-memory backend, signed in as a made-up user. */
-export type ApiMode = "live" | "demo";
+/**
+ * `live` talks to the real API; `demo` runs on an in-memory backend, signed in as a made-up user;
+ * `local` is a preview account's end-to-end encrypted vault (the local backend over IndexedDB,
+ * synced through `/v2`). Demo-only behaviour checks `=== "demo"`; live-only behaviour `=== "live"`.
+ */
+export type ApiMode = "live" | "demo" | "local";
 
 /** Everything one backend needs, kept together so two backends never share a cache. */
 export interface ApiScope {

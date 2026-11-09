@@ -559,3 +559,51 @@ describe("/v2/keys", () => {
     }
   });
 });
+
+describe("PUT /v2/keys/{id} with If-None-Match: *", () => {
+  const putFirst = (headers: Headers, id: string, body: WrapInput) =>
+    t.request("PUT", `/v2/keys/${id}`, { headers: { ...headers, "if-none-match": "*" }, body });
+
+  test("stores the first recovery wrap of an account without wraps", async () => {
+    const { headers } = await person();
+    const id = randomUUID();
+    const res = await putFirst(headers, id, recovery());
+    expect(res.status).toBe(200);
+    expect((await list(headers)).map((w) => w.id)).toEqual([id]);
+  });
+
+  test("is 409 already_set_up once the account has a wrap, and changes nothing", async () => {
+    const { headers } = await person();
+    const first = await put(headers, recovery(1, { wrapped: bytes(48, 1) }));
+    const res = await putFirst(headers, randomUUID(), recovery(1, { wrapped: bytes(48, 2) }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "already_set_up" });
+    expect(await list(headers)).toEqual([first]);
+  });
+
+  test("a retry of the same id goes through (its first answer was lost)", async () => {
+    const { headers } = await person();
+    const id = randomUUID();
+    expect((await putFirst(headers, id, recovery())).status).toBe(200);
+    expect((await putFirst(headers, id, recovery())).status).toBe(200);
+    expect(await list(headers)).toHaveLength(1);
+  });
+
+  test("two setups at once: exactly one wins", async () => {
+    const { headers } = await person();
+    const results = await Promise.all(
+      [1, 2, 3].map((n) => putFirst(headers, randomUUID(), recovery(1, { wrapped: bytes(48, n) }))),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
+    expect(await list(headers)).toHaveLength(1);
+  });
+
+  test("any other If-None-Match is 422", async () => {
+    const { headers } = await person();
+    const res = await t.request("PUT", `/v2/keys/${randomUUID()}`, {
+      headers: { ...headers, "if-none-match": '"abc"' },
+      body: recovery(),
+    });
+    expect(res.status).toBe(422);
+  });
+});

@@ -64,6 +64,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
   other kinds sending `publicKey` or `attestation` are 422 `validation_failed`).
+  `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
+  the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
+  recovery wrap with it, so two setups at once cannot make two data keys.
 - `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
   approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
   `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is
@@ -85,6 +88,16 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
+- End-to-end encryption preview (stage 2a): `E2E_PREVIEW_USER_IDS` (comma-separated user ids,
+  unset by default; `isPreviewAccount` in `config.ts`). `GET /v1/me` (every profile answer) says
+  `encryption: "preview" | "plain"`. A preview account's finances live only as records under
+  `/v2`; the user-create hook in `auth.ts` seeds no default account or categories for it (the web
+  creates them as records), so its `/v1` finance tables stay empty.
+  `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 403 `encrypted_account` on the `/v1` finance
+  routes (transactions, categories, recurrences, summary, reports, captures, imports,
+  `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
+  403 too (the currency lives in the settings record). `DELETE /v1/me` still works:
+  `records`, `key_wraps`, `record_purges` and `pairing_requests` cascade from `user`.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
@@ -94,9 +107,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
-- Client headers `x-wambito-{locale,next,timezone,client,background}`, always read via
+- Client headers `x-wambito-{locale,next,timezone,client,background,user}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
-  session with `disableRefresh` (not counted as activity).
+  session with `disableRefresh` (not counted as activity); `user` on `/v2/*` is the account the
+  client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
+  `src/http/expected-user.ts`, after `requireUser`, before the scopes; sessions and tokens alike).
 - DB: connects as the runtime role (RLS); migrations run as admin (`packages/db`).
 
 ## Run and test (repo root)

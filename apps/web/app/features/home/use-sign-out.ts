@@ -2,12 +2,28 @@ import { useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
 import { useClearSession } from "../../api/ApiProvider.tsx";
 import { authClient } from "../../auth/auth-client.ts";
+import { forgetVault } from "../../local/vault-session.ts";
 import { useToast } from "../../ui/Toast.tsx";
 
 /** Ends the session; Better Auth answers `{ error }` rather than throwing on an HTTP failure. */
 export type SignOutRequest = () => Promise<{ error: unknown }>;
 
-export const liveSignOut: SignOutRequest = () => authClient.signOut();
+/**
+ * Better Auth's sign-out, then (only once it worked) this browser's vault of a preview account:
+ * the sync stops, the store closes and the database with its keys is deleted, before anything
+ * navigates. A plain account has no vault: nothing more happens. Deleting the account signs out
+ * through here too.
+ */
+export const liveSignOut: SignOutRequest = async () => {
+  const result = await authClient.signOut();
+  if (!result.error) {
+    await forgetVault().catch(() => {
+      // "Blocked" by another tab holding the vault: the browser still deletes it once that tab
+      // lets go (the request stays queued). The session is over either way.
+    });
+  }
+  return result;
+};
 
 /**
  * Signs out, safely: only once the server says the session is over does it go to /sign-in and

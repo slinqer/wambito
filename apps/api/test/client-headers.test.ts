@@ -15,7 +15,7 @@ describe("clientHeader", () => {
     expect(clientHeader(new Headers({ "x-other-timezone": "UTC" }), "timezone")).toBeUndefined();
   });
 
-  test.each(["locale", "next", "timezone", "client", "background"] as const)(
+  test.each(["locale", "next", "timezone", "client", "background", "user"] as const)(
     "%s reads x-wambito-%s",
     (name) => {
       expect(clientHeader(new Headers({ [`x-wambito-${name}`]: "new" }), name)).toBe("new");

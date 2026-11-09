@@ -152,17 +152,30 @@ export async function listKeyWraps(db: Db, userId: string): Promise<KeyWrapDto[]
  * recovery wrap (422 `recovery_required`). It also replaces the wrap it would
  * otherwise duplicate: the recovery wrap (one per account), or the wrap of the same kind and ref.
  * The recovery wrap's id cannot take another kind (409 `recovery_required`). An id that is someone
- * else's is 409 `id_taken`.
+ * else's is 409 `id_taken`. `onlyFirst` (`If-None-Match: *`): only while the account has no wrap
+ * but `id` itself (a retry of the same PUT), else 409 `already_set_up`; checked under the lock, so
+ * of two setups at once exactly one makes the account's data key.
  */
 export async function putKeyWrap(
   db: Db,
   userId: string,
   id: string,
   wrap: KeyWrapInput,
+  { onlyFirst = false }: { onlyFirst?: boolean } = {},
 ): Promise<KeyWrapDto> {
   checkAttestation(wrap);
   return withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
+    if (onlyFirst) {
+      const [other] = await tx
+        .select({ id: keyWraps.id })
+        .from(keyWraps)
+        .where(own(userId, ne(keyWraps.id, id)))
+        .limit(1);
+      if (other) {
+        throw new ApiError(409, "already_set_up", "This account already has its keys");
+      }
+    }
     const current = await currentKeyV(tx, userId);
     if (current !== null && wrap.keyV !== current) throw keyVersionMismatch(current, current);
     if (current === null && wrap.kind !== "recovery") {

@@ -6,6 +6,7 @@ import { queryKeys } from "../../api/queries.ts";
 import type { paths } from "../../api/schema";
 import { isLocale, type Locale } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
+import { deleteStaleVaults } from "../../local/stale-vaults.ts";
 import {
   type AuthUser,
   destinationAfterSignIn,
@@ -34,8 +35,8 @@ export const PASSKEY_OFFER_PATH = "/passkey-offer";
 
 /**
  * What happens right after any sign-in (code, magic link, passkey): forget the previous person's
- * cached data, give a new user the language of the page they came from (`PATCH /v1/me`), switch
- * the app to the profile's language, and go to onboarding, `next` or the app. After an email
+ * cached data and any vault of someone else left in this browser, give a new user the language of
+ * the page they came from (`PATCH /v1/me`), switch the app to the profile's language, and go to onboarding, `next` or the app. After an email
  * sign-in that is due the passkey offer, it goes first and then leads on to that page.
  */
 export function useFinishSignIn(auth: Pick<SignInAuth, "shouldOfferPasskey">) {
@@ -48,6 +49,8 @@ export function useFinishSignIn(auth: Pick<SignInAuth, "shouldOfferPasskey">) {
   return useCallback(
     async ({ user, next, lang, method = "email" }: FinishSignIn) => {
       clearSession();
+      // Another person's vault left in this browser (a session that ended outside the sign-out).
+      await deleteStaleVaults(user.id);
       let profile: Profile | null = null;
       try {
         profile = (await api.GET("/v1/me")).data ?? null;
