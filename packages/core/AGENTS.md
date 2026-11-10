@@ -20,7 +20,9 @@ suggested categories, Wambi's messages. No I/O.
 - `src/records.ts`: zod bodies of the encrypted records (`transaction`, `category`, `budget`,
   `recurrence`, `merchant`, `settings`, `account`), each `{ s: 1, ...fields }` without `id`,
   `version` or `deleted` (those live in the envelope); unknown keys are stripped. `RECORD_TYPES`,
-  `parseRecord(type, json)` returns `{ ok, value | error }` and never throws. Changing a body
+  `parseRecord(type, json)` returns `{ ok, value | error }` and never throws. `settings` carries
+  `revokedDevices: string[]` (default `[]`): the device wrap ids removed from the account, which
+  every key rotation leaves out whatever the server lists (stage 2b Ruling 7). Changing a body
   means a new `s` and a Dart change.
 - `src/reports.ts`: pure `byCategory` and `trend` (the web demo and the local backend use them).
   Shared cases for the Dart port: `reports/cases.json`, run by `src/reports.test.ts`.
