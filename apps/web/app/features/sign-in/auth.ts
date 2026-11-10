@@ -250,13 +250,18 @@ interface WithWebAuthn {
 
 /**
  * A passkey sign-in asks for the PRF (`prfExtension`); when the passkey gave one, it waits in
- * memory for the vault gate of an encrypted account (`keepSignInPrf`). A plain account ignores it
+ * memory for the vault gate of that account (`keepSignInPrf`, tied to the user who signed in). A
+ * plain account ignores it
  * (the app's loader drops it).
  */
 function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
   const credentialId = result.webauthn?.response?.id;
-  const prf = result.error ? null : readPrf(result.webauthn?.clientExtensionResults);
-  if (credentialId && prf) keepSignInPrf({ credentialId, prf });
+  const userId = (result.data as { user?: { id?: unknown } } | null)?.user?.id;
+  // Read (and so zero the browser's bytes) in every case; keep it only for whoever signed in.
+  const prf = readPrf(result.webauthn?.clientExtensionResults);
+  if (!prf) return result;
+  if (result.error || !credentialId || typeof userId !== "string") prf.fill(0);
+  else keepSignInPrf({ userId, credentialId, prf });
   return result;
 }
 

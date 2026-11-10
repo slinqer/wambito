@@ -6,6 +6,7 @@ import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
 import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
+import { authClient } from "../../auth/auth-client.ts";
 import {
   addPasskeyWrap,
   KeysError,
@@ -63,6 +64,13 @@ async function sessionUserId(): Promise<string | null> {
   }
 }
 
+/** The signed-in account's passkey credential ids (Better Auth's list); throws when unreadable. */
+async function accountPasskeyIds(): Promise<string[]> {
+  const { data, error } = await authClient.passkey.listUserPasskeys();
+  if (error || !Array.isArray(data)) throw new Error("passkeys_unavailable");
+  return data.map((passkey) => passkey.credentialID);
+}
+
 /** Another account signed in under this page: load the app again, for them (never the old vault). */
 function reloadApp() {
   window.location.assign("/app");
@@ -77,10 +85,11 @@ function gateFor(profile: VaultProfile): Gate<VaultSession> {
     prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
     unlockWithRecovery: (text) => signInAgainOn401(unlockWithRecovery({ userId, text })),
     // The passkey the person signed in (or registered) with, then Unlock's "Use a passkey".
-    takeSignInPrf,
+    takeSignInPrf: () => takeSignInPrf(userId),
     unlockWithPasskey: (passkey) => signInAgainOn401(unlockWithPasskey({ userId, ...passkey })),
     addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
-    evaluatePrf: () => evaluatePrf(),
+    evaluatePrf: (ids) => evaluatePrf(ids),
+    accountPasskeyIds,
     open: (keys, fresh) =>
       openVaultSession({
         profile,

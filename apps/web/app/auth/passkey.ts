@@ -1,6 +1,7 @@
 import { localArea, readStored, type StoredArea, writeStored } from "../lib/stored.ts";
 import {
   evaluatePrf,
+  keepSignInPrf,
   type PasskeyPrf,
   prfEnabledWithoutResults,
   prfExtension,
@@ -169,6 +170,24 @@ export interface PasskeyPrfUse {
   keep(passkey: PasskeyPrf): Promise<void> | void;
 }
 
+/**
+ * The passkey offer's use (right after sign-in, before the vault opens): the new passkey's PRF
+ * waits in the stash for `userId`'s vault gate, which adds its wrap once the data is open. Whether
+ * the account is encrypted comes from the caller (the profile the sign-in already read): no
+ * request here, and a plain account never gets a second touch.
+ */
+export function offerPrfUse(options: {
+  userId: string;
+  encrypted: boolean;
+  explainSecondTouch(): void;
+}): PasskeyPrfUse {
+  return {
+    wantsPrf: async () => options.encrypted,
+    explainSecondTouch: options.explainSecondTouch,
+    keep: (passkey) => keepSignInPrf({ userId: options.userId, ...passkey }),
+  };
+}
+
 /** SimpleWebAuthn's extension inputs do not list `prf`, which it passes on unchanged. */
 type AddExtensions = NonNullable<Parameters<typeof authClient.passkey.addPasskey>[0]>["extensions"];
 
@@ -182,8 +201,9 @@ async function prfOfNewPasskey(
   use: PasskeyPrfUse,
 ): Promise<PasskeyPrf | null> {
   const credentialId = webauthn?.response?.id;
-  if (!credentialId) return null;
   const prf = readPrf(webauthn?.clientExtensionResults);
+  if (prf && !credentialId) prf.fill(0);
+  if (!credentialId) return null;
   if (prf) return { credentialId, prf };
   if (!prfEnabledWithoutResults(webauthn?.clientExtensionResults)) return null;
   if (!(await use.wantsPrf().catch(() => false))) return null;
@@ -210,8 +230,11 @@ export async function addPasskey(prf?: PasskeyPrfUse): Promise<PasskeyOutcome> {
       error ? { code: "code" in error ? error.code : undefined } : null,
     );
     if (outcome === "added") rememberPasskeyUsed();
-    if (!error && prf) {
-      const webauthn = (result as { webauthn?: Parameters<typeof prfOfNewPasskey>[0] }).webauthn;
+    const webauthn = (result as { webauthn?: Parameters<typeof prfOfNewPasskey>[0] }).webauthn;
+    if (error || !prf) {
+      // Nothing wants it: the browser's bytes are zeroed all the same.
+      readPrf(webauthn?.clientExtensionResults)?.fill(0);
+    } else {
       const passkey = await prfOfNewPasskey(webauthn, prf);
       if (passkey) {
         try {

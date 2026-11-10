@@ -41,12 +41,12 @@ describe("readPrf", () => {
     expect(readPrf({ prf: { results: { first: bytes(16).buffer } } })).toBeNull();
   });
 
-  it("takes results.first as an ArrayBuffer of 32 bytes, and copies the bytes", () => {
+  it("takes results.first as an ArrayBuffer of 32 bytes, copies the bytes and zeroes the source", () => {
     const source = bytes(32);
     const prf = readPrf({ prf: { results: { first: source.buffer } } });
     expect(prf).toEqual(bytes(32));
-    source.fill(0);
-    expect(prf).toEqual(bytes(32));
+    // The browser's copy is zeroed: only the returned bytes hold the PRF.
+    expect(source).toEqual(new Uint8Array(32));
   });
 });
 
@@ -101,25 +101,36 @@ describe("evaluatePrf", () => {
 });
 
 describe("the sign-in stash", () => {
-  it("is read once", () => {
-    keepSignInPrf({ credentialId: "c", prf: bytes(32) });
-    expect(takeSignInPrf()).toEqual({ credentialId: "c", prf: bytes(32) });
-    expect(takeSignInPrf()).toBeNull();
+  const A = "user_a";
+  const B = "user_b";
+
+  it("is read once, by its account", () => {
+    keepSignInPrf({ userId: A, credentialId: "c", prf: bytes(32) });
+    expect(takeSignInPrf(A)).toEqual({ credentialId: "c", prf: bytes(32) });
+    expect(takeSignInPrf(A)).toBeNull();
+  });
+
+  it("a stash from user A is not used by user B, and is zeroed", () => {
+    const prf = bytes(32);
+    keepSignInPrf({ userId: A, credentialId: "c", prf });
+    expect(takeSignInPrf(B)).toBeNull();
+    expect(prf).toEqual(new Uint8Array(32));
+    expect(takeSignInPrf(A)).toBeNull();
   });
 
   it("clearing it zeroes the kept PRF", () => {
     const prf = bytes(32);
-    keepSignInPrf({ credentialId: "c", prf });
+    keepSignInPrf({ userId: A, credentialId: "c", prf });
     clearSignInPrf();
     expect(prf).toEqual(new Uint8Array(32));
-    expect(takeSignInPrf()).toBeNull();
+    expect(takeSignInPrf(A)).toBeNull();
   });
 
   it("a new one zeroes the one it replaces", () => {
     const old = bytes(32);
-    keepSignInPrf({ credentialId: "a", prf: old });
-    keepSignInPrf({ credentialId: "b", prf: bytes(32, 9) });
+    keepSignInPrf({ userId: A, credentialId: "a", prf: old });
+    keepSignInPrf({ userId: A, credentialId: "b", prf: bytes(32, 9) });
     expect(old).toEqual(new Uint8Array(32));
-    expect(takeSignInPrf()?.credentialId).toBe("b");
+    expect(takeSignInPrf(A)?.credentialId).toBe("b");
   });
 });

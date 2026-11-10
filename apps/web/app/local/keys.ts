@@ -46,7 +46,9 @@ export type KeysErrorCode =
   /** The touched passkey gave no PRF output (some password managers): it cannot open a wrap. */
   | "no_prf"
   /** No passkey wrap has the touched credential as `ref`, or its PRF does not open it. */
-  | "no_passkey_wrap";
+  | "no_passkey_wrap"
+  /** 422: the credential is not one of the signed-in account's passkeys; no wrap was stored. */
+  | "unknown_passkey";
 
 export class KeysError extends Error {
   constructor(
@@ -135,6 +137,9 @@ export function api(options: KeysOptions) {
       }
       if (response.status === 409 && code === "key_version_mismatch") {
         throw new KeysError("rotated_elsewhere", 409);
+      }
+      if (response.status === 422 && code === "unknown_passkey") {
+        throw new KeysError("unknown_passkey", 422);
       }
       throw new KeysError("server", response.status);
     }
@@ -412,7 +417,10 @@ export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): P
  * Adds (or replaces) the wrap of DK for one passkey: DK from this browser's own device wrap
  * (`withDataKey`, Ruling 1 of stage 2b; the touch on that passkey is the confirmation), wrapped
  * under its PRF at the current `keyV`, PUT as `kind: "passkey"`, `ref: credentialId`. A passkey
- * that already has a wrap keeps its id. The caller owns the PRF and zeroes it.
+ * that already has a wrap keeps its id. The caller owns the PRF and zeroes it. The server stores it
+ * only for one of the signed-in account's passkeys (the cookie's, which must be the vault's):
+ * another credential is `KeysError("unknown_passkey")`, so a wrap is never made under someone
+ * else's passkey.
  */
 export async function addPasskeyWrap(options: KeysOptions & PasskeySecret): Promise<void> {
   const { userId, credentialId, prf } = options;

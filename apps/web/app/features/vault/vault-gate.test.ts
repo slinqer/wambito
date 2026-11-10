@@ -521,5 +521,82 @@ describe("vault gate", () => {
       expect(await gate.unlockWithPasskey()).toBe("no_passkey_wrap");
       expect(gate.getState()).toEqual({ status: "unlock" });
     });
+
+    it("a pending credential that is not the account's gets no wrap, is zeroed, and the vault opens", async () => {
+      const kept = stash();
+      const addPasskeyWrap = vi.fn(async () => {
+        throw fail("unknown_passkey");
+      });
+      const { gate } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: () => kept,
+        unlockWithPasskey: vi.fn(async () => {
+          throw fail("no_passkey_wrap");
+        }),
+        addPasskeyWrap,
+      });
+      gate.start();
+      await settle();
+      await gate.unlock("ABCD");
+      expect(addPasskeyWrap).toHaveBeenCalledTimes(1);
+      expect(kept.prf.every((b) => b === 0)).toBe(true);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "unlocked" } });
+    });
+
+    it("the stash is zeroed when another account is signed in now", async () => {
+      const kept = stash();
+      const reload = vi.fn();
+      const unlockWithPasskey = vi.fn(async () => ({ k: "passkey" }));
+      const { gate } = gateWith({
+        ...elsewhere,
+        userId: "me",
+        sessionUserId: async () => "someone-else",
+        reload,
+        takeSignInPrf: () => kept,
+        unlockWithPasskey,
+      });
+      gate.start();
+      await settle();
+      expect(reload).toHaveBeenCalled();
+      expect(unlockWithPasskey).not.toHaveBeenCalled();
+      expect(kept.prf.every((b) => b === 0)).toBe(true);
+    });
+
+    it("Use a passkey offers only the account's passkeys", async () => {
+      const evaluatePrf = vi.fn(async () => null);
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => ["cred-1", "cred-2"],
+        evaluatePrf,
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      expect(evaluatePrf).toHaveBeenCalledWith(["cred-1", "cred-2"]);
+    });
+
+    it("Use a passkey on an account without passkeys is no_passkey_wrap, with no touch", async () => {
+      const evaluatePrf = vi.fn(async () => null);
+      const { gate } = gateWith({ ...elsewhere, accountPasskeyIds: async () => [], evaluatePrf });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBe("no_passkey_wrap");
+      expect(evaluatePrf).not.toHaveBeenCalled();
+    });
+
+    it("Use a passkey with an unreadable list still asks (the server checks the wrap's ref)", async () => {
+      const evaluatePrf = vi.fn(async () => null);
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => {
+          throw fail("offline");
+        },
+        evaluatePrf,
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      expect(evaluatePrf).toHaveBeenCalledWith(undefined);
+    });
   });
 });

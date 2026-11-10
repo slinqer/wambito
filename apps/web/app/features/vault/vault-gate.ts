@@ -65,14 +65,19 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
   sessionUserId?(): Promise<string | null>;
   /** Loads the app again for whoever is signed in now. */
   reload?(): void;
-  /** The sign-in's (or registration's) passkey PRF, once; null when there is none. */
+  /** The sign-in's (or registration's) passkey PRF, once, when it is this account's; else null. */
   takeSignInPrf?(): GatePasskey | null;
   /** Opens the passkey wrap of that credential; throws `{ code: "no_passkey_wrap" }` when none. */
   unlockWithPasskey?(passkey: GatePasskey): Promise<K>;
   /** Adds the wrap for that passkey, from this browser's device wrap (once unlocked). */
   addPasskeyWrap?(passkey: GatePasskey): Promise<void>;
-  /** Touches a passkey for its PRF: null when cancelled, `{ code: "no_prf" }` without one. */
-  evaluatePrf?(): Promise<GatePasskey | null>;
+  /**
+   * Touches a passkey (one of `credentialIds` when given) for its PRF: null when cancelled,
+   * `{ code: "no_prf" }` without one.
+   */
+  evaluatePrf?(credentialIds?: string[]): Promise<GatePasskey | null>;
+  /** The account's passkey credential ids, so Unlock offers only those; throws when unknown. */
+  accountPasskeyIds?(): Promise<string[]>;
 }
 
 /** Why the vault is locked; `unsupported` and `guest` have no retry. */
@@ -253,8 +258,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
       return open(keys, false);
     }
     if (stashed) keepPending(stashed);
-    // Never make keys for an account that is no longer the signed-in one.
-    if (!(await sameSession())) return;
+    // Never make keys for an account that is no longer the signed-in one (nor keep its PRF).
+    if (!(await sameSession())) {
+      keepPending(null);
+      return;
+    }
     try {
       prepared = await deps.prepareAccount();
     } catch (error) {
@@ -331,9 +339,19 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     async unlockWithPasskey() {
       if (state.status !== "unlock" || !deps.evaluatePrf) return null;
       if (!(await sameSession())) return null;
+      // Only this account's passkeys (another account's on a shared browser would open nothing,
+      // and must never get a wrap of this data key); an unreadable list leaves the browser's
+      // choice open, and the server refuses a wrap for a credential not this account's.
+      let ids: string[] | undefined;
+      try {
+        ids = await deps.accountPasskeyIds?.();
+      } catch {
+        ids = undefined;
+      }
+      if (ids && ids.length === 0) return "no_passkey_wrap";
       let passkey: GatePasskey | null;
       try {
-        passkey = await deps.evaluatePrf();
+        passkey = await deps.evaluatePrf(ids);
       } catch (error) {
         const code = codeOf(error);
         return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";

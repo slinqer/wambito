@@ -85,19 +85,24 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the credential (base64url, Better Auth's `credentialID`) and enrolls this browser
   (`KeysError("no_passkey_wrap")` when none opens); `addPasskeyWrap({ userId, credentialId, prf })`
   PUTs `kind: "passkey"`, `ref`, at the current `keyV`, DK from `withDataKey` (the touch is the
-  confirmation; an existing wrap of that credential keeps its id). The caller zeroes the PRF.
+  confirmation; an existing wrap of that credential keeps its id; a credential not the account's is
+  the server's 422, `KeysError("unknown_passkey")`, nothing stored). The caller zeroes the PRF.
   `prf.ts`: `prfExtension()` (`PRF_SALT`), `readPrf(clientExtensionResults)` (a copy of
-  `prf.results.first` only when 32 bytes: `prf: {}` from Proton Pass / 1Password is null),
+  `prf.results.first` only when 32 bytes, the browser's bytes zeroed: `prf: {}` from Proton Pass /
+  1Password is null),
   `evaluatePrf(credentialIds?)` (a raw `navigator.credentials.get`, random challenge, `rpId` =
   hostname, `userVerification: "required"`; nothing goes to the server; null on cancel,
-  `KeysError("no_prf")`), and the one-shot stash `keepSignInPrf` / `takeSignInPrf` /
-  `clearSignInPrf` (module memory only, never storage; cleared by `liveSignOut`, by the `/app` and
+  `KeysError("no_prf")`), and the one-shot stash `keepSignInPrf({ userId, credentialId, prf })` /
+  `takeSignInPrf(userId)` (another account's is zeroed, null) / `clearSignInPrf` (module memory
+  only, never storage; cleared by `liveSignOut`, by the `/app` and
   `/welcome` loaders of a plain account and once the vault is open). The passkey sign-in (also
   autofill, `features/sign-in/auth.ts`) and `auth/passkey.ts` `addPasskey(prf?)` ask for the
   extension with `returnWebAuthnResponse: true`; a registration that says `prf.enabled` without
   results gets one second touch (`evaluatePrf([newId])`, explained first by a toast
-  `vault.passkey_second_touch`) only for an encrypted account. The passkey offer stashes the new
-  passkey's PRF for the gate; Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
+  `vault.passkey_second_touch`) only for an encrypted account. The passkey offer
+  (`offerPrfUse`) stashes the new passkey's PRF for that user's gate, and knows the account is
+  encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
+  plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
   at once.
   `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
@@ -144,7 +149,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
   ready, else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
-  from Unlock's "Use a passkey", `gate.unlockWithPasskey()`) gets its wrap once the vault is
+  from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
+  passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
   unlocked by the recovery key or set up; a known browser zeroes the stash; before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so

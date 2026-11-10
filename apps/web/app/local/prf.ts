@@ -28,22 +28,30 @@ const asBytes = (value: unknown): Uint8Array | null => {
   return null;
 };
 
+type PrfResults = { prf?: { enabled?: unknown; results?: { first?: unknown } } };
+
+const prfOf = (clientExtensionResults: unknown) =>
+  clientExtensionResults && typeof clientExtensionResults === "object"
+    ? (clientExtensionResults as PrfResults).prf
+    : undefined;
+
 /**
  * `prf.results.first` from `getClientExtensionResults()`, copied, only when it is 32 bytes; else
- * null (no extension, `prf: {}`, `enabled` without results, another length).
+ * null (no extension, `prf: {}`, `enabled` without results, another length). The browser's bytes
+ * are zeroed once read: only the returned copy holds the PRF.
  */
 export function readPrf(clientExtensionResults: unknown): Uint8Array | null {
-  if (!clientExtensionResults || typeof clientExtensionResults !== "object") return null;
-  const prf = (clientExtensionResults as { prf?: { results?: { first?: unknown } } }).prf;
-  const bytes = asBytes(prf?.results?.first);
-  return bytes && bytes.byteLength === 32 ? bytes.slice() : null;
+  const bytes = asBytes(prfOf(clientExtensionResults)?.results?.first);
+  if (!bytes) return null;
+  const copy = bytes.byteLength === 32 ? bytes.slice() : null;
+  bytes.fill(0);
+  return copy;
 }
 
 /** Whether a registration's results say the passkey supports PRF but gave no output yet. */
 export function prfEnabledWithoutResults(clientExtensionResults: unknown): boolean {
-  if (!clientExtensionResults || typeof clientExtensionResults !== "object") return false;
-  const prf = (clientExtensionResults as { prf?: { enabled?: unknown } }).prf;
-  return prf?.enabled === true && readPrf(clientExtensionResults) === null;
+  const prf = prfOf(clientExtensionResults);
+  return prf?.enabled === true && asBytes(prf.results?.first) === null;
 }
 
 const isCancel = (error: unknown) =>
@@ -88,20 +96,31 @@ export async function evaluatePrf(credentialIds?: string[]): Promise<PasskeyPrf 
   return { credentialId: pk.id, prf };
 }
 
-/** The sign-in's (or a fresh registration's) PRF, for the vault gate: memory only, read once. */
-let signInPrf: PasskeyPrf | null = null;
+/**
+ * The sign-in's (or a fresh registration's) PRF, for the vault gate of the account it belongs to:
+ * memory only, read once.
+ */
+let signInPrf: (PasskeyPrf & { userId: string }) | null = null;
 
-/** Keeps a PRF for the gate, zeroing any earlier one. The stash now owns `value.prf`. */
-export function keepSignInPrf(value: PasskeyPrf): void {
+/** Keeps a PRF for `userId`'s gate, zeroing any earlier one. The stash now owns `value.prf`. */
+export function keepSignInPrf(value: PasskeyPrf & { userId: string }): void {
   if (signInPrf && signInPrf.prf !== value.prf) signInPrf.prf.fill(0);
   signInPrf = value;
 }
 
-/** The kept PRF, once: the caller owns (and zeroes) it after. */
-export function takeSignInPrf(): PasskeyPrf | null {
+/**
+ * The kept PRF, once, when it is `userId`'s: the caller owns (and zeroes) it after. Another
+ * account's (the session changed after a passkey sign-in) is zeroed and dropped: null.
+ */
+export function takeSignInPrf(userId: string): PasskeyPrf | null {
   const value = signInPrf;
   signInPrf = null;
-  return value;
+  if (!value) return null;
+  if (value.userId !== userId) {
+    value.prf.fill(0);
+    return null;
+  }
+  return { credentialId: value.credentialId, prf: value.prf };
 }
 
 /** Zeroes and drops the kept PRF (sign-out, a plain account, the open app). */

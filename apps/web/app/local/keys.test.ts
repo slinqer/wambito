@@ -69,7 +69,7 @@ interface Wrap {
 }
 
 /** A fake `/v2/keys` that enforces the rules the tests care about (the real one: `routes/keys.ts`). */
-function fakeKeys() {
+function fakeKeys(options: { passkeys?: string[] } = {}) {
   const wraps: Wrap[] = [];
   const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -93,6 +93,9 @@ function fakeKeys() {
       }
       if (wraps.length === 0 && body.kind !== "recovery") {
         return json({ code: "recovery_required" }, 422);
+      }
+      if (body.kind === "passkey" && options.passkeys && !options.passkeys.includes(body.ref)) {
+        return json({ code: "unknown_passkey" }, 422);
       }
       if (body.kind === "device" && (!body.publicKey || !body.attestation)) {
         return json({ code: "attestation_required" }, 422);
@@ -770,5 +773,15 @@ describe("passkey wraps", () => {
     await expect(
       unlockWithPasskey({ userId, credentialId: CRED, prf: prfOf(4), fetch: api.fetch }),
     ).rejects.toEqual(new KeysError("no_passkey_wrap"));
+  });
+
+  it("a credential that is not the account's never gets a wrap (422 unknown_passkey)", async () => {
+    const api = fakeKeys({ passkeys: [CRED] });
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    await expect(
+      addPasskeyWrap({ userId, credentialId: "c29tZW9uZS1lbHNl", prf: prfOf(3), fetch: api.fetch }),
+    ).rejects.toEqual(new KeysError("unknown_passkey", 422));
+    expect(api.wraps.filter((w) => w.kind === "passkey")).toHaveLength(0);
   });
 });
