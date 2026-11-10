@@ -811,9 +811,12 @@
       "busy": "Apertura…",
       "error_bad_recovery_key": "Quella chiave non ha il formato giusto. Controlla di averla copiata tutta.",
       "error_wrong_recovery_key": "Quella chiave non apre questo account. Prova con quella che hai salvato alla creazione.",
+      "error_no_prf": "Questa passkey non può aprire i tuoi dati: il tuo gestore di password non lo consente. Scrivi la tua chiave di recupero o apri i dati da un altro dispositivo.",
+      "error_no_passkey_wrap": "Questa passkey non apre ancora i tuoi dati. Scrivi la tua chiave di recupero una volta e da allora li aprirà anche lei.",
       "error_offline": "Sei offline. Riprova quando torni online.",
       "error_server": "Qualcosa è andato storto da parte nostra. Riprova.",
-      "soon": "Presto potrai aprire i tuoi dati con una passkey o da un altro dispositivo."
+      "passkey": "Usa una passkey",
+      "soon": "Presto potrai aprire i tuoi dati anche da un altro dispositivo."
     },
     "locked": {
       "title": "Non siamo riusciti ad aprire i tuoi dati",
@@ -832,6 +835,7 @@
       "deleting": "Eliminazione…",
       "delete_failed": "Non siamo riusciti a eliminarlo. Riprova.",
       "delete_cancel": "Annulla"
-    }
+    },
+    "passkey_second_touch": "Tocca di nuovo la tua passkey: così aprirà anche i tuoi dati cifrati."
   }
 }

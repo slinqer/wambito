@@ -8,7 +8,15 @@ import type { UnlockError } from "./Unlock.tsx";
  *      │                                                               ▲
  *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
  *      │     (a guest commits at once, nothing to show)                │
- *      └─ account with wraps ──▶ unlock ─ recovery key ────────────────┘
+ *      └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
+ *                              └─ the sign-in's passkey PRF opens a wrap ─▶ opening
+ *
+ * Passkeys (stage 2b): a passkey sign-in (or a fresh registration) leaves its PRF in a one-shot
+ * stash (`takeSignInPrf`). An account with keys elsewhere tries it first; when it opens nothing,
+ * Unlock shows, and once the vault is unlocked by other means (the recovery key, a new account's
+ * setup) the gate adds the wrap for that credential. Unlock's "Use a passkey" touches a passkey
+ * for its PRF (`evaluatePrf`); one without a wrap is kept the same way. A known browser zeroes the
+ * stash. Every PRF is zeroed once used.
  *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
@@ -21,6 +29,12 @@ import type { UnlockError } from "./Unlock.tsx";
  * asks who is signed in; another account (or none) reloads the app for them, so nothing runs for
  * the old id. The server refuses a `/v2` call for another account (409) as the last guard.
  */
+
+/** A touched passkey's credential id and PRF output; the gate zeroes `prf` once used. */
+export interface GatePasskey {
+  credentialId: string;
+  prf: Uint8Array;
+}
 
 /** The keys a gate hands from setup or unlock to opening; opaque here. */
 export type GateKeys = unknown;
@@ -51,6 +65,14 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
   sessionUserId?(): Promise<string | null>;
   /** Loads the app again for whoever is signed in now. */
   reload?(): void;
+  /** The sign-in's (or registration's) passkey PRF, once; null when there is none. */
+  takeSignInPrf?(): GatePasskey | null;
+  /** Opens the passkey wrap of that credential; throws `{ code: "no_passkey_wrap" }` when none. */
+  unlockWithPasskey?(passkey: GatePasskey): Promise<K>;
+  /** Adds the wrap for that passkey, from this browser's device wrap (once unlocked). */
+  addPasskeyWrap?(passkey: GatePasskey): Promise<void>;
+  /** Touches a passkey for its PRF: null when cancelled, `{ code: "no_prf" }` without one. */
+  evaluatePrf?(): Promise<GatePasskey | null>;
 }
 
 /** Why the vault is locked; `unsupported` and `guest` have no retry. */
@@ -74,6 +96,8 @@ export interface VaultGate<S = unknown> {
   confirmSetup(): Promise<void>;
   /** The Unlock screen's submit: null when it worked, else why not (the screen shows it). */
   unlock(text: string): Promise<UnlockError | null>;
+  /** Unlock's "Use a passkey": null when it worked or was cancelled, else why not. */
+  unlockWithPasskey(): Promise<UnlockError | null>;
   /** Locked's retry. */
   retry(): void;
   /** The open vault closed under the app (another tab): check again (reopen, or Unlock). */
@@ -85,6 +109,8 @@ export interface VaultGate<S = unknown> {
 const UNLOCK_ERRORS: readonly string[] = [
   "bad_recovery_key",
   "wrong_recovery_key",
+  "no_prf",
+  "no_passkey_wrap",
   "offline",
   "server",
 ];
@@ -110,6 +136,44 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   let started = false;
   let prepared: GatePrepared<K> | null = null;
   let again: () => Promise<void> = check;
+  /** A passkey without a wrap yet: its wrap is added once the vault is unlocked by other means. */
+  let pendingPasskey: GatePasskey | null = null;
+
+  const keepPending = (passkey: GatePasskey | null) => {
+    if (pendingPasskey && pendingPasskey !== passkey) pendingPasskey.prf.fill(0);
+    pendingPasskey = passkey;
+  };
+
+  /** Adds the pending passkey's wrap (a failure only leaves it without one), then zeroes it. */
+  async function wrapPending(): Promise<void> {
+    const passkey = pendingPasskey;
+    pendingPasskey = null;
+    if (!passkey) return;
+    try {
+      await deps.addPasskeyWrap?.(passkey);
+    } catch {
+      // The passkey simply does not unlock yet; Settings can turn it on later.
+    } finally {
+      passkey.prf.fill(0);
+    }
+  }
+
+  /** Tries a passkey's PRF on its wrap; on failure keeps it for after another unlock. */
+  async function tryPasskey(passkey: GatePasskey): Promise<{ keys: K } | { error: unknown }> {
+    if (!deps.unlockWithPasskey) {
+      keepPending(passkey);
+      return { error: { code: "no_passkey_wrap" } };
+    }
+    try {
+      const keys = await deps.unlockWithPasskey(passkey);
+      passkey.prf.fill(0);
+      return { keys };
+    } catch (error) {
+      if (codeOf(error) === "no_passkey_wrap") keepPending(passkey);
+      else passkey.prf.fill(0);
+      return { error };
+    }
+  }
 
   const set = (next: VaultGateState<S>) => {
     state = next;
@@ -119,8 +183,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   /** The account has keys made elsewhere: Unlock, or Locked for a guest (nothing to type). */
   const hasKeysElsewhere = () => {
     prepared = null;
-    if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
-    else set({ status: "unlock" });
+    if (deps.guest) {
+      // Nothing to unlock with first: a guest has no recovery key to type.
+      keepPending(null);
+      set({ status: "locked", kind: "guest", retrying: false });
+    } else set({ status: "unlock" });
   };
 
   /** Shows Locked; its retry runs `step`. */
@@ -155,7 +222,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   async function open(keys: K, fresh: boolean): Promise<void> {
     set({ status: "opening" });
     try {
-      set({ status: "ready", session: await deps.open(keys, fresh) });
+      const session = await deps.open(keys, fresh);
+      keepPending(null);
+      set({ status: "ready", session });
     } catch (error) {
       // The keys are kept now: a retry starts over and finds them.
       if (codeOf(error) === "session_changed") await changed(error, check);
@@ -178,14 +247,27 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
       lock(error, check);
       return;
     }
-    if (keys) return open(keys, false);
+    const stashed = deps.takeSignInPrf?.() ?? null;
+    if (keys) {
+      stashed?.prf.fill(0);
+      return open(keys, false);
+    }
+    if (stashed) keepPending(stashed);
     // Never make keys for an account that is no longer the signed-in one.
     if (!(await sameSession())) return;
     try {
       prepared = await deps.prepareAccount();
     } catch (error) {
-      if (codeOf(error) === "already_set_up") hasKeysElsewhere();
-      else if (codeOf(error) === "session_changed") await changed(error, check);
+      if (codeOf(error) === "already_set_up") {
+        const passkey = pendingPasskey;
+        if (passkey) {
+          pendingPasskey = null;
+          const tried = await tryPasskey(passkey);
+          if ("keys" in tried) return open(tried.keys, true);
+          if (codeOf(tried.error) === "session_changed") return changed(tried.error, check);
+        }
+        hasKeysElsewhere();
+      } else if (codeOf(error) === "session_changed") await changed(error, check);
       else lock(error, check);
       return;
     }
@@ -208,6 +290,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
       return;
     }
     prepared = null;
+    await wrapPending();
     return open(keys, true);
   }
 
@@ -241,8 +324,37 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
         }
         return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";
       }
+      await wrapPending();
       await open(keys, true);
       return null;
+    },
+    async unlockWithPasskey() {
+      if (state.status !== "unlock" || !deps.evaluatePrf) return null;
+      if (!(await sameSession())) return null;
+      let passkey: GatePasskey | null;
+      try {
+        passkey = await deps.evaluatePrf();
+      } catch (error) {
+        const code = codeOf(error);
+        return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";
+      }
+      if (!passkey) return null;
+      const tried = await tryPasskey(passkey);
+      if ("keys" in tried) {
+        keepPending(null);
+        await open(tried.keys, true);
+        return null;
+      }
+      const code = codeOf(tried.error);
+      if (code === "session_changed") {
+        await changed(tried.error, check);
+        return null;
+      }
+      if (code === "unsupported_browser") {
+        lock(tried.error, check);
+        return null;
+      }
+      return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";
     },
     closed() {
       if (state.status === "ready") void recheck();

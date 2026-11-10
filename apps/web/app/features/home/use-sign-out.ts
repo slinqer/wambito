@@ -2,6 +2,7 @@ import { useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
 import { useClearSession } from "../../api/ApiProvider.tsx";
 import { authClient } from "../../auth/auth-client.ts";
+import { clearSignInPrf } from "../../local/prf.ts";
 import { forgetVault } from "../../local/vault-session.ts";
 import { useToast } from "../../ui/Toast.tsx";
 
@@ -15,6 +16,8 @@ export type SignOutRequest = () => Promise<{ error: unknown }>;
  * through here too.
  */
 export const liveSignOut: SignOutRequest = async () => {
+  // A passkey's PRF kept for the vault never outlives the sign-out, whatever its answer.
+  clearSignInPrf();
   const result = await authClient.signOut();
   if (!result.error) {
     await forgetVault().catch(() => {

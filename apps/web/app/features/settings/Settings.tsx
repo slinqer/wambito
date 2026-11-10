@@ -75,7 +75,12 @@ export function Settings({
         </div>
         <PreferencesSection />
         <TimeAndMoneySection me={me} />
-        <PasskeysSection passkeys={passkeys} timeZone={me.timezone} off={demo} />
+        <PasskeysSection
+          passkeys={passkeys}
+          timeZone={me.timezone}
+          off={demo}
+          vaultUserId={local ? me.id : undefined}
+        />
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">
             <SettingLabel label={t("data.import_title")} hint={t("data.import_lead")} />

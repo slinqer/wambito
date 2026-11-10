@@ -6,7 +6,15 @@ import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
 import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
-import { KeysError, loadLocalKeys, prepareAccount, unlockWithRecovery } from "../../local/keys.ts";
+import {
+  addPasskeyWrap,
+  KeysError,
+  loadLocalKeys,
+  prepareAccount,
+  unlockWithPasskey,
+  unlockWithRecovery,
+} from "../../local/keys.ts";
+import { clearSignInPrf, evaluatePrf, takeSignInPrf } from "../../local/prf.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -68,6 +76,11 @@ function gateFor(profile: VaultProfile): Gate<VaultSession> {
     loadLocalKeys: () => loadLocalKeys(userId),
     prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
     unlockWithRecovery: (text) => signInAgainOn401(unlockWithRecovery({ userId, text })),
+    // The passkey the person signed in (or registered) with, then Unlock's "Use a passkey".
+    takeSignInPrf,
+    unlockWithPasskey: (passkey) => signInAgainOn401(unlockWithPasskey({ userId, ...passkey })),
+    addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
+    evaluatePrf: () => evaluatePrf(),
     open: (keys, fresh) =>
       openVaultSession({
         profile,
@@ -109,6 +122,10 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   const state = useSyncExternalStore(gate.subscribe, gate.getState, gate.getState);
   const session = state.status === "ready" ? state.session : null;
   useEffect(() => session?.onClosed(() => gate.closed()), [session, gate]);
+  // The open app needs no passkey PRF: whatever is still kept is zeroed.
+  useEffect(() => {
+    if (session) clearSignInPrf();
+  }, [session]);
   // The live sign-out: it wipes this browser's vault (the gate remembered the account).
   const signOut = useSignOut();
   const deleteAccount = useDeleteLockedAccount();
@@ -123,7 +140,13 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
         />
       );
     case "unlock":
-      return <Unlock onUnlock={gate.unlock} onSignOut={() => void signOut()} />;
+      return (
+        <Unlock
+          onUnlock={gate.unlock}
+          onPasskey={gate.unlockWithPasskey}
+          onSignOut={() => void signOut()}
+        />
+      );
     case "locked":
       return (
         <Locked

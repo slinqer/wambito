@@ -14,7 +14,12 @@ const meta = {
       </MemoryRouter>
     ),
   ],
-  args: { onUnlock: fn(async (): Promise<UnlockError | null> => null), onSignOut: fn() },
+  args: {
+    onUnlock: fn(async (): Promise<UnlockError | null> => null),
+    onPasskey: fn(async (): Promise<UnlockError | null> => null),
+    passkeysSupported: (): boolean => true,
+    onSignOut: fn(),
+  },
 } satisfies Meta<typeof Unlock>;
 
 export default meta;
@@ -31,9 +36,9 @@ export const Ready: Story = {
     await expect(
       canvas.getByRole("heading", { level: 1, name: "Abre tus datos aquí" }),
     ).toBeVisible();
-    await expect(canvas.getByText(/llave de acceso o desde otro dispositivo/)).toBeVisible();
-    // The other ways are announced, not offered: the screen's own buttons and sign-out only.
-    await expect(canvas.getAllByRole("button")).toHaveLength(3);
+    await expect(canvas.getByText(/desde otro dispositivo/)).toBeVisible();
+    // One more than before: the passkey. Another device is announced, not offered yet.
+    await expect(canvas.getAllByRole("button")).toHaveLength(4);
     await userEvent.click(canvas.getByRole("button", { name: "Cerrar sesión" }));
     await expect(args.onSignOut).toHaveBeenCalledTimes(1);
     await expectTarget(canvas.getByLabelText("Clave de recuperación").parentElement as HTMLElement);
@@ -86,5 +91,46 @@ export const Opening: Story = {
     const canvas = within(canvasElement);
     await typeKey(canvas, "7QK2");
     await expect(await canvas.findByRole("button", { name: "Abriendo…" })).toBeDisabled();
+  },
+};
+
+export const UsePasskey: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Usar una llave de acceso" }));
+    await expect(args.onPasskey).toHaveBeenCalledTimes(1);
+    await expect(args.onUnlock).not.toHaveBeenCalled();
+    await expect(canvas.queryByRole("alert")).toBeNull();
+  },
+};
+
+export const PasskeyWithoutPrf: Story = {
+  args: { onPasskey: fn(async () => "no_prf" as const) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Usar una llave de acceso" }));
+    const alert = await canvas.findByRole("alert");
+    // The two other ways: the recovery key, and another device.
+    await expect(alert).toHaveTextContent("clave de recuperación");
+    await expect(alert).toHaveTextContent("otro dispositivo");
+  },
+};
+
+export const PasskeyWithoutWrap: Story = {
+  args: { onPasskey: fn(async () => "no_passkey_wrap" as const) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Usar una llave de acceso" }));
+    await expect(await canvas.findByRole("alert")).toHaveTextContent("clave de recuperación");
+  },
+};
+
+export const NoPasskeys: Story = {
+  args: { passkeysSupported: () => false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole("button", { name: "Usar una llave de acceso" })).toBeNull();
+    // The screen's own buttons and sign-out only, as before passkeys could unlock.
+    await expect(canvas.getAllByRole("button")).toHaveLength(3);
   },
 };

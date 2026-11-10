@@ -32,13 +32,17 @@ export function PasskeysSection({
   passkeys,
   timeZone,
   off = false,
+  vaultUserId,
 }: {
   passkeys: PasskeysApi;
   timeZone: string;
   /** The demo: nothing is listed or asked of the browser; "Agregar" is off, with a note. */
   off?: boolean;
+  /** An encrypted account's open vault: a new passkey unlocks it too (its PRF wraps the data key). */
+  vaultUserId?: string | undefined;
 }) {
   const t = useTranslations("settings.passkeys");
+  const tVault = useTranslations("vault");
   const { locale } = useLocale();
   const qc = useQueryClient();
   const toast = useToast();
@@ -57,7 +61,14 @@ export function PasskeysSection({
     inFlight.current = true;
     setAdding(true);
     try {
-      const outcome = await passkeys.add();
+      const outcome = await passkeys.add(
+        vaultUserId
+          ? {
+              userId: vaultUserId,
+              explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
+            }
+          : undefined,
+      );
       if (outcome === "added") {
         toast.show({ message: t("added") });
         await qc.invalidateQueries({ queryKey: PASSKEYS_KEY });

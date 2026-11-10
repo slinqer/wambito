@@ -3,6 +3,7 @@ import { previewProfile } from "../auth/encryption.ts";
 import { requireOnboarded, requireSession } from "../auth/session.ts";
 import { AppShell } from "../features/home/AppShell.tsx";
 import { LocalOnboardingRoute, VaultGate } from "../features/vault/VaultGate.tsx";
+import { clearSignInPrf } from "../local/prf.ts";
 import type { Route } from "./+types/app";
 
 /**
@@ -15,6 +16,8 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   const next = new URL(request.url).pathname;
   await requireSession(next);
   const vault = await previewProfile();
+  // A plain account has no vault: a passkey PRF kept at sign-in is not needed.
+  if (!vault) clearSignInPrf();
   if (!vault) await requireOnboarded(next);
   return { vault };
 }

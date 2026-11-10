@@ -1,34 +1,73 @@
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
+import { passkeysSupported as browserPasskeys } from "../../auth/passkey.ts";
 import { cx } from "../../ui/cx.ts";
+import { FingerprintIcon } from "../../ui/FingerprintIcon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 
 /** Why unlocking failed; `null` from `onUnlock` means it worked. Mirrors `KeysError.code`. */
-export type UnlockError = "bad_recovery_key" | "wrong_recovery_key" | "offline" | "server";
+export type UnlockError =
+  | "bad_recovery_key"
+  | "wrong_recovery_key"
+  | "no_prf"
+  | "no_passkey_wrap"
+  | "offline"
+  | "server";
 
 export interface UnlockProps {
   /** Tries the typed text (any case, spaces or dashes). Resolves to the error, or `null`. */
   onUnlock(text: string): Promise<UnlockError | null>;
+  /**
+   * "Use a passkey": a touch of one of the person's passkeys for its PRF. Resolves to the error, or
+   * `null` (it worked, or the person closed the prompt). Without it there is no button.
+   */
+  onPasskey?(): Promise<UnlockError | null>;
+  /** Whether this browser can use passkeys (WebAuthn); stories stand in for it. */
+  passkeysSupported?(): boolean;
   /** Signs out (and wipes this browser's vault): the way out. */
   onSignOut(): void;
 }
 
-/** A new browser on an account that has keys: type the recovery key to open the data here. */
-export function Unlock({ onUnlock, onSignOut }: UnlockProps) {
+/**
+ * A new browser on an account that has keys: type the recovery key, or touch a passkey whose PRF
+ * opens its wrap, to open the data here.
+ */
+export function Unlock({
+  onUnlock,
+  onPasskey,
+  passkeysSupported = browserPasskeys,
+  onSignOut,
+}: UnlockProps) {
   const t = useTranslations("vault.unlock");
   const tVault = useTranslations("vault");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UnlockError | null>(null);
+  const [passkeyError, setPasskeyError] = useState<UnlockError | null>(null);
+  const [withPasskey] = useState(() => Boolean(onPasskey) && passkeysSupported());
   const inputId = useId();
   const errorId = useId();
+  const passkeyErrorId = useId();
+
+  async function passkey() {
+    if (busy || !onPasskey) return;
+    setBusy(true);
+    setError(null);
+    setPasskeyError(null);
+    try {
+      setPasskeyError(await onPasskey());
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy || text.trim() === "") return;
     setBusy(true);
     setError(null);
+    setPasskeyError(null);
     try {
       setError(await onUnlock(text));
     } finally {
@@ -70,6 +109,23 @@ export function Unlock({ onUnlock, onSignOut }: UnlockProps) {
           {busy ? t("busy") : t("submit")}
         </PressButton>
       </form>
+      {withPasskey && (
+        <div className="flex w-full flex-col gap-(--space-2)">
+          <PressButton
+            variant="secondary"
+            className="w-full"
+            disabled={busy}
+            aria-describedby={passkeyError ? passkeyErrorId : undefined}
+            onClick={() => void passkey()}
+          >
+            <FingerprintIcon />
+            {t("passkey")}
+          </PressButton>
+          {passkeyError && (
+            <FieldError id={passkeyErrorId}>{t(`error_${passkeyError}`)}</FieldError>
+          )}
+        </div>
+      )}
       <p className="text-center text-[14px] text-ink-muted">{t("soon")}</p>
       <PressButton variant="ghost" className="w-full" disabled={busy} onClick={onSignOut}>
         {tVault("sign_out")}

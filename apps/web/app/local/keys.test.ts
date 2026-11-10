@@ -13,6 +13,7 @@ import {
   toBase64Url,
   unwrapDataKey,
   verifyDeviceAttestation,
+  wrapDataKey,
 } from "@wambito/crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore } from "./encrypted-store.ts";
@@ -32,6 +33,7 @@ vi.mock("@wambito/crypto", async (original) => {
 });
 
 import {
+  addPasskeyWrap,
   dropKeyVersion,
   forgetDevice,
   KeysError,
@@ -39,6 +41,7 @@ import {
   loadLocalKeys,
   prepareAccount,
   refreshKeys,
+  unlockWithPasskey,
   unlockWithRecovery,
   withDataKey,
 } from "./keys.ts";
@@ -105,7 +108,10 @@ function fakeKeys() {
         label: body.label ?? null,
       };
       const at = wraps.findIndex(
-        (w) => w.id === id || (w.kind === "recovery" && body.kind === "recovery"),
+        (w) =>
+          w.id === id ||
+          (w.kind === "recovery" && body.kind === "recovery") ||
+          (w.kind === "passkey" && body.kind === "passkey" && w.ref === body.ref),
       );
       if (at >= 0) wraps.splice(at, 1);
       wraps.push(wrap);
@@ -669,5 +675,100 @@ describe("refreshKeys", () => {
       code: "device_removed",
     });
     expect((await loadLocalKeys(userId))?.keyring.current).toBe(1);
+  });
+});
+
+describe("passkey wraps", () => {
+  const CRED = "cHJmLWNyZWRlbnRpYWw";
+  const prfOf = (fill: number) => new Uint8Array(32).fill(fill);
+
+  /** An account set up in another browser, with its recovery key typed here and a known DK. */
+  async function accountInAnotherBrowser() {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery")!;
+    const dk = await unwrapDataKey(
+      parseRecoveryKey(recoveryKey as string),
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const record = currentKeys(await loadLocalKeys(userId));
+    await forgetDevice(userId);
+    return { api, userId, dk, record };
+  }
+
+  it("unlockWithPasskey opens the wrap whose ref is the credential and enrolls this browser", async () => {
+    const { api, userId, dk, record } = await accountInAnotherBrowser();
+    const prf = prfOf(5);
+    api.wraps.push(
+      {
+        id: "01930000-0000-7000-8000-0000000000b1",
+        kind: "passkey",
+        ref: "other",
+        keyV: 1,
+        wrapped: toBase64Url(
+          await wrapDataKey(prfOf(6), { kind: "passkey", userId, keyV: 1 }, generateDataKey()),
+        ),
+        publicKey: null,
+        attestation: null,
+        label: null,
+      },
+      {
+        id: "01930000-0000-7000-8000-0000000000b2",
+        kind: "passkey",
+        ref: CRED,
+        keyV: 1,
+        wrapped: toBase64Url(await wrapDataKey(prf, { kind: "passkey", userId, keyV: 1 }, dk)),
+        publicKey: null,
+        attestation: null,
+        label: null,
+      },
+    );
+    const keys = await unlockWithPasskey({ userId, credentialId: CRED, prf, fetch: api.fetch });
+    expect(keys.keyring.current).toBe(1);
+    expect(api.wraps.filter((w) => w.kind === "device")).toHaveLength(2);
+    const sealed = await sealRecord(record, CTX(userId, REC), { s: 1 });
+    expect(
+      await openRecord(currentKeys(await loadLocalKeys(userId)), CTX(userId, REC), sealed),
+    ).toEqual({ s: 1 });
+  });
+
+  it("unlockWithPasskey with an unknown credential is no_passkey_wrap", async () => {
+    const { api, userId } = await accountInAnotherBrowser();
+    const before = api.puts.length;
+    await expect(
+      unlockWithPasskey({ userId, credentialId: CRED, prf: prfOf(5), fetch: api.fetch }),
+    ).rejects.toEqual(new KeysError("no_passkey_wrap"));
+    expect(api.puts.length).toBe(before);
+    expect(await loadLocalKeys(userId)).toBeNull();
+  });
+
+  it("addPasskeyWrap PUTs a wrap that unlockWithPasskey opens", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const record = currentKeys(await loadLocalKeys(userId));
+    await addPasskeyWrap({ userId, credentialId: CRED, prf: prfOf(3), fetch: api.fetch });
+    // Again (a second registration of the same credential): it replaces, it does not add.
+    await addPasskeyWrap({ userId, credentialId: CRED, prf: prfOf(3), fetch: api.fetch });
+    const passkeys = api.wraps.filter((w) => w.kind === "passkey");
+    expect(passkeys).toHaveLength(1);
+    expect(passkeys[0]).toMatchObject({ ref: CRED, keyV: 1 });
+
+    await forgetDevice(userId);
+    const keys = await unlockWithPasskey({
+      userId,
+      credentialId: CRED,
+      prf: prfOf(3),
+      fetch: api.fetch,
+    });
+    const sealed = await sealRecord(record, CTX(userId, REC), { s: 2 });
+    expect(await openRecord(currentKeys(keys), CTX(userId, REC), sealed)).toEqual({ s: 2 });
+    // Another PRF opens nothing.
+    await forgetDevice(userId);
+    await expect(
+      unlockWithPasskey({ userId, credentialId: CRED, prf: prfOf(4), fetch: api.fetch }),
+    ).rejects.toEqual(new KeysError("no_passkey_wrap"));
   });
 });

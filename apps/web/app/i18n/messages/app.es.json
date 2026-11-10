@@ -811,9 +811,12 @@
       "busy": "Abriendo…",
       "error_bad_recovery_key": "Esa clave no tiene el formato correcto. Revisa que la copiaste completa.",
       "error_wrong_recovery_key": "Esa clave no abre esta cuenta. Prueba con la que guardaste al crearla.",
+      "error_no_prf": "Esta llave de acceso no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
+      "error_no_passkey_wrap": "Esta llave de acceso todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
       "error_offline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
       "error_server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
-      "soon": "Pronto podrás abrir tus datos con una llave de acceso o desde otro dispositivo."
+      "passkey": "Usar una llave de acceso",
+      "soon": "Pronto también podrás abrirlos desde otro dispositivo."
     },
     "locked": {
       "title": "No pudimos abrir tus datos",
@@ -832,6 +835,7 @@
       "deleting": "Eliminando…",
       "delete_failed": "No pudimos eliminarla. Inténtalo de nuevo.",
       "delete_cancel": "Cancelar"
-    }
+    },
+    "passkey_second_touch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados."
   }
 }

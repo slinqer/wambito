@@ -811,9 +811,12 @@
       "busy": "Opening…",
       "error_bad_recovery_key": "That key is not in the right format. Check that you copied all of it.",
       "error_wrong_recovery_key": "That key does not open this account. Try the one you saved when you created it.",
+      "error_no_prf": "This passkey can't open your data: your password manager doesn't allow it. Type your recovery key, or open your data from another device.",
+      "error_no_passkey_wrap": "This passkey doesn't open your data yet. Type your recovery key once, and from then on it will.",
       "error_offline": "You are offline. Try again when you are back online.",
       "error_server": "Something went wrong on our side. Try again.",
-      "soon": "Soon you will be able to open your data with a passkey or from another device."
+      "passkey": "Use a passkey",
+      "soon": "Soon you will also be able to open your data from another device."
     },
     "locked": {
       "title": "We could not open your data",
@@ -832,6 +835,7 @@
       "deleting": "Deleting…",
       "delete_failed": "We couldn't delete it. Try again.",
       "delete_cancel": "Cancel"
-    }
+    },
+    "passkey_second_touch": "Touch your passkey once more: that lets it open your encrypted data too."
   }
 }

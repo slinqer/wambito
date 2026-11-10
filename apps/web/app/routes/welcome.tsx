@@ -5,6 +5,7 @@ import { requireSession } from "../auth/session.ts";
 import { Welcome } from "../features/onboarding/Welcome.tsx";
 import { LocalOnboardingRoute, VaultGate } from "../features/vault/VaultGate.tsx";
 import { CATALOGS } from "../i18n/catalog.ts";
+import { clearSignInPrf } from "../local/prf.ts";
 import type { Route } from "./+types/welcome";
 
 export const meta = () => {
@@ -20,6 +21,8 @@ export const meta = () => {
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   const user = await requireSession(new URL(request.url).pathname);
   const vault = await previewProfile();
+  // A plain account has no vault: a passkey PRF kept at sign-in is not needed.
+  if (!vault) clearSignInPrf();
   if (!vault && user.onboardingCompletedAt != null) throw redirect("/app");
   return { vault };
 }

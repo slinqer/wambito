@@ -42,7 +42,11 @@ export type KeysErrorCode =
   /** The server lists no device wrap for this browser (or one sealed to another key): removed. */
   | "device_removed"
   /** Another device rotated the data key first (409 `key_version_mismatch`): nothing was kept. */
-  | "rotated_elsewhere";
+  | "rotated_elsewhere"
+  /** The touched passkey gave no PRF output (some password managers): it cannot open a wrap. */
+  | "no_prf"
+  /** No passkey wrap has the touched credential as `ref`, or its PRF does not open it. */
+  | "no_passkey_wrap";
 
 export class KeysError extends Error {
   constructor(
@@ -367,6 +371,62 @@ export async function unlockWithRecovery(
   } finally {
     secret.fill(0);
   }
+}
+
+/** A passkey's credential id (base64url, Better Auth's `credentialID`) and its PRF output. */
+export interface PasskeySecret {
+  credentialId: string;
+  prf: Uint8Array;
+}
+
+/**
+ * Unlocks this browser with a passkey's PRF (spec 7.2): opens the passkey wrap whose `ref` is the
+ * credential, enrolls this device and keeps the derived keys, as `unlockWithRecovery`. The caller
+ * owns the PRF and zeroes it. `no_passkey_wrap` when no wrap has that `ref` or the PRF does not
+ * open it (nothing is sent).
+ */
+export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): Promise<LocalKeys> {
+  const { userId, credentialId, prf } = options;
+  const pair = await safeDeviceKeyPair(options);
+  const call = api(options);
+  const wrap = (await listWraps(call)).find((w) => w.kind === "passkey" && w.ref === credentialId);
+  if (!wrap) throw new KeysError("no_passkey_wrap");
+  let dataKey: Uint8Array;
+  try {
+    dataKey = await unwrapDataKey(
+      prf,
+      { kind: "passkey", userId, keyV: wrap.keyV },
+      fromBase64Url(wrap.wrapped),
+    );
+  } catch {
+    throw new KeysError("no_passkey_wrap");
+  }
+  try {
+    return await enrollWithPair(call, userId, dataKey, wrap.keyV, pair);
+  } finally {
+    dataKey.fill(0);
+  }
+}
+
+/**
+ * Adds (or replaces) the wrap of DK for one passkey: DK from this browser's own device wrap
+ * (`withDataKey`, Ruling 1 of stage 2b; the touch on that passkey is the confirmation), wrapped
+ * under its PRF at the current `keyV`, PUT as `kind: "passkey"`, `ref: credentialId`. A passkey
+ * that already has a wrap keeps its id. The caller owns the PRF and zeroes it.
+ */
+export async function addPasskeyWrap(options: KeysOptions & PasskeySecret): Promise<void> {
+  const { userId, credentialId, prf } = options;
+  await withDataKey(options, async (dataKey, keyV) => {
+    const call = api(options);
+    const existing = (await listWraps(call)).find(
+      (w) => w.kind === "passkey" && w.ref === credentialId,
+    );
+    const wrapped = await wrapDataKey(prf, { kind: "passkey", userId, keyV }, dataKey);
+    await call(
+      `/v2/keys/${existing?.id ?? uuidv7()}`,
+      putJson({ kind: "passkey", ref: credentialId, keyV, wrapped: toBase64Url(wrapped) }),
+    );
+  });
 }
 
 /**

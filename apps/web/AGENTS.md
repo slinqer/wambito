@@ -81,6 +81,24 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
   `api`, `listWraps`, `putJson` and `WrapDto` are exported for `rotate.ts`.
+  Passkeys: `unlockWithPasskey({ userId, credentialId, prf })` opens the passkey wrap whose `ref` is
+  the credential (base64url, Better Auth's `credentialID`) and enrolls this browser
+  (`KeysError("no_passkey_wrap")` when none opens); `addPasskeyWrap({ userId, credentialId, prf })`
+  PUTs `kind: "passkey"`, `ref`, at the current `keyV`, DK from `withDataKey` (the touch is the
+  confirmation; an existing wrap of that credential keeps its id). The caller zeroes the PRF.
+  `prf.ts`: `prfExtension()` (`PRF_SALT`), `readPrf(clientExtensionResults)` (a copy of
+  `prf.results.first` only when 32 bytes: `prf: {}` from Proton Pass / 1Password is null),
+  `evaluatePrf(credentialIds?)` (a raw `navigator.credentials.get`, random challenge, `rpId` =
+  hostname, `userVerification: "required"`; nothing goes to the server; null on cancel,
+  `KeysError("no_prf")`), and the one-shot stash `keepSignInPrf` / `takeSignInPrf` /
+  `clearSignInPrf` (module memory only, never storage; cleared by `liveSignOut`, by the `/app` and
+  `/welcome` loaders of a plain account and once the vault is open). The passkey sign-in (also
+  autofill, `features/sign-in/auth.ts`) and `auth/passkey.ts` `addPasskey(prf?)` ask for the
+  extension with `returnWebAuthnResponse: true`; a registration that says `prf.enabled` without
+  results gets one second touch (`evaluatePrf([newId])`, explained first by a toast
+  `vault.passkey_second_touch`) only for an encrypted account. The passkey offer stashes the new
+  passkey's PRF for the gate; Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
+  at once.
   `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
   dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
@@ -124,7 +142,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
-  ready, else `Locked` with a retry of the failed step; before making or unlocking keys, when the
+  ready, else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
+  the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
+  from Unlock's "Use a passkey", `gate.unlockWithPasskey()`) gets its wrap once the vault is
+  unlocked by the recovery key or set up; a known browser zeroes the stash; before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
   nothing runs for the old id; Locked kinds `error`, `offline`,
@@ -136,7 +157,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"), `Unlock` (`onUnlock(text) → UnlockError |
-  null`), `Locked` (retry, guest delete); all three have `onSignOut` (the gate passes `useSignOut`,
+  null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
+  where `passkeysSupported()` is false), `Locked` (retry, guest delete); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule

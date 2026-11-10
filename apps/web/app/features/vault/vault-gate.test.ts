@@ -376,4 +376,150 @@ describe("vault gate", () => {
       expect(deps.open).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("passkeys", () => {
+    const stash = () => ({ credentialId: "cred-1", prf: new Uint8Array(32).fill(7) });
+    const elsewhere = {
+      prepareAccount: vi.fn(async () => {
+        throw fail("already_set_up");
+      }),
+    };
+
+    it("a stashed sign-in PRF that opens a wrap unlocks without showing Unlock", async () => {
+      const kept = stash();
+      const unlockWithPasskey = vi.fn(async () => ({ k: "passkey" }));
+      const { gate, deps, seen } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: () => kept,
+        unlockWithPasskey,
+      });
+      gate.start();
+      await settle();
+      expect(unlockWithPasskey).toHaveBeenCalledWith(
+        expect.objectContaining({ credentialId: "cred-1" }),
+      );
+      expect(deps.open).toHaveBeenCalledWith({ k: "passkey" }, true);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "passkey" } });
+      expect(seen).not.toContain("unlock");
+      // Used, then zeroed.
+      expect(kept.prf.every((b) => b === 0)).toBe(true);
+    });
+
+    it("one that opens nothing shows Unlock, and after a recovery unlock the wrap for that credential is added", async () => {
+      const kept = stash();
+      const addPasskeyWrap = vi.fn(async (passkey: { credentialId: string; prf: Uint8Array }) => {
+        expect(passkey.credentialId).toBe("cred-1");
+        expect(passkey.prf).toEqual(new Uint8Array(32).fill(7));
+      });
+      const { gate, deps } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: () => kept,
+        unlockWithPasskey: vi.fn(async () => {
+          throw fail("no_passkey_wrap");
+        }),
+        addPasskeyWrap,
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(addPasskeyWrap).not.toHaveBeenCalled();
+
+      expect(await gate.unlock("ABCD")).toBeNull();
+      expect(deps.unlockWithRecovery).toHaveBeenCalledWith("ABCD");
+      expect(addPasskeyWrap).toHaveBeenCalledTimes(1);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "unlocked" } });
+      expect(kept.prf.every((b) => b === 0)).toBe(true);
+    });
+
+    it("a wrap that fails to save still opens the vault", async () => {
+      const { gate } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: stash,
+        unlockWithPasskey: vi.fn(async () => {
+          throw fail("no_passkey_wrap");
+        }),
+        addPasskeyWrap: vi.fn(async () => {
+          throw fail("offline");
+        }),
+      });
+      gate.start();
+      await settle();
+      await gate.unlock("ABCD");
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "unlocked" } });
+    });
+
+    it("no stash shows Unlock", async () => {
+      const unlockWithPasskey = vi.fn(async () => ({ k: "passkey" }));
+      const { gate } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: () => null,
+        unlockWithPasskey,
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(unlockWithPasskey).not.toHaveBeenCalled();
+    });
+
+    it("a new account adds the stashed passkey's wrap after setup", async () => {
+      const addPasskeyWrap = vi.fn(async () => {});
+      const { gate } = gateWith({ takeSignInPrf: stash, addPasskeyWrap });
+      gate.start();
+      await settle();
+      await gate.confirmSetup();
+      expect(addPasskeyWrap).toHaveBeenCalledWith(
+        expect.objectContaining({ credentialId: "cred-1" }),
+      );
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
+    });
+
+    it("a known browser zeroes the stash and opens", async () => {
+      const kept = stash();
+      const { gate } = gateWith({
+        loadLocalKeys: async () => ({ k: "kept" }),
+        takeSignInPrf: () => kept,
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "kept" } });
+      expect(kept.prf.every((b) => b === 0)).toBe(true);
+    });
+
+    it("Use a passkey: the touch's PRF opens the vault", async () => {
+      const touched = stash();
+      const unlockWithPasskey = vi.fn(async () => ({ k: "touched" }));
+      const { gate } = gateWith({
+        ...elsewhere,
+        evaluatePrf: async () => touched,
+        unlockWithPasskey,
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBeNull();
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "touched" } });
+      expect(touched.prf.every((b) => b === 0)).toBe(true);
+    });
+
+    it("Use a passkey: cancelled stays on Unlock; no_prf and no_passkey_wrap are shown", async () => {
+      const evaluatePrf = vi
+        .fn<() => Promise<{ credentialId: string; prf: Uint8Array } | null>>()
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(fail("no_prf"))
+        .mockResolvedValueOnce(stash());
+      const { gate } = gateWith({
+        ...elsewhere,
+        evaluatePrf,
+        unlockWithPasskey: vi.fn(async () => {
+          throw fail("no_passkey_wrap");
+        }),
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBeNull();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
+      expect(await gate.unlockWithPasskey()).toBe("no_passkey_wrap");
+      expect(gate.getState()).toEqual({ status: "unlock" });
+    });
+  });
 });
