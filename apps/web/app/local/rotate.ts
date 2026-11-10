@@ -348,7 +348,10 @@ async function keepRotated(
  * A new recovery key (spec 7.5: no rotation): a new secret wraps DK, opened from this browser's
  * own device wrap, at the current `keyV`. `recoveryKey` is shown; `commit()` PUTs the wrap, which
  * replaces the account's recovery wrap (`rotated_elsewhere` when the key version moved meanwhile:
- * make it again). DK and the secret are zeroed before this returns.
+ * make it again). Retry-safe: the same id and wrap on every try, and a PUT whose answer was lost
+ * counts as saved when `GET /v2/keys` shows the prepared wrap (`landed()`). Any other failure may
+ * still have been saved: the caller keeps showing the key and retries. DK and the secret are
+ * zeroed before this returns.
  */
 export async function newRecoveryKey(
   options: KeysOptions,
@@ -364,17 +367,32 @@ export async function newRecoveryKey(
       wrapped: toBase64Url(await wrapDataKey(secret, { kind: "recovery", userId, keyV }, dataKey)),
     }));
     const id = uuidv7();
+    /** The server's recovery wrap is the prepared one: an answer lost on the way was a success. */
+    async function landed(): Promise<boolean> {
+      try {
+        const wrap = (await listWraps(call)).find((w) => w.kind === "recovery");
+        return wrap?.id === id && wrap.wrapped === body.wrapped;
+      } catch {
+        return false;
+      }
+    }
+    async function send(): Promise<void> {
+      try {
+        await call(`/v2/keys/${id}`, putJson(body));
+      } catch (error) {
+        // `rotated_elsewhere` was refused for sure; anything else may have been kept.
+        const refused = error instanceof KeysError && error.code === "rotated_elsewhere";
+        if (refused || !(await landed())) throw error;
+      }
+    }
     let sent: Promise<void> | null = null;
     return {
       recoveryKey,
       commit() {
-        sent ??= call(`/v2/keys/${id}`, putJson(body)).then(
-          () => undefined,
-          (error) => {
-            sent = null;
-            throw error;
-          },
-        );
+        sent ??= send().catch((error) => {
+          sent = null;
+          throw error;
+        });
         return sent;
       },
     };

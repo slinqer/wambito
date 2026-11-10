@@ -680,6 +680,7 @@
       "unreadable": "{count, plural, one {Non è stato possibile leggere # elemento} other {Non è stato possibile leggere # elementi}}",
       "unreadable_lead": "Sono stati salvati con una chiave che questo browser non ha. Restano al sicuro così come sono.",
       "passkeys_failed": "Non siamo riusciti a caricare le tue impronte, quindi non possiamo ancora offrirti una nuova chiave.",
+      "maybe_saved": "Potrebbe essere già stata salvata: conserva questa nuova chiave finché non dice che è pronta.",
       "remove_sheet": {
         "title": "Rimuovere {name}?",
         "body": "Non potrà più aprire i tuoi dati. Per questo cambiano le tue chiavi di cifratura: scrivi la tua chiave di recupero per confermare.",
@@ -698,10 +699,13 @@
       "new_key": {
         "title": "Crea una nuova chiave di recupero",
         "body": "La vecchia chiave smette di funzionare. Prima conferma che sei tu: scrivi la tua chiave di recupero attuale o usa un'impronta.",
+        "body_no_passkeys": "La vecchia chiave smette di funzionare. Prima conferma che sei tu: scrivi la tua chiave di recupero attuale. Se l'hai persa, puoi crearne una nuova senza.",
+        "body_no_touch": "La vecchia chiave smette di funzionare. Prima conferma che sei tu: scrivi la tua chiave di recupero attuale. Le tue impronte non si possono usare in questo browser.",
         "key_label": "Chiave di recupero attuale",
         "continue": "Continua",
         "checking": "Verifica…",
         "passkey": "Usa un'impronta",
+        "plain": "L'hai persa? Creane una nuova senza",
         "saved": "La tua nuova chiave di recupero è salvata. Quella vecchia non funziona più.",
         "rotated_elsewhere": "Nel frattempo le tue chiavi sono cambiate su un altro dispositivo. Crea di nuovo la nuova chiave.",
         "failed": "Non siamo riusciti a salvare la nuova chiave. Riprova."

@@ -680,6 +680,7 @@
       "unreadable": "{count, plural, one {Could not read # item} other {Could not read # items}}",
       "unreadable_lead": "They were saved with a key this browser does not have. They are kept safe as they are.",
       "passkeys_failed": "We couldn't load your fingerprints, so a new key can't be offered yet.",
+      "maybe_saved": "It may have been saved: keep this new key until it says it is done.",
       "remove_sheet": {
         "title": "Remove {name}?",
         "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm.",
@@ -698,10 +699,13 @@
       "new_key": {
         "title": "Make a new recovery key",
         "body": "The old key stops working. First confirm it's you: type your current recovery key, or use a fingerprint.",
+        "body_no_passkeys": "The old key stops working. First confirm it's you: type your current recovery key. If you lost it, you can make a new one without it.",
+        "body_no_touch": "The old key stops working. First confirm it's you: type your current recovery key. Your fingerprints can't be used in this browser.",
         "key_label": "Current recovery key",
         "continue": "Continue",
         "checking": "Checking…",
         "passkey": "Use a fingerprint",
+        "plain": "Lost it? Make a new one without it",
         "saved": "Your new recovery key is saved. The old one no longer works.",
         "rotated_elsewhere": "Your keys changed on another device meanwhile. Make the new key again.",
         "failed": "We couldn't save the new key. Try again."

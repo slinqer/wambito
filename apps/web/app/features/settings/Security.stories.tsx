@@ -69,13 +69,27 @@ interface FakeOptions {
   rotate?: Array<"ok" | "wrong_recovery_key" | "rotated_elsewhere">;
   /** What the passkey touch gives. */
   touch?: "prf" | "no_prf" | "cancel";
+  /** What each commit of a rotation does, in turn (default: works). */
+  commitRotate?: Array<"ok" | "offline" | "rotated_elsewhere">;
+  /** What each commit of a new recovery key does, in turn (default: works). */
+  commitNewKey?: Array<"ok" | "offline" | "rotated_elsewhere">;
 }
 
 /** The vault's keys in memory, with spies on every effect. */
-function fakeSecurity({ unreadable = 3, rotate = [], touch = "prf" }: FakeOptions = {}) {
+function fakeSecurity({
+  unreadable = 3,
+  rotate = [],
+  touch = "prf",
+  commitRotate: rotateCommits = [],
+  commitNewKey: newKeyCommits = [],
+}: FakeOptions = {}) {
   let wraps = [...WRAPS];
   let attempt = 0;
+  let rotateCommit = 0;
+  let newKeyCommit = 0;
   const commitRotate = fn(async (request: RotateRequest): Promise<RotateResult> => {
+    const outcome = rotateCommits[rotateCommit++] ?? "ok";
+    if (outcome !== "ok") throw coded(outcome);
     const removed = new Set(request.remove);
     const dropped = wraps
       .filter(
@@ -98,7 +112,10 @@ function fakeSecurity({ unreadable = 3, rotate = [], touch = "prf" }: FakeOption
       .map((w) => ({ ...w, keyV: 2 }));
     return { keyV: 2, dropped };
   });
-  const commitNewKey = fn(async () => {});
+  const commitNewKey = fn(async () => {
+    const outcome = newKeyCommits[newKeyCommit++] ?? "ok";
+    if (outcome !== "ok") throw coded(outcome);
+  });
   const security = {
     load: fn(
       async (): Promise<SecuritySnapshot> => ({
@@ -603,5 +620,146 @@ export const NewKeyWithoutPasskeys: Story = {
     await userEvent.click(sheet.getByRole("button", { name: OR_NEW }));
     await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" });
     await expect(security.evaluatePrf).not.toHaveBeenCalled();
+  },
+};
+
+const MAYBE_SAVED =
+  "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.";
+
+/**
+ * A new recovery key whose commit failed (the answer was lost): the setup stays, says the key may
+ * be saved, offers no Cancel, and Continue commits the same prepared key again.
+ */
+export const NewRecoveryKeyCommitFails: Story = {
+  args: { options: { commitNewKey: ["offline"] } },
+  render: (args) => stage(args),
+  play: async ({ canvasElement, args }) => {
+    const { security, commitNewKey } = fakeOf(args);
+    const area = await section(within(canvasElement));
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const sheet = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await userEvent.type(sheet.getByRole("textbox", { name: "Clave de recuperación actual" }), KEY);
+    await userEvent.click(sheet.getByRole("button", { name: "Continuar" }));
+    await typeBack(KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await expect(await screen.findByText(MAYBE_SAVED)).toHaveAttribute("role", "alert");
+    await expect(screen.getByRole("heading", { name: "Confirma que la guardaste" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Ver la clave otra vez" }));
+    await expect(
+      screen.getByRole("heading", { name: "Guarda tu clave de recuperación" }),
+    ).toBeVisible();
+    await expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+    await typeBack(KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => expect(commitNewKey).toHaveBeenCalledTimes(2));
+    await expect(security.newRecoveryKey).toHaveBeenCalledTimes(1);
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText(
+            "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
+          ),
+        ).toBeVisible(),
+      { timeout: 8000 },
+    );
+  },
+};
+
+/** The keys changed elsewhere before the new key was saved: start over; keys and list reload. */
+export const NewRecoveryKeyRotatedElsewhere: Story = {
+  args: { options: { commitNewKey: ["rotated_elsewhere"] } },
+  render: (args) => stage(args),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const area = await section(within(canvasElement));
+    await waitFor(() => expect(security.load).toHaveBeenCalledTimes(1));
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const sheet = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await userEvent.type(sheet.getByRole("textbox", { name: "Clave de recuperación actual" }), KEY);
+    await userEvent.click(sheet.getByRole("button", { name: "Continuar" }));
+    await typeBack(KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    const again = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await expect(await again.findByRole("alert")).toHaveTextContent(
+      "Tus claves cambiaron en otro dispositivo mientras tanto. Crea la clave nueva otra vez.",
+    );
+    await expect(security.reloadKeys).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(security.load).toHaveBeenCalledTimes(2));
+  },
+};
+
+/** Removing with a new key whose commit failed: the setup stays and Continue retries the same commit. */
+export const RemoveWithNewKeyCommitFails: Story = {
+  args: { options: { commitRotate: ["offline"] } },
+  render: (args) => stage(args),
+  play: async ({ canvasElement, args }) => {
+    const { security, commitRotate } = fakeOf(args);
+    const sheet = await openRemove(within(canvasElement));
+    await userEvent.click(sheet.getByRole("button", { name: OR_NEW }));
+    await typeBack(KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await expect(await screen.findByText(MAYBE_SAVED)).toHaveAttribute("role", "alert");
+    await expect(screen.getByRole("heading", { name: "Confirma que la guardaste" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await expect(await screen.findByRole("dialog", { name: "Listo" })).toBeVisible();
+    await expect(commitRotate).toHaveBeenCalledTimes(2);
+    await expect(security.rotate).toHaveBeenCalledTimes(1);
+  },
+};
+
+const NEW_KEY_PLAIN = "¿La perdiste? Crea una nueva sin ella";
+
+/** No passkeys: a lost key can still be replaced; the four characters typed back confirm it. */
+export const NewRecoveryKeyWithoutPasskeys: Story = {
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: [] }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security, commitNewKey } = fakeOf(args);
+    const canvas = within(canvasElement);
+    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+      /Aún no tienes/,
+    );
+    const area = await section(canvas);
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const sheet = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await expect(sheet.queryByRole("button", { name: "Usar una huella" })).toBeNull();
+    await userEvent.click(sheet.getByRole("button", { name: NEW_KEY_PLAIN }));
+    await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" });
+    await expect(security.checkRecoveryKey).not.toHaveBeenCalled();
+    await expect(security.evaluatePrf).not.toHaveBeenCalled();
+    await typeBack(KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => expect(commitNewKey).toHaveBeenCalledTimes(1));
+  },
+};
+
+/** Passkeys, but none can be touched here: only the typed key, and the sheet says why. */
+export const NewRecoveryKeyWithoutTouch: Story = {
+  render: (args) =>
+    stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, supported: false }) }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+      "Pixel 9",
+    );
+    const area = await section(canvas);
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const sheet = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await expect(
+      sheet.getByText(
+        "La clave anterior deja de funcionar. Primero confirma que eres tú: escribe tu clave de recuperación actual. Tus huellas no se pueden usar en este navegador.",
+      ),
+    ).toBeVisible();
+    await expect(sheet.queryByRole("button", { name: "Usar una huella" })).toBeNull();
+    await expect(sheet.queryByRole("button", { name: NEW_KEY_PLAIN })).toBeNull();
   },
 };

@@ -123,7 +123,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
-  the recovery wrap). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
+  the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when
+  `GET /v2/keys` shows the prepared wrap, `landed()`). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
   the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
   `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
@@ -192,7 +193,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (import); settings shows `settings.local_off` under import, export and the assistants in
   `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
-  characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
+  characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings,
+  `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
@@ -214,8 +216,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   revoked ids left out, "Not verified" when the attestation fails; `passkeyRows`: joined to passkey
   wraps by credential id, `PasskeyItem.credentialId`); `SecuritySection.tsx` (devices, "Approve a new
   device" (`ApproveDevice` in a full-screen `Takeover`), "New recovery key" (the current key typed
-  or a passkey touch, `no_prf` counts and a cancel does not, then `RecoveryKeySetup`, `commit()`
-  after the four characters), "Could not read N items" only when N > 0); `RemoveDeviceSheet.tsx`
+  or a passkey touch, `no_prf` counts and a cancel does not; with no passkeys (list ready and
+  empty) also "Lost it? Make a new one without it", the type-back confirming it; with passkeys
+  this browser cannot touch, only the typed key, and the copy says why; then `RecoveryKeySetup`,
+  `commit()` after the four characters), "Could not read N items" only when N > 0). A failed
+  commit of a new recovery key (here and in `RemoveDeviceSheet`'s "make a new one") may have
+  been saved: the setup stays with the same key, says `settings.security.maybe_saved`, hides
+  Cancel, and Continue retries the same `commit()`; only `rotated_elsewhere` goes back, reloading
+  the keys and invalidating `SECURITY_KEY`; `RemoveDeviceSheet.tsx`
   (the recovery key typed, or "make a new one": a passkey touch, whose PRF (a copy per try, since
   `rotateKeys` zeroes it) keeps that passkey's wrap; then `commit()`, `reloadKeys()`, and what was
   dropped; `rotated_elsewhere` reloads the keys and says to try again; "make a new one" (and New

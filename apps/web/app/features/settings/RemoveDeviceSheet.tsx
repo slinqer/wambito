@@ -107,7 +107,14 @@ export function RecoveryKeyField({
 
 type Step =
   | { step: "ask"; busy: boolean; keyError: KeyError | null; problem: Problem | null }
-  | { step: "setup"; recoveryKey: string; commit(): Promise<RotateResult> }
+  | {
+      step: "setup";
+      recoveryKey: string;
+      commit(): Promise<RotateResult>;
+      saving: boolean;
+      /** A commit failed: the new key may be saved, so it stays on screen (no Cancel) until done. */
+      failed: boolean;
+    }
   | { step: "committing" }
   | { step: "done"; result: RotateResult };
 
@@ -228,12 +235,25 @@ export function RemoveDeviceSheet({
     ask({ problem });
   };
 
-  async function commit(run: () => Promise<RotateResult>) {
-    setStep({ step: "committing" });
+  /**
+   * Commits the rotation. From the new key's setup, a failure other than `rotated_elsewhere` (refused
+   * for sure) may have been saved: the setup stays with the same key, and Continue retries the
+   * same `commit()` (retry-safe; `landed()` recognises a rotation whose answer was lost).
+   */
+  async function commit(
+    run: () => Promise<RotateResult>,
+    setup?: Extract<Step, { step: "setup" }>,
+  ) {
+    if (setup?.saving) return;
+    setStep(setup ? { ...setup, saving: true } : { step: "committing" });
     let result: RotateResult;
     try {
       result = await run();
     } catch (error) {
+      if (setup && problemOf(error) !== "rotated_elsewhere") {
+        setStep({ ...setup, saving: false, failed: true });
+        return;
+      }
       failed(error);
       return;
     }
@@ -300,6 +320,8 @@ export function RemoveDeviceSheet({
       step: "setup",
       recoveryKey: prepared.recoveryKey as string,
       commit: prepared.commit,
+      saving: false,
+      failed: false,
     });
   }
 
@@ -308,8 +330,10 @@ export function RemoveDeviceSheet({
       <Takeover label={tSheet("title", { name })}>
         <RecoveryKeySetup
           recoveryKey={step.recoveryKey}
-          onContinue={() => void commit(step.commit)}
-          onCancel={() => ask()}
+          busy={step.saving}
+          problem={step.failed ? t("maybe_saved") : null}
+          onContinue={() => void commit(step.commit, step)}
+          {...(step.failed ? {} : { onCancel: () => ask() })}
         />
       </Takeover>
     );

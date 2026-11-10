@@ -129,6 +129,7 @@ export function SecuritySection({
         passkeyList={known}
         canTouch={canTouch}
         onClose={() => setNewKey(false)}
+        onChanged={changed}
       />
       {approving && (
         <Takeover label={t("approve")}>
@@ -149,14 +150,24 @@ export function SecuritySection({
 
 type NewKeyStep =
   | { step: "confirm"; busy: boolean; keyError: KeyError | null; problem: Problem | null }
-  | { step: "setup"; recoveryKey: string; commit(): Promise<void> }
-  | { step: "saving" };
+  | {
+      step: "setup";
+      recoveryKey: string;
+      commit(): Promise<void>;
+      saving: boolean;
+      /** A commit failed: the key may be saved, so it stays on screen (no Cancel) until done. */
+      failed: boolean;
+    };
 
 /**
  * "New recovery key" (spec 7.4's "ask again", stage 2b Ruling 1): the current recovery key, typed,
  * or a touch of one of the person's passkeys confirms it (a touch without PRF counts; a cancel does
- * not); then `RecoveryKeySetup` shows the new key, and `commit()` runs only after its four
- * characters are typed back.
+ * not); an account with no passkeys can also make one without the old key (the four characters
+ * typed back are the confirmation), while one with passkeys this browser cannot touch needs the
+ * typed key. Then `RecoveryKeySetup` shows the new key, and `commit()` runs only after its four
+ * characters are typed back. A failed commit may have been saved: the setup stays, says so, and
+ * Continue commits the same key again; only `rotated_elsewhere` (refused for sure) starts over,
+ * with the keys and the list read again.
  */
 function NewRecoveryKeySheet({
   open,
@@ -164,6 +175,7 @@ function NewRecoveryKeySheet({
   passkeyList,
   canTouch,
   onClose,
+  onChanged,
 }: {
   open: boolean;
   security: SecurityApi;
@@ -171,8 +183,11 @@ function NewRecoveryKeySheet({
   passkeyList: PasskeyList;
   canTouch: boolean;
   onClose(): void;
+  /** The account's keys changed (or may have): read them again. */
+  onChanged(): void;
 }) {
   const t = useTranslations("settings.security.new_key");
+  const tSecurity = useTranslations("settings.security");
   const tUnlock = useTranslations("vault.unlock");
   const toast = useToast();
   const problemId = useId();
@@ -184,6 +199,8 @@ function NewRecoveryKeySheet({
     problem: null,
   });
   const passkeyIds = passkeyList.status === "ready" ? passkeyList.ids : null;
+  /** No passkeys at all: nothing else could confirm it, so the type-back does. */
+  const plain = passkeyIds !== null && passkeyIds.length === 0;
   const confirm = (patch: Partial<Extract<NewKeyStep, { step: "confirm" }>> = {}) =>
     setStep({ step: "confirm", busy: false, keyError: null, problem: null, ...patch });
 
@@ -196,7 +213,7 @@ function NewRecoveryKeySheet({
   async function make() {
     try {
       const prepared = await security.newRecoveryKey();
-      setStep({ step: "setup", ...prepared });
+      setStep({ step: "setup", ...prepared, saving: false, failed: false });
     } catch (error) {
       confirm({ problem: problemOf(error) });
     }
@@ -237,12 +254,26 @@ function NewRecoveryKeySheet({
     await make();
   }
 
-  async function save(commit: () => Promise<void>) {
-    setStep({ step: "saving" });
+  async function withoutKey() {
+    if (step.step !== "confirm" || step.busy || !plain) return;
+    confirm({ busy: true });
+    await make();
+  }
+
+  async function save(setup: Extract<NewKeyStep, { step: "setup" }>) {
+    if (setup.saving) return;
+    setStep({ ...setup, saving: true });
     try {
-      await commit();
+      await setup.commit();
     } catch (error) {
-      confirm({ problem: problemOf(error) });
+      if (problemOf(error) === "rotated_elsewhere") {
+        // Refused for sure: the sync picks up the other device's keys, the list follows.
+        void security.reloadKeys().catch(() => {});
+        onChanged();
+        confirm({ problem: "rotated_elsewhere" });
+      } else {
+        setStep({ ...setup, saving: false, failed: true });
+      }
       return;
     }
     toast.show({ message: t("saved") });
@@ -254,19 +285,23 @@ function NewRecoveryKeySheet({
       <Takeover label={t("title")}>
         <RecoveryKeySetup
           recoveryKey={step.recoveryKey}
-          onContinue={() => void save(step.commit)}
-          onCancel={close}
+          busy={step.saving}
+          problem={step.failed ? tSecurity("maybe_saved") : null}
+          onContinue={() => void save(step)}
+          {...(step.failed ? {} : { onCancel: close })}
         />
       </Takeover>
     );
   }
 
-  const busy = step.step === "saving" || step.busy;
+  const busy = step.busy;
   const asking = step.step === "confirm" ? step : null;
   return (
     <Sheet open={open} onClose={close} title={t("title")}>
       <form noValidate className="flex flex-col gap-(--space-4) pt-(--space-3)" onSubmit={withKey}>
-        <p className="m-0 text-[15px] text-ink">{t("body")}</p>
+        <p className="m-0 text-[15px] text-ink">
+          {t(plain ? "body_no_passkeys" : canTouch ? "body" : "body_no_touch")}
+        </p>
         <RecoveryKeyField
           label={t("key_label")}
           value={text}
@@ -294,6 +329,16 @@ function NewRecoveryKeySheet({
             onClick={() => void withPasskey()}
           >
             {t("passkey")}
+          </PressButton>
+        )}
+        {plain && (
+          <PressButton
+            variant="ghost"
+            className="w-full"
+            disabled={busy}
+            onClick={() => void withoutKey()}
+          >
+            {t("plain")}
           </PressButton>
         )}
         {passkeyList.status === "failed" && <PasskeyListFailed retry={passkeyList.retry} />}

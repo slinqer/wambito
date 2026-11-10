@@ -83,6 +83,8 @@ function fakeKeys() {
     rotatedElsewhere: false,
     /** The next rotate commits, then its answer is lost: the network is down from then on. */
     loseNextAnswer: false,
+    /** The next PUT is kept, then its answer is lost (the network stays up). */
+    losePutAnswer: false,
     offline: false,
   };
   const json = (body: unknown, status = 200) =>
@@ -107,6 +109,10 @@ function fakeKeys() {
     if (state.loseNextAnswer && String(input).endsWith("/v2/keys/rotate") && response.ok) {
       state.loseNextAnswer = false;
       state.offline = true;
+      throw new TypeError("offline");
+    }
+    if (state.losePutAnswer && init?.method === "PUT" && response.ok) {
+      state.losePutAnswer = false;
       throw new TypeError("offline");
     }
     return response;
@@ -624,6 +630,36 @@ describe("newRecoveryKey", () => {
     await expect(openRecovery(a.api, a.userId, a.recoveryKey, 1)).rejects.toThrow();
     expect(a.api.rotations).toEqual([]);
     expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+});
+
+describe("newRecoveryKey commit", () => {
+  it("a PUT whose answer was lost counts as saved when GET /v2/keys shows the prepared wrap", async () => {
+    const a = await account();
+    const prepared = await newRecoveryKey(a.options);
+    a.api.losePutAnswer = true;
+    await expect(prepared.commit()).resolves.toBeUndefined();
+    await expect(openRecovery(a.api, a.userId, prepared.recoveryKey, 1)).resolves.toEqual(a.dk);
+  });
+
+  it("a failed commit is retried with the same wrap id; offline throughout is offline", async () => {
+    const a = await account();
+    const prepared = await newRecoveryKey(a.options);
+    a.api.offline = true;
+    await expect(prepared.commit()).rejects.toMatchObject({ code: "offline" });
+    a.api.offline = false;
+    await prepared.commit();
+    const [put] = a.api.puts;
+    expect(a.api.puts).toHaveLength(1);
+    expect(a.api.wraps.find((w) => w.kind === "recovery")?.id).toBe(put?.id);
+  });
+
+  it("a key version that moved is rotated_elsewhere, and nothing was kept", async () => {
+    const a = await account();
+    const prepared = await newRecoveryKey(a.options);
+    for (const w of a.api.wraps) w.keyV = 2;
+    await expect(prepared.commit()).rejects.toMatchObject({ code: "rotated_elsewhere" });
+    expect(a.api.puts).toEqual([]);
   });
 });
 

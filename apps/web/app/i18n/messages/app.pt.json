@@ -680,6 +680,7 @@
       "unreadable": "{count, plural, one {Não foi possível ler # elemento} other {Não foi possível ler # elementos}}",
       "unreadable_lead": "Foram guardados com uma chave que este browser não tem. Continuam seguros tal como estão.",
       "passkeys_failed": "Não conseguimos carregar as tuas impressões digitais, por isso ainda não podemos oferecer uma chave nova.",
+      "maybe_saved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",
       "remove_sheet": {
         "title": "Remover {name}?",
         "body": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar.",
@@ -698,10 +699,13 @@
       "new_key": {
         "title": "Criar uma chave de recuperação nova",
         "body": "A chave anterior deixa de funcionar. Primeiro confirma que és tu: escreve a tua chave de recuperação atual ou usa uma impressão digital.",
+        "body_no_passkeys": "A chave anterior deixa de funcionar. Primeiro confirma que és tu: escreve a tua chave de recuperação atual. Se a perdeste, podes criar uma nova sem ela.",
+        "body_no_touch": "A chave anterior deixa de funcionar. Primeiro confirma que és tu: escreve a tua chave de recuperação atual. As tuas impressões digitais não podem ser usadas neste browser.",
         "key_label": "Chave de recuperação atual",
         "continue": "Continuar",
         "checking": "A verificar…",
         "passkey": "Usar uma impressão digital",
+        "plain": "Perdeste-a? Cria uma nova sem ela",
         "saved": "A tua chave de recuperação nova ficou guardada. A anterior já não funciona.",
         "rotated_elsewhere": "Entretanto, as tuas chaves mudaram noutro dispositivo. Cria a chave nova outra vez.",
         "failed": "Não conseguimos guardar a chave nova. Tenta outra vez."

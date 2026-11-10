@@ -680,6 +680,7 @@
       "unreadable": "{count, plural, one {No pudimos leer # elemento} other {No pudimos leer # elementos}}",
       "unreadable_lead": "Se guardaron con una clave que este navegador no tiene. Siguen a salvo tal como están.",
       "passkeys_failed": "No pudimos cargar tus huellas, así que todavía no podemos ofrecerte una clave nueva.",
+      "maybe_saved": "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.",
       "remove_sheet": {
         "title": "¿Quitar {name}?",
         "body": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar.",
@@ -698,10 +699,13 @@
       "new_key": {
         "title": "Crear una clave de recuperación nueva",
         "body": "La clave anterior deja de funcionar. Primero confirma que eres tú: escribe tu clave de recuperación actual o usa una huella.",
+        "body_no_passkeys": "La clave anterior deja de funcionar. Primero confirma que eres tú: escribe tu clave de recuperación actual. Si la perdiste, puedes crear una nueva sin ella.",
+        "body_no_touch": "La clave anterior deja de funcionar. Primero confirma que eres tú: escribe tu clave de recuperación actual. Tus huellas no se pueden usar en este navegador.",
         "key_label": "Clave de recuperación actual",
         "continue": "Continuar",
         "checking": "Comprobando…",
         "passkey": "Usar una huella",
+        "plain": "¿La perdiste? Crea una nueva sin ella",
         "saved": "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
         "rotated_elsewhere": "Tus claves cambiaron en otro dispositivo mientras tanto. Crea la clave nueva otra vez.",
         "failed": "No pudimos guardar la clave nueva. Inténtalo otra vez."
