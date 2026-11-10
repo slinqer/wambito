@@ -73,7 +73,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
-  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK), `loadLocalKeys(userId)` →
+  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK). Key links (spec
+  2026-11-10): `listKeys(call)` → `{ wraps, links: Map<keyV, bytes> }` (an undecodable link is
+  missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
+  `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
+  there; zeroes what it opened on a throw). The trusted ways in (recovery, passkey, pairing) keep
+  the older versions the links reach: with no vault held here from version 1 down, not strict;
+  with one held, strictly down to its current version, whose key must match the held one
+  (`sameDataKey`), else `tampered` before anything is sent or kept (a version below the held one
+  too). `loadLocalKeys(userId)` →
   `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
   `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
   `currentRecordKeys(local)`; the sync engine takes the keyring), `withDataKey(options, fn)`
@@ -82,11 +90,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
   wrap and keeps the one that opens; when this browser already holds the wrap's `keyV`, DK must
   be the one its `record:<v>` came from (a random canary sealed with the kept key opens with the
-  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs: every caller
+  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs; a wrap above
+  the held current version is accepted only when its links lead strictly down to it and reach the
+  held key, else `tampered`, every opened key zeroed: every caller
   (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
-  `refreshKeys(options)` (a device wrap at a higher `keyV` is
-  added to the keyring and made current, old versions kept; one below the current version
-  changes nothing, and a held version is never overwritten), `dropKeyVersion(userId, keyV)`,
+  `refreshKeys(options)` (a device wrap at a higher `keyV` n, verified as `withDataKey`, adds
+  every version from the current c + 1 to n to the keyring and makes n current, old versions kept;
+  `tampered` keeps nothing; one below the current version changes nothing, and a held version is
+  never overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
   `api`, `listWraps`, `putJson` and `WrapDto` are exported for `rotate.ts`.
@@ -245,11 +256,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
-  Known limits of `app/local/` (design follow-ups before stage 3): a new key version is not
-  authenticated under the previous one (the device wrap is an anonymous sealed box, so a
-  malicious server can forge `keyV + 1` to the web; only a held version is checked); and a
-  browser that missed two rotations gets only the newest version from its device wrap, so it can
-  read the middle version's records only once another device has re-sealed them.
+  Known limit of `app/local/` (spec 2026-11-10 section 2.4): a malicious server together with a
+  stolen device that still holds DK(v-1) can forge a version whose link leads back to it, for a
+  browser that has not seen the real one yet.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
