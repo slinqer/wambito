@@ -7,6 +7,7 @@ import {
   newRecoverySecret,
   parseRecoveryKey,
   type RecordKeys,
+  sealKeyLink,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
@@ -21,6 +22,7 @@ import {
   KeysError,
   type KeysOptions,
   listWraps,
+  migrateLegacyKeys,
   putJson,
   recordKeyName,
   type WrapDto,
@@ -157,7 +159,7 @@ export async function checkRecoveryKey(options: KeysOptions & { text: string }):
  *    label, sealed to their public keys with fresh attestations; this browser's own with the
  *    public key it kept), the touched passkey. Assistants have no web wraps yet (stage 4).
  *
- * `commit()` then `POST /v2/keys/rotate`s them (409 `key_version_mismatch` = `rotated_elsewhere`:
+ * `commit()` then `POST /v2/keys/rotate`s them with the key link (the old DK sealed under the new one) (409 `key_version_mismatch` = `rotated_elsewhere`:
  * another device rotated first, nothing is kept), keeps the new version's record and dedupe keys
  * in this browser and makes it current, and writes the removed ids into `settings.revokedDevices`
  * (a local write: the sync seals it under the new version). The caller then calls the session's
@@ -264,8 +266,11 @@ export async function rotateKeys(
             ...(existing?.label ? { label: existing.label } : {}),
           });
         }
+        // The link: the old DK (version `keyV`) sealed under the new one, so other browsers can
+        // follow the rotation. Made here, kept in `prepared`: a retried commit posts the same one.
+        const link = toBase64Url(await sealKeyLink(newKey, dataKey, { userId, keyV: nextV }));
         const keys = await deriveRecordKeys(newKey, false);
-        return { keyV: nextV, wraps: body, keys, dropped, ownId };
+        return { keyV: nextV, wraps: body, link, keys, dropped, ownId };
       } finally {
         newKey.fill(0);
       }
@@ -290,7 +295,10 @@ export async function rotateKeys(
       if (done) return done;
       if (!posted) {
         try {
-          await call("/v2/keys/rotate", postJson({ keyV: prepared.keyV, wraps: prepared.wraps }));
+          await call(
+            "/v2/keys/rotate",
+            postJson({ keyV: prepared.keyV, wraps: prepared.wraps, link: prepared.link }),
+          );
         } catch (error) {
           // The rotate is not idempotent: a post whose answer was lost (`offline`), retried, gets
           // 409 (`rotated_elsewhere`). Ours if the server holds this browser's prepared wrap.
@@ -330,6 +338,8 @@ async function keepRotated(
 ): Promise<void> {
   const store = await createEncryptedStore(userId);
   try {
+    // a 2a vault's legacy names move to their version first, or a later load would overwrite
+    await migrateLegacyKeys(store);
     await store.putKey(recordKeyName(keyV), keys.record);
     await store.putKey(dedupeKeyName(keyV), keys.dedupe);
     await store.setMeta("keyV", keyV);

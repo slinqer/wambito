@@ -618,7 +618,7 @@ export async function addPasskeyWrap(options: KeysOptions & PasskeySecret): Prom
  * then the old names go. Runs before anything moves meta `keyV`, or the legacy keys would be read
  * as the new version.
  */
-async function migrateLegacyKeys(store: EncryptedStore): Promise<void> {
+export async function migrateLegacyKeys(store: EncryptedStore): Promise<void> {
   const current = await store.getMeta<number>("keyV");
   if (current === undefined) return;
   const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);

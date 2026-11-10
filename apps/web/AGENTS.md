@@ -133,10 +133,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   same one, or a new one shown as `recoveryKey`), every kept device (same id/ref/label, sealed to
   its public key, fresh attestation; this browser's own with its kept public key) and the touched
   passkey (same wrap id; other passkeys lose theirs); DK, the new DK, the secret and the PRF are
-  zeroed before it returns. `commit()` POSTs `/v2/keys/rotate` (retry-safe; a post that ended
+  zeroed before it returns. The key link (old DK sealed under the new one, `sealKeyLink`) is made in `withDataKey` and kept in the prepared object. `commit()` POSTs `/v2/keys/rotate` with `{ keyV, wraps, link }` (retry-safe, the same link; a post that ended
   `offline` or `rotated_elsewhere` counts as ours when `GET /v2/keys` shows this browser's prepared
   wrap at the new `keyV`), keeps
-  `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
+  `record:<v>`/`dedupe:<v>` (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when
