@@ -1,6 +1,6 @@
 # End-to-end encryption: authenticated key versions (addendum)
 
-Date: 2026-11-10. Status: approach A chosen in conversation; written addendum under review.
+Date: 2026-11-10. Status: approach A chosen in conversation; amended during implementation.
 Amends `2026-11-08-end-to-end-encryption-design.md` (sections 3, 5.2, 6, 7.5) and
 `2026-11-08-e2e-stage-1b-design.md`. Comes before stage 3 (the Dart port), which builds it into the
 phone from the start; the web (stage 2b, already built) is changed to match.
@@ -75,10 +75,14 @@ from its `device` wrap accepts it only when the links lead back to the key it ho
    non-extractable `record:<v>`/`dedupe:<v>`; the phone keeps the data keys) and makes `n` current.
    Versions no local record uses are dropped later, as today (`dropKeyVersion`).
 4. A missing link, a link that does not open, or a chain that ends at another key: refused as
-   `tampered`. Every data key opened on the way is zeroed and nothing is kept. The device keeps
-   working under `c`; the server will refuse its writes (409 `key_version_mismatch`), so it shows
-   the "could not verify the new key" state and offers to unlock with a passkey or the recovery key
-   (section 2.3).
+   `tampered`. Every data key opened on the way is zeroed and nothing is kept.
+   - The sync stops (`key_unverified`).
+   - The vault, its held versions and its unsent changes are kept.
+   - Unlock shows the "could not verify the new key" notice.
+   - A passkey or recovery unlock opens it again (section 2.3), and the first sync pushes what
+     waited.
+5. A key from the device's own `device` wrap below its current version must be a version it holds
+   and pass the same check (step 2), else `tampered`. Versions only grow.
 
 The web applies this in `refreshKeys` and in `withDataKey`: an operation that opens DK from the
 device wrap at a version above the browser's current one verifies the chain first, with the same
@@ -87,17 +91,26 @@ result. "A new version is not checked against the old one" is no longer true.
 ### 2.3 Ways in that need no chain
 
 - **Passkey and recovery wraps** are sealed under secrets the server does not have, so a key opened
-  from one is trusted as it is. When the device already holds an older version, it still walks the
-  links down to it as in 2.2 and treats a mismatch as `tampered`. It also opens older versions it
-  does not hold, so a newly unlocked device can read records not yet resealed.
-- **Pairing** hands over DK(n) authenticated by the 6-digit number (stage 1b). The new device holds
-  nothing older and walks the links only to read records under older versions.
-- **The rotating device** made DK(n) itself and seals `link(n)` from the DK(n-1) it opened.
+  from one is trusted as it is.
+  - It walks the links down, not strictly, and keeps the older versions they reach, so a newly
+    unlocked device can read records not yet resealed.
+  - A chain that stops, or ends at another key, is no error.
+  - Versions the device holds are never replaced.
+  - A passkey or recovery wrap below the held current version is `tampered` (a replay): nothing is
+    sent or kept.
+  - After an unlock of a held vault keeps its new device wrap, the previous one is deleted, best
+    effort.
+- **Pairing** hands over DK(n) authenticated by the 6-digit number (stage 1b).
+  - A new device holds nothing older and walks the links only to read records under older versions.
+  - With a vault held, pairing walks strictly down to the held key, else `tampered`.
+- **The rotating device** made DK(n) itself and seals `link(n)` from the DK(n-1) it opened. It
+  refreshes first, so it holds every version up to the current one.
 
 ### 2.4 Limits
 
 - A server that withholds a link (or the whole rotation) stops devices from moving up: they get
   stuck at the old version and see the `tampered` state. That denies service but reveals nothing.
+  They get out with a passkey or the recovery key, not with pairing.
 - **A malicious server together with a stolen device** that still holds DK(v-1) can forge a
   version v+1 whose link leads back to DK(v-1). Devices that already accepted the real v+1 never
   replace it (versions only grow and a held version is never overwritten), so only a device that
@@ -117,8 +130,9 @@ result. "A new version is not checked against the old one" is no longer true.
 
   It never deletes the caller's own session. Better Auth keeps no cookie cache here, so the next
   request with that session gets 401.
-- The removed device then sees a sign-in screen. Its local copy (data it already had) stays on its
-  disk until it signs in again and learns `device_removed` (which deletes the vault), or signs out.
+- A session still referenced by another remaining device wrap is not ended.
+- The removed device's next request is 401. That deletes its local vault (unsent changes included)
+  and sends it to sign in. Signed in again, it shows a plain Unlock, not the removed notice.
   A device wrap stored before this change has no session id, and nothing is revoked for it.
 - The copy that asks to sign out on the removed device (`settings.security.remove_sheet.done_lead`) says
   instead that the device was signed out.
@@ -143,15 +157,18 @@ result. "A new version is not checked against the old one" is no longer true.
   - a passkey unlock at v+2 on a browser holding v walks down and refuses a mismatch;
   - `rotateKeys` posts a link that opens to the old DK.
 - Web e2e (`vault.spec.ts`):
-  - A removes B; B's next request is 401 and B, signed in again, shows the removed notice;
-  - A rotates twice while C is closed; C opens and reads a record still under the middle version.
+  - A removes B; B's next request is 401; B, signed in again, shows a plain Unlock and its old
+    keys are gone;
+  - A rotates twice while C is closed; C opens and shows the data. The record under the middle
+    version is checked by a unit test.
 
 ## 5. Migration
 
 Encryption is still behind the preview switch, which lists nobody, so no real account has rotated.
 An account that rotated before this change has versions without links. A device holding an older
 version refuses them (`tampered`) and unlocks again with a passkey or the recovery key, which
-starts it at the current version. No backfill.
+starts it at the current version. No backfill. A held vault stuck at `unverified` gets out the same
+way, with a passkey or the recovery key, and keeps its outbox.
 
 ## 6. Changes to existing docs
 
