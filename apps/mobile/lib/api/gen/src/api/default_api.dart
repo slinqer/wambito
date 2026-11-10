@@ -884,7 +884,7 @@ class DefaultApi {
   }
 
   /// deleteKeyWrap
-  /// Removes a wrap. The recovery wrap stays (409 &#x60;recovery_required&#x60;): make a new recovery key to replace it.
+  /// Removes a wrap. The recovery wrap stays (409 &#x60;recovery_required&#x60;): make a new recovery key to replace it. Removing a device wrap ends the session that registered it (never the caller&#39;s own).
   ///
   /// Parameters:
   /// * [id] - A UUID in lower case
@@ -2938,7 +2938,7 @@ class DefaultApi {
   }
 
   /// rotateKeys
-  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Device wraps carry an attestation too. &#x60;link&#x60; is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 &#x60;link_required&#x60;), refused for its first (422 &#x60;link_unexpected&#x60;), 422 &#x60;invalid_link&#x60; when not 60 bytes; it is stored with the wraps and the answer lists every link. Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
+  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Device wraps carry an attestation too. &#x60;link&#x60; is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 &#x60;link_required&#x60;), refused for its first (422 &#x60;link_unexpected&#x60;), 422 &#x60;invalid_link&#x60; when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it (never the caller&#39;s own); a kept one keeps it. Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
   ///
   /// Parameters:
   /// * [rotateKeys]

@@ -63,7 +63,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
-  other kinds sending `publicKey` or `attestation` are 422 `validation_failed`).
+  other kinds sending `publicKey` or `attestation` are 422 `validation_failed`). A device wrap also
+  stores `session_id`, the session that registered it (`grant.sessionId` from `requireUser`; null
+  for OAuth grants): deleting it, or a rotation that leaves its `ref` out, deletes that session in
+  the same transaction, never the caller's own; a kept device's new row copies the old `session_id`.
   `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
   the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
   recovery wrap with it, so two setups at once cannot make two data keys.

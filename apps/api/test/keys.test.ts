@@ -717,3 +717,98 @@ describe("PUT /v2/keys/{id} with If-None-Match: *", () => {
     expect(res.status).toBe(422);
   });
 });
+
+describe("a removed device loses its session", () => {
+  /** Two sessions of one person, and the id of the wrap B's session registers for its device. */
+  async function twoSessions() {
+    const { email, headers: a, userId } = await person();
+    const { headers: b } = await t.signIn(email);
+    await put(a, recovery(1));
+    return { a, b, userId };
+  }
+  const sessionOf = async (userId: string) =>
+    (await t.admin.execute(sql`select id from session where user_id = ${userId}`)) as unknown as {
+      id: string;
+    }[];
+  const storedSession = async (id: string) => {
+    const rows = await t.admin
+      .select({ sessionId: keyWraps.sessionId })
+      .from(keyWraps)
+      .where(eq(keyWraps.id, id));
+    return rows[0]?.sessionId;
+  };
+  const status = async (headers: Headers) =>
+    (await t.request("GET", "/v2/keys", { headers })).status;
+
+  test("a device PUT stores the caller's session; other kinds store none", async () => {
+    const { a, userId } = await twoSessions();
+    const wrap = await put(a, device(1));
+    const stored = await storedSession(wrap.id);
+    expect(stored).toBeTruthy();
+    expect((await sessionOf(userId)).map((s) => s.id)).toContain(stored);
+    const [rec] = await list(a);
+    expect(await storedSession((rec as KeyWrap).id)).toBeNull();
+  });
+
+  test("DELETE of a device wrap ends that device's session: its next GET /v2/keys is 401", async () => {
+    const { a, b } = await twoSessions();
+    const wrap = await put(b, device(1));
+    expect(await status(b)).toBe(200);
+    expect((await t.request("DELETE", `/v2/keys/${wrap.id}`, { headers: a })).status).toBe(204);
+    expect(await status(b)).toBe(401);
+    expect(await status(a)).toBe(200);
+  });
+
+  test("a rotation that leaves a device out ends its session; kept devices keep theirs", async () => {
+    const { email, headers: a, userId } = await person();
+    const { headers: b } = await t.signIn(email);
+    const { headers: c } = await t.signIn(email);
+    await put(a, recovery(1));
+    const keptRef = randomUUID();
+    const kept = await put(b, device(1, { ref: keptRef }));
+    await put(c, device(1));
+    const oldSession = await storedSession(kept.id);
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [
+        { id: randomUUID(), ...recovery(2) },
+        { id: randomUUID(), ...device(2, { ref: keptRef }) },
+      ],
+      link: link(),
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const { wraps } = (await res.json()) as { wraps: KeyWrap[] };
+    const newKept = wraps.find((w) => w.kind === "device") as KeyWrap;
+    expect(await storedSession(newKept.id)).toBe(oldSession);
+    expect(await status(b)).toBe(200);
+    expect(await status(c)).toBe(401);
+    expect(await status(a)).toBe(200);
+    expect(await sessionOf(userId)).toHaveLength(2);
+  });
+
+  test("the caller's own session is never ended", async () => {
+    const { a } = await twoSessions();
+    const wrap = await put(a, device(1));
+    expect((await t.request("DELETE", `/v2/keys/${wrap.id}`, { headers: a })).status).toBe(204);
+    expect(await status(a)).toBe(200);
+  });
+
+  test("a device wrap whose session is gone (null) is removed and rotated away without error", async () => {
+    const { a, b, userId } = await twoSessions();
+    const gone = await put(b, device(1));
+    const other = await put(a, device(1));
+    await t.admin.execute(sql`delete from session where id = ${await storedSession(gone.id)}`);
+    expect(await storedSession(gone.id)).toBeNull();
+    expect((await t.request("DELETE", `/v2/keys/${gone.id}`, { headers: a })).status).toBe(204);
+    const wraps = await list(a);
+    expect(wraps.map((w) => w.id)).toContain(other.id);
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [{ id: randomUUID(), ...recovery(2) }],
+      link: link(),
+    });
+    expect(res.status).toBe(200);
+    expect(await status(a)).toBe(200);
+    expect(userId).toBeTruthy();
+  });
+});

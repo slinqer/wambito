@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { AppDeps } from "../deps.ts";
+import type { Grant } from "../env.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
 import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
@@ -11,6 +12,9 @@ import {
   rotateKeys,
   useAssistantWrap,
 } from "../services/keys.ts";
+
+/** The caller's session id; null for an assistant's OAuth grant. */
+const sessionIdOf = (grant: Grant) => (grant.kind === "session" ? grant.sessionId : null);
 
 const idParam = z.object({ id: lowerCaseUuid() });
 const firstWrapHeader = z.object({
@@ -73,7 +77,10 @@ export function keyRoutes(deps: AppDeps) {
       const { id } = c.req.valid("param");
       const onlyFirst = c.req.valid("header")["if-none-match"] === "*";
       return c.json(
-        await putKeyWrap(deps.db, c.get("userId"), id, c.req.valid("json"), { onlyFirst }),
+        await putKeyWrap(deps.db, c.get("userId"), id, c.req.valid("json"), {
+          onlyFirst,
+          sessionId: sessionIdOf(c.get("grant")),
+        }),
         200,
       );
     },
@@ -85,12 +92,14 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/{id}",
       operationId: "deleteKeyWrap",
       description:
-        "Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it.",
+        "Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. Removing a device wrap ends the session that registered it (never the caller's own).",
       request: { params: idParam },
       responses: { 204: { description: "Deleted" }, ...problems(404, 409) },
     }),
     async (c) => {
-      await deleteKeyWrap(deps.db, c.get("userId"), c.req.valid("param").id);
+      await deleteKeyWrap(deps.db, c.get("userId"), c.req.valid("param").id, {
+        sessionId: sessionIdOf(c.get("grant")),
+      });
       return c.body(null, 204);
     },
   );
@@ -101,7 +110,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/rotate",
       operationId: "rotateKeys",
       description:
-        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. Records are re-encrypted through `/v2/sync` afterwards.",
+        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it (never the caller's own); a kept one keeps it. Records are re-encrypted through `/v2/sync` afterwards.",
       request: { body: jsonBody(RotateKeys) },
       responses: {
         200: jsonResponse(KeyWraps, "The new wraps and every link"),
@@ -111,7 +120,12 @@ export function keyRoutes(deps: AppDeps) {
     async (c) => {
       const { keyV, wraps, link } = c.req.valid("json");
       const bytes = link == null ? null : new Uint8Array(Buffer.from(link, "base64url"));
-      return c.json(await rotateKeys(deps.db, c.get("userId"), keyV, wraps, bytes), 200);
+      return c.json(
+        await rotateKeys(deps.db, c.get("userId"), keyV, wraps, bytes, {
+          sessionId: sessionIdOf(c.get("grant")),
+        }),
+        200,
+      );
     },
   );
 
