@@ -10,6 +10,8 @@ import { addPasskeyWrap } from "../../local/keys.ts";
 /** One of the person's passkeys, as settings lists it. */
 export interface PasskeyItem {
   id: string;
+  /** The WebAuthn credential id (base64url, Better Auth's `credentialID`): a passkey wrap's `ref`. */
+  credentialId: string;
   /** The name it was given, if any. */
   name: string | null;
   /** When it was created (ISO). */
@@ -49,6 +51,7 @@ export const livePasskeys: PasskeysApi = {
     return data
       .map((passkey) => ({
         id: passkey.id,
+        credentialId: passkey.credentialID,
         name: passkey.name ?? null,
         createdAt: new Date(passkey.createdAt).toISOString(),
         synced: Boolean(passkey.backedUp),

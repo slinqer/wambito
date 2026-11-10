@@ -35,7 +35,12 @@ export interface RecoveryKeySetupProps {
   /** The person confirmed they kept it: the app goes on. */
   onContinue(): void;
   /** Signs out (and wipes this browser's vault): nothing was sent yet, so nothing is kept. */
-  onSignOut(): void;
+  onSignOut?(): void;
+  /**
+   * Settings' new key (an open vault): "Cancel" instead of signing out; nothing was sent, the old
+   * key keeps working.
+   */
+  onCancel?(): void;
   onCopy?(text: string): Promise<void> | void;
   onSave?: SaveTextFile;
   /** For the file's date; defaults to now. */
@@ -53,6 +58,7 @@ export function RecoveryKeySetup({
   recoveryKey,
   onContinue,
   onSignOut,
+  onCancel,
   onCopy = (text) => navigator.clipboard.writeText(text),
   onSave = saveTextFile,
   now,
@@ -66,6 +72,7 @@ export function RecoveryKeySetup({
   const [copied, setCopied] = useState(false);
   const [typed, setTyped] = useState<string[]>(() => positions.map(() => ""));
   const errorId = useId();
+  const tCommon = useTranslations("common");
 
   async function copy() {
     try {
@@ -116,9 +123,17 @@ export function RecoveryKeySetup({
         <PressButton className="w-full" onClick={() => setStep("confirm")}>
           {t("saved")}
         </PressButton>
-        <PressButton variant="ghost" className="w-full" onClick={onSignOut}>
-          {tVault("sign_out")}
-        </PressButton>
+        {onCancel ? (
+          <PressButton variant="ghost" className="w-full" onClick={onCancel}>
+            {tCommon("cancel")}
+          </PressButton>
+        ) : (
+          onSignOut && (
+            <PressButton variant="ghost" className="w-full" onClick={onSignOut}>
+              {tVault("sign_out")}
+            </PressButton>
+          )
+        )}
       </SignInScreen>
     );
   }

@@ -138,3 +138,15 @@ export const NoPasskeys: Story = {
     await expect(canvas.getAllByRole("button")).toHaveLength(4);
   },
 };
+
+/** Another device removed this browser: the vault is gone, and the notice says what was lost. */
+export const Removed: Story = {
+  args: { notice: "removed" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("status")).toHaveTextContent(
+      "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
+    );
+    await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
+  },
+};

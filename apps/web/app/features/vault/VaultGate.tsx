@@ -32,6 +32,7 @@ import { Locked } from "./Locked.tsx";
 import { PairNewDevice } from "./PairNewDevice.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
 import { Unlock } from "./Unlock.tsx";
+import { VaultSessionContext } from "./vault-context.ts";
 import { createVaultGate, type VaultGate as Gate } from "./vault-gate.ts";
 
 /** The session ended under the vault (a 401 from sync): wipe it, then sign in again. */
@@ -136,6 +137,8 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   const state = useSyncExternalStore(gate.subscribe, gate.getState, gate.getState);
   const session = state.status === "ready" ? state.session : null;
   useEffect(() => session?.onClosed(() => gate.closed()), [session, gate]);
+  // Removed from the account by another device: the vault is gone, Unlock says so.
+  useEffect(() => session?.onRemoved(() => gate.removed()), [session, gate]);
   // The open app needs no passkey PRF: whatever is still kept is zeroed.
   useEffect(() => {
     if (session) clearSignInPrf();
@@ -156,6 +159,7 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     case "unlock":
       return (
         <Unlock
+          notice={state.notice}
           onUnlock={gate.unlock}
           onPasskey={gate.unlockWithPasskey}
           onPair={() => void gate.pair()}
@@ -178,8 +182,10 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     case "ready":
       return (
         <ApiProvider mode="local" fetch={state.session.fetch}>
-          <RefetchOnCommit session={state.session} />
-          {children}
+          <VaultSessionContext.Provider value={state.session}>
+            <RefetchOnCommit session={state.session} />
+            {children}
+          </VaultSessionContext.Provider>
         </ApiProvider>
       );
     default:

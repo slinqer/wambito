@@ -25,6 +25,10 @@ import type { UnlockError } from "./Unlock.tsx";
  * the vault exactly as after a recovery unlock (pending passkey wrap, then a full sync). A failed
  * pairing stays on its screen, which shows why; `leavePairing()` cancels it and goes back.
  *
+ * A browser removed from the account by another device (`removed()`, from the session's
+ * `onRemoved`: its vault is already deleted) shows Unlock with the `removed` notice; a guest, which
+ * has no recovery key to type, its Locked.
+ *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
  * A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
@@ -107,7 +111,8 @@ export type VaultGateState<S = unknown> =
   | { status: "checking" }
   | { status: "setup"; recoveryKey: string }
   | { status: "committing" }
-  | { status: "unlock" }
+  /** `notice: "removed"`: this browser was removed from the account (its vault is gone). */
+  | { status: "unlock"; notice?: "removed" }
   /** `from`: where back goes, Unlock or a guest's Locked. */
   | { status: "pairing"; from: "unlock" | "guest" }
   | { status: "opening" }
@@ -140,6 +145,11 @@ export interface VaultGate<S = unknown, K = GateKeys> {
   closed(): void;
   /** The sync said another account is signed in (409 `session_changed`): reload or lock. */
   sessionChanged(): void;
+  /**
+   * This browser was removed from the account (`VaultSession.onRemoved`: its device wrap is gone
+   * and the vault was deleted): Unlock with the `removed` notice; a guest's Locked.
+   */
+  removed(): void;
 }
 
 const UNLOCK_ERRORS: readonly string[] = [
@@ -440,6 +450,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     },
     sessionChanged() {
       if (state.status === "ready") void changed({ code: "session_changed" }, recheck);
+    },
+    removed() {
+      if (state.status !== "ready") return;
+      if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
+      else set({ status: "unlock", notice: "removed" });
     },
     async pair() {
       const from =

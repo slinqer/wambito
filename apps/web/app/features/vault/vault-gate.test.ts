@@ -730,4 +730,64 @@ describe("vault gate", () => {
       expect(gate.getState()).toMatchObject({ status: "ready" });
     });
   });
+
+  describe("a removed browser", () => {
+    it("removed() from the open app shows Unlock with the removed notice", async () => {
+      const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
+      gate.start();
+      await settle();
+      gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      // the vault is gone already: nothing is opened or made again
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+      expect(deps.open).toHaveBeenCalledTimes(1);
+    });
+
+    it("the notice stays through a failed unlock and goes with a new screen", async () => {
+      const unlockWithRecovery = vi
+        .fn<(text: string) => Promise<Keys>>()
+        .mockRejectedValueOnce(fail("wrong_recovery_key"));
+      const { gate } = gateWith({
+        loadLocalKeys: async () => ({ k: "kept" }),
+        unlockWithRecovery,
+        startPairing: vi.fn(async () => ({
+          id: "p-1",
+          code: "ABCDEFGH",
+          qr: "wambito://pair?id=p-1&key=k",
+          expiresAt: "2026-11-10T12:10:00Z",
+          number: async () => "123456",
+          finish: () => new Promise<Keys>(() => {}),
+          cancel: () => {},
+        })),
+      });
+      gate.start();
+      await settle();
+      gate.removed();
+      expect(await gate.unlock("nope")).toBe("wrong_recovery_key");
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      await gate.pair();
+      gate.leavePairing();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+    });
+
+    it("a removed guest is locked out: it has no recovery key to type", async () => {
+      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), guest: true });
+      gate.start();
+      await settle();
+      gate.removed();
+      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    });
+
+    it("removed() outside the open app does nothing", async () => {
+      const { gate } = gateWith({
+        prepareAccount: async () => {
+          throw fail("already_set_up");
+        },
+      });
+      gate.start();
+      await settle();
+      gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+    });
+  });
 });

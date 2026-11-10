@@ -652,7 +652,59 @@
       "remove_body": "Ya no podrás entrar con ella. Tu correo sigue funcionando.",
       "remove_confirm": "Sí, eliminar",
       "removed": "Eliminamos la huella.",
-      "remove_failed": "No pudimos eliminar la huella. Inténtalo otra vez."
+      "remove_failed": "No pudimos eliminar la huella. Inténtalo otra vez.",
+      "unlocks": "Abre tus datos",
+      "locked": "No abre tus datos",
+      "turn_on": "Activar",
+      "turn_on_label": "Activar para tus datos la huella creada el {date}",
+      "turn_on_named_label": "Activar {name} para tus datos",
+      "turned_on": "Listo: esta huella también abre tus datos.",
+      "turn_on_failed": "No pudimos activarla. Inténtalo otra vez.",
+      "turn_on_no_prf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo."
+    },
+    "security": {
+      "title": "Seguridad",
+      "lead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
+      "this_browser": "Este navegador",
+      "unnamed": "Dispositivo",
+      "added": "Agregado el {date}",
+      "not_verified": "Sin verificar",
+      "load_failed": "No pudimos cargar tus dispositivos. Inténtalo de nuevo en un momento.",
+      "remove": "Quitar",
+      "remove_label": "Quitar {name}",
+      "approve": "Aprobar un dispositivo nuevo",
+      "approve_lead": "Abre tus datos en un celular o navegador nuevo, sin tu clave de recuperación.",
+      "recovery_title": "Clave de recuperación",
+      "recovery_lead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
+      "new_recovery": "Nueva clave de recuperación",
+      "unreadable": "{count, plural, one {No pudimos leer # elemento} other {No pudimos leer # elementos}}",
+      "unreadable_lead": "Se guardaron con una clave que este navegador no tiene. Siguen a salvo tal como están.",
+      "remove_sheet": {
+        "title": "¿Quitar {name}?",
+        "body": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar.",
+        "key_label": "Clave de recuperación",
+        "confirm": "Sí, quitarlo",
+        "removing": "Quitando…",
+        "or_new": "¿No la tienes? Crea una clave de recuperación nueva",
+        "rotated_elsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
+        "failed": "No pudimos quitarlo. Inténtalo otra vez.",
+        "done_title": "Listo",
+        "done_lead": "{name} ya no puede abrir tus datos.",
+        "dropped_lead": "También quedaron fuera:",
+        "dropped_item": "{name} ({reason, select, removed {quitado ahora} revoked {quitado antes} other {sin verificar}})",
+        "passkeys_note": "Las huellas que no usaste ahora ya no abren tus datos: vuelve a activarlas en las huellas."
+      },
+      "new_key": {
+        "title": "Crear una clave de recuperación nueva",
+        "body": "La clave anterior deja de funcionar. Primero confirma que eres tú: escribe tu clave de recuperación actual o usa una huella.",
+        "key_label": "Clave de recuperación actual",
+        "continue": "Continuar",
+        "checking": "Comprobando…",
+        "passkey": "Usar una huella",
+        "saved": "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
+        "rotated_elsewhere": "Tus claves cambiaron en otro dispositivo mientras tanto. Crea la clave nueva otra vez.",
+        "failed": "No pudimos guardar la clave nueva. Inténtalo otra vez."
+      }
     },
     "data": {
       "title": "Tus datos",
@@ -888,6 +940,7 @@
       "restart": "Empezar de nuevo",
       "cancel": "Cancelar",
       "close": "Cerrar"
-    }
+    },
+    "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo."
   }
 }

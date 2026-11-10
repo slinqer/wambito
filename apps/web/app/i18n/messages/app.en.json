@@ -652,7 +652,59 @@
       "remove_body": "You won't be able to sign in with it anymore. Your email still works.",
       "remove_confirm": "Yes, delete",
       "removed": "Fingerprint deleted.",
-      "remove_failed": "We couldn't delete the fingerprint. Try again."
+      "remove_failed": "We couldn't delete the fingerprint. Try again.",
+      "unlocks": "Opens your data",
+      "locked": "Does not open your data",
+      "turn_on": "Turn on",
+      "turn_on_label": "Turn on the fingerprint created on {date} for your data",
+      "turn_on_named_label": "Turn on {name} for your data",
+      "turned_on": "Done: this fingerprint opens your data too.",
+      "turn_on_failed": "We couldn't turn it on. Try again.",
+      "turn_on_no_prf": "This fingerprint's provider can't open your data. Use your recovery key, or open your data from another device."
+    },
+    "security": {
+      "title": "Security",
+      "lead": "Your data is encrypted. These devices can open it.",
+      "this_browser": "This browser",
+      "unnamed": "Device",
+      "added": "Added on {date}",
+      "not_verified": "Not verified",
+      "load_failed": "We couldn't load your devices. Try again in a moment.",
+      "remove": "Remove",
+      "remove_label": "Remove {name}",
+      "approve": "Approve a new device",
+      "approve_lead": "Open your data on a new phone or browser, without your recovery key.",
+      "recovery_title": "Recovery key",
+      "recovery_lead": "Make a new one if you lost it or someone else may have seen it. The old one stops working.",
+      "new_recovery": "New recovery key",
+      "unreadable": "{count, plural, one {Could not read # item} other {Could not read # items}}",
+      "unreadable_lead": "They were saved with a key this browser does not have. They are kept safe as they are.",
+      "remove_sheet": {
+        "title": "Remove {name}?",
+        "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm.",
+        "key_label": "Recovery key",
+        "confirm": "Remove it",
+        "removing": "Removing…",
+        "or_new": "Don't have it? Make a new recovery key",
+        "rotated_elsewhere": "Another device changed your keys at the same time. Wait a moment while they refresh here, then try again.",
+        "failed": "We couldn't remove it. Try again.",
+        "done_title": "Removed",
+        "done_lead": "{name} can no longer open your data.",
+        "dropped_lead": "These were left out too:",
+        "dropped_item": "{name} ({reason, select, removed {removed now} revoked {removed earlier} other {not verified}})",
+        "passkeys_note": "Fingerprints you didn't use just now no longer open your data: turn them on again under fingerprints."
+      },
+      "new_key": {
+        "title": "Make a new recovery key",
+        "body": "The old key stops working. First confirm it's you: type your current recovery key, or use a fingerprint.",
+        "key_label": "Current recovery key",
+        "continue": "Continue",
+        "checking": "Checking…",
+        "passkey": "Use a fingerprint",
+        "saved": "Your new recovery key is saved. The old one no longer works.",
+        "rotated_elsewhere": "Your keys changed on another device meanwhile. Make the new key again.",
+        "failed": "We couldn't save the new key. Try again."
+      }
     },
     "data": {
       "title": "Your data",
@@ -888,6 +940,7 @@
       "restart": "Start again",
       "cancel": "Cancel",
       "close": "Close"
-    }
+    },
+    "removed": "This browser was removed from your account on another device. Changes not yet synced here were lost. To open your data again, type your recovery key or use another device."
   }
 }

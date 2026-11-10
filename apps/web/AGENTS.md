@@ -119,7 +119,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
-  the recovery wrap). `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
+  the recovery wrap). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
+  the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
+  `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
   request, or the approver's lookup) → `expired` and on
   `cancel()` → `cancelled`): `startPairing(options)` → `{ id, code, qr, expiresAt, number(),
@@ -150,7 +152,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   or, later, closes the session and calls `onSessionChanged`. The engine's `refreshKeys` is
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
-  `session.onRemoved(cb)` listeners (the gate's notice is wired separately). `session.reloadKeys()`
+  `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
+  notice `vault.removed`, a guest's Locked). `session.reloadKeys()`
   gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
@@ -184,7 +187,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (import); settings shows `settings.local_off` under import, export and the assistants in
   `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
-  characters back, each named "group N, character M"), `Unlock` (`onUnlock(text) → UnlockError |
+  characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`: the QR as `uqr`
@@ -195,6 +198,25 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   type the code, or scan where `BarcodeDetector` exists (a `getUserMedia` video, stopped on a
   `wambito://pair?` hit, on cancel and on unmount), then the number with "They match" (only once
   shown; disabled while `approve()` runs) and "They do not match" (cancels: nothing shared));
+  `vault-context.ts` `VaultSessionContext` / `useVaultSession()`: the gate provides the open
+  session beside `<ApiProvider mode="local">` (null elsewhere), so Settings reaches its keys.
+  Settings → Security (`features/settings/`, mode `local` and not a guest, Ruling 8):
+  `security.ts` `SecurityApi` (`load()` → wraps, `ownId`, `revoked`, `verified` (attestations under
+  DK from `withDataKey`), `unreadable` (`quarantineCount()`); `rotate`, `checkRecoveryKey`,
+  `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `pairing`), `liveSecurity(session)`
+  the default, `Settings`' `security` prop (and `HomeStage`'s) for stories; react-query key
+  `SECURITY_KEY`; `security-model.ts` (`deviceRows`: this browser marked and never removable,
+  revoked ids left out, "Not verified" when the attestation fails; `passkeyRows`: joined to passkey
+  wraps by credential id, `PasskeyItem.credentialId`); `SecuritySection.tsx` (devices, "Approve a new
+  device" (`ApproveDevice` in a full-screen `Takeover`), "New recovery key" (the current key typed
+  or a passkey touch, `no_prf` counts and a cancel does not, then `RecoveryKeySetup`, `commit()`
+  after the four characters), "Could not read N items" only when N > 0); `RemoveDeviceSheet.tsx`
+  (the recovery key typed, or "make a new one": a passkey touch, whose PRF (a copy per try, since
+  `rotateKeys` zeroes it) keeps that passkey's wrap; then `commit()`, `reloadKeys()`, and what was
+  dropped; `rotated_elsewhere` reloads the keys and says to try again); `PasskeysSection` with
+  `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
+  then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
+  `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.
   `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule

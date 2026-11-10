@@ -99,7 +99,12 @@ async function checkRecovery(userId: string, wraps: WrapDto[], secret: Uint8Arra
   opened.fill(0);
 }
 
-async function attested(userId: string, dataKey: Uint8Array, wrap: WrapDto): Promise<boolean> {
+/** Whether a device wrap's attestation checks out under `dataKey` (Settings → Security shows the rest as "Not verified"). */
+export async function attested(
+  userId: string,
+  dataKey: Uint8Array,
+  wrap: WrapDto,
+): Promise<boolean> {
   if (!wrap.publicKey || !wrap.attestation) return false;
   try {
     return await verifyDeviceAttestation(
@@ -113,13 +118,32 @@ async function attested(userId: string, dataKey: Uint8Array, wrap: WrapDto): Pro
 }
 
 /** The settings record's `revokedDevices` (none when the vault has no settings yet). */
-async function revokedDevices(userId: string): Promise<string[]> {
+export async function revokedDevices(userId: string): Promise<string[]> {
   const store = await createEncryptedStore(userId);
   try {
     const [settings] = await store.list("settings");
     return settings?.body.revokedDevices ?? [];
   } finally {
     store.close();
+  }
+}
+
+/**
+ * Settings' confirmation before a new recovery key (stage 2b Ruling 1): resolves when `text` opens
+ * the account's current recovery wrap; `bad_recovery_key` / `wrong_recovery_key` otherwise. Nothing
+ * is made or sent; the secret is zeroed.
+ */
+export async function checkRecoveryKey(options: KeysOptions & { text: string }): Promise<void> {
+  let secret: Uint8Array;
+  try {
+    secret = parseRecoveryKey(options.text);
+  } catch {
+    throw new KeysError("bad_recovery_key");
+  }
+  try {
+    await checkRecovery(options.userId, await listWraps(api(options)), secret);
+  } finally {
+    secret.fill(0);
   }
 }
 

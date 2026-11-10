@@ -60,7 +60,7 @@ vi.mock("@wambito/crypto", async (original) => {
 });
 
 import { KeysError, loadLocalKeys, prepareAccount } from "./keys.ts";
-import { newRecoveryKey, rotateKeys } from "./rotate.ts";
+import { checkRecoveryKey, newRecoveryKey, rotateKeys } from "./rotate.ts";
 
 interface Wrap {
   id: string;
@@ -580,5 +580,23 @@ describe("newRecoveryKey", () => {
     await expect(openRecovery(a.api, a.userId, a.recoveryKey, 1)).rejects.toThrow();
     expect(a.api.rotations).toEqual([]);
     expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+});
+
+describe("checkRecoveryKey", () => {
+  it("resolves for the account's recovery key, and names a wrong or malformed one; the secret is zeroed", async () => {
+    const a = await account();
+    await expect(checkRecoveryKey({ ...a.options, text: a.recoveryKey })).resolves.toBeUndefined();
+    const stranger = formatRecoveryKey(crypto.getRandomValues(new Uint8Array(16)));
+    await expect(checkRecoveryKey({ ...a.options, text: stranger })).rejects.toMatchObject({
+      code: "wrong_recovery_key",
+    });
+    await expect(checkRecoveryKey({ ...a.options, text: "nope" })).rejects.toMatchObject({
+      code: "bad_recovery_key",
+    });
+    expect(handed.parsed).toHaveLength(2);
+    expect(handed.parsed.every((s) => s.every((x) => x === 0))).toBe(true);
+    expect(handed.opened).toEqual([]);
+    expect(a.api.puts).toEqual([]);
   });
 });

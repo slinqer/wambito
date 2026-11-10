@@ -652,7 +652,59 @@
       "remove_body": "Non potrai più entrare con essa. La tua email continua a funzionare.",
       "remove_confirm": "Sì, elimina",
       "removed": "Abbiamo eliminato l'impronta.",
-      "remove_failed": "Non siamo riusciti a eliminare l'impronta. Riprova."
+      "remove_failed": "Non siamo riusciti a eliminare l'impronta. Riprova.",
+      "unlocks": "Apre i tuoi dati",
+      "locked": "Non apre i tuoi dati",
+      "turn_on": "Attiva",
+      "turn_on_label": "Attiva per i tuoi dati l'impronta creata il {date}",
+      "turn_on_named_label": "Attiva {name} per i tuoi dati",
+      "turned_on": "Fatto: questa impronta apre anche i tuoi dati.",
+      "turn_on_failed": "Non siamo riusciti ad attivarla. Riprova.",
+      "turn_on_no_prf": "Il fornitore di questa impronta non può aprire i tuoi dati. Usa la tua chiave di recupero o apri i dati da un altro dispositivo."
+    },
+    "security": {
+      "title": "Sicurezza",
+      "lead": "I tuoi dati sono cifrati. Questi dispositivi possono aprirli.",
+      "this_browser": "Questo browser",
+      "unnamed": "Dispositivo",
+      "added": "Aggiunto il {date}",
+      "not_verified": "Non verificato",
+      "load_failed": "Non siamo riusciti a caricare i tuoi dispositivi. Riprova tra un momento.",
+      "remove": "Rimuovi",
+      "remove_label": "Rimuovi {name}",
+      "approve": "Approva un nuovo dispositivo",
+      "approve_lead": "Apri i tuoi dati su un nuovo telefono o browser, senza la chiave di recupero.",
+      "recovery_title": "Chiave di recupero",
+      "recovery_lead": "Creane una nuova se l'hai persa o se qualcun altro potrebbe averla vista. Quella vecchia smette di funzionare.",
+      "new_recovery": "Nuova chiave di recupero",
+      "unreadable": "{count, plural, one {Non è stato possibile leggere # elemento} other {Non è stato possibile leggere # elementi}}",
+      "unreadable_lead": "Sono stati salvati con una chiave che questo browser non ha. Restano al sicuro così come sono.",
+      "remove_sheet": {
+        "title": "Rimuovere {name}?",
+        "body": "Non potrà più aprire i tuoi dati. Per questo cambiano le tue chiavi di cifratura: scrivi la tua chiave di recupero per confermare.",
+        "key_label": "Chiave di recupero",
+        "confirm": "Sì, rimuovilo",
+        "removing": "Rimozione…",
+        "or_new": "Non ce l'hai? Crea una nuova chiave di recupero",
+        "rotated_elsewhere": "Un altro dispositivo ha cambiato le tue chiavi nello stesso momento. Aspetta che si aggiornino qui, poi riprova.",
+        "failed": "Non siamo riusciti a rimuoverlo. Riprova.",
+        "done_title": "Fatto",
+        "done_lead": "{name} non può più aprire i tuoi dati.",
+        "dropped_lead": "Sono rimasti fuori anche:",
+        "dropped_item": "{name} ({reason, select, removed {rimosso ora} revoked {rimosso prima} other {non verificato}})",
+        "passkeys_note": "Le impronte che non hai usato ora non aprono più i tuoi dati: riattivale tra le impronte."
+      },
+      "new_key": {
+        "title": "Crea una nuova chiave di recupero",
+        "body": "La vecchia chiave smette di funzionare. Prima conferma che sei tu: scrivi la tua chiave di recupero attuale o usa un'impronta.",
+        "key_label": "Chiave di recupero attuale",
+        "continue": "Continua",
+        "checking": "Verifica…",
+        "passkey": "Usa un'impronta",
+        "saved": "La tua nuova chiave di recupero è salvata. Quella vecchia non funziona più.",
+        "rotated_elsewhere": "Nel frattempo le tue chiavi sono cambiate su un altro dispositivo. Crea di nuovo la nuova chiave.",
+        "failed": "Non siamo riusciti a salvare la nuova chiave. Riprova."
+      }
     },
     "data": {
       "title": "I tuoi dati",
@@ -888,6 +940,7 @@
       "restart": "Ricomincia",
       "cancel": "Annulla",
       "close": "Chiudi"
-    }
+    },
+    "removed": "Questo browser è stato rimosso dal tuo account da un altro dispositivo. Le modifiche non ancora sincronizzate qui sono andate perse. Per aprire di nuovo i tuoi dati, scrivi la tua chiave di recupero o usa un altro dispositivo."
   }
 }

@@ -16,6 +16,8 @@ export type UnlockError =
   | "server";
 
 export interface UnlockProps {
+  /** `removed`: another device removed this browser; its vault (and unsynced edits) are gone. */
+  notice?: "removed" | undefined;
   /** Tries the typed text (any case, spaces or dashes). Resolves to the error, or `null`. */
   onUnlock(text: string): Promise<UnlockError | null>;
   /**
@@ -36,6 +38,7 @@ export interface UnlockProps {
  * opens its wrap, or have another device approve this one, to open the data here.
  */
 export function Unlock({
+  notice,
   onUnlock,
   onPasskey,
   passkeysSupported = browserPasskeys,
@@ -81,6 +84,11 @@ export function Unlock({
   return (
     <SignInScreen>
       <ScreenTitle>{t("title")}</ScreenTitle>
+      {notice === "removed" && (
+        <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
+          {tVault("removed")}
+        </p>
+      )}
       <p className="text-center text-ink-muted">{t("lead")}</p>
       <form noValidate className="flex w-full flex-col gap-(--space-3)" onSubmit={submit}>
         <label htmlFor={inputId} className="text-sm text-ink-muted">
