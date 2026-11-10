@@ -92,7 +92,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/{id}",
       operationId: "deleteKeyWrap",
       description:
-        "Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. Removing a device wrap ends the session that registered it (never the caller's own).",
+        "Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. Removing a device wrap ends the session that registered it, unless another device wrap still uses it (never the caller's own).",
       request: { params: idParam },
       responses: { 204: { description: "Deleted" }, ...problems(404, 409) },
     }),
@@ -110,7 +110,7 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/rotate",
       operationId: "rotateKeys",
       description:
-        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it (never the caller's own); a kept one keeps it. Records are re-encrypted through `/v2/sync` afterwards.",
+        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it, unless a kept device wrap still uses it (never the caller's own); a kept one keeps it. Records are re-encrypted through `/v2/sync` afterwards.",
       request: { body: jsonBody(RotateKeys) },
       responses: {
         200: jsonResponse(KeyWraps, "The new wraps and every link"),

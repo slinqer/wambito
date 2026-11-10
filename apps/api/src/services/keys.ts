@@ -116,7 +116,12 @@ export interface SessionOption {
   sessionId: string | null;
 }
 
-/** Ends `sessionIds` (the removed devices'), in the caller's transaction, never the caller's own. */
+/**
+ * Ends `sessionIds` (the removed devices'), in the caller's transaction, after the wraps were
+ * deleted or replaced: never the caller's own, and never one a remaining device wrap of the person
+ * still uses (a browser that enrolled again under the same session keeps its old wrap when the
+ * delete of it failed; removing that stale wrap must not sign the good one out).
+ */
 async function endSessions(
   tx: Tx,
   userId: string,
@@ -125,7 +130,14 @@ async function endSessions(
 ): Promise<void> {
   const ids = sessionIds.filter((id): id is string => id !== null && id !== callerSessionId);
   if (ids.length === 0) return;
-  await tx.delete(session).where(and(eq(session.userId, userId), inArray(session.id, ids)));
+  const inUse = await tx
+    .select({ sessionId: keyWraps.sessionId })
+    .from(keyWraps)
+    .where(own(userId, inArray(keyWraps.sessionId, ids)));
+  const used = new Set(inUse.map((row) => row.sessionId));
+  const ended = ids.filter((id) => !used.has(id));
+  if (ended.length === 0) return;
+  await tx.delete(session).where(and(eq(session.userId, userId), inArray(session.id, ended)));
 }
 
 const values = (
@@ -276,7 +288,7 @@ export async function putKeyWrap(
 
 /**
  * Deletes wrap `id`; 404 when the person has none with that id, 409 for the recovery wrap. A device
- * wrap's session ends with it (never the caller's own).
+ * wrap's session ends with it (never the caller's own, nor one another device wrap still uses).
  */
 export async function deleteKeyWrap(
   db: Db,
@@ -306,7 +318,7 @@ export async function deleteKeyWrap(
  * `link_required`) and refused for its first (422 `link_unexpected`); it must be 60 bytes (422
  * `invalid_link`). It is stored in the same transaction, and the answer lists every link. A device
  * wrap is the same device across the rotation when its `ref` is: it keeps the old row's session;
- * the sessions of devices left out end (never the caller's own).
+ * the sessions of devices left out end (never the caller's own, nor one a kept wrap still uses).
  */
 export async function rotateKeys(
   db: Db,

@@ -786,6 +786,34 @@ describe("a removed device loses its session", () => {
     expect(await sessionOf(userId)).toHaveLength(2);
   });
 
+  test("a session another remaining device wrap still uses is not ended by a DELETE", async () => {
+    const { a, b } = await twoSessions();
+    // B re-enrolled under the same cookie, and the delete of its old wrap failed: both stay
+    const stale = await put(b, device(1));
+    const fresh = await put(b, device(1));
+    expect(await storedSession(stale.id)).toBe(await storedSession(fresh.id));
+    expect((await t.request("DELETE", `/v2/keys/${stale.id}`, { headers: a })).status).toBe(204);
+    expect(await status(b)).toBe(200);
+    expect((await list(a)).map((w) => w.id)).toContain(fresh.id);
+  });
+
+  test("a session another remaining device wrap still uses is not ended by a rotation", async () => {
+    const { a, b } = await twoSessions();
+    await put(b, device(1));
+    const freshRef = randomUUID();
+    await put(b, device(1, { ref: freshRef }));
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [
+        { id: randomUUID(), ...recovery(2) },
+        { id: randomUUID(), ...device(2, { ref: freshRef }) },
+      ],
+      link: link(),
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await status(b)).toBe(200);
+  });
+
   test("the caller's own session is never ended", async () => {
     const { a } = await twoSessions();
     const wrap = await put(a, device(1));

@@ -66,7 +66,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   other kinds sending `publicKey` or `attestation` are 422 `validation_failed`). A device wrap also
   stores `session_id`, the session that registered it (`grant.sessionId` from `requireUser`; null
   for OAuth grants): deleting it, or a rotation that leaves its `ref` out, deletes that session in
-  the same transaction, never the caller's own; a kept device's new row copies the old `session_id`.
+  the same transaction, never the caller's own nor one a remaining device wrap still references
+  (a browser that enrolled again under the same session); a kept device's new row copies the old
+  `session_id`.
   `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
   the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
   recovery wrap with it, so two setups at once cannot make two data keys.

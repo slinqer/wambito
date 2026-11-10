@@ -23,7 +23,7 @@ How to add to it:
 
 ### Added
 
-- Removing a device (deleting its wrap, or a rotation that leaves it out) ends the session that registered it.
+- Removing a device (deleting its wrap, or a rotation that leaves it out) ends the session that registered it, unless another device wrap still uses it.
 - `POST /v2/keys/rotate` requires `link`, the previous data key sealed under the new one (422 `link_required`, `link_unexpected`, `invalid_link`).
 - `GET /v2/keys` and the rotate answer return `links`.
 - `GET`/`POST /v2/sync` (`pullRecords`, `pushRecords`): encrypted records, not yet used by clients. Pull by version (`since`, `limit` 1–1000, `next`, `latest`); push up to 500 changes and 4 MiB, each a new version, a conflict with the current record (a stale `baseVersion` or another `type`: a record's type never changes), `id_taken` (someone else's id) or `not_found` (an update of a record the server does not have: resync in full); ids are lower-case UUIDs (any other form, upper case included, is 422 `validation_failed`; never lower-cased by the server); a live body is 28 bytes (nonce and tag) to 64 KiB, 100,000 live records per account (409 `record_limit`), tombstones purged after 180 days. Assistants pull with `finance:read` and push with `finance:write`.

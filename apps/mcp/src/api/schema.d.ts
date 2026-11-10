@@ -714,7 +714,7 @@ export interface paths {
         /** @description Adds the wrap `id`, or replaces it. `keyV` must be the account's current key version (any for the first wrap), else 409 `key_version_mismatch`. An account's first wrap is `recovery` (any other kind first: 422 `recovery_required`). A `passkey` wrap's `ref` is one of the person's passkey credential ids (422 `unknown_passkey`); an `assistant` wrap's, an OAuth client the person connected (422 `unknown_assistant`); a `device` wrap carries its 32-byte public key and a 32-byte `attestation` of it (else 422 `attestation_required`; other kinds send neither). A new `recovery` wrap replaces the old one (whose id cannot take another kind: 409 `recovery_required`), and a wrap replaces the one of the same kind and ref. 409 `id_taken` when the id is someone else's. With `If-None-Match: *` the wrap is stored only while the account has no other wrap (409 `already_set_up`), so two setups at once cannot make two data keys. */
         put: operations["putKeyWrap"];
         post?: never;
-        /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. Removing a device wrap ends the session that registered it (never the caller's own). */
+        /** @description Removes a wrap. The recovery wrap stays (409 `recovery_required`): make a new recovery key to replace it. Removing a device wrap ends the session that registered it, unless another device wrap still uses it (never the caller's own). */
         delete: operations["deleteKeyWrap"];
         options?: never;
         head?: never;
@@ -730,7 +730,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it (never the caller's own); a kept one keeps it. Records are re-encrypted through `/v2/sync` afterwards. */
+        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. A device left out of the rotation loses the session that registered it, unless a kept device wrap still uses it (never the caller's own); a kept one keeps it. Records are re-encrypted through `/v2/sync` afterwards. */
         post: operations["rotateKeys"];
         delete?: never;
         options?: never;
