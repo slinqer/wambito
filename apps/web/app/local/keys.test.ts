@@ -1033,8 +1033,8 @@ describe("unlocking an account that rotated", () => {
     expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
   });
 
-  it("unlockWithPasskey on a browser holding v whose chain does not reach its key is tampered", async () => {
-    const { api, userId, dk3 } = await rotatedTwice({ link2: "wrong" });
+  it("unlockWithPasskey on a browser holding v whose chain does not reach its key unlocks, keeps the held v and the trusted n", async () => {
+    const { api, userId, dk1, dk2, dk3 } = await rotatedTwice({ link2: "wrong" });
     const prf = new Uint8Array(32).fill(7);
     api.wraps.push({
       id: "01930000-0000-7000-8000-0000000000c1",
@@ -1046,16 +1046,65 @@ describe("unlocking an account that rotated", () => {
       attestation: null,
       label: null,
     });
+    openedLinks.length = 0;
+    const local = await unlockWithPasskey({ userId, credentialId: CRED, prf, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    // the held v1 stays the browser's own, never the key the wrong link leads to
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("unlockWithRecovery on a browser holding v whose v+1 has no link keeps v and v+1", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+    const secret = parseRecoveryKey(recoveryKey as string);
+    const dk1 = await unwrapDataKey(
+      secret,
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const dk2 = generateDataKey();
+    recovery.keyV = 2;
+    recovery.wrapped = toBase64Url(
+      await wrapDataKey(secret, { kind: "recovery", userId, keyV: 2 }, dk2),
+    );
+    const local = await unlockWithRecovery({
+      userId,
+      text: recoveryKey as string,
+      fetch: api.fetch,
+    });
+    expect(local.keyring.current).toBe(2);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+  });
+
+  it("a recovery wrap below the held current version is tampered: nothing sent, kept or deleted", async () => {
+    const { api, userId, recoveryKey, dk1 } = await rotatedTwice();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    // the server replays the v1 recovery wrap to a browser that holds v3
+    const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+    recovery.keyV = 1;
+    recovery.wrapped = toBase64Url(
+      await wrapDataKey(parseRecoveryKey(recoveryKey), { kind: "recovery", userId, keyV: 1 }, dk1),
+    );
     const before = await stored(userId);
     const puts = api.puts.length;
-    openedLinks.length = 0;
+    const deletes = api.deletes.length;
     await expect(
-      unlockWithPasskey({ userId, credentialId: CRED, prf, fetch: api.fetch }),
+      unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch }),
     ).rejects.toEqual(new KeysError("tampered"));
     expect(api.puts.length).toBe(puts);
+    expect(api.deletes.length).toBe(deletes);
     expect(await stored(userId)).toEqual(before);
-    expect((await loadLocalKeys(userId))?.keyring.current).toBe(1);
-    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(3);
   });
 
   it("unlockWithRecovery on a browser holding v walks down to its key and keeps the newer ones", async () => {
@@ -1094,17 +1143,16 @@ describe("unlocking an account that rotated", () => {
   it("a refused delete of the previous device wrap does not fail the unlock", async () => {
     const { api, userId, recoveryKey } = await rotatedTwice();
     api.state.failDeletes = true;
-    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
-    expect(local.keyring.current).toBe(3);
-    expect(api.deletes).toHaveLength(1);
-  });
-
-  it("a tampered unlock deletes nothing", async () => {
-    const { api, userId, recoveryKey } = await rotatedTwice({ link2: "wrong" });
-    await expect(
-      unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch }),
-    ).rejects.toEqual(new KeysError("tampered"));
-    expect(api.deletes).toEqual([]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+      expect(local.keyring.current).toBe(3);
+      expect(api.deletes).toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith("The previous device wrap could not be removed:", "server");
+      expect((await loadLocalKeys(userId))?.keyring.current).toBe(3);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("a 2a vault (legacy record/dedupe at v1) unlocked at v3 keeps the right key for every version", async () => {
@@ -1130,5 +1178,15 @@ describe("unlocking an account that rotated", () => {
     expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
     expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
     expect(dk3.some((b) => b !== 0)).toBe(true);
+  });
+  it("enrollDevice (pairing) with a vault held here stays strict: a chain that does not reach its key is tampered", async () => {
+    const { api, userId, dk3 } = await rotatedTwice({ link2: "wrong" });
+    const before = await stored(userId);
+    const puts = api.puts.length;
+    await expect(enrollDevice({ userId, fetch: api.fetch }, dk3, 3)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(api.puts.length).toBe(puts);
+    expect(await stored(userId)).toEqual(before);
   });
 });

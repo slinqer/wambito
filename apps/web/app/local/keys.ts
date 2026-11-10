@@ -287,22 +287,33 @@ async function chainToHeld(
 }
 
 /**
+ * How a trusted way in treats a vault held here. `strict` (pairing): the links must lead down to
+ * its current version and reach the key it holds (`chainToHeld`). `secret` (a passkey or recovery
+ * wrap, opened with the person's secret, which the server cannot forge; spec 2026-11-10 section 5
+ * over 2.3's mismatch rule): the walk is not strict, and a chain that stops or ends elsewhere is
+ * no error.
+ */
+type HeldVault = "strict" | "secret";
+
+/**
  * The older keys a data key from a trusted way in (a passkey or recovery wrap, or pairing) brings
- * along. With a vault held here: the strict walk down to its current version, checked against the
- * key it holds (`tampered` otherwise, and a version below the held one too, since versions only
- * grow). Without one: every version the links reach, down to the first, stopping silently at the
- * first missing or failing link.
+ * along: every version the links reach, down to the first, stopping silently at the first missing
+ * or failing link. With a vault held here, a trusted version below its current one is `tampered`
+ * (a replay: versions only grow), and `held: "strict"` walks as `chainToHeld` instead. Versions
+ * the vault holds are never replaced (`keepLocally`).
  */
 async function olderForTrustedKey(
   userId: string,
   top: { keyV: number; dataKey: Uint8Array },
   links: Map<number, Uint8Array>,
+  held: HeldVault,
 ): Promise<Map<number, Uint8Array>> {
   const store = await createEncryptedStore(userId);
   try {
     const current = await store.getMeta<number>("keyV");
     if (current !== undefined && (await heldRecordKey(store, current))) {
-      return await chainToHeld(store, userId, top, links, current);
+      if (held === "strict") return await chainToHeld(store, userId, top, links, current);
+      if (top.keyV < current) throw new KeysError("tampered");
     }
     return await chainDown(userId, top, links, FIRST_KEY_V, false);
   } finally {
@@ -350,7 +361,8 @@ async function prepareDevice(
  * cannot be kept safely), a wrap of DK sealed to its own public key with an attestation of that
  * key under DK, then the derived keys, the private key and the wrap's id and public key kept
  * locally. The caller owns `dataKey` and zeroes it. The end of pairing: DK came authenticated by
- * the number, and the links bring the older versions it reaches (`olderForTrustedKey`).
+ * the number, and the links bring the older versions it reaches (`olderForTrustedKey`; with a vault
+ * held here strictly down to its key, else `tampered`).
  */
 export async function enrollDevice(
   options: KeysOptions,
@@ -360,7 +372,7 @@ export async function enrollDevice(
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   const { links } = await listKeys(call);
-  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair);
+  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict");
 }
 
 /**
@@ -377,8 +389,9 @@ async function enrollTrusted(
   keyV: number,
   links: Map<number, Uint8Array>,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
+  held: HeldVault,
 ): Promise<LocalKeys> {
-  const older = await olderForTrustedKey(userId, { keyV, dataKey }, links);
+  const older = await olderForTrustedKey(userId, { keyV, dataKey }, links, held);
   let local: LocalKeys;
   let previous: string | undefined;
   try {
@@ -390,8 +403,13 @@ async function enrollTrusted(
   if (previous) {
     try {
       await call(`/v2/keys/${previous}`, { method: "DELETE" });
-    } catch {
-      // the old wrap stays listed; it opens nothing this browser still uses
+    } catch (error) {
+      // The unlock stands: the old wrap only stays listed (Settings can remove it). Said once,
+      // with the error's code only (never an id or a key).
+      console.warn(
+        "The previous device wrap could not be removed:",
+        error instanceof KeysError ? error.code : "unknown",
+      );
     }
   }
   return local;
@@ -421,8 +439,9 @@ async function enrollWithPair(
 }
 
 /**
- * Keeps the derived keys of `keyV` (made current) and of every `older` version, the device private
- * key and its wrap's id and public key. The caller owns and zeroes the data keys.
+ * Keeps the derived keys of `keyV` (made current) and of every `older` version the vault does not
+ * hold yet (a held version is never replaced), the device private key and its wrap's id and
+ * public key. The caller owns and zeroes the data keys.
  */
 async function keepLocally(
   userId: string,
@@ -438,6 +457,8 @@ async function keepLocally(
     // a held 2a vault's keys first move to their version's names (meta `keyV` moves below)
     await migrateLegacyKeys(store);
     for (const [v, keys] of derived) {
+      // a version this vault already holds is never replaced (versions only grow)
+      if (await store.getKey<CryptoKey>(recordKeyName(v))) continue;
       await store.putKey(recordKeyName(v), keys.record);
       await store.putKey(dedupeKeyName(v), keys.dedupe);
     }
@@ -538,9 +559,10 @@ export async function prepareAccount(
 
 /**
  * Unlocks this browser with the typed recovery key: opens the recovery wrap, enrolls this device
- * and keeps the derived keys, of the older versions the links reach too (`olderForTrustedKey`: with
- * a vault held here, the links must lead to its key, else `tampered` and nothing is sent or kept).
- * The caller then runs a full sync. `bad_recovery_key` is a key that
+ * and keeps the derived keys, of the older versions the links reach too (`olderForTrustedKey`, not
+ * strict: the recovery secret authenticates the key, so with a vault held here a chain that does
+ * not reach its key is no error, its held versions stay as they are; a recovery wrap below its
+ * current version is `tampered`, nothing sent or kept). The caller then runs a full sync. `bad_recovery_key` is a key that
  * does not parse (nothing was sent); `wrong_recovery_key` one that parses but opens nothing.
  */
 export async function unlockWithRecovery(
@@ -570,7 +592,7 @@ export async function unlockWithRecovery(
       throw new KeysError("wrong_recovery_key");
     }
     try {
-      return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair);
+      return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
     } finally {
       dataKey.fill(0);
     }
@@ -588,7 +610,7 @@ export interface PasskeySecret {
 /**
  * Unlocks this browser with a passkey's PRF (spec 7.2): opens the passkey wrap whose `ref` is the
  * credential, enrolls this device and keeps the derived keys, as `unlockWithRecovery` (the same walk
- * of the links, `tampered` with a held vault the links do not reach). The caller
+ * of the links, not strict; `tampered` only for a wrap below a held vault's current version). The caller
  * owns the PRF and zeroes it. `no_passkey_wrap` when no wrap has that `ref` or the PRF does not
  * open it (nothing is sent).
  */
@@ -610,7 +632,7 @@ export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): P
     throw new KeysError("no_passkey_wrap");
   }
   try {
-    return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair);
+    return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
   } finally {
     dataKey.fill(0);
   }

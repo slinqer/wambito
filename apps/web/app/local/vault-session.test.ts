@@ -585,7 +585,7 @@ describe("a new key version this browser cannot verify", () => {
    * wrap and `link(2)` are real, but this browser's device wrap holds a forged v2 (another DK,
    * sealed to its public key), whose link cannot lead back to the key it holds.
    */
-  async function forgedRotation() {
+  async function forgedRotation(options: { noLink?: boolean } = {}) {
     const net = fakeAccount();
     const profile = profileOf();
     const prepared = await prepareAccount({ userId: profile.id, guest: false, fetch: net.fetch });
@@ -611,7 +611,9 @@ describe("a new key version this browser cannot verify", () => {
         fromBase64Url(recovery.wrapped),
       );
       const dk2 = generateDataKey();
-      net.links.set(2, toBase64Url(await sealKeyLink(dk2, dk1, { userId: profile.id, keyV: 2 })));
+      if (!options.noLink) {
+        net.links.set(2, toBase64Url(await sealKeyLink(dk2, dk1, { userId: profile.id, keyV: 2 })));
+      }
       recovery.keyV = 2;
       recovery.wrapped = toBase64Url(
         await wrapDataKey(secret, { kind: "recovery", userId: profile.id, keyV: 2 }, dk2),
@@ -622,7 +624,8 @@ describe("a new key version this browser cannot verify", () => {
         await sealToDevice(
           fromBase64Url(device.publicKey as string),
           { kind: "device", userId: profile.id, keyV: 2 },
-          generateDataKey(),
+          // without a link (a rotation made before links) the real v2, else a forged one
+          options.noLink ? dk2 : generateDataKey(),
         ),
       );
       net.current = 2;
@@ -707,6 +710,36 @@ describe("a new key version this browser cannot verify", () => {
     expect(again).not.toBe(session);
     expect(net.rows.get(first.id)?.keyV).toBe(2);
     const reopened = await createEncryptedStore(profile.id);
+    expect((await reopened.readOutbox(Number.MAX_SAFE_INTEGER)).filter((e) => !e.reseal)).toEqual(
+      [],
+    );
+    reopened.close();
+    again.close();
+  });
+
+  it("a vault stuck in unverified because v+1 has no link unlocks with the recovery key at v+1, keeps v and v+1, and its outbox syncs", async () => {
+    const { net, profile, session, store, recoveryKey, rotate } = await forgedRotation({
+      noLink: true,
+    });
+    const unverified = vi.fn();
+    session.onUnverified(unverified);
+    await rotate();
+    const [first] = await store.list("category");
+    if (!first) throw new Error("no seeded category");
+    await store.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(unverified).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    const local = await unlockWithRecovery({
+      userId: profile.id,
+      text: recoveryKey,
+      fetch: net.fetch,
+    });
+    expect(local.keyring.current).toBe(2);
+    expect([...local.keyring.byVersion.keys()]).toEqual([1, 2]);
+    const again = await openVaultSession({ profile, keys: local, fresh: true, fetch: net.fetch });
+    expect(net.rows.get(first.id)?.keyV).toBe(2);
+    const reopened = await createEncryptedStore(profile.id);
+    expect((await reopened.get("category", first.id))?.body.name).toBe("Edited");
     expect((await reopened.readOutbox(Number.MAX_SAFE_INTEGER)).filter((e) => !e.reseal)).toEqual(
       [],
     );

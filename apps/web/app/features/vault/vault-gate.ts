@@ -33,8 +33,8 @@ import type { UnlockError } from "./Unlock.tsx";
  * A browser that could not verify a new key version (`unverified()`, from the session's
  * `onUnverified`, or an opening that fails with `key_unverified`) shows Unlock with the
  * `unverified` notice, a guest its Locked. Its vault is still here, unsent changes included: the
- * unlock (recovery key, passkey or pairing) keeps it, walks the links down to the key it holds and
- * opens it fresh, and the first sync pushes what waited.
+ * unlock (recovery key, passkey or pairing) keeps it and its held key versions, adds the newer
+ * ones and opens it fresh, and the first sync pushes what waited.
  *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.

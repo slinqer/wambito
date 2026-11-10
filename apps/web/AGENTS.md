@@ -80,11 +80,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
   `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
   there; zeroes what it opened on a throw). The trusted ways in (recovery, passkey, pairing) keep
-  the older versions the links reach: with no vault held here from version 1 down, not strict;
-  with one held, strictly down to its current version, whose key must match the held one
-  (`sameDataKey`), else `tampered` before anything is sent or kept (a version below the held one
-  too); with one held, once the new device wrap is kept, `DELETE /v2/keys/{previous deviceWrapId}`
-  (best effort; the server never ends the caller's own session). `loadLocalKeys(userId)` →
+  the older versions the links reach, from version 1 down, not strict. With a vault held here:
+  a recovery or passkey key (authenticated by the person's secret; spec 2026-11-10 section 5)
+  still walks not strict, a chain that stops or ends at another key is no error, and the held
+  versions are never replaced (`keepLocally` skips them); pairing walks strictly down to the held
+  current version, whose key must match (`sameDataKey`), else `tampered`; for all three a trusted
+  version below the held current one is `tampered` (a replay), before anything is sent or kept.
+  With a vault held, once the new device wrap is kept, `DELETE /v2/keys/{previous deviceWrapId}`
+  (the server never ends the caller's own session); best effort: a failure never fails the
+  unlock, it is `console.warn`ed with its code only and the old wrap stays listed in Settings. `loadLocalKeys(userId)` →
   `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
   `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
   `currentRecordKeys(local)`; the sync engine takes the keyring), `withDataKey(options, fn)`
@@ -183,7 +187,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
   (the opening's error the same way): Unlock with the notice `vault.unverified`, a guest's Locked.
   The unlock there (recovery key, passkey, pairing) keeps the vault, replaces the device wrap and
-  opens a new session fresh, whose first sync pushes what waited. `session.reloadKeys()`
+  opens a new session fresh, whose first sync pushes what waited; a recovery key or passkey
+  unlocks it even when the links do not reach the held key (a version made before links). `session.reloadKeys()`
   gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
@@ -268,7 +273,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   Known limit of `app/local/` (spec 2026-11-10 section 2.4): a malicious server together with a
   stolen device that still holds DK(v-1) can forge a version whose link leads back to it, for a
   browser that has not seen the real one yet. A server that withholds a link (or a whole rotation)
-  leaves browsers stuck in the `unverified` state: denial of service only, nothing is revealed.
+  leaves browsers stuck in the `unverified` state until a passkey or the recovery key unlocks
+  them (pairing stays strict): denial of service only, nothing is revealed.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
