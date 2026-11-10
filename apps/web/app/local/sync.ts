@@ -67,12 +67,19 @@ import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keys.ts
  * - The engine holds a keyring (record keys by `keyV`). A record opens with the keys of its own
  *   `keyV`; every change is sealed under the keyring's current version, never an old one.
  * - A record under a version higher than the current one (another device rotated) calls
- *   `refreshKeys` once per run (`run()`, all its passes); a version still unknown after that, or
- *   one below the current that this browser no longer holds, goes to quarantine
- *   (`unknown_key_version`). The refresh is not repeated for every such record.
+ *   `refreshKeys`, again only when it needs a version above what the run's last refresh reached
+ *   and never twice for the same version in a run (`run()`, all its passes): a rotation that
+ *   commits between a refresh and the next record is followed. A version still unknown after
+ *   that, or one below the current that this browser no longer holds, goes to quarantine
+ *   (`unknown_key_version`, with its `keyV`).
+ * - Whenever the keyring's current version grows (a refresh, or `useKeyring`), and on the
+ *   engine's first pull, the pull retries the `unknown_key_version` quarantine rows under a
+ *   version now held: it pulls again from the oldest one's version (base = `latest`), applying
+ *   only those ids. A remote write of an id clears its quarantine rows.
  * - A change refused with `key_version_mismatch` (the server's current `keyV` is newer) refreshes
- *   the same way and is sealed and pushed again; a second refusal of it in the run, or a refresh
- *   that does not reach that version, parks it (`key_version_mismatch`).
+ *   the same way and is sealed and pushed again under the current version (also when the refresh
+ *   went past the refused one); a second refusal of it in the run, or a refresh that does not
+ *   reach that version, parks it (`key_version_mismatch`).
  * - `refreshKeys` throwing `device_removed` (this browser's wrap is gone) stops the run with
  *   `{ ok: false, error: "device_removed", problem: "device_removed" }`, reports it and stops
  *   `start()`'s triggers; the session deletes the vault. Its other failures stop the run as
@@ -279,22 +286,46 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   const ctx = (type: RecordType, id: string, v: number) => ({ userId, type, id, keyV: v });
 
-  /** The run's one key refresh, shared by every record and change that needs it. */
+  /**
+   * Key refreshes in this run: one per distinct version needed above what the last refresh
+   * reached (a rotation may commit between two of them), never twice for the same version.
+   */
   let refreshing: Promise<void> | null = null;
-  function refresh(): Promise<void> {
-    refreshing ??= (async () => {
+  let refreshedTo = 0;
+  const refreshedFor = new Set<number>();
+  /**
+   * The keyring's current version grew: records quarantined as `unknown_key_version` retry. Also
+   * on the first pull of the engine (another tab or an earlier page may have got the keys since).
+   */
+  let retryUnknown = true;
+  function refresh(needed: number): Promise<void> {
+    if (refreshing) return refreshing;
+    if (needed <= refreshedTo || refreshedFor.has(needed)) return Promise.resolve();
+    refreshedFor.add(needed);
+    refreshing = (async () => {
+      const before = keyring.current;
       try {
         keyring = await options.refreshKeys();
       } catch (error) {
         throw keysStop(error);
+      } finally {
+        refreshing = null;
       }
+      refreshedTo = keyring.current;
+      if (keyring.current > before) retryUnknown = true;
     })();
     return refreshing;
+  }
+  /** A new run may refresh again. */
+  function resetRefreshes() {
+    refreshing = null;
+    refreshedTo = 0;
+    refreshedFor.clear();
   }
 
   /** The keys of version `v`; a version above the current one refreshes the keyring first. */
   async function keysFor(v: number): Promise<RecordKeys | undefined> {
-    if (!keyring.byVersion.has(v) && v > keyring.current) await refresh();
+    if (!keyring.byVersion.has(v) && v > keyring.current) await refresh(v);
     return keyring.byVersion.get(v);
   }
 
@@ -330,6 +361,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       type: rec.type as RecordType,
       version: rec.version,
       reason,
+      keyV: rec.keyV,
     });
   }
 
@@ -528,8 +560,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         // The account rotated: seal it again under the new version, once.
         const count = (mismatches.get(entry.id) ?? 0) + 1;
         mismatches.set(entry.id, count);
-        if (count === 1 && r.keyV > keyring.current) await refresh();
-        if (count === 1 && keyring.current === r.keyV && keyring.byVersion.has(r.keyV)) {
+        if (count === 1 && r.keyV > keyring.current) await refresh(r.keyV);
+        // A refresh that went past the refused version (rotated again) seals under that one.
+        if (count === 1 && keyring.current >= r.keyV && keyring.byVersion.has(keyring.current)) {
           handled.delete(entry.id);
         } else {
           await park(entry, "key_version_mismatch", result);
@@ -594,8 +627,46 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   async function pull(result: SyncResult): Promise<void> {
     const since0 = (await store.getMeta<number>("latest")) ?? 0;
     const base = (await store.getMeta<number>("base")) ?? since0;
-    let since = since0;
-    let latest = since0;
+    const latest = await pullPages(result, since0, base);
+    await store.setMeta("latest", latest);
+    await store.setMeta("base", latest);
+    if (retryUnknown) await retryQuarantined(result, latest);
+    // A resync's set-aside changes, once a whole download has landed.
+    const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
+    if (outbox.some((e) => e.setAside)) await restoreSetAside(result);
+  }
+
+  /**
+   * The keyring grew (a refresh, or a rotation here): records quarantined earlier as
+   * `unknown_key_version` under a version it now holds are pulled again (the server has no
+   * single-record read: the pages from the oldest such version, applying only those ids; base =
+   * `latest`, so no resync). A record that opens clears its quarantine row; one that still does
+   * not stays quarantined.
+   */
+  async function retryQuarantined(result: SyncResult, latest: number): Promise<void> {
+    retryUnknown = false;
+    const rows = (await store.quarantined()).filter(
+      (q) =>
+        q.reason === "unknown_key_version" && (q.keyV === undefined || q.keyV <= keyring.current),
+    );
+    if (rows.length === 0) return;
+    const only = new Set(rows.map((q) => `${q.type}:${q.id}`));
+    const since = Math.max(0, Math.min(...rows.map((q) => q.version)) - 1);
+    await pullPages(result, since, latest, only);
+  }
+
+  /**
+   * Pulls and applies the pages from `since`; returns the server's `latest`. With `only`, applies
+   * just those `type:id`s (a quarantine retry).
+   */
+  async function pullPages(
+    result: SyncResult,
+    from: number,
+    base: number,
+    only?: Set<string>,
+  ): Promise<number> {
+    let since = from;
+    let latest = from;
     for (;;) {
       const page = (await call(`/v2/sync?since=${since}&base=${base}&limit=${PULL_LIMIT}`)) as {
         records: WireRecord[];
@@ -611,6 +682,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       const apply: Apply[] = [];
       let quarantined = 0;
       for (const rec of page.records) {
+        if (only && !only.has(`${rec.type}:${rec.id}`)) continue;
         if (pending.has(rec.id)) continue; // the push's conflict path merges it
         if (!isRecordType(rec.type)) {
           await quarantine(rec, "unknown_type");
@@ -649,11 +721,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       if (page.next === null) break;
       since = page.next;
     }
-    await store.setMeta("latest", latest);
-    await store.setMeta("base", latest);
-    // A resync's set-aside changes, once a whole download has landed.
-    const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
-    if (outbox.some((e) => e.setAside)) await restoreSetAside(result);
+    return latest;
   }
 
   // ---- key versions ---------------------------------------------------------------------------
@@ -808,8 +876,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       running = true;
       try {
         return await locked(async () => {
-          // One key refresh per run, shared by its passes.
-          refreshing = null;
+          // Key refreshes are counted per run, across its passes.
+          resetRefreshes();
           let last: SyncResult | undefined;
           do {
             again = false;
@@ -897,6 +965,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   function useKeyring(next: Keyring): void {
     if (next.current < keyring.current || !next.byVersion.has(next.current)) return;
+    if (next.current > keyring.current) retryUnknown = true;
     keyring = next;
   }
 

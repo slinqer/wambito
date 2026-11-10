@@ -141,6 +141,27 @@ describe("meta, quarantine, wipe", () => {
     expect(await store.quarantineCount()).toBe(2);
   });
 
+  it("a remote put or delete of a record clears its quarantine rows; a local write does not", async () => {
+    const store = await fresh();
+    const remote = { origin: "remote", version: 3, keyV: 2 } as const;
+    await store.quarantine({ id: "a", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "a", type: "category", version: 2, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "b", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "c", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "a", type: "merchant", version: 1, reason: "x", keyV: 2 });
+    await store.put("category", "c", category("C"));
+    expect(await store.quarantineCount()).toBe(5);
+    await store.put("category", "a", category("A"), remote);
+    expect(await store.quarantineCount()).toBe(3);
+    // a tombstone of a record this browser never had
+    await store.delete("category", "b", remote);
+    expect(await store.quarantineCount()).toBe(2);
+    expect((await store.quarantined()).map((q) => `${q.type}:${q.id}`).sort()).toEqual([
+      "category:c",
+      "merchant:a",
+    ]);
+  });
+
   it("wipes records, quarantine and the cursors, but not the keys, userId or outbox", async () => {
     const store = await fresh();
     const listener = vi.fn();
@@ -356,6 +377,9 @@ describe("re-sealing under a new key version", () => {
     await store.put("category", "e", category("E"), remote(4, 1));
     await store.delete("category", "e", remote(5, 1)); // a tombstone has no body
     expect(await store.keyVersionsInUse()).toEqual(new Set([1, 2]));
+    // a quarantined record may still be retried under its key version
+    await store.quarantine({ id: "q", type: "category", version: 9, reason: "x", keyV: 5 });
+    expect(await store.keyVersionsInUse()).toEqual(new Set([1, 2, 5]));
     expect(await store.queueReseal(2, 1)).toBe(1);
     expect(await store.queueReseal(2, 1)).toBe(0); // one pending already fills the limit
     expect(await store.queueReseal(2, 5)).toBe(1);

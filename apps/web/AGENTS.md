@@ -23,7 +23,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta`,
   `quarantine`, `wipeRecords`, `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`,
   `adoptServerCopy`, `restoreSetAside`, `queueReseal(current, limit)` (outbox entries `reseal: true`
-  for pushed records under an older `keyV`), `keyVersionsInUse()`). Subscribers fire after every commit that
+  for pushed records under an older `keyV`), `keyVersionsInUse()` (quarantined rows' `keyV`
+  included), `quarantined()`; a remote put or delete of an id clears its quarantine rows). Subscribers fire after every commit that
   wrote, whatever its origin, and for other tabs' commits too (a BroadcastChannel
   `wambito-vault-<userId>` tells the other tabs of each commit). `close()` (or another tab deleting
   or upgrading the database) closes it for good: every later op rejects with `VaultClosedError`
@@ -48,8 +49,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   cookie is now another account's) stops the run and `start()`'s triggers (problem
   `session_changed`; `KeysError("session_changed")` in `keys.ts`). Key versions: a record opens
   with the keys of its own `keyV`, every change is sealed under `keyring.current`; a record under a
-  newer `keyV`, or a per-change `key_version_mismatch` (pushed again once, re-sealed), calls
-  `refreshKeys` once per run (still unknown: quarantine `unknown_key_version`); after each pull the
+  newer `keyV`, or a per-change `key_version_mismatch` (pushed again once, re-sealed under the
+  current version, also when the refresh went past the refused one), calls `refreshKeys` (again
+  when a version above the last refresh's result is needed, at most once per distinct version per
+  run; still unknown: quarantine `unknown_key_version`, with the row's `keyV`); when the keyring's
+  current version grows, and on the engine's first pull, the pull retries those quarantine rows
+  (pages again from the oldest one's version, only those ids); after each pull the
   upgrade pass re-seals records under an older `keyV` through the outbox (`reseal` entries: unchanged
   body, `baseVersion` = its version, at most 500 per run, a conflict takes the server's copy) and
   drops an old version's keys once no local record uses it; `refreshKeys` throwing `device_removed`

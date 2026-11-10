@@ -73,6 +73,8 @@ export interface QuarantineEntry {
   type: RecordType;
   version: number;
   reason: string;
+  /** The key version it was sealed under (absent on rows from before stage 2b's fixes). */
+  keyV?: number;
 }
 
 export const vaultName = (userId: string) => `wambito-vault-${userId}`;

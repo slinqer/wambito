@@ -1063,6 +1063,65 @@ describe("key versions", () => {
     expect(two.refreshKeys).toHaveBeenCalledTimes(1);
   });
 
+  it("a rotation that commits after the run's refresh does not quarantine the next keyV", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const k3 = await fresh();
+    server.wraps.set(1, k1).set(2, k2);
+    await serverWrite(server, k2, A, "at two", 2);
+    await serverWrite(server, k3, B, "at three", 3);
+    const two = await device(server, k1);
+    const refresh = two.refreshKeys.getMockImplementation() as () => Promise<Keyring>;
+    two.refreshKeys.mockImplementationOnce(async () => {
+      const ring = await refresh();
+      server.wraps.set(3, k3); // another device rotates right after this refresh
+      return ring;
+    });
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: true, pulled: 2, quarantined: 0 });
+    expect((await two.store.get("category", B))?.body.name).toBe("at three");
+    expect(two.refreshKeys).toHaveBeenCalledTimes(2);
+  });
+
+  it("a record quarantined under an unknown keyV opens once a later refresh reaches it", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k3 = await fresh();
+    server.wraps.set(1, k1);
+    await serverWrite(server, k3, A, "early", 3);
+    const two = await device(server, k1);
+    expect(await two.engine.run()).toMatchObject({ ok: true, quarantined: 1 });
+    expect(await two.store.quarantineCount()).toBe(1);
+
+    server.wraps.set(3, k3);
+    await serverWrite(server, k3, B, "later", 3);
+    const r = await two.engine.run();
+    expect(r.ok).toBe(true);
+    expect((await two.store.get("category", A))?.body.name).toBe("early");
+    expect((await two.store.get("category", B))?.body.name).toBe("later");
+    expect(await two.store.quarantineCount()).toBe(0);
+  });
+
+  it("a refresh that goes past the refused keyV re-seals and pushes, not parks", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const k3 = await fresh();
+    server.wraps.set(1, k1).set(2, k2);
+    const one = await device(server, k1);
+    const refresh = one.refreshKeys.getMockImplementation() as () => Promise<Keyring>;
+    one.refreshKeys.mockImplementationOnce(async () => {
+      server.wraps.set(3, k3); // rotated again before this refresh read the wrap
+      return refresh();
+    });
+    await one.store.put("category", A, category("typed before both"));
+    const r = await one.engine.run();
+    expect(r).toMatchObject({ ok: true, pushed: 1, parked: [] });
+    expect(server.rows.get(A)?.keyV).toBe(3);
+    expect((await openOnServer(server, k3, A)).name).toBe("typed before both");
+  });
+
   it("a push refused with key_version_mismatch refreshes, re-seals at the new keyV and pushes again", async () => {
     const server = fakeServer();
     const k1 = await fresh();
