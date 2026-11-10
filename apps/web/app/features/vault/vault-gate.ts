@@ -272,6 +272,13 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     } else set({ status: "unlock" });
   };
 
+  /** This browser was removed (its vault is gone): Unlock with the notice, a guest's Locked. */
+  const showRemoved = () => {
+    prepared = null;
+    if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
+    else set({ status: "unlock", notice: "removed" });
+  };
+
   /** Shows Locked; its retry runs `step`. */
   const lock = (error: unknown, step: () => Promise<void>) => {
     again = step;
@@ -309,8 +316,13 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       set({ status: "ready", session });
     } catch (error) {
       // The keys are kept now: a retry starts over and finds them.
-      if (codeOf(error) === "session_changed") await changed(error, check);
-      else lock(error, check);
+      const code = codeOf(error);
+      if (code === "session_changed") await changed(error, check);
+      else if (code === "device_removed") {
+        // Removed while this page was closed: the session deleted the vault, so say so.
+        keepPending(null);
+        showRemoved();
+      } else lock(error, check);
     }
   }
 
@@ -459,8 +471,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     },
     removed() {
       if (state.status !== "ready") return;
-      if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
-      else set({ status: "unlock", notice: "removed" });
+      showRemoved();
     },
     async pair() {
       const from =

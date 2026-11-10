@@ -809,6 +809,27 @@ describe("vault gate", () => {
       expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
     });
 
+    it("a browser removed while closed opens to Unlock with the removed notice", async () => {
+      const open = vi.fn(async () => {
+        throw fail("device_removed");
+      });
+      const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+    });
+
+    it("a guest removed while closed is Locked guest", async () => {
+      const open = vi.fn(async () => {
+        throw fail("device_removed");
+      });
+      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open, guest: true });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    });
+
     it("removed() outside the open app does nothing", async () => {
       const { gate } = gateWith({
         prepareAccount: async () => {

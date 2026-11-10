@@ -449,7 +449,9 @@ test("a removed browser locks", async ({ browser }) => {
   await expect(first.page.getByRole("dialog", { name: "Listo" })).toBeVisible({
     timeout: 20_000,
   });
-  await expect(first.page.getByText(/ya no puede abrir tus datos\.$/)).toBeVisible();
+  await expect(
+    first.page.getByText(/ya no puede abrir tus datos\. Si aún tienes ese dispositivo/),
+  ).toBeVisible();
 
   // -- the second, on its next sync, is locked out with the notice; nothing of the vault stays --
   await expect(async () => {
@@ -468,6 +470,41 @@ test("a removed browser locks", async ({ browser }) => {
   const after = await vaultKeys(first.page);
   expect(after.keyV).toBe(2);
   expect(after.names).toContain("record:2");
+
+  await first.context.close();
+  await second.context.close();
+});
+
+test("a browser removed while closed says so after a reload", async ({ browser }) => {
+  test.setTimeout(120_000);
+  reseed();
+
+  const first = await openBrowser(browser);
+  const key = await firstBrowser(first);
+  const second = await openBrowser(browser);
+  await unlockWithKey(second, key);
+
+  // -- the second's page closes (its vault stays in the context), then the first removes it ----
+  await second.page.close();
+  await openSecurity(first.page);
+  await first.page.getByRole("button", { name: /^Quitar / }).click();
+  const sheet = first.page.getByRole("dialog", { name: /^¿Quitar / });
+  await sheet.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
+  await sheet.getByRole("button", { name: "Sí, quitarlo" }).click();
+  await expect(first.page.getByRole("dialog", { name: "Listo" })).toBeVisible({
+    timeout: 20_000,
+  });
+
+  // -- the second opens the app again: Unlock with the removed notice, not a generic failure --
+  const page = await second.context.newPage();
+  await pinClock(page);
+  await page.goto("/app");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Este navegador se eliminó de tu cuenta" }),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
+  await expect(page.getByText("No pudimos abrir tus datos")).toHaveCount(0);
+  await expect.poll(() => vaultDatabases(page)).toEqual([]);
 
   await first.context.close();
   await second.context.close();
