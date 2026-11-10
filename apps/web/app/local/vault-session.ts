@@ -3,7 +3,7 @@ import { isLocale, type Locale } from "../i18n/format.ts";
 import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { uuidv5 } from "./ids.ts";
-import { forgetDevice, type LocalKeys } from "./keys.ts";
+import { currentRecordKeys, forgetDevice, type LocalKeys } from "./keys.ts";
 import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 
 /**
@@ -182,8 +182,9 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       store,
       fetch: network,
       userId: profile.id,
-      keys: keys.keys,
-      keyV: keys.keyV,
+      // One key version for now: the engine follows versions in a later task.
+      keys: currentRecordKeys(keys),
+      keyV: keys.keyring.current,
       onError: (problem) => {
         if (problem.code === "unauthorized") options.onUnauthorized?.();
         if (problem.code === "session_changed" && opened) {

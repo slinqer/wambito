@@ -1,11 +1,16 @@
 import "fake-indexeddb/auto";
 import {
+  deriveRecordKeys,
   formatRecoveryKey,
   fromBase64Url,
+  generateDataKey,
+  generateDeviceKeyPair,
   openFromDevice,
   openRecord,
   parseRecoveryKey,
   sealRecord,
+  sealToDevice,
+  toBase64Url,
   unwrapDataKey,
   verifyDeviceAttestation,
 } from "@wambito/crypto";
@@ -27,12 +32,20 @@ vi.mock("@wambito/crypto", async (original) => {
 });
 
 import {
+  dropKeyVersion,
   forgetDevice,
   KeysError,
+  type LocalKeys,
   loadLocalKeys,
   prepareAccount,
+  refreshKeys,
   unlockWithRecovery,
+  withDataKey,
 } from "./keys.ts";
+
+/** The record keys of the keyring's current version. */
+const currentKeys = (local: LocalKeys | null) =>
+  local!.keyring.byVersion.get(local!.keyring.current)!;
 
 /** Prepares and commits at once, as the setup screen does once the person confirmed the key. */
 async function setUpAccount(options: Parameters<typeof prepareAccount>[0]) {
@@ -138,11 +151,11 @@ describe("prepareAccount then commit", () => {
     ).toBe(true);
 
     const local = await loadLocalKeys(userId);
-    expect(local?.keyV).toBe(1);
-    expect(local?.keys.record.extractable).toBe(false);
-    expect(local?.keys.dedupe.extractable).toBe(false);
+    expect(local?.keyring.current).toBe(1);
+    expect(currentKeys(local).record.extractable).toBe(false);
+    expect(currentKeys(local).dedupe.extractable).toBe(false);
     // the stored keys are the ones the data key derives
-    const sealed = await sealRecord(local!.keys, CTX(userId, REC), { s: 1 });
+    const sealed = await sealRecord(currentKeys(local), CTX(userId, REC), { s: 1 });
     expect(sealed.length).toBeGreaterThan(0);
     const store = await createEncryptedStore(userId);
     const priv = await store.getKey("device");
@@ -193,7 +206,7 @@ describe("prepareAccount", () => {
 
     const keys = await prepared.commit();
     expect(api.puts.map((p) => p.kind)).toEqual(["recovery", "device"]);
-    expect(keys.keyV).toBe(1);
+    expect(keys.keyring.current).toBe(1);
     expect(await loadLocalKeys(userId)).not.toBeNull();
   });
 
@@ -250,7 +263,7 @@ describe("prepareAccount", () => {
     const puts = api.puts.length;
     const second = await prepared.commit();
     expect(api.puts.length).toBe(puts);
-    expect(second.keyV).toBe(first.keyV);
+    expect(second.keyring.current).toBe(first.keyring.current);
   });
 });
 
@@ -346,13 +359,13 @@ describe("unlockWithRecovery", () => {
     // tolerant of case, spaces and dashes
     const messy = ` ${recoveryKey.toLowerCase().replaceAll("-", "  ")} `;
     const keys = await unlockWithRecovery({ userId, text: messy, fetch: api.fetch });
-    expect(keys.keyV).toBe(1);
+    expect(keys.keyring.current).toBe(1);
     expect(api.wraps.length).toBe(before + 1);
     expect(api.wraps.filter((w) => w.kind === "device").length).toBe(2);
-    const sealed = await sealRecord(keys.keys, CTX(userId, REC), { s: 1 });
-    expect(await openRecord((await loadLocalKeys(userId))!.keys, CTX(userId, REC), sealed)).toEqual(
-      { s: 1 },
-    );
+    const sealed = await sealRecord(currentKeys(keys), CTX(userId, REC), { s: 1 });
+    expect(
+      await openRecord(currentKeys(await loadLocalKeys(userId)), CTX(userId, REC), sealed),
+    ).toEqual({ s: 1 });
   });
 
   it("rejects a malformed key with bad_recovery_key before any request", async () => {
@@ -425,5 +438,197 @@ describe("the signed-in account", () => {
       status: 409,
     });
     expect(await loadLocalKeys(userId)).toBeNull();
+  });
+});
+
+/** An account set up in this browser, with its DK (from the recovery wrap) for checks. */
+async function enrolledAccount() {
+  const api = fakeKeys();
+  const userId = newUser();
+  const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+  const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+  const dk = await unwrapDataKey(
+    parseRecoveryKey(recoveryKey as string),
+    { kind: "recovery", userId, keyV: 1 },
+    fromBase64Url(recovery.wrapped),
+  );
+  const device = api.wraps.find((w) => w.kind === "device") as Wrap;
+  return { api, userId, dk, device };
+}
+
+describe("the device wrap", () => {
+  it("enroll keeps the device wrap id and public key", async () => {
+    const { userId, device } = await enrolledAccount();
+    const store = await createEncryptedStore(userId);
+    expect(await store.getMeta("deviceWrapId")).toBe(device.id);
+    expect(await store.getMeta("devicePublicKey")).toBe(device.publicKey);
+    store.close();
+  });
+
+  it("enroll labels the wrap after this browser", async () => {
+    const { device } = await enrolledAccount();
+    expect(typeof device.label).toBe("string");
+    expect(device.label?.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the keyring", () => {
+  it("a 2a vault's keys load as version keyV and move to the versioned names", async () => {
+    const userId = newUser();
+    const keys = await deriveRecordKeys(generateDataKey(), false);
+    const store = await createEncryptedStore(userId);
+    await store.putKey("record", keys.record);
+    await store.putKey("dedupe", keys.dedupe);
+    await store.setMeta("keyV", 3);
+    await store.setMeta("userId", userId);
+
+    const local = await loadLocalKeys(userId);
+    expect(local?.keyring.current).toBe(3);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([3]);
+    const sealed = await sealRecord(keys, { ...CTX(userId, REC), keyV: 3 }, { s: 1 });
+    expect(await openRecord(currentKeys(local), { ...CTX(userId, REC), keyV: 3 }, sealed)).toEqual({
+      s: 1,
+    });
+    expect(await store.getKey("record")).toBeUndefined();
+    expect(await store.getKey("dedupe")).toBeUndefined();
+    expect(await store.getKey("record:3")).toBeDefined();
+    expect(await store.getKey("dedupe:3")).toBeDefined();
+    // and loads the same again under the new names
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(3);
+    store.close();
+  });
+
+  it("dropKeyVersion removes record:1 and dedupe:1 only", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    await rotateDeviceWrap(api, userId, device, generateDataKey(), 2);
+    await refreshKeys({ userId, fetch: api.fetch });
+
+    await dropKeyVersion(userId, 1);
+    const store = await createEncryptedStore(userId);
+    expect(await store.getKey("record:1")).toBeUndefined();
+    expect(await store.getKey("dedupe:1")).toBeUndefined();
+    expect(await store.getKey("record:2")).toBeDefined();
+    expect(await store.getKey("dedupe:2")).toBeDefined();
+    expect(await store.getKey("device")).toBeDefined();
+    store.close();
+    const local = await loadLocalKeys(userId);
+    expect(local?.keyring.current).toBe(2);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([2]);
+  });
+});
+
+/** The server re-wrapped a new DK to this browser's public key under `keyV` (a rotation). */
+async function rotateDeviceWrap(
+  api: ReturnType<typeof fakeKeys>,
+  userId: string,
+  device: Wrap,
+  dk: Uint8Array,
+  keyV: number,
+) {
+  const wrap = api.wraps.find((w) => w.id === device.id) as Wrap;
+  wrap.keyV = keyV;
+  wrap.wrapped = toBase64Url(
+    await sealToDevice(
+      fromBase64Url(device.publicKey as string),
+      { kind: "device", userId, keyV },
+      dk,
+    ),
+  );
+}
+
+describe("withDataKey", () => {
+  it("withDataKey opens this browser's device wrap and zeroes DK after", async () => {
+    const { api, userId, dk } = await enrolledAccount();
+    let seen: Uint8Array | undefined;
+    let copy: Uint8Array | undefined;
+    const result = await withDataKey({ userId, fetch: api.fetch }, async (key, keyV) => {
+      seen = key;
+      copy = key.slice();
+      return keyV;
+    });
+    expect(result).toBe(1);
+    expect(copy).toEqual(dk);
+    expect(seen?.every((b) => b === 0)).toBe(true);
+  });
+
+  it("zeroes DK when fn throws too", async () => {
+    const { api, userId } = await enrolledAccount();
+    let seen: Uint8Array | undefined;
+    const err = await withDataKey({ userId, fetch: api.fetch }, async (key) => {
+      seen = key;
+      throw new Error("boom");
+    }).catch((e) => e);
+    expect(err.message).toBe("boom");
+    expect(seen?.every((b) => b === 0)).toBe(true);
+  });
+
+  it("withDataKey throws device_removed when no device wrap has this browser's id", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    api.wraps.splice(
+      api.wraps.findIndex((w) => w.id === device.id),
+      1,
+    );
+    const fn = vi.fn(async () => 1);
+    await expect(withDataKey({ userId, fetch: api.fetch }, fn)).rejects.toMatchObject({
+      code: "device_removed",
+    });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a 2a browser without the wrap id finds its device wrap and remembers it", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    // a second device wrap that is not this browser's
+    const other = await generateDeviceKeyPair();
+    api.wraps.unshift({
+      ...device,
+      id: "01930000-0000-7000-8000-0000000000ff",
+      ref: "01930000-0000-7000-8000-0000000000ff",
+      publicKey: toBase64Url(other.publicKey),
+      wrapped: toBase64Url(
+        await sealToDevice(other.publicKey, { kind: "device", userId, keyV: 1 }, dk),
+      ),
+    });
+    const store = await createEncryptedStore(userId);
+    await store.setMeta("deviceWrapId", undefined);
+    await store.setMeta("devicePublicKey", undefined);
+
+    let copy: Uint8Array | undefined;
+    await withDataKey({ userId, fetch: api.fetch }, async (key) => {
+      copy = key.slice();
+    });
+    expect(copy).toEqual(dk);
+    expect(await store.getMeta("deviceWrapId")).toBe(device.id);
+    expect(await store.getMeta("devicePublicKey")).toBe(device.publicKey);
+    store.close();
+  });
+});
+
+describe("refreshKeys", () => {
+  it("refreshKeys adds the new version and keeps the old one", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    const next = generateDataKey();
+    await rotateDeviceWrap(api, userId, device, next, 2);
+
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(2);
+    expect([...local.keyring.byVersion.keys()].sort()).toEqual([1, 2]);
+    const ctx2 = { ...CTX(userId, REC), keyV: 2 };
+    const sealed = await sealRecord(await deriveRecordKeys(next, false), ctx2, { s: 2 });
+    expect(await openRecord(currentKeys(local), ctx2, sealed)).toEqual({ s: 2 });
+
+    const again = await loadLocalKeys(userId);
+    expect(again?.keyring.current).toBe(2);
+    expect([...(again?.keyring.byVersion.keys() ?? [])].sort()).toEqual([1, 2]);
+  });
+
+  it("refreshKeys refuses a device wrap whose public key is not this browser's", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    const other = await generateDeviceKeyPair();
+    const wrap = api.wraps.find((w) => w.id === device.id) as Wrap;
+    wrap.publicKey = toBase64Url(other.publicKey);
+    await expect(refreshKeys({ userId, fetch: api.fetch })).rejects.toMatchObject({
+      code: "device_removed",
+    });
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(1);
   });
 });

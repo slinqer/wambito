@@ -21,7 +21,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
   also the sync helpers `readOutbox`, `ackOutbox`, `getMeta/setMeta`, `quarantine`, `wipeRecords`,
-  `getKey/putKey`, `parkOutbox`, `abandonOutbox`, `adoptServerCopy`, `restoreSetAside`). Subscribers fire after every commit that
+  `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`, `adoptServerCopy`, `restoreSetAside`). Subscribers fire after every commit that
   wrote, whatever its origin, and for other tabs' commits too (a BroadcastChannel
   `wambito-vault-<userId>` tells the other tabs of each commit). `close()` (or another tab deleting
   or upgrading the database) closes it for good: every later op rejects with `VaultClosedError`
@@ -48,16 +48,27 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
   recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
   until `commit()`, which the setup screen calls only after the four characters are typed back:
-  PUT the recovery wrap first, then the attested device wrap, then keep only the non-extractable
-  record/dedupe keys and the device private key in the vault's `keys` store, plus meta `keyV`;
+  PUT the recovery wrap first, then the attested device wrap (label `deviceLabel(userAgent)` from
+  `device-label.ts`: `"Firefox on macOS"`, else `"Web"`), then keep only the non-extractable
+  record/dedupe keys (`record:<v>`, `dedupe:<v>`) and the device private key (`device`) in the
+  vault's `keys` store, plus meta `keyV` (current), `deviceWrapId` and `devicePublicKey`;
   retry-safe, the same ids on a retry, DK zeroed after success; `recoveryKey` is `null` for a
   guest, whose recovery secret is never shown and who commits at once; `KeysError("already_set_up")`
   when the account has wraps, and from `commit()` when another setup won the race: the recovery
   wrap goes with `If-None-Match: *`, so the server keeps one data key; the losing DK is zeroed;
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
-  `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `loadLocalKeys(userId)`
-  (`null` = locked), `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
+  `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
+  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK), `loadLocalKeys(userId)` →
+  `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
+  `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
+  `currentRecordKeys(local)`; the sync engine still takes one version), `withDataKey(options, fn)`
+  (DK from this browser's own device wrap: found by `deviceWrapId`, its `publicKey` must equal
+  `devicePublicKey`, opened with `openFromDevice`; `fn(dk, keyV)`, DK zeroed after;
+  `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
+  wrap and keeps the one that opens), `refreshKeys(options)` (adds the device wrap's `keyV` to the
+  keyring and makes it current, keeps the old versions), `dropKeyVersion(userId, keyV)`,
+  `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load

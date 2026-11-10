@@ -52,7 +52,12 @@ function fakeNetwork() {
   return net;
 }
 
-const keys = async () => ({ keys: await deriveRecordKeys(generateDataKey(), false), keyV: 1 });
+const keys = async () => ({
+  keyring: {
+    current: 1,
+    byVersion: new Map([[1, await deriveRecordKeys(generateDataKey(), false)]]),
+  },
+});
 
 const vaultExists = async (userId: string) =>
   (await indexedDB.databases()).some((d) => d.name === `wambito-vault-${userId}`);

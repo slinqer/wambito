@@ -7,6 +7,7 @@ import {
   generateDataKey,
   generateDeviceKeyPair,
   newRecoverySecret,
+  openFromDevice,
   parseRecoveryKey,
   type RecordKeys,
   sealToDevice,
@@ -15,13 +16,16 @@ import {
   wrapDataKey,
 } from "@wambito/crypto";
 import { deleteVault } from "./db.ts";
+import { deviceLabel } from "./device-label.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { uuidv7 } from "./ids.ts";
 
 /**
- * Keys on the web (spec 2026-11-08 sections 4.1, 5.2, 7.1, 7.2, 7.4). This browser keeps only the
- * record and dedupe `CryptoKey`s (non-extractable) and its device private key, in the vault's
- * `keys` store; the data key DK lives in memory during setup or unlock and is dropped after.
+ * Keys on the web (spec 2026-11-08 sections 4.1, 5.2, 7.1, 7.2, 7.4, 7.5). This browser keeps only
+ * the record and dedupe `CryptoKey`s (non-extractable) of each key version it still needs
+ * (`record:<v>`, `dedupe:<v>`) and its device private key, in the vault's `keys` store; meta keeps
+ * the current `keyV` and this browser's device wrap (`deviceWrapId`, `devicePublicKey`). The data
+ * key DK lives in memory during setup, unlock or one `withDataKey` operation and is zeroed after.
  * All network goes through an injected `fetch` against `baseUrl` (`/api`).
  */
 
@@ -34,7 +38,9 @@ export type KeysErrorCode =
   /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
   | "unsupported_browser"
   /** The signed-in account is not this vault's (409): the app reloads for the new one. */
-  | "session_changed";
+  | "session_changed"
+  /** The server lists no device wrap for this browser (or one sealed to another key): removed. */
+  | "device_removed";
 
 export class KeysError extends Error {
   constructor(
@@ -46,13 +52,15 @@ export class KeysError extends Error {
   }
 }
 
-/** The names under which the vault's `keys` store keeps them. */
-export const RECORD_KEY = "record";
-export const DEDUPE_KEY = "dedupe";
+/** The names under which the vault's `keys` store keeps them: `record:<v>`, `dedupe:<v>`. */
+export const recordKeyName = (keyV: number) => `record:${keyV}`;
+export const dedupeKeyName = (keyV: number) => `dedupe:${keyV}`;
 export const DEVICE_KEY = "device";
+/** Stage 2a's single-version names, read as version `meta.keyV` and renamed on first load. */
+const LEGACY_RECORD_KEY = "record";
+const LEGACY_DEDUPE_KEY = "dedupe";
 /** The key version a new account starts at. */
 export const FIRST_KEY_V = 1;
-const DEVICE_LABEL = "Web";
 
 export interface KeysOptions {
   userId: string;
@@ -63,9 +71,21 @@ export interface KeysOptions {
   deviceKeyPair?: typeof generateDeviceKeyPair;
 }
 
+/** The record keys this browser holds, by key version; `current` is the account's newest. */
+export interface Keyring {
+  current: number;
+  byVersion: Map<number, RecordKeys>;
+}
+
 export interface LocalKeys {
-  keys: RecordKeys;
-  keyV: number;
+  keyring: Keyring;
+}
+
+/** The record keys of the keyring's current version (always present in a loaded keyring). */
+export function currentRecordKeys(local: LocalKeys): RecordKeys {
+  const keys = local.keyring.byVersion.get(local.keyring.current);
+  if (!keys) throw new Error(`no record keys for key version ${local.keyring.current}`);
+  return keys;
 }
 
 interface WrapDto {
@@ -73,6 +93,7 @@ interface WrapDto {
   kind: string;
   keyV: number;
   wrapped: string;
+  publicKey?: string | null;
 }
 
 function api(options: KeysOptions) {
@@ -160,16 +181,27 @@ async function prepareDevice(
       wrapped: toBase64Url(wrapped),
       publicKey: toBase64Url(pair.publicKey),
       attestation: toBase64Url(attestation),
-      label: DEVICE_LABEL,
+      label: deviceLabel(typeof navigator === "undefined" ? "" : navigator.userAgent),
     },
   };
 }
 
 /**
- * Adds this browser as a device: a key pair, a wrap of DK sealed to its own public key with an
- * attestation of that key under DK, then the derived keys and the private key kept locally.
+ * Adds this browser as a device: a key pair (`unsupported_browser` before anything is sent when it
+ * cannot be kept safely), a wrap of DK sealed to its own public key with an attestation of that
+ * key under DK, then the derived keys, the private key and the wrap's id and public key kept
+ * locally. The caller owns `dataKey` and zeroes it. Also the end of pairing (a later task).
  */
-async function enrollDevice(
+export async function enrollDevice(
+  options: KeysOptions,
+  dataKey: Uint8Array,
+  keyV: number,
+): Promise<LocalKeys> {
+  const pair = await safeDeviceKeyPair(options);
+  return enrollWithPair(api(options), options.userId, dataKey, keyV, pair);
+}
+
+async function enrollWithPair(
   call: ReturnType<typeof api>,
   userId: string,
   dataKey: Uint8Array,
@@ -178,27 +210,29 @@ async function enrollDevice(
 ): Promise<LocalKeys> {
   const device = await prepareDevice(userId, dataKey, keyV, pair);
   await call(`/v2/keys/${device.id}`, putJson(device.body));
-  return keepLocally(userId, dataKey, keyV, device.privateKey);
+  return keepLocally(userId, dataKey, keyV, device);
 }
 
 async function keepLocally(
   userId: string,
   dataKey: Uint8Array,
   keyV: number,
-  devicePrivateKey: DevicePrivateKey,
+  device: { id: string; privateKey: DevicePrivateKey; body: { publicKey: string } },
 ): Promise<LocalKeys> {
   const keys = await deriveRecordKeys(dataKey, false);
   const store = await createEncryptedStore(userId);
   try {
-    await store.putKey(RECORD_KEY, keys.record);
-    await store.putKey(DEDUPE_KEY, keys.dedupe);
-    await store.putKey(DEVICE_KEY, devicePrivateKey);
+    await store.putKey(recordKeyName(keyV), keys.record);
+    await store.putKey(dedupeKeyName(keyV), keys.dedupe);
+    await store.putKey(DEVICE_KEY, device.privateKey);
+    await store.setMeta("deviceWrapId", device.id);
+    await store.setMeta("devicePublicKey", device.body.publicKey);
     await store.setMeta("keyV", keyV);
     await store.setMeta("userId", userId);
   } finally {
     store.close();
   }
-  return { keys, keyV };
+  return { keyring: { current: keyV, byVersion: new Map([[keyV, keys]]) } };
 }
 
 /** A new account's keys, made but not yet sent: see `prepareAccount`. */
@@ -266,7 +300,7 @@ export async function prepareAccount(
       recoverySent = true;
     }
     await call(`/v2/keys/${device.id}`, putJson(device.body));
-    done = await keepLocally(userId, dataKey, FIRST_KEY_V, device.privateKey);
+    done = await keepLocally(userId, dataKey, FIRST_KEY_V, device);
     dataKey.fill(0);
     return done;
   }
@@ -314,7 +348,7 @@ export async function unlockWithRecovery(
       throw new KeysError("wrong_recovery_key");
     }
     try {
-      return await enrollDevice(call, userId, dataKey, wrap.keyV, pair);
+      return await enrollWithPair(call, userId, dataKey, wrap.keyV, pair);
     } finally {
       dataKey.fill(0);
     }
@@ -323,15 +357,131 @@ export async function unlockWithRecovery(
   }
 }
 
-/** The keys this browser kept, or `null` when it was never set up (the app is locked). */
+/**
+ * The keys this browser kept, or `null` when it was never set up or lacks the current version's
+ * keys (the app is locked). A 2a vault's `record` and `dedupe` are version `meta.keyV`: they are
+ * written under the versioned names first, then the old names go.
+ */
 export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
   const store: EncryptedStore = await createEncryptedStore(userId);
   try {
-    const record = await store.getKey<CryptoKey>(RECORD_KEY);
-    const dedupe = await store.getKey<CryptoKey>(DEDUPE_KEY);
-    const keyV = await store.getMeta<number>("keyV");
-    if (!record || !dedupe || keyV === undefined) return null;
-    return { keys: { record, dedupe }, keyV };
+    const current = await store.getMeta<number>("keyV");
+    if (current === undefined) return null;
+    const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);
+    const legacyDedupe = await store.getKey<CryptoKey>(LEGACY_DEDUPE_KEY);
+    if (legacyRecord && legacyDedupe) {
+      await store.putKey(recordKeyName(current), legacyRecord);
+      await store.putKey(dedupeKeyName(current), legacyDedupe);
+      await store.deleteKey(LEGACY_RECORD_KEY);
+      await store.deleteKey(LEGACY_DEDUPE_KEY);
+    }
+    const byVersion = new Map<number, RecordKeys>();
+    for (const name of await store.keyNames()) {
+      const match = /^record:(\d+)$/.exec(name);
+      if (!match) continue;
+      const keyV = Number(match[1]);
+      const record = await store.getKey<CryptoKey>(name);
+      const dedupe = await store.getKey<CryptoKey>(dedupeKeyName(keyV));
+      if (record && dedupe) byVersion.set(keyV, { record, dedupe });
+    }
+    if (!byVersion.has(current)) return null;
+    return { keyring: { current, byVersion: new Map([...byVersion].sort(([a], [b]) => a - b)) } };
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Opens DK from this browser's own `device` wrap (spec 7.5, Ruling 1 of stage 2b) for one
+ * operation: `fn` gets DK and the wrap's `keyV`, and DK is zeroed once `fn` settles. The wrap is the
+ * one whose id this browser kept at enroll, and it must still be sealed to this browser's public
+ * key; else `device_removed`. A 2a browser kept no wrap id: it tries each device wrap with its
+ * private key, and keeps the id and public key of the one that opens.
+ */
+export async function withDataKey<T>(
+  options: KeysOptions,
+  fn: (dk: Uint8Array, keyV: number) => Promise<T>,
+): Promise<T> {
+  const { userId } = options;
+  let dataKey: Uint8Array | undefined;
+  try {
+    const store = await createEncryptedStore(userId);
+    let keyV = 0;
+    try {
+      const privateKey = await store.getKey<DevicePrivateKey>(DEVICE_KEY);
+      if (!privateKey) throw new KeysError("device_removed");
+      const wrapId = await store.getMeta<string>("deviceWrapId");
+      const publicKey = await store.getMeta<string>("devicePublicKey");
+      const devices = (await listWraps(api(options))).filter((w) => w.kind === "device");
+      const open = (wrap: WrapDto) =>
+        openFromDevice(
+          privateKey,
+          { kind: "device", userId, keyV: wrap.keyV },
+          fromBase64Url(wrap.wrapped),
+        );
+      if (wrapId && publicKey) {
+        const wrap = devices.find((w) => w.id === wrapId);
+        // base64url of the same 32 bytes is one string: compare as text
+        if (!wrap || wrap.publicKey !== publicKey) throw new KeysError("device_removed");
+        try {
+          dataKey = await open(wrap);
+        } catch {
+          throw new KeysError("device_removed");
+        }
+        keyV = wrap.keyV;
+      } else {
+        for (const wrap of devices) {
+          if (!wrap.publicKey) continue;
+          try {
+            dataKey = await open(wrap);
+          } catch {
+            continue;
+          }
+          keyV = wrap.keyV;
+          await store.setMeta("deviceWrapId", wrap.id);
+          await store.setMeta("devicePublicKey", wrap.publicKey);
+          break;
+        }
+      }
+    } finally {
+      store.close();
+    }
+    if (!dataKey) throw new KeysError("device_removed");
+    return await fn(dataKey, keyV);
+  } finally {
+    dataKey?.fill(0);
+  }
+}
+
+/**
+ * The account moved to a new key version (a rotation): opens this browser's device wrap, keeps the
+ * record and dedupe keys of its `keyV` beside the older ones (records under them still need
+ * opening) and makes it the current version. `device_removed` as `withDataKey`.
+ */
+export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {
+  const { userId } = options;
+  await withDataKey(options, async (dataKey, keyV) => {
+    const keys = await deriveRecordKeys(dataKey, false);
+    const store = await createEncryptedStore(userId);
+    try {
+      await store.putKey(recordKeyName(keyV), keys.record);
+      await store.putKey(dedupeKeyName(keyV), keys.dedupe);
+      await store.setMeta("keyV", keyV);
+    } finally {
+      store.close();
+    }
+  });
+  const local = await loadLocalKeys(userId);
+  if (!local) throw new KeysError("device_removed");
+  return local;
+}
+
+/** Forgets one old key version's record and dedupe keys, once no local record uses it. */
+export async function dropKeyVersion(userId: string, keyV: number): Promise<void> {
+  const store = await createEncryptedStore(userId);
+  try {
+    await store.deleteKey(recordKeyName(keyV));
+    await store.deleteKey(dedupeKeyName(keyV));
   } finally {
     store.close();
   }

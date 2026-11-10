@@ -107,6 +107,9 @@ export interface EncryptedStore extends FinanceStore {
   /** The CryptoKeys and the device private key (`keys` store), by name. */
   getKey<T = unknown>(name: string): Promise<T | undefined>;
   putKey(name: string, key: unknown): Promise<void>;
+  deleteKey(name: string): Promise<void>;
+  /** The names in the `keys` store (`record:<v>`, `dedupe:<v>`, `device`). */
+  keyNames(): Promise<string[]>;
   /** Closes the database; every later operation rejects with `VaultClosedError`. */
   close(): void;
   isClosed(): boolean;
@@ -523,6 +526,14 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       short([KEYS], "readwrite", async (tx) => {
         await request(tx.objectStore(KEYS).put(key, name));
       }),
+    deleteKey: (name) =>
+      short([KEYS], "readwrite", async (tx) => {
+        await request(tx.objectStore(KEYS).delete(name));
+      }),
+    keyNames: () =>
+      short([KEYS], "readonly", async (tx) =>
+        (await request(tx.objectStore(KEYS).getAllKeys())).map(String),
+      ),
     close,
     isClosed: () => closed,
     onClosed(listener) {
