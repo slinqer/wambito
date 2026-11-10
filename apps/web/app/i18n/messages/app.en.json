@@ -690,7 +690,7 @@
         "rotated_elsewhere": "Another device changed your keys at the same time. Wait a moment while they refresh here, then try again.",
         "failed": "We couldn't remove it. Try again.",
         "done_title": "Removed",
-        "done_lead": "{name} can no longer open your data.",
+        "done_lead": "{name} can no longer open your data. If you still have that device, sign out on it too.",
         "dropped_lead": "These were left out too:",
         "dropped_item": "{name} ({reason, select, removed {removed now} revoked {removed earlier} other {not verified}})",
         "passkeys_note": "Fingerprints you didn't use just now no longer open your data: turn them on again under fingerprints."

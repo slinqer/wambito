@@ -690,7 +690,7 @@
         "rotated_elsewhere": "Un altro dispositivo ha cambiato le tue chiavi nello stesso momento. Aspetta che si aggiornino qui, poi riprova.",
         "failed": "Non siamo riusciti a rimuoverlo. Riprova.",
         "done_title": "Fatto",
-        "done_lead": "{name} non può più aprire i tuoi dati.",
+        "done_lead": "{name} non può più aprire i tuoi dati. Se hai ancora quel dispositivo, esci anche lì.",
         "dropped_lead": "Sono rimasti fuori anche:",
         "dropped_item": "{name} ({reason, select, removed {rimosso ora} revoked {rimosso prima} other {non verificato}})",
         "passkeys_note": "Le impronte che non hai usato ora non aprono più i tuoi dati: riattivale tra le impronte."
