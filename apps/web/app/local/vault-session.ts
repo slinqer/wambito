@@ -3,7 +3,7 @@ import { isLocale, type Locale } from "../i18n/format.ts";
 import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { uuidv5 } from "./ids.ts";
-import { currentRecordKeys, forgetDevice, type LocalKeys } from "./keys.ts";
+import { forgetDevice, type LocalKeys, refreshKeys } from "./keys.ts";
 import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 
 /**
@@ -32,6 +32,11 @@ export interface VaultSession {
    * sync has stopped and the session is gone; the gate checks again (reopen, or Unlock).
    */
   onClosed(listener: () => void): () => void;
+  /**
+   * Called once if this browser was removed from the account (its device wrap is gone): the sync
+   * has stopped, the vault is deleted and the session is gone; the gate shows Unlock.
+   */
+  onRemoved(listener: () => void): () => void;
   close(): void;
 }
 
@@ -176,24 +181,30 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       },
       unavailable: LOCAL_UNAVAILABLE,
     });
-    /** Set once open: a later 409 `session_changed` closes it. */
+    /** Set once open: a later 409 `session_changed` closes it, `device_removed` removes it. */
     let opened: VaultSession | undefined;
+    let removed: (() => void) | undefined;
     const engine = createSyncEngine({
       store,
       fetch: network,
       userId: profile.id,
-      // One key version for now: the engine follows versions in a later task.
-      keys: currentRecordKeys(keys),
-      keyV: keys.keyring.current,
+      keyring: keys.keyring,
+      refreshKeys: async () => (await refreshKeys({ userId: profile.id, fetch: network })).keyring,
       onError: (problem) => {
         if (problem.code === "unauthorized") options.onUnauthorized?.();
         if (problem.code === "session_changed" && opened) {
           opened.close();
           options.onSessionChanged?.();
         }
+        if (problem.code === "device_removed") removed?.();
       },
     });
     const first = await engine.run();
+    if (first.problem === "device_removed") {
+      store.close();
+      await forgetDevice(profile.id);
+      throw new VaultOpenError("device_removed");
+    }
     const fatal = first.error === "unauthorized" || first.error === "session_changed";
     if (!first.ok && (fresh || fatal)) {
       throw new VaultOpenError(first.error ?? "server");
@@ -211,6 +222,7 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       return isLive(method, pathname) ? network(input, init) : backend.fetch(input, init);
     }) as typeof globalThis.fetch;
     const closedListeners = new Set<() => void>();
+    const removedListeners = new Set<() => void>();
     let closing = false;
     const drop = () => {
       stop();
@@ -224,6 +236,10 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         closedListeners.add(listener);
         return () => closedListeners.delete(listener);
       },
+      onRemoved(listener) {
+        removedListeners.add(listener);
+        return () => removedListeners.delete(listener);
+      },
       close() {
         closing = true;
         drop();
@@ -236,6 +252,16 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       drop();
       for (const listener of closedListeners) listener();
     });
+    // This browser's device wrap is gone: stop, delete the vault (its keys included), tell the gate.
+    removed = () => {
+      removed = undefined;
+      session.close();
+      void forgetDevice(profile.id)
+        .catch(() => undefined)
+        .then(() => {
+          for (const listener of removedListeners) listener();
+        });
+    };
     if (active?.userId === profile.id) active.session = session;
     opened = session;
     return session;

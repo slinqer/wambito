@@ -13,6 +13,7 @@ import {
   type SetAsideOutcome,
   VaultClosedError,
 } from "./encrypted-store.ts";
+import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keys.ts";
 
 /**
  * The sync engine: pushes the outbox to `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the
@@ -60,6 +61,30 @@ import {
  *   change left pending never loops).
  * - Runs take the Web Lock `wambito-sync-<userId>` when the browser has it, so two tabs never
  *   sync the same vault at once.
+ *
+ * Key versions (stage 2b, Rulings 3 and 4):
+ *
+ * - The engine holds a keyring (record keys by `keyV`). A record opens with the keys of its own
+ *   `keyV`; every change is sealed under the keyring's current version, never an old one.
+ * - A record under a version higher than the current one (another device rotated) calls
+ *   `refreshKeys` once per run (`run()`, all its passes); a version still unknown after that, or
+ *   one below the current that this browser no longer holds, goes to quarantine
+ *   (`unknown_key_version`). The refresh is not repeated for every such record.
+ * - A change refused with `key_version_mismatch` (the server's current `keyV` is newer) refreshes
+ *   the same way and is sealed and pushed again; a second refusal of it in the run, or a refresh
+ *   that does not reach that version, parks it (`key_version_mismatch`).
+ * - `refreshKeys` throwing `device_removed` (this browser's wrap is gone) stops the run with
+ *   `{ ok: false, error: "device_removed", problem: "device_removed" }`, reports it and stops
+ *   `start()`'s triggers; the session deletes the vault. Its other failures stop the run as
+ *   `offline`, `session_changed` or `server`.
+ * - The upgrade pass, after each pull while the keyring holds a version below the current one:
+ *   records the server has under an older `keyV` get a `reseal` outbox entry (the unchanged body,
+ *   `baseVersion` = the record's version), at most 500 pending per pass, and are pushed in the
+ *   same pass. Through the outbox, so a closed tab never leaves a rotation half done. A conflict
+ *   on a reseal takes the server's copy (no merge); a local write turns it into an ordinary edit.
+ *   Reseal entries do not trigger a follow-up pass, so a run does at most 500.
+ * - An acked push records its `keyV` on the local row. An old version's keys are dropped (from the
+ *   keyring and the vault's `keys` store) once no local record the server has is under it.
  */
 
 /** The record format version this client reads and writes. */
@@ -68,6 +93,8 @@ const PUSH_BATCH = 500;
 /** Stay under the server's 4 MiB request limit. */
 const PUSH_BYTES = 3 * 1024 * 1024;
 const PULL_LIMIT = 1000;
+/** The most reseal entries pending at once: one upgrade pass re-encrypts at most this many. */
+const RESEAL_LIMIT = 500;
 /** How many times one id may conflict inside one run before it is parked. */
 const MAX_CONFLICTS = 3;
 /** The failure on which a parked change is given up on (`abandoned`). */
@@ -89,7 +116,9 @@ export type SyncProblemCode =
   /** The store was closed (another tab deleted the vault, or the session closed it). */
   | "closed"
   /** The signed-in account is not the vault's (409 `session_changed`): the engine stops. */
-  | "session_changed";
+  | "session_changed"
+  /** This browser's device wrap is gone (removed from the account): the engine stops. */
+  | "device_removed";
 
 /** Something the UI may want to tell the person. Ids and counts only. */
 export interface SyncProblem {
@@ -114,6 +143,8 @@ export interface SyncResult {
   parked: string[];
   resynced: boolean;
   error?: SyncProblemCode;
+  /** This browser was removed from the account: the session deletes the vault. */
+  problem?: "device_removed";
 }
 
 export interface SyncEngineOptions {
@@ -124,8 +155,13 @@ export interface SyncEngineOptions {
   baseUrl?: string;
   /** The account's exact id (it is part of every record's associated data). */
   userId: string;
-  keys: RecordKeys;
-  keyV: number;
+  /** The record keys this browser holds, by key version; changes are sealed under `current`. */
+  keyring: Keyring;
+  /**
+   * Fetches this browser's device wrap again and returns the keyring with any newer version
+   * (`keys.ts` `refreshKeys`). Throws `KeysError("device_removed")` when the wrap is gone.
+   */
+  refreshKeys: () => Promise<Keyring>;
   now?: () => number;
   onError?: (problem: SyncProblem) => void;
   /** `start()` only. Defaults: 1000, 60000. */
@@ -153,6 +189,7 @@ interface WireRecord {
 type PushResult =
   | { id: string; version: number }
   | { id: string; conflict: WireRecord }
+  | { id: string; error: "key_version_mismatch"; keyV: number }
   | { id: string; error: "id_taken" | "not_found" };
 
 /** Thrown to stop a run; `problem` says why. */
@@ -197,7 +234,8 @@ function mergeBodies(local: unknown, server: unknown, touched: string[]): unknow
 }
 
 export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
-  const { store, userId, keys, keyV, onError } = options;
+  const { store, userId, onError } = options;
+  let keyring = options.keyring;
   const baseUrl = options.baseUrl ?? "/api";
   const now = options.now ?? Date.now;
   const doFetch = (input: string, init?: RequestInit) => (options.fetch ?? fetch)(input, init);
@@ -236,6 +274,31 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   const ctx = (type: RecordType, id: string, v: number) => ({ userId, type, id, keyV: v });
 
+  /** The run's one key refresh, shared by every record and change that needs it. */
+  let refreshing: Promise<void> | null = null;
+  function refresh(): Promise<void> {
+    refreshing ??= (async () => {
+      try {
+        keyring = await options.refreshKeys();
+      } catch (error) {
+        throw keysStop(error);
+      }
+    })();
+    return refreshing;
+  }
+
+  /** The keys of version `v`; a version above the current one refreshes the keyring first. */
+  async function keysFor(v: number): Promise<RecordKeys | undefined> {
+    if (!keyring.byVersion.has(v) && v > keyring.current) await refresh();
+    return keyring.byVersion.get(v);
+  }
+
+  function sealingKeys(): { keyV: number; keys: RecordKeys } {
+    const keys = keyring.byVersion.get(keyring.current);
+    if (!keys) throw new Error(`no record keys for key version ${keyring.current}`);
+    return { keyV: keyring.current, keys };
+  }
+
   /** Opens and validates a server record: the body, or why it cannot be used. */
   async function openWire(
     rec: WireRecord,
@@ -243,6 +306,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (!isRecordType(rec.type)) return { ok: false, reason: "unknown_type" };
     if (rec.encV !== ENC_V) return { ok: false, reason: "unsupported_enc_v" };
     if (rec.body === null) return { ok: false, reason: "missing_body" };
+    const keys = await keysFor(rec.keyV);
+    if (!keys) return { ok: false, reason: "unknown_key_version" };
     let json: unknown;
     try {
       json = await openRecord(keys, ctx(rec.type, rec.id, rec.keyV), fromBase64Url(rec.body));
@@ -281,6 +346,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return undefined;
     }
     const deleted = entry.deleted || row.deleted;
+    const { keyV, keys } = sealingKeys();
     const sealed = deleted
       ? null
       : toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body));
@@ -318,7 +384,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (server.deleted) {
       await store.delete(type, entry.id, remote);
       await store.ackOutbox(entry.id, server.version, entry.seq);
-      if (!entry.deleted) {
+      if (!entry.deleted && !entry.reseal) {
         result.serverDeleted.push(entry.id);
         report({ code: "server_deleted", ids: [entry.id] });
       }
@@ -339,6 +405,18 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       result.quarantined += 1;
       report({ code: "conflict_unreadable", ids: [entry.id] });
       throw new Skip("conflict_unreadable");
+    }
+    if (entry.reseal) {
+      // Nothing of ours to keep: the server's copy wins (another device has re-sealed or edited it).
+      const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
+      if (outbox.find((e) => e.id === entry.id)?.seq !== entry.seq) {
+        // The person edited it since: an ordinary edit now, pushed (and merged) again.
+        throw new Retry();
+      }
+      await store.put(type, entry.id, opened.body as never, remote);
+      await store.ackOutbox(entry.id, server.version, entry.seq, server.keyV);
+      result.merged += 1;
+      return;
     }
     if (created) {
       // Two devices created the same deterministic id: the server's copy wins, plus whatever the
@@ -405,6 +483,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   async function push(result: SyncResult): Promise<void> {
     const conflicts = new Map<string, number>();
+    const mismatches = new Map<string, number>();
     /** The seq of each entry this run is done with: it is sent again only after a newer write. */
     const handled = new Map<string, number>();
     const due = (e: OutboxEntry) =>
@@ -419,7 +498,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       if (!r) {
         await park(entry, "no_result", result);
       } else if ("version" in r) {
-        await store.ackOutbox(entry.id, r.version, entry.seq);
+        await store.ackOutbox(entry.id, r.version, entry.seq, p.change.keyV as number);
         result.pushed += 1;
       } else if ("conflict" in r) {
         const count = (conflicts.get(entry.id) ?? 0) + 1;
@@ -433,14 +512,29 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           // Still pending after the merge: push it again on the server's version.
           handled.delete(entry.id);
         } catch (error) {
+          if (error instanceof Retry) {
+            handled.delete(entry.id);
+            return;
+          }
           if (!(error instanceof Skip)) throw error;
           await park(entry, error.message, result);
+        }
+      } else if (r.error === "key_version_mismatch") {
+        // The account rotated: seal it again under the new version, once.
+        const count = (mismatches.get(entry.id) ?? 0) + 1;
+        mismatches.set(entry.id, count);
+        if (count === 1 && r.keyV > keyring.current) await refresh();
+        if (count === 1 && keyring.current === r.keyV && keyring.byVersion.has(r.keyV)) {
+          handled.delete(entry.id);
+        } else {
+          await park(entry, "key_version_mismatch", result);
         }
       } else {
         // id_taken / not_found: the server will never take this change.
         const row = await store.getRaw(entry.type, entry.id);
         await store.ackOutbox(entry.id, row?.version ?? 0, entry.seq);
-        result.dropped.push(entry.id);
+        // A reseal is not the person's change: nothing of theirs was lost.
+        if (!entry.reseal) result.dropped.push(entry.id);
       }
     }
 
@@ -557,6 +651,30 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (outbox.some((e) => e.setAside)) await restoreSetAside(result);
   }
 
+  // ---- key versions ---------------------------------------------------------------------------
+
+  /**
+   * After the pull: records under an older key version are sealed again under the current one
+   * (through the outbox, at most `RESEAL_LIMIT` pending), and an old version no local record uses
+   * any more is forgotten.
+   */
+  async function upgrade(result: SyncResult): Promise<void> {
+    const current = keyring.current;
+    if (![...keyring.byVersion.keys()].some((v) => v < current)) return;
+    if ((await store.queueReseal(current, RESEAL_LIMIT)) > 0) await push(result);
+    const inUse = await store.keyVersionsInUse();
+    const unused = [...keyring.byVersion.keys()].filter((v) => v < current && !inUse.has(v));
+    if (unused.length === 0) return;
+    for (const v of unused) {
+      await store.deleteKey(recordKeyName(v));
+      await store.deleteKey(dedupeKeyName(v));
+    }
+    keyring = {
+      current: keyring.current,
+      byVersion: new Map([...keyring.byVersion].filter(([v]) => !unused.includes(v))),
+    };
+  }
+
   /** The server purged tombstones we may have missed: download everything again. */
   async function resync(result: SyncResult): Promise<void> {
     // Sets the pending changes aside in the same commit, so a failed download loses nothing.
@@ -614,6 +732,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         if (!(error instanceof ResyncRequired)) throw error;
         await resync(result);
       }
+      await upgrade(result);
       await store.setMeta("lastSync", now());
     } catch (error) {
       if (error instanceof ResyncRequired) {
@@ -623,6 +742,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       } else if (error instanceof Stop) {
         result.ok = false;
         result.error = error.code;
+        if (error.code === "device_removed") result.problem = "device_removed";
         report({ code: error.code, status: error.status });
       } else if (error instanceof VaultClosedError || store.isClosed()) {
         result.ok = false;
@@ -683,6 +803,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       running = true;
       try {
         return await locked(async () => {
+          // One key refresh per run, shared by its passes.
+          refreshing = null;
           let last: SyncResult | undefined;
           do {
             again = false;
@@ -692,7 +814,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
             // pending (parked, set aside, waiting) waits for the next trigger.
             if (last.ok && !again) {
               const outbox = await store.readOutbox(Number.MAX_SAFE_INTEGER);
-              if (outbox.some((e) => e.seq > start)) again = true;
+              // The upgrade pass's own entries are not the person's: they wait for the next run.
+              if (outbox.some((e) => e.seq > start && !e.reseal)) again = true;
             }
           } while (again && last.ok);
           return last;
@@ -723,8 +846,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           clearTimeout(retry);
           if (result.ok) {
             failures = 0;
-          } else if (result.error === "session_changed") {
-            // Someone else's cookie: never again in this page (the session reloads it).
+          } else if (result.error === "session_changed" || result.error === "device_removed") {
+            // Someone else's cookie, or this browser removed: never again in this page.
             stop();
           } else if (result.error !== "closed") {
             failures += 1;
@@ -782,3 +905,17 @@ async function problemCode(response: Response): Promise<string | undefined> {
 
 /** Internal: park this change; the message is the park's `lastError`. */
 class Skip extends Error {}
+
+/** Internal: push this change again in the same run (a reseal the person edited meanwhile). */
+class Retry extends Error {}
+
+/** A failed key refresh as the run's stop. */
+function keysStop(error: unknown): Stop {
+  if (error instanceof KeysError) {
+    if (error.code === "device_removed") return new Stop("device_removed");
+    if (error.code === "session_changed") return new Stop("session_changed", 409);
+    if (error.code === "offline") return new Stop("offline");
+    return new Stop("server", error.status);
+  }
+  return new Stop("server");
+}

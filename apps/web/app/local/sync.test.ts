@@ -10,6 +10,7 @@ import {
 } from "@wambito/crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
+import { type Keyring, KeysError } from "./keys.ts";
 import type { RecordBodies } from "./store.ts";
 import { createSyncEngine } from "./sync.ts";
 
@@ -37,6 +38,12 @@ function fakeServer() {
     offline: false,
     posts: 0,
     pullLimit: undefined as number | undefined,
+    /**
+     * The account's key wraps: the record keys this device's wrap opens, by key version (empty:
+     * the account has no wraps, any `keyV` is taken). `removed`: no wrap of this device is left.
+     */
+    wraps: new Map<number, RecordKeys>(),
+    removed: false,
     rows,
     purge() {
       // Purge every tombstone, as the daily job does after 180 days.
@@ -62,7 +69,12 @@ function fakeServer() {
         const { changes } = JSON.parse(String(init.body)) as {
           changes: Array<Wire & { baseVersion: number | null }>;
         };
+        const current = s.wraps.size > 0 ? Math.max(...s.wraps.keys()) : null;
         const results = changes.map((c) => {
+          // Task 1's rule: with wraps, only the account's current key version is taken.
+          if (current !== null && c.keyV !== current) {
+            return { id: c.id, error: "key_version_mismatch", keyV: current };
+          }
           const cur = rows.get(c.id);
           const put = () => {
             const { baseVersion: _b, ...rest } = c;
@@ -110,20 +122,52 @@ let counter = 0;
 let keys: RecordKeys;
 const getKeys = async () => (keys ??= await deriveRecordKeys(generateDataKey()));
 
-async function device(server: Server, k?: RecordKeys) {
-  const store = await createEncryptedStore(`device-${++counter}`);
+/** A keyring of one version (1) that no refresh changes. */
+const single = (k: RecordKeys) => {
+  const keyring: Keyring = { current: 1, byVersion: new Map([[1, k]]) };
+  return { keyring, refreshKeys: async () => keyring };
+};
+
+/**
+ * `refreshKeys` as the session builds it over `keys.ts`: this device's wrap of the server's newest
+ * version is added and made current (only a higher one); `device_removed` once it has no wrap.
+ */
+function refresher(server: Server, start: Keyring) {
+  let ring = start;
+  return vi.fn(async (): Promise<Keyring> => {
+    if (server.removed) throw new KeysError("device_removed");
+    const newest = Math.max(0, ...server.wraps.keys());
+    const keys = server.wraps.get(newest);
+    if (keys && newest > ring.current) {
+      ring = { current: newest, byVersion: new Map([...ring.byVersion, [newest, keys]]) };
+    }
+    return ring;
+  });
+}
+
+async function device(
+  server: Server,
+  k?: RecordKeys,
+  options: { keyring?: Keyring; store?: EncryptedStore } = {},
+) {
+  const store = options.store ?? (await createEncryptedStore(`device-${++counter}`));
   const problems: Array<{ code: string }> = [];
+  const keyring = options.keyring ?? {
+    current: 1,
+    byVersion: new Map([[1, k ?? (await getKeys())]]),
+  };
+  const refreshKeys = refresher(server, keyring);
   const engine = createSyncEngine({
     store,
     fetch: (...args) => server.fetch(...args),
     userId: USER,
-    keys: k ?? (await getKeys()),
-    keyV: 1,
+    keyring,
+    refreshKeys,
     onError: (p) => problems.push(p),
     debounceMs: 20,
     intervalMs: 100000,
   });
-  return { store, engine, problems };
+  return { store, engine, problems, refreshKeys };
 }
 
 const category = (name: string, color = "#fff"): RecordBodies["category"] => ({
@@ -525,8 +569,7 @@ describe("runs never loop and park what keeps failing", () => {
       store,
       fetch: (...args) => server.fetch(...args),
       userId: USER,
-      keys: await getKeys(),
-      keyV: 1,
+      ...single(await getKeys()),
       now: () => clock,
     });
     let reject = true;
@@ -631,8 +674,7 @@ describe("pulls never overwrite or lose local edits", () => {
           ? Promise.reject(new TypeError("offline"))
           : server.fetch(input, init),
       userId: USER,
-      keys: await getKeys(),
-      keyV: 1,
+      ...single(await getKeys()),
     });
     await engine.run();
     expect(injected).toBe(true);
@@ -795,8 +837,7 @@ describe("a change refused again and again is given up on", () => {
       store,
       fetch: (...args) => server.fetch(...args),
       userId: USER,
-      keys: await getKeys(),
-      keyV: 1,
+      ...single(await getKeys()),
       now: () => clock,
       onError: (p) => problems.push(p),
     });
@@ -854,8 +895,7 @@ describe("a change refused again and again is given up on", () => {
       store,
       fetch: (...args) => server.fetch(...args),
       userId: USER,
-      keys: await getKeys(),
-      keyV: 1,
+      ...single(await getKeys()),
       now: () => clock,
     });
     await store.put("category", A, category("a"));
@@ -913,8 +953,7 @@ describe("the signed-in account", () => {
       store,
       fetch: (...args) => server.fetch(...args),
       userId: USER,
-      keys: await getKeys(),
-      keyV: 1,
+      ...single(await getKeys()),
       debounceMs: 5,
       intervalMs: 10,
     });
@@ -951,5 +990,264 @@ describe("a create conflict racing a local write", () => {
     await two.engine.run();
     expect(await names(two.store)).toEqual([`${C}:Theirs/#999`]);
     expect(await one.store.readOutbox(10)).toEqual([]);
+  });
+});
+
+// ---- key versions (stage 2b) -------------------------------------------------------------------
+
+describe("key versions", () => {
+  const fresh = () => deriveRecordKeys(generateDataKey());
+  const ring = (entries: Array<[number, RecordKeys]>): Keyring => ({
+    current: Math.max(...entries.map(([v]) => v)),
+    byVersion: new Map(entries),
+  });
+  async function sealedAt(k: RecordKeys, id: string, body: unknown, keyV: number) {
+    return toBase64Url(await sealRecord(k, { userId: USER, type: "category", id, keyV }, body));
+  }
+  /** Writes a category on the server as another device would, sealed at `keyV`. */
+  async function serverWrite(
+    server: Server,
+    k: RecordKeys,
+    id: string,
+    name: string,
+    keyV: number,
+  ) {
+    server.rows.set(id, {
+      id,
+      type: "category",
+      version: ++server.counter,
+      deleted: false,
+      keyV,
+      encV: 1,
+      body: await sealedAt(k, id, category(name), keyV),
+    });
+  }
+  async function openOnServer(server: Server, k: RecordKeys, id: string) {
+    const row = server.rows.get(id);
+    return openRecord(
+      k,
+      { userId: USER, type: "category", id, keyV: row?.keyV ?? 0 },
+      fromBase64Url(row?.body ?? ""),
+    ) as Promise<{ name: string }>;
+  }
+  const ids = (n: number) =>
+    Array.from({ length: n }, (_, i) => `01930000-0000-7000-8000-${String(i).padStart(12, "0")}`);
+
+  it("a record under a newer keyV refreshes the keys, then applies", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    server.wraps.set(1, k1).set(2, k2);
+    await serverWrite(server, k2, A, "rotated", 2);
+    await serverWrite(server, k2, B, "rotated too", 2);
+    const two = await device(server, k1);
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: true, pulled: 2, quarantined: 0 });
+    expect(await two.store.quarantineCount()).toBe(0);
+    expect((await two.store.get("category", A))?.body.name).toBe("rotated");
+    expect((await two.store.getRaw("category", A))?.keyV).toBe(2);
+    expect(two.refreshKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it("a record under a keyV no refresh can open goes to quarantine", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    server.wraps.set(1, k1).set(2, await fresh());
+    await serverWrite(server, await fresh(), A, "from the future", 3);
+    await serverWrite(server, await fresh(), B, "also", 3);
+    const two = await device(server, k1);
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: true, quarantined: 2 });
+    expect(await two.store.quarantineCount()).toBe(2);
+    expect(await two.store.get("category", A)).toBeUndefined();
+    expect(two.refreshKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it("a push refused with key_version_mismatch refreshes, re-seals at the new keyV and pushes again", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    server.wraps.set(1, k1).set(2, k2);
+    const one = await device(server, k1);
+    await one.store.put("category", A, category("typed before the rotation"));
+    const r = await one.engine.run();
+    expect(r).toMatchObject({ ok: true, pushed: 1, parked: [] });
+    expect(one.refreshKeys).toHaveBeenCalledTimes(1);
+    expect(server.rows.get(A)?.keyV).toBe(2);
+    expect((await openOnServer(server, k2, A)).name).toBe("typed before the rotation");
+    expect(await one.store.readOutbox(10)).toEqual([]);
+    expect((await one.store.getRaw("category", A))?.keyV).toBe(2);
+  });
+
+  it("the upgrade pass re-seals old records and drops the old key when none is left", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const before = await device(server, k1, { store });
+    for (const id of [A, B, C]) await store.put("category", id, category(`n${id.slice(-1)}`));
+    await before.engine.run();
+    expect([...server.rows.values()].map((r) => r.keyV)).toEqual([1, 1, 1]);
+    // This browser now holds version 2 (a rotation); its records are still under 1.
+    server.wraps.set(1, k1).set(2, k2);
+    await store.putKey("record:1", k1.record);
+    await store.putKey("dedupe:1", k1.dedupe);
+    await store.putKey("record:2", k2.record);
+    await store.putKey("dedupe:2", k2.dedupe);
+    const keyring = ring([
+      [1, k1],
+      [2, k2],
+    ]);
+    const after = await device(server, undefined, { store, keyring });
+    const versions = [...server.rows.values()].map((r) => r.version);
+    const r = await after.engine.run();
+    expect(r.ok).toBe(true);
+    expect([...server.rows.values()].map((row) => row.keyV)).toEqual([2, 2, 2]);
+    for (const [id, version] of [A, B, C].map((x, i) => [x, versions[i]] as const)) {
+      expect(server.rows.get(id)?.version).toBeGreaterThan(version ?? 0);
+      expect((await openOnServer(server, k2, id)).name).toBe(`n${id.slice(-1)}`);
+      expect((await store.getRaw("category", id))?.keyV).toBe(2);
+    }
+    expect(await store.readOutbox(10)).toEqual([]);
+    expect((await store.keyNames()).sort()).toEqual(["dedupe:2", "record:2"]);
+    // The next run has nothing left to re-seal.
+    const posts = server.posts;
+    await after.engine.run();
+    expect(server.posts).toBe(posts);
+  });
+
+  it("the upgrade pass does at most 500 per run", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const before = await device(server, k1, { store });
+    const all = ids(501);
+    await store.transaction(async (tx) => {
+      for (const id of all) await tx.put("category", id, category("x"));
+    });
+    await before.engine.run();
+    server.wraps.set(1, k1).set(2, k2);
+    await store.putKey("record:1", k1.record);
+    await store.putKey("dedupe:1", k1.dedupe);
+    const after = await device(server, undefined, {
+      store,
+      keyring: ring([
+        [1, k1],
+        [2, k2],
+      ]),
+    });
+    expect((await after.engine.run()).ok).toBe(true);
+    const at = (v: number) => [...server.rows.values()].filter((r) => r.keyV === v).length;
+    expect(at(2)).toBe(500);
+    expect(at(1)).toBe(1);
+    expect(await store.keyNames()).toContain("record:1");
+    expect((await after.engine.run()).ok).toBe(true);
+    expect(at(2)).toBe(501);
+    expect(await store.keyNames()).not.toContain("record:1");
+  }, 30_000);
+
+  it("a conflict on a re-seal takes the server's copy", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const before = await device(server, k1, { store });
+    await store.put("category", A, category("old"));
+    await before.engine.run();
+    server.wraps.set(1, k1).set(2, k2);
+    const after = await device(server, undefined, {
+      store,
+      keyring: ring([
+        [1, k1],
+        [2, k2],
+      ]),
+    });
+    // Another device edits A (under the new key) between this browser's pull and its re-seal.
+    let raced = false;
+    intercept(server, async (real, input, init) => {
+      if (init?.method === "POST" && !raced && changeIds(init).includes(A)) {
+        raced = true;
+        await serverWrite(server, k2, A, "theirs", 2);
+      }
+      return real(input, init);
+    });
+    const r = await after.engine.run();
+    expect(r.ok).toBe(true);
+    expect(raced).toBe(true);
+    const version = server.rows.get(A)?.version;
+    expect((await openOnServer(server, k2, A)).name).toBe("theirs");
+    expect((await store.get("category", A))?.body.name).toBe("theirs");
+    expect(await store.getRaw("category", A)).toMatchObject({ version, keyV: 2 });
+    expect(await store.readOutbox(10)).toEqual([]);
+  });
+
+  it("device_removed stops the engine and reports it", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    server.wraps.set(1, k1).set(2, await fresh());
+    server.removed = true;
+    await serverWrite(server, await fresh(), A, "after my removal", 2);
+    const two = await device(server, k1);
+    let calls = 0;
+    intercept(server, (real, input, init) => {
+      calls += 1;
+      return real(input, init);
+    });
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: false, error: "device_removed", problem: "device_removed" });
+    expect(two.problems).toContainEqual({ code: "device_removed" });
+    expect(await two.store.quarantineCount()).toBe(0);
+    // Its triggers stop: no retry, no interval, no local write.
+    const engine = createSyncEngine({
+      store: two.store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keyring: ring([[1, k1]]),
+      refreshKeys: refresher(server, ring([[1, k1]])),
+      debounceMs: 5,
+      intervalMs: 10,
+    });
+    calls = 0;
+    const stop = engine.start();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await two.store.put("category", B, category("b"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    stop();
+    expect(calls).toBe(1);
+  });
+
+  it("pending edits are sealed under the current keyV, never an old one", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const before = await device(server, k1, { store });
+    await store.put("category", A, category("a"));
+    await before.engine.run();
+    server.wraps.set(1, k1).set(2, k2);
+    const after = await device(server, undefined, {
+      store,
+      keyring: ring([
+        [1, k1],
+        [2, k2],
+      ]),
+    });
+    const sent: number[] = [];
+    intercept(server, (real, input, init) => {
+      if (init?.method === "POST") {
+        const { changes } = JSON.parse(String(init.body)) as { changes: Array<{ keyV: number }> };
+        sent.push(...changes.map((c) => c.keyV));
+      }
+      return real(input, init);
+    });
+    await store.put("category", A, category("edited"));
+    await store.put("category", B, category("new"));
+    const r = await after.engine.run();
+    expect(r).toMatchObject({ ok: true, pushed: 2 });
+    expect(sent).toEqual([2, 2]);
+    expect(after.refreshKeys).not.toHaveBeenCalled();
+    expect((await openOnServer(server, k2, A)).name).toBe("edited");
+    expect((await openOnServer(server, k2, B)).name).toBe("new");
   });
 });

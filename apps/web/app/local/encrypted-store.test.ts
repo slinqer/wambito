@@ -343,3 +343,34 @@ describe("keys and the vault", () => {
     expect(await again.getKey("k")).toBeUndefined();
   });
 });
+
+describe("re-sealing under a new key version", () => {
+  it("queues the pushed records under an older keyV, up to the limit, and a local write makes one an edit", async () => {
+    const store = await fresh();
+    const remote = (version: number, keyV: number) =>
+      ({ origin: "remote", version, keyV }) as const;
+    await store.put("category", "a", category("A"), remote(1, 1));
+    await store.put("category", "b", category("B"), remote(2, 1));
+    await store.put("category", "c", category("C"), remote(3, 2));
+    await store.put("category", "d", category("D")); // never pushed: nothing to re-seal
+    await store.put("category", "e", category("E"), remote(4, 1));
+    await store.delete("category", "e", remote(5, 1)); // a tombstone has no body
+    expect(await store.keyVersionsInUse()).toEqual(new Set([1, 2]));
+    expect(await store.queueReseal(2, 1)).toBe(1);
+    expect(await store.queueReseal(2, 1)).toBe(0); // one pending already fills the limit
+    expect(await store.queueReseal(2, 5)).toBe(1);
+    const reseals = (await store.readOutbox(10)).filter((e) => e.reseal);
+    expect(reseals.map((e) => [e.id, e.baseVersion, e.touched]).sort()).toEqual([
+      ["a", 1, []],
+      ["b", 2, []],
+    ]);
+    // Acked under keyV 2: the record is under 2 now.
+    await store.ackOutbox("a", 6, reseals.find((e) => e.id === "a")?.seq ?? 0, 2);
+    expect(await store.getRaw("category", "a")).toMatchObject({ version: 6, keyV: 2 });
+    // The person edits b before its re-seal went: an ordinary edit, based on the same version.
+    await store.put("category", "b", category("B2"));
+    const [b] = (await store.readOutbox(10)).filter((e) => e.id === "b");
+    expect(b).toMatchObject({ baseVersion: 2, touched: ["name"] });
+    expect(b?.reseal).toBeUndefined();
+  });
+});

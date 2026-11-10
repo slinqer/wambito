@@ -56,11 +56,20 @@ export interface EncryptedStore extends FinanceStore {
   /** The pending changes, oldest first. */
   readOutbox(limit: number): Promise<OutboxEntry[]>;
   /**
-   * The server accepted the change read as `seq` and gave it `version`. Records the version, and
-   * clears the entry only if there was no newer local write since; otherwise the entry stays,
-   * now based on `version`.
+   * The server accepted the change read as `seq` and gave it `version` (sealed under `keyV`, when
+   * given). Records them, and clears the entry only if there was no newer local write since;
+   * otherwise the entry stays, now based on `version`.
    */
-  ackOutbox(id: string, version: number, seq: number): Promise<void>;
+  ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
+  /**
+   * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
+   * for records the server has (version above 0, not deleted) sealed under a key version below
+   * `current` and with no outbox entry, until `limit` reseal entries are pending (those already
+   * pending count). Returns how many it added. Notifies nobody (the engine's own write).
+   */
+  queueReseal(current: number, limit: number): Promise<number>;
+  /** The key versions the server copies of the local records (not deleted, pushed) are under. */
+  keyVersionsInUse(): Promise<Set<number>>;
   /**
    * The engine gives up on the change read as `seq` for now: stores `park` on it. A no-op when a
    * newer local write replaced it (that write is pushed normally).
@@ -421,16 +430,58 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       });
       return all.sort((x, y) => x.seq - y.seq).slice(0, limit);
     },
-    ackOutbox: (id, version, seq) =>
+    ackOutbox: (id, version, seq, keyV) =>
       short([...RECORD_TYPES, OUTBOX], "readwrite", async (tx) => {
         const outbox = tx.objectStore(OUTBOX);
         const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
         if (!entry) return;
         const records = tx.objectStore(entry.type);
         const row = (await request(records.get(id))) as StoredRow | undefined;
-        if (row) await request(records.put({ ...row, version }));
+        if (row) await request(records.put({ ...row, version, keyV: keyV ?? row.keyV }));
         if (entry.seq === seq) await request(outbox.delete(id));
         else await request(outbox.put({ ...entry, baseVersion: version }));
+      }),
+    queueReseal: (current, limit) =>
+      short([...RECORD_TYPES, OUTBOX, META], "readwrite", async (tx) => {
+        const outbox = tx.objectStore(OUTBOX);
+        const entries = (await request(outbox.getAll())) as OutboxEntry[];
+        const pending = new Set(entries.map((e) => e.id));
+        let room = limit - entries.filter((e) => e.reseal).length;
+        let seq = ((await request(tx.objectStore(META).get("seq"))) as number | undefined) ?? 0;
+        let added = 0;
+        for (const type of RECORD_TYPES) {
+          if (room <= 0) break;
+          for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
+            if (room <= 0) break;
+            if (row.deleted || row.version === 0 || row.keyV >= current || pending.has(row.id)) {
+              continue;
+            }
+            const entry: OutboxEntry = {
+              id: row.id,
+              type,
+              baseVersion: row.version,
+              deleted: false,
+              touched: [],
+              seq: ++seq,
+              reseal: true,
+            };
+            await request(outbox.put(entry));
+            room -= 1;
+            added += 1;
+          }
+        }
+        if (added > 0) await request(tx.objectStore(META).put(seq, "seq"));
+        return added;
+      }),
+    keyVersionsInUse: () =>
+      short([...RECORD_TYPES], "readonly", async (tx) => {
+        const versions = new Set<number>();
+        for (const type of RECORD_TYPES) {
+          for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
+            if (!row.deleted && row.version > 0) versions.add(row.keyV);
+          }
+        }
+        return versions;
       }),
     parkOutbox: (id, seq, park) =>
       short([OUTBOX], "readwrite", async (tx) => {

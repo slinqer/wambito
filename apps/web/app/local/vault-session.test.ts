@@ -28,6 +28,8 @@ function fakeNetwork() {
   const net = {
     mode: "ok" as "ok" | "offline" | "unauthorized" | "session_changed",
     pushed: 0,
+    /** Records the pull hands out (e.g. one under a key version this browser never got). */
+    records: [] as unknown[],
     live: [] as string[],
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request =
@@ -39,7 +41,7 @@ function fakeNetwork() {
         return json({ code: "session_changed" }, 409);
       }
       if (url.pathname === "/api/v2/sync" && request.method === "GET") {
-        return json({ records: [], next: null, latest: net.pushed });
+        return json({ records: net.records, next: null, latest: net.pushed + net.records.length });
       }
       if (url.pathname === "/api/v2/sync" && request.method === "POST") {
         const { changes } = (await request.json()) as { changes: { id: string }[] };
@@ -371,5 +373,70 @@ describe("forgetVault", () => {
 
   it("does nothing when the tab never showed a preview account", async () => {
     await expect(forgetVault()).resolves.toBeUndefined();
+  });
+});
+
+describe("this browser removed from the account", () => {
+  // No device wrap of this browser is left: `refreshKeys` (over `keys.ts`) says `device_removed`.
+  const rotated = {
+    id: "01930000-0000-7000-8000-0000000000ff",
+    type: "category",
+    version: 1,
+    deleted: false,
+    keyV: 2,
+    encV: 1,
+    body: "AAAA",
+  };
+
+  it("stops the sync, deletes the vault and calls onRemoved", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    let store: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    const removed = vi.fn();
+    const closed = vi.fn();
+    session.onRemoved(removed);
+    session.onClosed(closed);
+    net.records = [rotated];
+    const [first] = (await store?.list("category")) ?? [];
+    if (first) await store?.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(removed).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    expect(store?.isClosed()).toBe(true);
+    expect(await vaultExists(profile.id)).toBe(false);
+    expect(closed).not.toHaveBeenCalled();
+    // the session is gone: the next open makes a new one
+    net.records = [];
+    const again = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+    });
+    expect(again).not.toBe(session);
+    again.close();
+  });
+
+  it("fails the opening with device_removed and deletes the vault", async () => {
+    const net = fakeNetwork();
+    net.records = [rotated];
+    const profile = profileOf();
+    const failed = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: false,
+      fetch: net.fetch,
+    }).catch((e) => e);
+    expect(failed).toBeInstanceOf(VaultOpenError);
+    expect(failed.code).toBe("device_removed");
+    expect(await vaultExists(profile.id)).toBe(false);
   });
 });

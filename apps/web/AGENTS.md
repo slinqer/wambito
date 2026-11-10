@@ -20,15 +20,17 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `quarantine`, `keys`; `deleteVault`), `encrypted-store.ts` (`createEncryptedStore(userId)`: a
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
-  also the sync helpers `readOutbox`, `ackOutbox`, `getMeta/setMeta`, `quarantine`, `wipeRecords`,
-  `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`, `adoptServerCopy`, `restoreSetAside`). Subscribers fire after every commit that
+  also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta`,
+  `quarantine`, `wipeRecords`, `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`,
+  `adoptServerCopy`, `restoreSetAside`, `queueReseal(current, limit)` (outbox entries `reseal: true`
+  for pushed records under an older `keyV`), `keyVersionsInUse()`). Subscribers fire after every commit that
   wrote, whatever its origin, and for other tabs' commits too (a BroadcastChannel
   `wambito-vault-<userId>` tells the other tabs of each commit). `close()` (or another tab deleting
   or upgrading the database) closes it for good: every later op rejects with `VaultClosedError`
   (code `vault_closed`); `isClosed()`, `onClosed(cb)` → unsubscribe. `wipeRecords` keeps the outbox
   and sets pending entries aside (`restoreSetAside` puts them back after the full download,
   merging the touched fields); remote writes take `skipIfPending` / `ifSeq`.
-  `sync.ts` (`createSyncEngine({ store, fetch, userId, keys, keyV, onError })` → `run()` /
+  `sync.ts` (`createSyncEngine({ store, fetch, userId, keyring, refreshKeys, onError })` → `run()` /
   `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
   `410` resync that keeps pending edits (set aside, then re-applied); the design notes are at the
   top of the file; tests run against a fake `/v2` in `sync.test.ts`). A run holds a Web Lock
@@ -44,7 +46,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   store ends a run with `{ ok: false, error: "closed" }` (problem `closed`). Every `/v2` call
   (`sync.ts`, `keys.ts`) sends `x-wambito-user: <vault's user id>`; a 409 `session_changed` (the
   cookie is now another account's) stops the run and `start()`'s triggers (problem
-  `session_changed`; `KeysError("session_changed")` in `keys.ts`).
+  `session_changed`; `KeysError("session_changed")` in `keys.ts`). Key versions: a record opens
+  with the keys of its own `keyV`, every change is sealed under `keyring.current`; a record under a
+  newer `keyV`, or a per-change `key_version_mismatch` (pushed again once, re-sealed), calls
+  `refreshKeys` once per run (still unknown: quarantine `unknown_key_version`); after each pull the
+  upgrade pass re-seals records under an older `keyV` through the outbox (`reseal` entries: unchanged
+  body, `baseVersion` = its version, at most 500 per run, a conflict takes the server's copy) and
+  drops an old version's keys once no local record uses it; `refreshKeys` throwing `device_removed`
+  stops the run and the triggers (`{ ok: false, error: "device_removed", problem: "device_removed" }`).
   `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
   recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
   until `commit()`, which the setup screen calls only after the four characters are typed back:
@@ -62,7 +71,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK), `loadLocalKeys(userId)` →
   `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
   `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
-  `currentRecordKeys(local)`; the sync engine still takes one version), `withDataKey(options, fn)`
+  `currentRecordKeys(local)`; the sync engine takes the keyring), `withDataKey(options, fn)`
   (DK from this browser's own device wrap: found by `deviceWrapId`, its `publicKey` must equal
   `devicePublicKey`, opened with `openFromDevice`; `fn(dk, keyV)`, DK zeroed after;
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
@@ -81,7 +90,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   from the server profile, currency EUR, and the suggested categories, through the local backend),
   then `start()`s the engine; it seeds only after a complete first sync with no set-aside changes
   waiting. A 409 `session_changed` fails the opening (`VaultOpenError`, even for a known browser)
-  or, later, closes the session and calls `onSessionChanged`. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
+  or, later, closes the session and calls `onSessionChanged`. The engine's `refreshKeys` is
+  `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
+  (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
+  `session.onRemoved(cb)` listeners (the gate's notice is wired separately). Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
   If the store closes under it (another tab), the session stops its sync, drops itself and calls
