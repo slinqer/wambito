@@ -86,6 +86,8 @@ function fakeServer(clock: { t: number }) {
     log: [] as string[],
     /** The relay never expires rows: only the clients' own clocks stop them. */
     ignoreExpiry: false,
+    /** How long the relay says a new request lives (a hostile relay may say much longer). */
+    ttl: TTL,
     onGet: undefined as undefined | ((body: Record<string, unknown>, row: Row) => void),
     onPickup: undefined as undefined | ((body: { sealed: string; keyV: number }) => void),
   };
@@ -124,7 +126,7 @@ function fakeServer(clock: { t: number }) {
         publicKey: null,
         sealed: null,
         keyV: null,
-        expiresAt: clock.t + TTL,
+        expiresAt: clock.t + state.ttl,
       };
       state.rows.set(id, row);
       return json({ id, code: row.code, expiresAt: new Date(row.expiresAt).toISOString() }, 201);
@@ -303,7 +305,8 @@ describe("pairing", () => {
     const approverNumber = approver.number();
     fresh.number().catch(() => {});
     expect(await pairingErrorOf(approverNumber)).toBe("tampered");
-    expect(await pairingErrorOf(approver.approve())).toBe("tampered");
+    // number() never resolved: approve() refuses and sends nothing
+    await expect(approver.approve()).rejects.toThrow("approve before number");
     expect(w.server.log.some((l) => l.endsWith("/seal"))).toBe(false);
     fresh.cancel();
   });
@@ -429,7 +432,7 @@ describe("pairing", () => {
     expect(await pairingErrorOf(fresh.number())).toBe("expired");
     expect(await pairingErrorOf(fresh.finish())).toBe("expired");
     expect(await pairingErrorOf(approver.number())).toBe("expired");
-    expect(await pairingErrorOf(approver.approve())).toBe("expired");
+    await expect(approver.approve()).rejects.toThrow("approve before number");
 
     // the clock passes expiresAt while the server still answers: both stop by themselves
     const v = await world();
@@ -495,7 +498,45 @@ describe("pairing", () => {
     const then = w.server.log.length;
     await ticks(20);
     expect(w.server.log.length).toBe(then);
-    expect(await pairingErrorOf(approver.approve())).toBe("cancelled");
+    await expect(approver.approve()).rejects.toThrow("approve before number");
     again.cancel();
+  });
+
+  it("approve() before number() rejects and no seal request is made", async () => {
+    const w = await world();
+    const fresh = await startPairing(w.options);
+    const approver = await findPairing({ ...w.options, code: fresh.code });
+    // the new device reveals; the approver's number is ready but was never asked for
+    await fresh.number();
+    await expect(approver.approve()).rejects.toThrow("approve before number");
+    await expect(approver.approve()).rejects.not.toBeInstanceOf(PairingError);
+    await ticks(10);
+    expect(w.server.log.some((l) => l.endsWith("/seal"))).toBe(false);
+    expect(w.server.log.some((l) => l === "GET /api/v2/keys")).toBe(false);
+    expect(handed.openedDevice).toHaveLength(0);
+
+    // once the number was shown, the same object approves
+    await approver.number();
+    await Promise.all([fresh.finish(), approver.approve()]);
+    expect(w.server.rows.size).toBe(0);
+  });
+
+  it("a relay whose expiresAt is far in the future still ends both sides after 10 minutes", async () => {
+    const w = await world();
+    w.server.ttl = 365 * 24 * 60 * 60 * 1000;
+    const start = w.clock.t;
+    const fresh = await startPairing(w.options);
+    expect(await pairingErrorOf(fresh.number())).toBe("expired");
+    expect(w.clock.t - start).toBeGreaterThanOrEqual(TTL);
+    expect(w.clock.t - start).toBeLessThan(TTL + 2 * 1500);
+
+    const late = await startPairing(w.options);
+    const lookup = w.clock.t;
+    const approver = await findPairing({ ...w.options, code: late.code });
+    // the new device never reveals: the approver stops 10 minutes after its lookup
+    expect(await pairingErrorOf(approver.number())).toBe("expired");
+    expect(w.clock.t - lookup).toBeGreaterThanOrEqual(TTL);
+    expect(w.clock.t - lookup).toBeLessThan(TTL + 2 * 1500);
+    late.cancel();
   });
 });

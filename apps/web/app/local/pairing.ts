@@ -55,6 +55,8 @@ class Gone extends PairingError {
 }
 
 export const PAIRING_POLL_MS = 1500;
+/** A request lives 10 minutes (spec 7.3): the most either device waits, whatever the relay says. */
+export const PAIRING_TTL_MS = 10 * 60 * 1000;
 
 export interface PairingClock {
   now(): number;
@@ -99,7 +101,8 @@ export interface ApproverPairing {
   /** The 6 digits, once the new device revealed a key that matches the pinned commitment. */
   number(): Promise<string>;
   /**
-   * The person confirmed the numbers match: seals DK (from this browser's device wrap) to the
+   * Rejects with a plain `Error("approve before number")`, sending nothing, unless `number()` has
+   * resolved on this object. The person confirmed the numbers match: seals DK (from this browser's device wrap) to the
    * revealed key from `A`, then waits for the new device to pick it up (the relay answers 404).
    */
   approve(): Promise<void>;
@@ -163,11 +166,14 @@ function key32(text: string): Uint8Array {
  * with its errors read as pairing errors: offline → `offline`, 404 → `expired`, 422 → `tampered`,
  * a 409 → `conflict`, the rest `server`. `KeysError`s that are not about the relay
  * (`session_changed`, `rotated_elsewhere`) go through unchanged. Every call first checks the
- * cancel signal and the clock against `expiresAt`.
+ * cancel signal and the clock against the deadline: the relay's `expiresAt`, capped at 10 minutes
+ * from when this device started (the new device's request, the approver's lookup).
  */
 function relay(options: PairingOptions, signal: AbortSignal, clock: PairingClock) {
   const call = api(options);
-  let deadline = Number.POSITIVE_INFINITY;
+  // this device's own cap: a relay cannot stretch a request past 10 minutes from its start
+  const cap = clock.now() + PAIRING_TTL_MS;
+  let deadline = cap;
   const check = () => {
     if (signal.aborted) throw new PairingError("cancelled");
     if (clock.now() >= deadline) throw new PairingError("expired");
@@ -210,7 +216,7 @@ function relay(options: PairingOptions, signal: AbortSignal, clock: PairingClock
     check,
     setDeadline(expiresAt: string) {
       const at = Date.parse(expiresAt);
-      deadline = Number.isNaN(at) ? Number.POSITIVE_INFINITY : at;
+      deadline = Number.isNaN(at) ? cap : Math.min(at, cap);
     },
     get: async <T>(path: string): Promise<T> =>
       (await (await send(path, undefined, "server"))?.json()) as T,
@@ -419,6 +425,8 @@ export async function findPairing(
 
   let numbering: Promise<{ number: string; newKey: Uint8Array }> | null = null;
   let approving: Promise<void> | null = null;
+  /** Set once `number()` resolved on this object: the person has been shown the number. */
+  let shown = false;
 
   const reveal = () => {
     numbering ??= (async () => {
@@ -465,9 +473,14 @@ export async function findPairing(
 
   return {
     async number() {
-      return (await reveal()).number;
+      const { number } = await reveal();
+      shown = true;
+      return number;
     },
     approve() {
+      // the number comparison is the only check of a relayed `N` after a typed code: never seal
+      // before the person could compare it
+      if (!shown) return Promise.reject(new Error("approve before number"));
       approving ??= approve();
       return approving;
     },

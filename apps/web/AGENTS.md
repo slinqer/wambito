@@ -120,7 +120,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
   the recovery wrap). `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
-  `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` → `expired` and on
+  `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
+  request, or the approver's lookup) → `expired` and on
   `cancel()` → `cancelled`): `startPairing(options)` → `{ id, code, qr, expiresAt, number(),
   finish(), cancel() }` (the new device: an ephemeral pair `N`, separate from the device key pair,
   posts its commitment; `qr` is `wambito://pair?id=<id>&key=<base64url N.pub>`; polling pins the
@@ -130,7 +131,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   cancel() }` (the approving device: pins the commitment from `?code=`, or the QR key's own
   commitment after checking it against `GET /v2/pairing/{id}`, then posts its ephemeral `A.pub`;
   `number()` after a revealed key that matches the pinned commitment (and the QR key);
-  `approve()` seals DK from `withDataKey` from `A` at its `keyV`, then waits for the pickup's
+  `approve()` (a plain `Error("approve before number")`, nothing sent, unless `number()` resolved
+  on that object) seals DK from `withDataKey` from `A` at its `keyV`, then waits for the pickup's
   404). `PairingError` codes `expired` (404 or the clock), `tampered` (any relayed value that does
   not match a pin, a 422, a second approver), `bad_code` (a code that cannot be one or finds
   nothing, a QR not exactly that string), `offline`, `server`, `cancelled`; `session_changed` and
