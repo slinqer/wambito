@@ -79,7 +79,22 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   added to the keyring and made current, old versions kept; one at or below the current version
   changes nothing, and a held version is never overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
-  in a `finally`. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
+  in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
+  `api`, `listWraps`, `putJson` and `WrapDto` are exported for `rotate.ts`.
+  `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
+  | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
+  dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
+  nothing made); DK from `withDataKey`; device wraps in `remove` (`removed`), in
+  `settings.revokedDevices` (`revoked`) or whose attestation fails under the old DK
+  (`attestation`) are left out and reported; a new DK at `keyV + 1` wraps the recovery secret (the
+  same one, or a new one shown as `recoveryKey`), every kept device (same id/ref/label, sealed to
+  its public key, fresh attestation; this browser's own with its kept public key) and the touched
+  passkey (same wrap id; other passkeys lose theirs); DK, the new DK, the secret and the PRF are
+  zeroed before it returns. `commit()` POSTs `/v2/keys/rotate` (retry-safe), keeps
+  `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
+  (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
+  `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
+  the recovery wrap). `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
@@ -93,7 +108,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   or, later, closes the session and calls `onSessionChanged`. The engine's `refreshKeys` is
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
-  `session.onRemoved(cb)` listeners (the gate's notice is wired separately). Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
+  `session.onRemoved(cb)` listeners (the gate's notice is wired separately). `session.reloadKeys()`
+  gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
+  `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
   If the store closes under it (another tab), the session stops its sync, drops itself and calls

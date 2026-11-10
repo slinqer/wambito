@@ -28,6 +28,8 @@ function fakeNetwork() {
   const net = {
     mode: "ok" as "ok" | "offline" | "unauthorized" | "session_changed",
     pushed: 0,
+    /** The `keyV` of every pushed change, in order. */
+    pushedKeyV: [] as number[],
     /** Records the pull hands out (e.g. one under a key version this browser never got). */
     records: [] as unknown[],
     live: [] as string[],
@@ -44,7 +46,8 @@ function fakeNetwork() {
         return json({ records: net.records, next: null, latest: net.pushed + net.records.length });
       }
       if (url.pathname === "/api/v2/sync" && request.method === "POST") {
-        const { changes } = (await request.json()) as { changes: { id: string }[] };
+        const { changes } = (await request.json()) as { changes: { id: string; keyV: number }[] };
+        net.pushedKeyV.push(...changes.map((c) => c.keyV));
         return json({ results: changes.map((c) => ({ id: c.id, version: ++net.pushed })) });
       }
       net.live.push(`${request.method} ${url.pathname}`);
@@ -438,5 +441,42 @@ describe("this browser removed from the account", () => {
     expect(failed).toBeInstanceOf(VaultOpenError);
     expect(failed.code).toBe("device_removed");
     expect(await vaultExists(profile.id)).toBe(false);
+  });
+});
+
+describe("reloadKeys", () => {
+  it("gives the running sync the keyring the vault now holds (a rotation), then syncs", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    let store: EncryptedStore | undefined;
+    const first = await keys();
+    const session = await openVaultSession({
+      profile,
+      keys: first,
+      fresh: true,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    // a rotation committed in this browser: version 2's keys are in the vault, and current
+    const v1 = first.keyring.byVersion.get(1) as Awaited<ReturnType<typeof deriveRecordKeys>>;
+    const v2 = await deriveRecordKeys(generateDataKey(), false);
+    await store?.putKey("record:1", v1.record);
+    await store?.putKey("dedupe:1", v1.dedupe);
+    await store?.putKey("record:2", v2.record);
+    await store?.putKey("dedupe:2", v2.dedupe);
+    await store?.setMeta("keyV", 2);
+    const pulls = net.pushed;
+
+    await session.reloadKeys();
+    const [category] = (await store?.list("category")) ?? [];
+    if (!category) throw new Error("no seeded category");
+    await store?.put("category", category.id, { ...category.body, name: "Edited" });
+    await vi.waitFor(() => expect(net.pushedKeyV.slice(pulls)).toContain(2), { timeout: 4000 });
+    const after = net.pushedKeyV.slice(net.pushedKeyV.indexOf(2));
+    expect(after.every((v) => v === 2)).toBe(true);
+    session.close();
   });
 });

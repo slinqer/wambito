@@ -174,6 +174,11 @@ export interface SyncEngine {
   run(): Promise<SyncResult>;
   /** Starts the triggers (now, focus, visibility, local writes, every minute). Returns stop. */
   start(): () => void;
+  /**
+   * Takes a keyring loaded again from the vault (after a rotation committed in this browser).
+   * Key versions only grow: one whose `current` is lower than the engine's is ignored.
+   */
+  useKeyring(next: Keyring): void;
 }
 
 interface WireRecord {
@@ -890,7 +895,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     return stop;
   }
 
-  return { run, start };
+  function useKeyring(next: Keyring): void {
+    if (next.current < keyring.current || !next.byVersion.has(next.current)) return;
+    keyring = next;
+  }
+
+  return { run, start, useKeyring };
 }
 
 /** The problem's `code`, if the body has one. */

@@ -3,7 +3,7 @@ import { isLocale, type Locale } from "../i18n/format.ts";
 import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { uuidv5 } from "./ids.ts";
-import { forgetDevice, type LocalKeys, refreshKeys } from "./keys.ts";
+import { forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
 import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 
 /**
@@ -37,6 +37,11 @@ export interface VaultSession {
    * has stopped, the vault is deleted and the session is gone; the gate shows Unlock.
    */
   onRemoved(listener: () => void): () => void;
+  /**
+   * After a rotation committed in this browser (`rotate.ts`): gives the sync the keyring the vault
+   * now holds, then runs a sync (its upgrade pass re-seals the old records).
+   */
+  reloadKeys(): Promise<void>;
   close(): void;
 }
 
@@ -239,6 +244,11 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       onRemoved(listener) {
         removedListeners.add(listener);
         return () => removedListeners.delete(listener);
+      },
+      async reloadKeys() {
+        const local = await loadLocalKeys(profile.id);
+        if (local) engine.useKeyring(local.keyring);
+        await engine.run();
       },
       close() {
         closing = true;

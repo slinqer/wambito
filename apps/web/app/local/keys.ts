@@ -40,7 +40,9 @@ export type KeysErrorCode =
   /** The signed-in account is not this vault's (409): the app reloads for the new one. */
   | "session_changed"
   /** The server lists no device wrap for this browser (or one sealed to another key): removed. */
-  | "device_removed";
+  | "device_removed"
+  /** Another device rotated the data key first (409 `key_version_mismatch`): nothing was kept. */
+  | "rotated_elsewhere";
 
 export class KeysError extends Error {
   constructor(
@@ -88,15 +90,22 @@ export function currentRecordKeys(local: LocalKeys): RecordKeys {
   return keys;
 }
 
-interface WrapDto {
+/** A wrap as `GET /v2/keys` lists it. */
+export interface WrapDto {
   id: string;
   kind: string;
+  ref?: string | null;
   keyV: number;
   wrapped: string;
   publicKey?: string | null;
+  attestation?: string | null;
+  label?: string | null;
 }
 
-function api(options: KeysOptions) {
+/** `/v2/keys` calls for the vault's account, with the errors as `KeysError`s. */
+export type KeysApi = ReturnType<typeof api>;
+
+export function api(options: KeysOptions) {
   const baseUrl = options.baseUrl ?? "/api";
   return async (path: string, init?: RequestInit): Promise<Response> => {
     let response: Response;
@@ -119,6 +128,9 @@ function api(options: KeysOptions) {
       }
       if (response.status === 409 && code === "session_changed") {
         throw new KeysError("session_changed", 409);
+      }
+      if (response.status === 409 && code === "key_version_mismatch") {
+        throw new KeysError("rotated_elsewhere", 409);
       }
       throw new KeysError("server", response.status);
     }
@@ -146,12 +158,12 @@ async function safeDeviceKeyPair(options: KeysOptions) {
   return pair;
 }
 
-async function listWraps(call: ReturnType<typeof api>): Promise<WrapDto[]> {
+export async function listWraps(call: KeysApi): Promise<WrapDto[]> {
   const body = (await (await call("/v2/keys")).json()) as { wraps: WrapDto[] };
   return body.wraps;
 }
 
-const putJson = (body: unknown, headers: Record<string, string> = {}): RequestInit => ({
+export const putJson = (body: unknown, headers: Record<string, string> = {}): RequestInit => ({
   method: "PUT",
   headers: { "content-type": "application/json", ...headers },
   body: JSON.stringify(body),
