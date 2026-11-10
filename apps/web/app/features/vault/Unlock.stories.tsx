@@ -18,6 +18,7 @@ const meta = {
     onUnlock: fn(async (): Promise<UnlockError | null> => null),
     onPasskey: fn(async (): Promise<UnlockError | null> => null),
     passkeysSupported: (): boolean => true,
+    onPair: fn(),
     onSignOut: fn(),
   },
 } satisfies Meta<typeof Unlock>;
@@ -36,9 +37,12 @@ export const Ready: Story = {
     await expect(
       canvas.getByRole("heading", { level: 1, name: "Abre tus datos aquí" }),
     ).toBeVisible();
-    await expect(canvas.getByText(/desde otro dispositivo/)).toBeVisible();
-    // One more than before: the passkey. Another device is announced, not offered yet.
-    await expect(canvas.getAllByRole("button")).toHaveLength(4);
+    // The recovery key, a passkey, another device, and sign-out (plus the screen's own).
+    await expect(canvas.getAllByRole("button")).toHaveLength(5);
+    const pair = canvas.getByRole("button", { name: "Desde otro dispositivo" });
+    await expectTarget(pair);
+    await userEvent.click(pair);
+    await expect(args.onPair).toHaveBeenCalledTimes(1);
     await userEvent.click(canvas.getByRole("button", { name: "Cerrar sesión" }));
     await expect(args.onSignOut).toHaveBeenCalledTimes(1);
     await expectTarget(canvas.getByLabelText("Clave de recuperación").parentElement as HTMLElement);
@@ -130,7 +134,7 @@ export const NoPasskeys: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole("button", { name: "Usar una llave de acceso" })).toBeNull();
-    // The screen's own buttons and sign-out only, as before passkeys could unlock.
-    await expect(canvas.getAllByRole("button")).toHaveLength(3);
+    // The screen's own buttons, another device and sign-out.
+    await expect(canvas.getAllByRole("button")).toHaveLength(4);
   },
 };

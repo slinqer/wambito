@@ -23,6 +23,7 @@ export default defineConfig({
       "better-auth/react",
       "better-auth/client/plugins",
       "@better-auth/passkey/client",
+      "uqr",
     ],
   },
   test: {

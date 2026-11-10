@@ -816,7 +816,7 @@
       "error_offline": "Estás sem ligação. Tenta outra vez quando voltares a estar online.",
       "error_server": "Algo correu mal do nosso lado. Tenta outra vez.",
       "passkey": "Usar uma chave de acesso",
-      "soon": "Em breve também poderás abrir os teus dados a partir de outro dispositivo."
+      "pair": "A partir de outro dispositivo"
     },
     "locked": {
       "title": "Não conseguimos abrir os teus dados",
@@ -828,7 +828,8 @@
       "unsupported_title": "Este navegador não consegue guardar a tua chave",
       "unsupported_lead": "Para proteger os teus dados, o Wambito precisa de um navegador que guarde a chave de forma segura. Atualiza o navegador ou abre o Wambito noutro.",
       "guest_title": "Os teus dados não se podem abrir aqui",
-      "guest_lead": "Começaste como convidado noutro navegador ou dispositivo, e os dados só se abrem lá. Volta a esse navegador, ou termina a sessão.",
+      "guest_lead": "Começaste como convidado noutro navegador ou dispositivo, e os seus dados só abrem lá. Aprova este a partir desse dispositivo, ou termina a sessão.",
+      "guest_pair": "Aprovar a partir de outro dispositivo",
       "delete_account": "Eliminar esta conta",
       "delete_lead": "A conta de convidado e tudo o que tem são eliminados, também no outro navegador. Não se pode anular.",
       "delete_confirm": "Sim, eliminar",
@@ -836,6 +837,57 @@
       "delete_failed": "Não conseguimos eliminá-la. Tenta outra vez.",
       "delete_cancel": "Cancelar"
     },
-    "passkey_second_touch": "Toca na tua chave de acesso mais uma vez: assim também abrirá os teus dados cifrados."
+    "passkey_second_touch": "Toca na tua chave de acesso mais uma vez: assim também abrirá os teus dados cifrados.",
+    "pair": {
+      "title": "Abre os teus dados a partir de outro dispositivo",
+      "lead": "Num dispositivo onde o Wambito já está aberto, vai a Definições → Segurança → Aprovar um dispositivo novo, e lê este código ou escreve-o.",
+      "starting": "A preparar um código…",
+      "code_label": "Código",
+      "expires": "Este código serve até às {time}.",
+      "waiting": "À espera do teu outro dispositivo…",
+      "number_title": "Confirma que os dois ecrãs mostram o mesmo número",
+      "number_lead": "Se coincidirem, confirma no teu outro dispositivo.",
+      "done": "Feito. A abrir os teus dados…",
+      "expired_title": "Este código expirou",
+      "expired_lead": "Um código dura 10 minutos. Começa de novo para teres outro.",
+      "failed_title": "Não foi possível terminar",
+      "tampered": "Parámos: pode haver alguém a interferir. Nada foi partilhado.",
+      "offline": "Estás sem ligação. Começa de novo quando voltares a ter rede.",
+      "server": "Algo correu mal do nosso lado. Começa de novo.",
+      "restart": "Começar de novo",
+      "back": "Voltar"
+    },
+    "approve": {
+      "title": "Aprovar um dispositivo novo",
+      "lead": "No dispositivo novo, escolhe «A partir de outro dispositivo». Depois escreve o código que ele mostra, ou lê o seu QR.",
+      "code_label": "Código do dispositivo novo",
+      "placeholder": "XXXX XXXX",
+      "submit": "Continuar",
+      "finding": "A procurar…",
+      "scan": "Ler o QR",
+      "scan_lead": "Aponta a câmara para o QR do dispositivo novo.",
+      "scan_stop": "Desligar a câmara",
+      "camera_failed": "Não foi possível usar a câmara. Escreve o código.",
+      "error_bad_code": "Esse código não corresponde a nenhum pedido. Verifica-o, ou começa de novo no dispositivo novo.",
+      "waiting": "À espera do dispositivo novo…",
+      "number_title": "Confirma que os dois ecrãs mostram o mesmo número",
+      "number_lead": "Aprova só se o número no dispositivo novo for exatamente este.",
+      "match": "Coincidem",
+      "approving": "A aprovar…",
+      "no_match": "Não coincidem",
+      "mismatch_title": "Nada foi partilhado",
+      "mismatch_lead": "O dispositivo novo não recebeu nada. Se o querias adicionar, começa de novo nele.",
+      "done_title": "Feito",
+      "done_lead": "O dispositivo novo já pode abrir os teus dados.",
+      "expired_title": "O pedido expirou",
+      "expired_lead": "Começa de novo no dispositivo novo e escreve o código novo.",
+      "failed_title": "Não foi possível aprovar",
+      "tampered": "Parámos: pode haver alguém a interferir. Nada foi partilhado.",
+      "offline": "Estás sem ligação. Tenta de novo quando voltares a ter rede.",
+      "server": "Algo correu mal do nosso lado. Tenta de novo.",
+      "restart": "Começar de novo",
+      "cancel": "Cancelar",
+      "close": "Fechar"
+    }
   }
 }

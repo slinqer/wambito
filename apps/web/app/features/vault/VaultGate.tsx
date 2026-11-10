@@ -10,11 +10,13 @@ import { authClient } from "../../auth/auth-client.ts";
 import {
   addPasskeyWrap,
   KeysError,
+  type LocalKeys,
   loadLocalKeys,
   prepareAccount,
   unlockWithPasskey,
   unlockWithRecovery,
 } from "../../local/keys.ts";
+import { startPairing } from "../../local/pairing.ts";
 import { clearSignInPrf, evaluatePrf, takeSignInPrf } from "../../local/prf.ts";
 import {
   forgetVault,
@@ -27,6 +29,7 @@ import { landingLink } from "../../site/config.ts";
 import { liveSignOut, useSignOut } from "../home/use-sign-out.ts";
 import { ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 import { Locked } from "./Locked.tsx";
+import { PairNewDevice } from "./PairNewDevice.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
 import { Unlock } from "./Unlock.tsx";
 import { createVaultGate, type VaultGate as Gate } from "./vault-gate.ts";
@@ -76,10 +79,10 @@ function reloadApp() {
   window.location.assign("/app");
 }
 
-function gateFor(profile: VaultProfile): Gate<VaultSession> {
+function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
   const userId = profile.id;
   // Set below: the open session's sync tells the gate when the cookie changed hands.
-  let gate: Gate<VaultSession> | undefined;
+  let gate: Gate<VaultSession, LocalKeys> | undefined;
   gate = createVaultGate({
     loadLocalKeys: () => loadLocalKeys(userId),
     prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
@@ -90,6 +93,8 @@ function gateFor(profile: VaultProfile): Gate<VaultSession> {
     addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
     evaluatePrf: (ids) => evaluatePrf(ids),
     accountPasskeyIds,
+    // "From another device": a device that has the data approves this one.
+    startPairing: () => signInAgainOn401(startPairing({ userId })),
     open: (keys, fresh) =>
       openVaultSession({
         profile,
@@ -153,9 +158,12 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
         <Unlock
           onUnlock={gate.unlock}
           onPasskey={gate.unlockWithPasskey}
+          onPair={() => void gate.pair()}
           onSignOut={() => void signOut()}
         />
       );
+    case "pairing":
+      return <PairNewDevice start={gate.startPairing} onBack={gate.leavePairing} />;
     case "locked":
       return (
         <Locked
@@ -164,6 +172,7 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           onRetry={gate.retry}
           onSignOut={() => void signOut()}
           onDeleteAccount={state.kind === "guest" ? deleteAccount : undefined}
+          onPair={state.kind === "guest" ? () => void gate.pair() : undefined}
         />
       );
     case "ready":

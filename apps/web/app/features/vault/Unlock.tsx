@@ -25,18 +25,21 @@ export interface UnlockProps {
   onPasskey?(): Promise<UnlockError | null>;
   /** Whether this browser can use passkeys (WebAuthn); stories stand in for it. */
   passkeysSupported?(): boolean;
+  /** "From another device": the pairing screen, where a device that has the data approves this one. */
+  onPair?(): void;
   /** Signs out (and wipes this browser's vault): the way out. */
   onSignOut(): void;
 }
 
 /**
- * A new browser on an account that has keys: type the recovery key, or touch a passkey whose PRF
- * opens its wrap, to open the data here.
+ * A new browser on an account that has keys: type the recovery key, touch a passkey whose PRF
+ * opens its wrap, or have another device approve this one, to open the data here.
  */
 export function Unlock({
   onUnlock,
   onPasskey,
   passkeysSupported = browserPasskeys,
+  onPair,
   onSignOut,
 }: UnlockProps) {
   const t = useTranslations("vault.unlock");
@@ -126,7 +129,11 @@ export function Unlock({
           )}
         </div>
       )}
-      <p className="text-center text-[14px] text-ink-muted">{t("soon")}</p>
+      {onPair && (
+        <PressButton variant="secondary" className="w-full" disabled={busy} onClick={onPair}>
+          {t("pair")}
+        </PressButton>
+      )}
       <PressButton variant="ghost" className="w-full" disabled={busy} onClick={onSignOut}>
         {tVault("sign_out")}
       </PressButton>

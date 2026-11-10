@@ -816,7 +816,7 @@
       "error_offline": "You are offline. Try again when you are back online.",
       "error_server": "Something went wrong on our side. Try again.",
       "passkey": "Use a passkey",
-      "soon": "Soon you will also be able to open your data from another device."
+      "pair": "From another device"
     },
     "locked": {
       "title": "We could not open your data",
@@ -828,7 +828,8 @@
       "unsupported_title": "This browser can't keep your key",
       "unsupported_lead": "To protect your data, Wambito needs a browser that keeps the key safely. Update your browser or open Wambito in another one.",
       "guest_title": "Your data can't be opened here",
-      "guest_lead": "You started as a guest in another browser or device, and its data only opens there. Go back to that browser, or sign out.",
+      "guest_lead": "You started as a guest in another browser or device, and its data only opens there. Approve this one from that device, or sign out.",
+      "guest_pair": "Approve from another device",
       "delete_account": "Delete this account",
       "delete_lead": "The guest account and everything in it are deleted, in the other browser too. This can't be undone.",
       "delete_confirm": "Yes, delete it",
@@ -836,6 +837,57 @@
       "delete_failed": "We couldn't delete it. Try again.",
       "delete_cancel": "Cancel"
     },
-    "passkey_second_touch": "Touch your passkey once more: that lets it open your encrypted data too."
+    "passkey_second_touch": "Touch your passkey once more: that lets it open your encrypted data too.",
+    "pair": {
+      "title": "Open your data from another device",
+      "lead": "On a device where Wambito is already open, go to Settings → Security → Approve a new device, and scan this code or type it.",
+      "starting": "Preparing a code…",
+      "code_label": "Code",
+      "expires": "This code works until {time}.",
+      "waiting": "Waiting for your other device…",
+      "number_title": "Check both screens show the same number",
+      "number_lead": "If they match, confirm it on your other device.",
+      "done": "Done. Opening your data…",
+      "expired_title": "This code expired",
+      "expired_lead": "A code lasts 10 minutes. Start again to get a new one.",
+      "failed_title": "This could not finish",
+      "tampered": "Stop: someone may be interfering. Nothing was shared.",
+      "offline": "You are offline. Start again when you are back online.",
+      "server": "Something went wrong on our side. Start again.",
+      "restart": "Start again",
+      "back": "Back"
+    },
+    "approve": {
+      "title": "Approve a new device",
+      "lead": "On the new device, choose “From another device”. Then type the code it shows, or scan its QR.",
+      "code_label": "Code from the new device",
+      "placeholder": "XXXX XXXX",
+      "submit": "Continue",
+      "finding": "Looking…",
+      "scan": "Scan the QR",
+      "scan_lead": "Point the camera at the QR on the new device.",
+      "scan_stop": "Turn off the camera",
+      "camera_failed": "We couldn't use the camera. Type the code instead.",
+      "error_bad_code": "That code does not match any request. Check it, or start again on the new device.",
+      "waiting": "Waiting for the new device…",
+      "number_title": "Check both screens show the same number",
+      "number_lead": "Approve only if the number on the new device is exactly this one.",
+      "match": "They match",
+      "approving": "Approving…",
+      "no_match": "They do not match",
+      "mismatch_title": "Nothing was shared",
+      "mismatch_lead": "The new device got nothing. If you meant to add it, start again on it.",
+      "done_title": "Done",
+      "done_lead": "The new device can open your data now.",
+      "expired_title": "The request expired",
+      "expired_lead": "Start again on the new device and type its new code.",
+      "failed_title": "This could not be approved",
+      "tampered": "Stop: someone may be interfering. Nothing was shared.",
+      "offline": "You are offline. Try again when you are back online.",
+      "server": "Something went wrong on our side. Try again.",
+      "restart": "Start again",
+      "cancel": "Cancel",
+      "close": "Close"
+    }
   }
 }

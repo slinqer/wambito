@@ -17,6 +17,8 @@ export interface LockedProps {
   onSignOut(): void;
   /** A guest's way out for good: deletes the account. Resolves to whether it worked. */
   onDeleteAccount?(): Promise<boolean>;
+  /** A guest's way in: another device that has the data approves this one (no recovery key). */
+  onPair?(): void;
 }
 
 const PREFIX: Record<LockedKind, string> = {
@@ -36,6 +38,7 @@ export function Locked({
   retrying = false,
   onSignOut,
   onDeleteAccount,
+  onPair,
 }: LockedProps) {
   const t = useTranslations("vault.locked");
   const tVault = useTranslations("vault");
@@ -50,7 +53,16 @@ export function Locked({
           {retrying ? t("retrying") : t("retry")}
         </PressButton>
       )}
-      <PressButton variant={canRetry ? "ghost" : "primary"} className="w-full" onClick={onSignOut}>
+      {kind === "guest" && onPair && (
+        <PressButton className="w-full" onClick={onPair}>
+          {t("guest_pair")}
+        </PressButton>
+      )}
+      <PressButton
+        variant={canRetry || (kind === "guest" && onPair) ? "ghost" : "primary"}
+        className="w-full"
+        onClick={onSignOut}
+      >
         {tVault("sign_out")}
       </PressButton>
       {kind === "guest" && onDeleteAccount && <DeleteGuest onDelete={onDeleteAccount} />}

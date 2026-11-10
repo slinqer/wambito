@@ -816,7 +816,7 @@
       "error_offline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
       "error_server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
       "passkey": "Usar una llave de acceso",
-      "soon": "Pronto también podrás abrirlos desde otro dispositivo."
+      "pair": "Desde otro dispositivo"
     },
     "locked": {
       "title": "No pudimos abrir tus datos",
@@ -828,7 +828,8 @@
       "unsupported_title": "Este navegador no puede guardar tu clave",
       "unsupported_lead": "Para cuidar tus datos, Wambito necesita un navegador que guarde la clave de forma segura. Actualiza tu navegador o abre Wambito en otro.",
       "guest_title": "Tus datos no se pueden abrir aquí",
-      "guest_lead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allá. Vuelve a ese navegador, o cierra sesión.",
+      "guest_lead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allí. Apruébalo desde ese dispositivo, o cierra sesión.",
+      "guest_pair": "Aprobar desde otro dispositivo",
       "delete_account": "Eliminar esta cuenta",
       "delete_lead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
       "delete_confirm": "Sí, eliminarla",
@@ -836,6 +837,57 @@
       "delete_failed": "No pudimos eliminarla. Inténtalo de nuevo.",
       "delete_cancel": "Cancelar"
     },
-    "passkey_second_touch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados."
+    "passkey_second_touch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados.",
+    "pair": {
+      "title": "Abre tus datos desde otro dispositivo",
+      "lead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Aprobar un dispositivo nuevo, y escanea este código o escríbelo.",
+      "starting": "Preparando un código…",
+      "code_label": "Código",
+      "expires": "Este código sirve hasta las {time}.",
+      "waiting": "Esperando a tu otro dispositivo…",
+      "number_title": "Comprueba que las dos pantallas muestran el mismo número",
+      "number_lead": "Si coinciden, confírmalo en tu otro dispositivo.",
+      "done": "Listo. Abriendo tus datos…",
+      "expired_title": "Este código caducó",
+      "expired_lead": "Un código dura 10 minutos. Empieza de nuevo para tener otro.",
+      "failed_title": "No se pudo terminar",
+      "tampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+      "offline": "No hay conexión. Empieza de nuevo cuando vuelvas a tenerla.",
+      "server": "Algo falló de nuestro lado. Empieza de nuevo.",
+      "restart": "Empezar de nuevo",
+      "back": "Volver"
+    },
+    "approve": {
+      "title": "Aprobar un dispositivo nuevo",
+      "lead": "En el dispositivo nuevo, elige «Desde otro dispositivo». Luego escribe el código que muestra, o escanea su QR.",
+      "code_label": "Código del dispositivo nuevo",
+      "placeholder": "XXXX XXXX",
+      "submit": "Continuar",
+      "finding": "Buscando…",
+      "scan": "Escanear el QR",
+      "scan_lead": "Apunta la cámara al QR del dispositivo nuevo.",
+      "scan_stop": "Apagar la cámara",
+      "camera_failed": "No pudimos usar la cámara. Escribe el código.",
+      "error_bad_code": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el dispositivo nuevo.",
+      "waiting": "Esperando al dispositivo nuevo…",
+      "number_title": "Comprueba que las dos pantallas muestran el mismo número",
+      "number_lead": "Aprueba solo si el número del dispositivo nuevo es exactamente este.",
+      "match": "Coinciden",
+      "approving": "Aprobando…",
+      "no_match": "No coinciden",
+      "mismatch_title": "No se compartió nada",
+      "mismatch_lead": "El dispositivo nuevo no recibió nada. Si querías añadirlo, empieza de nuevo en él.",
+      "done_title": "Listo",
+      "done_lead": "El dispositivo nuevo ya puede abrir tus datos.",
+      "expired_title": "La solicitud caducó",
+      "expired_lead": "Empieza de nuevo en el dispositivo nuevo y escribe el código nuevo.",
+      "failed_title": "No se pudo aprobar",
+      "tampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+      "offline": "No hay conexión. Inténtalo cuando vuelvas a tenerla.",
+      "server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+      "restart": "Empezar de nuevo",
+      "cancel": "Cancelar",
+      "close": "Cerrar"
+    }
   }
 }

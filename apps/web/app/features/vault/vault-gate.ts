@@ -9,7 +9,8 @@ import type { UnlockError } from "./Unlock.tsx";
  *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
  *      │     (a guest commits at once, nothing to show)                │
  *      └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
- *                              └─ the sign-in's passkey PRF opens a wrap ─▶ opening
+ *                              ├─ the sign-in's passkey PRF opens a wrap ─▶ opening
+ *                              └─ "From another device" ─▶ pairing ─ finish() ─▶ opening
  *
  * Passkeys (stage 2b): a passkey sign-in (or a fresh registration) leaves its PRF in a one-shot
  * stash (`takeSignInPrf`). An account with keys elsewhere tries it first; when it opens nothing,
@@ -17,6 +18,12 @@ import type { UnlockError } from "./Unlock.tsx";
  * setup) the gate adds the wrap for that credential. Unlock's "Use a passkey" touches a passkey
  * for its PRF (`evaluatePrf`); one without a wrap is kept the same way. A known browser zeroes the
  * stash. Every PRF is zeroed once used.
+ *
+ * Pairing (stage 2b): Unlock's "From another device" (and a guest's Locked, which has nothing
+ * else to open with) enters `pairing`. The screen starts a request through `startPairing()` (again
+ * for "Start again", which cancels the previous one); when its `finish()` resolves, the gate opens
+ * the vault exactly as after a recovery unlock (pending passkey wrap, then a full sync). A failed
+ * pairing stays on its screen, which shows why; `leavePairing()` cancels it and goes back.
  *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
@@ -38,6 +45,17 @@ export interface GatePasskey {
 
 /** The keys a gate hands from setup or unlock to opening; opaque here. */
 export type GateKeys = unknown;
+
+/** A new device's pairing request (`local/pairing.ts` `NewDevicePairing`, keys opaque). */
+export interface GatePairing<K = GateKeys> {
+  id: string;
+  code: string;
+  qr: string;
+  expiresAt: string;
+  number(): Promise<string>;
+  finish(): Promise<K>;
+  cancel(): void;
+}
 
 /** A prepared new account: the key to show (null for a guest) and the commit that sends it. */
 export interface GatePrepared<K = GateKeys> {
@@ -78,6 +96,8 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
   evaluatePrf?(credentialIds?: string[]): Promise<GatePasskey | null>;
   /** The account's passkey credential ids, so Unlock offers only those; throws when unknown. */
   accountPasskeyIds?(): Promise<string[]>;
+  /** Asks the relay for a pairing request; another unlocked device approves it. */
+  startPairing?(): Promise<GatePairing<K>>;
 }
 
 /** Why the vault is locked; `unsupported` and `guest` have no retry. */
@@ -88,11 +108,13 @@ export type VaultGateState<S = unknown> =
   | { status: "setup"; recoveryKey: string }
   | { status: "committing" }
   | { status: "unlock" }
+  /** `from`: where back goes, Unlock or a guest's Locked. */
+  | { status: "pairing"; from: "unlock" | "guest" }
   | { status: "opening" }
   | { status: "ready"; session: S }
   | { status: "locked"; kind: LockedKind; retrying: boolean };
 
-export interface VaultGate<S = unknown> {
+export interface VaultGate<S = unknown, K = GateKeys> {
   getState(): VaultGateState<S>;
   subscribe(listener: () => void): () => void;
   /** Runs the first check. Once; later calls do nothing. */
@@ -103,6 +125,15 @@ export interface VaultGate<S = unknown> {
   unlock(text: string): Promise<UnlockError | null>;
   /** Unlock's "Use a passkey": null when it worked or was cancelled, else why not. */
   unlockWithPasskey(): Promise<UnlockError | null>;
+  /** Unlock's "From another device", or a guest Locked's "Approve from another device". */
+  pair(): Promise<void>;
+  /**
+   * The pairing screen asks for a request (again for "Start again": the previous one is
+   * cancelled). Its `finish()` opens the vault; its errors are the screen's to show.
+   */
+  startPairing(): Promise<GatePairing<K>>;
+  /** The pairing screen's back: cancels the request and returns to where it came from. */
+  leavePairing(): void;
   /** Locked's retry. */
   retry(): void;
   /** The open vault closed under the app (another tab): check again (reopen, or Unlock). */
@@ -135,7 +166,7 @@ const lockedKind = (error: unknown): LockedKind => {
 /** Kinds a retry cannot fix. */
 const FINAL: readonly LockedKind[] = ["unsupported", "guest"];
 
-export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
+export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K> {
   let state: VaultGateState<S> = { status: "checking" };
   const listeners = new Set<() => void>();
   let started = false;
@@ -143,6 +174,36 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
   let again: () => Promise<void> = check;
   /** A passkey without a wrap yet: its wrap is added once the vault is unlocked by other means. */
   let pendingPasskey: GatePasskey | null = null;
+  /** The pairing request the screen shows now; only its `finish()` opens the vault. */
+  let pairing: GatePairing<K> | null = null;
+
+  const dropPairing = () => {
+    pairing?.cancel();
+    pairing = null;
+  };
+
+  /** A finished pairing opens like a recovery unlock; a failed one stays for the screen. */
+  async function watchPairing(current: GatePairing<K>): Promise<void> {
+    let keys: K;
+    try {
+      keys = await current.finish();
+    } catch (error) {
+      if (pairing !== current || state.status !== "pairing") return;
+      const code = codeOf(error);
+      if (code === "session_changed") {
+        pairing = null;
+        await changed(error, check);
+      } else if (code === "unsupported_browser") {
+        pairing = null;
+        lock(error, check);
+      }
+      return;
+    }
+    if (pairing !== current || state.status !== "pairing") return;
+    pairing = null;
+    await wrapPending();
+    await open(keys, true);
+  }
 
   const keepPending = (passkey: GatePasskey | null) => {
     if (pendingPasskey && pendingPasskey !== passkey) pendingPasskey.prf.fill(0);
@@ -379,6 +440,46 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S> {
     },
     sessionChanged() {
       if (state.status === "ready") void changed({ code: "session_changed" }, recheck);
+    },
+    async pair() {
+      const from =
+        state.status === "unlock"
+          ? "unlock"
+          : state.status === "locked" && state.kind === "guest"
+            ? "guest"
+            : null;
+      if (!from || !deps.startPairing) return;
+      if (!(await sameSession())) return;
+      set({ status: "pairing", from });
+    },
+    async startPairing() {
+      if (state.status !== "pairing" || !deps.startPairing) {
+        throw Object.assign(new Error("not_pairing"), { code: "cancelled" });
+      }
+      dropPairing();
+      let next: GatePairing<K>;
+      try {
+        next = await deps.startPairing();
+      } catch (error) {
+        if (codeOf(error) === "session_changed") await changed(error, check);
+        throw error;
+      }
+      if (state.status !== "pairing") {
+        // Left (or reloaded) while the request was being made.
+        next.cancel();
+        throw Object.assign(new Error("cancelled"), { code: "cancelled" });
+      }
+      dropPairing();
+      pairing = next;
+      void watchPairing(next);
+      return next;
+    },
+    leavePairing() {
+      if (state.status !== "pairing") return;
+      const { from } = state;
+      dropPairing();
+      if (from === "guest") set({ status: "locked", kind: "guest", retrying: false });
+      else set({ status: "unlock" });
     },
     retry() {
       if (state.status !== "locked" || state.retrying || FINAL.includes(state.kind)) return;

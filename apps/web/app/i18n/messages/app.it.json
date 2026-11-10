@@ -816,7 +816,7 @@
       "error_offline": "Sei offline. Riprova quando torni online.",
       "error_server": "Qualcosa è andato storto da parte nostra. Riprova.",
       "passkey": "Usa una passkey",
-      "soon": "Presto potrai aprire i tuoi dati anche da un altro dispositivo."
+      "pair": "Da un altro dispositivo"
     },
     "locked": {
       "title": "Non siamo riusciti ad aprire i tuoi dati",
@@ -828,7 +828,8 @@
       "unsupported_title": "Questo browser non può conservare la tua chiave",
       "unsupported_lead": "Per proteggere i tuoi dati, Wambito ha bisogno di un browser che conservi la chiave in modo sicuro. Aggiorna il browser o apri Wambito in un altro.",
       "guest_title": "Qui non si possono aprire i tuoi dati",
-      "guest_lead": "Hai iniziato come ospite in un altro browser o dispositivo, e i suoi dati si aprono solo lì. Torna a quel browser, oppure esci.",
+      "guest_lead": "Hai iniziato come ospite in un altro browser o dispositivo, e i suoi dati si aprono solo lì. Approva questo da quel dispositivo, oppure esci.",
+      "guest_pair": "Approva da un altro dispositivo",
       "delete_account": "Elimina questo account",
       "delete_lead": "L'account ospite e tutto ciò che contiene vengono eliminati, anche nell'altro browser. Non si può annullare.",
       "delete_confirm": "Sì, eliminalo",
@@ -836,6 +837,57 @@
       "delete_failed": "Non siamo riusciti a eliminarlo. Riprova.",
       "delete_cancel": "Annulla"
     },
-    "passkey_second_touch": "Tocca di nuovo la tua passkey: così aprirà anche i tuoi dati cifrati."
+    "passkey_second_touch": "Tocca di nuovo la tua passkey: così aprirà anche i tuoi dati cifrati.",
+    "pair": {
+      "title": "Apri i tuoi dati da un altro dispositivo",
+      "lead": "Su un dispositivo dove Wambito è già aperto, vai in Impostazioni → Sicurezza → Approva un nuovo dispositivo, e scansiona questo codice o scrivilo.",
+      "starting": "Preparazione del codice…",
+      "code_label": "Codice",
+      "expires": "Questo codice vale fino alle {time}.",
+      "waiting": "In attesa dell'altro dispositivo…",
+      "number_title": "Controlla che i due schermi mostrino lo stesso numero",
+      "number_lead": "Se coincidono, confermalo sull'altro dispositivo.",
+      "done": "Fatto. Apertura dei tuoi dati…",
+      "expired_title": "Questo codice è scaduto",
+      "expired_lead": "Un codice dura 10 minuti. Ricomincia per averne uno nuovo.",
+      "failed_title": "Non è stato possibile finire",
+      "tampered": "Fermati: qualcuno potrebbe interferire. Non è stato condiviso nulla.",
+      "offline": "Sei offline. Ricomincia quando torni online.",
+      "server": "Qualcosa è andato storto da parte nostra. Ricomincia.",
+      "restart": "Ricomincia",
+      "back": "Indietro"
+    },
+    "approve": {
+      "title": "Approva un nuovo dispositivo",
+      "lead": "Sul nuovo dispositivo, scegli «Da un altro dispositivo». Poi scrivi il codice che mostra, o scansiona il suo QR.",
+      "code_label": "Codice del nuovo dispositivo",
+      "placeholder": "XXXX XXXX",
+      "submit": "Continua",
+      "finding": "Ricerca…",
+      "scan": "Scansiona il QR",
+      "scan_lead": "Inquadra con la fotocamera il QR del nuovo dispositivo.",
+      "scan_stop": "Spegni la fotocamera",
+      "camera_failed": "Non è stato possibile usare la fotocamera. Scrivi il codice.",
+      "error_bad_code": "Quel codice non corrisponde a nessuna richiesta. Controllalo, o ricomincia sul nuovo dispositivo.",
+      "waiting": "In attesa del nuovo dispositivo…",
+      "number_title": "Controlla che i due schermi mostrino lo stesso numero",
+      "number_lead": "Approva solo se il numero sul nuovo dispositivo è esattamente questo.",
+      "match": "Coincidono",
+      "approving": "Approvazione…",
+      "no_match": "Non coincidono",
+      "mismatch_title": "Non è stato condiviso nulla",
+      "mismatch_lead": "Il nuovo dispositivo non ha ricevuto nulla. Se volevi aggiungerlo, ricomincia lì.",
+      "done_title": "Fatto",
+      "done_lead": "Il nuovo dispositivo ora può aprire i tuoi dati.",
+      "expired_title": "La richiesta è scaduta",
+      "expired_lead": "Ricomincia sul nuovo dispositivo e scrivi il nuovo codice.",
+      "failed_title": "Non è stato possibile approvare",
+      "tampered": "Fermati: qualcuno potrebbe interferire. Non è stato condiviso nulla.",
+      "offline": "Sei offline. Riprova quando torni online.",
+      "server": "Qualcosa è andato storto da parte nostra. Riprova.",
+      "restart": "Ricomincia",
+      "cancel": "Annulla",
+      "close": "Chiudi"
+    }
   }
 }

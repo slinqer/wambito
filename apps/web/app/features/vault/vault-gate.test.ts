@@ -599,4 +599,135 @@ describe("vault gate", () => {
       expect(evaluatePrf).toHaveBeenCalledWith(undefined);
     });
   });
+
+  describe("pairing", () => {
+    const elsewhere = {
+      prepareAccount: vi.fn(async () => {
+        throw fail("already_set_up");
+      }),
+    };
+    /** A new-device pairing whose `finish()` the test settles. */
+    function fakePairing(finish: () => Promise<Keys>) {
+      return {
+        id: "p-1",
+        code: "ABCDEFGH",
+        qr: "wambito://pair?id=p-1&key=k",
+        expiresAt: "2026-11-10T12:10:00Z",
+        number: vi.fn(async () => "123456"),
+        finish: vi.fn(finish),
+        cancel: vi.fn(),
+      };
+    }
+
+    it("pairing → open after finish(), as a fresh unlock (the pending passkey gets its wrap)", async () => {
+      let done!: (keys: Keys) => void;
+      const pairing = fakePairing(() => new Promise((resolve) => (done = resolve)));
+      const addPasskeyWrap = vi.fn(async () => {});
+      const { gate, deps } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: () => ({ credentialId: "cred-1", prf: new Uint8Array(32).fill(7) }),
+        unlockWithPasskey: vi.fn(async () => {
+          throw fail("no_passkey_wrap");
+        }),
+        addPasskeyWrap,
+        startPairing: vi.fn(async () => pairing),
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+
+      await gate.pair();
+      expect(gate.getState()).toEqual({ status: "pairing", from: "unlock" });
+      expect(await gate.startPairing()).toBe(pairing);
+      await settle();
+      expect(deps.open).not.toHaveBeenCalled();
+
+      done({ k: "paired" });
+      await settle();
+      expect(addPasskeyWrap).toHaveBeenCalledTimes(1);
+      expect(deps.open).toHaveBeenCalledWith({ k: "paired" }, true);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "paired" } });
+    });
+
+    it("back cancels the pairing and shows Unlock; starting again cancels the previous one", async () => {
+      const first = fakePairing(() => new Promise(() => {}));
+      const second = fakePairing(() => new Promise(() => {}));
+      const startPairing = vi
+        .fn<() => Promise<ReturnType<typeof fakePairing>>>()
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(second);
+      const { gate } = gateWith({ ...elsewhere, startPairing });
+      gate.start();
+      await settle();
+      await gate.pair();
+      await gate.startPairing();
+      await gate.startPairing();
+      expect(first.cancel).toHaveBeenCalledTimes(1);
+      expect(second.cancel).not.toHaveBeenCalled();
+
+      gate.leavePairing();
+      expect(second.cancel).toHaveBeenCalledTimes(1);
+      expect(gate.getState()).toEqual({ status: "unlock" });
+    });
+
+    it("a guest locked out pairs from Locked, and back returns to Locked", async () => {
+      const pairing = fakePairing(() => new Promise(() => {}));
+      const { gate } = gateWith({
+        ...elsewhere,
+        guest: true,
+        startPairing: vi.fn(async () => pairing),
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+      await gate.pair();
+      expect(gate.getState()).toEqual({ status: "pairing", from: "guest" });
+      gate.leavePairing();
+      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    });
+
+    it("a pairing that fails stays on the pairing screen, which shows why", async () => {
+      const pairing = fakePairing(() => Promise.reject(fail("tampered")));
+      const { gate, deps } = gateWith({ ...elsewhere, startPairing: vi.fn(async () => pairing) });
+      gate.start();
+      await settle();
+      await gate.pair();
+      await gate.startPairing();
+      await settle();
+      expect(deps.open).not.toHaveBeenCalled();
+      expect(gate.getState()).toEqual({ status: "pairing", from: "unlock" });
+    });
+
+    it("a finish refused with session_changed reloads for the account signed in now", async () => {
+      const reload = vi.fn();
+      let who = "me";
+      const pairing = fakePairing(
+        () => new Promise((_, reject) => setTimeout(() => reject(fail("session_changed")), 1)),
+      );
+      const { gate } = gateWith({
+        ...elsewhere,
+        userId: "me",
+        sessionUserId: async () => who,
+        reload,
+        startPairing: vi.fn(async () => pairing),
+      });
+      gate.start();
+      await settle();
+      await gate.pair();
+      await gate.startPairing();
+      who = "someone-else";
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await settle();
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it("pair() does nothing outside Unlock and a guest's Locked", async () => {
+      const startPairing = vi.fn();
+      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), startPairing });
+      gate.start();
+      await settle();
+      await gate.pair();
+      expect(gate.getState()).toMatchObject({ status: "ready" });
+    });
+  });
 });

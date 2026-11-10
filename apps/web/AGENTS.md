@@ -168,12 +168,17 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
   from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
   passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
-  unlocked by the recovery key or set up; a known browser zeroes the stash; before making or unlocking keys, when the
+  unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
+  device" and a guest Locked's "Approve from another device" enter `pairing` (`gate.pair()`;
+  `gate.startPairing()` makes the request, again for "Start again", cancelling the previous one;
+  its `finish()` opens the vault like a recovery unlock: pending passkey wrap, full sync; a failed
+  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock or Locked);
+  before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
   nothing runs for the old id; Locked kinds `error`, `offline`,
   `unsupported` (no X25519: no retry) and `guest` (a guest whose account has keys elsewhere: no
-  recovery key to type, so sign-out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
+  recovery key to type, so pair from another device, sign out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
   the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is
   `live | demo | local`: demo-only behaviour checks `=== "demo"`, live-only `=== "live"`
   (import); settings shows `settings.local_off` under import, export and the assistants in
@@ -181,8 +186,16 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"), `Unlock` (`onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
-  where `passkeysSupported()` is false), `Locked` (retry, guest delete); all three have `onSignOut` (the gate passes `useSignOut`,
-  which wipes the vault); pure UI,
+  where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
+  which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`: the QR as `uqr`
+  `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
+  number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
+  again", tampered only back; `cancelled` shows nothing); `ApproveDevice` (`keys: PairingOptions`,
+  injected `findPairing` and `scanSupported`, `onDone`; Task 8 mounts it in Settings → Security:
+  type the code, or scan where `BarcodeDetector` exists (a `getUserMedia` video, stopped on a
+  `wambito://pair?` hit, on cancel and on unmount), then the number with "They match" (only once
+  shown; disabled while `approve()` runs) and "They do not match" (cancels: nothing shared));
+  `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
