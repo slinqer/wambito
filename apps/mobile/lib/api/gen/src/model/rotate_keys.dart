@@ -15,6 +15,7 @@ part 'rotate_keys.g.dart';
 /// Properties:
 /// * [keyV] - The new key version: current + 1
 /// * [wraps]
+/// * [link] - The previous data key sealed under the new one, 60 bytes, base64url without padding. Required when the account already has a version; not allowed for the first (422 `link_required`, `link_unexpected`, `invalid_link`)
 @BuiltValue()
 abstract class RotateKeys implements Built<RotateKeys, RotateKeysBuilder> {
   /// The new key version: current + 1
@@ -23,6 +24,10 @@ abstract class RotateKeys implements Built<RotateKeys, RotateKeysBuilder> {
 
   @BuiltValueField(wireName: r'wraps')
   BuiltList<RotatedKeyWrap> get wraps;
+
+  /// The previous data key sealed under the new one, 60 bytes, base64url without padding. Required when the account already has a version; not allowed for the first (422 `link_required`, `link_unexpected`, `invalid_link`)
+  @BuiltValueField(wireName: r'link')
+  String? get link;
 
   RotateKeys._();
 
@@ -54,6 +59,10 @@ class _$RotateKeysSerializer implements PrimitiveSerializer<RotateKeys> {
       object.wraps,
       specifiedType: const FullType(BuiltList, [FullType(RotatedKeyWrap)]),
     );
+    if (object.link != null) {
+      yield r'link';
+      yield serializers.serialize(object.link, specifiedType: const FullType.nullable(String));
+    }
   }
 
   @override
@@ -88,6 +97,14 @@ class _$RotateKeysSerializer implements PrimitiveSerializer<RotateKeys> {
             specifiedType: const FullType(BuiltList, [FullType(RotatedKeyWrap)]),
           ) as BuiltList<RotatedKeyWrap>;
           result.wraps.replace(valueDes);
+          break;
+        case r'link':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.link = valueDes;
           break;
         default:
           unhandled.add(key);

@@ -59,6 +59,7 @@ Serializers _$serializers =
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
           ..add(ImportStatsRejectedInner.serializer)
+          ..add(KeyLink.serializer)
           ..add(KeyWrap.serializer)
           ..add(KeyWrapKindEnum.serializer)
           ..add(KeyWraps.serializer)
@@ -164,6 +165,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyWrap)]),
             () => ListBuilder<KeyWrap>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(KeyLink)]),
+            () => ListBuilder<KeyLink>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

@@ -286,7 +286,22 @@ export const KeyWrap = z
   })
   .openapi("KeyWrap");
 
-export const KeyWraps = z.object({ wraps: z.array(KeyWrap) }).openapi("KeyWraps");
+export const KeyLink = z
+  .object({
+    keyV: z.int().openapi({ description: "The data key version this link leads to (>= 2)" }),
+    link: z.string().openapi({
+      description:
+        "The previous data key sealed under this version's key, base64url without padding, 60 bytes decoded",
+    }),
+  })
+  .openapi("KeyLink");
+
+export const KeyWraps = z
+  .object({
+    wraps: z.array(KeyWrap),
+    links: z.array(KeyLink).openapi({ description: "Ordered by `keyV`" }),
+  })
+  .openapi("KeyWraps");
 
 export const RotateKeys = z
   .object({
@@ -301,6 +316,17 @@ export const RotateKeys = z
       )
       .min(1)
       .max(200),
+    link: z
+      .string()
+      .regex(BASE64URL, "Not base64url")
+      .refine((text) => text.length % 4 !== 1, { message: "Not base64url" })
+      .max(1024)
+      .nullable()
+      .optional()
+      .openapi({
+        description:
+          "The previous data key sealed under the new one, 60 bytes, base64url without padding. Required when the account already has a version; not allowed for the first (422 `link_required`, `link_unexpected`, `invalid_link`)",
+      }),
   })
   .refine((body) => body.wraps.every((wrap) => wrap.keyV === body.keyV), {
     message: "Every wrap carries the new keyV",

@@ -1939,7 +1939,7 @@ class DefaultApi {
   }
 
   /// listKeyWraps
-  /// Every wrap of the account&#39;s data key.
+  /// Every wrap of the account&#39;s data key, and &#x60;links&#x60;: one per rotation, ordered by &#x60;keyV&#x60;, each the previous data key sealed under the new one.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -2938,7 +2938,7 @@ class DefaultApi {
   }
 
   /// rotateKeys
-  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Device wraps carry an attestation too. Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
+  /// Replaces every wrap at once with &#x60;wraps&#x60;, made for a new data key. &#x60;keyV&#x60; is the current key version + 1 (409 &#x60;key_version_mismatch&#x60;); every wrap carries it; exactly one is &#x60;recovery&#x60; (422 &#x60;recovery_required&#x60;). Device wraps carry an attestation too. &#x60;link&#x60; is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 &#x60;link_required&#x60;), refused for its first (422 &#x60;link_unexpected&#x60;), 422 &#x60;invalid_link&#x60; when not 60 bytes; it is stored with the wraps and the answer lists every link. Records are re-encrypted through &#x60;/v2/sync&#x60; afterwards.
   ///
   /// Parameters:
   /// * [rotateKeys]

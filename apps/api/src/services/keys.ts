@@ -1,4 +1,5 @@
-import { type Db, keyWraps, oauthConsent, passkey, type Tx, withUser } from "@wambito/db";
+import { LINK_BYTES } from "@wambito/crypto";
+import { type Db, keyLinks, keyWraps, oauthConsent, passkey, type Tx, withUser } from "@wambito/db";
 import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
@@ -135,14 +136,33 @@ const recoveryRequired = () =>
     "An account always keeps its recovery wrap; make a new recovery key to replace it",
   );
 
-export async function listKeyWraps(db: Db, userId: string): Promise<KeyWrapDto[]> {
+/** A key link as it travels: the version it leads to and its 60 bytes, base64url. */
+export interface KeyLinkDto {
+  keyV: number;
+  link: string;
+}
+
+async function listLinks(tx: Tx, userId: string): Promise<KeyLinkDto[]> {
+  const rows = await tx
+    .select({ keyV: keyLinks.keyV, link: keyLinks.link })
+    .from(keyLinks)
+    .where(eq(keyLinks.userId, userId))
+    .orderBy(asc(keyLinks.keyV));
+  return rows.map((row) => ({ keyV: row.keyV, link: b64(row.link) }));
+}
+
+/** Every wrap of the account's data key, and the links between its versions, by keyV. */
+export async function listKeys(
+  db: Db,
+  userId: string,
+): Promise<{ wraps: KeyWrapDto[]; links: KeyLinkDto[] }> {
   return withUser(db, userId, async (tx) => {
     const rows = await tx
       .select()
       .from(keyWraps)
       .where(own(userId))
       .orderBy(asc(keyWraps.createdAt), asc(keyWraps.id));
-    return rows.map(toKeyWrap);
+    return { wraps: rows.map(toKeyWrap), links: await listLinks(tx, userId) };
   });
 }
 
@@ -237,14 +257,18 @@ export async function deleteKeyWrap(db: Db, userId: string, id: string): Promise
  * Replaces every wrap of the account with `wraps`, all at `keyV`, in one transaction. `keyV` must
  * be the current keyV + 1 (any keyV when the account has no wrap yet), and `wraps` must hold
  * exactly one recovery wrap. Each wrap passes the same ref checks as a PUT. An id that is someone
- * else's fails the whole rotation with 409 `id_taken`.
+ * else's fails the whole rotation with 409 `id_taken`. `link` (the previous data key sealed under the
+ * new one, which the server cannot open) is required once the account has a version (422
+ * `link_required`) and refused for its first (422 `link_unexpected`); it must be 60 bytes (422
+ * `invalid_link`). It is stored in the same transaction, and the answer lists every link.
  */
 export async function rotateKeys(
   db: Db,
   userId: string,
   keyV: number,
   wraps: (KeyWrapInput & { id: string })[],
-): Promise<KeyWrapDto[]> {
+  link: Uint8Array | null,
+): Promise<{ wraps: KeyWrapDto[]; links: KeyLinkDto[] }> {
   if (wraps.filter((wrap) => wrap.kind === "recovery").length !== 1) {
     throw new ApiError(422, "recovery_required", "A rotation carries exactly one recovery wrap");
   }
@@ -253,6 +277,15 @@ export async function rotateKeys(
     await lockWraps(tx, userId);
     const current = await currentKeyV(tx, userId);
     if (current !== null && keyV !== current + 1) throw keyVersionMismatch(current, current + 1);
+    if (current === null && link !== null) {
+      throw new ApiError(422, "link_unexpected", "The first version has no link");
+    }
+    if (current !== null && link === null) {
+      throw new ApiError(422, "link_required", "A rotation carries the link to the previous key");
+    }
+    if (link !== null && link.length !== LINK_BYTES) {
+      throw new ApiError(422, "invalid_link", `A link is ${LINK_BYTES} bytes`);
+    }
     for (const wrap of wraps) await checkRef(tx, userId, wrap);
 
     await tx.delete(keyWraps).where(own(userId));
@@ -264,7 +297,8 @@ export async function rotateKeys(
       .returning();
     // Some id exists, hidden by row-level security: the whole rotation rolls back.
     if (inserted.length !== rows.length) throw new ApiError(409, "id_taken", "An id is taken");
-    return inserted.map(toKeyWrap);
+    if (link !== null) await tx.insert(keyLinks).values({ userId, keyV, link });
+    return { wraps: inserted.map(toKeyWrap), links: await listLinks(tx, userId) };
   });
 }
 

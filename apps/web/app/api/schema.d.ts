@@ -693,7 +693,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Every wrap of the account's data key. */
+        /** @description Every wrap of the account's data key, and `links`: one per rotation, ordered by `keyV`, each the previous data key sealed under the new one. */
         get: operations["listKeyWraps"];
         put?: never;
         post?: never;
@@ -730,7 +730,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. Records are re-encrypted through `/v2/sync` afterwards. */
+        /** @description Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. Records are re-encrypted through `/v2/sync` afterwards. */
         post: operations["rotateKeys"];
         delete?: never;
         options?: never;
@@ -1382,6 +1382,14 @@ export interface components {
         };
         KeyWraps: {
             wraps: components["schemas"]["KeyWrap"][];
+            /** @description Ordered by `keyV` */
+            links: components["schemas"]["KeyLink"][];
+        };
+        KeyLink: {
+            /** @description The data key version this link leads to (>= 2) */
+            keyV: number;
+            /** @description The previous data key sealed under this version's key, base64url without padding, 60 bytes decoded */
+            link: string;
         };
         PutKeyWrap: {
             /** @enum {string} */
@@ -1403,6 +1411,8 @@ export interface components {
             /** @description The new key version: current + 1 */
             keyV: number;
             wraps: components["schemas"]["RotatedKeyWrap"][];
+            /** @description The previous data key sealed under the new one, 60 bytes, base64url without padding. Required when the account already has a version; not allowed for the first (422 `link_required`, `link_unexpected`, `invalid_link`) */
+            link?: string | null;
         };
         RotatedKeyWrap: {
             /**
@@ -3536,7 +3546,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The wraps */
+            /** @description The wraps and the links */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3647,7 +3657,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The new wraps */
+            /** @description The new wraps and every link */
             200: {
                 headers: {
                     [name: string]: unknown;

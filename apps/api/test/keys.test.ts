@@ -79,6 +79,9 @@ async function list(headers: Headers): Promise<KeyWrap[]> {
 const rotateRaw = (headers: Headers, body: unknown) =>
   t.request("POST", "/v2/keys/rotate", { headers, body });
 
+/** A link the server cannot open: any 60 bytes. */
+const link = (fill = 3) => bytes(60, fill);
+
 async function expectProblem(res: Response, status: number, code: string) {
   expect(res.status).toBe(status);
   expect(((await res.json()) as { code: string }).code).toBe(code);
@@ -219,6 +222,7 @@ describe("/v2/keys", () => {
           { id: randomUUID(), ...recovery(2) },
           { id: randomUUID(), ...device(2, { attestation: null }) },
         ],
+        link: link(),
       }),
       422,
       "attestation_required",
@@ -289,7 +293,7 @@ describe("/v2/keys", () => {
         { id: randomUUID(), ...recovery(5) },
         { id: randomUUID(), ...device(5, { label: "Kept phone" }) },
       ];
-      const res = await rotateRaw(headers, { keyV: 5, wraps: next });
+      const res = await rotateRaw(headers, { keyV: 5, wraps: next, link: link() });
       expect(res.status, await res.clone().text()).toBe(200);
       const { wraps } = (await res.json()) as { wraps: KeyWrap[] };
       const byId = (a: KeyWrap, b: KeyWrap) => a.id.localeCompare(b.id);
@@ -310,7 +314,11 @@ describe("/v2/keys", () => {
       const kept = await put(headers, recovery(1));
       for (const keyV of [1, 3]) {
         await expectProblem(
-          await rotateRaw(headers, { keyV, wraps: [{ id: randomUUID(), ...recovery(keyV) }] }),
+          await rotateRaw(headers, {
+            keyV,
+            wraps: [{ id: randomUUID(), ...recovery(keyV) }],
+            link: link(),
+          }),
           409,
           "key_version_mismatch",
         );
@@ -322,7 +330,11 @@ describe("/v2/keys", () => {
       const { headers } = await person();
       const kept = await put(headers, recovery(1));
       await expectProblem(
-        await rotateRaw(headers, { keyV: 2, wraps: [{ id: randomUUID(), ...device(2) }] }),
+        await rotateRaw(headers, {
+          keyV: 2,
+          wraps: [{ id: randomUUID(), ...device(2) }],
+          link: link(),
+        }),
         422,
         "recovery_required",
       );
@@ -333,6 +345,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), ...recovery(2) },
           ],
+          link: link(),
         }),
         422,
         "recovery_required",
@@ -347,6 +360,7 @@ describe("/v2/keys", () => {
         await rotateRaw(headers, {
           keyV: 2,
           wraps: [{ id: randomUUID().toUpperCase(), ...recovery(2) }],
+          link: link(),
         }),
         422,
         "validation_failed",
@@ -364,6 +378,7 @@ describe("/v2/keys", () => {
       const rotated = await rotateRaw(a.headers, {
         keyV: 2,
         wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(),
       });
       expect(rotated.status).toBe(200);
       expect((await list(b.headers)).sort(byId)).toEqual([...bWraps].sort(byId));
@@ -371,6 +386,7 @@ describe("/v2/keys", () => {
       const back = await rotateRaw(b.headers, {
         keyV: 2,
         wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(),
       });
       expect(back.status).toBe(200);
       const aNow = await list(a.headers);
@@ -393,6 +409,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), ...device(1) },
           ],
+          link: link(),
         }),
         422,
         "validation_failed",
@@ -404,6 +421,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), kind: "passkey", ref: "nope", keyV: 2, wrapped: bytes(60) },
           ],
+          link: link(),
         }),
         422,
         "unknown_passkey",
@@ -448,6 +466,98 @@ describe("/v2/keys", () => {
     expect(await list(headers)).toEqual([recoveryWrap, keptWrap]);
   });
 
+  describe("key links", () => {
+    const oneRecovery = (keyV: number) => [{ id: randomUUID(), ...recovery(keyV) }];
+    const getLinks = async (headers: Headers) => {
+      const res = await t.request("GET", "/v2/keys", { headers });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { links: { keyV: number; link: string }[] }).links;
+    };
+
+    test("a rotation of an account with a version needs a link (422 link_required) and changes nothing", async () => {
+      const { headers } = await person();
+      const kept = await put(headers, recovery(1));
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 2, wraps: oneRecovery(2) }),
+        422,
+        "link_required",
+      );
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 2, wraps: oneRecovery(2), link: null }),
+        422,
+        "link_required",
+      );
+      expect(await list(headers)).toEqual([kept]);
+      expect(await getLinks(headers)).toEqual([]);
+    });
+
+    test("a link on the first version is 422 link_unexpected", async () => {
+      const { headers } = await person();
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 1, wraps: oneRecovery(1), link: link() }),
+        422,
+        "link_unexpected",
+      );
+      expect(await list(headers)).toEqual([]);
+      const res = await rotateRaw(headers, { keyV: 1, wraps: oneRecovery(1) });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { links: unknown[] }).links).toEqual([]);
+    });
+
+    test("a link that is not 60 bytes is 422 invalid_link", async () => {
+      const { headers } = await person();
+      const kept = await put(headers, recovery(1));
+      for (const length of [1, 59, 61, 200]) {
+        await expectProblem(
+          await rotateRaw(headers, {
+            keyV: 2,
+            wraps: oneRecovery(2),
+            link: bytes(length),
+          }),
+          422,
+          "invalid_link",
+        );
+      }
+      expect(await list(headers)).toEqual([kept]);
+    });
+
+    test("GET /v2/keys lists the links in keyV order, and they survive later rotations", async () => {
+      const { headers } = await person();
+      await put(headers, recovery(1));
+      const first = await rotateRaw(headers, {
+        keyV: 2,
+        wraps: oneRecovery(2),
+        link: link(4),
+      });
+      expect(first.status, await first.clone().text()).toBe(200);
+      expect(((await first.json()) as { links: unknown[] }).links).toEqual([
+        { keyV: 2, link: link(4) },
+      ]);
+      const second = await rotateRaw(headers, {
+        keyV: 3,
+        wraps: oneRecovery(3),
+        link: link(5),
+      });
+      expect(second.status).toBe(200);
+      const expected = [
+        { keyV: 2, link: link(4) },
+        { keyV: 3, link: link(5) },
+      ];
+      expect(((await second.json()) as { links: unknown[] }).links).toEqual(expected);
+      expect(await getLinks(headers)).toEqual(expected);
+    });
+
+    test("one person never sees another's links", async () => {
+      const a = await person();
+      const b = await person();
+      await put(a.headers, recovery(1));
+      await put(b.headers, recovery(1));
+      await rotateRaw(a.headers, { keyV: 2, wraps: oneRecovery(2), link: link(8) });
+      expect(await getLinks(a.headers)).toHaveLength(1);
+      expect(await getLinks(b.headers)).toEqual([]);
+    });
+  });
+
   describe("assistants", () => {
     test("a token reaches only GET /v2/keys/assistant, which returns its own client's wrap", async () => {
       const { email, headers } = await person();
@@ -489,7 +599,7 @@ describe("/v2/keys", () => {
         await t.request("GET", "/v2/keys", { headers: h }),
         await putRaw(h, id, device(1)),
         await t.request("DELETE", `/v2/keys/${firstWrap.id}`, { headers: h }),
-        await rotateRaw(h, { keyV: 2, wraps: [{ id, ...recovery(2) }] }),
+        await rotateRaw(h, { keyV: 2, wraps: [{ id, ...recovery(2) }], link: link() }),
         await t.request("PUT", "/v2/keys/assistant", { headers: h, body: device(1) }),
         await t.request("DELETE", "/v2/keys/assistant", { headers: h }),
       ]) {

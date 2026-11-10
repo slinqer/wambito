@@ -6,7 +6,7 @@ import { router } from "../http/router.ts";
 import { KeyWrap, KeyWraps, lowerCaseUuid, PutKeyWrap, RotateKeys } from "../http/schemas.ts";
 import {
   deleteKeyWrap,
-  listKeyWraps,
+  listKeys,
   putKeyWrap,
   rotateKeys,
   useAssistantWrap,
@@ -52,10 +52,11 @@ export function keyRoutes(deps: AppDeps) {
       method: "get",
       path: "/v2/keys",
       operationId: "listKeyWraps",
-      description: "Every wrap of the account's data key.",
-      responses: { 200: jsonResponse(KeyWraps, "The wraps") },
+      description:
+        "Every wrap of the account's data key, and `links`: one per rotation, ordered by `keyV`, each the previous data key sealed under the new one.",
+      responses: { 200: jsonResponse(KeyWraps, "The wraps and the links") },
     }),
-    async (c) => c.json({ wraps: await listKeyWraps(deps.db, c.get("userId")) }, 200),
+    async (c) => c.json(await listKeys(deps.db, c.get("userId")), 200),
   );
 
   app.openapi(
@@ -100,13 +101,17 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/rotate",
       operationId: "rotateKeys",
       description:
-        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. Records are re-encrypted through `/v2/sync` afterwards.",
+        "Replaces every wrap at once with `wraps`, made for a new data key. `keyV` is the current key version + 1 (409 `key_version_mismatch`); every wrap carries it; exactly one is `recovery` (422 `recovery_required`). Device wraps carry an attestation too. `link` is the previous data key sealed under the new one (60 bytes, base64url): required once the account has a version (422 `link_required`), refused for its first (422 `link_unexpected`), 422 `invalid_link` when not 60 bytes; it is stored with the wraps and the answer lists every link. Records are re-encrypted through `/v2/sync` afterwards.",
       request: { body: jsonBody(RotateKeys) },
-      responses: { 200: jsonResponse(KeyWraps, "The new wraps"), ...problems(409, 422) },
+      responses: {
+        200: jsonResponse(KeyWraps, "The new wraps and every link"),
+        ...problems(409, 422),
+      },
     }),
     async (c) => {
-      const { keyV, wraps } = c.req.valid("json");
-      return c.json({ wraps: await rotateKeys(deps.db, c.get("userId"), keyV, wraps) }, 200);
+      const { keyV, wraps, link } = c.req.valid("json");
+      const bytes = link == null ? null : new Uint8Array(Buffer.from(link, "base64url"));
+      return c.json(await rotateKeys(deps.db, c.get("userId"), keyV, wraps, bytes), 200);
     },
   );
 
