@@ -97,7 +97,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
   wrap and keeps the one that opens; when this browser already holds the wrap's `keyV`, DK must
   be the one its `record:<v>` came from (a random canary sealed with the kept key opens with the
-  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs; a wrap above
+  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs; a wrap below
+  the held current version must be at a version this browser holds and pass the same check, else
+  `tampered` (versions only grow; a server that withheld the links at an unlock cannot hand it a
+  key there); a wrap above
   the held current version is accepted only when its links lead strictly down to it and reach the
   held key, else `tampered`, every opened key zeroed: every caller
   (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
@@ -134,7 +137,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
   dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
-  nothing made); DK from `withDataKey`; device wraps in `remove` (`removed`), in
+  nothing made); then `refreshKeys`, so this browser holds every version up to the account's
+  current one; DK from `withDataKey`; device wraps in `remove` (`removed`), in
   `settings.revokedDevices` (`revoked`) or whose attestation fails under the old DK
   (`attestation`) are left out and reported; a new DK at `keyV + 1` wraps the recovery secret (the
   same one, or a new one shown as `recoveryKey`), every kept device (same id/ref/label, sealed to
@@ -143,7 +147,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   zeroed before it returns. The key link (old DK sealed under the new one, `sealKeyLink`) is made in `withDataKey` and kept in the prepared object. `commit()` POSTs `/v2/keys/rotate` with `{ keyV, wraps, link }` (retry-safe, the same link; a post that ended
   `offline` or `rotated_elsewhere` counts as ours when `GET /v2/keys` shows this browser's prepared
   wrap at the new `keyV`), keeps
-  `record:<v>`/`dedupe:<v>` (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
+  `record:<v>`/`dedupe:<v>` (a `record:<v>` already held is never overwritten: `tampered`) (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when

@@ -713,8 +713,9 @@ export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
  * private key, and keeps the id and public key of the one that opens. A wrap at a version above
  * the current one this browser holds is accepted only through its links (`chainToHeld`, spec
  * 2026-11-10 section 2.2), which also give `older`: the data keys from `keyV - 1` down to the held
- * current version. At or below it, when this browser holds that `keyV`'s record key, DK must be
- * the one it came from (`sameDataKey`). Else `tampered`. On a throw every key is zeroed.
+ * current version. At it, DK must be the one its record key came from (`sameDataKey`); below it,
+ * the version must be one this browser holds and pass the same check. Else `tampered`. On a throw
+ * every key is zeroed.
  */
 async function openOwnDeviceKey(
   options: KeysOptions,
@@ -769,6 +770,9 @@ async function openOwnDeviceKey(
       older = await chainToHeld(store, userId, { keyV, dataKey }, listed.links, current);
     } else {
       const held = await heldRecordKey(store, keyV);
+      // below current: only a version this browser holds, with the key it holds (versions only
+      // grow; a server that withheld the links at an unlock could otherwise hand it any key there)
+      if (!held && keyV < current) throw new KeysError("tampered");
       if (held && !(await sameDataKey(userId, dataKey, keyV, held))) {
         throw new KeysError("tampered");
       }
@@ -800,9 +804,9 @@ async function withOwnDeviceKey<T>(
 /**
  * Opens DK from this browser's own `device` wrap for one operation: `fn` gets DK and the wrap's
  * `keyV`, and DK is zeroed once `fn` settles. `device_removed` when this browser's wrap is gone or
- * sealed to another key. A version this browser holds must be the DK its record key came from, and
- * a newer one must lead back to it through its links; else `tampered` (every key zeroed, `fn`
- * never runs). See `openOwnDeviceKey`.
+ * sealed to another key. A version this browser holds must be the DK its record key came from, a
+ * version below the current one must be held, and a newer one must lead back to it through its
+ * links; else `tampered` (every key zeroed, `fn` never runs). See `openOwnDeviceKey`.
  */
 export async function withDataKey<T>(
   options: KeysOptions,

@@ -23,6 +23,8 @@ import { createEncryptedStore } from "./encrypted-store.ts";
 const parsedSecrets = vi.hoisted(() => [] as Uint8Array[]);
 /** Every older data key `openKeyLink` handed out, to check that the walks zero them. */
 const openedLinks = vi.hoisted(() => [] as Uint8Array[]);
+/** Every data key `openFromDevice` handed out, to check that a refused device wrap is zeroed. */
+const openedDevice = vi.hoisted(() => [] as Uint8Array[]);
 vi.mock("@wambito/crypto", async (original) => {
   const crypto = await original<typeof import("@wambito/crypto")>();
   return {
@@ -31,6 +33,11 @@ vi.mock("@wambito/crypto", async (original) => {
       const secret = crypto.parseRecoveryKey(text);
       parsedSecrets.push(secret);
       return secret;
+    },
+    openFromDevice: async (...args: Parameters<typeof crypto.openFromDevice>) => {
+      const key = await crypto.openFromDevice(...args);
+      openedDevice.push(key);
+      return key;
     },
     openKeyLink: async (...args: Parameters<typeof crypto.openKeyLink>) => {
       const key = await crypto.openKeyLink(...args);
@@ -1014,6 +1021,7 @@ describe("unlocking an account that rotated", () => {
     const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
     expect(local.keyring.current).toBe(3);
     expect([...local.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(openedLinks).toHaveLength(2);
     const loaded = (await loadLocalKeys(userId)) as LocalKeys;
     expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
     expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
@@ -1055,6 +1063,8 @@ describe("unlocking an account that rotated", () => {
     expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
     expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
     expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    // link 3 opens DK(2), the wrong link 2 opens a key that is not DK(1): both zeroed
+    expect(openedLinks).toHaveLength(2);
     for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
   });
 
@@ -1153,6 +1163,45 @@ describe("unlocking an account that rotated", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("an own device wrap below the held current version, at a version this browser does not hold, is tampered", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    await forgetDevice(userId);
+    // the server withholds every link during a fresh unlock: the browser holds only v3
+    const links = new Map(api.links);
+    api.links.clear();
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect([...local.keyring.byVersion.keys()]).toEqual([3]);
+    api.links.clear();
+    for (const [v, link] of links) api.links.set(v, link);
+    // later it serves this browser's own wrap id at v2, sealed with a key of its own
+    const store = await createEncryptedStore(userId);
+    const ownId = await store.getMeta<string>("deviceWrapId");
+    store.close();
+    const own = api.wraps.find((w) => w.id === ownId) as Wrap;
+    await rotateDeviceWrap(api, userId, own, generateDataKey(), 2);
+    const before = await stored(userId);
+    openedDevice.length = 0;
+    const fn = vi.fn(async () => 1);
+    await expect(withDataKey({ userId, fetch: api.fetch }, fn)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(fn).not.toHaveBeenCalled();
+    expect(openedDevice).toHaveLength(1);
+    for (const key of openedDevice) expect(key.every((b) => b === 0)).toBe(true);
+    expect(await stored(userId)).toEqual(before);
+  });
+
+  it("an own device wrap below the held current version with the held key of that version still opens", async () => {
+    const { api, userId, recoveryKey, dk2 } = await rotatedTwice();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const store = await createEncryptedStore(userId);
+    const ownId = await store.getMeta<string>("deviceWrapId");
+    store.close();
+    const own = api.wraps.find((w) => w.id === ownId) as Wrap;
+    await rotateDeviceWrap(api, userId, own, dk2, 2);
+    await expect(withDataKey({ userId, fetch: api.fetch }, async (_dk, v) => v)).resolves.toBe(2);
   });
 
   it("a 2a vault (legacy record/dedupe at v1) unlocked at v3 keeps the right key for every version", async () => {

@@ -25,6 +25,7 @@ import {
   migrateLegacyKeys,
   putJson,
   recordKeyName,
+  refreshKeys,
   type WrapDto,
   withDataKey,
 } from "./keys.ts";
@@ -152,7 +153,8 @@ export async function checkRecoveryKey(options: KeysOptions & { text: string }):
 /**
  * Removes devices and rotates the data key, in the order of spec 7.5 and addendum section 2:
  * 1. the typed recovery key must open the current recovery wrap (before anything is made);
- * 2. DK from this browser's own device wrap; every other device wrap's attestation is verified
+ * 2. `refreshKeys` first (this browser then holds every version up to the account's current
+ *    one), then DK from this browser's own device wrap; every other device wrap's attestation is verified
  *    under it, and the ids in `remove` and in `settings.revokedDevices` are left out, whatever the
  *    server lists (reported in `dropped`, with a forged attestation as `attestation`);
  * 3. a new DK at `keyV + 1`, and its wraps: one recovery, the kept devices (same id, ref and
@@ -186,6 +188,9 @@ export async function rotateKeys(
     const recoveryKey = "fresh" in options.recovery ? formatRecoveryKey(secret) : null;
     const recoverySecret = secret;
     const revoked = new Set([...(await revokedDevices(userId)), ...options.remove]);
+    // Holds every version up to the account's current one first: `withDataKey` alone would accept
+    // a verified wrap above the held current without keeping the versions in between.
+    await refreshKeys(options);
 
     const prepared = await withDataKey(options, async (dataKey, keyV) => {
       // Read after `withDataKey`, which remembers them for a 2a browser.
@@ -329,7 +334,10 @@ export async function rotateKeys(
   }
 }
 
-/** The new version's keys become current, and the removed ids join `settings.revokedDevices`. */
+/**
+ * The new version's keys become current, and the removed ids join `settings.revokedDevices`. A
+ * version this browser already holds is never overwritten: `tampered`, nothing kept.
+ */
 async function keepRotated(
   userId: string,
   keyV: number,
@@ -340,6 +348,8 @@ async function keepRotated(
   try {
     // a 2a vault's legacy names move to their version first, or a later load would overwrite
     await migrateLegacyKeys(store);
+    // a version this browser holds is never replaced (versions only grow)
+    if (await store.getKey<CryptoKey>(recordKeyName(keyV))) throw new KeysError("tampered");
     await store.putKey(recordKeyName(keyV), keys.record);
     await store.putKey(dedupeKeyName(keyV), keys.dedupe);
     await store.setMeta("keyV", keyV);

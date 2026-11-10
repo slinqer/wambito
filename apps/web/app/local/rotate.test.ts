@@ -10,6 +10,7 @@ import {
   openKeyLink,
   openRecord,
   parseRecoveryKey,
+  sealKeyLink,
   sealRecord,
   sealToDevice,
   toBase64Url,
@@ -80,6 +81,10 @@ function fakeKeys() {
     wraps: [] as Wrap[],
     puts: [] as Array<{ id: string; kind: string; keyV: number }>,
     rotations: [] as Array<{ keyV: number; wraps: Wrap[]; link?: string }>,
+    /** Every `POST /v2/keys/rotate` body, kept before any check (refused ones too). */
+    posts: [] as Array<{ keyV: number; link?: string }>,
+    /** `link(v)` by the version whose key seals it, base64url, listed by `GET /v2/keys`. */
+    links: new Map<number, string>(),
     /** Another device rotated first: the next rotate gets 409 `key_version_mismatch`. */
     rotatedElsewhere: false,
     /** The next rotate commits, then its answer is lost: the network is down from then on. */
@@ -121,13 +126,18 @@ function fakeKeys() {
   const answer = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const method = init?.method ?? "GET";
-    if (url.pathname === "/api/v2/keys" && method === "GET") return json({ wraps: state.wraps });
+    if (url.pathname === "/api/v2/keys" && method === "GET")
+      return json({
+        wraps: state.wraps,
+        links: [...state.links].sort(([x], [y]) => x - y).map(([keyV, link]) => ({ keyV, link })),
+      });
     if (url.pathname === "/api/v2/keys/rotate" && method === "POST") {
       const body = JSON.parse(String(init?.body)) as {
         keyV: number;
         wraps: Array<Record<string, unknown>>;
         link?: string;
       };
+      state.posts.push({ keyV: body.keyV, link: body.link });
       if (state.rotatedElsewhere || body.keyV !== current() + 1) {
         return json({ code: "key_version_mismatch" }, 409);
       }
@@ -488,7 +498,72 @@ describe("rotateKeys", () => {
     a.api.offline = false;
     await expect(prepared.commit()).resolves.toMatchObject({ keyV: 2 });
     expect(a.api.rotations).toHaveLength(1);
+    // the retry was posted (and refused as a second rotation) with the very same link
+    expect(a.api.posts).toHaveLength(2);
+    expect(a.api.posts[1]?.link).toBe(a.api.posts[0]?.link);
     expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(2);
+  });
+
+  it("a browser at v1 while the account is at v2 (valid link) refreshes first, rotates to v3 and holds 1, 2 and 3", async () => {
+    const a = await account();
+    // another device rotated to v2: the same recovery key, this browser's wrap sealed to DK(2)
+    const dk2 = generateDataKey();
+    const secret = parseRecoveryKey(a.recoveryKey);
+    for (const wrap of a.api.wraps) {
+      wrap.keyV = 2;
+      if (wrap.kind === "recovery") {
+        wrap.wrapped = toBase64Url(
+          await wrapDataKey(secret, { kind: "recovery", userId: a.userId, keyV: 2 }, dk2),
+        );
+      }
+    }
+    wrapOf(a, a.own.id).wrapped = toBase64Url(
+      await sealToDevice(
+        fromBase64Url(a.own.publicKey as string),
+        { kind: "device", userId: a.userId, keyV: 2 },
+        dk2,
+      ),
+    );
+    a.api.links.set(2, toBase64Url(await sealKeyLink(dk2, a.dk, { userId: a.userId, keyV: 2 })));
+    const result = await (
+      await rotateKeys({ ...a.options, remove: [], recovery: { text: a.recoveryKey } })
+    ).commit();
+    expect(result.keyV).toBe(3);
+    const local = await loadLocalKeys(a.userId);
+    expect(local?.keyring.current).toBe(3);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([1, 2, 3]);
+    const ctx = { userId: a.userId, type: "settings" as const, id: SETTINGS_ID, keyV: 2 };
+    const sealed = await sealRecord(await deriveRecordKeys(dk2, false), ctx, { s: 2 });
+    expect(await openRecord(local?.keyring.byVersion.get(2) as never, ctx, sealed)).toEqual({
+      s: 2,
+    });
+    // the link posted with v3 opens to DK(2)
+    const dk3 = await openRecovery(a.api, a.userId, a.recoveryKey, 3);
+    const link = a.api.rotations[0]?.link as string;
+    expect(await openKeyLink(dk3, { userId: a.userId, keyV: 3 }, fromBase64Url(link))).toEqual(dk2);
+  });
+
+  it("a commit never overwrites a record key this browser already holds for the new version", async () => {
+    const a = await account();
+    const prepared = await rotateKeys({
+      ...a.options,
+      remove: [],
+      recovery: { text: a.recoveryKey },
+    });
+    // record:2 appeared meanwhile (it must never be replaced: versions only grow)
+    const held = await deriveRecordKeys(generateDataKey(), false);
+    const store = await createEncryptedStore(a.userId);
+    await store.putKey("record:2", held.record);
+    await store.putKey("dedupe:2", held.dedupe);
+    store.close();
+    await expect(prepared.commit()).rejects.toEqual(new KeysError("tampered"));
+    const after = await createEncryptedStore(a.userId);
+    const kept = (await after.getKey<CryptoKey>("record:2")) as CryptoKey;
+    const ctx = { userId: a.userId, type: "settings" as const, id: SETTINGS_ID, keyV: 2 };
+    const sealed = await sealRecord(held, ctx, { s: 2 });
+    expect(await openRecord({ record: kept, dedupe: held.dedupe }, ctx, sealed)).toEqual({ s: 2 });
+    expect(await after.getMeta("keyV")).toBe(1);
+    after.close();
   });
 
   it("a 2a vault at v1 rotates to v2, and a record sealed under v2 opens after a reload", async () => {
