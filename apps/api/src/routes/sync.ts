@@ -58,7 +58,7 @@ export function syncRoutes(deps: AppDeps) {
       path: "/v2/sync",
       operationId: "pushRecords",
       description:
-        "Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, or `not_found` for an update of a record the server does not have (resync in full).",
+        "Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, `not_found` for an update of a record the server does not have (resync in full), or `key_version_mismatch` (with the current `keyV`) when the change's `keyV` is not the account's current key version and the account has key wraps.",
       request: { body: jsonBody(PushRecords) },
       responses: {
         200: jsonResponse(PushResults, "One result per change, in request order"),

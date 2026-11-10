@@ -6,34 +6,31 @@ part of 'push_result.dart';
 // BuiltValueGenerator
 // **************************************************************************
 
-const PushResultErrorEnum _$pushResultErrorEnum_idTaken = const PushResultErrorEnum._('idTaken');
-const PushResultErrorEnum _$pushResultErrorEnum_notFound = const PushResultErrorEnum._('notFound');
+const PushResultErrorEnum _$pushResultErrorEnum_keyVersionMismatch = const PushResultErrorEnum._(
+  'keyVersionMismatch',
+);
 
 PushResultErrorEnum _$pushResultErrorEnumValueOf(String name) {
   switch (name) {
-    case 'idTaken':
-      return _$pushResultErrorEnum_idTaken;
-    case 'notFound':
-      return _$pushResultErrorEnum_notFound;
+    case 'keyVersionMismatch':
+      return _$pushResultErrorEnum_keyVersionMismatch;
     default:
       throw ArgumentError(name);
   }
 }
 
 final BuiltSet<PushResultErrorEnum> _$pushResultErrorEnumValues = BuiltSet<PushResultErrorEnum>(
-  const <PushResultErrorEnum>[_$pushResultErrorEnum_idTaken, _$pushResultErrorEnum_notFound],
+  const <PushResultErrorEnum>[_$pushResultErrorEnum_keyVersionMismatch],
 );
 
 Serializer<PushResultErrorEnum> _$pushResultErrorEnumSerializer = _$PushResultErrorEnumSerializer();
 
 class _$PushResultErrorEnumSerializer implements PrimitiveSerializer<PushResultErrorEnum> {
   static const Map<String, Object> _toWire = const <String, Object>{
-    'idTaken': 'id_taken',
-    'notFound': 'not_found',
+    'keyVersionMismatch': 'key_version_mismatch',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
-    'id_taken': 'idTaken',
-    'not_found': 'notFound',
+    'key_version_mismatch': 'keyVersionMismatch',
   };
 
   @override

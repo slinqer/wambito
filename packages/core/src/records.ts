@@ -102,6 +102,8 @@ export const settingsRecord = z
     locale: z.enum(["es", "en", "it", "pt"]),
     timezone: z.string().refine(isValidTimeZone, "Unknown time zone"),
     onboardingCompletedAt: timestamp.nullable().default(null),
+    /** Wrap ids of the devices removed from the vault; every rotation leaves them out. */
+    revokedDevices: z.array(z.uuid()).default([]),
   })
   .loose();
 

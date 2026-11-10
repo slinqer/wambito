@@ -82,6 +82,8 @@ Serializers _$serializers =
           ..add(PulledRecords.serializer)
           ..add(PushApplied.serializer)
           ..add(PushConflict.serializer)
+          ..add(PushKeyVersionMismatch.serializer)
+          ..add(PushKeyVersionMismatchErrorEnum.serializer)
           ..add(PushRecords.serializer)
           ..add(PushRejected.serializer)
           ..add(PushRejectedErrorEnum.serializer)

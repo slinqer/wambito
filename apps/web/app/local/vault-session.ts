@@ -136,6 +136,7 @@ async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promis
       locale,
       timezone: profile.timezone,
       onboardingCompletedAt: null,
+      revokedDevices: [],
     });
     for (const { id, body } of categories) await tx.put("category", id, body);
   });

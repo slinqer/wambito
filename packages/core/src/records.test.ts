@@ -101,3 +101,26 @@ describe("parseRecord", () => {
     ).toMatchObject({ ok: true, value: { updatedAt: "2026-10-21T10:00:00Z" } });
   });
 });
+
+describe("settings revokedDevices", () => {
+  const settings = { s: 1, currency: "COP", locale: "es", timezone: "America/Bogota" };
+  const uuid = "0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b";
+
+  test("settings without revokedDevices parses to []", () => {
+    expect(parseRecord("settings", settings)).toMatchObject({
+      ok: true,
+      value: { revokedDevices: [] },
+    });
+  });
+
+  test("revokedDevices keeps lower-case uuids", () => {
+    expect(parseRecord("settings", { ...settings, revokedDevices: [uuid] })).toMatchObject({
+      ok: true,
+      value: { revokedDevices: [uuid] },
+    });
+  });
+
+  test("a non-uuid in revokedDevices fails", () => {
+    expect(parseRecord("settings", { ...settings, revokedDevices: ["nope"] }).ok).toBe(false);
+  });
+});
