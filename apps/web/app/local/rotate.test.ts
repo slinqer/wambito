@@ -81,6 +81,9 @@ function fakeKeys() {
     rotations: [] as Array<{ keyV: number; wraps: Wrap[] }>,
     /** Another device rotated first: the next rotate gets 409 `key_version_mismatch`. */
     rotatedElsewhere: false,
+    /** The next rotate commits, then its answer is lost: the network is down from then on. */
+    loseNextAnswer: false,
+    offline: false,
   };
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -99,6 +102,16 @@ function fakeKeys() {
   });
   const current = () => Math.max(0, ...state.wraps.map((w) => w.keyV));
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (state.offline) throw new TypeError("offline");
+    const response = await answer(input, init);
+    if (state.loseNextAnswer && String(input).endsWith("/v2/keys/rotate") && response.ok) {
+      state.loseNextAnswer = false;
+      state.offline = true;
+      throw new TypeError("offline");
+    }
+    return response;
+  };
+  const answer = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const method = init?.method ?? "GET";
     if (url.pathname === "/api/v2/keys" && method === "GET") return json({ wraps: state.wraps });
@@ -455,6 +468,69 @@ describe("rotateKeys", () => {
     expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([1]);
     const store = await createEncryptedStore(a.userId);
     expect((await store.get("settings", SETTINGS_ID))?.body.revokedDevices).toEqual([]);
+    expect(await store.getKey("record:2")).toBeUndefined();
+    store.close();
+  });
+
+  it("a rotation whose answer was lost is recognised as ours on retry, and kept locally", async () => {
+    const a = await account();
+    const gone = await addDevice(a, "Chrome on Android");
+    const prepared = await rotateKeys({
+      ...a.options,
+      remove: [gone.id],
+      recovery: { fresh: true },
+    });
+    a.api.loseNextAnswer = true;
+    const err = await prepared.commit().catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("offline");
+    expect(a.api.rotations).toHaveLength(1); // the server did commit
+    expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(1);
+
+    a.api.offline = false;
+    const result = await prepared.commit();
+    expect(result).toEqual({
+      keyV: 2,
+      dropped: [{ id: gone.id, label: "Chrome on Android", reason: "removed" }],
+    });
+    expect(a.api.rotations).toHaveLength(1);
+    expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(2);
+    const store = await createEncryptedStore(a.userId);
+    expect((await store.get("settings", SETTINGS_ID))?.body.revokedDevices).toEqual([gone.id]);
+    store.close();
+    // the shown key is the account's recovery key
+    await expect(
+      openRecovery(a.api, a.userId, prepared.recoveryKey as string, 2),
+    ).resolves.toHaveLength(32);
+  });
+
+  it("a 409 after another device's rotation (its wraps, not ours) is rotated_elsewhere, local keys untouched", async () => {
+    const a = await account();
+    const prepared = await rotateKeys({
+      ...a.options,
+      remove: [],
+      recovery: { text: a.recoveryKey },
+    });
+    // another device rotated to keyV 2: its own DK, sealed to this browser's public key too
+    const theirs = generateDataKey();
+    for (const wrap of a.api.wraps) wrap.keyV = 2;
+    const own = wrapOf(a, a.own.id);
+    own.wrapped = toBase64Url(
+      await sealToDevice(
+        fromBase64Url(a.own.publicKey as string),
+        { kind: "device", userId: a.userId, keyV: 2 },
+        theirs,
+      ),
+    );
+
+    const err = await prepared.commit().catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("rotated_elsewhere");
+    expect(a.api.rotations).toEqual([]);
+    const local = await loadLocalKeys(a.userId);
+    expect(local?.keyring.current).toBe(1);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([1]);
+    const store = await createEncryptedStore(a.userId);
     expect(await store.getKey("record:2")).toBeUndefined();
     store.close();
   });

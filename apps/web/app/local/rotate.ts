@@ -241,11 +241,22 @@ export async function rotateKeys(
           });
         }
         const keys = await deriveRecordKeys(newKey, false);
-        return { keyV: nextV, wraps: body, keys, dropped };
+        return { keyV: nextV, wraps: body, keys, dropped, ownId };
       } finally {
         newKey.fill(0);
       }
     });
+
+    /** The server's current wraps include this browser's prepared wrap: the rotation is ours. */
+    async function landed(): Promise<boolean> {
+      const own = prepared.wraps.find((w) => w.id === prepared.ownId);
+      try {
+        const wrap = (await listWraps(call)).find((w) => w.id === prepared.ownId);
+        return !!own && wrap?.keyV === prepared.keyV && wrap.wrapped === own.wrapped;
+      } catch {
+        return false;
+      }
+    }
 
     let posted = false;
     let done: RotateResult | null = null;
@@ -254,7 +265,16 @@ export async function rotateKeys(
     async function run(): Promise<RotateResult> {
       if (done) return done;
       if (!posted) {
-        await call("/v2/keys/rotate", postJson({ keyV: prepared.keyV, wraps: prepared.wraps }));
+        try {
+          await call("/v2/keys/rotate", postJson({ keyV: prepared.keyV, wraps: prepared.wraps }));
+        } catch (error) {
+          // The rotate is not idempotent: a post whose answer was lost (`offline`), retried, gets
+          // 409 (`rotated_elsewhere`). Ours if the server holds this browser's prepared wrap.
+          const lost =
+            error instanceof KeysError &&
+            (error.code === "offline" || error.code === "rotated_elsewhere");
+          if (!lost || !(await landed())) throw error;
+        }
         posted = true;
       }
       await keepRotated(userId, prepared.keyV, prepared.keys, options.remove);
