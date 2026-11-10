@@ -408,6 +408,8 @@ async function keepLocally(
   for (const [v, key] of older) derived.set(v, await deriveRecordKeys(key, false));
   const store = await createEncryptedStore(userId);
   try {
+    // a held 2a vault's keys first move to their version's names (meta `keyV` moves below)
+    await migrateLegacyKeys(store);
     for (const [v, keys] of derived) {
       await store.putKey(recordKeyName(v), keys.record);
       await store.putKey(dedupeKeyName(v), keys.dedupe);
@@ -612,6 +614,23 @@ export async function addPasskeyWrap(options: KeysOptions & PasskeySecret): Prom
 }
 
 /**
+ * A 2a vault's single `record`/`dedupe` are version `meta.keyV`: written under the versioned names,
+ * then the old names go. Runs before anything moves meta `keyV`, or the legacy keys would be read
+ * as the new version.
+ */
+async function migrateLegacyKeys(store: EncryptedStore): Promise<void> {
+  const current = await store.getMeta<number>("keyV");
+  if (current === undefined) return;
+  const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);
+  const legacyDedupe = await store.getKey<CryptoKey>(LEGACY_DEDUPE_KEY);
+  if (!legacyRecord || !legacyDedupe) return;
+  await store.putKey(recordKeyName(current), legacyRecord);
+  await store.putKey(dedupeKeyName(current), legacyDedupe);
+  await store.deleteKey(LEGACY_RECORD_KEY);
+  await store.deleteKey(LEGACY_DEDUPE_KEY);
+}
+
+/**
  * The keys this browser kept, or `null` when it was never set up or lacks the current version's
  * keys (the app is locked). A 2a vault's `record` and `dedupe` are version `meta.keyV`: they are
  * written under the versioned names first, then the old names go.
@@ -621,14 +640,7 @@ export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
   try {
     const current = await store.getMeta<number>("keyV");
     if (current === undefined) return null;
-    const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);
-    const legacyDedupe = await store.getKey<CryptoKey>(LEGACY_DEDUPE_KEY);
-    if (legacyRecord && legacyDedupe) {
-      await store.putKey(recordKeyName(current), legacyRecord);
-      await store.putKey(dedupeKeyName(current), legacyDedupe);
-      await store.deleteKey(LEGACY_RECORD_KEY);
-      await store.deleteKey(LEGACY_DEDUPE_KEY);
-    }
+    await migrateLegacyKeys(store);
     const byVersion = new Map<number, RecordKeys>();
     for (const name of await store.keyNames()) {
       const match = /^record:(\d+)$/.exec(name);
@@ -796,6 +808,7 @@ export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {
     }
     const store = await createEncryptedStore(userId);
     try {
+      await migrateLegacyKeys(store);
       for (const [v, keys] of fresh) {
         await store.putKey(recordKeyName(v), keys.record);
         await store.putKey(dedupeKeyName(v), keys.dedupe);

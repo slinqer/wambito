@@ -585,6 +585,21 @@ async function stored(userId: string) {
   }
 }
 
+/** Turns the vault into a 2a one: `record:<v>`/`dedupe:<v>` back under the single legacy names. */
+async function makeLegacy(userId: string, keyV: number) {
+  const store = await createEncryptedStore(userId);
+  try {
+    const record = await store.getKey<CryptoKey>(`record:${keyV}`);
+    const dedupe = await store.getKey<CryptoKey>(`dedupe:${keyV}`);
+    await store.putKey("record", record);
+    await store.putKey("dedupe", dedupe);
+    await store.deleteKey(`record:${keyV}`);
+    await store.deleteKey(`dedupe:${keyV}`);
+  } finally {
+    store.close();
+  }
+}
+
 /** A record sealed under `dk` at `keyV` opens with the keyring's keys for `keyV`. */
 async function opensUnder(local: LocalKeys, userId: string, dk: Uint8Array, keyV: number) {
   const ctx = { ...CTX(userId, REC), keyV };
@@ -819,6 +834,21 @@ describe("refreshKeys", () => {
     for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
   });
 
+  it("refreshKeys from a 2a vault (legacy record/dedupe at v1) keeps the right key for every version", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    await makeLegacy(userId, 1);
+    const dk2 = generateDataKey();
+    const dk3 = generateDataKey();
+    await addLink(api, userId, dk2, dk, 2);
+    await rotateDeviceWrap(api, userId, device, dk3, 3, dk2);
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect(await opensUnder(loaded, userId, dk, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+  });
+
   it("refreshKeys refuses a device wrap whose public key is not this browser's", async () => {
     const { api, userId, device } = await enrolledAccount();
     const other = await generateDeviceKeyPair();
@@ -1026,6 +1056,19 @@ describe("unlocking an account that rotated", () => {
     expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
     expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
     expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+  });
+
+  it("a 2a vault (legacy record/dedupe at v1) unlocked at v3 keeps the right key for every version", async () => {
+    const { api, userId, recoveryKey, dk1, dk2, dk3 } = await rotatedTwice();
+    await makeLegacy(userId, 1);
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    expect((await stored(userId)).names).not.toContain("record");
   });
 
   it("enrollDevice (pairing) keeps the older versions the links reach", async () => {
