@@ -503,3 +503,55 @@ describe("/v2/sync", () => {
     expect(logged).not.toContain(b64(marker));
   });
 });
+
+describe("/v2/sync key version", () => {
+  const wrapIn = (headers: Headers, body: unknown) =>
+    t.request("PUT", `/v2/keys/${randomUUID()}`, { headers, body });
+  const wrapBytes = (length: number) => Buffer.alloc(length, 7).toString("base64url");
+  async function withWraps(email: string, keyV: number): Promise<Headers> {
+    const { headers } = await t.signIn(email);
+    const res = await wrapIn(headers, {
+      kind: "recovery",
+      ref: null,
+      keyV,
+      wrapped: wrapBytes(48),
+    });
+    expect(res.status).toBe(200);
+    return headers;
+  }
+
+  test("a change under an old keyV is refused with the current one", async () => {
+    const headers = await withWraps("keyv-old@wambito.test", 2);
+    const change = create("old", { keyV: 1 });
+    expect(await push(headers, [change])).toEqual([
+      { id: change.id, error: "key_version_mismatch", keyV: 2 },
+    ]);
+    expect(await pull(headers)).toMatchObject({ records: [] });
+  });
+
+  test("a change under a future keyV is refused too", async () => {
+    const headers = await withWraps("keyv-future@wambito.test", 2);
+    const change = create("future", { keyV: 3 });
+    expect(await push(headers, [change])).toEqual([
+      { id: change.id, error: "key_version_mismatch", keyV: 2 },
+    ]);
+  });
+
+  test("an account without wraps accepts any keyV", async () => {
+    const { headers } = await t.signIn("keyv-none@wambito.test");
+    const change = create("any", { keyV: 7 });
+    const [result] = await push(headers, [change]);
+    expect(result).toEqual({ id: change.id, version: expect.any(Number) });
+  });
+
+  test("one stale change does not stop the batch", async () => {
+    const headers = await withWraps("keyv-batch@wambito.test", 2);
+    const stale = create("stale", { keyV: 1 });
+    const fresh = create("fresh", { keyV: 2 });
+    expect(await push(headers, [stale, fresh])).toEqual([
+      { id: stale.id, error: "key_version_mismatch", keyV: 2 },
+      { id: fresh.id, version: expect.any(Number) },
+    ]);
+    expect((await pull(headers)).records.map((r) => r.id)).toEqual([fresh.id]);
+  });
+});

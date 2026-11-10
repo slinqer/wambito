@@ -376,7 +376,15 @@ export const Passkeys: Story = {
   render: (args) =>
     stage(args, {
       passkeys: storyPasskeys({
-        initial: [{ id: "pk-1", name: null, createdAt: "2026-10-02T09:00:00.000Z", synced: true }],
+        initial: [
+          {
+            id: "pk-1",
+            credentialId: "cred-1",
+            name: null,
+            createdAt: "2026-10-02T09:00:00.000Z",
+            synced: true,
+          },
+        ],
       }),
     }),
   play: async ({ canvasElement }) => {
@@ -593,8 +601,20 @@ export const AppSectionsPasskeys: Story = {
       noRecurrences: true,
       passkeys: storyPasskeys({
         initial: [
-          { id: "pk-1", name: null, createdAt: "2026-10-02T09:00:00.000Z", synced: true },
-          { id: "pk-2", name: "Pixel 9", createdAt: "2026-10-05T10:00:00.000Z", synced: false },
+          {
+            id: "pk-1",
+            credentialId: "cred-1",
+            name: null,
+            createdAt: "2026-10-02T09:00:00.000Z",
+            synced: true,
+          },
+          {
+            id: "pk-2",
+            credentialId: "cred-2",
+            name: "Pixel 9",
+            createdAt: "2026-10-05T10:00:00.000Z",
+            synced: false,
+          },
         ],
       }),
     }),
@@ -656,7 +676,15 @@ export const PasskeyRemoveSheetOpen: Story = {
   render: (args) =>
     stage(args, {
       passkeys: storyPasskeys({
-        initial: [{ id: "pk-1", name: null, createdAt: "2026-10-02T09:00:00.000Z", synced: true }],
+        initial: [
+          {
+            id: "pk-1",
+            credentialId: "cred-1",
+            name: null,
+            createdAt: "2026-10-02T09:00:00.000Z",
+            synced: true,
+          },
+        ],
       }),
     }),
   play: async ({ canvasElement }) => {

@@ -56,11 +56,23 @@ export interface EncryptedStore extends FinanceStore {
   /** The pending changes, oldest first. */
   readOutbox(limit: number): Promise<OutboxEntry[]>;
   /**
-   * The server accepted the change read as `seq` and gave it `version`. Records the version, and
-   * clears the entry only if there was no newer local write since; otherwise the entry stays,
-   * now based on `version`.
+   * The server accepted the change read as `seq` and gave it `version` (sealed under `keyV`, when
+   * given). Records them, and clears the entry only if there was no newer local write since;
+   * otherwise the entry stays, now based on `version`.
    */
-  ackOutbox(id: string, version: number, seq: number): Promise<void>;
+  ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
+  /**
+   * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
+   * for records the server has (version above 0, not deleted) sealed under a key version below
+   * `current` and with no outbox entry, until `limit` reseal entries are pending (those already
+   * pending count). Returns how many it added. Notifies nobody (the engine's own write).
+   */
+  queueReseal(current: number, limit: number): Promise<number>;
+  /**
+   * The key versions the server copies of the local records (not deleted, pushed) are under, and
+   * those of quarantined records (they may still be retried).
+   */
+  keyVersionsInUse(): Promise<Set<number>>;
   /**
    * The engine gives up on the change read as `seq` for now: stores `park` on it. A no-op when a
    * newer local write replaced it (that write is pushed normally).
@@ -87,7 +99,10 @@ export interface EncryptedStore extends FinanceStore {
   ): Promise<void>;
   getMeta<T = unknown>(key: string): Promise<T | undefined>;
   setMeta(key: string, value: unknown): Promise<void>;
+  /** Keeps a record that could not be opened; a later remote write of the id clears its rows. */
   quarantine(entry: QuarantineEntry): Promise<void>;
+  /** Every quarantine row (the sync retries the `unknown_key_version` ones after a refresh). */
+  quarantined(): Promise<QuarantineEntry[]>;
   quarantineCount(): Promise<number>;
   /**
    * The server asked for a resync: forgets every record, the quarantine and the `latest` and
@@ -107,6 +122,9 @@ export interface EncryptedStore extends FinanceStore {
   /** The CryptoKeys and the device private key (`keys` store), by name. */
   getKey<T = unknown>(name: string): Promise<T | undefined>;
   putKey(name: string, key: unknown): Promise<void>;
+  deleteKey(name: string): Promise<void>;
+  /** The names in the `keys` store (`record:<v>`, `dedupe:<v>`, `device`). */
+  keyNames(): Promise<string[]>;
   /** Closes the database; every later operation rejects with `VaultClosedError`. */
   close(): void;
   isClosed(): boolean;
@@ -230,10 +248,16 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       return entry !== undefined && !entry.setAside && !entry.abandoned;
     }
 
-    /** A remote write landed: an abandoned change of the id is done with. */
-    async function clearAbandoned(id: string) {
+    /**
+     * A remote write landed: an abandoned change of the id is done with, and the server's copy
+     * opened, so the id's quarantine rows (older copies that did not) are too.
+     */
+    async function clearAbandoned(type: RecordType, id: string) {
       const entry = (await request(store(OUTBOX).get(id))) as OutboxEntry | undefined;
       if (entry?.abandoned) await request(store(OUTBOX).delete(id));
+      await request(
+        store(QUARANTINE).delete(IDBKeyRange.bound([type, id, -Infinity], [type, id, Infinity])),
+      );
     }
 
     return {
@@ -269,12 +293,16 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         await request(store(type).put(row));
         wrote.value = true;
         if (!remote) await outboxFor(type, id, prev, false, changedKeys(prev?.body, body), body);
-        else await clearAbandoned(id);
+        else await clearAbandoned(type, id);
       },
       async delete(type: RecordType, id: string, opts?: WriteOptions) {
         const prev = await raw(type, id);
-        if (!prev) return;
         const remote = opts?.origin === "remote";
+        if (!prev) {
+          // A tombstone of a record this browser never opened: its quarantine rows go.
+          if (remote) await clearAbandoned(type, id);
+          return;
+        }
         if (!remote && prev.deleted) return;
         if (remote && (await remoteBlocked(id, opts))) return;
         await request(
@@ -287,7 +315,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         );
         wrote.value = true;
         if (!remote) await outboxFor(type, id, prev, true, [], prev.body);
-        else await clearAbandoned(id);
+        else await clearAbandoned(type, id);
       },
       async pendingAside() {
         const all = (await request(store(OUTBOX).getAll())) as OutboxEntry[];
@@ -418,16 +446,61 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       });
       return all.sort((x, y) => x.seq - y.seq).slice(0, limit);
     },
-    ackOutbox: (id, version, seq) =>
+    ackOutbox: (id, version, seq, keyV) =>
       short([...RECORD_TYPES, OUTBOX], "readwrite", async (tx) => {
         const outbox = tx.objectStore(OUTBOX);
         const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
         if (!entry) return;
         const records = tx.objectStore(entry.type);
         const row = (await request(records.get(id))) as StoredRow | undefined;
-        if (row) await request(records.put({ ...row, version }));
+        if (row) await request(records.put({ ...row, version, keyV: keyV ?? row.keyV }));
         if (entry.seq === seq) await request(outbox.delete(id));
         else await request(outbox.put({ ...entry, baseVersion: version }));
+      }),
+    queueReseal: (current, limit) =>
+      short([...RECORD_TYPES, OUTBOX, META], "readwrite", async (tx) => {
+        const outbox = tx.objectStore(OUTBOX);
+        const entries = (await request(outbox.getAll())) as OutboxEntry[];
+        const pending = new Set(entries.map((e) => e.id));
+        let room = limit - entries.filter((e) => e.reseal).length;
+        let seq = ((await request(tx.objectStore(META).get("seq"))) as number | undefined) ?? 0;
+        let added = 0;
+        for (const type of RECORD_TYPES) {
+          if (room <= 0) break;
+          for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
+            if (room <= 0) break;
+            if (row.deleted || row.version === 0 || row.keyV >= current || pending.has(row.id)) {
+              continue;
+            }
+            const entry: OutboxEntry = {
+              id: row.id,
+              type,
+              baseVersion: row.version,
+              deleted: false,
+              touched: [],
+              seq: ++seq,
+              reseal: true,
+            };
+            await request(outbox.put(entry));
+            room -= 1;
+            added += 1;
+          }
+        }
+        if (added > 0) await request(tx.objectStore(META).put(seq, "seq"));
+        return added;
+      }),
+    keyVersionsInUse: () =>
+      short([...RECORD_TYPES, QUARANTINE], "readonly", async (tx) => {
+        const versions = new Set<number>();
+        for (const type of RECORD_TYPES) {
+          for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
+            if (!row.deleted && row.version > 0) versions.add(row.keyV);
+          }
+        }
+        // A quarantined record may be retried under its version: keep that version's keys.
+        const held = (await request(tx.objectStore(QUARANTINE).getAll())) as QuarantineEntry[];
+        for (const row of held) if (row.keyV !== undefined) versions.add(row.keyV);
+        return versions;
       }),
     parkOutbox: (id, seq, park) =>
       short([OUTBOX], "readwrite", async (tx) => {
@@ -482,6 +555,8 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       short([QUARANTINE], "readwrite", async (tx) => {
         await request(tx.objectStore(QUARANTINE).put(entry));
       }),
+    quarantined: () =>
+      short([QUARANTINE], "readonly", (tx) => request(tx.objectStore(QUARANTINE).getAll())),
     quarantineCount: () =>
       short([QUARANTINE], "readonly", (tx) => request(tx.objectStore(QUARANTINE).count())),
     async wipeRecords() {
@@ -523,6 +598,14 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       short([KEYS], "readwrite", async (tx) => {
         await request(tx.objectStore(KEYS).put(key, name));
       }),
+    deleteKey: (name) =>
+      short([KEYS], "readwrite", async (tx) => {
+        await request(tx.objectStore(KEYS).delete(name));
+      }),
+    keyNames: () =>
+      short([KEYS], "readonly", async (tx) =>
+        (await request(tx.objectStore(KEYS).getAllKeys())).map(String),
+      ),
     close,
     isClosed: () => closed,
     onClosed(listener) {

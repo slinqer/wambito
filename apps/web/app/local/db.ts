@@ -51,6 +51,12 @@ export interface OutboxEntry {
    * again onto the fresh server copy (only the `touched` fields), and this is cleared.
    */
   setAside?: { body: unknown };
+  /**
+   * Added by the sync engine's upgrade pass, never by a local write: the record's unchanged body,
+   * to be sealed again under the current key version (`baseVersion` = its version). A conflict
+   * takes the server's copy. A local write of the id turns it into an ordinary edit.
+   */
+  reseal?: true;
 }
 
 export interface OutboxPark {
@@ -67,6 +73,8 @@ export interface QuarantineEntry {
   type: RecordType;
   version: number;
   reason: string;
+  /** The key version it was sealed under (absent on rows from before stage 2b's fixes). */
+  keyV?: number;
 }
 
 export const vaultName = (userId: string) => `wambito-vault-${userId}`;

@@ -141,6 +141,27 @@ describe("meta, quarantine, wipe", () => {
     expect(await store.quarantineCount()).toBe(2);
   });
 
+  it("a remote put or delete of a record clears its quarantine rows; a local write does not", async () => {
+    const store = await fresh();
+    const remote = { origin: "remote", version: 3, keyV: 2 } as const;
+    await store.quarantine({ id: "a", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "a", type: "category", version: 2, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "b", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "c", type: "category", version: 1, reason: "x", keyV: 2 });
+    await store.quarantine({ id: "a", type: "merchant", version: 1, reason: "x", keyV: 2 });
+    await store.put("category", "c", category("C"));
+    expect(await store.quarantineCount()).toBe(5);
+    await store.put("category", "a", category("A"), remote);
+    expect(await store.quarantineCount()).toBe(3);
+    // a tombstone of a record this browser never had
+    await store.delete("category", "b", remote);
+    expect(await store.quarantineCount()).toBe(2);
+    expect((await store.quarantined()).map((q) => `${q.type}:${q.id}`).sort()).toEqual([
+      "category:c",
+      "merchant:a",
+    ]);
+  });
+
   it("wipes records, quarantine and the cursors, but not the keys, userId or outbox", async () => {
     const store = await fresh();
     const listener = vi.fn();
@@ -341,5 +362,39 @@ describe("keys and the vault", () => {
     const again = await createEncryptedStore(userId);
     expect(await again.list("category")).toEqual([]);
     expect(await again.getKey("k")).toBeUndefined();
+  });
+});
+
+describe("re-sealing under a new key version", () => {
+  it("queues the pushed records under an older keyV, up to the limit, and a local write makes one an edit", async () => {
+    const store = await fresh();
+    const remote = (version: number, keyV: number) =>
+      ({ origin: "remote", version, keyV }) as const;
+    await store.put("category", "a", category("A"), remote(1, 1));
+    await store.put("category", "b", category("B"), remote(2, 1));
+    await store.put("category", "c", category("C"), remote(3, 2));
+    await store.put("category", "d", category("D")); // never pushed: nothing to re-seal
+    await store.put("category", "e", category("E"), remote(4, 1));
+    await store.delete("category", "e", remote(5, 1)); // a tombstone has no body
+    expect(await store.keyVersionsInUse()).toEqual(new Set([1, 2]));
+    // a quarantined record may still be retried under its key version
+    await store.quarantine({ id: "q", type: "category", version: 9, reason: "x", keyV: 5 });
+    expect(await store.keyVersionsInUse()).toEqual(new Set([1, 2, 5]));
+    expect(await store.queueReseal(2, 1)).toBe(1);
+    expect(await store.queueReseal(2, 1)).toBe(0); // one pending already fills the limit
+    expect(await store.queueReseal(2, 5)).toBe(1);
+    const reseals = (await store.readOutbox(10)).filter((e) => e.reseal);
+    expect(reseals.map((e) => [e.id, e.baseVersion, e.touched]).sort()).toEqual([
+      ["a", 1, []],
+      ["b", 2, []],
+    ]);
+    // Acked under keyV 2: the record is under 2 now.
+    await store.ackOutbox("a", 6, reseals.find((e) => e.id === "a")?.seq ?? 0, 2);
+    expect(await store.getRaw("category", "a")).toMatchObject({ version: 6, keyV: 2 });
+    // The person edits b before its re-seal went: an ordinary edit, based on the same version.
+    await store.put("category", "b", category("B2"));
+    const [b] = (await store.readOutbox(10)).filter((e) => e.id === "b");
+    expect(b).toMatchObject({ baseVersion: 2, touched: ["name"] });
+    expect(b?.reseal).toBeUndefined();
   });
 });

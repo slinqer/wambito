@@ -4,6 +4,7 @@ import { useTranslations } from "use-intl";
 import { DEFAULT_NEXT, safeNext } from "../../auth/next.ts";
 import {
   addPasskey,
+  offerPrfUse,
   type PasskeyOutcome,
   passkeysSupported,
   rememberOfferDecided,
@@ -17,15 +18,25 @@ import { FieldError, ScreenTitle, SignInScreen } from "./SignInScreen.tsx";
 export interface PasskeyOfferApi {
   /** Whether this browser can use passkeys at all (WebAuthn). */
   supported(): boolean;
-  /** Creates a passkey for the signed-in user; the browser asks for the fingerprint or face. */
-  add(): Promise<PasskeyOutcome>;
+  /**
+   * Creates a passkey for the signed-in user; the browser asks for the fingerprint or face. Its PRF
+   * is kept for `userId`'s vault gate; an `encrypted` account may need a second touch for it, and
+   * `explainSecondTouch` says why first.
+   */
+  add(hooks?: {
+    userId: string;
+    encrypted: boolean;
+    explainSecondTouch(): void;
+  }): Promise<PasskeyOutcome>;
   /** Remembers that this user answered, so the offer is not shown to them again on this device. */
   decide(userId: string): void;
 }
 
 export const livePasskeyOffer: PasskeyOfferApi = {
   supported: passkeysSupported,
-  add: addPasskey,
+  // The offer comes right after sign-in, before the vault opens: the new passkey's PRF waits for
+  // the vault gate, which adds its wrap once the data is open (a plain account drops it).
+  add: (hooks) => addPasskey(hooks && offerPrfUse(hooks)),
   decide: (userId) => rememberOfferDecided(userId),
 };
 
@@ -38,8 +49,18 @@ export const livePasskeyOffer: PasskeyOfferApi = {
  * to offer and it goes straight on. The heading takes the focus on arrival, since the screen
  * appears without a tap on a link.
  */
-export function PasskeyOffer({ offer, userId }: { offer: PasskeyOfferApi; userId: string }) {
+export function PasskeyOffer({
+  offer,
+  userId,
+  encrypted = false,
+}: {
+  offer: PasskeyOfferApi;
+  userId: string;
+  /** The account's data is end-to-end encrypted (`GET /v1/me` `encryption: "preview"`). */
+  encrypted?: boolean;
+}) {
   const t = useTranslations("passkey_offer");
+  const tVault = useTranslations("vault");
   const toast = useToast();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -64,7 +85,11 @@ export function PasskeyOffer({ offer, userId }: { offer: PasskeyOfferApi; userId
     setBusy(true);
     setFailed(false);
     try {
-      const outcome = await offer.add();
+      const outcome = await offer.add({
+        userId,
+        encrypted,
+        explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
+      });
       if (outcome === "failed") {
         setFailed(true);
         return;

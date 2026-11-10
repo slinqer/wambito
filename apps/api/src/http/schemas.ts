@@ -171,6 +171,16 @@ export const PushResult = z
         }),
       })
       .openapi("PushRejected"),
+    z
+      .object({
+        id: z.uuid(),
+        error: z.literal("key_version_mismatch"),
+        keyV: z.int().openapi({ description: "The account's current key version" }),
+      })
+      .openapi("PushKeyVersionMismatch", {
+        description:
+          "The change's `keyV` is not the account's current key version (accounts with key wraps only); nothing was written. Re-seal it under the current key and push again.",
+      }),
   ])
   .openapi("PushResult");
 

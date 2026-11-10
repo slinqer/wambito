@@ -661,7 +661,7 @@ export interface paths {
         /** @description The person's records with a version above `since`, oldest first. `since=0` downloads everything; follow `next` until it is null, then keep `latest` for the next pull. `base` is the `latest` the cycle started from (0 for a full download, so paging one never fails; defaults to `since`). 410 `resync_required` when `0 < base` and `base` is below the version of a tombstone the server has purged: the device may have missed deletions, so it downloads everything again from `since=0&base=0`. */
         get: operations["pullRecords"];
         put?: never;
-        /** @description Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, or `not_found` for an update of a record the server does not have (resync in full). */
+        /** @description Applies each change on its own, in order: `baseVersion: null` creates (a retry of the same create answers the stored version), otherwise the change applies only on the stored version. An update also needs the stored type (a record's type never changes). Each result is the new version, a conflict with the current record, `id_taken` when the id is someone else's, `not_found` for an update of a record the server does not have (resync in full), or `key_version_mismatch` (with the current `keyV`) when the change's `keyV` is not the account's current key version and the account has key wraps. */
         post: operations["pushRecords"];
         delete?: never;
         options?: never;
@@ -1313,7 +1313,7 @@ export interface components {
         PushResults: {
             results: components["schemas"]["PushResult"][];
         };
-        PushResult: components["schemas"]["PushApplied"] | components["schemas"]["PushConflict"] | components["schemas"]["PushRejected"];
+        PushResult: components["schemas"]["PushApplied"] | components["schemas"]["PushConflict"] | components["schemas"]["PushRejected"] | components["schemas"]["PushKeyVersionMismatch"];
         PushApplied: {
             /** Format: uuid */
             id: string;
@@ -1332,6 +1332,15 @@ export interface components {
              * @enum {string}
              */
             error: "id_taken" | "not_found";
+        };
+        /** @description The change's `keyV` is not the account's current key version (accounts with key wraps only); nothing was written. Re-seal it under the current key and push again. */
+        PushKeyVersionMismatch: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            error: "key_version_mismatch";
+            /** @description The account's current key version */
+            keyV: number;
         };
         PushRecords: {
             changes: components["schemas"]["SyncChange"][];

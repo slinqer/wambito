@@ -1,9 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearSignInPrf, takeSignInPrf } from "../local/prf.ts";
+
+const addPasskeyCall = vi.hoisted(() => vi.fn());
+vi.mock("./auth-client.ts", () => ({
+  authClient: { passkey: { addPasskey: addPasskeyCall } },
+}));
+
 import {
+  addPasskey,
   forgetPasskeyUsed,
   hasUsedPasskey,
   type OfferDeps,
   offerDecided,
+  offerPrfUse,
   passkeyOutcome,
   rememberOfferDecided,
   rememberPasskeyUsed,
@@ -145,5 +154,68 @@ describe("passkeyOutcome", () => {
   it("is failed for anything else", () => {
     expect(passkeyOutcome({ code: "UNKNOWN_ERROR" })).toBe("failed");
     expect(passkeyOutcome({})).toBe("failed");
+  });
+});
+
+describe("the offer's passkey PRF", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearSignInPrf();
+    addPasskeyCall.mockReset();
+  });
+
+  const registered = (clientExtensionResults: unknown) => ({
+    data: { id: "p1" },
+    error: null,
+    webauthn: { response: { id: "Y3JlZA" }, clientExtensionResults },
+  });
+
+  function stubBrowser() {
+    const fetch = vi.fn();
+    const get = vi.fn(async () => null);
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("navigator", { credentials: { get } });
+    vi.stubGlobal("location", { hostname: "app.wambito.test" });
+    return { fetch, get };
+  }
+
+  it("a plain account's offer makes no /v1/me call and no second touch", async () => {
+    const { fetch, get } = stubBrowser();
+    const explain = vi.fn();
+    addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+    const use = offerPrfUse({ userId: "u1", encrypted: false, explainSecondTouch: explain });
+    expect(await addPasskey(use)).toBe("added");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(explain).not.toHaveBeenCalled();
+  });
+
+  it("an encrypted account explains, then asks for the second touch of the new passkey only", async () => {
+    const { fetch, get } = stubBrowser();
+    const explain = vi.fn();
+    addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+    await addPasskey(offerPrfUse({ userId: "u1", encrypted: true, explainSecondTouch: explain }));
+    expect(explain).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("a registration's PRF waits for that account's gate only", async () => {
+    stubBrowser();
+    const first = new Uint8Array(32).fill(4);
+    addPasskeyCall.mockResolvedValue(registered({ prf: { results: { first: first.buffer } } }));
+    await addPasskey(offerPrfUse({ userId: "u1", encrypted: true, explainSecondTouch: vi.fn() }));
+    expect(takeSignInPrf("u2")).toBeNull();
+    // A mismatched take drops it for everyone.
+    expect(takeSignInPrf("u1")).toBeNull();
+
+    addPasskeyCall.mockResolvedValue(
+      registered({ prf: { results: { first: new Uint8Array(32).fill(4).buffer } } }),
+    );
+    await addPasskey(offerPrfUse({ userId: "u1", encrypted: true, explainSecondTouch: vi.fn() }));
+    expect(takeSignInPrf("u1")).toEqual({
+      credentialId: "Y3JlZA",
+      prf: new Uint8Array(32).fill(4),
+    });
   });
 });

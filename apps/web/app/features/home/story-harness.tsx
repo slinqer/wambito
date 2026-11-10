@@ -31,6 +31,7 @@ import { RecurringPage } from "../recurring/RecurringPage.tsx";
 import { Search } from "../search/Search.tsx";
 import type { PasskeyItem, PasskeysApi } from "../settings/passkeys.ts";
 import { Settings } from "../settings/Settings.tsx";
+import type { SecurityApi } from "../settings/security.ts";
 import { AppShell } from "./AppShell.tsx";
 import { Home } from "./Home.tsx";
 import { clearHomeStorage } from "./home-storage.ts";
@@ -327,6 +328,8 @@ export interface HomeApiOptions {
   assistants?: Assistant[];
   /** Revoking an assistant answers 503. */
   failRevoke?: boolean;
+  /** The profile is a guest's (`isAnonymous`). */
+  guest?: boolean;
 }
 
 /** One budget amount, from its month on (until a later one), as the API keeps them. */
@@ -390,6 +393,7 @@ function homeFetch({
   failDelete = false,
   assistants: initialAssistants = [],
   failRevoke = false,
+  guest = false,
 }: HomeApiOptions): typeof fetch {
   let assistants = [...initialAssistants];
   let categories: FakeCategory[] =
@@ -472,7 +476,7 @@ function homeFetch({
     locale: locale as string,
     onboardingCompletedAt: "2026-10-01T10:00:00.000Z",
     currency: currency as string,
-    isAnonymous: false,
+    isAnonymous: guest,
   };
   const newestFirst = (a: TransactionDto, b: TransactionDto) =>
     a.date === b.date ? (a.id < b.id ? 1 : -1) : a.date < b.date ? 1 : -1;
@@ -827,6 +831,7 @@ export function storyPasskeys({
           ...items,
           {
             id: `pk-${items.length + 1}`,
+            credentialId: `cred-${items.length + 1}`,
             name: null,
             createdAt: `${STORY_TODAY}T10:00:00.000Z`,
             synced: true,
@@ -854,6 +859,8 @@ export interface HomeStageProps extends HomeApiOptions {
   onCopy?(text: string): Promise<void>;
   /** The provider's mode; `local` shows a preview account's app. Default `live`. */
   mode?: ApiMode;
+  /** Stands in for the open vault's keys in settings (Security, mode `local`). */
+  security?: SecurityApi;
 }
 
 /**
@@ -870,6 +877,7 @@ export function HomeStage({
   onSave = () => {},
   onCopy = async () => {},
   mode,
+  security,
   ...api
 }: HomeStageProps) {
   // The toolbar's language, held here so settings can switch it (the toolbar's provider can't).
@@ -910,6 +918,7 @@ export function HomeStage({
                       signOut={signOut}
                       save={(blob, filename) => onSave(filename, blob)}
                       copy={onCopy}
+                      {...(security ? { security } : {})}
                     />,
                   )}
                 />

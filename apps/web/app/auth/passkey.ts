@@ -1,4 +1,12 @@
 import { localArea, readStored, type StoredArea, writeStored } from "../lib/stored.ts";
+import {
+  evaluatePrf,
+  keepSignInPrf,
+  type PasskeyPrf,
+  prfEnabledWithoutResults,
+  prfExtension,
+  readPrf,
+} from "../local/prf.ts";
 import { authClient } from "./auth-client.ts";
 
 /**
@@ -146,14 +154,96 @@ export function passkeyOutcome(error: { code?: string | undefined } | null): Pas
   }
 }
 
-/** Creates a passkey for the signed-in user (the browser asks for the fingerprint or face). */
-export async function addPasskey(): Promise<PasskeyOutcome> {
+/**
+ * What a new passkey's PRF is for: an encrypted account wraps its data key under it (stage 2b).
+ * Without one (a plain account), the PRF is asked for anyway (harmless) and dropped.
+ */
+export interface PasskeyPrfUse {
+  /**
+   * Whether a passkey that gave `prf.enabled` without an output is worth a second touch: the
+   * account's data is encrypted. Asked only then.
+   */
+  wantsPrf(): Promise<boolean>;
+  /** Says why the browser asks for a second touch, before it does. */
+  explainSecondTouch(): void;
+  /** Takes the new passkey's PRF; it owns (and zeroes) the bytes from then on. */
+  keep(passkey: PasskeyPrf): Promise<void> | void;
+}
+
+/**
+ * The passkey offer's use (right after sign-in, before the vault opens): the new passkey's PRF
+ * waits in the stash for `userId`'s vault gate, which adds its wrap once the data is open. Whether
+ * the account is encrypted comes from the caller (the profile the sign-in already read): no
+ * request here, and a plain account never gets a second touch.
+ */
+export function offerPrfUse(options: {
+  userId: string;
+  encrypted: boolean;
+  explainSecondTouch(): void;
+}): PasskeyPrfUse {
+  return {
+    wantsPrf: async () => options.encrypted,
+    explainSecondTouch: options.explainSecondTouch,
+    keep: (passkey) => keepSignInPrf({ userId: options.userId, ...passkey }),
+  };
+}
+
+/** SimpleWebAuthn's extension inputs do not list `prf`, which it passes on unchanged. */
+type AddExtensions = NonNullable<Parameters<typeof authClient.passkey.addPasskey>[0]>["extensions"];
+
+/**
+ * The new passkey's PRF: from the registration itself, else (when it said `prf.enabled` without an
+ * output and the account wants one) from a second touch of that passkey only. A second touch that
+ * is cancelled or gives nothing leaves the passkey without a wrap: it still signs in.
+ */
+async function prfOfNewPasskey(
+  webauthn: { response?: { id?: string }; clientExtensionResults?: unknown } | undefined,
+  use: PasskeyPrfUse,
+): Promise<PasskeyPrf | null> {
+  const credentialId = webauthn?.response?.id;
+  const prf = readPrf(webauthn?.clientExtensionResults);
+  if (prf && !credentialId) prf.fill(0);
+  if (!credentialId) return null;
+  if (prf) return { credentialId, prf };
+  if (!prfEnabledWithoutResults(webauthn?.clientExtensionResults)) return null;
+  if (!(await use.wantsPrf().catch(() => false))) return null;
+  use.explainSecondTouch();
   try {
-    const { error } = await authClient.passkey.addPasskey();
+    return await evaluatePrf([credentialId]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Creates a passkey for the signed-in user (the browser asks for the fingerprint or face), asking
+ * for its PRF; `prf` says what to do with it (nothing: it is dropped).
+ */
+export async function addPasskey(prf?: PasskeyPrfUse): Promise<PasskeyOutcome> {
+  try {
+    const result = await authClient.passkey.addPasskey({
+      extensions: prfExtension() as unknown as AddExtensions,
+      returnWebAuthnResponse: true,
+    });
+    const { error } = result;
     const outcome = passkeyOutcome(
       error ? { code: "code" in error ? error.code : undefined } : null,
     );
     if (outcome === "added") rememberPasskeyUsed();
+    const webauthn = (result as { webauthn?: Parameters<typeof prfOfNewPasskey>[0] }).webauthn;
+    if (error || !prf) {
+      // Nothing wants it: the browser's bytes are zeroed all the same.
+      readPrf(webauthn?.clientExtensionResults)?.fill(0);
+    } else {
+      const passkey = await prfOfNewPasskey(webauthn, prf);
+      if (passkey) {
+        try {
+          await prf.keep(passkey);
+        } catch {
+          // The passkey was added and signs in; it only does not open the data yet.
+        }
+      }
+    }
     return outcome;
   } catch {
     return "failed";

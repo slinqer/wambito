@@ -69,6 +69,7 @@ import 'package:wambito/api/gen/src/model/profile.dart';
 import 'package:wambito/api/gen/src/model/pulled_records.dart';
 import 'package:wambito/api/gen/src/model/push_applied.dart';
 import 'package:wambito/api/gen/src/model/push_conflict.dart';
+import 'package:wambito/api/gen/src/model/push_key_version_mismatch.dart';
 import 'package:wambito/api/gen/src/model/push_records.dart';
 import 'package:wambito/api/gen/src/model/push_rejected.dart';
 import 'package:wambito/api/gen/src/model/push_result.dart';
@@ -156,6 +157,7 @@ part 'serializers.g.dart';
   PulledRecords,
   PushApplied,
   PushConflict,
+  PushKeyVersionMismatch,
   PushRecords,
   PushRejected,
   PushResult,

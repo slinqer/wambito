@@ -9,6 +9,7 @@ import {
   shouldOfferPasskey,
 } from "../../auth/passkey.ts";
 import { detectLocale, isLocale, type Locale } from "../../i18n/format.ts";
+import { keepSignInPrf, prfExtension, readPrf } from "../../local/prf.ts";
 
 /** Good enough to catch typos; the server has the final word. */
 export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -234,6 +235,36 @@ function hintHeaders({ locale, next }: CodeHints): Record<string, string> {
   return { "x-wambito-locale": locale, ...(next ? { "x-wambito-next": safeNext(next) } : {}) };
 }
 
+/**
+ * The PRF extension as Better Auth's option type takes it: SimpleWebAuthn's extension inputs do not
+ * list `prf`, which it passes on to `navigator.credentials.get` unchanged.
+ */
+const PRF_EXTENSIONS = prfExtension() as unknown as NonNullable<
+  Parameters<typeof authClient.signIn.passkey>[0]
+>["extensions"];
+
+/** What `returnWebAuthnResponse: true` adds to a passkey call's result. */
+interface WithWebAuthn {
+  webauthn?: { response?: { id?: string }; clientExtensionResults?: unknown };
+}
+
+/**
+ * A passkey sign-in asks for the PRF (`prfExtension`); when the passkey gave one, it waits in
+ * memory for the vault gate of that account (`keepSignInPrf`, tied to the user who signed in). A
+ * plain account ignores it
+ * (the app's loader drops it).
+ */
+function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
+  const credentialId = result.webauthn?.response?.id;
+  const userId = (result.data as { user?: { id?: unknown } } | null)?.user?.id;
+  // Read (and so zero the browser's bytes) in every case; keep it only for whoever signed in.
+  const prf = readPrf(result.webauthn?.clientExtensionResults);
+  if (!prf) return result;
+  if (result.error || !credentialId || typeof userId !== "string") prf.fill(0);
+  else keepSignInPrf({ userId, credentialId, prf });
+  return result;
+}
+
 /** The real thing: Better Auth's emailOTP and passkey plugins under /api/auth. */
 export const liveSignInAuth: SignInAuth = {
   sendCode: (email, hints) =>
@@ -253,7 +284,14 @@ export const liveSignInAuth: SignInAuth = {
   passkeyUsedHere: () => hasUsedPasskey(),
   signInWithPasskey: async () => {
     const result = await settle(
-      (fetchOptions) => authClient.signIn.passkey({ fetchOptions }),
+      async (fetchOptions) =>
+        keepPrfOf(
+          await authClient.signIn.passkey({
+            extensions: PRF_EXTENSIONS,
+            returnWebAuthnResponse: true,
+            fetchOptions,
+          }),
+        ),
       (data) => (data as { user: AuthUser }).user,
     );
     if (!result.error) rememberPasskeyUsed();
@@ -264,7 +302,15 @@ export const liveSignInAuth: SignInAuth = {
       return { data: null, error: { code: "AUTH_CANCELLED", status: 400 } };
     }
     const result = await settle(
-      (fetchOptions) => authClient.signIn.passkey({ autoFill: true, fetchOptions }),
+      async (fetchOptions) =>
+        keepPrfOf(
+          await authClient.signIn.passkey({
+            autoFill: true,
+            extensions: PRF_EXTENSIONS,
+            returnWebAuthnResponse: true,
+            fetchOptions,
+          }),
+        ),
       (data) => (data as { user: AuthUser }).user,
     );
     if (!result.error) rememberPasskeyUsed();

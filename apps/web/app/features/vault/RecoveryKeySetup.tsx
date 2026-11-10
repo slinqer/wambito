@@ -35,7 +35,16 @@ export interface RecoveryKeySetupProps {
   /** The person confirmed they kept it: the app goes on. */
   onContinue(): void;
   /** Signs out (and wipes this browser's vault): nothing was sent yet, so nothing is kept. */
-  onSignOut(): void;
+  onSignOut?(): void;
+  /**
+   * Settings' new key (an open vault): "Cancel" instead of signing out; nothing was sent, the old
+   * key keeps working.
+   */
+  onCancel?(): void;
+  /** Settings: the commit runs (Continue waits). */
+  busy?: boolean;
+  /** Settings: why the last commit did not finish (the key may be saved: it stays on screen). */
+  problem?: string | null;
   onCopy?(text: string): Promise<void> | void;
   onSave?: SaveTextFile;
   /** For the file's date; defaults to now. */
@@ -53,6 +62,9 @@ export function RecoveryKeySetup({
   recoveryKey,
   onContinue,
   onSignOut,
+  onCancel,
+  busy = false,
+  problem = null,
   onCopy = (text) => navigator.clipboard.writeText(text),
   onSave = saveTextFile,
   now,
@@ -66,6 +78,8 @@ export function RecoveryKeySetup({
   const [copied, setCopied] = useState(false);
   const [typed, setTyped] = useState<string[]>(() => positions.map(() => ""));
   const errorId = useId();
+  const problemId = useId();
+  const tCommon = useTranslations("common");
 
   async function copy() {
     try {
@@ -113,12 +127,21 @@ export function RecoveryKeySetup({
             {t("download")}
           </PressButton>
         </div>
+        {problem && <FieldError id={problemId}>{problem}</FieldError>}
         <PressButton className="w-full" onClick={() => setStep("confirm")}>
           {t("saved")}
         </PressButton>
-        <PressButton variant="ghost" className="w-full" onClick={onSignOut}>
-          {tVault("sign_out")}
-        </PressButton>
+        {onCancel ? (
+          <PressButton variant="ghost" className="w-full" onClick={onCancel}>
+            {tCommon("cancel")}
+          </PressButton>
+        ) : (
+          onSignOut && (
+            <PressButton variant="ghost" className="w-full" onClick={onSignOut}>
+              {tVault("sign_out")}
+            </PressButton>
+          )
+        )}
       </SignInScreen>
     );
   }
@@ -134,7 +157,7 @@ export function RecoveryKeySetup({
         className="flex w-full flex-col gap-(--space-3)"
         onSubmit={(event) => {
           event.preventDefault();
-          if (matches) onContinue();
+          if (matches && !busy) onContinue();
         }}
       >
         <fieldset className="m-0 flex min-w-0 justify-center gap-(--space-2) border-0 p-0">
@@ -175,7 +198,18 @@ export function RecoveryKeySetup({
             <FieldError id={errorId}>{t("mismatch")}</FieldError>
           </div>
         )}
-        <PressButton type="submit" className="w-full" disabled={!matches}>
+        {problem && (
+          <div className="text-center">
+            <FieldError id={problemId}>{problem}</FieldError>
+          </div>
+        )}
+        <PressButton
+          type="submit"
+          className="w-full"
+          disabled={!matches || busy}
+          aria-busy={busy || undefined}
+          aria-describedby={problem ? problemId : undefined}
+        >
           {t("continue")}
         </PressButton>
         <PressButton variant="ghost" className="w-full" onClick={() => setStep("show")}>

@@ -3,6 +3,7 @@ import { and, asc, eq, gt, lte, sql } from "@wambito/db/orm";
 import type { SyncHooks } from "../deps.ts";
 import { ApiError } from "../http/problem.ts";
 import type { RECORD_TYPES } from "../http/schemas.ts";
+import { currentKeyV } from "./keys.ts";
 import { purgeExpiredPairings } from "./pairing.ts";
 
 type RecordType = (typeof RECORD_TYPES)[number];
@@ -42,7 +43,8 @@ export interface SyncChangeInput {
 export type PushResult =
   | { id: string; version: number }
   | { id: string; conflict: SyncRecordDto }
-  | { id: string; error: "id_taken" | "not_found" };
+  | { id: string; error: "id_taken" | "not_found" }
+  | { id: string; error: "key_version_mismatch"; keyV: number };
 
 /** Thrown inside a probe savepoint to undo the probe's insert. */
 const PROBE_ROLLBACK = Symbol("probe rollback");
@@ -142,6 +144,10 @@ const sameBytes = (a: Uint8Array | null, b: Uint8Array | null) =>
  *   does not have (never uploaded, or a tombstone purged after 180 days) creates nothing and is
  *   `not_found`, which tells the device to resync in full; another person's id stays `id_taken`.
  *
+ * - When the account has key wraps, a change whose `keyV` is not the current key version is
+ *   `key_version_mismatch` (carrying the current one) and writes nothing; an account without wraps
+ *   accepts any `keyV`.
+ *
  * Every write takes a fresh version from `records_version_seq` and sets `updated_at`. Each change
  * runs in its own savepoint. More than MAX_LIVE_RECORDS live records after a change fails the
  * whole push with 409 `record_limit`.
@@ -183,8 +189,16 @@ export async function pushRecords(
     };
     if (changes.some((change) => !change.deleted)) await live$.count();
 
+    // Read once, under the records lock. A key rotation takes the wraps lock, not this one, so a
+    // rotation that commits during this push is seen by the next push, which is as soon as it can be.
+    const currentKey = await currentKeyV(tx, userId);
+
     const results: PushResult[] = [];
     for (const change of changes) {
+      if (currentKey !== null && change.keyV !== currentKey) {
+        results.push({ id: change.id, error: "key_version_mismatch", keyV: currentKey });
+        continue;
+      }
       // A savepoint per change keeps its writes together; only conflicts, `id_taken` and
       // `not_found` are per-change results. An unexpected database error (and `record_limit`)
       // still aborts the whole push.

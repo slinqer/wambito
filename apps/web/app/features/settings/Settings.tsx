@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import { useTranslations } from "use-intl";
 import { useApiMode } from "../../api/ApiProvider.tsx";
 import { useMe } from "../../api/queries.ts";
@@ -9,12 +9,15 @@ import { AssistantsSection, type CopyText } from "../assistants/AssistantsSectio
 import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
+import { useVaultSession } from "../vault/vault-context.ts";
 import { DeleteAccount } from "./DeleteAccount.tsx";
 import { FeedbackSection } from "./FeedbackSection.tsx";
 import { PasskeysSection } from "./PasskeysSection.tsx";
 import { PreferencesSection } from "./PreferencesSection.tsx";
 import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
+import { SecuritySection } from "./SecuritySection.tsx";
+import { liveSecurity, type SecurityApi } from "./security.ts";
 import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
 import { type SaveFile, saveToDisk, useExport } from "./use-export.ts";
 
@@ -29,6 +32,8 @@ export interface SettingsProps {
   save?: SaveFile;
   /** Copies the assistants' address; the browser's clipboard by default. */
   copy?: CopyText;
+  /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
+  security?: SecurityApi;
 }
 
 /**
@@ -39,13 +44,15 @@ export interface SettingsProps {
  * (`/demo/settings`, spec §2.6b) passkeys, import, export and deleting the account are off, each
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
  * steps there, and lists nothing. A preview account (`local` mode) has import, export and the
- * assistants' list off with a "not available yet" note; passkeys and deleting the account work.
+ * assistants' list off with a "not available yet" note; passkeys and deleting the account work,
+ * and Security lists the devices that open the data (not for a guest, who has no recovery key).
  */
 export function Settings({
   passkeys = livePasskeys,
   signOut = liveSignOut,
   save = saveToDisk,
   copy,
+  security: securityProp,
 }: SettingsProps) {
   const t = useTranslations("settings");
   const tManage = useTranslations("manage");
@@ -58,6 +65,12 @@ export function Settings({
   // A preview account's vault: no export, import or assistants yet (passkeys and deleting the
   // account work: they are the account's, not its finances).
   const local = mode === "local";
+  const session = useVaultSession();
+  const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
+  // An encrypted account's devices and keys. A guest (Ruling 8: no recovery key) gets only
+  // "Approve a new device", so its other device has somewhere to approve a pairing.
+  const vaultKeys = local ? (securityProp ?? vaultSecurity) : null;
+  const security = me.isAnonymous ? null : vaultKeys;
   const dataOffId = useId();
   const assistantsOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
@@ -75,7 +88,21 @@ export function Settings({
         </div>
         <PreferencesSection />
         <TimeAndMoneySection me={me} />
-        <PasskeysSection passkeys={passkeys} timeZone={me.timezone} off={demo} />
+        <PasskeysSection
+          passkeys={passkeys}
+          timeZone={me.timezone}
+          off={demo}
+          vaultUserId={local ? me.id : undefined}
+          security={security ?? undefined}
+        />
+        {vaultKeys && (
+          <SecuritySection
+            security={vaultKeys}
+            passkeys={passkeys}
+            timeZone={me.timezone}
+            guest={me.isAnonymous}
+          />
+        )}
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">
             <SettingLabel label={t("data.import_title")} hint={t("data.import_lead")} />

@@ -68,6 +68,7 @@ export 'package:wambito/api/gen/src/model/profile.dart';
 export 'package:wambito/api/gen/src/model/pulled_records.dart';
 export 'package:wambito/api/gen/src/model/push_applied.dart';
 export 'package:wambito/api/gen/src/model/push_conflict.dart';
+export 'package:wambito/api/gen/src/model/push_key_version_mismatch.dart';
 export 'package:wambito/api/gen/src/model/push_records.dart';
 export 'package:wambito/api/gen/src/model/push_rejected.dart';
 export 'package:wambito/api/gen/src/model/push_result.dart';

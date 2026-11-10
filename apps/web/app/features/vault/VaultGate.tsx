@@ -6,7 +6,18 @@ import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
 import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
-import { KeysError, loadLocalKeys, prepareAccount, unlockWithRecovery } from "../../local/keys.ts";
+import { authClient } from "../../auth/auth-client.ts";
+import {
+  addPasskeyWrap,
+  KeysError,
+  type LocalKeys,
+  loadLocalKeys,
+  prepareAccount,
+  unlockWithPasskey,
+  unlockWithRecovery,
+} from "../../local/keys.ts";
+import { startPairing } from "../../local/pairing.ts";
+import { clearSignInPrf, evaluatePrf, takeSignInPrf } from "../../local/prf.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -18,8 +29,10 @@ import { landingLink } from "../../site/config.ts";
 import { liveSignOut, useSignOut } from "../home/use-sign-out.ts";
 import { ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 import { Locked } from "./Locked.tsx";
+import { PairNewDevice } from "./PairNewDevice.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
 import { Unlock } from "./Unlock.tsx";
+import { VaultSessionContext } from "./vault-context.ts";
 import { createVaultGate, type VaultGate as Gate } from "./vault-gate.ts";
 
 /** The session ended under the vault (a 401 from sync): wipe it, then sign in again. */
@@ -55,19 +68,34 @@ async function sessionUserId(): Promise<string | null> {
   }
 }
 
+/** The signed-in account's passkey credential ids (Better Auth's list); throws when unreadable. */
+async function accountPasskeyIds(): Promise<string[]> {
+  const { data, error } = await authClient.passkey.listUserPasskeys();
+  if (error || !Array.isArray(data)) throw new Error("passkeys_unavailable");
+  return data.map((passkey) => passkey.credentialID);
+}
+
 /** Another account signed in under this page: load the app again, for them (never the old vault). */
 function reloadApp() {
   window.location.assign("/app");
 }
 
-function gateFor(profile: VaultProfile): Gate<VaultSession> {
+function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
   const userId = profile.id;
   // Set below: the open session's sync tells the gate when the cookie changed hands.
-  let gate: Gate<VaultSession> | undefined;
+  let gate: Gate<VaultSession, LocalKeys> | undefined;
   gate = createVaultGate({
     loadLocalKeys: () => loadLocalKeys(userId),
     prepareAccount: () => signInAgainOn401(prepareAccount({ userId, guest: profile.isAnonymous })),
     unlockWithRecovery: (text) => signInAgainOn401(unlockWithRecovery({ userId, text })),
+    // The passkey the person signed in (or registered) with, then Unlock's "Use a passkey".
+    takeSignInPrf: () => takeSignInPrf(userId),
+    unlockWithPasskey: (passkey) => signInAgainOn401(unlockWithPasskey({ userId, ...passkey })),
+    addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
+    evaluatePrf: (ids) => evaluatePrf(ids),
+    accountPasskeyIds,
+    // "From another device": a device that has the data approves this one.
+    startPairing: () => signInAgainOn401(startPairing({ userId })),
     open: (keys, fresh) =>
       openVaultSession({
         profile,
@@ -109,6 +137,12 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   const state = useSyncExternalStore(gate.subscribe, gate.getState, gate.getState);
   const session = state.status === "ready" ? state.session : null;
   useEffect(() => session?.onClosed(() => gate.closed()), [session, gate]);
+  // Removed from the account by another device: the vault is gone, Unlock says so.
+  useEffect(() => session?.onRemoved(() => gate.removed()), [session, gate]);
+  // The open app needs no passkey PRF: whatever is still kept is zeroed.
+  useEffect(() => {
+    if (session) clearSignInPrf();
+  }, [session]);
   // The live sign-out: it wipes this browser's vault (the gate remembered the account).
   const signOut = useSignOut();
   const deleteAccount = useDeleteLockedAccount();
@@ -123,7 +157,23 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
         />
       );
     case "unlock":
-      return <Unlock onUnlock={gate.unlock} onSignOut={() => void signOut()} />;
+      return (
+        <Unlock
+          notice={state.notice}
+          onUnlock={gate.unlock}
+          onPasskey={gate.unlockWithPasskey}
+          onPair={() => void gate.pair()}
+          onSignOut={() => void signOut()}
+        />
+      );
+    case "pairing":
+      return (
+        <PairNewDevice
+          start={gate.startPairing}
+          onBack={gate.leavePairing}
+          timeZone={profile.timezone}
+        />
+      );
     case "locked":
       return (
         <Locked
@@ -132,13 +182,16 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           onRetry={gate.retry}
           onSignOut={() => void signOut()}
           onDeleteAccount={state.kind === "guest" ? deleteAccount : undefined}
+          onPair={state.kind === "guest" ? () => void gate.pair() : undefined}
         />
       );
     case "ready":
       return (
         <ApiProvider mode="local" fetch={state.session.fetch}>
-          <RefetchOnCommit session={state.session} />
-          {children}
+          <VaultSessionContext.Provider value={state.session}>
+            <RefetchOnCommit session={state.session} />
+            {children}
+          </VaultSessionContext.Provider>
         </ApiProvider>
       );
     default:

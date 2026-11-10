@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
 import 'package:wambito/api/gen/src/model/push_applied.dart';
+import 'package:wambito/api/gen/src/model/push_key_version_mismatch.dart';
 import 'package:wambito/api/gen/src/model/sync_record.dart';
 import 'package:wambito/api/gen/src/model/push_conflict.dart';
 import 'package:wambito/api/gen/src/model/push_rejected.dart';
@@ -20,10 +21,11 @@ part 'push_result.g.dart';
 /// * [id]
 /// * [version]
 /// * [conflict]
-/// * [error] - `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
+/// * [error]
+/// * [keyV] - The account's current key version
 @BuiltValue()
 abstract class PushResult implements Built<PushResult, PushResultBuilder> {
-  /// Any Of [PushApplied], [PushConflict], [PushRejected]
+  /// Any Of [PushApplied], [PushConflict], [PushKeyVersionMismatch], [PushRejected]
   AnyOf get anyOf;
 
   PushResult._();
@@ -75,6 +77,7 @@ class _$PushResultSerializer implements PrimitiveSerializer<PushResult> {
       FullType(PushApplied),
       FullType(PushConflict),
       FullType(PushRejected),
+      FullType(PushKeyVersionMismatch),
     ]);
     anyOfDataSrc = serialized;
     result.anyOf = serializers.deserialize(anyOfDataSrc, specifiedType: targetType) as AnyOf;
@@ -82,12 +85,9 @@ class _$PushResultSerializer implements PrimitiveSerializer<PushResult> {
   }
 }
 
-/// `id_taken`: the id is someone else's. `not_found`: an update for a record the server does not have (never uploaded, or a purged tombstone); resync in full.
 class PushResultErrorEnum extends EnumClass {
-  @BuiltValueEnumConst(wireName: r'id_taken')
-  static const PushResultErrorEnum idTaken = _$pushResultErrorEnum_idTaken;
-  @BuiltValueEnumConst(wireName: r'not_found')
-  static const PushResultErrorEnum notFound = _$pushResultErrorEnum_notFound;
+  @BuiltValueEnumConst(wireName: r'key_version_mismatch')
+  static const PushResultErrorEnum keyVersionMismatch = _$pushResultErrorEnum_keyVersionMismatch;
 
   static Serializer<PushResultErrorEnum> get serializer => _$pushResultErrorEnumSerializer;
 
