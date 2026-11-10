@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { renderSVG } from "uqr";
-import { useFormatter, useTranslations } from "use-intl";
+import { useTranslations } from "use-intl";
+import { intlTag, type Locale } from "../../i18n/format.ts";
+import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 
@@ -43,11 +45,30 @@ export function PairingNumber({ value }: { value: string }) {
   );
 }
 
+/** A time as `14:05` (es) or `02:05 PM` (en), in the person's time zone. */
+export function formatTime(iso: string, locale: Locale, timeZone: string): string {
+  const at = new Date(iso);
+  try {
+    return new Intl.DateTimeFormat(intlTag(locale), {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    }).format(at);
+  } catch {
+    // An unknown zone: the browser's own.
+    return new Intl.DateTimeFormat(intlTag(locale), { hour: "2-digit", minute: "2-digit" }).format(
+      at,
+    );
+  }
+}
+
 export interface PairNewDeviceProps {
   /** Asks for a request (again on "Start again"; the gate cancels the previous one). */
   start(): Promise<PairNewDeviceRequest>;
   /** Back to where the person came from (Unlock, or a guest's Locked); cancels the request. */
   onBack(): void;
+  /** The account's time zone (`VaultProfile.timezone`), for the expiry. */
+  timeZone: string;
 }
 
 type View =
@@ -61,9 +82,9 @@ type View =
  * (two groups of four), how long it works, then the number to compare once the other device
  * answered. The other device approves; this one only waits.
  */
-export function PairNewDevice({ start, onBack }: PairNewDeviceProps) {
+export function PairNewDevice({ start, onBack, timeZone }: PairNewDeviceProps) {
   const t = useTranslations("vault.pair");
-  const format = useFormatter();
+  const { locale } = useLocale();
   const [view, setView] = useState<View>({ step: "starting" });
   const [attempt, setAttempt] = useState(0);
   const errorId = useId();
@@ -163,10 +184,7 @@ export function PairNewDevice({ start, onBack }: PairNewDeviceProps) {
           </div>
           <p className="text-center text-[14px] text-ink-muted">
             {t("expires", {
-              time: format.dateTime(new Date(view.request.expiresAt), {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
+              time: formatTime(view.request.expiresAt, locale, timeZone),
             })}
           </p>
           <p className="text-center text-ink-muted" role="status">

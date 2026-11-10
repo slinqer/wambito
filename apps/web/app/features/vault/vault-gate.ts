@@ -21,7 +21,8 @@ import type { UnlockError } from "./Unlock.tsx";
  *
  * Pairing (stage 2b): Unlock's "From another device" (and a guest's Locked, which has nothing
  * else to open with) enters `pairing`. The screen starts a request through `startPairing()` (again
- * for "Start again", which cancels the previous one); when its `finish()` resolves, the gate opens
+ * for "Start again", which cancels the previous one; only the latest call's request becomes
+ * current, an older one answering later cancels itself); when its `finish()` resolves, the gate opens
  * the vault exactly as after a recovery unlock (pending passkey wrap, then a full sync). A failed
  * pairing stays on its screen, which shows why; `leavePairing()` cancels it and goes back.
  *
@@ -186,6 +187,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
   let pendingPasskey: GatePasskey | null = null;
   /** The pairing request the screen shows now; only its `finish()` opens the vault. */
   let pairing: GatePairing<K> | null = null;
+  /**
+   * Bumped by every `startPairing()` and by `leavePairing()`: only the latest call's request
+   * becomes current (StrictMode's double effect, a quick "Start again", answers out of order).
+   */
+  let pairingCall = 0;
 
   const dropPairing = () => {
     pairing?.cancel();
@@ -472,15 +478,18 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
         throw Object.assign(new Error("not_pairing"), { code: "cancelled" });
       }
       dropPairing();
+      const call = ++pairingCall;
       let next: GatePairing<K>;
       try {
         next = await deps.startPairing();
       } catch (error) {
-        if (codeOf(error) === "session_changed") await changed(error, check);
+        if (call === pairingCall && codeOf(error) === "session_changed") {
+          await changed(error, check);
+        }
         throw error;
       }
-      if (state.status !== "pairing") {
-        // Left (or reloaded) while the request was being made.
+      if (call !== pairingCall || state.status !== "pairing") {
+        // A newer call started (it wins), or the screen was left, while this one was made.
         next.cancel();
         throw Object.assign(new Error("cancelled"), { code: "cancelled" });
       }
@@ -492,6 +501,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     leavePairing() {
       if (state.status !== "pairing") return;
       const { from } = state;
+      pairingCall++;
       dropPairing();
       if (from === "guest") set({ status: "locked", kind: "guest", retrying: false });
       else set({ status: "unlock" });

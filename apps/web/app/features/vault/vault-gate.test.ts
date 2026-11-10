@@ -670,6 +670,37 @@ describe("vault gate", () => {
       expect(gate.getState()).toEqual({ status: "unlock" });
     });
 
+    it("the latest startPairing wins: an older call resolving last cancels its own request", async () => {
+      let doneSecond!: (keys: Keys) => void;
+      const first = fakePairing(() => new Promise(() => {}));
+      const second = fakePairing(() => new Promise((resolve) => (doneSecond = resolve)));
+      let resolveFirst!: (p: typeof first) => void;
+      let resolveSecond!: (p: typeof second) => void;
+      const startPairing = vi
+        .fn<() => Promise<ReturnType<typeof fakePairing>>>()
+        .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+        .mockImplementationOnce(() => new Promise((resolve) => (resolveSecond = resolve)));
+      const { gate, deps } = gateWith({ ...elsewhere, startPairing });
+      gate.start();
+      await settle();
+      await gate.pair();
+      // StrictMode's double effect, or a quick "Start again": two calls in flight.
+      const a = gate.startPairing();
+      const b = gate.startPairing();
+      a.catch(() => {});
+      resolveSecond(second);
+      expect(await b).toBe(second);
+      resolveFirst(first);
+      await expect(a).rejects.toMatchObject({ code: "cancelled" });
+      expect(first.cancel).toHaveBeenCalled();
+      expect(second.cancel).not.toHaveBeenCalled();
+
+      doneSecond({ k: "second" });
+      await settle();
+      expect(deps.open).toHaveBeenCalledWith({ k: "second" }, true);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "second" } });
+    });
+
     it("a guest locked out pairs from Locked, and back returns to Locked", async () => {
       const pairing = fakePairing(() => new Promise(() => {}));
       const { gate } = gateWith({

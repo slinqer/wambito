@@ -167,7 +167,13 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
         />
       );
     case "pairing":
-      return <PairNewDevice start={gate.startPairing} onBack={gate.leavePairing} />;
+      return (
+        <PairNewDevice
+          start={gate.startPairing}
+          onBack={gate.leavePairing}
+          timeZone={profile.timezone}
+        />
+      );
     case "locked":
       return (
         <Locked

@@ -174,6 +174,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
   device" and a guest Locked's "Approve from another device" enter `pairing` (`gate.pair()`;
   `gate.startPairing()` makes the request, again for "Start again", cancelling the previous one;
+  the latest call wins: an older one answering later cancels its own request;
   its `finish()` opens the vault like a recovery unlock: pending passkey wrap, full sync; a failed
   pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock or Locked);
   before making or unlocking keys, when the
@@ -190,7 +191,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
-  which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`: the QR as `uqr`
+  which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
   `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
   number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
   again", tampered only back; `cancelled` shows nothing); `ApproveDevice` (`keys: PairingOptions`,

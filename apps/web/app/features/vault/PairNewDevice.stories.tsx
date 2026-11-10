@@ -40,6 +40,7 @@ const meta = {
   args: {
     start: fn(async () => request()),
     onBack: fn(),
+    timeZone: "Europe/Madrid",
   },
 } satisfies Meta<typeof PairNewDevice>;
 
@@ -58,7 +59,8 @@ export const Waiting: Story = {
     await expect(qr.getAttribute("src")).toMatch(/^data:image\/svg\+xml,/);
     await expect(decodeURIComponent(qr.getAttribute("src") ?? "")).toContain("<svg");
     await expect(canvas.getByText(/Esperando a tu otro dispositivo/)).toBeVisible();
-    await expect(canvas.getByText(/Este código sirve hasta/)).toBeVisible();
+    // 12:10 UTC in the account's zone (Madrid, UTC+1 in November).
+    await expect(canvas.getByText("Este código sirve hasta las 13:10.")).toBeVisible();
     await expect(args.start).toHaveBeenCalledTimes(1);
     const back = canvas.getByRole("button", { name: "Volver" });
     await expectTarget(back);
