@@ -14,6 +14,8 @@ import type { PasskeysApi } from "./passkeys.ts";
 import {
   type KeyError,
   keyErrorOf,
+  type PasskeyList,
+  PasskeyListFailed,
   type Problem,
   problemOf,
   RecoveryKeyField,
@@ -49,7 +51,11 @@ export function SecuritySection({
   const [approving, setApproving] = useState(false);
   const [newKey, setNewKey] = useState(false);
 
-  const passkeyIds = (passkeyList.data ?? []).map((p) => p.credentialId);
+  const known: PasskeyList = passkeyList.isSuccess
+    ? { status: "ready", ids: passkeyList.data.map((p) => p.credentialId) }
+    : passkeyList.isError
+      ? { status: "failed", retry: () => void passkeyList.refetch() }
+      : { status: "loading" };
   const rows = snapshot.data ? deviceRows(snapshot.data) : null;
   const changed = () => void qc.invalidateQueries({ queryKey: SECURITY_KEY });
   const day = (iso: string | null) => (iso ? formatDay(iso, locale, timeZone) : null);
@@ -112,7 +118,7 @@ export function SecuritySection({
       <RemoveDeviceSheet
         device={removing}
         security={security}
-        passkeyIds={passkeyIds}
+        passkeyList={known}
         canTouch={canTouch}
         onClose={() => setRemoving(null)}
         onChanged={changed}
@@ -120,7 +126,7 @@ export function SecuritySection({
       <NewRecoveryKeySheet
         open={newKey}
         security={security}
-        passkeyIds={passkeyIds}
+        passkeyList={known}
         canTouch={canTouch}
         onClose={() => setNewKey(false)}
       />
@@ -155,13 +161,14 @@ type NewKeyStep =
 function NewRecoveryKeySheet({
   open,
   security,
-  passkeyIds,
+  passkeyList,
   canTouch,
   onClose,
 }: {
   open: boolean;
   security: SecurityApi;
-  passkeyIds: readonly string[];
+  /** The touch is offered only once the list has loaded, and only when there are passkeys. */
+  passkeyList: PasskeyList;
   canTouch: boolean;
   onClose(): void;
 }) {
@@ -176,6 +183,7 @@ function NewRecoveryKeySheet({
     keyError: null,
     problem: null,
   });
+  const passkeyIds = passkeyList.status === "ready" ? passkeyList.ids : null;
   const confirm = (patch: Partial<Extract<NewKeyStep, { step: "confirm" }>> = {}) =>
     setStep({ step: "confirm", busy: false, keyError: null, problem: null, ...patch });
 
@@ -209,7 +217,7 @@ function NewRecoveryKeySheet({
   }
 
   async function withPasskey() {
-    if (step.step !== "confirm" || step.busy) return;
+    if (step.step !== "confirm" || step.busy || !passkeyIds?.length || !canTouch) return;
     confirm({ busy: true });
     try {
       const touched = await security.evaluatePrf([...passkeyIds]);
@@ -277,16 +285,18 @@ function NewRecoveryKeySheet({
         >
           {busy ? t("checking") : t("continue")}
         </PressButton>
-        {canTouch && passkeyIds.length > 0 && (
+        {canTouch && (passkeyList.status === "loading" || (passkeyIds?.length ?? 0) > 0) && (
           <PressButton
             variant="secondary"
             className="w-full"
-            disabled={busy}
+            disabled={busy || passkeyIds === null}
+            aria-busy={passkeyIds === null || undefined}
             onClick={() => void withPasskey()}
           >
             {t("passkey")}
           </PressButton>
         )}
+        {passkeyList.status === "failed" && <PasskeyListFailed retry={passkeyList.retry} />}
         {asking?.problem && (
           <FieldError id={problemId}>
             {asking.problem === "offline"

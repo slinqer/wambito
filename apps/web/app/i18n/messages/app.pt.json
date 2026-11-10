@@ -679,6 +679,7 @@
       "new_recovery": "Nova chave de recuperação",
       "unreadable": "{count, plural, one {Não foi possível ler # elemento} other {Não foi possível ler # elementos}}",
       "unreadable_lead": "Foram guardados com uma chave que este browser não tem. Continuam seguros tal como estão.",
+      "passkeys_failed": "Não conseguimos carregar as tuas impressões digitais, por isso ainda não podemos oferecer uma chave nova.",
       "remove_sheet": {
         "title": "Remover {name}?",
         "body": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar.",

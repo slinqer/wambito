@@ -679,6 +679,7 @@
       "new_recovery": "New recovery key",
       "unreadable": "{count, plural, one {Could not read # item} other {Could not read # items}}",
       "unreadable_lead": "They were saved with a key this browser does not have. They are kept safe as they are.",
+      "passkeys_failed": "We couldn't load your fingerprints, so a new key can't be offered yet.",
       "remove_sheet": {
         "title": "Remove {name}?",
         "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm.",

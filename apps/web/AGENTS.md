@@ -213,7 +213,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   after the four characters), "Could not read N items" only when N > 0); `RemoveDeviceSheet.tsx`
   (the recovery key typed, or "make a new one": a passkey touch, whose PRF (a copy per try, since
   `rotateKeys` zeroes it) keeps that passkey's wrap; then `commit()`, `reloadKeys()`, and what was
-  dropped; `rotated_elsewhere` reloads the keys and says to try again); `PasskeysSection` with
+  dropped; `rotated_elsewhere` reloads the keys and says to try again; "make a new one" (and New
+  recovery key's touch) waits for the passkey list (`PasskeyList`: disabled while loading, hidden
+  with a retry when it failed; with passkeys but no WebAuthn here, only the typed key); a
+  `Takeover` makes the rest of the page `inert`); `PasskeysSection` with
   `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
   then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
   `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.

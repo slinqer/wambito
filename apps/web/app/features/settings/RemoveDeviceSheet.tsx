@@ -11,15 +11,24 @@ import { RecoveryKeySetup } from "../vault/RecoveryKeySetup.tsx";
 import { codeOf, type SecurityApi } from "./security.ts";
 import type { DeviceRow } from "./security-model.ts";
 
-/** A whole-screen step over Settings (the recovery key's setup, approving a device). */
+/**
+ * A whole-screen step over Settings (the recovery key's setup, approving a device). Everything
+ * else on the page is `inert` meanwhile: out of reach and out of the accessibility tree.
+ */
 export function Takeover({ label, children }: { label: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
+    const outside = [...document.body.children].filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement && !element.contains(ref.current) && !element.inert,
+    );
+    for (const element of outside) element.inert = true;
     ref.current?.focus();
     return () => {
+      for (const element of outside) element.inert = false;
       document.body.style.overflow = overflow;
       opener?.focus();
     };
@@ -102,12 +111,35 @@ type Step =
   | { step: "committing" }
   | { step: "done"; result: RotateResult };
 
+/**
+ * The account's passkeys, as far as Settings knows: a new recovery key is offered only once the
+ * list is `ready` (Ruling 2's touch must not be skipped while it loads or after it failed).
+ */
+export type PasskeyList =
+  | { status: "loading" }
+  | { status: "failed"; retry(): void }
+  | { status: "ready"; ids: readonly string[] };
+
+/** The passkey list could not be read: the new key waits, with a retry. */
+export function PasskeyListFailed({ retry }: { retry(): void }) {
+  const t = useTranslations("settings.security");
+  const tCommon = useTranslations("common");
+  return (
+    <div className="flex flex-col gap-(--space-2)">
+      <p className="m-0 text-[14px] text-ink-muted">{t("passkeys_failed")}</p>
+      <PressButton variant="ghost" size="sm" className="self-start" onClick={retry}>
+        {tCommon("retry")}
+      </PressButton>
+    </div>
+  );
+}
+
 export interface RemoveDeviceSheetProps {
   /** The device to remove; null: closed. Never this browser's own (rotate.ts refuses it). */
   device: DeviceRow | null;
   security: SecurityApi;
-  /** The account's passkey credential ids: a touch confirms "make a new recovery key". */
-  passkeyIds: readonly string[];
+  /** The account's passkeys: a touch of one confirms "make a new recovery key". */
+  passkeyList: PasskeyList;
   /** Whether this browser can touch a passkey (WebAuthn). */
   canTouch: boolean;
   onClose(): void;
@@ -125,11 +157,26 @@ export interface RemoveDeviceSheetProps {
 export function RemoveDeviceSheet({
   device,
   security,
-  passkeyIds,
+  passkeyList,
   canTouch,
   onClose,
   onChanged,
 }: RemoveDeviceSheetProps) {
+  const passkeyIds = passkeyList.status === "ready" ? passkeyList.ids : null;
+  /**
+   * "Make a new recovery key": only with the list loaded, and, when the account has passkeys,
+   * only where this browser can touch one (else only the typed key confirms).
+   */
+  const newKeyOffer: "wait" | "failed" | "no" | "touch" | "plain" =
+    passkeyIds === null
+      ? passkeyList.status === "failed"
+        ? "failed"
+        : "wait"
+      : passkeyIds.length === 0
+        ? "plain"
+        : canTouch
+          ? "touch"
+          : "no";
   const t = useTranslations("settings.security");
   const tSheet = useTranslations("settings.security.remove_sheet");
   const tUnlock = useTranslations("vault.unlock");
@@ -215,9 +262,10 @@ export function RemoveDeviceSheet({
   }
 
   async function withNewKey() {
-    if (!device || step.step !== "ask" || step.busy) return;
+    if (!device || step.step !== "ask" || step.busy || passkeyIds === null) return;
+    if (newKeyOffer !== "touch" && newKeyOffer !== "plain") return;
     ask({ busy: true });
-    if (!confirmed.current && canTouch && passkeyIds.length > 0) {
+    if (!confirmed.current && newKeyOffer === "touch") {
       let passkey: PasskeyPrf | null = null;
       try {
         passkey = await security.evaluatePrf([...passkeyIds]);
@@ -269,7 +317,7 @@ export function RemoveDeviceSheet({
 
   const done = step.step === "done" ? step.result : null;
   const dropped = done ? done.dropped.filter((d) => d.id !== device?.id) : [];
-  const lostPasskeys = passkeyIds.length > (usedPasskey ? 1 : 0);
+  const lostPasskeys = (passkeyIds?.length ?? 0) > (usedPasskey ? 1 : 0);
   const busy = step.step === "committing" || (step.step === "ask" && step.busy);
   const asking = step.step === "ask" ? step : null;
 
@@ -324,14 +372,18 @@ export function RemoveDeviceSheet({
           >
             {busy ? tSheet("removing") : tSheet("confirm")}
           </PressButton>
-          <PressButton
-            variant="ghost"
-            className="w-full"
-            disabled={busy}
-            onClick={() => void withNewKey()}
-          >
-            {tSheet("or_new")}
-          </PressButton>
+          {(newKeyOffer === "wait" || newKeyOffer === "touch" || newKeyOffer === "plain") && (
+            <PressButton
+              variant="ghost"
+              className="w-full"
+              disabled={busy || newKeyOffer === "wait"}
+              aria-busy={newKeyOffer === "wait" || undefined}
+              onClick={() => void withNewKey()}
+            >
+              {tSheet("or_new")}
+            </PressButton>
+          )}
+          {passkeyList.status === "failed" && <PasskeyListFailed retry={passkeyList.retry} />}
           {asking?.problem && (
             <FieldError id={problemId}>
               {asking.problem === "offline"

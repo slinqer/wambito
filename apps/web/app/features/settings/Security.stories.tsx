@@ -3,7 +3,7 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { expectTarget } from "../../../.storybook/story-utils.ts";
 import type { RotateResult } from "../../local/rotate.ts";
 import { HomeStage, storyPasskeys } from "../home/story-harness.tsx";
-import type { PasskeyItem } from "./passkeys.ts";
+import type { PasskeyItem, PasskeysApi } from "./passkeys.ts";
 import type { RotateRequest, SecurityApi, SecuritySnapshot } from "./security.ts";
 import type { SecurityWrap } from "./security-model.ts";
 
@@ -166,7 +166,10 @@ export default meta;
 type Story = StoryObj<Args & { fake?: Fake }>;
 type Canvas = ReturnType<typeof within>;
 
-const stage = (args: Args, extra: { guest?: boolean; mode?: "local" | "live" } = {}) => {
+const stage = (
+  args: Args,
+  extra: { guest?: boolean; mode?: "local" | "live"; passkeys?: PasskeysApi } = {},
+) => {
   current ??= fakeSecurity(args.options);
   const fake = current;
   return (
@@ -174,7 +177,7 @@ const stage = (args: Args, extra: { guest?: boolean; mode?: "local" | "live" } =
       onRequest={() => {}}
       mode={extra.mode ?? "local"}
       path="/app/settings"
-      passkeys={storyPasskeys({ initial: PASSKEYS })}
+      passkeys={extra.passkeys ?? storyPasskeys({ initial: PASSKEYS })}
       security={fake.security}
       {...(extra.guest ? { guest: true } : {})}
     />
@@ -411,11 +414,15 @@ export const NewRecoveryKey: Story = {
     await expect(commitNewKey).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
     await waitFor(() => expect(commitNewKey).toHaveBeenCalledTimes(1));
-    await expect(
-      await screen.findByText(
-        "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
-      ),
-    ).toBeVisible();
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText(
+            "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
+          ),
+        ).toBeVisible(),
+      { timeout: 8000 },
+    );
   },
 };
 
@@ -493,5 +500,104 @@ export const PasskeyCannotUnlock: Story = {
       "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo.",
     );
     await expect(security.addPasskeyWrap).not.toHaveBeenCalled();
+  },
+};
+
+const OR_NEW = "¿No la tienes? Crea una clave de recuperación nueva";
+
+/** A passkey list that never answers: the account may have passkeys, so no touch-free new key. */
+const loadingPasskeys = (): PasskeysApi => ({
+  ...storyPasskeys({ initial: PASSKEYS }),
+  list: () => new Promise<PasskeyItem[]>(() => {}),
+});
+
+/** While the passkey list loads, "make a new recovery key" waits (disabled), in both sheets. */
+export const NewKeyWaitsForThePasskeyList: Story = {
+  render: (args) => stage(args, { passkeys: loadingPasskeys() }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const sheet = await openRemove(within(canvasElement));
+    const orNew = sheet.getByRole("button", { name: OR_NEW });
+    await expect(orNew).toBeDisabled();
+    await userEvent.click(orNew, { pointerEventsCheck: 0 });
+    await expect(security.rotate).not.toHaveBeenCalled();
+    await expect(security.evaluatePrf).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const area = await section(within(canvasElement));
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const newKey = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await expect(newKey.getByRole("button", { name: "Usar una huella" })).toBeDisabled();
+  },
+};
+
+/** A passkey list that failed: no new key is offered, only the typed key, with a retry. */
+export const NewKeyNotOfferedWhenThePasskeyListFailed: Story = {
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, failList: true }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const canvas = within(canvasElement);
+    // the list's query gives up after its retries
+    await canvas.findByText(
+      "No pudimos cargar tus huellas. Inténtalo de nuevo en un momento.",
+      {},
+      { timeout: 15000 },
+    );
+    const sheet = await openRemove(canvas);
+    await expect(sheet.queryByRole("button", { name: OR_NEW })).toBeNull();
+    await expect(
+      sheet.getByText(
+        "No pudimos cargar tus huellas, así que todavía no podemos ofrecerte una clave nueva.",
+      ),
+    ).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Reintentar" })).toBeVisible();
+    await expect(sheet.getByRole("textbox", { name: "Clave de recuperación" })).toBeVisible();
+    await expect(security.rotate).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const area = await section(within(canvasElement));
+    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    const newKey = within(
+      await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
+    );
+    await expect(newKey.queryByRole("button", { name: "Usar una huella" })).toBeNull();
+    await expect(newKey.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  },
+};
+
+/** The account has passkeys but this browser cannot touch one: only the typed key. */
+export const OnlyTheTypedKeyWithoutTouch: Story = {
+  render: (args) =>
+    stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, supported: false }) }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await (await section(canvas)).findAllByRole("listitem");
+    // the list has loaded
+    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+      "Pixel 9",
+    );
+    const sheet = await openRemove(canvas);
+    await expect(sheet.getByRole("textbox", { name: "Clave de recuperación" })).toBeVisible();
+    await expect(sheet.queryByRole("button", { name: OR_NEW })).toBeNull();
+  },
+};
+
+/** No passkeys at all: a new key needs no touch; the type-back confirms it. */
+export const NewKeyWithoutPasskeys: Story = {
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: [] }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const canvas = within(canvasElement);
+    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+      /Aún no tienes/,
+    );
+    const sheet = await openRemove(canvas);
+    await userEvent.click(sheet.getByRole("button", { name: OR_NEW }));
+    await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" });
+    await expect(security.evaluatePrf).not.toHaveBeenCalled();
   },
 };
