@@ -67,8 +67,10 @@ export function Settings({
   const local = mode === "local";
   const session = useVaultSession();
   const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
-  // Ruling 8: an encrypted account's devices and keys; never a guest's.
-  const security = local && !me.isAnonymous ? (securityProp ?? vaultSecurity) : null;
+  // An encrypted account's devices and keys. A guest (Ruling 8: no recovery key) gets only
+  // "Approve a new device", so its other device has somewhere to approve a pairing.
+  const vaultKeys = local ? (securityProp ?? vaultSecurity) : null;
+  const security = me.isAnonymous ? null : vaultKeys;
   const dataOffId = useId();
   const assistantsOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
@@ -93,8 +95,13 @@ export function Settings({
           vaultUserId={local ? me.id : undefined}
           security={security ?? undefined}
         />
-        {security && (
-          <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
+        {vaultKeys && (
+          <SecuritySection
+            security={vaultKeys}
+            passkeys={passkeys}
+            timeZone={me.timezone}
+            guest={me.isAnonymous}
+          />
         )}
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">

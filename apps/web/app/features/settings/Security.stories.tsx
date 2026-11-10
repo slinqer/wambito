@@ -261,14 +261,29 @@ export const NothingUnreadable: Story = {
   },
 };
 
-/** Ruling 8: a guest has no recovery key; the section is not there (nor in the live app). */
-export const HiddenForGuests: Story = {
+/**
+ * A guest has no recovery key (Ruling 8): its Security shows only "Approve a new device", so a
+ * guest's other device (Locked's "Approve from another device") has somewhere to approve.
+ */
+export const GuestsOnlyApprove: Story = {
   render: (args) => stage(args, { guest: true }),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { level: 1, name: "Ajustes" });
-    await canvas.findByRole("region", { name: "Entrar con tu huella" });
-    await expect(canvas.queryByRole("region", { name: "Seguridad" })).toBeNull();
+    const area = await section(canvas);
+    await expect(
+      area.getByText("Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo."),
+    ).toBeVisible();
+    await expect(area.queryByRole("listitem")).toBeNull();
+    await expect(area.queryByRole("button", { name: "Nueva clave de recuperación" })).toBeNull();
+    await expect(area.queryByRole("button", { name: /^Quitar / })).toBeNull();
+    await expect(area.queryByText(/No pudimos leer/)).toBeNull();
+    await expect(security.load).not.toHaveBeenCalled();
+    await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
+    await expect(
+      await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),
+    ).toBeVisible();
   },
 };
 

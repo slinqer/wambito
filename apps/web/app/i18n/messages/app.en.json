@@ -665,6 +665,7 @@
     "security": {
       "title": "Security",
       "lead": "Your data is encrypted. These devices can open it.",
+      "guest_lead": "Your data is encrypted. From here you can open it on another device.",
       "this_browser": "This browser",
       "unnamed": "Device",
       "added": "Added on {date}",

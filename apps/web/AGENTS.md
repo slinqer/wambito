@@ -212,7 +212,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   shown; disabled while `approve()` runs) and "They do not match" (cancels: nothing shared));
   `vault-context.ts` `VaultSessionContext` / `useVaultSession()`: the gate provides the open
   session beside `<ApiProvider mode="local">` (null elsewhere), so Settings reaches its keys.
-  Settings → Security (`features/settings/`, mode `local` and not a guest, Ruling 8):
+  Settings → Security (`features/settings/`, mode `local`; a guest (Ruling 8, no recovery key)
+  gets only "Approve a new device", `SecuritySection guest`, nothing loaded, copy
+  `settings.security.guest_lead`, so a guest's Locked "Approve from another device" has an
+  approver):
   `security.ts` `SecurityApi` (`load()` → wraps, `ownId`, `revoked`, `verified` (attestations under
   DK from `withDataKey`), `unreadable` (`quarantineCount()`); `rotate`, `checkRecoveryKey`,
   `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `pairing`), `liveSecurity(session)`

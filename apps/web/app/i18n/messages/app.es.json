@@ -665,6 +665,7 @@
     "security": {
       "title": "Seguridad",
       "lead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
+      "guest_lead": "Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo.",
       "this_browser": "Este navegador",
       "unnamed": "Dispositivo",
       "added": "Agregado el {date}",

@@ -26,7 +26,8 @@ import { codeOf, SECURITY_KEY, type SecurityApi } from "./security.ts";
 import { type DeviceRow, deviceRows } from "./security-model.ts";
 
 /**
- * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`, never a guest):
+ * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). A guest (no
+ * recovery key, Ruling 8) gets only "Approve a new device": nothing is loaded for it. Otherwise:
  * this browser and the other devices that open the data (label, added date; "Not verified" when
  * an attestation fails), each other one with "Remove" (a key rotation, `RemoveDeviceSheet`);
  * "Approve a new device" (`ApproveDevice`); "New recovery key" (confirmed by the current key or a
@@ -36,16 +37,27 @@ export function SecuritySection({
   security,
   passkeys,
   timeZone,
+  guest = false,
 }: {
   security: SecurityApi;
   passkeys: PasskeysApi;
   timeZone: string;
+  /** A guest's reduced section: only approving a new device. */
+  guest?: boolean;
 }) {
   const t = useTranslations("settings.security");
   const { locale } = useLocale();
   const qc = useQueryClient();
-  const snapshot = useQuery({ queryKey: SECURITY_KEY, queryFn: () => security.load() });
-  const passkeyList = useQuery({ queryKey: PASSKEYS_KEY, queryFn: () => passkeys.list() });
+  const snapshot = useQuery({
+    queryKey: SECURITY_KEY,
+    queryFn: () => security.load(),
+    enabled: !guest,
+  });
+  const passkeyList = useQuery({
+    queryKey: PASSKEYS_KEY,
+    queryFn: () => passkeys.list(),
+    enabled: !guest,
+  });
   const [canTouch] = useState(() => passkeys.supported());
   const [removing, setRemoving] = useState<DeviceRow | null>(null);
   const [approving, setApproving] = useState(false);
@@ -89,6 +101,38 @@ export function SecuritySection({
     );
   };
 
+  const approve = (
+    <>
+      <div className="flex flex-col gap-(--space-2)">
+        <SettingLabel label={t("approve")} hint={t("approve_lead")} />
+        <PressButton variant="secondary" className="self-start" onClick={() => setApproving(true)}>
+          {t("approve")}
+        </PressButton>
+      </div>
+      {approving && (
+        <Takeover label={t("approve")}>
+          <ApproveDevice
+            keys={security.pairing}
+            {...(security.findPairing ? { findPairing: security.findPairing } : {})}
+            {...(security.scanSupported ? { scanSupported: security.scanSupported } : {})}
+            onDone={() => {
+              setApproving(false);
+              if (!guest) changed();
+            }}
+          />
+        </Takeover>
+      )}
+    </>
+  );
+
+  if (guest) {
+    return (
+      <SettingsSection title={t("title")} lead={t("guest_lead")}>
+        {approve}
+      </SettingsSection>
+    );
+  }
+
   return (
     <SettingsSection title={t("title")} lead={t("lead")}>
       <div className="flex flex-col gap-(--space-2)" aria-busy={snapshot.isPending || undefined}>
@@ -100,12 +144,7 @@ export function SecuritySection({
           </ul>
         )}
       </div>
-      <div className="flex flex-col gap-(--space-2)">
-        <SettingLabel label={t("approve")} hint={t("approve_lead")} />
-        <PressButton variant="secondary" className="self-start" onClick={() => setApproving(true)}>
-          {t("approve")}
-        </PressButton>
-      </div>
+      {approve}
       <div className="flex flex-col gap-(--space-2)">
         <SettingLabel label={t("recovery_title")} hint={t("recovery_lead")} />
         <PressButton variant="secondary" className="self-start" onClick={() => setNewKey(true)}>
@@ -131,19 +170,6 @@ export function SecuritySection({
         onClose={() => setNewKey(false)}
         onChanged={changed}
       />
-      {approving && (
-        <Takeover label={t("approve")}>
-          <ApproveDevice
-            keys={security.pairing}
-            {...(security.findPairing ? { findPairing: security.findPairing } : {})}
-            {...(security.scanSupported ? { scanSupported: security.scanSupported } : {})}
-            onDone={() => {
-              setApproving(false);
-              changed();
-            }}
-          />
-        </Takeover>
-      )}
     </SettingsSection>
   );
 }
