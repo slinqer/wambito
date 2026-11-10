@@ -327,6 +327,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   and `docker` on the PATH; it runs on the desktop project only (one shared account; the file is skipped on the phone and
   its `beforeAll` returns there). CI seeds it
   too.
+- e2e trap: `pinClock`'s clock keeps running across a page load, while a new page's animation
+  clock starts at zero, so a sheet (Motion) stays off-screen after a `goto` in a long-lived
+  context for as long as the context had lived; long tests move with in-app links instead.
 
 ## Landing builds
 
