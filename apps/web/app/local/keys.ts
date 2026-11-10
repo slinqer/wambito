@@ -454,13 +454,20 @@ export async function withDataKey<T>(
 }
 
 /**
- * The account moved to a new key version (a rotation): opens this browser's device wrap, keeps the
- * record and dedupe keys of its `keyV` beside the older ones (records under them still need
- * opening) and makes it the current version. `device_removed` as `withDataKey`.
+ * The account moved to a new key version (a rotation): opens this browser's device wrap and, only
+ * when its `keyV` is higher than the current one, keeps that version's record and dedupe keys
+ * beside the older ones (records under them still need opening) and makes it current. Key
+ * versions only grow: a wrap at or below the current version (a stale listing, or a server
+ * replaying an old wrap or sealing another DK to this browser's public key) changes nothing, and
+ * a version already held is never overwritten. Returns the keyring. `device_removed` as
+ * `withDataKey`.
  */
 export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {
   const { userId } = options;
+  const before = await loadLocalKeys(userId);
+  if (!before) throw new KeysError("device_removed");
   await withDataKey(options, async (dataKey, keyV) => {
+    if (keyV <= before.keyring.current || before.keyring.byVersion.has(keyV)) return;
     const keys = await deriveRecordKeys(dataKey, false);
     const store = await createEncryptedStore(userId);
     try {

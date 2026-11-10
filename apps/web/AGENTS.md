@@ -66,8 +66,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (DK from this browser's own device wrap: found by `deviceWrapId`, its `publicKey` must equal
   `devicePublicKey`, opened with `openFromDevice`; `fn(dk, keyV)`, DK zeroed after;
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
-  wrap and keeps the one that opens), `refreshKeys(options)` (adds the device wrap's `keyV` to the
-  keyring and makes it current, keeps the old versions), `dropKeyVersion(userId, keyV)`,
+  wrap and keeps the one that opens), `refreshKeys(options)` (a device wrap at a higher `keyV` is
+  added to the keyring and made current, old versions kept; one at or below the current version
+  changes nothing, and a held version is never overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,

@@ -621,6 +621,45 @@ describe("refreshKeys", () => {
     expect([...(again?.keyring.byVersion.keys() ?? [])].sort()).toEqual([1, 2]);
   });
 
+  it("a replayed lower-version wrap leaves current and the stored keys unchanged", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    const next = generateDataKey();
+    await rotateDeviceWrap(api, userId, device, next, 2);
+    await refreshKeys({ userId, fetch: api.fetch });
+    // the server replays the old keyV 1 wrap (it opens: it is sealed to this browser)
+    await rotateDeviceWrap(api, userId, device, generateDataKey(), 1);
+
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(2);
+    const store = await createEncryptedStore(userId);
+    expect(await store.getMeta("keyV")).toBe(2);
+    store.close();
+    const again = await loadLocalKeys(userId);
+    expect(again?.keyring.current).toBe(2);
+    for (const [v, key] of [
+      [1, dk],
+      [2, next],
+    ] as const) {
+      const ctx = { ...CTX(userId, REC), keyV: v };
+      const sealed = await sealRecord(await deriveRecordKeys(key, false), ctx, { v });
+      expect(await openRecord(again!.keyring.byVersion.get(v)!, ctx, sealed)).toEqual({ v });
+    }
+  });
+
+  it("a same-version wrap under another DK does not overwrite record:<v>", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    await rotateDeviceWrap(api, userId, device, generateDataKey(), 1);
+
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(1);
+    const ctx = CTX(userId, REC);
+    const sealed = await sealRecord(await deriveRecordKeys(dk, false), ctx, { s: 1 });
+    expect(await openRecord(currentKeys(local), ctx, sealed)).toEqual({ s: 1 });
+    expect(await openRecord(currentKeys(await loadLocalKeys(userId)), ctx, sealed)).toEqual({
+      s: 1,
+    });
+  });
+
   it("refreshKeys refuses a device wrap whose public key is not this browser's", async () => {
     const { api, userId, device } = await enrolledAccount();
     const other = await generateDeviceKeyPair();
