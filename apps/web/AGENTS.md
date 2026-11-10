@@ -119,7 +119,22 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
-  the recovery wrap). `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
+  the recovery wrap). `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
+  `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` → `expired` and on
+  `cancel()` → `cancelled`): `startPairing(options)` → `{ id, code, qr, expiresAt, number(),
+  finish(), cancel() }` (the new device: an ephemeral pair `N`, separate from the device key pair,
+  posts its commitment; `qr` is `wambito://pair?id=<id>&key=<base64url N.pub>`; polling pins the
+  first `approverKey` and reveals `N.pub`, then `number()` resolves; `finish()` picks up, opens
+  with `openFromPairing` against the pinned key and enrolls with `enrollDevice`, the opened DK
+  zeroed); `findPairing({ ...options, code } | { ...options, qr })` → `{ number(), approve(),
+  cancel() }` (the approving device: pins the commitment from `?code=`, or the QR key's own
+  commitment after checking it against `GET /v2/pairing/{id}`, then posts its ephemeral `A.pub`;
+  `number()` after a revealed key that matches the pinned commitment (and the QR key);
+  `approve()` seals DK from `withDataKey` from `A` at its `keyV`, then waits for the pickup's
+  404). `PairingError` codes `expired` (404 or the clock), `tampered` (any relayed value that does
+  not match a pin, a 422, a second approver), `bad_code` (a code that cannot be one or finds
+  nothing, a QR not exactly that string), `offline`, `server`, `cancelled`; `session_changed` and
+  `rotated_elsewhere` stay `KeysError`s. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
