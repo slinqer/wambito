@@ -82,8 +82,11 @@ import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keys.ts
  *   reach that version, parks it (`key_version_mismatch`).
  * - `refreshKeys` throwing `device_removed` (this browser's wrap is gone) stops the run with
  *   `{ ok: false, error: "device_removed", problem: "device_removed" }`, reports it and stops
- *   `start()`'s triggers; the session deletes the vault. Its other failures stop the run as
- *   `offline`, `session_changed` or `server`.
+ *   `start()`'s triggers; the session deletes the vault. `refreshKeys` throwing `tampered` (a
+ *   newer version whose links do not lead back to the held key) stops the run and the triggers the
+ *   same way with `key_unverified` (`problem: "key_unverified"`); the vault and the outbox stay,
+ *   and the session asks to unlock again. Its other failures stop the run as `offline`,
+ *   `session_changed` or `server`.
  * - The upgrade pass, after each pull while the keyring holds a version below the current one:
  *   records the server has under an older `keyV` get a `reseal` outbox entry (the unchanged body,
  *   `baseVersion` = the record's version), at most 500 pending per pass, and are pushed in the
@@ -125,7 +128,9 @@ export type SyncProblemCode =
   /** The signed-in account is not the vault's (409 `session_changed`): the engine stops. */
   | "session_changed"
   /** This browser's device wrap is gone (removed from the account): the engine stops. */
-  | "device_removed";
+  | "device_removed"
+  /** A newer key version's links do not lead back to the held key (`tampered`): the engine stops. */
+  | "key_unverified";
 
 /** Something the UI may want to tell the person. Ids and counts only. */
 export interface SyncProblem {
@@ -150,8 +155,12 @@ export interface SyncResult {
   parked: string[];
   resynced: boolean;
   error?: SyncProblemCode;
-  /** This browser was removed from the account: the session deletes the vault. */
-  problem?: "device_removed";
+  /**
+   * `device_removed`: this browser was removed from the account, the session deletes the vault.
+   * `key_unverified`: a new key version did not verify, the session keeps the vault and asks to
+   * unlock again.
+   */
+  problem?: "device_removed" | "key_unverified";
 }
 
 export interface SyncEngineOptions {
@@ -166,7 +175,8 @@ export interface SyncEngineOptions {
   keyring: Keyring;
   /**
    * Fetches this browser's device wrap again and returns the keyring with any newer version
-   * (`keys.ts` `refreshKeys`). Throws `KeysError("device_removed")` when the wrap is gone.
+   * (`keys.ts` `refreshKeys`). Throws `KeysError("device_removed")` when the wrap is gone,
+   * `KeysError("tampered")` when a newer version does not lead back to the held key.
    */
   refreshKeys: () => Promise<Keyring>;
   now?: () => number;
@@ -815,7 +825,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       } else if (error instanceof Stop) {
         result.ok = false;
         result.error = error.code;
-        if (error.code === "device_removed") result.problem = "device_removed";
+        if (error.code === "device_removed" || error.code === "key_unverified") {
+          result.problem = error.code;
+        }
         report({ code: error.code, status: error.status });
       } else if (error instanceof VaultClosedError || store.isClosed()) {
         result.ok = false;
@@ -919,8 +931,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           clearTimeout(retry);
           if (result.ok) {
             failures = 0;
-          } else if (result.error === "session_changed" || result.error === "device_removed") {
-            // Someone else's cookie, or this browser removed: never again in this page.
+          } else if (
+            result.error === "session_changed" ||
+            result.error === "device_removed" ||
+            result.error === "key_unverified"
+          ) {
+            // Someone else's cookie, this browser removed, or a key it cannot verify: never
+            // again in this page.
             stop();
           } else if (result.error !== "closed") {
             failures += 1;
@@ -992,6 +1009,7 @@ class Retry extends Error {}
 function keysStop(error: unknown): Stop {
   if (error instanceof KeysError) {
     if (error.code === "device_removed") return new Stop("device_removed");
+    if (error.code === "tampered") return new Stop("key_unverified");
     if (error.code === "session_changed") return new Stop("session_changed", 409);
     if (error.code === "offline") return new Stop("offline");
     return new Stop("server", error.status);

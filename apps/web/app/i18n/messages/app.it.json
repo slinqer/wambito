@@ -692,7 +692,7 @@
         "rotated_elsewhere": "Un altro dispositivo ha cambiato le tue chiavi nello stesso momento. Aspetta che si aggiornino qui, poi riprova.",
         "failed": "Non siamo riusciti a rimuoverlo. Riprova.",
         "done_title": "Fatto",
-        "done_lead": "{name} non può più aprire i tuoi dati. Se hai ancora quel dispositivo, esci anche lì.",
+        "done_lead": "{name} non può più aprire i tuoi dati e la sua sessione è stata chiusa.",
         "dropped_lead": "Sono rimasti fuori anche:",
         "dropped_item": "{name} ({reason, select, removed {rimosso ora} revoked {rimosso prima} other {non verificato}})",
         "passkeys_note": "Le impronte che non hai usato ora non aprono più i tuoi dati: riattivale tra le impronte."
@@ -947,6 +947,7 @@
       "cancel": "Annulla",
       "close": "Chiudi"
     },
-    "removed": "Questo browser è stato rimosso dal tuo account da un altro dispositivo. Le modifiche non ancora sincronizzate qui sono andate perse. Per aprire di nuovo i tuoi dati, scrivi la tua chiave di recupero o usa un altro dispositivo."
+    "removed": "Questo browser è stato rimosso dal tuo account da un altro dispositivo. Le modifiche non ancora sincronizzate qui sono andate perse. Per aprire di nuovo i tuoi dati, scrivi la tua chiave di recupero o usa un altro dispositivo.",
+    "unverified": "Questo browser non è riuscito a verificare la nuova chiave del tuo account, quindi ha smesso di sincronizzare. I tuoi dati qui sono al sicuro. Per continuare, usa la tua passkey o scrivi la tua chiave di recupero."
   }
 }

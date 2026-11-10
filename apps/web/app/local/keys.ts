@@ -363,7 +363,13 @@ export async function enrollDevice(
   return enrollTrusted(call, options.userId, dataKey, keyV, links, pair);
 }
 
-/** Enrolls with a trusted DK (passkey, recovery, pairing), after its walk; nothing sent before. */
+/**
+ * Enrolls with a trusted DK (passkey, recovery, pairing), after its walk; nothing sent before.
+ * With a vault held here (unlocking again after a key version that did not verify), the new device
+ * wrap replaces this browser's previous one: once the new one is kept, `DELETE /v2/keys/{previous}`
+ * (the server never ends the caller's own session). A failed delete only leaves the old wrap
+ * listed, for Settings to remove.
+ */
 async function enrollTrusted(
   call: KeysApi,
   userId: string,
@@ -373,10 +379,31 @@ async function enrollTrusted(
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
 ): Promise<LocalKeys> {
   const older = await olderForTrustedKey(userId, { keyV, dataKey }, links);
+  let local: LocalKeys;
+  let previous: string | undefined;
   try {
-    return await enrollWithPair(call, userId, dataKey, keyV, pair, older);
+    previous = await heldDeviceWrapId(userId);
+    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older);
   } finally {
     zeroKeys(older);
+  }
+  if (previous) {
+    try {
+      await call(`/v2/keys/${previous}`, { method: "DELETE" });
+    } catch {
+      // the old wrap stays listed; it opens nothing this browser still uses
+    }
+  }
+  return local;
+}
+
+/** The device wrap id a vault held here kept at its enroll, if any. */
+async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
+  const store = await createEncryptedStore(userId);
+  try {
+    return await store.getMeta<string>("deviceWrapId");
+  } finally {
+    store.close();
   }
 }
 

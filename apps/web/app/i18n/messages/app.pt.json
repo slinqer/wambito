@@ -692,7 +692,7 @@
         "rotated_elsewhere": "Outro dispositivo mudou as tuas chaves ao mesmo tempo. Espera um momento até que se atualizem aqui e tenta outra vez.",
         "failed": "Não conseguimos removê-lo. Tenta outra vez.",
         "done_title": "Feito",
-        "done_lead": "{name} já não consegue abrir os teus dados. Se ainda tens esse dispositivo, termina também a sessão nele.",
+        "done_lead": "{name} já não consegue abrir os teus dados e a sessão nele foi terminada.",
         "dropped_lead": "Também ficaram de fora:",
         "dropped_item": "{name} ({reason, select, removed {removido agora} revoked {removido antes} other {não verificado}})",
         "passkeys_note": "As impressões digitais que não usaste agora já não abrem os teus dados: volta a ativá-las nas impressões digitais."
@@ -947,6 +947,7 @@
       "cancel": "Cancelar",
       "close": "Fechar"
     },
-    "removed": "Este browser foi removido da tua conta a partir de outro dispositivo. As alterações ainda não sincronizadas aqui perderam-se. Para voltar a abrir os teus dados, escreve a tua chave de recuperação ou usa outro dispositivo."
+    "removed": "Este browser foi removido da tua conta a partir de outro dispositivo. As alterações ainda não sincronizadas aqui perderam-se. Para voltar a abrir os teus dados, escreve a tua chave de recuperação ou usa outro dispositivo.",
+    "unverified": "Este browser não conseguiu verificar a chave nova da tua conta, por isso deixou de sincronizar. Os teus dados aqui estão seguros. Para continuar, usa a tua chave de acesso ou escreve a tua chave de recuperação."
   }
 }

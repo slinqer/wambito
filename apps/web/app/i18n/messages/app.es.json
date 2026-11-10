@@ -692,7 +692,7 @@
         "rotated_elsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
         "failed": "No pudimos quitarlo. Inténtalo otra vez.",
         "done_title": "Listo",
-        "done_lead": "{name} ya no puede abrir tus datos. Si aún tienes ese dispositivo, cierra la sesión en él también.",
+        "done_lead": "{name} ya no puede abrir tus datos y se cerró su sesión.",
         "dropped_lead": "También quedaron fuera:",
         "dropped_item": "{name} ({reason, select, removed {quitado ahora} revoked {quitado antes} other {sin verificar}})",
         "passkeys_note": "Las huellas que no usaste ahora ya no abren tus datos: vuelve a activarlas en las huellas."
@@ -947,6 +947,7 @@
       "cancel": "Cancelar",
       "close": "Cerrar"
     },
-    "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo."
+    "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
+    "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu passkey o escribe tu clave de recuperación."
   }
 }

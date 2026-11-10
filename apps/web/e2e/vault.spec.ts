@@ -450,7 +450,7 @@ test("a removed browser locks", async ({ browser }) => {
     timeout: 20_000,
   });
   await expect(
-    first.page.getByText(/ya no puede abrir tus datos\. Si aún tienes ese dispositivo/),
+    first.page.getByText(/ya no puede abrir tus datos y se cerró su sesión\./),
   ).toBeVisible();
 
   // -- the second, on its next sync, is locked out with the notice; nothing of the vault stays --

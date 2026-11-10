@@ -331,9 +331,7 @@ export const RemoveWithRecoveryKey: Story = {
     await userEvent.click(sheet.getByRole("button", { name: "Sí, quitarlo" }));
     const done = within(await screen.findByRole("dialog", { name: "Listo" }));
     await expect(
-      done.getByText(
-        /^Firefox on Linux ya no puede abrir tus datos\. Si aún tienes ese dispositivo, cierra la sesión en él también\.$/,
-      ),
+      done.getByText(/^Firefox on Linux ya no puede abrir tus datos y se cerró su sesión\.$/),
     ).toBeVisible();
     await expect(done.getByText("Edge on Windows (quitado antes)")).toBeVisible();
     await expect(done.getByText("Safari on iOS (sin verificar)")).toBeVisible();

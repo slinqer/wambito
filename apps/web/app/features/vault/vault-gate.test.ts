@@ -842,4 +842,65 @@ describe("vault gate", () => {
       expect(gate.getState()).toEqual({ status: "unlock" });
     });
   });
+  describe("a new key version this browser cannot verify", () => {
+    it("unverified() from the open app shows Unlock with the unverified notice", async () => {
+      const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
+      gate.start();
+      await settle();
+      gate.unverified();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified" });
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+      expect(deps.open).toHaveBeenCalledTimes(1);
+    });
+
+    it("an unverified guest goes to its Locked", async () => {
+      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), guest: true });
+      gate.start();
+      await settle();
+      gate.unverified();
+      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    });
+
+    it("an opening that fails with key_unverified shows Unlock with the notice; a guest its Locked", async () => {
+      const open = vi.fn(async () => {
+        throw fail("key_unverified");
+      });
+      const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified" });
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+      const guest = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open, guest: true });
+      guest.gate.start();
+      await settle();
+      expect(guest.gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    });
+
+    it("the recovery key from unverified unlocks the kept vault and opens it fresh", async () => {
+      const open = vi
+        .fn<(keys: Keys, fresh: boolean) => Promise<Session>>()
+        .mockImplementation(async (keys) => ({ id: keys.k }));
+      const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
+      gate.start();
+      await settle();
+      gate.unverified();
+      expect(await gate.unlock("ABCD-EFGH")).toBeNull();
+      expect(deps.unlockWithRecovery).toHaveBeenCalledWith("ABCD-EFGH");
+      expect(deps.prepareAccount).not.toHaveBeenCalled();
+      expect(open).toHaveBeenLastCalledWith({ k: "unlocked" }, true);
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "unlocked" } });
+    });
+
+    it("unverified() outside the open app does nothing", async () => {
+      const { gate } = gateWith({
+        prepareAccount: async () => {
+          throw fail("already_set_up");
+        },
+      });
+      gate.start();
+      await settle();
+      gate.unverified();
+      expect(gate.getState()).toEqual({ status: "unlock" });
+    });
+  });
 });

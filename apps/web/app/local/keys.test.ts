@@ -83,6 +83,9 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
   /** `link(v)` by the version whose key seals it, base64url. */
   const links = new Map<number, string>();
   const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
+  /** Ids of the `DELETE /v2/keys/{id}` calls, in order; `failDeletes`: answered with a 503. */
+  const deletes: string[] = [];
+  const state = { failDeletes: false };
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const json = (body: unknown, status = 200) =>
@@ -96,6 +99,14 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
         links: [...links].sort(([a], [b]) => a - b).map(([keyV, link]) => ({ keyV, link })),
       });
     const match = /^\/api\/v2\/keys\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (match && init?.method === "DELETE") {
+      const id = match[1] as string;
+      deletes.push(id);
+      if (state.failDeletes) return json({ code: "unavailable" }, 503);
+      const at = wraps.findIndex((w) => w.id === id);
+      if (at >= 0) wraps.splice(at, 1);
+      return new Response(null, { status: 204 });
+    }
     if (match && init?.method === "PUT") {
       const id = match[1] as string;
       expect(id).toBe(id.toLowerCase());
@@ -136,7 +147,7 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
     }
     return new Response(null, { status: 404 });
   };
-  return { fetch: fetch as typeof globalThis.fetch, wraps, links, puts };
+  return { fetch: fetch as typeof globalThis.fetch, wraps, links, puts, deletes, state };
 }
 
 let counter = 0;
@@ -1056,6 +1067,44 @@ describe("unlocking an account that rotated", () => {
     expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
     expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
     expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+  });
+
+  it("an unlock with a vault held here deletes this browser's previous device wrap, after keeping the new one", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    const before = await createEncryptedStore(userId);
+    const previous = await before.getMeta<string>("deviceWrapId");
+    before.close();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const after = await createEncryptedStore(userId);
+    const current = await after.getMeta<string>("deviceWrapId");
+    after.close();
+    expect(previous).toBeDefined();
+    expect(current).not.toBe(previous);
+    expect(api.deletes).toEqual([previous]);
+    expect(api.wraps.filter((w) => w.kind === "device").map((w) => w.id)).toEqual([current]);
+  });
+
+  it("an unlock on a fresh browser deletes no wrap", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    await forgetDevice(userId);
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(api.deletes).toEqual([]);
+  });
+
+  it("a refused delete of the previous device wrap does not fail the unlock", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    api.state.failDeletes = true;
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    expect(api.deletes).toHaveLength(1);
+  });
+
+  it("a tampered unlock deletes nothing", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice({ link2: "wrong" });
+    await expect(
+      unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch }),
+    ).rejects.toEqual(new KeysError("tampered"));
+    expect(api.deletes).toEqual([]);
   });
 
   it("a 2a vault (legacy record/dedupe at v1) unlocked at v3 keeps the right key for every version", async () => {

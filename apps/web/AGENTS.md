@@ -58,7 +58,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   upgrade pass re-seals records under an older `keyV` through the outbox (`reseal` entries: unchanged
   body, `baseVersion` = its version, at most 500 per run, a conflict takes the server's copy) and
   drops an old version's keys once no local record uses it; `refreshKeys` throwing `device_removed`
-  stops the run and the triggers (`{ ok: false, error: "device_removed", problem: "device_removed" }`).
+  stops the run and the triggers (`{ ok: false, error: "device_removed", problem: "device_removed" }`);
+  `refreshKeys` throwing `tampered` does the same as `key_unverified` (`problem: "key_unverified"`),
+  the outbox untouched (a change refused at the stale `keyV` is neither parked nor dropped).
   `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
   recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
   until `commit()`, which the setup screen calls only after the four characters are typed back:
@@ -81,7 +83,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the older versions the links reach: with no vault held here from version 1 down, not strict;
   with one held, strictly down to its current version, whose key must match the held one
   (`sameDataKey`), else `tampered` before anything is sent or kept (a version below the held one
-  too). `loadLocalKeys(userId)` →
+  too); with one held, once the new device wrap is kept, `DELETE /v2/keys/{previous deviceWrapId}`
+  (best effort; the server never ends the caller's own session). `loadLocalKeys(userId)` →
   `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
   `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
   `currentRecordKeys(local)`; the sync engine takes the keyring), `withDataKey(options, fn)`
@@ -174,7 +177,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`, a guest's Locked). `session.reloadKeys()`
+  notice `vault.removed`, a guest's Locked). `key_unverified` (a new key version whose links do
+  not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
+  stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
+  its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
+  (the opening's error the same way): Unlock with the notice `vault.unverified`, a guest's Locked.
+  The unlock there (recovery key, passkey, pairing) keeps the vault, replaces the device wrap and
+  opens a new session fresh, whose first sync pushes what waited. `session.reloadKeys()`
   gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
@@ -210,7 +219,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings,
-  `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
+  `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
@@ -258,7 +267,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   bumps its `rev`.
   Known limit of `app/local/` (spec 2026-11-10 section 2.4): a malicious server together with a
   stolen device that still holds DK(v-1) can forge a version whose link leads back to it, for a
-  browser that has not seen the real one yet.
+  browser that has not seen the real one yet. A server that withholds a link (or a whole rotation)
+  leaves browsers stuck in the `unverified` state: denial of service only, nothing is revealed.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
