@@ -14,6 +14,7 @@ export {
 } from "./devices.ts";
 export { CryptoError, type CryptoErrorCode } from "./errors.ts";
 export { deriveRecordKeys, generateDataKey, type RecordKeys } from "./keys.ts";
+export { LINK_BYTES, type LinkContext, openKeyLink, sealKeyLink } from "./links.ts";
 export { pairingCode, pairingCommitment, pairingNumber } from "./pairing.ts";
 export {
   dedupeTag,

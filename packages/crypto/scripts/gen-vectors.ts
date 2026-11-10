@@ -12,6 +12,7 @@ import {
   importDevicePrivateKey,
   pairingCommitment,
   pairingNumber,
+  sealKeyLink,
   sealRecord,
   sealToDevice,
   wrapDataKey,
@@ -240,6 +241,22 @@ for (const a of attestationInputs) {
   });
 }
 
+// Key links: the older data key sealed under a key derived from the newer one.
+const linkInputs = [
+  { newKey: dataKeyB, oldKey: dataKeyA, ctx: { userId: USER, keyV: 2 }, nonce: fixed(0x06, 12) },
+  { newKey: dataKeyA, oldKey: dataKeyB, ctx: { userId: USER_2, keyV: 3 }, nonce: fixed(0x26, 12) },
+];
+const links = [];
+for (const l of linkInputs) {
+  links.push({
+    newKey: b64(l.newKey),
+    oldKey: b64(l.oldKey),
+    ctx: l.ctx,
+    nonce: b64(l.nonce),
+    link: b64(await sealKeyLink(l.newKey, l.oldKey, l.ctx, l.nonce)),
+  });
+}
+
 // Inputs every implementation must refuse.
 const okRecord = recordInputs[0];
 const okRecovery = recovery[0]?.text ?? "";
@@ -297,6 +314,14 @@ const rejects = [
     approverKey: b64(keyA),
     code: "cannot_open",
   },
+  {
+    name: "link opened at the wrong key version",
+    op: "openKeyLink",
+    newKey: links[0]?.newKey,
+    ctx: { ...linkInputs[0]?.ctx, keyV: 3 },
+    link: links[0]?.link,
+    code: "cannot_open",
+  },
 ];
 
 const out = {
@@ -309,6 +334,7 @@ const out = {
   pairing,
   approvals,
   attestations,
+  links,
   rejects,
 };
 writeFileSync(
