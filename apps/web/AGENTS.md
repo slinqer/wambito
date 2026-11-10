@@ -75,8 +75,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (DK from this browser's own device wrap: found by `deviceWrapId`, its `publicKey` must equal
   `devicePublicKey`, opened with `openFromDevice`; `fn(dk, keyV)`, DK zeroed after;
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
-  wrap and keeps the one that opens), `refreshKeys(options)` (a device wrap at a higher `keyV` is
-  added to the keyring and made current, old versions kept; one at or below the current version
+  wrap and keeps the one that opens; when this browser already holds the wrap's `keyV`, DK must
+  be the one its `record:<v>` came from (a random canary sealed with the kept key opens with the
+  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs: every caller
+  (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
+  `refreshKeys(options)` (a device wrap at a higher `keyV` is
+  added to the keyring and made current, old versions kept; one below the current version
   changes nothing, and a held version is never overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
@@ -225,6 +229,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
+  Known limits of `app/local/` (design follow-ups before stage 3): a new key version is not
+  authenticated under the previous one (the device wrap is an anonymous sealed box, so a
+  malicious server can forge `keyV + 1` to the web; only a held version is checked); and a
+  browser that missed two rotations gets only the newest version from its device wrap, so it can
+  read the middle version's records only once another device has re-sealed them.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),

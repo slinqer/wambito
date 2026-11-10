@@ -564,6 +564,50 @@ describe("rotateKeys", () => {
   });
 });
 
+describe("a device wrap that holds another data key at a held key version", () => {
+  /** The server seals another DK to this browser's public key, at the version it already holds. */
+  async function forgeOwnWrap(a: Account) {
+    const forged = generateDataKey();
+    a.own.wrapped = toBase64Url(
+      await sealToDevice(
+        fromBase64Url(a.own.publicKey as string),
+        { kind: "device", userId: a.userId, keyV: 1 },
+        forged,
+      ),
+    );
+    clearHanded();
+    return forged;
+  }
+  const zeroed = (list: Uint8Array[]) => list.every((b) => b.every((x) => x === 0));
+
+  it("rotateKeys refuses it as tampered: nothing is made or sent, and the opened DK is zeroed", async () => {
+    const a = await account();
+    await addDevice(a, "Phone");
+    await forgeOwnWrap(a);
+    const err = await rotateKeys({
+      ...a.options,
+      remove: [],
+      recovery: { text: a.recoveryKey },
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("tampered");
+    expect(a.api.rotations).toEqual([]);
+    expect(a.api.puts).toEqual([]);
+    expect(handed.dataKeys).toEqual([]);
+    expect(handed.opened.length).toBeGreaterThan(0);
+    expect(zeroed(handed.opened)).toBe(true);
+    expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(1);
+  });
+
+  it("newRecoveryKey refuses it as tampered, and sends nothing", async () => {
+    const a = await account();
+    await forgeOwnWrap(a);
+    await expect(newRecoveryKey(a.options)).rejects.toMatchObject({ code: "tampered" });
+    expect(a.api.puts).toEqual([]);
+    expect(zeroed(handed.opened)).toBe(true);
+  });
+});
+
 describe("newRecoveryKey", () => {
   it("newRecoveryKey replaces the recovery wrap at the current keyV (PUT, same kind) only on commit", async () => {
     const a = await account();

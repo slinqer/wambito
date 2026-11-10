@@ -9,7 +9,9 @@ import {
   newRecoverySecret,
   openFromDevice,
   parseRecoveryKey,
+  openRecord,
   type RecordKeys,
+  sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
@@ -48,7 +50,12 @@ export type KeysErrorCode =
   /** No passkey wrap has the touched credential as `ref`, or its PRF does not open it. */
   | "no_passkey_wrap"
   /** 422: the credential is not one of the signed-in account's passkeys; no wrap was stored. */
-  | "unknown_passkey";
+  | "unknown_passkey"
+  /**
+   * This browser's device wrap holds a data key that is not the one this browser already keeps
+   * for that key version (anyone with its public key can seal one to it): refused, DK zeroed.
+   */
+  | "tampered";
 
 export class KeysError extends Error {
   constructor(
@@ -476,7 +483,9 @@ export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
  * operation: `fn` gets DK and the wrap's `keyV`, and DK is zeroed once `fn` settles. The wrap is the
  * one whose id this browser kept at enroll, and it must still be sealed to this browser's public
  * key; else `device_removed`. A 2a browser kept no wrap id: it tries each device wrap with its
- * private key, and keeps the id and public key of the one that opens.
+ * private key, and keeps the id and public key of the one that opens. When this browser already
+ * holds that `keyV`'s record key, DK must be the one it came from (`sameDataKey`), else
+ * `tampered` (DK zeroed, `fn` never runs). A new version is not checked against the old one.
  */
 export async function withDataKey<T>(
   options: KeysOptions,
@@ -523,6 +532,16 @@ export async function withDataKey<T>(
           break;
         }
       }
+      if (dataKey) {
+        const held =
+          (await store.getKey<CryptoKey>(recordKeyName(keyV))) ??
+          ((await store.getMeta<number>("keyV")) === keyV
+            ? await store.getKey<CryptoKey>(LEGACY_RECORD_KEY)
+            : undefined);
+        if (held && !(await sameDataKey(userId, dataKey, keyV, held))) {
+          throw new KeysError("tampered");
+        }
+      }
     } finally {
       store.close();
     }
@@ -534,12 +553,35 @@ export async function withDataKey<T>(
 }
 
 /**
+ * Whether `dataKey` is the data key whose record key this browser keeps for `keyV`: a random
+ * canary sealed with the kept `record:<v>` key must open with the record key derived from
+ * `dataKey`. The device wrap is an anonymous sealed box, so this is what stops a server from
+ * handing this browser another DK at a version it already holds.
+ */
+async function sameDataKey(
+  userId: string,
+  dataKey: Uint8Array,
+  keyV: number,
+  held: CryptoKey,
+): Promise<boolean> {
+  const derived = await deriveRecordKeys(dataKey, false);
+  const ctx = { userId, type: "settings" as const, id: uuidv7(), keyV };
+  const canary = toBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+  try {
+    const sealed = await sealRecord({ record: held, dedupe: derived.dedupe }, ctx, canary);
+    return (await openRecord(derived, ctx, sealed)) === canary;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The account moved to a new key version (a rotation): opens this browser's device wrap and, only
  * when its `keyV` is higher than the current one, keeps that version's record and dedupe keys
  * beside the older ones (records under them still need opening) and makes it current. Key
  * versions only grow: a wrap at or below the current version (a stale listing, or a server
- * replaying an old wrap or sealing another DK to this browser's public key) changes nothing, and
- * a version already held is never overwritten. Returns the keyring. `device_removed` as
+ * replaying an old wrap) changes nothing, and a version already held is never overwritten.
+ * Returns the keyring. `device_removed` and `tampered` (another DK at a held version) as
  * `withDataKey`.
  */
 export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {

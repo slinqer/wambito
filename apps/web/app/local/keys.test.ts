@@ -584,6 +584,27 @@ describe("withDataKey", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+  it("a wrap at a held keyV that holds another DK is tampered: fn never runs", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    await rotateDeviceWrap(api, userId, device, generateDataKey(), 1);
+    const fn = vi.fn(async () => 1);
+    const err = await withDataKey({ userId, fetch: api.fetch }, fn).catch((e) => e);
+    expect(err).toBeInstanceOf(KeysError);
+    expect(err.code).toBe("tampered");
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a wrap at a keyV this browser does not hold yet is not checked (a rotation)", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    const next = generateDataKey();
+    await rotateDeviceWrap(api, userId, device, next, 2);
+    let copy: Uint8Array | undefined;
+    await withDataKey({ userId, fetch: api.fetch }, async (key) => {
+      copy = key.slice();
+    });
+    expect(copy).toEqual(next);
+  });
+
   it("a 2a browser without the wrap id finds its device wrap and remembers it", async () => {
     const { api, userId, dk, device } = await enrolledAccount();
     // a second device wrap that is not this browser's
@@ -636,7 +657,7 @@ describe("refreshKeys", () => {
     await rotateDeviceWrap(api, userId, device, next, 2);
     await refreshKeys({ userId, fetch: api.fetch });
     // the server replays the old keyV 1 wrap (it opens: it is sealed to this browser)
-    await rotateDeviceWrap(api, userId, device, generateDataKey(), 1);
+    await rotateDeviceWrap(api, userId, device, dk, 1);
 
     const local = await refreshKeys({ userId, fetch: api.fetch });
     expect(local.keyring.current).toBe(2);
@@ -655,11 +676,14 @@ describe("refreshKeys", () => {
     }
   });
 
-  it("a same-version wrap under another DK does not overwrite record:<v>", async () => {
+  it("a same-version wrap under another DK is tampered and does not overwrite record:<v>", async () => {
     const { api, userId, dk, device } = await enrolledAccount();
     await rotateDeviceWrap(api, userId, device, generateDataKey(), 1);
 
-    const local = await refreshKeys({ userId, fetch: api.fetch });
+    await expect(refreshKeys({ userId, fetch: api.fetch })).rejects.toMatchObject({
+      code: "tampered",
+    });
+    const local = (await loadLocalKeys(userId)) as LocalKeys;
     expect(local.keyring.current).toBe(1);
     const ctx = CTX(userId, REC);
     const sealed = await sealRecord(await deriveRecordKeys(dk, false), ctx, { s: 1 });
