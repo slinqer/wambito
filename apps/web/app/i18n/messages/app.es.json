@@ -951,6 +951,6 @@
       "close": "Cerrar"
     },
     "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
-    "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu passkey o escribe tu clave de recuperación."
+    "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación."
   }
 }
