@@ -6,6 +6,8 @@ import WambitoNative
 /// Android string resources (scripts/gen-ios-strings.dart), in the language the app is set to.
 enum NoticePoster {
   static let guestId = "wambito.notice.guest"
+  /// "Hoy vence…" (DueTask.swift): one at a time, a new one replaces the last.
+  static let dueId = "wambito.notice.due"
   /// The notification centre's title, the mascot's name (`notice_title` on Android).
   static let title = "Wambi"
 

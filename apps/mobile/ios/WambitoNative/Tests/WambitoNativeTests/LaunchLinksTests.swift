@@ -50,4 +50,12 @@ final class LaunchLinksTests: XCTestCase {
     XCTAssertEqual(announced, 1)
     XCTAssertEqual(pending.take(), "wambito://capture")
   }
+
+  func testANoticeTapOpensItsLink() {
+    XCTAssertEqual(LaunchLinks.noticeTap(["link": "due"])?.absoluteString, "wambito://due")
+    XCTAssertEqual(LaunchLinks.noticeTap(["link": "progress"])?.absoluteString, "wambito://progress")
+    XCTAssertNil(LaunchLinks.noticeTap([:]))
+    XCTAssertNil(LaunchLinks.noticeTap(["link": ""]))
+    XCTAssertNil(LaunchLinks.noticeTap(["link": 7]))
+  }
 }

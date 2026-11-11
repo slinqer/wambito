@@ -23,6 +23,13 @@ public enum LaunchLinks {
     }
     return url.absoluteString
   }
+
+  /// The link a tapped notice opens: its `userInfo["link"]` (`due`, `progress`) as
+  /// `wambito://<link>`. Nil when it has none.
+  public static func noticeTap(_ userInfo: [AnyHashable: Any]) -> URL? {
+    guard let link = userInfo["link"] as? String, !link.isEmpty else { return nil }
+    return URL(string: "\(scheme)://\(link)")
+  }
 }
 
 /// The link the app was opened with, kept until Dart takes it (`lib/launch/launch_links.dart`).
