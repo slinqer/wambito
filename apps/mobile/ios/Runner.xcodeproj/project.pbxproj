@@ -22,6 +22,7 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A1B2C3D4E5F6071800000003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071800000002 /* PrivacyInfo.xcprivacy */; };
 		A1B2C3D4E5F6071800000005 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071800000004 /* InfoPlist.strings */; };
+		B7C8D9E0F1A2B3C400000041 /* LaunchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000040 /* LaunchChannel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +75,7 @@
 		A1B2C3D4E5F6071800000011 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071800000012 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071800000013 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C400000040 /* LaunchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,6 +105,14 @@
 				B7C8D9E0F1A2B3C400000020 /* HapticsChannel.swift */,
 			);
 			path = Haptics;
+			sourceTree = "<group>";
+		};
+		B7C8D9E0F1A2B3C400000042 /* Launch */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C400000040 /* LaunchChannel.swift */,
+			);
+			path = Launch;
 			sourceTree = "<group>";
 		};
 		B7C8D9E0F1A2B3C400000014 /* Device */ = {
@@ -166,6 +176,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				B7C8D9E0F1A2B3C400000014 /* Device */,
+				B7C8D9E0F1A2B3C400000042 /* Launch */,
 				B7C8D9E0F1A2B3C400000022 /* Haptics */,
 				B7C8D9E0F1A2B3C400000032 /* Sounds */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
@@ -338,6 +349,7 @@
 				B7C8D9E0F1A2B3C400000011 /* DeviceChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000021 /* HapticsChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000031 /* SoundChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C400000041 /* LaunchChannel.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);
