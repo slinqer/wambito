@@ -10,7 +10,7 @@ jobs:
   ios-release:
     runs-on: macos-latest
     timeout-minutes: 60
-    # The six secrets live in this environment (docs/mobile/ios.md).
+    # The seven secrets live in this environment (docs/mobile/ios.md).
     environment: app-store
     permissions:
       contents: read
@@ -18,7 +18,6 @@ jobs:
       group: ios-release-${{ github.ref }}
       cancel-in-progress: false
     env:
-      KEYCHAIN_PATH: ${{ runner.temp }}/wambito-signing.keychain-db
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
     defaults:
@@ -26,6 +25,12 @@ jobs:
         working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
+      # `runner` is not a context in a job-level env, so the paths come from the shell.
+      - name: Name the temporary files
+        run: |
+          echo "KEYCHAIN_PATH=$RUNNER_TEMP/wambito-signing.keychain-db" >> "$GITHUB_ENV"
+          echo "PROFILE_PLIST=$RUNNER_TEMP/profile.plist" >> "$GITHUB_ENV"
+          echo "EXPORT_OPTIONS=$RUNNER_TEMP/ExportOptions.plist" >> "$GITHUB_ENV"
       - name: Read the pinned Flutter version
         id: flutter-version
         run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
@@ -35,13 +40,6 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
-      # The team id is a build setting, git-ignored in the repo (scripts/check-ios-signing.sh).
-      - name: Write the signing settings
-        env:
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-        run: |
-          umask 077
-          printf 'DEVELOPMENT_TEAM = %s\n' "$IOS_TEAM_ID" > ios/Flutter/Signing.xcconfig
       - name: Import the distribution certificate into a temporary keychain
         env:
           IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
@@ -66,9 +64,36 @@ jobs:
           umask 077
           mkdir -p "$HOME/.appstoreconnect/private_keys"
           printf '%s' "$ASC_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-      # `flutter build ipa` takes no App Store Connect key, so Flutter only prepares the project
-      # (version, Generated.xcconfig) and xcodebuild archives and exports with the key, which lets
-      # Xcode create and fetch the provisioning profile (automatic signing).
+      - name: Install the App Store provisioning profile
+        env:
+          IOS_APPSTORE_PROFILE: ${{ secrets.IOS_APPSTORE_PROFILE }}
+        run: |
+          umask 077
+          profile_file="$RUNNER_TEMP/appstore.mobileprovision"
+          printf '%s' "$IOS_APPSTORE_PROFILE" | base64 --decode > "$profile_file"
+          security cms -D -i "$profile_file" > "$PROFILE_PLIST"
+          uuid="$(plutil -extract UUID raw -o - "$PROFILE_PLIST")"
+          echo "PROFILE_UUID=$uuid" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$(plutil -extract Name raw -o - "$PROFILE_PLIST")" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mv "$profile_file" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+      # Manual distribution signing, set in the git-ignored Signing.xcconfig, which only the Runner
+      # target includes (Release.xcconfig). A command-line override would also reach the plugin
+      # packages' targets, which take no provisioning profile.
+      - name: Write the signing settings
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          umask 077
+          {
+            printf 'DEVELOPMENT_TEAM = %s\n' "$IOS_TEAM_ID"
+            printf 'CODE_SIGN_STYLE = Manual\n'
+            printf 'CODE_SIGN_IDENTITY = Apple Distribution\n'
+            printf 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution\n'
+            printf 'PROVISIONING_PROFILE_SPECIFIER = %s\n' "$PROFILE_NAME"
+          } > ios/Flutter/Signing.xcconfig
+      # `flutter build ipa` cannot be told to use a manual profile per target, so Flutter only
+      # prepares the project (version, Generated.xcconfig) and xcodebuild archives and exports.
       - name: Prepare the project
         run: flutter build ios --release --config-only
       - name: Archive
@@ -78,23 +103,23 @@ jobs:
             -scheme Runner \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/ios/Runner.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -archivePath build/ios/Runner.xcarchive
       - name: Export the ipa
         run: |
+          cp ios/ExportOptions.plist "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy \
+            -c "Add :provisioningProfiles dict" \
+            -c "Add :provisioningProfiles:com.wambito.app string $PROFILE_NAME" \
+            "$EXPORT_OPTIONS"
           xcodebuild -exportArchive \
             -archivePath build/ios/Runner.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath build/ios/ipa \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -exportOptionsPlist "$EXPORT_OPTIONS" \
+            -exportPath build/ios/ipa
+      # altool is on Apple's deprecation path (the replacement is the App Store Connect API or
+      # Transporter); it still works for now.
       - name: Upload to App Store Connect
         run: |
+          shopt -s nullglob
           ipa=(build/ios/ipa/*.ipa)
           [ "${#ipa[@]}" -eq 1 ] || { echo "::error::expected one .ipa, found ${#ipa[@]}"; exit 1; }
           xcrun altool --upload-app --type ios --file "${ipa[0]}" \
@@ -103,5 +128,6 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$KEYCHAIN_PATH" || true
-          rm -f "$RUNNER_TEMP/dist-cert.p12" ios/Flutter/Signing.xcconfig
+          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/appstore.mobileprovision" "$PROFILE_PLIST" "$EXPORT_OPTIONS" ios/Flutter/Signing.xcconfig
+          [ -z "${PROFILE_UUID:-}" ] || rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
           rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
