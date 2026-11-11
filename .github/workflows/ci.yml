@@ -17,13 +17,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # The Storybook tests in `pnpm test` run in Vitest browser mode on Playwright Chromium.
-      - run: pnpm --filter @wambito/web exec playwright install --with-deps chromium
+      # It falls back to the main Ubuntu archive when the runner's apt mirror fails.
+      - run: scripts/ci-install-chromium.sh
       # Wambito depends on nothing at the founder's personal domain (docs/superpowers keeps history).
       - run: "! git grep -n -I -i -e 'anderson''laverde' -- . ':!docs/superpowers'"
       # No old app name or old mascot name (see the guard script) outside .github/name-allowlist.txt.
       - run: scripts/check-old-name.sh
       # The guard's own test: each allowlist reason must be one the guard knows.
       - run: scripts/test-check-old-name.sh
+      # The Chromium install script's own test (stub install, temporary mirror list).
+      - run: scripts/test-ci-install-chromium.sh
       - run: pnpm lint
       # Generated files must be committed as generated. tokens.css comes from the design system's
       # tokens.json: run `pnpm --filter @wambito/web tokens` and commit it.
@@ -74,7 +77,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @wambito/web exec playwright install --with-deps chromium
+      # Playwright Chromium; falls back to the main Ubuntu archive when the runner's apt mirror fails.
+      - run: scripts/ci-install-chromium.sh
       # The dev stack: Postgres, Mailpit and the API (which applies the migrations on start), with
       # the development defaults. The e2e's global setup waits for the API and Mailpit.
       - run: cp .env.example .env
