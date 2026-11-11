@@ -6,6 +6,7 @@ import UIKit
   // One object per channel, kept here so the channel lives as long as the app.
   private var deviceChannel: DeviceChannel?
   private var hapticsChannel: HapticsChannel?
+  private var soundChannel: SoundChannel?
 
   override func application(
     _ application: UIApplication,
@@ -23,5 +24,6 @@ import UIKit
   private func registerChannels(messenger: FlutterBinaryMessenger) {
     deviceChannel = DeviceChannel(messenger: messenger)
     hapticsChannel = HapticsChannel(messenger: messenger)
+    soundChannel = SoundChannel(messenger: messenger)
   }
 }
