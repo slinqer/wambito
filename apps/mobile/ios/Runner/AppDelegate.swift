@@ -5,6 +5,7 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   // One object per channel, kept here so the channel lives as long as the app.
   private var deviceChannel: DeviceChannel?
+  private var hapticsChannel: HapticsChannel?
 
   override func application(
     _ application: UIApplication,
@@ -21,5 +22,6 @@ import UIKit
   /// Every `wambito/*` channel registers here: create its object, keep it in a property above.
   private func registerChannels(messenger: FlutterBinaryMessenger) {
     deviceChannel = DeviceChannel(messenger: messenger)
+    hapticsChannel = HapticsChannel(messenger: messenger)
   }
 }
