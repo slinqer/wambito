@@ -11,7 +11,8 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   chosen concept, `wambito-icon.svg` (master, 1024), `-foreground`/`-monochrome` (Android adaptive,
   108 dp), `wambito-logo.svg` and `-logo-dark.svg` (wordmark as outlines), `wambito-icon-preview.png`.
   `docs/brand/tools/gen-icon.cjs` holds the one geometry and writes all of them plus the icon PNGs
-  (`mipmap-*`, F-Droid `icon.png`, web `favicon.ico`/`apple-touch-icon.png`) and
+  (`mipmap-*`, F-Droid `icon.png`, web `favicon.ico`/`apple-touch-icon.png`, the iOS
+  `AppIcon.appiconset/*.png`, solid plum without alpha) and
   `drawable/ic_launcher_{foreground,monochrome}.xml`; never hand-edit those (usage in its header).
   `docs/brand/tools/gen-email-images.cjs` writes the emails' `apps/web/public/email/*` (Wambi,
   the wordmark day/night, the fonts) from the landing's sprite and Fredoka; a changed image needs
