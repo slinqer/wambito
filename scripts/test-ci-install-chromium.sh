@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tests scripts/ci-install-chromium.sh with a stub install command and a temporary mirror list:
-# a first success touches nothing; a failure swaps the runner's apt mirror for the main archive and
-# retries; a command that always fails ends in failure after the attempts.
+# Tests scripts/ci-install-chromium.sh with stub install commands: when the install with system
+# packages passes, the browser-only install never runs; when it fails, the browser-only install runs
+# and its result is the script's.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -15,42 +15,30 @@ fail() {
   failures=$((failures + 1))
 }
 
-# A stub that fails the first $1 calls, then succeeds; it counts calls in $work/calls.
+# stub <name> <exit code>: a command that records its name in $work/calls and exits with the code.
 stub() {
-  cat >"$work/install" <<EOF
-#!/usr/bin/env bash
-n=\$(( \$(cat "$work/calls" 2>/dev/null || echo 0) + 1 ))
-echo "\$n" >"$work/calls"
-[ "\$n" -gt $1 ]
-EOF
-  chmod +x "$work/install"
-  rm -f "$work/calls"
-  printf 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n' >"$work/mirrors"
+  printf '#!/usr/bin/env bash\necho %s >>"%s/calls"\nexit %s\n' "$1" "$work" "$2" >"$work/$1"
+  chmod +x "$work/$1"
 }
 
+# run <with-deps exit> <browser-only exit>
 run() {
-  APT_MIRRORS_FILE="$work/mirrors" INSTALL_CMD="$work/install" SUDO="" RETRY_SLEEP=0 \
-    "$script" >"$work/out" 2>&1
+  stub with-deps "$1"
+  stub browser-only "$2"
+  rm -f "$work/calls"
+  WITH_DEPS_CMD="$work/with-deps" BROWSER_ONLY_CMD="$work/browser-only" "$script" >"$work/out" 2>&1
 }
 
-# 1. Success first time: one call, mirror list untouched.
-stub 0
-run || fail "first-time success should pass"
-[ "$(cat "$work/calls")" = 1 ] || fail "first-time success should call once"
-grep -q azure "$work/mirrors" || fail "first-time success should keep the mirror list"
+calls() { tr '\n' ' ' <"$work/calls"; }
 
-# 2. One failure: the mirror list becomes the main archive and the retry passes.
-stub 1
-run || fail "a failure then success should pass"
-[ "$(cat "$work/calls")" = 2 ] || fail "a failure then success should call twice"
-grep -q azure "$work/mirrors" && fail "a failure should drop the runner's mirror"
-grep -q 'http://archive.ubuntu.com/ubuntu/' "$work/mirrors" ||
-  fail "a failure should switch to the main archive"
+run 0 1 || fail "a passing install with system packages should pass"
+[ "$(calls)" = "with-deps " ] || fail "a passing install should not run the browser-only one: $(calls)"
 
-# 3. Always failing: fails after 3 attempts.
-stub 99
-if run; then fail "an always-failing install should fail"; fi
-[ "$(cat "$work/calls")" = 3 ] || fail "an always-failing install should try 3 times"
+run 1 0 || fail "a failing install with system packages should fall back and pass"
+[ "$(calls)" = "with-deps browser-only " ] || fail "a failing install should fall back: $(calls)"
+grep -q 'without system packages' "$work/out" || fail "the fallback should say so in the log"
+
+if run 1 1; then fail "both installs failing should fail"; fi
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

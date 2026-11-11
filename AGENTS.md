@@ -39,8 +39,8 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 
 ## What CI runs (`.github/workflows/ci.yml`)
 
-- `check`: install, Playwright chromium (`scripts/ci-install-chromium.sh`, which falls back to
-  the main Ubuntu archive; tested by `scripts/test-ci-install-chromium.sh`), the two guards and the
+- `check`: install, Playwright chromium (`scripts/ci-install-chromium.sh`, browser only when
+  apt cannot reach Ubuntu; tested by `scripts/test-ci-install-chromium.sh`), the two guards and the
   old-name guard's test, `pnpm lint`,
   generated-file checks (web `tokens`, web and mcp `api:types` + `git diff --exit-code`),
   `pnpm typecheck`, `pnpm test`, then `deploy/personal/test-*.sh` (retention, r2, auto-deploy,
