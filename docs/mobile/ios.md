@@ -31,9 +31,9 @@ job in `ci.yml`. The Android side is `release.md`.
    | `IOS_TEAM_ID` | the 10-character team id (Developer portal, Membership details) |
    | `IOS_DIST_CERT_P12` | the base64 text of the `.p12` from step 2 |
    | `IOS_DIST_CERT_PASSWORD` | the `.p12`'s password |
+   | `IOS_APPSTORE_PROFILE` | the base64 text of the `.mobileprovision` from step 4 |
    | `ASC_KEY_ID` | the API key's Key ID |
    | `ASC_ISSUER_ID` | the Issuer ID (top of the API keys page) |
-   | `IOS_APPSTORE_PROFILE` | the base64 text of the `.mobileprovision` from step 4 |
    | `ASC_KEY_P8` | the whole contents of the `.p8` file, header and footer lines included |
 
 7. **The web server.** Universal Links and passkeys need the team id in the apple-app-site-association
@@ -45,9 +45,10 @@ job in `ci.yml`. The Android side is `release.md`.
 
 ## A release
 
-1. Release as in `release.md`: tag `mobile-vX.Y.Z` on the release commit and push the tag (pushing is what starts the workflow, so do it after the Android APK is
-   checked). The tagged commit's `pubspec.yaml` version (`X.Y.Z+<base code>`) is the iOS version and build number; App
-   Store Connect refuses a build number it has already seen.
+1. Release as in `release.md`: tag `mobile-vX.Y.Z` on the release commit and push the tag (pushing
+   is what starts the workflow, so do it after the Android APK is checked). The tagged commit's
+   `pubspec.yaml` version (`X.Y.Z+<base code>`) is the iOS version and build number; App Store
+   Connect refuses a build number it has already seen.
 2. The `iOS release` workflow installs the App Store profile, archives and exports with manual
    distribution signing, and uploads the build with the API key (`altool`, which is on Apple's
    deprecation path; Transporter or the App Store Connect API replace it when it stops working).
@@ -68,10 +69,11 @@ job in `ci.yml`. The Android side is `release.md`.
   exempt. No export documents are filed. If the encryption changes beyond this, review the answer
   first.
 - **App Privacy.** Match `apps/mobile/ios/Runner/PrivacyInfo.xcprivacy`: no tracking, no tracking
-  domains; collected data, both linked to the user, not used for tracking, purpose App
-  Functionality: **Financial Info, Other Financial Info** (the movements) and **User Content, Other
-  User Content** (notes and categories). Nothing else is collected. The data is stored encrypted
-  end to end; say so in the privacy policy link, which is the web app's.
+  domains; collected data, all linked to the user, not used for tracking, purpose App
+  Functionality: **Financial Info, Other Financial Info** (the movements), **User Content, Other
+  User Content** (notes and categories), **Contact Info, Email Address** (the sign-in email; a guest
+  has none) and **Identifiers, User ID** (the account id). The data is stored encrypted end to end;
+  say so in the privacy policy link, which is the web app's.
 - **Required-reason APIs.** UserDefaults (reason CA92.1) and file timestamps (reason C617.1) are
   declared in the same file; no answer is needed in the console.
 
