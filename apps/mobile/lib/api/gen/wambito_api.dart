@@ -50,6 +50,7 @@ export 'package:wambito/api/gen/src/model/import_stats.dart';
 export 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
 export 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
 export 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
+export 'package:wambito/api/gen/src/model/key_link.dart';
 export 'package:wambito/api/gen/src/model/key_wrap.dart';
 export 'package:wambito/api/gen/src/model/key_wraps.dart';
 export 'package:wambito/api/gen/src/model/pairing_approver.dart';

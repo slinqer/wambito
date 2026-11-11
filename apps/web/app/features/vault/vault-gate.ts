@@ -30,6 +30,12 @@ import type { UnlockError } from "./Unlock.tsx";
  * `onRemoved`: its vault is already deleted) shows Unlock with the `removed` notice; a guest, which
  * has no recovery key to type, its Locked.
  *
+ * A browser that could not verify a new key version (`unverified()`, from the session's
+ * `onUnverified`, or an opening that fails with `key_unverified`) shows Unlock with the
+ * `unverified` notice, a guest its Locked. Its vault is still here, unsent changes included: the
+ * unlock (recovery key, passkey or pairing) keeps it and its held key versions, adds the newer
+ * ones and opens it fresh, and the first sync pushes what waited.
+ *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
  * A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
@@ -112,8 +118,11 @@ export type VaultGateState<S = unknown> =
   | { status: "checking" }
   | { status: "setup"; recoveryKey: string }
   | { status: "committing" }
-  /** `notice: "removed"`: this browser was removed from the account (its vault is gone). */
-  | { status: "unlock"; notice?: "removed" }
+  /**
+   * `notice: "removed"`: this browser was removed from the account (its vault is gone).
+   * `notice: "unverified"`: a new key version did not verify (its vault is kept).
+   */
+  | { status: "unlock"; notice?: "removed" | "unverified" }
   /** `from`: where back goes, Unlock or a guest's Locked. */
   | { status: "pairing"; from: "unlock" | "guest" }
   | { status: "opening" }
@@ -151,6 +160,11 @@ export interface VaultGate<S = unknown, K = GateKeys> {
    * and the vault was deleted): Unlock with the `removed` notice; a guest's Locked.
    */
   removed(): void;
+  /**
+   * A new key version did not verify (`VaultSession.onUnverified`: the sync stopped, the vault is
+   * kept): Unlock with the `unverified` notice; a guest's Locked.
+   */
+  unverified(): void;
 }
 
 const UNLOCK_ERRORS: readonly string[] = [
@@ -272,11 +286,14 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     } else set({ status: "unlock" });
   };
 
-  /** This browser was removed (its vault is gone): Unlock with the notice, a guest's Locked. */
-  const showRemoved = () => {
+  /**
+   * Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice, a
+   * guest's Locked.
+   */
+  const showNotice = (notice: "removed" | "unverified") => {
     prepared = null;
     if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
-    else set({ status: "unlock", notice: "removed" });
+    else set({ status: "unlock", notice });
   };
 
   /** Shows Locked; its retry runs `step`. */
@@ -321,7 +338,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       else if (code === "device_removed") {
         // Removed while this page was closed: the session deleted the vault, so say so.
         keepPending(null);
-        showRemoved();
+        showNotice("removed");
+      } else if (code === "key_unverified") {
+        // A new key version did not verify: the vault is kept, an unlock opens it again.
+        keepPending(null);
+        showNotice("unverified");
       } else lock(error, check);
     }
   }
@@ -471,7 +492,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     },
     removed() {
       if (state.status !== "ready") return;
-      showRemoved();
+      showNotice("removed");
+    },
+    unverified() {
+      if (state.status !== "ready") return;
+      showNotice("unverified");
     },
     async pair() {
       const from =

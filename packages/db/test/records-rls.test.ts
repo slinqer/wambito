@@ -3,10 +3,12 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   createDb,
   type Db,
+  keyLinks,
   keyWraps,
   pairingRequests,
   recordPurges,
   records,
+  session,
   user,
   withUser,
 } from "../src/index.ts";
@@ -65,6 +67,9 @@ beforeAll(async () => {
     await tx.insert(keyWraps).values(wrap("user-b", B));
     await tx.insert(pairingRequests).values(pairing("user-b", B));
     await tx.insert(recordPurges).values({ userId: "user-b", throughVersion: 5 });
+    await tx
+      .insert(keyLinks)
+      .values({ userId: "user-b", keyV: 2, link: new Uint8Array(60).fill(7) });
   });
 }, 120_000);
 
@@ -299,5 +304,80 @@ describe("pairing_requests columns", () => {
         keyV: 1,
       }),
     );
+  });
+});
+
+describe("key_links", () => {
+  const link = (userId: string, keyV: number, len = 60) => ({
+    userId,
+    keyV,
+    link: new Uint8Array(len).fill(3),
+  });
+
+  test("forced RLS, one person never reads or writes another's", async () => {
+    expect(await withUser(app.db, "user-a", (tx) => tx.select().from(keyLinks))).toEqual([]);
+    const updated = await withUser(app.db, "user-a", (tx) =>
+      tx.update(keyLinks).set({ keyV: 3 }).where(eq(keyLinks.userId, "user-b")).returning(),
+    );
+    expect(updated).toEqual([]);
+    const deleted = await withUser(app.db, "user-a", (tx) =>
+      tx.delete(keyLinks).where(eq(keyLinks.userId, "user-b")).returning(),
+    );
+    expect(deleted).toEqual([]);
+    expect(await withUser(app.db, "user-b", (tx) => tx.select().from(keyLinks))).toHaveLength(1);
+    const e = await rlsError(
+      withUser(app.db, "user-a", (tx) => tx.insert(keyLinks).values(link("user-b", 3))),
+    );
+    expect(e).toMatch(/row-level security/);
+  });
+
+  test("a key_links row needs 60 bytes and key_v >= 2", async () => {
+    const ins = (v: ReturnType<typeof link>) =>
+      rlsError(withUser(app.db, "user-a", (tx) => tx.insert(keyLinks).values(v)));
+    expect(await ins(link("user-a", 2, 59))).toMatch(/check constraint/);
+    expect(await ins(link("user-a", 2, 61))).toMatch(/check constraint/);
+    expect(await ins(link("user-a", 1))).toMatch(/check constraint/);
+    await withUser(app.db, "user-a", (tx) => tx.insert(keyLinks).values(link("user-a", 2)));
+    expect(await ins(link("user-a", 2))).toMatch(/duplicate key/);
+  });
+});
+
+describe("key_wraps.session_id", () => {
+  test("is set null when the session is deleted", async () => {
+    await admin.db.insert(session).values({
+      id: "sess-1",
+      userId: "user-a",
+      token: "tok-1",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const id = "c0000000-0000-4000-8000-000000000001";
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(keyWraps).values({ ...wrap("user-a", id), sessionId: "sess-1" }),
+    );
+    await admin.db.delete(session).where(eq(session.id, "sess-1"));
+    const [row] = await withUser(app.db, "user-a", (tx) =>
+      tx.select().from(keyWraps).where(eq(keyWraps.id, id)),
+    );
+    expect(row?.sessionId).toBeNull();
+  });
+
+  test("only a device wrap can carry one", async () => {
+    await admin.db.insert(session).values({
+      id: "sess-2",
+      userId: "user-a",
+      token: "tok-2",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const e = await rlsError(
+      withUser(app.db, "user-a", (tx) =>
+        tx.insert(keyWraps).values({
+          ...wrap("user-a", "c0000000-0000-4000-8000-000000000002"),
+          kind: "passkey",
+          ref: "pk-s",
+          sessionId: "sess-2",
+        }),
+      ),
+    );
+    expect(e).toMatch(/check constraint/);
   });
 });

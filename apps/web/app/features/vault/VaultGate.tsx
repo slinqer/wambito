@@ -139,6 +139,8 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   useEffect(() => session?.onClosed(() => gate.closed()), [session, gate]);
   // Removed from the account by another device: the vault is gone, Unlock says so.
   useEffect(() => session?.onRemoved(() => gate.removed()), [session, gate]);
+  // A new key version did not verify: the vault is kept, Unlock asks for a passkey or the key.
+  useEffect(() => session?.onUnverified(() => gate.unverified()), [session, gate]);
   // The open app needs no passkey PRF: whatever is still kept is zeroed.
   useEffect(() => {
     if (session) clearSignInPrf();

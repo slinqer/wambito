@@ -63,10 +63,19 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
-  other kinds sending `publicKey` or `attestation` are 422 `validation_failed`).
+  other kinds sending `publicKey` or `attestation` are 422 `validation_failed`). A device wrap also
+  stores `session_id`, the session that registered it (`grant.sessionId` from `requireUser`; null
+  for OAuth grants): deleting it, or a rotation that leaves its `ref` out, deletes that session in
+  the same transaction, never the caller's own nor one a remaining device wrap still references
+  (a browser that enrolled again under the same session); a kept device's new row copies the old
+  `session_id`.
   `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
   the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
   recovery wrap with it, so two setups at once cannot make two data keys.
+  Rotation also takes a `link` (the previous data key sealed under the new one, 60 bytes, opaque to
+  the server): stored in `key_links` in the rotation's transaction; 422 `link_required` (account
+  has a version), `link_unexpected` (first version), `invalid_link` (not 60 bytes). `GET /v2/keys`
+  and the rotate answer are `{ wraps, links }` (`listKeys`), links ordered by `keyV`.
 - `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
   approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
   `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is

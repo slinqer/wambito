@@ -150,3 +150,16 @@ export const Removed: Story = {
     await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
   },
 };
+
+/** A new key version did not verify: the vault is kept, the notice asks to unlock again. */
+export const Unverified: Story = {
+  args: { notice: "unverified" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("status")).toHaveTextContent(
+      "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación.",
+    );
+    await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Usar una llave de acceso" })).toBeVisible();
+  },
+};

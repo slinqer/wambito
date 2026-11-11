@@ -311,10 +311,13 @@ export const keyWraps = pgTable(
     publicKey: bytea("public_key"),
     attestation: bytea("attestation"),
     label: text("label"),
+    /** The Better Auth session that registered a device wrap; null once that session is gone. */
+    sessionId: text("session_id").references(() => session.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   },
   (t) => [
+    check("key_wraps_session_device", sql`${t.kind} = 'device' or ${t.sessionId} is null`),
     check("key_wraps_kind", sql`${t.kind} in ('passkey', 'recovery', 'device', 'assistant')`),
     check(
       "key_wraps_device_attestation",
@@ -322,6 +325,22 @@ export const keyWraps = pgTable(
     ),
     uniqueIndex("key_wraps_one_recovery").on(t.userId).where(sql`${t.kind} = 'recovery'`),
     uniqueIndex("key_wraps_ref").on(t.userId, t.kind, t.ref).where(sql`${t.ref} is not null`),
+  ],
+);
+
+/** One link per rotation: the previous data key sealed under the new one (60 bytes). */
+export const keyLinks = pgTable(
+  "key_links",
+  {
+    userId: userId(),
+    keyV: smallint("key_v").notNull(),
+    link: bytea("link").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.keyV] }),
+    check("key_links_link_len", sql`octet_length(${t.link}) = 60`),
+    check("key_links_key_v", sql`${t.keyV} >= 2`),
   ],
 );
 
@@ -375,4 +394,5 @@ export const RLS_TABLES = [
   "key_wraps",
   "pairing_requests",
   "record_purges",
+  "key_links",
 ] as const;

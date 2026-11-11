@@ -8,6 +8,7 @@ import {
   openFromDevice,
   openRecord,
   parseRecoveryKey,
+  sealKeyLink,
   sealRecord,
   sealToDevice,
   toBase64Url,
@@ -20,6 +21,10 @@ import { createEncryptedStore } from "./encrypted-store.ts";
 
 /** Every recovery secret `parseRecoveryKey` handed out, to check that unlock zeroes it. */
 const parsedSecrets = vi.hoisted(() => [] as Uint8Array[]);
+/** Every older data key `openKeyLink` handed out, to check that the walks zero them. */
+const openedLinks = vi.hoisted(() => [] as Uint8Array[]);
+/** Every data key `openFromDevice` handed out, to check that a refused device wrap is zeroed. */
+const openedDevice = vi.hoisted(() => [] as Uint8Array[]);
 vi.mock("@wambito/crypto", async (original) => {
   const crypto = await original<typeof import("@wambito/crypto")>();
   return {
@@ -29,12 +34,23 @@ vi.mock("@wambito/crypto", async (original) => {
       parsedSecrets.push(secret);
       return secret;
     },
+    openFromDevice: async (...args: Parameters<typeof crypto.openFromDevice>) => {
+      const key = await crypto.openFromDevice(...args);
+      openedDevice.push(key);
+      return key;
+    },
+    openKeyLink: async (...args: Parameters<typeof crypto.openKeyLink>) => {
+      const key = await crypto.openKeyLink(...args);
+      openedLinks.push(key);
+      return key;
+    },
   };
 });
 
 import {
   addPasskeyWrap,
   dropKeyVersion,
+  enrollDevice,
   forgetDevice,
   KeysError,
   type LocalKeys,
@@ -71,7 +87,12 @@ interface Wrap {
 /** A fake `/v2/keys` that enforces the rules the tests care about (the real one: `routes/keys.ts`). */
 function fakeKeys(options: { passkeys?: string[] } = {}) {
   const wraps: Wrap[] = [];
+  /** `link(v)` by the version whose key seals it, base64url. */
+  const links = new Map<number, string>();
   const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
+  /** Ids of the `DELETE /v2/keys/{id}` calls, in order; `failDeletes`: answered with a 503. */
+  const deletes: string[] = [];
+  const state = { failDeletes: false };
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const json = (body: unknown, status = 200) =>
@@ -80,8 +101,19 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
         headers: { "content-type": "application/json" },
       });
     if (url.pathname === "/api/v2/keys" && (init?.method ?? "GET") === "GET")
-      return json({ wraps });
+      return json({
+        wraps,
+        links: [...links].sort(([a], [b]) => a - b).map(([keyV, link]) => ({ keyV, link })),
+      });
     const match = /^\/api\/v2\/keys\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (match && init?.method === "DELETE") {
+      const id = match[1] as string;
+      deletes.push(id);
+      if (state.failDeletes) return json({ code: "unavailable" }, 503);
+      const at = wraps.findIndex((w) => w.id === id);
+      if (at >= 0) wraps.splice(at, 1);
+      return new Response(null, { status: 204 });
+    }
     if (match && init?.method === "PUT") {
       const id = match[1] as string;
       expect(id).toBe(id.toLowerCase());
@@ -122,7 +154,7 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
     }
     return new Response(null, { status: 404 });
   };
-  return { fetch: fetch as typeof globalThis.fetch, wraps, puts };
+  return { fetch: fetch as typeof globalThis.fetch, wraps, links, puts, deletes, state };
 }
 
 let counter = 0;
@@ -508,8 +540,8 @@ describe("the keyring", () => {
   });
 
   it("dropKeyVersion removes record:1 and dedupe:1 only", async () => {
-    const { api, userId, device } = await enrolledAccount();
-    await rotateDeviceWrap(api, userId, device, generateDataKey(), 2);
+    const { api, userId, dk, device } = await enrolledAccount();
+    await rotateDeviceWrap(api, userId, device, generateDataKey(), 2, dk);
     await refreshKeys({ userId, fetch: api.fetch });
 
     await dropKeyVersion(userId, 1);
@@ -526,14 +558,19 @@ describe("the keyring", () => {
   });
 });
 
-/** The server re-wrapped a new DK to this browser's public key under `keyV` (a rotation). */
+/**
+ * The server re-wrapped a new DK to this browser's public key under `keyV` (a rotation). With
+ * `previous`, the rotation also left `link(keyV)`: `previous` sealed under `dk`.
+ */
 async function rotateDeviceWrap(
   api: ReturnType<typeof fakeKeys>,
   userId: string,
   device: Wrap,
   dk: Uint8Array,
   keyV: number,
+  previous?: Uint8Array,
 ) {
+  if (previous) await addLink(api, userId, dk, previous, keyV);
   const wrap = api.wraps.find((w) => w.id === device.id) as Wrap;
   wrap.keyV = keyV;
   wrap.wrapped = toBase64Url(
@@ -543,6 +580,51 @@ async function rotateDeviceWrap(
       dk,
     ),
   );
+}
+
+/** Stores `link(keyV)`: `oldKey` sealed under `newKey`. */
+async function addLink(
+  api: ReturnType<typeof fakeKeys>,
+  userId: string,
+  newKey: Uint8Array,
+  oldKey: Uint8Array,
+  keyV: number,
+) {
+  api.links.set(keyV, toBase64Url(await sealKeyLink(newKey, oldKey, { userId, keyV })));
+}
+
+/** What the vault's `keys` store holds and its current `keyV`. */
+async function stored(userId: string) {
+  const store = await createEncryptedStore(userId);
+  try {
+    return { names: (await store.keyNames()).sort(), keyV: await store.getMeta("keyV") };
+  } finally {
+    store.close();
+  }
+}
+
+/** Turns the vault into a 2a one: `record:<v>`/`dedupe:<v>` back under the single legacy names. */
+async function makeLegacy(userId: string, keyV: number) {
+  const store = await createEncryptedStore(userId);
+  try {
+    const record = await store.getKey<CryptoKey>(`record:${keyV}`);
+    const dedupe = await store.getKey<CryptoKey>(`dedupe:${keyV}`);
+    await store.putKey("record", record);
+    await store.putKey("dedupe", dedupe);
+    await store.deleteKey(`record:${keyV}`);
+    await store.deleteKey(`dedupe:${keyV}`);
+  } finally {
+    store.close();
+  }
+}
+
+/** A record sealed under `dk` at `keyV` opens with the keyring's keys for `keyV`. */
+async function opensUnder(local: LocalKeys, userId: string, dk: Uint8Array, keyV: number) {
+  const ctx = { ...CTX(userId, REC), keyV };
+  const sealed = await sealRecord(await deriveRecordKeys(dk, false), ctx, { keyV });
+  const keys = local.keyring.byVersion.get(keyV);
+  if (!keys) return false;
+  return JSON.stringify(await openRecord(keys, ctx, sealed)) === JSON.stringify({ keyV });
 }
 
 describe("withDataKey", () => {
@@ -594,15 +676,40 @@ describe("withDataKey", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("a wrap at a keyV this browser does not hold yet is not checked (a rotation)", async () => {
+  it("withDataKey refuses a forged v+1: no link, or a link to another key, is tampered; fn never runs", async () => {
     const { api, userId, device } = await enrolledAccount();
+    const forged = generateDataKey();
+    await rotateDeviceWrap(api, userId, device, forged, 2);
+    const fn = vi.fn(async () => 1);
+    await expect(withDataKey({ userId, fetch: api.fetch }, fn)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+
+    // a link the server made: it leads to a key this browser never held
+    await addLink(api, userId, forged, generateDataKey(), 2);
+    openedLinks.length = 0;
+    await expect(withDataKey({ userId, fetch: api.fetch }, fn)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(fn).not.toHaveBeenCalled();
+    expect(openedLinks).toHaveLength(1);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("withDataKey accepts v+1 whose link leads to the held key, and zeroes what it opened", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
     const next = generateDataKey();
-    await rotateDeviceWrap(api, userId, device, next, 2);
+    await rotateDeviceWrap(api, userId, device, next, 2, dk);
+    openedLinks.length = 0;
     let copy: Uint8Array | undefined;
-    await withDataKey({ userId, fetch: api.fetch }, async (key) => {
+    const keyV = await withDataKey({ userId, fetch: api.fetch }, async (key, v) => {
       copy = key.slice();
+      return v;
     });
+    expect(keyV).toBe(2);
     expect(copy).toEqual(next);
+    expect(openedLinks).toHaveLength(1);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
   });
 
   it("a 2a browser without the wrap id finds its device wrap and remembers it", async () => {
@@ -635,9 +742,9 @@ describe("withDataKey", () => {
 
 describe("refreshKeys", () => {
   it("refreshKeys adds the new version and keeps the old one", async () => {
-    const { api, userId, device } = await enrolledAccount();
+    const { api, userId, dk, device } = await enrolledAccount();
     const next = generateDataKey();
-    await rotateDeviceWrap(api, userId, device, next, 2);
+    await rotateDeviceWrap(api, userId, device, next, 2, dk);
 
     const local = await refreshKeys({ userId, fetch: api.fetch });
     expect(local.keyring.current).toBe(2);
@@ -654,7 +761,7 @@ describe("refreshKeys", () => {
   it("a replayed lower-version wrap leaves current and the stored keys unchanged", async () => {
     const { api, userId, dk, device } = await enrolledAccount();
     const next = generateDataKey();
-    await rotateDeviceWrap(api, userId, device, next, 2);
+    await rotateDeviceWrap(api, userId, device, next, 2, dk);
     await refreshKeys({ userId, fetch: api.fetch });
     // the server replays the old keyV 1 wrap (it opens: it is sealed to this browser)
     await rotateDeviceWrap(api, userId, device, dk, 1);
@@ -691,6 +798,73 @@ describe("refreshKeys", () => {
     expect(await openRecord(currentKeys(await loadLocalKeys(userId)), ctx, sealed)).toEqual({
       s: 1,
     });
+  });
+
+  it("refreshKeys refuses a forged v+1, keeps nothing, and current stays v", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    const before = await stored(userId);
+    const forged = generateDataKey();
+    await rotateDeviceWrap(api, userId, device, forged, 2);
+    await expect(refreshKeys({ userId, fetch: api.fetch })).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    await addLink(api, userId, forged, generateDataKey(), 2);
+    await expect(refreshKeys({ userId, fetch: api.fetch })).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(await stored(userId)).toEqual(before);
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(1);
+  });
+
+  it("refreshKeys at v reaching v+2 keeps v+1 and v+2, and a record sealed under v+1 opens", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    const dk2 = generateDataKey();
+    const dk3 = generateDataKey();
+    await addLink(api, userId, dk2, dk, 2);
+    await rotateDeviceWrap(api, userId, device, dk3, 3, dk2);
+    openedLinks.length = 0;
+
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    expect([...local.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(local, userId, dk, 1)).toBe(true);
+    expect(await opensUnder(local, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(local, userId, dk3, 3)).toBe(true);
+    expect(openedLinks).toHaveLength(2);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("a broken middle link (v+2 → v+1 fine, v+1 → v wrong) is tampered and keeps nothing", async () => {
+    const { api, userId, device } = await enrolledAccount();
+    const before = await stored(userId);
+    const dk2 = generateDataKey();
+    const dk3 = generateDataKey();
+    await addLink(api, userId, dk2, generateDataKey(), 2);
+    await rotateDeviceWrap(api, userId, device, dk3, 3, dk2);
+    openedLinks.length = 0;
+
+    await expect(refreshKeys({ userId, fetch: api.fetch })).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(await stored(userId)).toEqual(before);
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(1);
+    expect(openedLinks).toHaveLength(2);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("refreshKeys from a 2a vault (legacy record/dedupe at v1) keeps the right key for every version", async () => {
+    const { api, userId, dk, device } = await enrolledAccount();
+    await makeLegacy(userId, 1);
+    const dk2 = generateDataKey();
+    const dk3 = generateDataKey();
+    await addLink(api, userId, dk2, dk, 2);
+    await rotateDeviceWrap(api, userId, device, dk3, 3, dk2);
+    const local = await refreshKeys({ userId, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect(await opensUnder(loaded, userId, dk, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
   });
 
   it("refreshKeys refuses a device wrap whose public key is not this browser's", async () => {
@@ -807,5 +981,261 @@ describe("passkey wraps", () => {
       addPasskeyWrap({ userId, credentialId: "c29tZW9uZS1lbHNl", prf: prfOf(3), fetch: api.fetch }),
     ).rejects.toEqual(new KeysError("unknown_passkey", 422));
     expect(api.wraps.filter((w) => w.kind === "passkey")).toHaveLength(0);
+  });
+});
+
+describe("unlocking an account that rotated", () => {
+  const CRED = "cHJmLWNyZWRlbnRpYWw";
+
+  /**
+   * An account set up at v1 and rotated twice by another device: DK(1..3), links 2 and 3 (unless
+   * left out), the recovery wrap at v3. The browser that set it up keeps its vault.
+   */
+  async function rotatedTwice(options: { link2?: "missing" | "wrong" } = {}) {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+    const secret = parseRecoveryKey(recoveryKey as string);
+    const dk1 = await unwrapDataKey(
+      secret,
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const dk2 = generateDataKey();
+    const dk3 = generateDataKey();
+    if (options.link2 === undefined) await addLink(api, userId, dk2, dk1, 2);
+    if (options.link2 === "wrong") await addLink(api, userId, dk2, generateDataKey(), 2);
+    await addLink(api, userId, dk3, dk2, 3);
+    recovery.keyV = 3;
+    recovery.wrapped = toBase64Url(
+      await wrapDataKey(secret, { kind: "recovery", userId, keyV: 3 }, dk3),
+    );
+    return { api, userId, recoveryKey: recoveryKey as string, dk1, dk2, dk3 };
+  }
+
+  it("unlockWithRecovery on a fresh browser keeps every version the links reach", async () => {
+    const { api, userId, recoveryKey, dk1, dk2, dk3 } = await rotatedTwice();
+    await forgetDevice(userId);
+    openedLinks.length = 0;
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    expect([...local.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(openedLinks).toHaveLength(2);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("unlockWithRecovery on an account whose link 2 is missing keeps v2 and v3 only, without error", async () => {
+    const { api, userId, recoveryKey, dk2, dk3 } = await rotatedTwice({ link2: "missing" });
+    await forgetDevice(userId);
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([2, 3]);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+  });
+
+  it("unlockWithPasskey on a browser holding v whose chain does not reach its key unlocks, keeps the held v and the trusted n", async () => {
+    const { api, userId, dk1, dk2, dk3 } = await rotatedTwice({ link2: "wrong" });
+    const prf = new Uint8Array(32).fill(7);
+    api.wraps.push({
+      id: "01930000-0000-7000-8000-0000000000c1",
+      kind: "passkey",
+      ref: CRED,
+      keyV: 3,
+      wrapped: toBase64Url(await wrapDataKey(prf, { kind: "passkey", userId, keyV: 3 }, dk3)),
+      publicKey: null,
+      attestation: null,
+      label: null,
+    });
+    openedLinks.length = 0;
+    const local = await unlockWithPasskey({ userId, credentialId: CRED, prf, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    // the held v1 stays the browser's own, never the key the wrong link leads to
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    // link 3 opens DK(2), the wrong link 2 opens a key that is not DK(1): both zeroed
+    expect(openedLinks).toHaveLength(2);
+    for (const key of openedLinks) expect(key.every((b) => b === 0)).toBe(true);
+  });
+
+  it("unlockWithRecovery on a browser holding v whose v+1 has no link keeps v and v+1", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+    const secret = parseRecoveryKey(recoveryKey as string);
+    const dk1 = await unwrapDataKey(
+      secret,
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const dk2 = generateDataKey();
+    recovery.keyV = 2;
+    recovery.wrapped = toBase64Url(
+      await wrapDataKey(secret, { kind: "recovery", userId, keyV: 2 }, dk2),
+    );
+    const local = await unlockWithRecovery({
+      userId,
+      text: recoveryKey as string,
+      fetch: api.fetch,
+    });
+    expect(local.keyring.current).toBe(2);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+  });
+
+  it("a recovery wrap below the held current version is tampered: nothing sent, kept or deleted", async () => {
+    const { api, userId, recoveryKey, dk1 } = await rotatedTwice();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    // the server replays the v1 recovery wrap to a browser that holds v3
+    const recovery = api.wraps.find((w) => w.kind === "recovery") as Wrap;
+    recovery.keyV = 1;
+    recovery.wrapped = toBase64Url(
+      await wrapDataKey(parseRecoveryKey(recoveryKey), { kind: "recovery", userId, keyV: 1 }, dk1),
+    );
+    const before = await stored(userId);
+    const puts = api.puts.length;
+    const deletes = api.deletes.length;
+    await expect(
+      unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch }),
+    ).rejects.toEqual(new KeysError("tampered"));
+    expect(api.puts.length).toBe(puts);
+    expect(api.deletes.length).toBe(deletes);
+    expect(await stored(userId)).toEqual(before);
+    expect((await loadLocalKeys(userId))?.keyring.current).toBe(3);
+  });
+
+  it("unlockWithRecovery on a browser holding v walks down to its key and keeps the newer ones", async () => {
+    const { api, userId, recoveryKey, dk1, dk2, dk3 } = await rotatedTwice();
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+  });
+
+  it("an unlock with a vault held here deletes this browser's previous device wrap, after keeping the new one", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    const before = await createEncryptedStore(userId);
+    const previous = await before.getMeta<string>("deviceWrapId");
+    before.close();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const after = await createEncryptedStore(userId);
+    const current = await after.getMeta<string>("deviceWrapId");
+    after.close();
+    expect(previous).toBeDefined();
+    expect(current).not.toBe(previous);
+    expect(api.deletes).toEqual([previous]);
+    expect(api.wraps.filter((w) => w.kind === "device").map((w) => w.id)).toEqual([current]);
+  });
+
+  it("an unlock on a fresh browser deletes no wrap", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    await forgetDevice(userId);
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(api.deletes).toEqual([]);
+  });
+
+  it("a refused delete of the previous device wrap does not fail the unlock", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    api.state.failDeletes = true;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+      expect(local.keyring.current).toBe(3);
+      expect(api.deletes).toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith("The previous device wrap could not be removed:", "server");
+      expect((await loadLocalKeys(userId))?.keyring.current).toBe(3);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("an own device wrap below the held current version, at a version this browser does not hold, is tampered", async () => {
+    const { api, userId, recoveryKey } = await rotatedTwice();
+    await forgetDevice(userId);
+    // the server withholds every link during a fresh unlock: the browser holds only v3
+    const links = new Map(api.links);
+    api.links.clear();
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect([...local.keyring.byVersion.keys()]).toEqual([3]);
+    api.links.clear();
+    for (const [v, link] of links) api.links.set(v, link);
+    // later it serves this browser's own wrap id at v2, sealed with a key of its own
+    const store = await createEncryptedStore(userId);
+    const ownId = await store.getMeta<string>("deviceWrapId");
+    store.close();
+    const own = api.wraps.find((w) => w.id === ownId) as Wrap;
+    await rotateDeviceWrap(api, userId, own, generateDataKey(), 2);
+    const before = await stored(userId);
+    openedDevice.length = 0;
+    const fn = vi.fn(async () => 1);
+    await expect(withDataKey({ userId, fetch: api.fetch }, fn)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(fn).not.toHaveBeenCalled();
+    expect(openedDevice).toHaveLength(1);
+    for (const key of openedDevice) expect(key.every((b) => b === 0)).toBe(true);
+    expect(await stored(userId)).toEqual(before);
+  });
+
+  it("an own device wrap below the held current version with the held key of that version still opens", async () => {
+    const { api, userId, recoveryKey, dk2 } = await rotatedTwice();
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const store = await createEncryptedStore(userId);
+    const ownId = await store.getMeta<string>("deviceWrapId");
+    store.close();
+    const own = api.wraps.find((w) => w.id === ownId) as Wrap;
+    await rotateDeviceWrap(api, userId, own, dk2, 2);
+    await expect(withDataKey({ userId, fetch: api.fetch }, async (_dk, v) => v)).resolves.toBe(2);
+  });
+
+  it("a 2a vault (legacy record/dedupe at v1) unlocked at v3 keeps the right key for every version", async () => {
+    const { api, userId, recoveryKey, dk1, dk2, dk3 } = await rotatedTwice();
+    await makeLegacy(userId, 1);
+    const local = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk3, 3)).toBe(true);
+    expect((await stored(userId)).names).not.toContain("record");
+  });
+
+  it("enrollDevice (pairing) keeps the older versions the links reach", async () => {
+    const { api, userId, dk1, dk2, dk3 } = await rotatedTwice();
+    await forgetDevice(userId);
+    const local = await enrollDevice({ userId, fetch: api.fetch }, dk3, 3);
+    expect(local.keyring.current).toBe(3);
+    const loaded = (await loadLocalKeys(userId)) as LocalKeys;
+    expect([...loaded.keyring.byVersion.keys()]).toEqual([1, 2, 3]);
+    expect(await opensUnder(loaded, userId, dk1, 1)).toBe(true);
+    expect(await opensUnder(loaded, userId, dk2, 2)).toBe(true);
+    expect(dk3.some((b) => b !== 0)).toBe(true);
+  });
+  it("enrollDevice (pairing) with a vault held here stays strict: a chain that does not reach its key is tampered", async () => {
+    const { api, userId, dk3 } = await rotatedTwice({ link2: "wrong" });
+    const before = await stored(userId);
+    const puts = api.puts.length;
+    await expect(enrollDevice({ userId, fetch: api.fetch }, dk3, 3)).rejects.toEqual(
+      new KeysError("tampered"),
+    );
+    expect(api.puts.length).toBe(puts);
+    expect(await stored(userId)).toEqual(before);
   });
 });

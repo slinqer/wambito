@@ -1,9 +1,20 @@
 import "fake-indexeddb/auto";
 import { SUGGESTED_CATEGORIES } from "@wambito/core";
-import { deriveRecordKeys, generateDataKey } from "@wambito/crypto";
+import {
+  deriveRecordKeys,
+  fromBase64Url,
+  generateDataKey,
+  parseRecoveryKey,
+  sealKeyLink,
+  sealToDevice,
+  toBase64Url,
+  unwrapDataKey,
+  wrapDataKey,
+} from "@wambito/crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { uuidv5 } from "./ids.ts";
+import { type LocalKeys, loadLocalKeys, prepareAccount, unlockWithRecovery } from "./keys.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -478,5 +489,261 @@ describe("reloadKeys", () => {
     const after = net.pushedKeyV.slice(net.pushedKeyV.indexOf(2));
     expect(after.every((v) => v === 2)).toBe(true);
     session.close();
+  });
+});
+
+interface AccountWrap {
+  id: string;
+  kind: string;
+  ref: string | null;
+  keyV: number;
+  wrapped: string;
+  publicKey: string | null;
+  attestation: string | null;
+  label: string | null;
+}
+
+/**
+ * An account's server for the real `keys.ts`: `/v2/keys` (wraps, links, PUT, DELETE) and a
+ * `/v2/sync` that takes a change only at the account's current key version (`current`, else
+ * 409-like `key_version_mismatch` per change, as Task 1's rule).
+ */
+function fakeAccount() {
+  const net = {
+    wraps: [] as AccountWrap[],
+    links: new Map<number, string>(),
+    current: 1,
+    deleted: [] as string[],
+    /** Every pushed change: its id and `keyV`, in order. */
+    pushed: [] as { id: string; keyV: number }[],
+    rows: new Map<string, { version: number; keyV: number }>(),
+    counter: 0,
+    fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request =
+        input instanceof Request ? input : new Request(new URL(String(input), "http://x"), init);
+      const url = new URL(request.url);
+      const method = request.method;
+      if (url.pathname === "/api/v2/keys" && method === "GET") {
+        return json({
+          wraps: net.wraps,
+          links: [...net.links].sort(([a], [b]) => a - b).map(([keyV, link]) => ({ keyV, link })),
+        });
+      }
+      const match = /^\/api\/v2\/keys\/([0-9a-f-]{36})$/.exec(url.pathname);
+      if (match && method === "PUT") {
+        const id = match[1] as string;
+        const body = (await request.json()) as AccountWrap;
+        const wrap: AccountWrap = {
+          id,
+          kind: body.kind,
+          ref: body.ref ?? null,
+          keyV: body.keyV,
+          wrapped: body.wrapped,
+          publicKey: body.publicKey ?? null,
+          attestation: body.attestation ?? null,
+          label: body.label ?? null,
+        };
+        net.wraps = net.wraps.filter(
+          (w) => w.id !== id && !(w.kind === "recovery" && body.kind === "recovery"),
+        );
+        net.wraps.push(wrap);
+        return json(wrap);
+      }
+      if (match && method === "DELETE") {
+        const id = match[1] as string;
+        net.deleted.push(id);
+        net.wraps = net.wraps.filter((w) => w.id !== id);
+        return new Response(null, { status: 204 });
+      }
+      if (url.pathname === "/api/v2/sync" && method === "GET") {
+        return json({ records: [], next: null, latest: net.counter });
+      }
+      if (url.pathname === "/api/v2/sync" && method === "POST") {
+        const { changes } = (await request.json()) as {
+          changes: { id: string; keyV: number }[];
+        };
+        const results = changes.map((c) => {
+          if (c.keyV !== net.current) {
+            return { id: c.id, error: "key_version_mismatch", keyV: net.current };
+          }
+          net.pushed.push({ id: c.id, keyV: c.keyV });
+          const version = ++net.counter;
+          net.rows.set(c.id, { version, keyV: c.keyV });
+          return { id: c.id, version };
+        });
+        return json({ results });
+      }
+      return new Response(null, { status: 404 });
+    }) as typeof globalThis.fetch,
+  };
+  return net;
+}
+
+describe("a new key version this browser cannot verify", () => {
+  /**
+   * An account set up in this browser at v1, then rotated to v2 by another device: the recovery
+   * wrap and `link(2)` are real, but this browser's device wrap holds a forged v2 (another DK,
+   * sealed to its public key), whose link cannot lead back to the key it holds.
+   */
+  async function forgedRotation(options: { noLink?: boolean } = {}) {
+    const net = fakeAccount();
+    const profile = profileOf();
+    const prepared = await prepareAccount({ userId: profile.id, guest: false, fetch: net.fetch });
+    const keys = await prepared.commit();
+    const recoveryKey = prepared.recoveryKey as string;
+    let store: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile,
+      keys,
+      fresh: true,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        store = await createEncryptedStore(userId);
+        return store;
+      },
+    });
+    const rotate = async () => {
+      const secret = parseRecoveryKey(recoveryKey);
+      const recovery = net.wraps.find((w) => w.kind === "recovery") as AccountWrap;
+      const dk1 = await unwrapDataKey(
+        secret,
+        { kind: "recovery", userId: profile.id, keyV: 1 },
+        fromBase64Url(recovery.wrapped),
+      );
+      const dk2 = generateDataKey();
+      if (!options.noLink) {
+        net.links.set(2, toBase64Url(await sealKeyLink(dk2, dk1, { userId: profile.id, keyV: 2 })));
+      }
+      recovery.keyV = 2;
+      recovery.wrapped = toBase64Url(
+        await wrapDataKey(secret, { kind: "recovery", userId: profile.id, keyV: 2 }, dk2),
+      );
+      const device = net.wraps.find((w) => w.kind === "device") as AccountWrap;
+      device.keyV = 2;
+      device.wrapped = toBase64Url(
+        await sealToDevice(
+          fromBase64Url(device.publicKey as string),
+          { kind: "device", userId: profile.id, keyV: 2 },
+          // without a link (a rotation made before links) the real v2, else a forged one
+          options.noLink ? dk2 : generateDataKey(),
+        ),
+      );
+      net.current = 2;
+      return device.id;
+    };
+    if (!store) throw new Error("no store");
+    return { net, profile, session, store, recoveryKey, rotate };
+  }
+
+  it("the session calls onUnverified once and does not delete the vault", async () => {
+    const { profile, session, store, rotate } = await forgedRotation();
+    const unverified = vi.fn();
+    const removed = vi.fn();
+    const closed = vi.fn();
+    session.onUnverified(unverified);
+    session.onRemoved(removed);
+    session.onClosed(closed);
+    await rotate();
+    const [first] = await store.list("category");
+    if (!first) throw new Error("no seeded category");
+    await store.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(unverified).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(unverified).toHaveBeenCalledTimes(1);
+    expect(removed).not.toHaveBeenCalled();
+    expect(closed).not.toHaveBeenCalled();
+    // the session is gone, the vault and its unsent edit are kept
+    expect(store.isClosed()).toBe(true);
+    expect(await vaultExists(profile.id)).toBe(true);
+    const kept = await createEncryptedStore(profile.id);
+    expect((await kept.readOutbox(10)).map((e) => e.id)).toContain(first.id);
+    expect((await kept.get("category", first.id))?.body.name).toBe("Edited");
+    kept.close();
+  });
+
+  it("fails the opening with key_unverified and keeps the vault", async () => {
+    const { net, profile, session, rotate } = await forgedRotation();
+    session.close();
+    await rotate();
+    const kept = await createEncryptedStore(profile.id);
+    const [first] = await kept.list("category");
+    if (!first) throw new Error("no seeded category");
+    await kept.put("category", first.id, { ...first.body, name: "Edited" });
+    kept.close();
+    const failed = await openVaultSession({
+      profile,
+      keys: (await loadLocalKeys(profile.id)) as LocalKeys,
+      fresh: false,
+      fetch: net.fetch,
+    }).catch((e) => e);
+    expect(failed).toBeInstanceOf(VaultOpenError);
+    expect(failed.code).toBe("key_unverified");
+    expect(await vaultExists(profile.id)).toBe(true);
+  });
+
+  it("unlocking with the recovery key from unverified keeps the outbox, deletes the old device wrap, and the next sync pushes the edit", async () => {
+    const { net, profile, session, store, recoveryKey, rotate } = await forgedRotation();
+    const unverified = vi.fn();
+    session.onUnverified(unverified);
+    const oldWrap = await rotate();
+    const [first] = await store.list("category");
+    if (!first) throw new Error("no seeded category");
+    await store.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(unverified).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    // Unlock's recovery key: the vault is kept, a new device wrap replaces the old one
+    const local = await unlockWithRecovery({
+      userId: profile.id,
+      text: recoveryKey,
+      fetch: net.fetch,
+    });
+    expect(local.keyring.current).toBe(2);
+    expect([...local.keyring.byVersion.keys()]).toEqual([1, 2]);
+    expect(net.deleted).toEqual([oldWrap]);
+    const devices = net.wraps.filter((w) => w.kind === "device");
+    expect(devices).toHaveLength(1);
+    expect(devices[0]?.id).not.toBe(oldWrap);
+    expect(await vaultExists(profile.id)).toBe(true);
+
+    // the gate opens again: a new session, whose first sync pushes the kept edit under v2
+    const again = await openVaultSession({ profile, keys: local, fresh: true, fetch: net.fetch });
+    expect(again).not.toBe(session);
+    expect(net.rows.get(first.id)?.keyV).toBe(2);
+    const reopened = await createEncryptedStore(profile.id);
+    expect((await reopened.readOutbox(Number.MAX_SAFE_INTEGER)).filter((e) => !e.reseal)).toEqual(
+      [],
+    );
+    reopened.close();
+    again.close();
+  });
+
+  it("a vault stuck in unverified because v+1 has no link unlocks with the recovery key at v+1, keeps v and v+1, and its outbox syncs", async () => {
+    const { net, profile, session, store, recoveryKey, rotate } = await forgedRotation({
+      noLink: true,
+    });
+    const unverified = vi.fn();
+    session.onUnverified(unverified);
+    await rotate();
+    const [first] = await store.list("category");
+    if (!first) throw new Error("no seeded category");
+    await store.put("category", first.id, { ...first.body, name: "Edited" });
+    await vi.waitFor(() => expect(unverified).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    const local = await unlockWithRecovery({
+      userId: profile.id,
+      text: recoveryKey,
+      fetch: net.fetch,
+    });
+    expect(local.keyring.current).toBe(2);
+    expect([...local.keyring.byVersion.keys()]).toEqual([1, 2]);
+    const again = await openVaultSession({ profile, keys: local, fresh: true, fetch: net.fetch });
+    expect(net.rows.get(first.id)?.keyV).toBe(2);
+    const reopened = await createEncryptedStore(profile.id);
+    expect((await reopened.get("category", first.id))?.body.name).toBe("Edited");
+    expect((await reopened.readOutbox(Number.MAX_SAFE_INTEGER)).filter((e) => !e.reseal)).toEqual(
+      [],
+    );
+    reopened.close();
+    again.close();
   });
 });

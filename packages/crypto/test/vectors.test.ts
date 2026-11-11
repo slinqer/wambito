@@ -8,13 +8,16 @@ import {
   formatRecoveryKey,
   fromBase64Url,
   importDevicePrivateKey,
+  type LinkContext,
   openFromDevice,
   openFromPairing,
+  openKeyLink,
   openRecord,
   pairingCommitment,
   pairingNumber,
   parseRecoveryKey,
   type RecordContext,
+  sealKeyLink,
   sealRecord,
   toBase64Url,
   unwrapDataKey,
@@ -69,6 +72,7 @@ const vectors = JSON.parse(
     publicKey: string;
     attestation: string;
   }[];
+  links: { newKey: string; oldKey: string; ctx: LinkContext; nonce: string; link: string }[];
   rejects: Record<string, unknown>[];
 };
 
@@ -149,6 +153,15 @@ describe("shared test vectors", () => {
     }
   });
 
+  it("links: sealKeyLink is exact and openKeyLink returns oldKey", async () => {
+    expect(vectors.links.length).toBeGreaterThanOrEqual(2);
+    for (const l of vectors.links) {
+      const link = await sealKeyLink(b(l.newKey), b(l.oldKey), l.ctx, b(l.nonce));
+      expect(toBase64Url(link)).toBe(l.link);
+      expect(await openKeyLink(b(l.newKey), l.ctx, b(l.link))).toEqual(b(l.oldKey));
+    }
+  });
+
   it("rejects: every input is refused with the expected code", async () => {
     for (const r of vectors.rejects as { op: string; code: string; [k: string]: any }[]) {
       let got = "none";
@@ -165,6 +178,8 @@ describe("shared test vectors", () => {
             b(r.sealed),
             b(r.approverKey),
           );
+        } else if (r.op === "openKeyLink") {
+          await openKeyLink(b(r.newKey), r.ctx, b(r.link));
         } else if (r.op === "parseRecoveryKey") {
           parseRecoveryKey(r.text);
         } else {

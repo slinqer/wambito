@@ -79,6 +79,9 @@ async function list(headers: Headers): Promise<KeyWrap[]> {
 const rotateRaw = (headers: Headers, body: unknown) =>
   t.request("POST", "/v2/keys/rotate", { headers, body });
 
+/** A link the server cannot open: any 60 bytes. */
+const link = (fill = 3) => bytes(60, fill);
+
 async function expectProblem(res: Response, status: number, code: string) {
   expect(res.status).toBe(status);
   expect(((await res.json()) as { code: string }).code).toBe(code);
@@ -219,6 +222,7 @@ describe("/v2/keys", () => {
           { id: randomUUID(), ...recovery(2) },
           { id: randomUUID(), ...device(2, { attestation: null }) },
         ],
+        link: link(),
       }),
       422,
       "attestation_required",
@@ -289,7 +293,7 @@ describe("/v2/keys", () => {
         { id: randomUUID(), ...recovery(5) },
         { id: randomUUID(), ...device(5, { label: "Kept phone" }) },
       ];
-      const res = await rotateRaw(headers, { keyV: 5, wraps: next });
+      const res = await rotateRaw(headers, { keyV: 5, wraps: next, link: link() });
       expect(res.status, await res.clone().text()).toBe(200);
       const { wraps } = (await res.json()) as { wraps: KeyWrap[] };
       const byId = (a: KeyWrap, b: KeyWrap) => a.id.localeCompare(b.id);
@@ -310,7 +314,11 @@ describe("/v2/keys", () => {
       const kept = await put(headers, recovery(1));
       for (const keyV of [1, 3]) {
         await expectProblem(
-          await rotateRaw(headers, { keyV, wraps: [{ id: randomUUID(), ...recovery(keyV) }] }),
+          await rotateRaw(headers, {
+            keyV,
+            wraps: [{ id: randomUUID(), ...recovery(keyV) }],
+            link: link(),
+          }),
           409,
           "key_version_mismatch",
         );
@@ -322,7 +330,11 @@ describe("/v2/keys", () => {
       const { headers } = await person();
       const kept = await put(headers, recovery(1));
       await expectProblem(
-        await rotateRaw(headers, { keyV: 2, wraps: [{ id: randomUUID(), ...device(2) }] }),
+        await rotateRaw(headers, {
+          keyV: 2,
+          wraps: [{ id: randomUUID(), ...device(2) }],
+          link: link(),
+        }),
         422,
         "recovery_required",
       );
@@ -333,6 +345,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), ...recovery(2) },
           ],
+          link: link(),
         }),
         422,
         "recovery_required",
@@ -347,6 +360,7 @@ describe("/v2/keys", () => {
         await rotateRaw(headers, {
           keyV: 2,
           wraps: [{ id: randomUUID().toUpperCase(), ...recovery(2) }],
+          link: link(),
         }),
         422,
         "validation_failed",
@@ -364,6 +378,7 @@ describe("/v2/keys", () => {
       const rotated = await rotateRaw(a.headers, {
         keyV: 2,
         wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(),
       });
       expect(rotated.status).toBe(200);
       expect((await list(b.headers)).sort(byId)).toEqual([...bWraps].sort(byId));
@@ -371,6 +386,7 @@ describe("/v2/keys", () => {
       const back = await rotateRaw(b.headers, {
         keyV: 2,
         wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(),
       });
       expect(back.status).toBe(200);
       const aNow = await list(a.headers);
@@ -393,6 +409,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), ...device(1) },
           ],
+          link: link(),
         }),
         422,
         "validation_failed",
@@ -404,6 +421,7 @@ describe("/v2/keys", () => {
             { id: randomUUID(), ...recovery(2) },
             { id: randomUUID(), kind: "passkey", ref: "nope", keyV: 2, wrapped: bytes(60) },
           ],
+          link: link(),
         }),
         422,
         "unknown_passkey",
@@ -448,6 +466,98 @@ describe("/v2/keys", () => {
     expect(await list(headers)).toEqual([recoveryWrap, keptWrap]);
   });
 
+  describe("key links", () => {
+    const oneRecovery = (keyV: number) => [{ id: randomUUID(), ...recovery(keyV) }];
+    const getLinks = async (headers: Headers) => {
+      const res = await t.request("GET", "/v2/keys", { headers });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { links: { keyV: number; link: string }[] }).links;
+    };
+
+    test("a rotation of an account with a version needs a link (422 link_required) and changes nothing", async () => {
+      const { headers } = await person();
+      const kept = await put(headers, recovery(1));
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 2, wraps: oneRecovery(2) }),
+        422,
+        "link_required",
+      );
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 2, wraps: oneRecovery(2), link: null }),
+        422,
+        "link_required",
+      );
+      expect(await list(headers)).toEqual([kept]);
+      expect(await getLinks(headers)).toEqual([]);
+    });
+
+    test("a link on the first version is 422 link_unexpected", async () => {
+      const { headers } = await person();
+      await expectProblem(
+        await rotateRaw(headers, { keyV: 1, wraps: oneRecovery(1), link: link() }),
+        422,
+        "link_unexpected",
+      );
+      expect(await list(headers)).toEqual([]);
+      const res = await rotateRaw(headers, { keyV: 1, wraps: oneRecovery(1) });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { links: unknown[] }).links).toEqual([]);
+    });
+
+    test("a link that is not 60 bytes is 422 invalid_link", async () => {
+      const { headers } = await person();
+      const kept = await put(headers, recovery(1));
+      for (const length of [1, 59, 61, 200]) {
+        await expectProblem(
+          await rotateRaw(headers, {
+            keyV: 2,
+            wraps: oneRecovery(2),
+            link: bytes(length),
+          }),
+          422,
+          "invalid_link",
+        );
+      }
+      expect(await list(headers)).toEqual([kept]);
+    });
+
+    test("GET /v2/keys lists the links in keyV order, and they survive later rotations", async () => {
+      const { headers } = await person();
+      await put(headers, recovery(1));
+      const first = await rotateRaw(headers, {
+        keyV: 2,
+        wraps: oneRecovery(2),
+        link: link(4),
+      });
+      expect(first.status, await first.clone().text()).toBe(200);
+      expect(((await first.json()) as { links: unknown[] }).links).toEqual([
+        { keyV: 2, link: link(4) },
+      ]);
+      const second = await rotateRaw(headers, {
+        keyV: 3,
+        wraps: oneRecovery(3),
+        link: link(5),
+      });
+      expect(second.status).toBe(200);
+      const expected = [
+        { keyV: 2, link: link(4) },
+        { keyV: 3, link: link(5) },
+      ];
+      expect(((await second.json()) as { links: unknown[] }).links).toEqual(expected);
+      expect(await getLinks(headers)).toEqual(expected);
+    });
+
+    test("one person never sees another's links", async () => {
+      const a = await person();
+      const b = await person();
+      await put(a.headers, recovery(1));
+      await put(b.headers, recovery(1));
+      await rotateRaw(a.headers, { keyV: 2, wraps: oneRecovery(2), link: link(8) });
+      expect(await getLinks(a.headers)).toHaveLength(1);
+      expect(await getLinks(b.headers)).toEqual([]);
+    });
+  });
+
   describe("assistants", () => {
     test("a token reaches only GET /v2/keys/assistant, which returns its own client's wrap", async () => {
       const { email, headers } = await person();
@@ -489,7 +599,7 @@ describe("/v2/keys", () => {
         await t.request("GET", "/v2/keys", { headers: h }),
         await putRaw(h, id, device(1)),
         await t.request("DELETE", `/v2/keys/${firstWrap.id}`, { headers: h }),
-        await rotateRaw(h, { keyV: 2, wraps: [{ id, ...recovery(2) }] }),
+        await rotateRaw(h, { keyV: 2, wraps: [{ id, ...recovery(2) }], link: link() }),
         await t.request("PUT", "/v2/keys/assistant", { headers: h, body: device(1) }),
         await t.request("DELETE", "/v2/keys/assistant", { headers: h }),
       ]) {
@@ -605,5 +715,128 @@ describe("PUT /v2/keys/{id} with If-None-Match: *", () => {
       body: recovery(),
     });
     expect(res.status).toBe(422);
+  });
+});
+
+describe("a removed device loses its session", () => {
+  /** Two sessions of one person, and the id of the wrap B's session registers for its device. */
+  async function twoSessions() {
+    const { email, headers: a, userId } = await person();
+    const { headers: b } = await t.signIn(email);
+    await put(a, recovery(1));
+    return { a, b, userId };
+  }
+  const sessionOf = async (userId: string) =>
+    (await t.admin.execute(sql`select id from session where user_id = ${userId}`)) as unknown as {
+      id: string;
+    }[];
+  const storedSession = async (id: string) => {
+    const rows = await t.admin
+      .select({ sessionId: keyWraps.sessionId })
+      .from(keyWraps)
+      .where(eq(keyWraps.id, id));
+    return rows[0]?.sessionId;
+  };
+  const status = async (headers: Headers) =>
+    (await t.request("GET", "/v2/keys", { headers })).status;
+
+  test("a device PUT stores the caller's session; other kinds store none", async () => {
+    const { a, userId } = await twoSessions();
+    const wrap = await put(a, device(1));
+    const stored = await storedSession(wrap.id);
+    expect(stored).toBeTruthy();
+    expect((await sessionOf(userId)).map((s) => s.id)).toContain(stored);
+    const [rec] = await list(a);
+    expect(await storedSession((rec as KeyWrap).id)).toBeNull();
+  });
+
+  test("DELETE of a device wrap ends that device's session: its next GET /v2/keys is 401", async () => {
+    const { a, b } = await twoSessions();
+    const wrap = await put(b, device(1));
+    expect(await status(b)).toBe(200);
+    expect((await t.request("DELETE", `/v2/keys/${wrap.id}`, { headers: a })).status).toBe(204);
+    expect(await status(b)).toBe(401);
+    expect(await status(a)).toBe(200);
+  });
+
+  test("a rotation that leaves a device out ends its session; kept devices keep theirs", async () => {
+    const { email, headers: a, userId } = await person();
+    const { headers: b } = await t.signIn(email);
+    const { headers: c } = await t.signIn(email);
+    await put(a, recovery(1));
+    const keptRef = randomUUID();
+    const kept = await put(b, device(1, { ref: keptRef }));
+    await put(c, device(1));
+    const oldSession = await storedSession(kept.id);
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [
+        { id: randomUUID(), ...recovery(2) },
+        { id: randomUUID(), ...device(2, { ref: keptRef }) },
+      ],
+      link: link(),
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const { wraps } = (await res.json()) as { wraps: KeyWrap[] };
+    const newKept = wraps.find((w) => w.kind === "device") as KeyWrap;
+    expect(await storedSession(newKept.id)).toBe(oldSession);
+    expect(await status(b)).toBe(200);
+    expect(await status(c)).toBe(401);
+    expect(await status(a)).toBe(200);
+    expect(await sessionOf(userId)).toHaveLength(2);
+  });
+
+  test("a session another remaining device wrap still uses is not ended by a DELETE", async () => {
+    const { a, b } = await twoSessions();
+    // B re-enrolled under the same cookie, and the delete of its old wrap failed: both stay
+    const stale = await put(b, device(1));
+    const fresh = await put(b, device(1));
+    expect(await storedSession(stale.id)).toBe(await storedSession(fresh.id));
+    expect((await t.request("DELETE", `/v2/keys/${stale.id}`, { headers: a })).status).toBe(204);
+    expect(await status(b)).toBe(200);
+    expect((await list(a)).map((w) => w.id)).toContain(fresh.id);
+  });
+
+  test("a session another remaining device wrap still uses is not ended by a rotation", async () => {
+    const { a, b } = await twoSessions();
+    await put(b, device(1));
+    const freshRef = randomUUID();
+    await put(b, device(1, { ref: freshRef }));
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [
+        { id: randomUUID(), ...recovery(2) },
+        { id: randomUUID(), ...device(2, { ref: freshRef }) },
+      ],
+      link: link(),
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await status(b)).toBe(200);
+  });
+
+  test("the caller's own session is never ended", async () => {
+    const { a } = await twoSessions();
+    const wrap = await put(a, device(1));
+    expect((await t.request("DELETE", `/v2/keys/${wrap.id}`, { headers: a })).status).toBe(204);
+    expect(await status(a)).toBe(200);
+  });
+
+  test("a device wrap whose session is gone (null) is removed and rotated away without error", async () => {
+    const { a, b, userId } = await twoSessions();
+    const gone = await put(b, device(1));
+    const other = await put(a, device(1));
+    await t.admin.execute(sql`delete from session where id = ${await storedSession(gone.id)}`);
+    expect(await storedSession(gone.id)).toBeNull();
+    expect((await t.request("DELETE", `/v2/keys/${gone.id}`, { headers: a })).status).toBe(204);
+    const wraps = await list(a);
+    expect(wraps.map((w) => w.id)).toContain(other.id);
+    const res = await rotateRaw(a, {
+      keyV: 2,
+      wraps: [{ id: randomUUID(), ...recovery(2) }],
+      link: link(),
+    });
+    expect(res.status).toBe(200);
+    expect(await status(a)).toBe(200);
+    expect(userId).toBeTruthy();
   });
 });

@@ -58,7 +58,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   upgrade pass re-seals records under an older `keyV` through the outbox (`reseal` entries: unchanged
   body, `baseVersion` = its version, at most 500 per run, a conflict takes the server's copy) and
   drops an old version's keys once no local record uses it; `refreshKeys` throwing `device_removed`
-  stops the run and the triggers (`{ ok: false, error: "device_removed", problem: "device_removed" }`).
+  stops the run and the triggers (`{ ok: false, error: "device_removed", problem: "device_removed" }`);
+  `refreshKeys` throwing `tampered` does the same as `key_unverified` (`problem: "key_unverified"`),
+  the outbox untouched (a change refused at the stale `keyV` is neither parked nor dropped).
   `keys.ts` (no React; injected `fetch`, `/api`): `prepareAccount({ userId, guest })` → `{
   recoveryKey, commit() }` (DK + recovery secret + device key pair, all in memory; nothing is sent
   until `commit()`, which the setup screen calls only after the four characters are typed back:
@@ -73,7 +75,20 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
-  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK), `loadLocalKeys(userId)` →
+  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK). Key links (spec
+  2026-11-10): `listKeys(call)` → `{ wraps, links: Map<keyV, bytes> }` (an undecodable link is
+  missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
+  `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
+  there; zeroes what it opened on a throw). The trusted ways in (recovery, passkey, pairing) keep
+  the older versions the links reach, from version 1 down, not strict. With a vault held here:
+  a recovery or passkey key (authenticated by the person's secret; spec 2026-11-10 section 5)
+  still walks not strict, a chain that stops or ends at another key is no error, and the held
+  versions are never replaced (`keepLocally` skips them); pairing walks strictly down to the held
+  current version, whose key must match (`sameDataKey`), else `tampered`; for all three a trusted
+  version below the held current one is `tampered` (a replay), before anything is sent or kept.
+  With a vault held, once the new device wrap is kept, `DELETE /v2/keys/{previous deviceWrapId}`
+  (the server never ends the caller's own session); best effort: a failure never fails the
+  unlock, it is `console.warn`ed with its code only and the old wrap stays listed in Settings. `loadLocalKeys(userId)` →
   `{ keyring: { current, byVersion: Map<keyV, RecordKeys> } }` (`null` = locked or no keys for
   `current`; a 2a vault's `record`/`dedupe` load as version `keyV` and are renamed;
   `currentRecordKeys(local)`; the sync engine takes the keyring), `withDataKey(options, fn)`
@@ -82,11 +97,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("device_removed")` otherwise; a 2a browser without `deviceWrapId` tries each device
   wrap and keeps the one that opens; when this browser already holds the wrap's `keyV`, DK must
   be the one its `record:<v>` came from (a random canary sealed with the kept key opens with the
-  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs: every caller
+  key derived from DK), else `KeysError("tampered")`, DK zeroed and `fn` never runs; a wrap below
+  the held current version must be at a version this browser holds and pass the same check, else
+  `tampered` (versions only grow; a server that withheld the links at an unlock cannot hand it a
+  key there); a wrap above
+  the held current version is accepted only when its links lead strictly down to it and reach the
+  held key, else `tampered`, every opened key zeroed: every caller
   (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
-  `refreshKeys(options)` (a device wrap at a higher `keyV` is
-  added to the keyring and made current, old versions kept; one below the current version
-  changes nothing, and a held version is never overwritten), `dropKeyVersion(userId, keyV)`,
+  `refreshKeys(options)` (a device wrap at a higher `keyV` n, verified as `withDataKey`, adds
+  every version from the current c + 1 to n to the keyring and makes n current, old versions kept;
+  `tampered` keeps nothing; one below the current version changes nothing only when it is a held
+  version that passes the check (an unheld one is `tampered`), and a held version is never
+  overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
   `api`, `listWraps`, `putJson` and `WrapDto` are exported for `rotate.ts`.
@@ -116,16 +138,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
   dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
-  nothing made); DK from `withDataKey`; device wraps in `remove` (`removed`), in
+  nothing made); then `refreshKeys`, so this browser holds every version up to the account's
+  current one; DK from `withDataKey`; device wraps in `remove` (`removed`), in
   `settings.revokedDevices` (`revoked`) or whose attestation fails under the old DK
   (`attestation`) are left out and reported; a new DK at `keyV + 1` wraps the recovery secret (the
   same one, or a new one shown as `recoveryKey`), every kept device (same id/ref/label, sealed to
   its public key, fresh attestation; this browser's own with its kept public key) and the touched
   passkey (same wrap id; other passkeys lose theirs); DK, the new DK, the secret and the PRF are
-  zeroed before it returns. `commit()` POSTs `/v2/keys/rotate` (retry-safe; a post that ended
+  zeroed before it returns. The key link (old DK sealed under the new one, `sealKeyLink`) is made in `withDataKey` and kept in the prepared object. `commit()` POSTs `/v2/keys/rotate` with `{ keyV, wraps, link }` (retry-safe, the same link; a post that ended
   `offline` or `rotated_elsewhere` counts as ours when `GET /v2/keys` shows this browser's prepared
   wrap at the new `keyV`), keeps
-  `record:<v>`/`dedupe:<v>` and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
+  `record:<v>`/`dedupe:<v>` (a `record:<v>` already held, from a refresh or a half-done earlier try, is kept when it is the
+  prepared key, checked by a canary; another key is `tampered`, nothing written) (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when
@@ -163,7 +187,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`, a guest's Locked). `session.reloadKeys()`
+  notice `vault.removed`, a guest's Locked). `key_unverified` (a new key version whose links do
+  not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
+  stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
+  its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
+  (the opening's error the same way): Unlock with the notice `vault.unverified`, a guest's Locked.
+  The unlock there (recovery key, passkey, pairing) keeps the vault, replaces the device wrap and
+  opens a new session fresh, whose first sync pushes what waited; a recovery key or passkey
+  unlocks it even when the links do not reach the held key (a version made before links). `session.reloadKeys()`
   gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
   API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
@@ -199,7 +230,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `local`; the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings,
-  `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed"` shows `vault.removed`; `onUnlock(text) → UnlockError |
+  `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
@@ -245,11 +276,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
   bumps its `rev`.
-  Known limits of `app/local/` (design follow-ups before stage 3): a new key version is not
-  authenticated under the previous one (the device wrap is an anonymous sealed box, so a
-  malicious server can forge `keyV + 1` to the web; only a held version is checked); and a
-  browser that missed two rotations gets only the newest version from its device wrap, so it can
-  read the middle version's records only once another device has re-sealed them.
+  Known limit of `app/local/` (spec 2026-11-10 section 2.4): a malicious server together with a
+  stolen device that still holds DK(v-1) can forge a version whose link leads back to it, for a
+  browser that has not seen the real one yet. A server that withholds a link (or a whole rotation)
+  leaves browsers stuck in the `unverified` state until a passkey or the recovery key unlocks
+  them (pairing stays strict): denial of service only, nothing is revealed.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
   (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
@@ -302,6 +333,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   and `docker` on the PATH; it runs on the desktop project only (one shared account; the file is skipped on the phone and
   its `beforeAll` returns there). CI seeds it
   too.
+- e2e trap: `pinClock`'s clock keeps running across a page load, while a new page's animation
+  clock starts at zero, so a sheet (Motion) stays off-screen after a `goto` in a long-lived
+  context for as long as the context had lived; long tests move with in-app links instead.
 
 ## Landing builds
 

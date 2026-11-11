@@ -81,13 +81,17 @@ interface Opened {
   page: Page;
 }
 
-/** A new browser (its own cookies, storage and IndexedDB), in Spanish, from Madrid. */
-async function openBrowser(browser: Browser): Promise<Opened> {
+/**
+ * A new browser (its own cookies, storage and IndexedDB), in Spanish, from Madrid. `userAgent`
+ * changes the label its device wrap gets in Settings → Security (`device-label.ts`).
+ */
+async function openBrowser(browser: Browser, userAgent?: string): Promise<Opened> {
   const context = await browser.newContext({
     locale: "es-ES",
     timezoneId: "Europe/Madrid",
     viewport: { width: 1280, height: 800 },
     extraHTTPHeaders: { "x-forwarded-for": clientIp() },
+    ...(userAgent ? { userAgent } : {}),
   });
   const page = await context.newPage();
   await pinClock(page);
@@ -428,7 +432,29 @@ test("a conflict merges field by field", async ({ browser }) => {
   await second.context.close();
 });
 
-test("a removed browser locks", async ({ browser }) => {
+/**
+ * A removed browser, signed in again: its session ended with the removal, and the 401 deleted its
+ * vault (device key included), so it cannot tell it was removed. A plain Unlock, as for a new
+ * browser: no removed notice, no generic failure, no data key or record key before it unlocks.
+ */
+async function showsPlainUnlock(page: Page) {
+  await expect(page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(
+    page.getByRole("status").filter({ hasText: "Este navegador se eliminó de tu cuenta" }),
+  ).toHaveCount(0);
+  await expect(page.getByText("No pudimos abrir tus datos")).toHaveCount(0);
+  // Unlock may already have started a new vault (this browser's device keys); none of the old
+  // one is in it. Read only once it exists: opening a missing one would create it empty.
+  if ((await vaultDatabases(page)).length > 0) {
+    const fresh = await vaultKeys(page);
+    expect(fresh.keyV).toBeUndefined();
+    expect(fresh.names.filter((name) => name.startsWith("record:"))).toEqual([]);
+  }
+}
+
+test("a removed browser is signed out", async ({ browser }) => {
   test.setTimeout(120_000);
   reseed();
 
@@ -437,6 +463,12 @@ test("a removed browser locks", async ({ browser }) => {
   const second = await openBrowser(browser);
   await unlockWithKey(second, key);
   expect((await vaultKeys(first.page)).keyV).toBe(1);
+
+  // Any 401 from /v2 on the second from now on (its sync may pull before it is nudged).
+  const unauthorized = second.page.waitForResponse(
+    (r) => r.url().includes("/api/v2/") && r.status() === 401,
+    { timeout: 90_000 },
+  );
 
   // -- the first removes the second, with the recovery key typed --------------------------------
   await openSecurity(first.page);
@@ -450,18 +482,20 @@ test("a removed browser locks", async ({ browser }) => {
     timeout: 20_000,
   });
   await expect(
-    first.page.getByText(/ya no puede abrir tus datos\. Si aún tienes ese dispositivo/),
+    first.page.getByText(/ya no puede abrir tus datos y se cerró su sesión\./),
   ).toBeVisible();
 
-  // -- the second, on its next sync, is locked out with the notice; nothing of the vault stays --
+  // -- the second's session ended with it: its next sync is a 401 and it lands on sign-in -----
   await expect(async () => {
     await nudgeSync(second.page);
-    await expect(
-      second.page.getByRole("status").filter({ hasText: "Este navegador se eliminó de tu cuenta" }),
-    ).toBeVisible({ timeout: 2_000 });
+    await expect(second.page).toHaveURL(/\/sign-in(\?|$)/, { timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
-  await expect(second.page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
+  await unauthorized;
+
+  // -- the 401 deleted its vault; signed in again, it is a browser like any new one ----------
   await expect.poll(() => vaultDatabases(second.page)).toEqual([]);
+  await signInExisting(second.page, EMAIL);
+  await showsPlainUnlock(second.page);
 
   // -- the first still opens its movements after a reload, now at key version 2 ---------------
   await first.page.goto("/app");
@@ -475,7 +509,7 @@ test("a removed browser locks", async ({ browser }) => {
   await second.context.close();
 });
 
-test("a browser removed while closed says so after a reload", async ({ browser }) => {
+test("a browser removed while closed is signed out when it opens again", async ({ browser }) => {
   test.setTimeout(120_000);
   reseed();
 
@@ -495,17 +529,110 @@ test("a browser removed while closed says so after a reload", async ({ browser }
     timeout: 20_000,
   });
 
-  // -- the second opens the app again: Unlock with the removed notice, not a generic failure --
+  // -- the second opens the app again: its session is gone, so sign-in first -----------------
   const page = await second.context.newPage();
   await pinClock(page);
   await page.goto("/app");
-  await expect(
-    page.getByRole("status").filter({ hasText: "Este navegador se eliminó de tu cuenta" }),
-  ).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
-  await expect(page.getByText("No pudimos abrir tus datos")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/sign-in(\?|$)/, { timeout: 20_000 });
+
+  // -- signed out, its vault is deleted; signed in again: a plain Unlock, not a failure -------
   await expect.poll(() => vaultDatabases(page)).toEqual([]);
+  await signInExisting(page, EMAIL);
+  await showsPlainUnlock(page);
 
   await first.context.close();
   await second.context.close();
+});
+
+test("a browser closed through two rotations opens and shows the data", async ({ browser }) => {
+  test.setTimeout(180_000);
+  reseed();
+
+  // The closed browser says it is Edge, so Settings → Security tells it apart from the two
+  // Chrome ones the first removes.
+  const edge =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) " +
+    "Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
+  const first = await openBrowser(browser);
+  const key = await firstBrowser(first);
+  const closed = await openBrowser(browser, edge);
+  await unlockWithKey(closed, key);
+  const others = [await openBrowser(browser), await openBrowser(browser)];
+  for (const other of others) await unlockWithKey(other, key);
+  expect((await vaultKeys(closed.page)).keyV).toBe(1);
+
+  // -- the closed browser's page goes (its vault, at version 1, stays in the context) ----------
+  await closed.page.close();
+
+  /**
+   * The first browser moves only through its own links, never `goto`: `pinClock`'s clock keeps
+   * counting across a page load but a new document's animation timeline starts at zero, so a
+   * sheet's slide-in (Motion, on that timeline) would wait out the time the context lived before.
+   */
+  const nav = (name: string) =>
+    first.page
+      .getByRole("navigation", { name: "Navegación principal" })
+      .getByRole("link", { name, exact: true })
+      .click();
+
+  /** The first removes one Chrome browser: a rotation to the next key version. */
+  const removeOne = async () => {
+    await nav("Ajustes");
+    await expect(first.page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
+    await first.page
+      .getByRole("button", { name: /^Quitar Chrome/ })
+      .first()
+      .click();
+    const sheet = first.page.getByRole("dialog", { name: /^¿Quitar Chrome/ });
+    await sheet.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
+    await sheet.getByRole("button", { name: "Sí, quitarlo" }).click();
+    const done = first.page.getByRole("dialog", { name: "Listo" });
+    await expect(done).toBeVisible({ timeout: 20_000 });
+    await done.getByRole("button", { name: "Cerrar" }).click();
+    await expect(done).toBeHidden();
+  };
+
+  /** How many changes the first browser still has to push. */
+  const outboxSize = () =>
+    first.page.evaluate(async (name) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open(name);
+        open.onsuccess = () => resolve(open.result);
+        open.onerror = () => reject(open.error);
+      });
+      const count = await new Promise<number>((resolve, reject) => {
+        const request = db.transaction("outbox", "readonly").objectStore("outbox").count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+      return count;
+    }, `wambito-vault-${USER_ID}`);
+
+  // -- two rotations, with a movement added (and pushed) between them --------------------------
+  await removeOne();
+  expect((await vaultKeys(first.page)).keyV).toBe(2);
+  const between = `${NAME} entre claves`;
+  await nav("Inicio");
+  await addMovement(first.page, between, ["1", "7"]);
+  await expect(async () => {
+    await nudgeSync(first.page);
+    expect(await outboxSize()).toBe(0);
+  }).toPass({ timeout: 30_000 });
+  await removeOne();
+  await expect(first.page.getByRole("button", { name: /^Quitar Chrome/ })).toHaveCount(0);
+  expect((await vaultKeys(first.page)).keyV).toBe(3);
+
+  // -- the closed browser opens again: no unlock, both movements, now at version 3 ------------
+  const page = await closed.context.newPage();
+  await pinClock(page);
+  await page.goto("/app");
+  await expect(page.getByText(between, { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(NAME, { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Abre tus datos aquí" })).toHaveCount(0);
+  await expect.poll(async () => (await vaultKeys(page)).keyV).toBe(3);
+
+  await first.context.close();
+  await closed.context.close();
+  for (const other of others) await other.context.close();
 });
