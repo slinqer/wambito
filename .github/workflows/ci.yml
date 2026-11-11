@@ -263,6 +263,40 @@ jobs:
       - run: scripts/check-fdroid-recipe.sh
       - run: scripts/check-fdroid-lock.sh
 
+  # The iOS app (docs/mobile/ios.md): the signing guard, the Swift package's tests and an unsigned
+  # release build. Same filter as the Android jobs, so it is skipped when nothing it depends on
+  # changed.
+  ios:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    concurrency:
+      group: ios-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the pinned Flutter version
+        id: flutter-version
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: The signing guard catches a team id
+        run: scripts/test-check-ios-signing.sh
+      - name: No team id in the iOS project
+        run: scripts/check-ios-signing.sh
+      - name: Swift package tests
+        run: swift test --package-path ios/WambitoNative
+      - name: Release build without signing
+        run: flutter build ios --release --no-codesign
+
   # The Android app's builds, beside the quick checks above (each took as long as the other, one
   # after the other): no Google dependencies, the debug build and the Kotlin tests, and the release
   # as scripts/release.sh makes it. Same filter, so it is skipped (which counts as passing) when

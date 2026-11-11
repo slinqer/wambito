@@ -10,7 +10,7 @@ status=0
 
 for f in "$dir"/*.xcodeproj/project.pbxproj; do
   [ -f "$f" ] || continue
-  if grep -Eq 'DEVELOPMENT_TEAM = [A-Z0-9]+;' "$f"; then
+  if grep -Eq 'DEVELOPMENT_TEAM(\[[^]]*\])?"? = "?[A-Za-z0-9]+"?;' "$f"; then
     echo "check-ios-signing: $f sets DEVELOPMENT_TEAM; keep it in ios/Flutter/Signing.xcconfig only" >&2
     status=1
   fi

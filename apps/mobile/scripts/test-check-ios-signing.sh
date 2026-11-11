@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests check-ios-signing.sh against a fixture iOS folder in a scratch git repo:
 #   - no DEVELOPMENT_TEAM line, or only DEVELOPMENT_TEAM = ""; passes (exit 0);
-#   - DEVELOPMENT_TEAM = ABCDE12345; fails (exit 1) and names project.pbxproj;
+#   - DEVELOPMENT_TEAM = ABCDE12345; (also quoted, or with an [sdk=...] condition) fails (exit 1) and names project.pbxproj;
 #   - a tracked ios/Flutter/Signing.xcconfig fails (exit 1) and names the file.
 #
 # Usage, from anywhere: apps/mobile/scripts/test-check-ios-signing.sh
@@ -46,6 +46,15 @@ expect "empty team passes" 0 ""
 
 printf 'buildSettings = {\n\tDEVELOPMENT_TEAM = ABCDE12345;\n};\n' >"$PBX"
 expect "a team id fails" 1 "project.pbxproj"
+
+printf 'buildSettings = {\n\tDEVELOPMENT_TEAM = "ABCDE12345";\n};\n' >"$PBX"
+expect "a quoted team id fails" 1 "project.pbxproj"
+
+printf 'buildSettings = {\n\t"DEVELOPMENT_TEAM[sdk=iphoneos*]" = ABCDE12345;\n};\n' >"$PBX"
+expect "an sdk-conditional team id fails" 1 "project.pbxproj"
+
+printf 'buildSettings = {\n\tDEVELOPMENT_TEAM[sdk=iphoneos*] = "ABCDE12345";\n};\n' >"$PBX"
+expect "an unquoted-key conditional quoted id fails" 1 "project.pbxproj"
 
 printf 'buildSettings = {\n\tPRODUCT_NAME = Runner;\n};\n' >"$PBX"
 printf 'DEVELOPMENT_TEAM = ABCDE12345\n' >"$IOS/Flutter/Signing.xcconfig"
