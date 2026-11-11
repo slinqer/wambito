@@ -1,3 +1,4 @@
+import Security
 import XCTest
 
 @testable import WambitoNative
@@ -281,5 +282,43 @@ final class DueTodayTests: XCTestCase {
   func testDayInZone() {
     // 03:00 UTC on the 12th is still the 11th in Bogota.
     XCTAssertEqual(DueToday.day(date("2026-11-12T03:00:00Z"), in: bogota), "2026-11-11")
+  }
+
+  // MARK: - The stored session
+
+  func testStoredItemOfKeychainAnswer() {
+    XCTAssertEqual(StoredItem.of(status: errSecItemNotFound, data: nil), .missing)
+    XCTAssertEqual(StoredItem.of(status: errSecSuccess, data: Data("tok".utf8)), .value("tok"))
+    // Before the first unlock, or an item still under the old accessibility: stored, not readable.
+    XCTAssertEqual(StoredItem.of(status: errSecInteractionNotAllowed, data: nil), .unreadable)
+    XCTAssertEqual(StoredItem.of(status: errSecSuccess, data: nil), .unreadable)
+    XCTAssertEqual(StoredItem.of(status: errSecSuccess, data: Data([0xFF, 0xFE])), .unreadable)
+  }
+
+  func testTokenStates() {
+    XCTAssertEqual(DueToday.token(.missing), .signedOut)
+    XCTAssertEqual(DueToday.token(.unreadable), .unreadable)
+    XCTAssertEqual(DueToday.token(.value("")), .unreadable)
+    XCTAssertEqual(DueToday.token(.value("tok")), .token("tok"))
+  }
+
+  func testOnlyASignedOutSessionStopsTheRuns() {
+    XCTAssertFalse(DueToday.keepsGoing(.missing))
+    XCTAssertTrue(DueToday.keepsGoing(.unreadable))
+    XCTAssertTrue(DueToday.keepsGoing(.value("tok")))
+  }
+
+  func testTheSessionUnchangedDuringARun() {
+    XCTAssertTrue(DueToday.unchanged("tok", now: .value("tok")))
+    XCTAssertFalse(DueToday.unchanged("tok", now: .value("other")))
+    XCTAssertFalse(DueToday.unchanged("tok", now: .missing))
+    XCTAssertFalse(DueToday.unchanged("tok", now: .unreadable))
+  }
+
+  func testServerSettingOfStoredItem() {
+    XCTAssertEqual(ServerSetting.of(.missing), .notChosen)
+    XCTAssertEqual(ServerSetting.of(.unreadable), .unreadable)
+    XCTAssertEqual(ServerSetting.of(.value("")), .unreadable)
+    XCTAssertEqual(ServerSetting.of(.value("https://mine.example")), .chosen("https://mine.example"))
   }
 }

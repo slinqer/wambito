@@ -1,4 +1,24 @@
 import Foundation
+import Security
+
+/// One item of the app's secure storage, as a background run finds it in the Keychain.
+public enum StoredItem: Equatable {
+  /// Not stored: for the token, signed out.
+  case missing
+  /// Stored but not readable now: before the phone's first unlock, or still kept with the old
+  /// accessibility until the app rewrites it (lib/storage/secure_storage.dart).
+  case unreadable
+  case value(String)
+
+  /// The item from a `SecItemCopyMatching` answer: [status] and the data it returned.
+  public static func of(status: OSStatus, data: Data?) -> StoredItem {
+    if status == errSecItemNotFound { return .missing }
+    guard status == errSecSuccess, let data, let text = String(data: data, encoding: .utf8) else {
+      return .unreadable
+    }
+    return .value(text)
+  }
+}
 
 /// The server a background run asks, as the app keeps it in secure storage (`setting.server`).
 /// Same cases as `ServerSetting` in SecureSession.kt on Android.
@@ -8,6 +28,15 @@ public enum ServerSetting: Equatable {
   case chosen(String)
   /// Something is stored but cannot be read: the run must not guess (nor send the token).
   case unreadable
+
+  /// The setting from its stored item (`setting.server`): an empty one counts as unreadable.
+  public static func of(_ item: StoredItem) -> ServerSetting {
+    switch item {
+    case .missing: return .notChosen
+    case .unreadable: return .unreadable
+    case .value(let url): return url.isEmpty ? .unreadable : .chosen(url)
+    }
+  }
 }
 
 /// "Hoy vence…" (spec section 7.2): what the daily run reads from the server and decides, without
@@ -67,6 +96,32 @@ public enum DueToday {
     public let today: String?
 
     public var keepGoing: Bool { outcome != .signedOut }
+  }
+
+  /// The session as a run reads it (`DueWorker` on Android tells the same three apart).
+  public enum TokenState: Equatable {
+    /// No token stored: no run, and none scheduled.
+    case signedOut
+    /// A token is stored but cannot be read now: nothing is asked, tomorrow's run is scheduled.
+    case unreadable
+    case token(String)
+  }
+
+  public static func token(_ item: StoredItem) -> TokenState {
+    switch item {
+    case .missing: return .signedOut
+    case .unreadable: return .unreadable
+    case .value(let token): return token.isEmpty ? .unreadable : .token(token)
+    }
+  }
+
+  /// Whether the next day's run goes on the calendar as far as the session goes: until signed out.
+  public static func keepsGoing(_ item: StoredItem) -> Bool { item != .missing }
+
+  /// Whether the session is still [token]'s after the requests: a sign-out, another sign-in, or a
+  /// token that cannot be read any more drops what the run found.
+  public static func unchanged(_ token: String, now item: StoredItem) -> Bool {
+    item == .value(token)
   }
 
   /// The API's largest page.

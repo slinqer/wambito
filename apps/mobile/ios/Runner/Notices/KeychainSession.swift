@@ -24,27 +24,12 @@ struct KeychainSession {
     Bundle.main.object(forInfoDictionaryKey: "WambitoDefaultServer") as? String
   }
 
-  private enum Item {
-    case missing
-    case unreadable
-    case value(String)
-  }
+  /// The token's item: missing (signed out), unreadable (locked) or its value.
+  func token() -> StoredItem { read(Self.tokenKey) }
 
-  /// The bearer token, or nil when signed out (or unreadable).
-  func token() -> String? {
-    if case .value(let token) = read(Self.tokenKey), !token.isEmpty { return token }
-    return nil
-  }
+  func server() -> ServerSetting { ServerSetting.of(read(Self.serverKey)) }
 
-  func server() -> ServerSetting {
-    switch read(Self.serverKey) {
-    case .missing: return .notChosen
-    case .unreadable: return .unreadable
-    case .value(let url): return url.isEmpty ? .unreadable : .chosen(url)
-    }
-  }
-
-  private func read(_ account: String) -> Item {
+  private func read(_ account: String) -> StoredItem {
     let query: [CFString: Any] = [
       kSecClass: kSecClassGenericPassword,
       kSecAttrService: Self.service,
@@ -54,12 +39,6 @@ struct KeychainSession {
     ]
     var found: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &found)
-    if status == errSecItemNotFound { return .missing }
-    // errSecInteractionNotAllowed (locked before the first unlock) and any other error: stored,
-    // but not readable now.
-    guard status == errSecSuccess, let data = found as? Data,
-      let text = String(data: data, encoding: .utf8)
-    else { return .unreadable }
-    return .value(text)
+    return StoredItem.of(status: status, data: found as? Data)
   }
 }

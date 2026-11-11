@@ -55,8 +55,17 @@ enum DueTask {
   ) async -> Bool {
     var zone = NoticeTimes.zone(defaults.string(forKey: DueSettings.zoneKey), fallback: .current)
     guard defaults.bool(forKey: DueSettings.enabledKey) else { return true }
+    let token: String
+    switch DueToday.token(session.token()) {
     // Signed out: nothing to ask, nothing to schedule.
-    guard let token = session.token() else { return true }
+    case .signedOut: return true
+    // Stored but locked (before the first unlock, or not yet rewritten by the app): nothing is
+    // asked today, and tomorrow's run looks again.
+    case .unreadable:
+      schedule(zone: zone)
+      return true
+    case .token(let read): token = read
+    }
     var keepGoing = true
     var done = true
     let status = await center.notificationSettings().authorizationStatus
@@ -75,7 +84,7 @@ enum DueTask {
         defaults.set(zone.identifier, forKey: DueSettings.zoneKey)
       }
       // Signed out, or the switch turned off, while the requests were on their way: nothing is said.
-      if case .due(let names) = run.outcome, session.token() == token,
+      if case .due(let names) = run.outcome, DueToday.unchanged(token, now: session.token()),
         defaults.bool(forKey: DueSettings.enabledKey),
         await post(names, language: defaults.string(forKey: DueSettings.languageKey), center: center)
       {
@@ -84,7 +93,9 @@ enum DueTask {
     }
     // Tomorrow's 9:00 (or today's, when this run came before it), as the last step: only while the
     // switch is on and someone is signed in.
-    if keepGoing, defaults.bool(forKey: DueSettings.enabledKey), session.token() != nil {
+    if keepGoing, defaults.bool(forKey: DueSettings.enabledKey),
+      DueToday.keepsGoing(session.token())
+    {
       schedule(zone: zone)
     }
     return done
