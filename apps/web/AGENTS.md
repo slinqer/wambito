@@ -106,8 +106,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
   `refreshKeys(options)` (a device wrap at a higher `keyV` n, verified as `withDataKey`, adds
   every version from the current c + 1 to n to the keyring and makes n current, old versions kept;
-  `tampered` keeps nothing; one below the current version changes nothing, and a held version is
-  never overwritten), `dropKeyVersion(userId, keyV)`,
+  `tampered` keeps nothing; one below the current version changes nothing only when it is a held
+  version that passes the check (an unheld one is `tampered`), and a held version is never
+  overwritten), `dropKeyVersion(userId, keyV)`,
   `forgetDevice(userId)` (sign-out: `deleteVault`). The recovery secret is zeroed
   in a `finally`. A 409 `key_version_mismatch` from `/v2/keys` is `KeysError("rotated_elsewhere")`;
   `api`, `listWraps`, `putJson` and `WrapDto` are exported for `rotate.ts`.
@@ -147,7 +148,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   zeroed before it returns. The key link (old DK sealed under the new one, `sealKeyLink`) is made in `withDataKey` and kept in the prepared object. `commit()` POSTs `/v2/keys/rotate` with `{ keyV, wraps, link }` (retry-safe, the same link; a post that ended
   `offline` or `rotated_elsewhere` counts as ours when `GET /v2/keys` shows this browser's prepared
   wrap at the new `keyV`), keeps
-  `record:<v>`/`dedupe:<v>` (a `record:<v>` already held is never overwritten: `tampered`) (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
+  `record:<v>`/`dedupe:<v>` (a `record:<v>` already held, from a refresh or a half-done earlier try, is kept when it is the
+  prepared key, checked by a canary; another key is `tampered`, nothing written) (after `migrateLegacyKeys` for a 2a vault) and meta `keyV`, and adds the removed ids to `settings.revokedDevices`
   (a local write); the caller then calls the session's `reloadKeys()`. `newRecoveryKey(options)` →
   `{ recoveryKey, commit() }`: a new secret wraps DK at the current `keyV`, PUT on commit (replaces
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when

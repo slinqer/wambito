@@ -5,9 +5,11 @@ import {
   fromBase64Url,
   generateDataKey,
   newRecoverySecret,
+  openRecord,
   parseRecoveryKey,
   type RecordKeys,
   sealKeyLink,
+  sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
@@ -336,7 +338,9 @@ export async function rotateKeys(
 
 /**
  * The new version's keys become current, and the removed ids join `settings.revokedDevices`. A
- * version this browser already holds is never overwritten: `tampered`, nothing kept.
+ * `record:<keyV>` already held (a refresh met this rotation first, or an earlier try failed half-
+ * way) is kept when it is the same key as `keys` (`sameRecordKey`); another key is never
+ * overwritten: `tampered`, nothing written.
  */
 async function keepRotated(
   userId: string,
@@ -348,9 +352,14 @@ async function keepRotated(
   try {
     // a 2a vault's legacy names move to their version first, or a later load would overwrite
     await migrateLegacyKeys(store);
-    // a version this browser holds is never replaced (versions only grow)
-    if (await store.getKey<CryptoKey>(recordKeyName(keyV))) throw new KeysError("tampered");
-    await store.putKey(recordKeyName(keyV), keys.record);
+    const held = await store.getKey<CryptoKey>(recordKeyName(keyV));
+    if (held) {
+      // a version this browser holds is never replaced by another key (versions only grow)
+      if (!(await sameRecordKey(userId, keyV, keys, held))) throw new KeysError("tampered");
+    } else {
+      await store.putKey(recordKeyName(keyV), keys.record);
+    }
+    // the same data key's dedupe key: written again when the record key matched
     await store.putKey(dedupeKeyName(keyV), keys.dedupe);
     await store.setMeta("keyV", keyV);
     const [settings] = await store.list("settings");
@@ -361,6 +370,26 @@ async function keepRotated(
     await store.put("settings", settings.id, { ...settings.body, revokedDevices: revoked });
   } finally {
     store.close();
+  }
+}
+
+/**
+ * Whether `held` is the record key of `keys`: a random canary sealed with `held` opens with
+ * `keys` (as `sameDataKey` in `keys.ts`).
+ */
+async function sameRecordKey(
+  userId: string,
+  keyV: number,
+  keys: RecordKeys,
+  held: CryptoKey,
+): Promise<boolean> {
+  const ctx = { userId, type: "settings" as const, id: uuidv7(), keyV };
+  const canary = toBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+  try {
+    const sealed = await sealRecord({ record: held, dedupe: keys.dedupe }, ctx, canary);
+    return (await openRecord(keys, ctx, sealed)) === canary;
+  } catch {
+    return false;
   }
 }
 

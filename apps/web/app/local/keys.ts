@@ -844,9 +844,11 @@ async function sameDataKey(
  * for c, keeps the record and dedupe keys of every version from c + 1 to n beside the older ones
  * (records under them still need opening) and makes n current. Key versions only grow: a wrap at
  * or below the current version (a stale listing, or a server replaying an old wrap) changes
- * nothing, and a version already held is never overwritten. Returns the keyring. `device_removed`
- * and `tampered` (another DK at a held version, or a chain that does not reach the held key:
- * nothing kept) as `withDataKey`.
+ * nothing only when it is a held version whose key passes the check; one below the current
+ * version that this browser does not hold is `tampered`. A version already held is never
+ * overwritten. Returns the keyring. `device_removed` and `tampered` (another DK at a held version,
+ * an unheld version below the current one, or a chain that does not reach the held key: nothing
+ * kept) as `withDataKey`.
  */
 export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {
   const { userId } = options;

@@ -61,7 +61,28 @@ vi.mock("@wambito/crypto", async (original) => {
   };
 });
 
-import { KeysError, loadLocalKeys, prepareAccount } from "./keys.ts";
+/** `failPutKey`: the next `putKey` of that name rejects once (a write that fails half-way). */
+const storeFaults = vi.hoisted(() => ({ failPutKey: null as string | null }));
+vi.mock("./encrypted-store.ts", async (original) => {
+  const real = await original<typeof import("./encrypted-store.ts")>();
+  return {
+    ...real,
+    createEncryptedStore: async (userId: string) => {
+      const store = await real.createEncryptedStore(userId);
+      const putKey = store.putKey.bind(store);
+      store.putKey = async (name, key) => {
+        if (storeFaults.failPutKey === name) {
+          storeFaults.failPutKey = null;
+          throw new Error("write failed");
+        }
+        return putKey(name, key);
+      };
+      return store;
+    },
+  };
+});
+
+import { KeysError, loadLocalKeys, prepareAccount, refreshKeys } from "./keys.ts";
 import { checkRecoveryKey, newRecoveryKey, rotateKeys } from "./rotate.ts";
 
 interface Wrap {
@@ -152,6 +173,7 @@ function fakeKeys() {
         return toWrap(w.id as string, w);
       });
       state.rotations.push({ keyV: body.keyV, wraps, link: body.link });
+      if (body.link) state.links.set(body.keyV, body.link);
       state.wraps.splice(0, state.wraps.length, ...wraps);
       return json({ wraps });
     }
@@ -543,6 +565,58 @@ describe("rotateKeys", () => {
     expect(await openKeyLink(dk3, { userId: a.userId, keyV: 3 }, fromBase64Url(link))).toEqual(dk2);
   });
 
+  it("a lost answer, then a refresh that stored record:n meanwhile: the retried commit finishes", async () => {
+    const a = await account();
+    const gone = await addDevice(a, "Chrome on Android");
+    const prepared = await rotateKeys({
+      ...a.options,
+      remove: [gone.id],
+      recovery: { text: a.recoveryKey },
+    });
+    a.api.loseNextAnswer = true;
+    await expect(prepared.commit()).rejects.toMatchObject({ code: "offline" });
+    a.api.offline = false;
+    // the vault's sync met the new version first: its own prepared wrap, through the valid link
+    expect((await refreshKeys(a.options)).keyring.current).toBe(2);
+    await expect(prepared.commit()).resolves.toEqual({
+      keyV: 2,
+      dropped: [{ id: gone.id, label: "Chrome on Android", reason: "removed" }],
+    });
+    const local = await loadLocalKeys(a.userId);
+    expect(local?.keyring.current).toBe(2);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([1, 2]);
+    const newDk = await openRecovery(a.api, a.userId, a.recoveryKey, 2);
+    const ctx = { userId: a.userId, type: "settings" as const, id: SETTINGS_ID, keyV: 2 };
+    const sealed = await sealRecord(await deriveRecordKeys(newDk, false), ctx, { s: 2 });
+    expect(await openRecord(local?.keyring.byVersion.get(2) as never, ctx, sealed)).toEqual({
+      s: 2,
+    });
+    const store = await createEncryptedStore(a.userId);
+    expect((await store.get("settings", SETTINGS_ID))?.body.revokedDevices).toEqual([gone.id]);
+    store.close();
+  });
+
+  it("a keep that failed after its first key write finishes on retry", async () => {
+    const a = await account();
+    const gone = await addDevice(a, "Chrome on Android");
+    const prepared = await rotateKeys({
+      ...a.options,
+      remove: [gone.id],
+      recovery: { text: a.recoveryKey },
+    });
+    storeFaults.failPutKey = "dedupe:2";
+    await expect(prepared.commit()).rejects.toThrow("write failed");
+    expect(a.api.rotations).toHaveLength(1);
+    await expect(prepared.commit()).resolves.toMatchObject({ keyV: 2 });
+    expect(a.api.posts).toHaveLength(1);
+    const local = await loadLocalKeys(a.userId);
+    expect(local?.keyring.current).toBe(2);
+    expect([...(local?.keyring.byVersion.keys() ?? [])]).toEqual([1, 2]);
+    const store = await createEncryptedStore(a.userId);
+    expect((await store.get("settings", SETTINGS_ID))?.body.revokedDevices).toEqual([gone.id]);
+    store.close();
+  });
+
   it("a commit never overwrites a record key this browser already holds for the new version", async () => {
     const a = await account();
     const prepared = await rotateKeys({
@@ -563,6 +637,7 @@ describe("rotateKeys", () => {
     const sealed = await sealRecord(held, ctx, { s: 2 });
     expect(await openRecord({ record: kept, dedupe: held.dedupe }, ctx, sealed)).toEqual({ s: 2 });
     expect(await after.getMeta("keyV")).toBe(1);
+    expect((await after.get("settings", SETTINGS_ID))?.body.revokedDevices).toEqual([]);
     after.close();
   });
 
