@@ -211,6 +211,8 @@ async function world() {
   const dataKey = generateDataKey();
   const base: KeysOptions = { userId, fetch: server.fetch };
   await enrollDevice(base, dataKey, 2);
+  // the setup's own requests (its enroll lists the keys for their links) are not the test's
+  server.log.length = 0;
   handed.openedDevice.length = 0;
   handed.openedPairing.length = 0;
   handed.seals.length = 0;

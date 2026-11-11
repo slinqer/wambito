@@ -5,8 +5,11 @@ import {
   fromBase64Url,
   generateDataKey,
   newRecoverySecret,
+  openRecord,
   parseRecoveryKey,
   type RecordKeys,
+  sealKeyLink,
+  sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
@@ -21,8 +24,10 @@ import {
   KeysError,
   type KeysOptions,
   listWraps,
+  migrateLegacyKeys,
   putJson,
   recordKeyName,
+  refreshKeys,
   type WrapDto,
   withDataKey,
 } from "./keys.ts";
@@ -150,14 +155,15 @@ export async function checkRecoveryKey(options: KeysOptions & { text: string }):
 /**
  * Removes devices and rotates the data key, in the order of spec 7.5 and addendum section 2:
  * 1. the typed recovery key must open the current recovery wrap (before anything is made);
- * 2. DK from this browser's own device wrap; every other device wrap's attestation is verified
+ * 2. `refreshKeys` first (this browser then holds every version up to the account's current
+ *    one), then DK from this browser's own device wrap; every other device wrap's attestation is verified
  *    under it, and the ids in `remove` and in `settings.revokedDevices` are left out, whatever the
  *    server lists (reported in `dropped`, with a forged attestation as `attestation`);
  * 3. a new DK at `keyV + 1`, and its wraps: one recovery, the kept devices (same id, ref and
  *    label, sealed to their public keys with fresh attestations; this browser's own with the
  *    public key it kept), the touched passkey. Assistants have no web wraps yet (stage 4).
  *
- * `commit()` then `POST /v2/keys/rotate`s them (409 `key_version_mismatch` = `rotated_elsewhere`:
+ * `commit()` then `POST /v2/keys/rotate`s them with the key link (the old DK sealed under the new one) (409 `key_version_mismatch` = `rotated_elsewhere`:
  * another device rotated first, nothing is kept), keeps the new version's record and dedupe keys
  * in this browser and makes it current, and writes the removed ids into `settings.revokedDevices`
  * (a local write: the sync seals it under the new version). The caller then calls the session's
@@ -184,6 +190,9 @@ export async function rotateKeys(
     const recoveryKey = "fresh" in options.recovery ? formatRecoveryKey(secret) : null;
     const recoverySecret = secret;
     const revoked = new Set([...(await revokedDevices(userId)), ...options.remove]);
+    // Holds every version up to the account's current one first: `withDataKey` alone would accept
+    // a verified wrap above the held current without keeping the versions in between.
+    await refreshKeys(options);
 
     const prepared = await withDataKey(options, async (dataKey, keyV) => {
       // Read after `withDataKey`, which remembers them for a 2a browser.
@@ -264,8 +273,11 @@ export async function rotateKeys(
             ...(existing?.label ? { label: existing.label } : {}),
           });
         }
+        // The link: the old DK (version `keyV`) sealed under the new one, so other browsers can
+        // follow the rotation. Made here, kept in `prepared`: a retried commit posts the same one.
+        const link = toBase64Url(await sealKeyLink(newKey, dataKey, { userId, keyV: nextV }));
         const keys = await deriveRecordKeys(newKey, false);
-        return { keyV: nextV, wraps: body, keys, dropped, ownId };
+        return { keyV: nextV, wraps: body, link, keys, dropped, ownId };
       } finally {
         newKey.fill(0);
       }
@@ -290,7 +302,10 @@ export async function rotateKeys(
       if (done) return done;
       if (!posted) {
         try {
-          await call("/v2/keys/rotate", postJson({ keyV: prepared.keyV, wraps: prepared.wraps }));
+          await call(
+            "/v2/keys/rotate",
+            postJson({ keyV: prepared.keyV, wraps: prepared.wraps, link: prepared.link }),
+          );
         } catch (error) {
           // The rotate is not idempotent: a post whose answer was lost (`offline`), retried, gets
           // 409 (`rotated_elsewhere`). Ours if the server holds this browser's prepared wrap.
@@ -321,7 +336,12 @@ export async function rotateKeys(
   }
 }
 
-/** The new version's keys become current, and the removed ids join `settings.revokedDevices`. */
+/**
+ * The new version's keys become current, and the removed ids join `settings.revokedDevices`. A
+ * `record:<keyV>` already held (a refresh met this rotation first, or an earlier try failed half-
+ * way) is kept when it is the same key as `keys` (`sameRecordKey`); another key is never
+ * overwritten: `tampered`, nothing written.
+ */
 async function keepRotated(
   userId: string,
   keyV: number,
@@ -330,7 +350,16 @@ async function keepRotated(
 ): Promise<void> {
   const store = await createEncryptedStore(userId);
   try {
-    await store.putKey(recordKeyName(keyV), keys.record);
+    // a 2a vault's legacy names move to their version first, or a later load would overwrite
+    await migrateLegacyKeys(store);
+    const held = await store.getKey<CryptoKey>(recordKeyName(keyV));
+    if (held) {
+      // a version this browser holds is never replaced by another key (versions only grow)
+      if (!(await sameRecordKey(userId, keyV, keys, held))) throw new KeysError("tampered");
+    } else {
+      await store.putKey(recordKeyName(keyV), keys.record);
+    }
+    // the same data key's dedupe key: written again when the record key matched
     await store.putKey(dedupeKeyName(keyV), keys.dedupe);
     await store.setMeta("keyV", keyV);
     const [settings] = await store.list("settings");
@@ -341,6 +370,26 @@ async function keepRotated(
     await store.put("settings", settings.id, { ...settings.body, revokedDevices: revoked });
   } finally {
     store.close();
+  }
+}
+
+/**
+ * Whether `held` is the record key of `keys`: a random canary sealed with `held` opens with
+ * `keys` (as `sameDataKey` in `keys.ts`).
+ */
+async function sameRecordKey(
+  userId: string,
+  keyV: number,
+  keys: RecordKeys,
+  held: CryptoKey,
+): Promise<boolean> {
+  const ctx = { userId, type: "settings" as const, id: uuidv7(), keyV };
+  const canary = toBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+  try {
+    const sealed = await sealRecord({ record: held, dedupe: keys.dedupe }, ctx, canary);
+    return (await openRecord(keys, ctx, sealed)) === canary;
+  } catch {
+    return false;
   }
 }
 

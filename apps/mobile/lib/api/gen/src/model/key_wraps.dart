@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:wambito/api/gen/src/model/key_link.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,10 +15,15 @@ part 'key_wraps.g.dart';
 ///
 /// Properties:
 /// * [wraps]
+/// * [links] - Ordered by `keyV`
 @BuiltValue()
 abstract class KeyWraps implements Built<KeyWraps, KeyWrapsBuilder> {
   @BuiltValueField(wireName: r'wraps')
   BuiltList<KeyWrap> get wraps;
+
+  /// Ordered by `keyV`
+  @BuiltValueField(wireName: r'links')
+  BuiltList<KeyLink> get links;
 
   KeyWraps._();
 
@@ -46,6 +52,11 @@ class _$KeyWrapsSerializer implements PrimitiveSerializer<KeyWraps> {
     yield serializers.serialize(
       object.wraps,
       specifiedType: const FullType(BuiltList, [FullType(KeyWrap)]),
+    );
+    yield r'links';
+    yield serializers.serialize(
+      object.links,
+      specifiedType: const FullType(BuiltList, [FullType(KeyLink)]),
     );
   }
 
@@ -76,6 +87,13 @@ class _$KeyWrapsSerializer implements PrimitiveSerializer<KeyWraps> {
             specifiedType: const FullType(BuiltList, [FullType(KeyWrap)]),
           ) as BuiltList<KeyWrap>;
           result.wraps.replace(valueDes);
+          break;
+        case r'links':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(KeyLink)]),
+          ) as BuiltList<KeyLink>;
+          result.links.replace(valueDes);
           break;
         default:
           unhandled.add(key);

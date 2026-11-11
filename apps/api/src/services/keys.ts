@@ -1,4 +1,14 @@
-import { type Db, keyWraps, oauthConsent, passkey, type Tx, withUser } from "@wambito/db";
+import { LINK_BYTES } from "@wambito/crypto";
+import {
+  type Db,
+  keyLinks,
+  keyWraps,
+  oauthConsent,
+  passkey,
+  session,
+  type Tx,
+  withUser,
+} from "@wambito/db";
 import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
@@ -98,7 +108,44 @@ async function checkRef(tx: Tx, userId: string, wrap: KeyWrapInput): Promise<voi
   }
 }
 
-const values = (userId: string, id: string, wrap: KeyWrapInput) => ({
+/**
+ * The caller's session id, or null for an OAuth grant. A device wrap remembers the session that
+ * registered it; removing the wrap ends that session, except the caller's own.
+ */
+export interface SessionOption {
+  sessionId: string | null;
+}
+
+/**
+ * Ends `sessionIds` (the removed devices'), in the caller's transaction, after the wraps were
+ * deleted or replaced: never the caller's own, and never one a remaining device wrap of the person
+ * still uses (a browser that enrolled again under the same session keeps its old wrap when the
+ * delete of it failed; removing that stale wrap must not sign the good one out).
+ */
+async function endSessions(
+  tx: Tx,
+  userId: string,
+  sessionIds: (string | null)[],
+  callerSessionId: string | null,
+): Promise<void> {
+  const ids = sessionIds.filter((id): id is string => id !== null && id !== callerSessionId);
+  if (ids.length === 0) return;
+  const inUse = await tx
+    .select({ sessionId: keyWraps.sessionId })
+    .from(keyWraps)
+    .where(own(userId, inArray(keyWraps.sessionId, ids)));
+  const used = new Set(inUse.map((row) => row.sessionId));
+  const ended = ids.filter((id) => !used.has(id));
+  if (ended.length === 0) return;
+  await tx.delete(session).where(and(eq(session.userId, userId), inArray(session.id, ended)));
+}
+
+const values = (
+  userId: string,
+  id: string,
+  wrap: KeyWrapInput,
+  sessionId: string | null = null,
+) => ({
   id,
   userId,
   kind: wrap.kind,
@@ -108,6 +155,7 @@ const values = (userId: string, id: string, wrap: KeyWrapInput) => ({
   publicKey: wrap.publicKey == null ? null : bytes(wrap.publicKey),
   attestation: wrap.attestation == null ? null : bytes(wrap.attestation),
   label: wrap.label ?? null,
+  sessionId: wrap.kind === "device" ? sessionId : null,
 });
 
 /** A device wrap carries its public key and the attestation of it; the server cannot check it. */
@@ -135,14 +183,33 @@ const recoveryRequired = () =>
     "An account always keeps its recovery wrap; make a new recovery key to replace it",
   );
 
-export async function listKeyWraps(db: Db, userId: string): Promise<KeyWrapDto[]> {
+/** A key link as it travels: the version it leads to and its 60 bytes, base64url. */
+export interface KeyLinkDto {
+  keyV: number;
+  link: string;
+}
+
+async function listLinks(tx: Tx, userId: string): Promise<KeyLinkDto[]> {
+  const rows = await tx
+    .select({ keyV: keyLinks.keyV, link: keyLinks.link })
+    .from(keyLinks)
+    .where(eq(keyLinks.userId, userId))
+    .orderBy(asc(keyLinks.keyV));
+  return rows.map((row) => ({ keyV: row.keyV, link: b64(row.link) }));
+}
+
+/** Every wrap of the account's data key, and the links between its versions, by keyV. */
+export async function listKeys(
+  db: Db,
+  userId: string,
+): Promise<{ wraps: KeyWrapDto[]; links: KeyLinkDto[] }> {
   return withUser(db, userId, async (tx) => {
     const rows = await tx
       .select()
       .from(keyWraps)
       .where(own(userId))
       .orderBy(asc(keyWraps.createdAt), asc(keyWraps.id));
-    return rows.map(toKeyWrap);
+    return { wraps: rows.map(toKeyWrap), links: await listLinks(tx, userId) };
   });
 }
 
@@ -161,7 +228,7 @@ export async function putKeyWrap(
   userId: string,
   id: string,
   wrap: KeyWrapInput,
-  { onlyFirst = false }: { onlyFirst?: boolean } = {},
+  { onlyFirst = false, sessionId }: { onlyFirst?: boolean } & SessionOption,
 ): Promise<KeyWrapDto> {
   checkAttestation(wrap);
   return withUser(db, userId, async (tx) => {
@@ -187,7 +254,7 @@ export async function putKeyWrap(
     }
     await checkRef(tx, userId, wrap);
 
-    const row = values(userId, id, wrap);
+    const row = values(userId, id, wrap, sessionId);
     const duplicate =
       wrap.kind === "recovery"
         ? eq(keyWraps.kind, "recovery")
@@ -219,17 +286,26 @@ export async function putKeyWrap(
   });
 }
 
-/** Deletes wrap `id`; 404 when the person has none with that id, 409 for the recovery wrap. */
-export async function deleteKeyWrap(db: Db, userId: string, id: string): Promise<void> {
+/**
+ * Deletes wrap `id`; 404 when the person has none with that id, 409 for the recovery wrap. A device
+ * wrap's session ends with it (never the caller's own, nor one another device wrap still uses).
+ */
+export async function deleteKeyWrap(
+  db: Db,
+  userId: string,
+  id: string,
+  { sessionId }: SessionOption,
+): Promise<void> {
   await withUser(db, userId, async (tx) => {
     await lockWraps(tx, userId);
     const [found] = await tx
-      .select({ kind: keyWraps.kind })
+      .select({ kind: keyWraps.kind, sessionId: keyWraps.sessionId })
       .from(keyWraps)
       .where(own(userId, eq(keyWraps.id, id)));
     if (!found) throw new ApiError(404, "not_found");
     if (found.kind === "recovery") throw recoveryRequired();
     await tx.delete(keyWraps).where(own(userId, eq(keyWraps.id, id)));
+    await endSessions(tx, userId, [found.sessionId], sessionId);
   });
 }
 
@@ -237,14 +313,21 @@ export async function deleteKeyWrap(db: Db, userId: string, id: string): Promise
  * Replaces every wrap of the account with `wraps`, all at `keyV`, in one transaction. `keyV` must
  * be the current keyV + 1 (any keyV when the account has no wrap yet), and `wraps` must hold
  * exactly one recovery wrap. Each wrap passes the same ref checks as a PUT. An id that is someone
- * else's fails the whole rotation with 409 `id_taken`.
+ * else's fails the whole rotation with 409 `id_taken`. `link` (the previous data key sealed under the
+ * new one, which the server cannot open) is required once the account has a version (422
+ * `link_required`) and refused for its first (422 `link_unexpected`); it must be 60 bytes (422
+ * `invalid_link`). It is stored in the same transaction, and the answer lists every link. A device
+ * wrap is the same device across the rotation when its `ref` is: it keeps the old row's session;
+ * the sessions of devices left out end (never the caller's own, nor one a kept wrap still uses).
  */
 export async function rotateKeys(
   db: Db,
   userId: string,
   keyV: number,
   wraps: (KeyWrapInput & { id: string })[],
-): Promise<KeyWrapDto[]> {
+  link: Uint8Array | null,
+  { sessionId }: SessionOption,
+): Promise<{ wraps: KeyWrapDto[]; links: KeyLinkDto[] }> {
   if (wraps.filter((wrap) => wrap.kind === "recovery").length !== 1) {
     throw new ApiError(422, "recovery_required", "A rotation carries exactly one recovery wrap");
   }
@@ -253,10 +336,29 @@ export async function rotateKeys(
     await lockWraps(tx, userId);
     const current = await currentKeyV(tx, userId);
     if (current !== null && keyV !== current + 1) throw keyVersionMismatch(current, current + 1);
+    if (current === null && link !== null) {
+      throw new ApiError(422, "link_unexpected", "The first version has no link");
+    }
+    if (current !== null && link === null) {
+      throw new ApiError(422, "link_required", "A rotation carries the link to the previous key");
+    }
+    if (link !== null && link.length !== LINK_BYTES) {
+      throw new ApiError(422, "invalid_link", `A link is ${LINK_BYTES} bytes`);
+    }
     for (const wrap of wraps) await checkRef(tx, userId, wrap);
 
+    const oldDevices = await tx
+      .select({ ref: keyWraps.ref, sessionId: keyWraps.sessionId })
+      .from(keyWraps)
+      .where(own(userId, eq(keyWraps.kind, "device")));
+    const sessionOfRef = new Map(oldDevices.map((row) => [row.ref, row.sessionId]));
+    const keptRefs = new Set(wraps.filter((w) => w.kind === "device").map((w) => w.ref ?? null));
+    const removed = oldDevices.filter((row) => !keptRefs.has(row.ref)).map((row) => row.sessionId);
+
     await tx.delete(keyWraps).where(own(userId));
-    const rows = wraps.map((wrap) => values(userId, wrap.id, wrap));
+    const rows = wraps.map((wrap) =>
+      values(userId, wrap.id, wrap, sessionOfRef.get(wrap.ref ?? null) ?? null),
+    );
     const inserted = await tx
       .insert(keyWraps)
       .values(rows)
@@ -264,7 +366,9 @@ export async function rotateKeys(
       .returning();
     // Some id exists, hidden by row-level security: the whole rotation rolls back.
     if (inserted.length !== rows.length) throw new ApiError(409, "id_taken", "An id is taken");
-    return inserted.map(toKeyWrap);
+    if (link !== null) await tx.insert(keyLinks).values({ userId, keyV, link });
+    await endSessions(tx, userId, removed, sessionId);
+    return { wraps: inserted.map(toKeyWrap), links: await listLinks(tx, userId) };
   });
 }
 

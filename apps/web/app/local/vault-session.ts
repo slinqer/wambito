@@ -38,6 +38,12 @@ export interface VaultSession {
    */
   onRemoved(listener: () => void): () => void;
   /**
+   * Called once if a new key version did not verify (its links do not lead back to the key this
+   * browser holds): the sync has stopped and the session is gone, but the vault and its unsent
+   * changes are kept; the gate shows Unlock, whose passkey or recovery key unlocks it again.
+   */
+  onUnverified(listener: () => void): () => void;
+  /**
    * After a rotation committed in this browser (`rotate.ts`): gives the sync the keyring the vault
    * now holds, then runs a sync (its upgrade pass re-seals the old records).
    */
@@ -186,9 +192,13 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       },
       unavailable: LOCAL_UNAVAILABLE,
     });
-    /** Set once open: a later 409 `session_changed` closes it, `device_removed` removes it. */
+    /**
+     * Set once open: a later 409 `session_changed` closes it, `device_removed` removes it,
+     * `key_unverified` closes it and keeps the vault.
+     */
     let opened: VaultSession | undefined;
     let removed: (() => void) | undefined;
+    let unverified: (() => void) | undefined;
     const engine = createSyncEngine({
       store,
       fetch: network,
@@ -202,6 +212,7 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
           options.onSessionChanged?.();
         }
         if (problem.code === "device_removed") removed?.();
+        if (problem.code === "key_unverified") unverified?.();
       },
     });
     const first = await engine.run();
@@ -210,6 +221,8 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       await forgetDevice(profile.id);
       throw new VaultOpenError("device_removed");
     }
+    // Never opened on a key version that did not verify; the vault stays (the `catch` closes it).
+    if (first.problem === "key_unverified") throw new VaultOpenError("key_unverified");
     const fatal = first.error === "unauthorized" || first.error === "session_changed";
     if (!first.ok && (fresh || fatal)) {
       throw new VaultOpenError(first.error ?? "server");
@@ -228,6 +241,7 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
     }) as typeof globalThis.fetch;
     const closedListeners = new Set<() => void>();
     const removedListeners = new Set<() => void>();
+    const unverifiedListeners = new Set<() => void>();
     let closing = false;
     const drop = () => {
       stop();
@@ -244,6 +258,10 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
       onRemoved(listener) {
         removedListeners.add(listener);
         return () => removedListeners.delete(listener);
+      },
+      onUnverified(listener) {
+        unverifiedListeners.add(listener);
+        return () => unverifiedListeners.delete(listener);
       },
       async reloadKeys() {
         const local = await loadLocalKeys(profile.id);
@@ -271,6 +289,12 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         .then(() => {
           for (const listener of removedListeners) listener();
         });
+    };
+    // A new key version did not verify: stop and close, keep the vault (never `forgetDevice`).
+    unverified = () => {
+      unverified = undefined;
+      session.close();
+      for (const listener of unverifiedListeners) listener();
     };
     if (active?.userId === profile.id) active.session = session;
     opened = session;

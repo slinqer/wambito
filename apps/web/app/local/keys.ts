@@ -8,6 +8,7 @@ import {
   generateDeviceKeyPair,
   newRecoverySecret,
   openFromDevice,
+  openKeyLink,
   openRecord,
   parseRecoveryKey,
   type RecordKeys,
@@ -53,7 +54,8 @@ export type KeysErrorCode =
   | "unknown_passkey"
   /**
    * This browser's device wrap holds a data key that is not the one this browser already keeps
-   * for that key version (anyone with its public key can seal one to it): refused, DK zeroed.
+   * for that key version (anyone with its public key can seal one to it), or a newer version
+   * whose links do not lead back to the key this browser holds: refused, every key zeroed.
    */
   | "tampered";
 
@@ -174,9 +176,149 @@ async function safeDeviceKeyPair(options: KeysOptions) {
   return pair;
 }
 
+/**
+ * `GET /v2/keys`: the wraps, and the links by the version whose key seals them (`link(v)` holds
+ * DK(v-1) under DK(v)). A link whose base64url does not decode counts as missing.
+ */
+export async function listKeys(
+  call: KeysApi,
+): Promise<{ wraps: WrapDto[]; links: Map<number, Uint8Array> }> {
+  const body = (await (await call("/v2/keys")).json()) as {
+    wraps: WrapDto[];
+    links?: Array<{ keyV: number; link: string }>;
+  };
+  const links = new Map<number, Uint8Array>();
+  for (const entry of body.links ?? []) {
+    try {
+      links.set(entry.keyV, fromBase64Url(entry.link));
+    } catch {
+      // missing
+    }
+  }
+  return { wraps: body.wraps, links };
+}
+
 export async function listWraps(call: KeysApi): Promise<WrapDto[]> {
-  const body = (await (await call("/v2/keys")).json()) as { wraps: WrapDto[] };
-  return body.wraps;
+  return (await listKeys(call)).wraps;
+}
+
+/** Zeroes every data key in the map. */
+function zeroKeys(keys: Map<number, Uint8Array>): void {
+  for (const key of keys.values()) key.fill(0);
+}
+
+/**
+ * Walks the key links down from `top` (spec 2026-11-10 section 2.2): the data keys of the versions
+ * `top.keyV - 1` down to `floor`, each opened from the link of the version above it. `strict`: a
+ * missing or failing link is `KeysError("tampered")`; otherwise the walk stops there and returns
+ * what it reached. On a throw every key it opened is zeroed; on success the caller owns them (and
+ * `top.dataKey` stays the caller's either way).
+ */
+export async function chainDown(
+  userId: string,
+  top: { keyV: number; dataKey: Uint8Array },
+  links: Map<number, Uint8Array>,
+  floor: number,
+  strict: boolean,
+): Promise<Map<number, Uint8Array>> {
+  const older = new Map<number, Uint8Array>();
+  try {
+    let key = top.dataKey;
+    for (let v = top.keyV; v >= 2 && v - 1 >= floor; v--) {
+      const link = links.get(v);
+      let opened: Uint8Array | undefined;
+      if (link) {
+        try {
+          opened = await openKeyLink(key, { userId, keyV: v }, link);
+        } catch {
+          opened = undefined;
+        }
+      }
+      if (!opened) {
+        if (strict) throw new KeysError("tampered");
+        break;
+      }
+      older.set(v - 1, opened);
+      key = opened;
+    }
+    return older;
+  } catch (error) {
+    zeroKeys(older);
+    throw error;
+  }
+}
+
+/** The record key this browser keeps for `keyV` (a 2a vault's single one is version `meta.keyV`). */
+async function heldRecordKey(store: EncryptedStore, keyV: number): Promise<CryptoKey | undefined> {
+  return (
+    (await store.getKey<CryptoKey>(recordKeyName(keyV))) ??
+    ((await store.getMeta<number>("keyV")) === keyV
+      ? await store.getKey<CryptoKey>(LEGACY_RECORD_KEY)
+      : undefined)
+  );
+}
+
+/**
+ * A data key at `top.keyV`, at or above the `current` version this browser holds, is accepted only
+ * when the links lead strictly down to `current` and the key reached there is the one this browser
+ * holds (`sameDataKey`); else `tampered`, with every key opened on the way zeroed. Returns the
+ * older keys from `top.keyV - 1` down to `current` (empty when `top.keyV` is `current`).
+ */
+async function chainToHeld(
+  store: EncryptedStore,
+  userId: string,
+  top: { keyV: number; dataKey: Uint8Array },
+  links: Map<number, Uint8Array>,
+  current: number,
+): Promise<Map<number, Uint8Array>> {
+  if (top.keyV < current) throw new KeysError("tampered");
+  const older = await chainDown(userId, top, links, current, true);
+  try {
+    const reached = top.keyV === current ? top.dataKey : older.get(current);
+    const held = await heldRecordKey(store, current);
+    if (!reached || !held || !(await sameDataKey(userId, reached, current, held))) {
+      throw new KeysError("tampered");
+    }
+    return older;
+  } catch (error) {
+    zeroKeys(older);
+    throw error;
+  }
+}
+
+/**
+ * How a trusted way in treats a vault held here. `strict` (pairing): the links must lead down to
+ * its current version and reach the key it holds (`chainToHeld`). `secret` (a passkey or recovery
+ * wrap, opened with the person's secret, which the server cannot forge; spec 2026-11-10 section 5
+ * over 2.3's mismatch rule): the walk is not strict, and a chain that stops or ends elsewhere is
+ * no error.
+ */
+type HeldVault = "strict" | "secret";
+
+/**
+ * The older keys a data key from a trusted way in (a passkey or recovery wrap, or pairing) brings
+ * along: every version the links reach, down to the first, stopping silently at the first missing
+ * or failing link. With a vault held here, a trusted version below its current one is `tampered`
+ * (a replay: versions only grow), and `held: "strict"` walks as `chainToHeld` instead. Versions
+ * the vault holds are never replaced (`keepLocally`).
+ */
+async function olderForTrustedKey(
+  userId: string,
+  top: { keyV: number; dataKey: Uint8Array },
+  links: Map<number, Uint8Array>,
+  held: HeldVault,
+): Promise<Map<number, Uint8Array>> {
+  const store = await createEncryptedStore(userId);
+  try {
+    const current = await store.getMeta<number>("keyV");
+    if (current !== undefined && (await heldRecordKey(store, current))) {
+      if (held === "strict") return await chainToHeld(store, userId, top, links, current);
+      if (top.keyV < current) throw new KeysError("tampered");
+    }
+    return await chainDown(userId, top, links, FIRST_KEY_V, false);
+  } finally {
+    store.close();
+  }
 }
 
 export const putJson = (body: unknown, headers: Record<string, string> = {}): RequestInit => ({
@@ -218,7 +360,9 @@ async function prepareDevice(
  * Adds this browser as a device: a key pair (`unsupported_browser` before anything is sent when it
  * cannot be kept safely), a wrap of DK sealed to its own public key with an attestation of that
  * key under DK, then the derived keys, the private key and the wrap's id and public key kept
- * locally. The caller owns `dataKey` and zeroes it. Also the end of pairing (a later task).
+ * locally. The caller owns `dataKey` and zeroes it. The end of pairing: DK came authenticated by
+ * the number, and the links bring the older versions it reaches (`olderForTrustedKey`; with a vault
+ * held here strictly down to its key, else `tampered`).
  */
 export async function enrollDevice(
   options: KeysOptions,
@@ -226,32 +370,98 @@ export async function enrollDevice(
   keyV: number,
 ): Promise<LocalKeys> {
   const pair = await safeDeviceKeyPair(options);
-  return enrollWithPair(api(options), options.userId, dataKey, keyV, pair);
+  const call = api(options);
+  const { links } = await listKeys(call);
+  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict");
+}
+
+/**
+ * Enrolls with a trusted DK (passkey, recovery, pairing), after its walk; nothing sent before.
+ * With a vault held here (unlocking again after a key version that did not verify), the new device
+ * wrap replaces this browser's previous one: once the new one is kept, `DELETE /v2/keys/{previous}`
+ * (the server never ends the caller's own session). A failed delete only leaves the old wrap
+ * listed, for Settings to remove.
+ */
+async function enrollTrusted(
+  call: KeysApi,
+  userId: string,
+  dataKey: Uint8Array,
+  keyV: number,
+  links: Map<number, Uint8Array>,
+  pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
+  held: HeldVault,
+): Promise<LocalKeys> {
+  const older = await olderForTrustedKey(userId, { keyV, dataKey }, links, held);
+  let local: LocalKeys;
+  let previous: string | undefined;
+  try {
+    previous = await heldDeviceWrapId(userId);
+    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older);
+  } finally {
+    zeroKeys(older);
+  }
+  if (previous) {
+    try {
+      await call(`/v2/keys/${previous}`, { method: "DELETE" });
+    } catch (error) {
+      // The unlock stands: the old wrap only stays listed (Settings can remove it). Said once,
+      // with the error's code only (never an id or a key).
+      console.warn(
+        "The previous device wrap could not be removed:",
+        error instanceof KeysError ? error.code : "unknown",
+      );
+    }
+  }
+  return local;
+}
+
+/** The device wrap id a vault held here kept at its enroll, if any. */
+async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
+  const store = await createEncryptedStore(userId);
+  try {
+    return await store.getMeta<string>("deviceWrapId");
+  } finally {
+    store.close();
+  }
 }
 
 async function enrollWithPair(
-  call: ReturnType<typeof api>,
+  call: KeysApi,
   userId: string,
   dataKey: Uint8Array,
   keyV: number,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
+  older: Map<number, Uint8Array>,
 ): Promise<LocalKeys> {
   const device = await prepareDevice(userId, dataKey, keyV, pair);
   await call(`/v2/keys/${device.id}`, putJson(device.body));
-  return keepLocally(userId, dataKey, keyV, device);
+  return keepLocally(userId, dataKey, keyV, device, older);
 }
 
+/**
+ * Keeps the derived keys of `keyV` (made current) and of every `older` version the vault does not
+ * hold yet (a held version is never replaced), the device private key and its wrap's id and
+ * public key. The caller owns and zeroes the data keys.
+ */
 async function keepLocally(
   userId: string,
   dataKey: Uint8Array,
   keyV: number,
   device: { id: string; privateKey: DevicePrivateKey; body: { publicKey: string } },
+  older: Map<number, Uint8Array>,
 ): Promise<LocalKeys> {
-  const keys = await deriveRecordKeys(dataKey, false);
+  const derived = new Map<number, RecordKeys>([[keyV, await deriveRecordKeys(dataKey, false)]]);
+  for (const [v, key] of older) derived.set(v, await deriveRecordKeys(key, false));
   const store = await createEncryptedStore(userId);
   try {
-    await store.putKey(recordKeyName(keyV), keys.record);
-    await store.putKey(dedupeKeyName(keyV), keys.dedupe);
+    // a held 2a vault's keys first move to their version's names (meta `keyV` moves below)
+    await migrateLegacyKeys(store);
+    for (const [v, keys] of derived) {
+      // a version this vault already holds is never replaced (versions only grow)
+      if (await store.getKey<CryptoKey>(recordKeyName(v))) continue;
+      await store.putKey(recordKeyName(v), keys.record);
+      await store.putKey(dedupeKeyName(v), keys.dedupe);
+    }
     await store.putKey(DEVICE_KEY, device.privateKey);
     await store.setMeta("deviceWrapId", device.id);
     await store.setMeta("devicePublicKey", device.body.publicKey);
@@ -260,7 +470,9 @@ async function keepLocally(
   } finally {
     store.close();
   }
-  return { keyring: { current: keyV, byVersion: new Map([[keyV, keys]]) } };
+  const local = await loadLocalKeys(userId);
+  if (!local) throw new Error(`no record keys for key version ${keyV}`);
+  return local;
 }
 
 /** A new account's keys, made but not yet sent: see `prepareAccount`. */
@@ -328,7 +540,7 @@ export async function prepareAccount(
       recoverySent = true;
     }
     await call(`/v2/keys/${device.id}`, putJson(device.body));
-    done = await keepLocally(userId, dataKey, FIRST_KEY_V, device);
+    done = await keepLocally(userId, dataKey, FIRST_KEY_V, device, new Map());
     dataKey.fill(0);
     return done;
   }
@@ -347,7 +559,10 @@ export async function prepareAccount(
 
 /**
  * Unlocks this browser with the typed recovery key: opens the recovery wrap, enrolls this device
- * and keeps the derived keys. The caller then runs a full sync. `bad_recovery_key` is a key that
+ * and keeps the derived keys, of the older versions the links reach too (`olderForTrustedKey`, not
+ * strict: the recovery secret authenticates the key, so with a vault held here a chain that does
+ * not reach its key is no error, its held versions stay as they are; a recovery wrap below its
+ * current version is `tampered`, nothing sent or kept). The caller then runs a full sync. `bad_recovery_key` is a key that
  * does not parse (nothing was sent); `wrong_recovery_key` one that parses but opens nothing.
  */
 export async function unlockWithRecovery(
@@ -363,7 +578,8 @@ export async function unlockWithRecovery(
   try {
     const pair = await safeDeviceKeyPair(options);
     const call = api(options);
-    const wrap = (await listWraps(call)).find((w) => w.kind === "recovery");
+    const { wraps, links } = await listKeys(call);
+    const wrap = wraps.find((w) => w.kind === "recovery");
     if (!wrap) throw new KeysError("wrong_recovery_key");
     let dataKey: Uint8Array;
     try {
@@ -376,7 +592,7 @@ export async function unlockWithRecovery(
       throw new KeysError("wrong_recovery_key");
     }
     try {
-      return await enrollWithPair(call, userId, dataKey, wrap.keyV, pair);
+      return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
     } finally {
       dataKey.fill(0);
     }
@@ -393,7 +609,8 @@ export interface PasskeySecret {
 
 /**
  * Unlocks this browser with a passkey's PRF (spec 7.2): opens the passkey wrap whose `ref` is the
- * credential, enrolls this device and keeps the derived keys, as `unlockWithRecovery`. The caller
+ * credential, enrolls this device and keeps the derived keys, as `unlockWithRecovery` (the same walk
+ * of the links, not strict; `tampered` only for a wrap below a held vault's current version). The caller
  * owns the PRF and zeroes it. `no_passkey_wrap` when no wrap has that `ref` or the PRF does not
  * open it (nothing is sent).
  */
@@ -401,7 +618,8 @@ export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): P
   const { userId, credentialId, prf } = options;
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
-  const wrap = (await listWraps(call)).find((w) => w.kind === "passkey" && w.ref === credentialId);
+  const { wraps, links } = await listKeys(call);
+  const wrap = wraps.find((w) => w.kind === "passkey" && w.ref === credentialId);
   if (!wrap) throw new KeysError("no_passkey_wrap");
   let dataKey: Uint8Array;
   try {
@@ -414,7 +632,7 @@ export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): P
     throw new KeysError("no_passkey_wrap");
   }
   try {
-    return await enrollWithPair(call, userId, dataKey, wrap.keyV, pair);
+    return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
   } finally {
     dataKey.fill(0);
   }
@@ -445,6 +663,23 @@ export async function addPasskeyWrap(options: KeysOptions & PasskeySecret): Prom
 }
 
 /**
+ * A 2a vault's single `record`/`dedupe` are version `meta.keyV`: written under the versioned names,
+ * then the old names go. Runs before anything moves meta `keyV`, or the legacy keys would be read
+ * as the new version.
+ */
+export async function migrateLegacyKeys(store: EncryptedStore): Promise<void> {
+  const current = await store.getMeta<number>("keyV");
+  if (current === undefined) return;
+  const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);
+  const legacyDedupe = await store.getKey<CryptoKey>(LEGACY_DEDUPE_KEY);
+  if (!legacyRecord || !legacyDedupe) return;
+  await store.putKey(recordKeyName(current), legacyRecord);
+  await store.putKey(dedupeKeyName(current), legacyDedupe);
+  await store.deleteKey(LEGACY_RECORD_KEY);
+  await store.deleteKey(LEGACY_DEDUPE_KEY);
+}
+
+/**
  * The keys this browser kept, or `null` when it was never set up or lacks the current version's
  * keys (the app is locked). A 2a vault's `record` and `dedupe` are version `meta.keyV`: they are
  * written under the versioned names first, then the old names go.
@@ -454,14 +689,7 @@ export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
   try {
     const current = await store.getMeta<number>("keyV");
     if (current === undefined) return null;
-    const legacyRecord = await store.getKey<CryptoKey>(LEGACY_RECORD_KEY);
-    const legacyDedupe = await store.getKey<CryptoKey>(LEGACY_DEDUPE_KEY);
-    if (legacyRecord && legacyDedupe) {
-      await store.putKey(recordKeyName(current), legacyRecord);
-      await store.putKey(dedupeKeyName(current), legacyDedupe);
-      await store.deleteKey(LEGACY_RECORD_KEY);
-      await store.deleteKey(LEGACY_DEDUPE_KEY);
-    }
+    await migrateLegacyKeys(store);
     const byVersion = new Map<number, RecordKeys>();
     for (const name of await store.keyNames()) {
       const match = /^record:(\d+)$/.exec(name);
@@ -479,77 +707,112 @@ export async function loadLocalKeys(userId: string): Promise<LocalKeys | null> {
 }
 
 /**
- * Opens DK from this browser's own `device` wrap (spec 7.5, Ruling 1 of stage 2b) for one
- * operation: `fn` gets DK and the wrap's `keyV`, and DK is zeroed once `fn` settles. The wrap is the
+ * Opens DK from this browser's own `device` wrap (spec 7.5, Ruling 1 of stage 2b). The wrap is the
  * one whose id this browser kept at enroll, and it must still be sealed to this browser's public
  * key; else `device_removed`. A 2a browser kept no wrap id: it tries each device wrap with its
- * private key, and keeps the id and public key of the one that opens. When this browser already
- * holds that `keyV`'s record key, DK must be the one it came from (`sameDataKey`), else
- * `tampered` (DK zeroed, `fn` never runs). A new version is not checked against the old one.
+ * private key, and keeps the id and public key of the one that opens. A wrap at a version above
+ * the current one this browser holds is accepted only through its links (`chainToHeld`, spec
+ * 2026-11-10 section 2.2), which also give `older`: the data keys from `keyV - 1` down to the held
+ * current version. At it, DK must be the one its record key came from (`sameDataKey`); below it,
+ * the version must be one this browser holds and pass the same check. Else `tampered`. On a throw
+ * every key is zeroed.
+ */
+async function openOwnDeviceKey(
+  options: KeysOptions,
+): Promise<{ dataKey: Uint8Array; keyV: number; older: Map<number, Uint8Array> }> {
+  const { userId } = options;
+  let dataKey: Uint8Array | undefined;
+  let older = new Map<number, Uint8Array>();
+  const store = await createEncryptedStore(userId);
+  try {
+    let keyV = 0;
+    const privateKey = await store.getKey<DevicePrivateKey>(DEVICE_KEY);
+    if (!privateKey) throw new KeysError("device_removed");
+    const wrapId = await store.getMeta<string>("deviceWrapId");
+    const publicKey = await store.getMeta<string>("devicePublicKey");
+    const listed = await listKeys(api(options));
+    const devices = listed.wraps.filter((w) => w.kind === "device");
+    const open = (wrap: WrapDto) =>
+      openFromDevice(
+        privateKey,
+        { kind: "device", userId, keyV: wrap.keyV },
+        fromBase64Url(wrap.wrapped),
+      );
+    if (wrapId && publicKey) {
+      const wrap = devices.find((w) => w.id === wrapId);
+      // base64url of the same 32 bytes is one string: compare as text
+      if (!wrap || wrap.publicKey !== publicKey) throw new KeysError("device_removed");
+      try {
+        dataKey = await open(wrap);
+      } catch {
+        throw new KeysError("device_removed");
+      }
+      keyV = wrap.keyV;
+    } else {
+      for (const wrap of devices) {
+        if (!wrap.publicKey) continue;
+        try {
+          dataKey = await open(wrap);
+        } catch {
+          continue;
+        }
+        keyV = wrap.keyV;
+        await store.setMeta("deviceWrapId", wrap.id);
+        await store.setMeta("devicePublicKey", wrap.publicKey);
+        break;
+      }
+    }
+    if (!dataKey) throw new KeysError("device_removed");
+    const current = await store.getMeta<number>("keyV");
+    // a device key without a current version: nothing to check a new version against
+    if (current === undefined) throw new KeysError("tampered");
+    if (keyV > current) {
+      older = await chainToHeld(store, userId, { keyV, dataKey }, listed.links, current);
+    } else {
+      const held = await heldRecordKey(store, keyV);
+      // below current: only a version this browser holds, with the key it holds (versions only
+      // grow; a server that withheld the links at an unlock could otherwise hand it any key there)
+      if (!held && keyV < current) throw new KeysError("tampered");
+      if (held && !(await sameDataKey(userId, dataKey, keyV, held))) {
+        throw new KeysError("tampered");
+      }
+    }
+    return { dataKey, keyV, older };
+  } catch (error) {
+    dataKey?.fill(0);
+    zeroKeys(older);
+    throw error;
+  } finally {
+    store.close();
+  }
+}
+
+/** `openOwnDeviceKey` for one operation: `fn` runs, then DK and the older keys are zeroed. */
+async function withOwnDeviceKey<T>(
+  options: KeysOptions,
+  fn: (dk: Uint8Array, keyV: number, older: Map<number, Uint8Array>) => Promise<T>,
+): Promise<T> {
+  const { dataKey, keyV, older } = await openOwnDeviceKey(options);
+  try {
+    return await fn(dataKey, keyV, older);
+  } finally {
+    dataKey.fill(0);
+    zeroKeys(older);
+  }
+}
+
+/**
+ * Opens DK from this browser's own `device` wrap for one operation: `fn` gets DK and the wrap's
+ * `keyV`, and DK is zeroed once `fn` settles. `device_removed` when this browser's wrap is gone or
+ * sealed to another key. A version this browser holds must be the DK its record key came from, a
+ * version below the current one must be held, and a newer one must lead back to it through its
+ * links; else `tampered` (every key zeroed, `fn` never runs). See `openOwnDeviceKey`.
  */
 export async function withDataKey<T>(
   options: KeysOptions,
   fn: (dk: Uint8Array, keyV: number) => Promise<T>,
 ): Promise<T> {
-  const { userId } = options;
-  let dataKey: Uint8Array | undefined;
-  try {
-    const store = await createEncryptedStore(userId);
-    let keyV = 0;
-    try {
-      const privateKey = await store.getKey<DevicePrivateKey>(DEVICE_KEY);
-      if (!privateKey) throw new KeysError("device_removed");
-      const wrapId = await store.getMeta<string>("deviceWrapId");
-      const publicKey = await store.getMeta<string>("devicePublicKey");
-      const devices = (await listWraps(api(options))).filter((w) => w.kind === "device");
-      const open = (wrap: WrapDto) =>
-        openFromDevice(
-          privateKey,
-          { kind: "device", userId, keyV: wrap.keyV },
-          fromBase64Url(wrap.wrapped),
-        );
-      if (wrapId && publicKey) {
-        const wrap = devices.find((w) => w.id === wrapId);
-        // base64url of the same 32 bytes is one string: compare as text
-        if (!wrap || wrap.publicKey !== publicKey) throw new KeysError("device_removed");
-        try {
-          dataKey = await open(wrap);
-        } catch {
-          throw new KeysError("device_removed");
-        }
-        keyV = wrap.keyV;
-      } else {
-        for (const wrap of devices) {
-          if (!wrap.publicKey) continue;
-          try {
-            dataKey = await open(wrap);
-          } catch {
-            continue;
-          }
-          keyV = wrap.keyV;
-          await store.setMeta("deviceWrapId", wrap.id);
-          await store.setMeta("devicePublicKey", wrap.publicKey);
-          break;
-        }
-      }
-      if (dataKey) {
-        const held =
-          (await store.getKey<CryptoKey>(recordKeyName(keyV))) ??
-          ((await store.getMeta<number>("keyV")) === keyV
-            ? await store.getKey<CryptoKey>(LEGACY_RECORD_KEY)
-            : undefined);
-        if (held && !(await sameDataKey(userId, dataKey, keyV, held))) {
-          throw new KeysError("tampered");
-        }
-      }
-    } finally {
-      store.close();
-    }
-    if (!dataKey) throw new KeysError("device_removed");
-    return await fn(dataKey, keyV);
-  } finally {
-    dataKey?.fill(0);
-  }
+  return withOwnDeviceKey(options, (dk, keyV) => fn(dk, keyV));
 }
 
 /**
@@ -577,24 +840,35 @@ async function sameDataKey(
 
 /**
  * The account moved to a new key version (a rotation): opens this browser's device wrap and, only
- * when its `keyV` is higher than the current one, keeps that version's record and dedupe keys
- * beside the older ones (records under them still need opening) and makes it current. Key
- * versions only grow: a wrap at or below the current version (a stale listing, or a server
- * replaying an old wrap) changes nothing, and a version already held is never overwritten.
- * Returns the keyring. `device_removed` and `tampered` (another DK at a held version) as
- * `withDataKey`.
+ * when its `keyV` (n) is higher than the current one (c) and its links lead back to the key held
+ * for c, keeps the record and dedupe keys of every version from c + 1 to n beside the older ones
+ * (records under them still need opening) and makes n current. Key versions only grow: a wrap at
+ * or below the current version (a stale listing, or a server replaying an old wrap) changes
+ * nothing only when it is a held version whose key passes the check; one below the current
+ * version that this browser does not hold is `tampered`. A version already held is never
+ * overwritten. Returns the keyring. `device_removed` and `tampered` (another DK at a held version,
+ * an unheld version below the current one, or a chain that does not reach the held key: nothing
+ * kept) as `withDataKey`.
  */
 export async function refreshKeys(options: KeysOptions): Promise<LocalKeys> {
   const { userId } = options;
   const before = await loadLocalKeys(userId);
   if (!before) throw new KeysError("device_removed");
-  await withDataKey(options, async (dataKey, keyV) => {
-    if (keyV <= before.keyring.current || before.keyring.byVersion.has(keyV)) return;
-    const keys = await deriveRecordKeys(dataKey, false);
+  await withOwnDeviceKey(options, async (dataKey, keyV, older) => {
+    const { current, byVersion } = before.keyring;
+    if (keyV <= current || byVersion.has(keyV)) return;
+    const fresh = new Map<number, RecordKeys>([[keyV, await deriveRecordKeys(dataKey, false)]]);
+    for (const [v, key] of older) {
+      if (v > current && !byVersion.has(v)) fresh.set(v, await deriveRecordKeys(key, false));
+    }
     const store = await createEncryptedStore(userId);
     try {
-      await store.putKey(recordKeyName(keyV), keys.record);
-      await store.putKey(dedupeKeyName(keyV), keys.dedupe);
+      await migrateLegacyKeys(store);
+      for (const [v, keys] of fresh) {
+        await store.putKey(recordKeyName(v), keys.record);
+        await store.putKey(dedupeKeyName(v), keys.dedupe);
+      }
+      // current last: a write that fails half-way leaves the held version current
       await store.setMeta("keyV", keyV);
     } finally {
       store.close();

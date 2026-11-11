@@ -220,6 +220,28 @@
       "attestation": "YjSQpKoIZhUYjQ3GIvxINke06kcqDeqgp2617YA_XMY"
     }
   ],
+  "links": [
+    {
+      "newKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "oldKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 2
+      },
+      "nonce": "BgcICQoLDA0ODxAR",
+      "link": "BgcICQoLDA0ODxARGrlngpUq8GlTyjCT5Kaky_eJijjtQXxrvzjV2HW9XAhPOVsX6DyT-7BUX95TqPK6"
+    },
+    {
+      "newKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "oldKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "ctx": {
+        "userId": "Zq8Rt2WnY5vLc1MbXe9HjD4sAf7GuK0p",
+        "keyV": 3
+      },
+      "nonce": "JicoKSorLC0uLzAx",
+      "link": "JicoKSorLC0uLzAxv1DY3c-qj3XLawFwyipsrvQEzx_9XtiCU7k70hg-tR2deGoMuqssr4sq_N5BbZiJ"
+    }
+  ],
   "rejects": [
     {
       "name": "record with a user id containing a slash",
@@ -305,6 +327,17 @@
       },
       "sealed": "c2hF1U6H3gnWuxFKpwQsUKSgFb2ZAdGgAm9ZVlM6FRkEBQYHCAkKCwwNDg9WoaEeanm-mAH_nyyq6YSJY5ND65N_C9vvE4P__l0__2b2qaTJUcBxVmjyN-q72uo",
       "approverKey": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "code": "cannot_open"
+    },
+    {
+      "name": "link opened at the wrong key version",
+      "op": "openKeyLink",
+      "newKey": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+      "ctx": {
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 3
+      },
+      "link": "BgcICQoLDA0ODxARGrlngpUq8GlTyjCT5Kaky_eJijjtQXxrvzjV2HW9XAhPOVsX6DyT-7BUX95TqPK6",
       "code": "cannot_open"
     }
   ]

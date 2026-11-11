@@ -51,6 +51,7 @@ import 'package:wambito/api/gen/src/model/import_stats.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
 import 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
+import 'package:wambito/api/gen/src/model/key_link.dart';
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
@@ -139,6 +140,7 @@ part 'serializers.g.dart';
   ImportStatsAverageMonthlySpendingInner,
   ImportStatsAverageWindow,
   ImportStatsRejectedInner,
+  KeyLink,
   KeyWrap,
   KeyWraps,
   PairingApprover,
@@ -240,6 +242,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(CategoryReportItemsInner)]),
             () => ListBuilder<CategoryReportItemsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(KeyLink)]),
+            () => ListBuilder<KeyLink>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(TrendReportMonthsInner)]),

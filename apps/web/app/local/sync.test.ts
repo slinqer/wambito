@@ -44,6 +44,8 @@ function fakeServer() {
      */
     wraps: new Map<number, RecordKeys>(),
     removed: false,
+    /** This device's wrap holds a version whose links do not lead back to its key. */
+    tampered: false,
     rows,
     purge() {
       // Purge every tombstone, as the daily job does after 180 days.
@@ -136,6 +138,7 @@ function refresher(server: Server, start: Keyring) {
   let ring = start;
   return vi.fn(async (): Promise<Keyring> => {
     if (server.removed) throw new KeysError("device_removed");
+    if (server.tampered) throw new KeysError("tampered");
     const newest = Math.max(0, ...server.wraps.keys());
     const keys = server.wraps.get(newest);
     if (keys && newest > ring.current) {
@@ -1274,6 +1277,49 @@ describe("key versions", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     stop();
     expect(calls).toBe(1);
+  });
+
+  it("a tampered refresh stops the run with problem key_unverified and keeps the outbox", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    server.wraps.set(1, k1).set(2, await fresh());
+    server.tampered = true;
+    const two = await device(server, k1);
+    await two.store.put("category", A, category("mine"));
+    const r = await two.engine.run();
+    expect(r).toMatchObject({ ok: false, error: "key_unverified", problem: "key_unverified" });
+    expect(two.problems).toContainEqual({ code: "key_unverified" });
+    expect(two.refreshKeys).toHaveBeenCalledTimes(1);
+    // nothing taken, nothing lost: the edit waits in the outbox, the vault stays open
+    expect(server.rows.size).toBe(0);
+    const outbox = await two.store.readOutbox(10);
+    expect(outbox.map((e) => e.id)).toEqual([A]);
+    expect(outbox[0]?.park).toBeUndefined();
+    expect(outbox[0]?.abandoned).toBeUndefined();
+    expect((await two.store.get("category", A))?.body.name).toBe("mine");
+    expect(two.store.isClosed()).toBe(false);
+    // its triggers stop, as for a removed browser
+    let calls = 0;
+    intercept(server, (real, input, init) => {
+      calls += 1;
+      return real(input, init);
+    });
+    const engine = createSyncEngine({
+      store: two.store,
+      fetch: (...args) => server.fetch(...args),
+      userId: USER,
+      keyring: ring([[1, k1]]),
+      refreshKeys: refresher(server, ring([[1, k1]])),
+      debounceMs: 5,
+      intervalMs: 10,
+    });
+    const stop = engine.start();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await two.store.put("category", B, category("b"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    stop();
+    expect(calls).toBe(1);
+    expect((await two.store.readOutbox(10)).map((e) => e.id).sort()).toEqual([A, B].sort());
   });
 
   it("pending edits are sealed under the current keyV, never an old one", async () => {

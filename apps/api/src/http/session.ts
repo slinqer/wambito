@@ -61,7 +61,7 @@ export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_UR
       // Suspending deletes the sessions (admin suspend); this also covers one that outlived it.
       if (await isSuspendedUser(auth, result.user.id)) throw suspended();
       user = toSessionUser(result.user as AuthUser);
-      grant = { kind: "session" };
+      grant = { kind: "session", sessionId: result.session.id };
     } else {
       const oauth = await oauthUser(auth, config, c.req.header("authorization"));
       if (!oauth) throw new ApiError(401, "unauthenticated", "Sign in to continue");

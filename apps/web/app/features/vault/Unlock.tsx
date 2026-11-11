@@ -16,8 +16,11 @@ export type UnlockError =
   | "server";
 
 export interface UnlockProps {
-  /** `removed`: another device removed this browser; its vault (and unsynced edits) are gone. */
-  notice?: "removed" | undefined;
+  /**
+   * `removed`: another device removed this browser; its vault (and unsynced edits) are gone.
+   * `unverified`: a new key version did not verify; the vault is kept, unlocking resumes the sync.
+   */
+  notice?: "removed" | "unverified" | undefined;
   /** Tries the typed text (any case, spaces or dashes). Resolves to the error, or `null`. */
   onUnlock(text: string): Promise<UnlockError | null>;
   /**
@@ -84,9 +87,9 @@ export function Unlock({
   return (
     <SignInScreen>
       <ScreenTitle>{t("title")}</ScreenTitle>
-      {notice === "removed" && (
+      {notice && (
         <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
-          {tVault("removed")}
+          {tVault(notice)}
         </p>
       )}
       <p className="text-center text-ink-muted">{t("lead")}</p>

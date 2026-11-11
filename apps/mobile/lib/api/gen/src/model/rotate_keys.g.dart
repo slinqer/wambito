@@ -11,11 +11,13 @@ class _$RotateKeys extends RotateKeys {
   final int keyV;
   @override
   final BuiltList<RotatedKeyWrap> wraps;
+  @override
+  final String? link;
 
   factory _$RotateKeys([void Function(RotateKeysBuilder)? updates]) =>
       (RotateKeysBuilder()..update(updates))._build();
 
-  _$RotateKeys._({required this.keyV, required this.wraps}) : super._();
+  _$RotateKeys._({required this.keyV, required this.wraps, this.link}) : super._();
   @override
   RotateKeys rebuild(void Function(RotateKeysBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,7 +28,7 @@ class _$RotateKeys extends RotateKeys {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is RotateKeys && keyV == other.keyV && wraps == other.wraps;
+    return other is RotateKeys && keyV == other.keyV && wraps == other.wraps && link == other.link;
   }
 
   @override
@@ -34,6 +36,7 @@ class _$RotateKeys extends RotateKeys {
     var _$hash = 0;
     _$hash = $jc(_$hash, keyV.hashCode);
     _$hash = $jc(_$hash, wraps.hashCode);
+    _$hash = $jc(_$hash, link.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -42,7 +45,8 @@ class _$RotateKeys extends RotateKeys {
   String toString() {
     return (newBuiltValueToStringHelper(r'RotateKeys')
           ..add('keyV', keyV)
-          ..add('wraps', wraps))
+          ..add('wraps', wraps)
+          ..add('link', link))
         .toString();
   }
 }
@@ -58,6 +62,10 @@ class RotateKeysBuilder implements Builder<RotateKeys, RotateKeysBuilder> {
   ListBuilder<RotatedKeyWrap> get wraps => _$this._wraps ??= ListBuilder<RotatedKeyWrap>();
   set wraps(ListBuilder<RotatedKeyWrap>? wraps) => _$this._wraps = wraps;
 
+  String? _link;
+  String? get link => _$this._link;
+  set link(String? link) => _$this._link = link;
+
   RotateKeysBuilder() {
     RotateKeys._defaults(this);
   }
@@ -67,6 +75,7 @@ class RotateKeysBuilder implements Builder<RotateKeys, RotateKeysBuilder> {
     if ($v != null) {
       _keyV = $v.keyV;
       _wraps = $v.wraps.toBuilder();
+      _link = $v.link;
       _$v = null;
     }
     return this;
@@ -93,6 +102,7 @@ class RotateKeysBuilder implements Builder<RotateKeys, RotateKeysBuilder> {
           _$RotateKeys._(
             keyV: BuiltValueNullFieldError.checkNotNull(keyV, r'RotateKeys', 'keyV'),
             wraps: wraps.build(),
+            link: link,
           );
     } catch (_) {
       late String _$failedField;

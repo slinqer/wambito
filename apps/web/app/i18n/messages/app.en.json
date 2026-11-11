@@ -183,6 +183,9 @@
     "too_many_pairings": "Too many pending device requests. Wait a few minutes and try again.",
     "unknown_assistant": "That assistant isn't connected to your account.",
     "unknown_passkey": "That passkey isn't on your account.",
+    "link_required": "This change needs the newest version of the app. Reload the page and try again.",
+    "link_unexpected": "Something went wrong while changing your keys. Reload the page and try again.",
+    "invalid_link": "Something went wrong while changing your keys. Reload the page and try again.",
     "generic": "Something went wrong. Please try again in a moment.",
     "network_error": "No connection. Check your internet and try again.",
     "unauthenticated": "Sign in to continue.",
@@ -692,7 +695,7 @@
         "rotated_elsewhere": "Another device changed your keys at the same time. Wait a moment while they refresh here, then try again.",
         "failed": "We couldn't remove it. Try again.",
         "done_title": "Removed",
-        "done_lead": "{name} can no longer open your data. If you still have that device, sign out on it too.",
+        "done_lead": "{name} can no longer open your data, and it was signed out.",
         "dropped_lead": "These were left out too:",
         "dropped_item": "{name} ({reason, select, removed {removed now} revoked {removed earlier} other {not verified}})",
         "passkeys_note": "Fingerprints you didn't use just now no longer open your data: turn them on again under fingerprints."
@@ -947,6 +950,7 @@
       "cancel": "Cancel",
       "close": "Close"
     },
-    "removed": "This browser was removed from your account on another device. Changes not yet synced here were lost. To open your data again, type your recovery key or use another device."
+    "removed": "This browser was removed from your account on another device. Changes not yet synced here were lost. To open your data again, type your recovery key or use another device.",
+    "unverified": "This browser couldn't verify your account's new key, so it stopped syncing. Your data here is safe. To keep going, use your passkey or type your recovery key."
   }
 }

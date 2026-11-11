@@ -27,6 +27,10 @@ API tests.
   `pairingCode` in production (`apps/api/src/services/pairing.ts`), not only in tests.
 - `src/attest.ts`: `deviceAttestation` / `verifyDeviceAttestation` (HMAC under HKDF info
   `wambito/v1/device-attest`; design: stage 1b spec section 2).
+- `src/links.ts`: `sealKeyLink` / `openKeyLink`, `LINK_BYTES` = 60: `nonce (12) || AES-256-GCM(older data
+  key)` under HKDF-SHA256(newer key, empty salt, info `wambito/v1/link`), AAD
+  `wambito/v1/link/<user id>/<newer key_v>` (`keyV` >= 2). Design: the 2026-11-10 addendum
+  (`docs/superpowers/specs/2026-11-10-e2e-key-links-design.md`, section 2).
 - `src/validate.ts`: user id, UUID, key version, nonce checks (`bad_input`).
 - `src/bytes.ts`: base64url, `timingSafeEqual`. `src/errors.ts`: `CryptoError` (`cannot_open`, `bad_recovery_key`,
   `bad_input`).
