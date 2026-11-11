@@ -11,7 +11,7 @@
 //
 // It writes the SVGs in docs/brand, the Android adaptive icon (vector drawables) and legacy
 // mipmaps, the F-Droid icon, the web favicon.svg/.ico and apple-touch-icon, the iOS app icon set
-// (apps/mobile/ios, every size in its Contents.json, solid plum, no alpha), and the review sheet
+// (apps/mobile/ios, the 1024 light, dark and tinted images its Contents.json lists), and the review sheet
 // docs/brand/wambito-icon-preview.png (quantised with ImageMagick when `magick` is installed).
 // `--svg-only` skips the PNGs. The module also exports the builders (used by the fitting script).
 
@@ -403,15 +403,25 @@ async function renderPngs(files) {
   // Solid, no transparency: iOS rounds the corners itself.
   const touch = path.join(PUBLIC, "apple-touch-icon.png");
   fs.writeFileSync(touch, await shot(iconSvg(P, { square: true }), 180, COLORS.plum));
-  // The iOS app icon set: every size x scale of Contents.json, solid plum, no alpha.
-  const iosSet = path.join(IOS_ICONS);
+  // The iOS app icon set, one image per entry of Contents.json (single size, 1024): the light
+  // icon solid plum without alpha (iOS rounds the corners); the dark one is the coin alone on
+  // transparency (iOS lays its dark background under it); the tinted one is the monochrome
+  // silhouette in white on transparency (iOS tints its luminance).
   const iosFiles = [];
-  for (const img of JSON.parse(fs.readFileSync(path.join(iosSet, "Contents.json"), "utf8"))
+  for (const img of JSON.parse(fs.readFileSync(path.join(IOS_ICONS, "Contents.json"), "utf8"))
     .images) {
-    const px = Math.round(Number.parseFloat(img.size) * Number.parseInt(img.scale, 10));
-    const file = path.join(iosSet, img.filename);
-    fs.writeFileSync(file, await shot(iconSvg(P, { square: true }), px, COLORS.plum));
-    iosFiles.push(file);
+    const px = Math.round(Number.parseFloat(img.size) * Number.parseInt(img.scale ?? "1", 10));
+    const look = img.appearances?.find((a) => a.appearance === "luminosity")?.value ?? "light";
+    const file = path.join(IOS_ICONS, img.filename);
+    if (look === "dark") {
+      fs.writeFileSync(file, await shot(svg(1024, 1024, "Wambito dark", svgPaths(P)), px));
+    } else if (look === "tinted") {
+      const mono = `  <path fill="#FFFFFF" fill-rule="evenodd" d="${monoPath()}"/>\n`;
+      fs.writeFileSync(file, await shot(svg(1024, 1024, "Wambito tinted", mono), px));
+    } else {
+      fs.writeFileSync(file, await shot(iconSvg(P, { square: true }), px, COLORS.plum));
+      iosFiles.push(file);
+    }
   }
   const sizes = [16, 32, 48];
   const pngs = [];
