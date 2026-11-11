@@ -10,6 +10,7 @@ import UIKit
   private var launchChannel: LaunchChannel?
   private var filesChannel: FilesChannel?
   private var passkeyChannel: PasskeyChannel?
+  private var noticesChannel: NoticesChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
 
@@ -39,6 +40,7 @@ import UIKit
     launchChannel = LaunchChannel(messenger: messenger)
     filesChannel = FilesChannel(messenger: messenger)
     passkeyChannel = PasskeyChannel(messenger: messenger)
+    noticesChannel = NoticesChannel(messenger: messenger)
   }
 
   /// A `wambito://` URL is the app's own: kept for Dart, never handed to Flutter's router (as on

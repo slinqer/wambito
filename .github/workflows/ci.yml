@@ -224,6 +224,14 @@ jobs:
             echo "::error::lib/theme/tokens.g.dart is stale: run 'dart run scripts/gen-tokens.dart' in apps/mobile and commit it."
             exit 1
           fi
+      - name: ios/Runner/*.lproj/Notices.strings is up to date
+        run: |
+          dart run scripts/gen-ios-strings.dart
+          if [ -n "$(git status --porcelain -- ios/Runner/es.lproj/Notices.strings ios/Runner/en.lproj/Notices.strings ios/Runner/it.lproj/Notices.strings ios/Runner/pt.lproj/Notices.strings)" ]; then
+            git diff -- ios/Runner
+            echo "::error::ios/Runner/*.lproj/Notices.strings is stale: run 'dart run scripts/gen-ios-strings.dart' in apps/mobile and commit it."
+            exit 1
+          fi
       - name: lib/api/gen is up to date
         run: |
           scripts/gen-api.sh
