@@ -84,4 +84,13 @@ final class HapticSpecTests: XCTestCase {
             HapticStep(delayMs: 90, style: .medium, intensity: 1),
         ])
     }
+
+    func testPrimitiveDelaysAddUpLikeAndroid() {
+        let spec = HapticSpec(waveform: [30], primitives: [
+            PrimitiveStep(name: "tick", scale: 1, delayMs: 0),
+            PrimitiveStep(name: "tick", scale: 1, delayMs: 30),
+            PrimitiveStep(name: "tick", scale: 1, delayMs: 30),
+        ])
+        XCTAssertEqual(spec.steps().map(\.delayMs), [0, 30, 60])
+    }
 }

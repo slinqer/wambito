@@ -96,8 +96,12 @@ public struct HapticSpec: Equatable {
     /// of the waveform (Android plays `[0] + waveform` as off/on pairs, so indexes 0, 2, 4...).
     public func steps() -> [HapticStep] {
         if !primitives.isEmpty {
+            // Each delay is the quiet after the previous primitive (as Android's addPrimitive),
+            // so a step's offset from the start is the sum of the delays up to it.
+            var offset = 0
             return primitives.map {
-                HapticStep(delayMs: $0.delayMs, style: Self.style(of: $0.name), intensity: $0.scale)
+                offset += $0.delayMs
+                return HapticStep(delayMs: offset, style: Self.style(of: $0.name), intensity: $0.scale)
             }
         }
         var result: [HapticStep] = []
