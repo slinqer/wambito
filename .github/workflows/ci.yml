@@ -24,6 +24,10 @@ jobs:
       - run: scripts/check-old-name.sh
       # The guard's own test: each allowlist reason must be one the guard knows.
       - run: scripts/test-check-old-name.sh
+      # Every native channel and method the Dart code calls exists on both phones (Kotlin and Swift),
+      # unless .github/channel-allowlist.txt says why not.
+      - run: scripts/check-channels.sh
+      - run: scripts/test-check-channels.sh
       - run: pnpm lint
       # Generated files must be committed as generated. tokens.css comes from the design system's
       # tokens.json: run `pnpm --filter @wambito/web tokens` and commit it.

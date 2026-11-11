@@ -52,13 +52,17 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   `check-fdroid-lock.sh`, tested by `test-fdroid-checks.sh`), no-Google check, debug build, Gradle
   lock check, Gradle unit tests, native-switch test (`test-native-switch.sh`), release build.
 
-## Guards (both in CI `check`, before lint)
+## Guards (all in CI `check`, before lint)
 
 - Old name: `scripts/check-old-name.sh` fails on the old app or mascot name outside
   `.github/name-allowlist.txt` (`<pathspec>  # <reason>[, <reason>]`; reasons `money`, `history`,
   `docs-rule`, `key-alias`). It also fails on a line with no reason or another one (tested by
   `scripts/test-check-old-name.sh`). A new legit hit: add the file there with its reason, never a
   folder glob.
+- Channel guard (`ci.yml` `check`): `scripts/check-channels.sh` fails when a `wambito/*` channel or a
+  method Dart calls is missing from `apps/mobile` Kotlin or Swift, unless `.github/channel-allowlist.txt`
+  has `<channel>  # <reason>` (`ios-impossible`, `ios-part-two`, `android-only`); tested by
+  `scripts/test-check-channels.sh`. Fix the missing native side, never widen the allowlist.
 - Personal-name guard (`ci.yml`): a `git grep` for the founder's name outside `docs/superpowers`.
   Never write personal names, emails or paths into the repo.
 
