@@ -418,13 +418,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: ref.watch(guestNoticeEnabledProvider),
                 onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
               ),
-              SettingSwitch(
-                key: const Key('settings.hideAmount'),
-                label: l10n.settingsHideAmount,
-                hint: l10n.settingsHideAmountHint,
-                value: ref.watch(hideWidgetAmountProvider),
-                onChanged: (on) => unawaited(ref.read(hideWidgetAmountProvider.notifier).set(on)),
-              ),
+              // The widgets are Android's: iOS has none, so no setting about them.
+              if (defaultTargetPlatform == TargetPlatform.android)
+                SettingSwitch(
+                  key: const Key('settings.hideAmount'),
+                  label: l10n.settingsHideAmount,
+                  hint: l10n.settingsHideAmountHint,
+                  value: ref.watch(hideWidgetAmountProvider),
+                  onChanged: (on) => unawaited(ref.read(hideWidgetAmountProvider.notifier).set(on)),
+                ),
             ],
           ),
           if (voiceInstalled)
