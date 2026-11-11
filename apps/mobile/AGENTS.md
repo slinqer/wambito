@@ -27,7 +27,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
-  (`x-wambito-timezone`, `-locale`, `-client: android` or `ios`); server defaults to `https://app.wambito.com`,
+  (`x-wambito-timezone`, `-locale`, `-client: android` on both phones, the API's word for the app); server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Storage: secure storage for session and settings; widget snapshot JSON under
   `wambito.widget.snapshot` in `HomeWidgetPreferences` (`lib/home/widget_snapshot.dart`).
@@ -100,7 +100,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Dart constants, as on Android. The app uses a UIScene `SceneDelegate` (a `FlutterSceneDelegate`),
   so a link arriving on a scene reaches Dart through `LaunchSceneHandler` (in `Launch/`), not
   through `AppDelegate`.
-  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`); `Haptics/`: `wambito/haptics`;
+  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`); `Haptics/`: `wambito/haptics` (`vibrate`);
     `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
@@ -133,9 +133,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - iOS lacks, by design: automatic capture (`wambito/capture`, no API for it), widgets (the setting
   is hidden on iOS), and voice until part two (`wambito/voice*`). Dart hides them when the channel
   or platform is absent.
-- `flutter pub get` (and any `flutter build ios`) adds `ios/**` to `analysis_options.yaml`'s
-  excludes in the working tree: restore the file (`git checkout -- analysis_options.yaml`) before
-  committing unless the change is intended. Do not run `flutter create` again.
+- `ios/**` is in `analysis_options.yaml`'s excludes (Flutter writes it on every `pub get` once `ios/`
+  exists; keep it committed). Do not run `flutter create` again.
 
 ## Generated
 

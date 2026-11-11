@@ -1,6 +1,6 @@
 // ignore_for_file: file_names, avoid_print
 
-/// Generates ios/Runner/<language>.lproj/Notices.strings from the Android string resources, so the
+/// Generates `ios/Runner/<language>.lproj/Notices.strings` from the Android string resources, so the
 /// two notices say the same words on both phones: `values/` is Spanish, `values-en/`, `values-it/`
 /// and `values-pt/` the others (android/app/src/main/res).
 ///
