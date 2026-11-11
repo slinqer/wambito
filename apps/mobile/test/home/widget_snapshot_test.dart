@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/home/widget_snapshot.dart';
@@ -123,6 +124,42 @@ void main() {
       store.failure = PlatformException(code: 'x');
       await saveWidgetSnapshot(store, signedOutSnapshot(hideAmount: false, theme: 'dark'));
       expect(store.saved, isEmpty);
+    });
+  });
+
+  group('the real store', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final calls = <String>[];
+
+    setUp(() {
+      calls.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('home_widget'),
+        (call) async {
+          calls.add(call.method);
+          return true;
+        },
+      );
+    });
+
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('home_widget'),
+        null,
+      );
+    });
+
+    test('asks Android to redraw both widgets', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await const HomeWidgetStore().updateWidgets();
+      expect(calls, ['updateWidget', 'updateWidget']);
+    });
+
+    test('calls nothing on iOS, which has no widgets here', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await const HomeWidgetStore().updateWidgets();
+      expect(calls, isEmpty);
     });
   });
 }

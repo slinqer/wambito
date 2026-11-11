@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
@@ -58,6 +59,8 @@ class HomeWidgetStore implements WidgetStore {
 
   @override
   Future<void> updateWidgets() async {
+    // The widgets are Android's (Glance); iOS has none, and `home_widget` would only look for them.
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     for (final receiver in widgetReceivers) {
       await HomeWidget.updateWidget(qualifiedAndroidName: receiver);
     }

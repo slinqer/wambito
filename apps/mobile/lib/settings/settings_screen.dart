@@ -9,6 +9,7 @@
 // line on what it is, and the web's switches and buttons.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -404,7 +405,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               SettingSwitch(
                 key: const Key('settings.dueNotice'),
                 label: l10n.settingsDueNotice,
-                hint: l10n.settingsDueNoticeHint,
+                hint: defaultTargetPlatform == TargetPlatform.iOS
+                    ? l10n.settingsDueNoticeHintIos
+                    : l10n.settingsDueNoticeHint,
                 value: ref.watch(dueNoticeEnabledProvider),
                 onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
               ),
