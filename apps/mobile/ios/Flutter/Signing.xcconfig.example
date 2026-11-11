@@ -1,0 +1,3 @@
+// Copy this file to Signing.xcconfig (git-ignored, same folder) and put your Apple team id there.
+// The real value never goes in the repo; scripts/check-ios-signing.sh enforces it.
+DEVELOPMENT_TEAM = ABCDE12345

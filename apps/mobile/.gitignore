@@ -58,3 +58,6 @@ app.*.map.json
 
 # What a failed golden test leaves beside its goldens (test/**/failures/).
 **/failures/
+
+# iOS signing team id (copy ios/Flutter/Signing.xcconfig.example).
+ios/Flutter/Signing.xcconfig
