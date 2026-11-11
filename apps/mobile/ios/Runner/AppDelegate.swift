@@ -8,6 +8,7 @@ import UIKit
   private var hapticsChannel: HapticsChannel?
   private var soundChannel: SoundChannel?
   private var launchChannel: LaunchChannel?
+  private var filesChannel: FilesChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
 
@@ -35,6 +36,7 @@ import UIKit
     hapticsChannel = HapticsChannel(messenger: messenger)
     soundChannel = SoundChannel(messenger: messenger)
     launchChannel = LaunchChannel(messenger: messenger)
+    filesChannel = FilesChannel(messenger: messenger)
   }
 
   /// A `wambito://` URL is the app's own: kept for Dart, never handed to Flutter's router (as on
