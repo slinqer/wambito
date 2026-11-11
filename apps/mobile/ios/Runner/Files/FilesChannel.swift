@@ -75,17 +75,31 @@ final class FilesChannel: NSObject {
     let args = call.arguments as? [String: Any]
     let limit = FileTransfer.limitOf(args?["maxBytes"])
     let picker = UIDocumentPickerViewController(
-      forOpeningContentTypes: [.commaSeparatedText, .plainText], asCopy: true)
+      forOpeningContentTypes: PickerTypes.contentTypes(args?["mimeTypes"]), asCopy: true)
     picker.allowsMultipleSelection = false
     let session = PickerSession(
       onPicked: { [weak self] urls in self?.read(urls.first, limit: limit, result) },
       onCancelled: { [weak self] in
         self?.finish()
         result(nil)
+      },
+      onRefused: { [weak self] in
+        self?.finish()
+        result(FlutterError(code: "unavailable", message: "The picker could not be shown", details: nil))
       })
+    show(picker, with: session, on: presenter)
+  }
+
+  /// Puts the picker up with the session as its delegate, and as the delegate of its presentation
+  /// too: a swipe down closes a picker without `documentPickerWasCancelled`. A present the system
+  /// refuses (another presentation under way) leaves no presenting controller: the session says so.
+  private func show(_ picker: UIDocumentPickerViewController, with session: PickerSession, on presenter: UIViewController) {
     self.session = session
     picker.delegate = session
-    presenter.present(picker, animated: true)
+    picker.presentationController?.delegate = session
+    presenter.present(picker, animated: true) { [weak picker, weak session] in
+      if picker?.presentingViewController == nil { session?.refused() }
+    }
   }
 
   /// Ends the pick or save: the slot is free and the picker's delegate is let go.
@@ -162,10 +176,13 @@ final class FilesChannel: NSObject {
         cleanUp()
         self?.finish()
         result(false)
+      },
+      onRefused: { [weak self] in
+        cleanUp()
+        self?.finish()
+        result(FlutterError(code: "unavailable", message: "The picker could not be shown", details: nil))
       })
-    self.session = session
-    picker.delegate = session
-    presenter.present(picker, animated: true)
+    show(picker, with: session, on: presenter)
   }
 
   private func share(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -193,34 +210,39 @@ final class FilesChannel: NSObject {
           return
         }
         let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
-        if let popover = sheet.popoverPresentationController {
-          // iPad: a popover must be anchored; the centre of the screen's root view.
-          let root = presenter.view!
-          popover.sourceView = root
-          popover.sourceRect = CGRect(x: root.bounds.midX, y: root.bounds.midY, width: 0, height: 0)
-          popover.permittedArrowDirections = []
-        }
         presenter.present(sheet, animated: true) { result(true) }
       }
     }
   }
 }
 
-/// A document picker's delegate: answers once, either with the chosen URLs or with the cancel.
-private final class PickerSession: NSObject, UIDocumentPickerDelegate {
+/// A document picker's delegate: answers once, whichever way the picker ends: the chosen URLs, the
+/// cancel button, a swipe down (the presentation's delegate), or a present the system refused.
+private final class PickerSession: NSObject, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
   private let onPicked: ([URL]) -> Void
   private let onCancelled: () -> Void
+  private let onRefused: () -> Void
+  private let once = AnswerOnce()
 
-  init(onPicked: @escaping ([URL]) -> Void, onCancelled: @escaping () -> Void) {
+  init(
+    onPicked: @escaping ([URL]) -> Void, onCancelled: @escaping () -> Void, onRefused: @escaping () -> Void
+  ) {
     self.onPicked = onPicked
     self.onCancelled = onCancelled
+    self.onRefused = onRefused
   }
 
+  func refused() { once.run(onRefused) }
+
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-    onPicked(urls)
+    once.run { onPicked(urls) }
   }
 
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-    onCancelled()
+    once.run(onCancelled)
+  }
+
+  func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+    once.run(onCancelled)
   }
 }
