@@ -52,7 +52,8 @@ final class LaunchSceneHandler: NSObject, FlutterSceneLifeCycleDelegate {
   }
 
   private func handle(_ contexts: Set<UIOpenURLContext>) -> Bool {
-    // `|` not `||`: every URL is looked at.
+    // `handles` is on the left of `||`, so it runs for every URL; `handled || handles(...)` would stop
+    // at the first one that was handled and leave the rest unkept.
     contexts.reduce(false) { handled, context in launch.handles(context.url) || handled }
   }
 }

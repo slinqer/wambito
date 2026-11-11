@@ -438,7 +438,7 @@ async function renderPngs(files) {
     `PNG24:${touch}`,
   ]);
   for (const file of iosFiles) {
-    spawnSync("magick", [
+    const flat = spawnSync("magick", [
       file,
       "-background",
       COLORS.plum,
@@ -448,6 +448,9 @@ async function renderPngs(files) {
       "off",
       `PNG24:${file}`,
     ]);
+    if (flat.error || flat.status !== 0) {
+      console.warn(`magick failed: ${path.basename(file)} may still carry alpha`);
+    }
   }
 }
 

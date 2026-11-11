@@ -70,6 +70,7 @@ import WambitoNative
 
   /// A `wambito://` URL is the app's own: kept for Dart, never handed to Flutter's router (as on
   /// Android). Any other URL (the sign-in email's `https://app.wambito.com/auth/verify`) goes to Flutter.
+  // Under UIScene iOS sends URLs to the scene (LaunchSceneHandler); this is a fallback only.
   override func application(
     _ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
