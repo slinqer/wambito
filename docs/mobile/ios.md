@@ -42,6 +42,15 @@ job in `ci.yml`. The Android side is `release.md`.
 8. **Local builds.** Copy `apps/mobile/ios/Flutter/Signing.xcconfig.example` to
    `Signing.xcconfig` (same folder, git-ignored) and put your team id there. The team id never goes
    in the repo: `scripts/check-ios-signing.sh` fails CI on one in the Xcode project.
+9. **A free personal team** (no paid account yet) cannot sign Associated Domains, so the build
+   fails on `Runner.entitlements`. Build without them for your own iPhone, from `apps/mobile/ios`,
+   with an empty entitlements plist kept outside the repo
+   (`<plist version="1.0"><dict/></plist>`):
+   `xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination
+   'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_ENTITLEMENTS=<that file> build`,
+   then `xcrun devicectl device install app --device <id> <the built Runner.app>` with the phone
+   unlocked. Passkeys and Universal Links do not work in such a build; sign in with the email code.
+   The signature lasts 7 days.
 
 ## A release
 
