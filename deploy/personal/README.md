@@ -196,6 +196,10 @@ signed with, as `release.sh` prints it (`AB:CD:...`, 32 pairs); with more than o
 (compose recreates `web` when its settings change), then `./smoke.sh`. Left empty, the file is `[]`: it links no app, but it is still
 there. A value that is not a fingerprint is skipped, with a warning in `docker compose logs web`.
 
+The API reads the same value to accept passkeys made in the app (Android sends the origin
+`android:apk-key-hash:<the certificate's SHA-256>`); there a value that is not a fingerprint stops
+the API from starting, so a typo shows up at once instead of as passkeys that never work.
+
 ### The iOS app
 
 **`IOS_TEAM_ID`** (in `.env`, empty by default) lets the iOS app open magic links and use passkeys
@@ -205,9 +209,6 @@ starts (the app id is `<team id>.com.wambito.app`; the link path is `/auth/verif
 changing it run `./up.sh`, then `./smoke.sh`. Left empty, the file has empty lists: it links no app,
 but it is still there, served as JSON. A value that is not a team id is skipped, with a warning in
 `docker compose logs web`.
-The API reads the same value to accept passkeys made in the app (Android sends the origin
-`android:apk-key-hash:<the certificate's SHA-256>`); there a value that is not a fingerprint stops
-the API from starting, so a typo shows up at once instead of as passkeys that never work.
 
 **`GUEST_SIGNUP`** (default `true`) lets the app create an account without an email (a guest),
 whatever `SIGN_IN_ALLOWLIST` says; the guest can save the account by claiming an email later (an
