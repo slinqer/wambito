@@ -53,6 +53,8 @@ jobs:
       # The unit installs (wambito-* units, the old ones stopped and removed first), against stub
       # sudo, systemctl and launchctl and a temporary unit folder.
       - run: deploy/personal/test-install-units.sh
+      # The web container's start-up files (/.well-known/assetlinks.json and apple-app-site-association).
+      - run: deploy/personal/test-web-entrypoint.sh
       # The web container's Caddy config (client address to the API and MCP, routes), in Docker.
       - run: deploy/personal/test-caddy.sh
       # The personal install's two ways (tunnel by default, direct with COMPOSE_FILE): compose files,

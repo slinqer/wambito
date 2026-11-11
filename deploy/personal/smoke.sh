@@ -29,6 +29,9 @@ check "GET /nope.png         missing file" 404 "$(status "$base/nope.png")"
 # Android App Links: always answered (`[]` until ANDROID_CERT_SHA256 is set), always as JSON.
 links="$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$base/.well-known/assetlinks.json")"
 check "GET assetlinks.json   200 and JSON" "200 application/json" "${links%%;*}"
+# iOS Universal Links: always answered (empty lists until IOS_TEAM_ID is set), always as JSON.
+aasa="$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$base/.well-known/apple-app-site-association")"
+check "GET apple-app-site-association  200 and JSON" "200 application/json" "${aasa%%;*}"
 check "GET /api/v1/me        needs a session" 401 "$(status "$base/api/v1/me")"
 
 # Kept off the internet by Caddy (not in the API): the schema.

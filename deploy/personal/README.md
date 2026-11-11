@@ -195,6 +195,16 @@ signed with, as `release.sh` prints it (`AB:CD:...`, 32 pairs); with more than o
 `/.well-known/assetlinks.json` from it each time it starts, so after changing it run `./up.sh`
 (compose recreates `web` when its settings change), then `./smoke.sh`. Left empty, the file is `[]`: it links no app, but it is still
 there. A value that is not a fingerprint is skipped, with a warning in `docker compose logs web`.
+
+### The iOS app
+
+**`IOS_TEAM_ID`** (in `.env`, empty by default) lets the iOS app open magic links and use passkeys
+for this hostname. Put in it the 10-character Apple team id the app is signed with (letters and
+digits). The web container writes `/.well-known/apple-app-site-association` from it each time it
+starts (the app id is `<team id>.com.wambito.app`; the link path is `/auth/verify`), so after
+changing it run `./up.sh`, then `./smoke.sh`. Left empty, the file has empty lists: it links no app,
+but it is still there, served as JSON. A value that is not a team id is skipped, with a warning in
+`docker compose logs web`.
 The API reads the same value to accept passkeys made in the app (Android sends the origin
 `android:apk-key-hash:<the certificate's SHA-256>`); there a value that is not a fingerprint stops
 the API from starting, so a typo shows up at once instead of as passkeys that never work.
@@ -470,7 +480,7 @@ registers a passkey again after signing in.
    - mail through Resend, since Bridge stays on the Mac: `RESEND_API_KEY`, with `SMTP_URL` empty and
      `SMTP_TLS_INSECURE=false`. The domain of `MAIL_FROM` must be verified in Resend (its SPF and
      DKIM records in the domain's DNS);
-   - the same `ANDROID_CERT_SHA256`;
+   - the same `ANDROID_CERT_SHA256` and `IOS_TEAM_ID`;
    - `COMPOSE_FILE=docker-compose.yml:docker-compose.direct.yml`, the direct way. No `TUNNEL_ID`.
 
    Keep a copy in your password manager.
@@ -745,7 +755,7 @@ the old tunnel, if one exists (`cloudflared tunnel delete lukitas-personal`).
 | `Caddyfile.direct` | The direct way's Caddy: automatic HTTPS and HSTS for `PUBLIC_HOSTNAME`, the client's address from the TCP peer, no log of requests for other hosts |
 | `cloudflared.yml` | Tunnel ingress: everything the tunnel receives goes to `web`; no hostname in it |
 | `Dockerfile.web` | Caddy with the web build inside (the API image is `apps/api/Dockerfile.prod`) |
-| `web-entrypoint.sh` `assetlinks.json.template` | At start, write `/.well-known/assetlinks.json` from `ANDROID_CERT_SHA256` |
+| `web-entrypoint.sh` `assetlinks.json.template` `apple-app-site-association.template` | At start, write `/.well-known/assetlinks.json` from `ANDROID_CERT_SHA256` and `/.well-known/apple-app-site-association` from `IOS_TEAM_ID` |
 | `.env.example` | Every setting, documented |
 | `up.sh` `update.sh` `smoke.sh` | Start, update, check |
 | `backup.sh` `restore.sh` | Verified backups; restore and drill |
