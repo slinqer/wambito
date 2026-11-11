@@ -38,7 +38,8 @@ Human docs. Live docs are kept current; `superpowers/` is history.
 - `docs/mobile/`: `setup.md` (toolchain, JDK 17, emulator, tests), `release.md` (signing, APK
   build; the founder copies its commands), `parity.md` (web/app visual parity ledger), `fdroid.md`
   (how Wambito is built on F-Droid), `play.md` (Google Play: account, Play App Signing, the Console
-  forms' answers, each release).
+  forms' answers, each release), `ios.md` (App Store Connect: App ID, certificate, API key, the
+  `app-store` secrets, TestFlight from a `mobile-v*` tag).
 
 ## History: `docs/superpowers/` (read only when needed, never edit after the fact)
 

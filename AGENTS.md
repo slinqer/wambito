@@ -51,6 +51,11 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   `--abi` and `build-sherpa-onnx.sh` argument tests, F-Droid recipe and lock checks (`check-fdroid-recipe.sh`,
   `check-fdroid-lock.sh`, tested by `test-fdroid-checks.sh`), no-Google check, debug build, Gradle
   lock check, Gradle unit tests, native-switch test (`test-native-switch.sh`), release build.
+- `ios` (same filter; macOS runner): pub get, the signing guard and its test
+  (`apps/mobile/scripts/check-ios-signing.sh`), `swift test` on `ios/WambitoNative`,
+  `flutter build ios --release --no-codesign`.
+- `iOS release` (`ios-release.yml`, on a `mobile-v*` tag, environment `app-store`): archive, export
+  and upload to App Store Connect for TestFlight (`docs/mobile/ios.md`).
 
 ## Guards (all in CI `check`, before lint)
 
