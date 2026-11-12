@@ -324,6 +324,38 @@ const rejects = [
   },
 ];
 
+// A low-order public key (32 zero bytes) gives an all-zero shared secret, which every
+// implementation must refuse. The blob below is what an attacker would build: sealed under
+// HKDF(zeros), so it opens only where the zero secret is accepted.
+const zeroKey = new Uint8Array(32);
+const lowOrderCtx = { kind: "device", userId: USER, keyV: 1 } as const;
+const lowOrderInner = await gcmSeal(
+  await deriveWrapKey(zeroKey, "device"),
+  wrapAssociatedData(lowOrderCtx),
+  dataKeyA,
+  fixed(0x33, 12),
+);
+const lowOrderSealed = new Uint8Array(32 + lowOrderInner.length);
+lowOrderSealed.set(lowOrderInner, 32);
+rejects.push(
+  {
+    name: "seal to a low-order (all-zero) device public key",
+    op: "sealToDevice",
+    publicKey: b64(zeroKey),
+    ctx: lowOrderCtx,
+    dataKey: b64(dataKeyA),
+    code: "bad_input",
+  },
+  {
+    name: "device blob whose ephemeral key is low-order (all-zero shared secret)",
+    op: "openFromDevice",
+    privateKey: devices[0]?.privateKey,
+    ctx: lowOrderCtx,
+    sealed: b64(lowOrderSealed),
+    code: "cannot_open",
+  },
+);
+
 const out = {
   _about:
     "Shared test vectors for packages/crypto (bytes are base64url). The Dart port must pass them byte for byte. Never edit by hand: regenerate with `pnpm --filter @wambito/crypto vectors`.",
