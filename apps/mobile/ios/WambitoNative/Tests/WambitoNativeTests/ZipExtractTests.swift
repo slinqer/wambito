@@ -119,4 +119,55 @@ final class ZipExtractTests: XCTestCase {
     }
     XCTAssertEqual(files(in: into), [])
   }
+
+  func testPartialWriteIsCleanedUp() throws {
+    let src = root.appendingPathComponent("src")
+    try fm.createDirectory(at: src, withIntermediateDirectories: true)
+    try Data(repeating: 1, count: 4096).write(to: src.appendingPathComponent("first.bin"))
+    // Small alphabet: compressible, so zip really deflates it (pure random would be stored).
+    try Data(randomData(200 * 1024).map { $0 % 16 }).write(to: src.appendingPathComponent("second.bin"))
+    let archive = try zip(["-9", "first.bin", "second.bin"], cwd: src)
+    var bytes = try Data(contentsOf: archive)
+    // Flip bytes in the middle of the second entry's data (second.bin is stored last, after first).
+    let mid = bytes.count - 20 * 1024
+    for i in mid..<(mid + 64) { bytes[i] ^= 0xFF }
+    try bytes.write(to: archive)
+    let into = try makeInto()
+
+    XCTAssertThrowsError(try ZipExtract.unzip(archive, into: into))
+    XCTAssertEqual(try fm.contentsOfDirectory(atPath: into.path), [])
+  }
+
+  private func residentBytes() -> UInt64 {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+      }
+    }
+    return result == KERN_SUCCESS ? UInt64(info.resident_size_max) : 0
+  }
+
+  func testLargeStoredEntryDoesNotAccumulateMemory() throws {
+    let src = root.appendingPathComponent("src")
+    try fm.createDirectory(at: src, withIntermediateDirectories: true)
+    let big = src.appendingPathComponent("big.bin")
+    fm.createFile(atPath: big.path, contents: nil)
+    let h = try FileHandle(forWritingTo: big)
+    let block = randomData(1024 * 1024)
+    for _ in 0..<150 { try h.write(contentsOf: block) }
+    try h.close()
+    let archive = try zip(["-0", "big.bin"], cwd: src)
+    let into = try makeInto()
+
+    let before = residentBytes()
+    try ZipExtract.unzip(archive, into: into)
+    let after = residentBytes()
+
+    let size = try fm.attributesOfItem(atPath: into.appendingPathComponent("big.bin").path)[.size] as? UInt64
+    XCTAssertEqual(size, 150 * 1024 * 1024)
+    // Peak resident growth must stay far below the 150 MiB entry.
+    XCTAssertLessThan(after > before ? after - before : 0, 60 * 1024 * 1024)
+  }
 }

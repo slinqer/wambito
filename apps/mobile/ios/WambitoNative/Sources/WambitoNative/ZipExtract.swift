@@ -185,13 +185,16 @@ public enum ZipExtract {
       guard entry.compressedSize == entry.size else { throw ZipError.truncated }
       var left = entry.compressedSize
       while left > 0 {
-        let want = Int(min(UInt64(chunk), left))
-        guard let data = try handle.read(upToCount: want), data.count == want else {
-          throw ZipError.truncated
+        // Drain Foundation's autoreleased Data each pass, or a big entry piles up in memory.
+        try autoreleasepool {
+          let want = Int(min(UInt64(chunk), left))
+          guard let data = try handle.read(upToCount: want), data.count == want else {
+            throw ZipError.truncated
+          }
+          try out.write(contentsOf: data)
+          written += UInt64(want)
+          left -= UInt64(want)
         }
-        try out.write(contentsOf: data)
-        written += UInt64(want)
-        left -= UInt64(want)
       }
     } else {
       written = try inflate(from: handle, compressedSize: entry.compressedSize, to: out)
@@ -220,36 +223,42 @@ public enum ZipExtract {
     var written: UInt64 = 0
     stream.dst_ptr = dst
     stream.dst_size = chunk
-    while true {
-      if stream.src_size == 0 && remaining > 0 {
-        let want = Int(min(UInt64(chunk), remaining))
-        guard let data = try handle.read(upToCount: want), data.count == want else {
+    var finished = false
+    while !finished {
+      // Drain Foundation's autoreleased Data each pass, or a big entry piles up in memory.
+      try autoreleasepool {
+        if stream.src_size == 0 && remaining > 0 {
+          let want = Int(min(UInt64(chunk), remaining))
+          guard let data = try handle.read(upToCount: want), data.count == want else {
+            throw ZipError.truncated
+          }
+          data.copyBytes(to: src, count: want)
+          stream.src_ptr = UnsafePointer(src)
+          stream.src_size = want
+          remaining -= UInt64(want)
+        }
+        let flags =
+          (remaining == 0 && stream.src_size == 0) ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+        let status = compression_stream_process(&stream, flags)
+        let produced = chunk - stream.dst_size
+        if produced > 0 {
+          try out.write(contentsOf: Data(bytes: dst, count: produced))
+          written += UInt64(produced)
+          stream.dst_ptr = dst
+          stream.dst_size = chunk
+        }
+        switch status {
+        case COMPRESSION_STATUS_END:
+          finished = true
+        case COMPRESSION_STATUS_OK:
+          if remaining == 0 && stream.src_size == 0 && produced == 0 && flags != 0 {
+            throw ZipError.truncated
+          }
+        default:
           throw ZipError.truncated
         }
-        data.copyBytes(to: src, count: want)
-        stream.src_ptr = UnsafePointer(src)
-        stream.src_size = want
-        remaining -= UInt64(want)
-      }
-      let flags = (remaining == 0 && stream.src_size == 0) ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
-      let status = compression_stream_process(&stream, flags)
-      let produced = chunk - stream.dst_size
-      if produced > 0 {
-        try out.write(contentsOf: Data(bytes: dst, count: produced))
-        written += UInt64(produced)
-        stream.dst_ptr = dst
-        stream.dst_size = chunk
-      }
-      switch status {
-      case COMPRESSION_STATUS_END:
-        return written
-      case COMPRESSION_STATUS_OK:
-        if remaining == 0 && stream.src_size == 0 && produced == 0 && flags != 0 {
-          throw ZipError.truncated
-        }
-      default:
-        throw ZipError.truncated
       }
     }
+    return written
   }
 }
