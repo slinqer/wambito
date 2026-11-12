@@ -253,7 +253,7 @@ void main() {
     });
   });
 
-  test('the precise pass is waited at most 3 s after refining', () {
+  test('a stuck precise pass is waited at most the limit plus the margin after refining', () {
     fakeAsync((async) {
       final heard = <String>[];
       var closed = false;
@@ -262,12 +262,33 @@ void main() {
       channel.send(const VoiceEvent.ready());
       channel.send(const VoiceEvent.partial('almuerzo'));
       channel.send(const VoiceEvent.refining());
-      async.elapse(const Duration(milliseconds: 2999));
+      final bound = refineLimit + PreciseEngine.refineMargin;
+      async.elapse(bound - const Duration(milliseconds: 1));
       expect(closed, isFalse);
       async.elapse(const Duration(milliseconds: 1));
       async.flushMicrotasks();
       expect(closed, isTrue);
       expect(heard.last, 'almuerzo');
+    });
+  });
+
+  test('the native fallback partial just after the limit still counts', () {
+    fakeAsync((async) {
+      final heard = <String>[];
+      var closed = false;
+      engine.listen(locale: 'es').listen(heard.add, onDone: () => closed = true);
+      async.flushMicrotasks();
+      channel.send(const VoiceEvent.ready());
+      channel.send(const VoiceEvent.partial('almuerzo 18'));
+      channel.send(const VoiceEvent.refining());
+      async.elapse(refineLimit + const Duration(milliseconds: 100));
+      expect(closed, isFalse);
+      channel.send(const VoiceEvent.partial('almuerzo 18 lukas'));
+      channel.send(const VoiceEvent.refineFailed('failed'));
+      channel.send(const VoiceEvent.done());
+      async.flushMicrotasks();
+      expect(closed, isTrue);
+      expect(heard.last, 'almuerzo 18 lukas');
     });
   });
 

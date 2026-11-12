@@ -10,13 +10,18 @@ import 'vosk_engine.dart' show longestListen, nothingHeardLimit, refineLimit;
 /// The iOS engine: the precise model (canary) alone, no Vosk. While the person speaks the native
 /// side sends live partials (its last word hidden while recording); a pause after the last changed
 /// partial ends the recording, and the precise model rewrites the whole sentence, whose text is the
-/// final one. If the precise pass fails, is blank, or takes over [refineLimit], the last partial
+/// final one. If the precise pass fails, is blank, or takes over [refineLimit] plus [refineMargin], the last partial
 /// stands (on a failure the native side first sends the last live decode whole, last word included). See docs/superpowers/specs/2026-11-12-ios-voice-design.md, section 2.
 class PreciseEngine implements SpeechEngine {
   PreciseEngine({required this._channel, required this._models});
 
   /// How long a pause after the last changed partial ends listening.
   static const endOfSpeechPause = Duration(milliseconds: 1500);
+
+  /// Extra wait over [refineLimit] before Dart gives up on the precise pass. The native pass is
+  /// bounded at [refineLimit] from `refining` and sends its fallback partial (the last live text,
+  /// last word included) at that moment; Dart's own timer must not win that race.
+  static const refineMargin = Duration(milliseconds: 500);
 
   final VoicePlatform _channel;
   final ModelStore _models;
@@ -137,7 +142,7 @@ class _Session {
       case VoiceRefining():
         _refining = true;
         if (_refiningStates.hasListener) _refiningStates.add(true);
-        _refineTimer ??= Timer(refineLimit, _finish);
+        _refineTimer ??= Timer(refineLimit + PreciseEngine.refineMargin, _finish);
       case VoiceRefined(:final text):
         // Blank is as good as nothing: the last partial stands (done follows).
         if (text.trim().isNotEmpty) _refined = text;
