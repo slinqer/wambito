@@ -434,7 +434,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: l10n.settingsVoice,
               lead: l10n.settingsDeleteVoiceHint,
               children: [
-                if (preciseEligible)
+                // On iOS the voice model is the precise one, and its row above covers it.
+                if (preciseEligible && defaultTargetPlatform != TargetPlatform.iOS)
                   SettingSwitch(
                     key: const Key('settings.voicePrecise'),
                     label: l10n.settingsVoicePrecise(

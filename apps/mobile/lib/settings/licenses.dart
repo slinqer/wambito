@@ -96,33 +96,38 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
   AndroidLibrary? find(String id) => libraries.where((l) => l.id == id).firstOrNull;
   String name(AndroidLibrary library) => '${library.id} ${library.version}';
 
-  for (final (model, language) in [
-    ('vosk-model-small-es-0.42', l10n.settingsLanguageEs),
-    ('vosk-model-small-en-us-0.15', l10n.settingsLanguageEn),
-    ('vosk-model-small-it-0.22', l10n.settingsLanguageIt),
-    ('vosk-model-small-pt-0.3', l10n.settingsLanguagePt),
-  ]) {
-    yield LicenseEntryWithLineBreaks([model], '${l10n.licenseNoticeModel(language)}\n\n$apache');
-  }
+  // iOS has no Vosk, JNA or their libraries: only the precise model's runtime below.
+  if (defaultTargetPlatform != TargetPlatform.iOS) {
+    for (final (model, language) in [
+      ('vosk-model-small-es-0.42', l10n.settingsLanguageEs),
+      ('vosk-model-small-en-us-0.15', l10n.settingsLanguageEn),
+      ('vosk-model-small-it-0.22', l10n.settingsLanguageIt),
+      ('vosk-model-small-pt-0.3', l10n.settingsLanguagePt),
+    ]) {
+      yield LicenseEntryWithLineBreaks([model], '${l10n.licenseNoticeModel(language)}\n\n$apache');
+    }
 
-  final vosk = find(_vosk);
-  if (vosk != null) {
-    yield LicenseEntryWithLineBreaks([
-      'vosk-android ${vosk.version}',
-    ], '${l10n.licenseNoticeVosk}\n\n$apache');
-    yield LicenseEntryWithLineBreaks([
-      'OpenBLAS 0.3.20',
-    ], '${l10n.licenseNoticeOpenBlas}\n\n${await load(_openBlas)}');
-    yield LicenseEntryWithLineBreaks([
-      'CLAPACK 3.2.1',
-    ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
-  }
-  final jna = find(_jna);
-  if (jna != null) {
-    yield LicenseEntryWithLineBreaks(['JNA ${jna.version}'], '${l10n.licenseNoticeJna}\n\n$apache');
-    yield LicenseEntryWithLineBreaks([
-      'libffi 3.4.4',
-    ], '${l10n.licenseNoticeLibffi}\n\n${await load(_libffi)}');
+    final vosk = find(_vosk);
+    if (vosk != null) {
+      yield LicenseEntryWithLineBreaks([
+        'vosk-android ${vosk.version}',
+      ], '${l10n.licenseNoticeVosk}\n\n$apache');
+      yield LicenseEntryWithLineBreaks([
+        'OpenBLAS 0.3.20',
+      ], '${l10n.licenseNoticeOpenBlas}\n\n${await load(_openBlas)}');
+      yield LicenseEntryWithLineBreaks([
+        'CLAPACK 3.2.1',
+      ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
+    }
+    final jna = find(_jna);
+    if (jna != null) {
+      yield LicenseEntryWithLineBreaks([
+        'JNA ${jna.version}',
+      ], '${l10n.licenseNoticeJna}\n\n$apache');
+      yield LicenseEntryWithLineBreaks([
+        'libffi 3.4.4',
+      ], '${l10n.licenseNoticeLibffi}\n\n${await load(_libffi)}');
+    }
   }
   // The precise voice model's runtime is in the build (not in the F-Droid one): sherpa-onnx, the
   // Canary and Parakeet models it runs, and the libraries inside the AAR's two native libraries.

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'engine/voice_channel.dart';
@@ -340,9 +341,12 @@ class ModelStore {
   }
 }
 
-/// The phone's model store.
-final modelStoreProvider = Provider<ModelStore>(
-  (ref) => ModelStore(
+/// The phone's model store: Vosk's on Android; on iOS, which has no Vosk, the precise store (the
+/// one `PreciseEngine` reads its folder from), so the same download offer, progress and deletion
+/// serve it.
+final modelStoreProvider = Provider<ModelStore>((ref) {
+  if (defaultTargetPlatform == TargetPlatform.iOS) return ref.watch(preciseModelStoreProvider);
+  return ModelStore(
     files: ref.watch(voiceChannelProvider),
     http: Dio(
       BaseOptions(
@@ -351,8 +355,8 @@ final modelStoreProvider = Provider<ModelStore>(
         receiveTimeout: const Duration(seconds: 30),
       ),
     ),
-  ),
-);
+  );
+});
 
 /// The precise model's store: the same download and verification, from the v2 release.
 final preciseModelStoreProvider = Provider<ModelStore>(

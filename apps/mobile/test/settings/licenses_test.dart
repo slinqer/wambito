@@ -34,6 +34,19 @@ void main() {
       }
     });
 
+    test('on iOS the Vosk and JNA entries are gone and sherpa-onnx stays', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final packages = [for (final e in await _extras()) ...e.packages];
+      expect(packages.where((p) => p.startsWith('sherpa-onnx ')), hasLength(1));
+      expect(packages.where((p) => p.startsWith('onnxruntime')), hasLength(1));
+      expect(packages.where((p) => p.toLowerCase().contains('vosk')), isEmpty);
+      for (final gone in ['OpenBLAS 0.3.20', 'CLAPACK 3.2.1', 'libffi 3.4.4']) {
+        expect(packages, isNot(contains(gone)));
+      }
+      expect(packages.where((p) => p.startsWith('JNA')), isEmpty);
+    });
+
     test('the sounds say they are original work under the app\'s own licence, AGPL-3.0', () async {
       final entries = await _extras('en');
       final sounds = entries.singleWhere((e) => e.packages.contains('Wambito feedback sounds'));

@@ -615,6 +615,15 @@ void main() {
       expect(find.byKey(const Key('settings.voicePrecise')), findsNothing);
     });
 
+    testWidgets('on iOS the voice model row covers it: no precise switch', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpSettingsApp(tester, location: '/settings', preciseEligible: true);
+      await _scrollTo(tester, 'settings.guestNotice');
+      expect(find.byKey(const Key('settings.voicePrecise')), findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
     testWidgets('the switch names the size, and turning it on downloads canary only', (
       tester,
     ) async {

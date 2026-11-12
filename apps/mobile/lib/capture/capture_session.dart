@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart' show CancelToken;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -275,11 +276,14 @@ class CaptureSheetState extends ConsumerState<CaptureSheet>
     _eligible = eligible;
     _joint = eligible && await ref.read(preciseOfferProvider(locale)).wantsWithVosk();
     if (!mounted) return;
-    canListen = available && hasVoice;
+    // iOS has only the precise model: a phone or language that does not qualify for it has no
+    // engine to listen with, so the sheet types.
+    final noPrecise = defaultTargetPlatform == TargetPlatform.iOS && !eligible;
+    canListen = available && hasVoice && !noPrecise;
     _warm = canListen && warm;
     if (!widget.listen) {
       type(null);
-    } else if (!available) {
+    } else if (!available || noPrecise) {
       type(CaptureWhy.noEngine);
     } else if (!hasVoice) {
       type(CaptureWhy.noVoiceYet);
