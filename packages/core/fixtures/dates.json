@@ -1,0 +1,179 @@
+{
+  "$comment": "Shared cases for the date helpers. Each case has fn (the function name), input (its argument list) and expected. todayIn takes [timeZone, nowIso]: the test converts nowIso (an ISO instant string) with new Date(nowIso) before calling, and the Dart port parses it as UTC. Every other input and output is a plain string, number, boolean or list of strings. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "Bogota 23:30 local is the next UTC day",
+      "fn": "todayIn",
+      "input": ["America/Bogota", "2026-10-31T23:30:00-05:00"],
+      "expected": "2026-10-31"
+    },
+    {
+      "name": "Bogota just after local midnight",
+      "fn": "todayIn",
+      "input": ["America/Bogota", "2026-11-01T00:30:00-05:00"],
+      "expected": "2026-11-01"
+    },
+    {
+      "name": "Bogota month end 23:30 local",
+      "fn": "todayIn",
+      "input": ["America/Bogota", "2026-02-28T23:30:00-05:00"],
+      "expected": "2026-02-28"
+    },
+    {
+      "name": "Madrid 23:30 local in summer time",
+      "fn": "todayIn",
+      "input": ["Europe/Madrid", "2026-07-31T23:30:00+02:00"],
+      "expected": "2026-07-31"
+    },
+    {
+      "name": "Madrid 23:30 local in winter time",
+      "fn": "todayIn",
+      "input": ["Europe/Madrid", "2026-12-31T23:30:00+01:00"],
+      "expected": "2026-12-31"
+    },
+    {
+      "name": "Madrid 00:30 local is still the day before in UTC",
+      "fn": "todayIn",
+      "input": ["Europe/Madrid", "2026-03-01T00:30:00+01:00"],
+      "expected": "2026-03-01"
+    },
+    {
+      "name": "Madrid leap day",
+      "fn": "todayIn",
+      "input": ["Europe/Madrid", "2028-02-29T23:30:00+01:00"],
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "UTC",
+      "fn": "todayIn",
+      "input": ["UTC", "2026-10-21T15:00:00Z"],
+      "expected": "2026-10-21"
+    },
+    {
+      "name": "monthOf",
+      "fn": "monthOf",
+      "input": ["2026-10-21"],
+      "expected": "2026-10"
+    },
+    {
+      "name": "monthOf first day",
+      "fn": "monthOf",
+      "input": ["2026-01-01"],
+      "expected": "2026-01"
+    },
+    {
+      "name": "firstDay",
+      "fn": "firstDay",
+      "input": ["2026-10"],
+      "expected": "2026-10-01"
+    },
+    {
+      "name": "lastDay of a 31-day month",
+      "fn": "lastDay",
+      "input": ["2026-10"],
+      "expected": "2026-10-31"
+    },
+    {
+      "name": "lastDay of a 30-day month",
+      "fn": "lastDay",
+      "input": ["2026-11"],
+      "expected": "2026-11-30"
+    },
+    {
+      "name": "lastDay of a common February",
+      "fn": "lastDay",
+      "input": ["2026-02"],
+      "expected": "2026-02-28"
+    },
+    {
+      "name": "lastDay of a leap February",
+      "fn": "lastDay",
+      "input": ["2028-02"],
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "lastDay of a century February",
+      "fn": "lastDay",
+      "input": ["2100-02"],
+      "expected": "2100-02-28"
+    },
+    {
+      "name": "addMonths forward",
+      "fn": "addMonths",
+      "input": ["2026-10", 1],
+      "expected": "2026-11"
+    },
+    {
+      "name": "addMonths across a year",
+      "fn": "addMonths",
+      "input": ["2026-11", 3],
+      "expected": "2027-02"
+    },
+    {
+      "name": "addMonths back across a year",
+      "fn": "addMonths",
+      "input": ["2026-02", -3],
+      "expected": "2025-11"
+    },
+    {
+      "name": "addMonths zero",
+      "fn": "addMonths",
+      "input": ["2026-05", 0],
+      "expected": "2026-05"
+    },
+    {
+      "name": "addMonths many years",
+      "fn": "addMonths",
+      "input": ["2026-12", 25],
+      "expected": "2029-01"
+    },
+    {
+      "name": "monthsBetween a range",
+      "fn": "monthsBetween",
+      "input": ["2026-10", "2027-02"],
+      "expected": ["2026-10", "2026-11", "2026-12", "2027-01", "2027-02"]
+    },
+    {
+      "name": "monthsBetween the same month",
+      "fn": "monthsBetween",
+      "input": ["2026-10", "2026-10"],
+      "expected": ["2026-10"]
+    },
+    {
+      "name": "monthsBetween reversed is empty",
+      "fn": "monthsBetween",
+      "input": ["2026-10", "2026-08"],
+      "expected": []
+    },
+    {
+      "name": "isMonth valid",
+      "fn": "isMonth",
+      "input": ["2026-10"],
+      "expected": true
+    },
+    {
+      "name": "isMonth month 13",
+      "fn": "isMonth",
+      "input": ["2026-13"],
+      "expected": false
+    },
+    {
+      "name": "isMonth month 00",
+      "fn": "isMonth",
+      "input": ["2026-00"],
+      "expected": false
+    },
+    {
+      "name": "isMonth a date",
+      "fn": "isMonth",
+      "input": ["2026-10-01"],
+      "expected": false
+    },
+    {
+      "name": "isMonth short year",
+      "fn": "isMonth",
+      "input": ["26-10"],
+      "expected": false
+    }
+  ]
+}

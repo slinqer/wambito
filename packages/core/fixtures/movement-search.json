@@ -1,0 +1,334 @@
+{
+  "$comment": "Shared cases for matchesMovementSearch and movementTotals. Each case has fn (the function name), input (its argument list) and expected. Search text folds case and the accents of foldText. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "empty search matches everything",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {}
+      ],
+      "expected": true
+    },
+    {
+      "name": "text folds accents and case",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "terms": ["ALMUERZO"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "text matches the note",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "to the airport",
+          "categoryId": "c-trans",
+          "amount": -45000,
+          "status": "pending"
+        },
+        {
+          "terms": ["airport"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "text folds ñ and ç",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Cena con Ñoño",
+          "note": "pizza ÇA",
+          "categoryId": "c-food",
+          "amount": -9000,
+          "status": "paid"
+        },
+        {
+          "terms": ["nono", "caza"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "text misses",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "to the airport",
+          "categoryId": "c-trans",
+          "amount": -45000,
+          "status": "pending"
+        },
+        {
+          "terms": ["bus"]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "blank terms are ignored",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "to the airport",
+          "categoryId": "c-trans",
+          "amount": -45000,
+          "status": "pending"
+        },
+        {
+          "terms": ["  ", ""]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "kind expense rejects income",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Salary",
+          "note": "October",
+          "categoryId": "c-pay",
+          "amount": 300000,
+          "status": "paid"
+        },
+        {
+          "kind": "expense"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "kind income accepts income",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Salary",
+          "note": "October",
+          "categoryId": "c-pay",
+          "amount": 300000,
+          "status": "paid"
+        },
+        {
+          "kind": "income"
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "kind expense rejects zero",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Zero",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": 0,
+          "status": "paid"
+        },
+        {
+          "kind": "expense"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "category matches",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "categoryIds": ["c-food", "c-rent"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "category misses",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "categoryIds": ["c-trans"]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "status pending",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "to the airport",
+          "categoryId": "c-trans",
+          "amount": -45000,
+          "status": "pending"
+        },
+        {
+          "status": "pending"
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "status mismatch",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "status": "pending"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "all: text and category must both match",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "terms": ["taxi"],
+          "categoryIds": ["c-food"]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "any: text or category is enough",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "terms": ["taxi"],
+          "categoryIds": ["c-food"],
+          "match": "any"
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "any still applies kind",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Almuérzo corrientazo",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -18000,
+          "status": "paid"
+        },
+        {
+          "terms": ["almuerzo"],
+          "kind": "income",
+          "match": "any"
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "totals of no rows",
+      "fn": "movementTotals",
+      "input": [[]],
+      "expected": {
+        "count": 0,
+        "expense": 0,
+        "income": 0
+      }
+    },
+    {
+      "name": "totals split expense and income",
+      "fn": "movementTotals",
+      "input": [
+        [
+          {
+            "amount": -18000
+          },
+          {
+            "amount": 300000
+          },
+          {
+            "amount": -45000
+          },
+          {
+            "amount": 0
+          }
+        ]
+      ],
+      "expected": {
+        "count": 4,
+        "expense": 63000,
+        "income": 300000
+      }
+    },
+    {
+      "name": "totals of expenses only",
+      "fn": "movementTotals",
+      "input": [
+        [
+          {
+            "amount": -1
+          },
+          {
+            "amount": -2
+          }
+        ]
+      ],
+      "expected": {
+        "count": 2,
+        "expense": 3,
+        "income": 0
+      }
+    }
+  ]
+}

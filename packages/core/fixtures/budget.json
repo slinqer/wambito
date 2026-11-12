@@ -1,0 +1,240 @@
+{
+  "$comment": "Shared cases for effectiveBudget. Each input is [entries, categoryId, month]; expected is cents or null. The entry in force is the latest effectiveFrom on or before the month. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "no entries",
+      "input": [[], "c-food", "2026-10"],
+      "expected": null
+    },
+    {
+      "name": "single entry, no override",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-rent",
+        "2026-10"
+      ],
+      "expected": 100000
+    },
+    {
+      "name": "override applies from its month",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-food",
+        "2026-10"
+      ],
+      "expected": 60000
+    },
+    {
+      "name": "before the override the older entry holds",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-food",
+        "2026-09"
+      ],
+      "expected": 50000
+    },
+    {
+      "name": "after the override the newest holds",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-food",
+        "2027-03"
+      ],
+      "expected": 60000
+    },
+    {
+      "name": "month before any entry",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-food",
+        "2025-12"
+      ],
+      "expected": null
+    },
+    {
+      "name": "entries out of order",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-food",
+        "2026-05"
+      ],
+      "expected": 50000
+    },
+    {
+      "name": "unknown category",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-other",
+        "2026-10"
+      ],
+      "expected": null
+    },
+    {
+      "name": "zero budget is not null",
+      "input": [
+        [
+          {
+            "categoryId": "c-food",
+            "amount": 50000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-food",
+            "amount": 60000,
+            "effectiveFrom": "2026-10"
+          },
+          {
+            "categoryId": "c-rent",
+            "amount": 100000,
+            "effectiveFrom": "2026-01"
+          },
+          {
+            "categoryId": "c-fun",
+            "amount": 0,
+            "effectiveFrom": "2026-01"
+          }
+        ],
+        "c-fun",
+        "2026-10"
+      ],
+      "expected": 0
+    }
+  ]
+}

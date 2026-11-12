@@ -1,0 +1,439 @@
+{
+  "$comment": "Shared cases for monthSummary. Each input is the argument list [SummaryInput]. Amounts are signed integer cents (expenses negative). Run by packages/core/src/fixtures.test.ts and by the Dart port. Category order in the input is the order of the output. A zero budget with nothing spent gives remaining -0 in TypeScript; JSON carries it as 0 and the test compares through JSON, so Dart's 0 is right. ratio values are doubles.",
+  "cases": [
+    {
+      "name": "empty month with budgets",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-food",
+              "amount": 50000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 60000,
+              "effectiveFrom": "2026-10"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": 100000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": 0,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": []
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 160000,
+        "spent": 0,
+        "remaining": 160000,
+        "income": 0,
+        "balance": 0,
+        "categories": [
+          {
+            "categoryId": "c-food",
+            "budget": 60000,
+            "spent": 0,
+            "remaining": 60000,
+            "ratio": 0,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-rent",
+            "budget": 100000,
+            "spent": 0,
+            "remaining": 100000,
+            "ratio": 0,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-fun",
+            "budget": 0,
+            "spent": 0,
+            "remaining": 0,
+            "ratio": null,
+            "state": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ok, near and over states",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-food",
+              "amount": 50000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 60000,
+              "effectiveFrom": "2026-10"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": 100000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": 0,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-food",
+              "amount": -30000
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -100001
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 300000
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 160000,
+        "spent": 150001,
+        "remaining": 9999,
+        "income": 300000,
+        "balance": 149999,
+        "categories": [
+          {
+            "categoryId": "c-food",
+            "budget": 60000,
+            "spent": 50000,
+            "remaining": 10000,
+            "ratio": 0.8333333333333334,
+            "state": "near"
+          },
+          {
+            "categoryId": "c-rent",
+            "budget": 100000,
+            "spent": 100001,
+            "remaining": -1,
+            "ratio": 1.00001,
+            "state": "over"
+          },
+          {
+            "categoryId": "c-fun",
+            "budget": 0,
+            "spent": 0,
+            "remaining": 0,
+            "ratio": null,
+            "state": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "name": "zero budget with spending is over",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-food",
+              "amount": 50000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 60000,
+              "effectiveFrom": "2026-10"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": 100000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": 0,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-fun",
+              "amount": -1500
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 160000,
+        "spent": 1500,
+        "remaining": 158500,
+        "income": 0,
+        "balance": -1500,
+        "categories": [
+          {
+            "categoryId": "c-food",
+            "budget": 60000,
+            "spent": 0,
+            "remaining": 60000,
+            "ratio": 0,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-rent",
+            "budget": 100000,
+            "spent": 0,
+            "remaining": 100000,
+            "ratio": 0,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-fun",
+            "budget": 0,
+            "spent": 1500,
+            "remaining": -1500,
+            "ratio": null,
+            "state": "over"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no budget for the category",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "budgets": [],
+          "transactions": [
+            {
+              "categoryId": "c-food",
+              "amount": -2500
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 10000
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 0,
+        "spent": 2500,
+        "remaining": -2500,
+        "income": 10000,
+        "balance": 7500,
+        "categories": [
+          {
+            "categoryId": "c-food",
+            "budget": null,
+            "spent": 2500,
+            "remaining": null,
+            "ratio": null,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-rent",
+            "budget": null,
+            "spent": 0,
+            "remaining": null,
+            "ratio": null,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-fun",
+            "budget": null,
+            "spent": 0,
+            "remaining": null,
+            "ratio": null,
+            "state": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "name": "refund makes the category net negative",
+      "input": [
+        {
+          "month": "2026-09",
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-food",
+              "amount": 50000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 60000,
+              "effectiveFrom": "2026-10"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": 100000,
+              "effectiveFrom": "2026-01"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": 0,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-food",
+              "amount": 4000
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -1000
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-09",
+        "budgetTotal": 150000,
+        "spent": -3000,
+        "remaining": 153000,
+        "income": 0,
+        "balance": 3000,
+        "categories": [
+          {
+            "categoryId": "c-food",
+            "budget": 50000,
+            "spent": -3000,
+            "remaining": 53000,
+            "ratio": -0.06,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-rent",
+            "budget": 100000,
+            "spent": 0,
+            "remaining": 100000,
+            "ratio": 0,
+            "state": "ok"
+          },
+          {
+            "categoryId": "c-fun",
+            "budget": 0,
+            "spent": 0,
+            "remaining": 0,
+            "ratio": null,
+            "state": "ok"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,467 @@
+{
+  "$comment": "Shared cases for costOfLiving. Each input is the argument list [CostOfLivingInput]. Amounts are signed integer cents; averages are rounded with Math.round (half up) into positive cents. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "no months",
+      "input": [
+        {
+          "months": [],
+          "categories": [
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "fixedCategoryIds": ["c-rent"],
+          "transactions": [
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-08-01"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000,
+              "date": "2026-08-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -35001,
+              "date": "2026-09-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 5000,
+              "date": "2026-09-13"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -7000,
+              "date": "2026-07-31"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -1,
+              "date": "2026-09-30"
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 400000,
+              "date": "2026-08-28"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 0,
+        "total": 0,
+        "fixed": 0,
+        "variable": 0,
+        "categories": []
+      }
+    },
+    {
+      "name": "two months, fixed and variable",
+      "input": [
+        {
+          "months": ["2026-08", "2026-09"],
+          "categories": [
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "fixedCategoryIds": ["c-rent"],
+          "transactions": [
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-08-01"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000,
+              "date": "2026-08-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -35001,
+              "date": "2026-09-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 5000,
+              "date": "2026-09-13"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -7000,
+              "date": "2026-07-31"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -1,
+              "date": "2026-09-30"
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 400000,
+              "date": "2026-08-28"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 2,
+        "total": 115002,
+        "fixed": 90000,
+        "variable": 25002,
+        "categories": [
+          {
+            "categoryId": "c-rent",
+            "average": 90000,
+            "type": "fixed"
+          },
+          {
+            "categoryId": "c-food",
+            "average": 25001,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-fun",
+            "average": 1,
+            "type": "variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "transactions outside the window are ignored",
+      "input": [
+        {
+          "months": ["2026-09"],
+          "categories": [
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "fixedCategoryIds": ["c-rent"],
+          "transactions": [
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-08-01"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000,
+              "date": "2026-08-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -35001,
+              "date": "2026-09-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 5000,
+              "date": "2026-09-13"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -7000,
+              "date": "2026-07-31"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -1,
+              "date": "2026-09-30"
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 400000,
+              "date": "2026-08-28"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 1,
+        "total": 120002,
+        "fixed": 90000,
+        "variable": 30002,
+        "categories": [
+          {
+            "categoryId": "c-rent",
+            "average": 90000,
+            "type": "fixed"
+          },
+          {
+            "categoryId": "c-food",
+            "average": 30001,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-fun",
+            "average": 1,
+            "type": "variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rounding of the average",
+      "input": [
+        {
+          "months": ["2026-07", "2026-08", "2026-09"],
+          "categories": [
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-08-01"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000,
+              "date": "2026-08-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -35001,
+              "date": "2026-09-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 5000,
+              "date": "2026-09-13"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -7000,
+              "date": "2026-07-31"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -1,
+              "date": "2026-09-30"
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 400000,
+              "date": "2026-08-28"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 3,
+        "total": 79001,
+        "fixed": 0,
+        "variable": 79001,
+        "categories": [
+          {
+            "categoryId": "c-rent",
+            "average": 60000,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-food",
+            "average": 16667,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-fun",
+            "average": 2334,
+            "type": "variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "income categories and empty months",
+      "input": [
+        {
+          "months": ["2026-01", "2026-02"],
+          "categories": [
+            {
+              "id": "c-rent",
+              "kind": "expense"
+            },
+            {
+              "id": "c-food",
+              "kind": "expense"
+            },
+            {
+              "id": "c-fun",
+              "kind": "expense"
+            },
+            {
+              "id": "c-pay",
+              "kind": "income"
+            }
+          ],
+          "fixedCategoryIds": ["c-rent"],
+          "transactions": [
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-08-01"
+            },
+            {
+              "categoryId": "c-rent",
+              "amount": -90000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -20000,
+              "date": "2026-08-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": -35001,
+              "date": "2026-09-12"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 5000,
+              "date": "2026-09-13"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -7000,
+              "date": "2026-07-31"
+            },
+            {
+              "categoryId": "c-fun",
+              "amount": -1,
+              "date": "2026-09-30"
+            },
+            {
+              "categoryId": "c-pay",
+              "amount": 400000,
+              "date": "2026-08-28"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 2,
+        "total": 0,
+        "fixed": 0,
+        "variable": 0,
+        "categories": []
+      }
+    },
+    {
+      "name": "net refund cancels a category",
+      "input": [
+        {
+          "months": ["2026-09"],
+          "categories": [
+            {
+              "id": "c-food",
+              "kind": "expense"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-food",
+              "amount": -3000,
+              "date": "2026-09-01"
+            },
+            {
+              "categoryId": "c-food",
+              "amount": 3000,
+              "date": "2026-09-02"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 1,
+        "total": 0,
+        "fixed": 0,
+        "variable": 0,
+        "categories": []
+      }
+    }
+  ]
+}
