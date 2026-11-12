@@ -37,4 +37,10 @@ final class LiveDecodeTests: XCTestCase {
     XCTAssertFalse(MemoryRule.qualifies(physical: (3 << 30) - 1, minimum: nil))
     XCTAssertFalse(MemoryRule.qualifies(physical: 4 << 30, minimum: 5 << 30))
   }
+
+  func testMemoryRuleNeverBelowTheDefault() {
+    // As Kotlin's max(minRam, MIN_RAM): a smaller minimum does not lower the floor.
+    XCTAssertFalse(MemoryRule.qualifies(physical: (5 << 30) / 2, minimum: 2 << 30))
+    XCTAssertTrue(MemoryRule.qualifies(physical: 3 << 30, minimum: 2 << 30))
+  }
 }

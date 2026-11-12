@@ -36,7 +36,8 @@ public enum MemoryRule {
   /// 3 GiB of physical memory.
   public static let defaultMinimum: UInt64 = 3 << 30
 
+  /// [minimum] can raise the floor, never lower it (Kotlin's `max(minRam, MIN_RAM)`).
   public static func qualifies(physical: UInt64, minimum: UInt64?) -> Bool {
-    physical >= (minimum ?? defaultMinimum)
+    physical >= max(minimum ?? 0, defaultMinimum)
   }
 }
