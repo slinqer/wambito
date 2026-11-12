@@ -172,6 +172,14 @@ void main() {
       expect(r.value!['revokedDevices'], [uuid]);
     });
 
+    test('each parse gets its own default list', () {
+      final a = parseRecord(RecordType.settings, settings).value!['revokedDevices'] as List;
+      a.add(uuid);
+      final b = parseRecord(RecordType.settings, settings).value!['revokedDevices'] as List;
+      expect(identical(a, b), isFalse);
+      expect(b, isEmpty);
+    });
+
     test('a non-uuid in revokedDevices fails', () {
       expect(
         parseRecord(RecordType.settings, {

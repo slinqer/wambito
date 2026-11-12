@@ -208,6 +208,10 @@ Field fOptional(Field inner) =>
 Field fDefault(Field inner, Object? value) =>
     (v, path, ctx) => identical(v, absent) ? value : inner(v, path, ctx);
 
+/// `.default(() => value)` for a non-primitive default: each parse gets a fresh value, as zod does.
+Field fDefaultWith(Field inner, Object? Function() make) =>
+    (v, path, ctx) => identical(v, absent) ? make() : inner(v, path, ctx);
+
 /// A cross-field check on a body whose fields all passed their type checks.
 typedef Refine = void Function(Json value, Ctx ctx);
 

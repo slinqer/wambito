@@ -96,7 +96,7 @@ final _settings = ObjectSchema({
   'timezone': fString(refine: isValidTimeZone, refineMessage: 'Unknown time zone'),
   'onboardingCompletedAt': _nullableDefaultNull(_timestamp),
   // Wrap ids of the devices removed from the vault; every rotation leaves them out.
-  'revokedDevices': fDefault(fArray(_uuid), <Object?>[]),
+  'revokedDevices': fDefaultWith(fArray(_uuid), () => <Object?>[]),
 }, loose: true);
 
 final _account = ObjectSchema({

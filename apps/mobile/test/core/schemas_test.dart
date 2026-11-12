@@ -192,13 +192,6 @@ void main() {
       expect(ok(updateTransactionSchema, {'name': 'xx  '}), {'name': 'xx'});
     });
 
-    test('needsReview only allows confirming', () {
-      expect(bad(updateTransactionSchema, {'needsReview': true}), [
-        'needsReview|Invalid input: expected false',
-      ]);
-      expect(ok(updateTransactionSchema, {'needsReview': false}), {'needsReview': false});
-    });
-
     test('a null where a value is needed is a type error, and skips the at-least-one check', () {
       expect(bad(updateTransactionSchema, {'amount': null}), [
         'amount|Invalid input: expected number, received null',
@@ -207,6 +200,15 @@ void main() {
         'amount|Too small: expected int to be >=-9007199254740991',
         'amount|Amount is too large',
       ]);
+    });
+  });
+
+  group('updateTransactionSchema needsReview', () {
+    test('only allows confirming', () {
+      expect(bad(updateTransactionSchema, {'needsReview': true}), [
+        'needsReview|Invalid input: expected false',
+      ]);
+      expect(ok(updateTransactionSchema, {'needsReview': false}), {'needsReview': false});
     });
   });
 
