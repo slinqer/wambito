@@ -219,8 +219,8 @@ open:
   a recorded API answer for the same data.
 - **Goes to the network:** auth, the rest of `/v1/me`, `/v2/*`, and every route that is not the
   user's finance data.
-- **Turned-off routes** (`/v1/me/export`, `/v1/imports/*` and the assistants' connection screens)
-  answer 403 `not_available_encrypted` locally, the same idea as the web's `DEMO_UNAVAILABLE`. The
+- **Turned-off routes** (`/v1/me/export`, `/v1/imports/*`, `/v1/me/assistants/*`: the web's
+  `LOCAL_UNAVAILABLE` in `vault-session.ts`) answer 403 `demo_unavailable` locally, the code the web's backend gives them. The
   screen shows "Coming soon with encryption" instead of failing quietly. Deleting the account still
   goes to the server.
 
@@ -285,7 +285,8 @@ on it does not need the recovery key again.
    - Copy;
    - Share, through the system sheet, for example to a password manager;
    - writing it down.
-3. To go on, the person types back one group chosen at random, as on the web.
+3. To go on, the person types back four characters of it at positions chosen at random, as on the
+   web (`apps/web/app/features/vault/vault-model.ts`, `confirmationMatches`).
 4. If PRF works, the app then offers to create a passkey with a wrap.
 
 ### 6.4 Guests (E2E design, section 10)
