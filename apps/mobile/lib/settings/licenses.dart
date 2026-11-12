@@ -183,7 +183,9 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};
   final groups = <String, List<AndroidLibrary>>{};
-  for (final library in libraries.where((l) => !handled.contains(l.id))) {
+  // iOS ships none of the Android libraries.
+  final android = defaultTargetPlatform != TargetPlatform.iOS;
+  for (final library in libraries.where((l) => android && !handled.contains(l.id))) {
     (groups[_textAssetFor(library)] ??= []).add(library);
   }
   for (final MapEntry(key: asset, value: group) in groups.entries) {

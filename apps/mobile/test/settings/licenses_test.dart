@@ -34,6 +34,11 @@ void main() {
       }
     });
 
+    test('on Android the androidx libraries are listed', () async {
+      final packages = [for (final e in await _extras()) ...e.packages];
+      expect(packages.where((p) => p.startsWith('androidx.')), isNotEmpty);
+    });
+
     test('on iOS the Vosk and JNA entries are gone and sherpa-onnx stays', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -45,6 +50,7 @@ void main() {
         expect(packages, isNot(contains(gone)));
       }
       expect(packages.where((p) => p.startsWith('JNA')), isEmpty);
+      expect(packages.where((p) => p.startsWith('androidx.')), isEmpty);
     });
 
     test('the sounds say they are original work under the app\'s own licence, AGPL-3.0', () async {
