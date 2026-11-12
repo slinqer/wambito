@@ -176,6 +176,47 @@ void runStoreContract(String name, Future<FinanceStore> Function() open) {
       expect(calls, 3);
     });
 
+    test('notifies after the commit: a listener that reads sees the written record', () async {
+      final store = await open();
+      final seen = <Future<StoredRecord?>>[];
+      store.subscribe(() => seen.add(store.get(RecordType.category, 'a')));
+      await store.put(RecordType.category, 'a', _category('A'));
+      expect(seen, hasLength(1));
+      expect((await seen.single)?.body['name'], 'A');
+    });
+
+    test('does not let a tombstone read be mutated through its body', () async {
+      final store = await open();
+      await store.put(RecordType.category, 'a', _category('A'));
+      await store.delete(RecordType.category, 'a');
+      const opts = ReadOptions(includeDeleted: true);
+      final dead = await store.get(RecordType.category, 'a', opts);
+      dead!.body['name'] = 'changed';
+      final listed = await store.list(RecordType.category, opts);
+      listed.single.body['name'] = 'changed too';
+      expect((await store.get(RecordType.category, 'a', opts))?.body['name'], 'A');
+    });
+
+    test('runs a transaction queued after one that threw, and commits it', () async {
+      final store = await open();
+      final failing = store.transaction((tx) async {
+        await tx.put(RecordType.category, 'a', _category('A'));
+        throw StateError('boom');
+      });
+      final next = store.transaction((tx) => tx.put(RecordType.category, 'b', _category('B')));
+      await expectLater(failing, throwsA(isA<StateError>()));
+      await next;
+      expect((await store.list(RecordType.category)).map((r) => r.id), ['b']);
+    });
+
+    test('does not notify when it deletes an unknown id', () async {
+      final store = await open();
+      var calls = 0;
+      store.subscribe(() => calls++);
+      await store.delete(RecordType.category, 'nope');
+      expect(calls, 0);
+    });
+
     test('does not notify for a transaction that only reads', () async {
       final store = await open();
       var calls = 0;

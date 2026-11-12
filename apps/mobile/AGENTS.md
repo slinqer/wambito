@@ -44,6 +44,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   byte for byte; a format change needs a new `enc_v` and vectors on both sides. `prfSalt` lives in `wraps.dart`.
 - `lib/local/`: the phone's end-to-end encryption, each file the twin of one in `apps/web/app/local/`
   (`prf.dart` = `prf.ts`: the passkey PRF over the `wambito/passkeys` channel, on iOS 18+ and Android).
+  `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
+  run by every store), `db.dart` + `sqlite_store.dart` (`SqliteStore.open(userId)`: the vault, file
+  `wambito-vault-<userId>.db` in the app support directory, one table per record type plus `outbox`,
+  `meta`, `quarantine`; a local write updates record and outbox in one SQLite transaction, all
+  operations go through one queue; keys are not in it, they live in secure storage; tests use
+  `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments).
   `lib/debug/prf_probe_screen.dart` is `/debug/prf`, registered only when `kDebugMode`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
