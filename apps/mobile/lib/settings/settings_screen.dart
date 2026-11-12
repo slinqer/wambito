@@ -9,7 +9,7 @@
 // line on what it is, and the web's switches and buttons.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,6 +76,10 @@ final settingsEmailProvider = FutureProvider.autoDispose<String?>((ref) async {
 /// widget, the voice models, the server, About, "Más en la web" and sign out.
 /// A guest also finds "Guarda tu progreso" at the top, and is warned before anything that would
 /// leave their account behind (signing out, changing server).
+/// Whether Settings shows its debug-only rows (the passkey PRF probe): debug builds only. A provider
+/// so a test can switch it.
+final debugToolsProvider = Provider<bool>((ref) => kDebugMode);
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.webSectionsOnly = false});
 
@@ -505,6 +509,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () => context.push('/settings/about'),
                 ),
               ),
+              if (ref.watch(debugToolsProvider))
+                _SelfStart(
+                  child: PressButton.text(
+                    'PRF probe',
+                    key: const Key('settings.prfProbe'),
+                    tone: PressTone.secondary,
+                    onPressed: () => context.push('/debug/prf'),
+                  ),
+                ),
             ],
           ),
           SettingsSection(

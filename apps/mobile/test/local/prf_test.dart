@@ -158,6 +158,14 @@ void main() {
       );
     });
 
+    test('a response without a credential id is a bad_response, not a TypeError', () async {
+      final fake = FakePasskeys((_) => jsonEncode({'clientExtensionResults': <String, Object?>{}}));
+      expect(
+        evaluatePrf(fake, options),
+        throwsA(isA<KeysError>().having((e) => e.code, 'code', 'bad_response')),
+      );
+    });
+
     test('is null when the person cancels', () async {
       final fake = FakePasskeys(
         (_) => throw const AuthFailure(code: 'AUTH_CANCELLED', status: 400),

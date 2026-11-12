@@ -82,9 +82,12 @@ Future<PasskeyPrf?> evaluatePrf(Passkeys passkeys, String optionsJson) async {
     if (error.code == 'AUTH_CANCELLED') return null;
     rethrow;
   }
-  final credential = (jsonDecode(json) as Map).cast<String, Object?>();
+  final decoded = jsonDecode(json);
+  final id = decoded is Map ? decoded['id'] : null;
+  if (decoded is! Map || id is! String) throw const KeysError('bad_response');
+  final credential = decoded.cast<String, Object?>();
   final results = credential['clientExtensionResults'];
   final prf = readPrf(results is Map ? results.cast<String, Object?>() : const {});
   if (prf == null) throw const KeysError('no_prf');
-  return PasskeyPrf(credentialId: credential['id'] as String, prf: prf);
+  return PasskeyPrf(credentialId: id, prf: prf);
 }

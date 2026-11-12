@@ -12,6 +12,7 @@ import 'package:wambito/entry/entry_screen.dart';
 import 'package:wambito/settings/licenses.dart';
 import 'package:wambito/settings/preferences.dart';
 import 'package:wambito/settings/settings_parts.dart' show LkSwitch;
+import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/sheet.dart' show LkSheetScope;
 import 'package:wambito/api/server_url.dart';
 
@@ -716,6 +717,23 @@ void main() {
         find.text('No pudimos borrar los modelos de voz. Inténtalo otra vez.'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('Debug tools', () {
+    testWidgets('the PRF probe row is there with the debug flag on', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [debugToolsProvider.overrideWithValue(true)],
+      );
+      await tester.scrollUntilVisible(find.byKey(const Key('settings.prfProbe')), 200);
+      expect(find.byKey(const Key('settings.prfProbe')), findsOneWidget);
+    });
+
+    testWidgets('and not with it off', (tester) async {
+      await pumpSettingsApp(tester, location: '/settings');
+      expect(find.byKey(const Key('settings.prfProbe'), skipOffstage: false), findsNothing);
     });
   });
 
