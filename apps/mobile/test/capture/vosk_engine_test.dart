@@ -50,6 +50,18 @@ class _FakeChannel implements VoicePlatform {
   }
 
   @override
+  Future<bool> warmUpPrecise({required String precisePath, required String language}) async =>
+      false;
+
+  @override
+  Future<bool> isWarmPrecise({required String precisePath, required String language}) async =>
+      false;
+
+  @override
+  Stream<VoiceEvent> startPrecise({required String precisePath, required String language}) =>
+      throw UnimplementedError('iOS only');
+
+  @override
   Future<void> stop() async {
     stops++;
   }

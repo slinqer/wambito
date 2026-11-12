@@ -9,6 +9,7 @@ const _codec = StandardMethodCodec();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  group('precise-only (iOS)', iosChannelTests);
   final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   late List<String> calls;
 
@@ -90,5 +91,51 @@ void main() {
       VoiceEvent.fromMap({'type': 'refine_failed', 'code': 'timeout'}),
       isA<VoiceRefineFailed>().having((e) => e.code, 'code', 'timeout'),
     );
+  });
+}
+
+void iosChannelTests() {
+  final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  const methods = MethodChannel('wambito/voice');
+  const events = MethodChannel('wambito/voice/events');
+  late List<MethodCall> calls;
+
+  setUp(() {
+    calls = [];
+    messenger.setMockMethodCallHandler(methods, (call) async {
+      calls.add(call);
+      return true;
+    });
+    messenger.setMockMethodCallHandler(events, (call) async {
+      calls.add(call);
+      return null;
+    });
+  });
+
+  tearDown(() {
+    messenger.setMockMethodCallHandler(methods, null);
+    messenger.setMockMethodCallHandler(events, null);
+  });
+
+  test('startPrecise sends only the precise path and the language', () async {
+    final sub = const VoiceChannel()
+        .startPrecise(precisePath: '/m/c', language: 'es')
+        .listen((_) {});
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final listen = calls.singleWhere((c) => c.method == 'listen');
+    expect(listen.arguments, {'precisePath': '/m/c', 'language': 'es'});
+    await sub.cancel();
+  });
+
+  test('warmUpPrecise sends warmUp with the precise path and the language only', () async {
+    expect(await const VoiceChannel().warmUpPrecise(precisePath: '/m/c', language: 'es'), isTrue);
+    expect(calls.single.method, 'warmUp');
+    expect(calls.single.arguments, {'precisePath': '/m/c', 'language': 'es'});
+  });
+
+  test('isWarmPrecise sends isWarm with the precise path and the language only', () async {
+    expect(await const VoiceChannel().isWarmPrecise(precisePath: '/m/c', language: 'es'), isTrue);
+    expect(calls.single.method, 'isWarm');
+    expect(calls.single.arguments, {'precisePath': '/m/c', 'language': 'es'});
   });
 }
