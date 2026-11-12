@@ -329,6 +329,108 @@
         "expense": 3,
         "income": 0
       }
+    },
+    {
+      "name": "single term folds ç and í in the name",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Açaí",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["acai"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "single term folds ç in the note",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Cena",
+          "note": "ÇA",
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["ca"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "single term folds á in the note",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Cena",
+          "note": "PIZZÁ",
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["pizza"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "single term folds ñ in the name",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Cena con Ñoño",
+          "note": null,
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["nono"]
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "a term cannot span the name/note boundary",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "airport",
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["taxi airport"]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "a term cannot span the boundary without a space",
+      "fn": "matchesMovementSearch",
+      "input": [
+        {
+          "name": "Taxi",
+          "note": "airport",
+          "categoryId": "c-food",
+          "amount": -100,
+          "status": "paid"
+        },
+        {
+          "terms": ["taxiairport"]
+        }
+      ],
+      "expected": false
     }
   ]
 }

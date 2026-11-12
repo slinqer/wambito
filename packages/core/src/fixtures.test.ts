@@ -24,8 +24,14 @@ type Fn = (...args: any[]) => unknown;
 
 function run(file: string, fns: Record<string, Fn>, only?: string) {
   const cases = load(file);
-  test("has at least three cases", () => {
-    expect(cases.length).toBeGreaterThanOrEqual(3);
+  test("has at least three cases per function", () => {
+    const counts = new Map<string, number>();
+    for (const c of cases) {
+      const key = only ?? (c.fn as string);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect([...counts.keys()].sort()).toEqual(Object.keys(fns).sort());
+    for (const [fn, n] of counts) expect(n, fn).toBeGreaterThanOrEqual(3);
   });
   for (const c of cases) {
     test(c.name, () => {

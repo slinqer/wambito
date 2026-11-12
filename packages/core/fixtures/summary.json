@@ -434,6 +434,231 @@
           }
         ]
       }
+    },
+    {
+      "name": "ratio just below near is ok",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-a",
+              "amount": 10000,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -7999
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 10000,
+        "spent": 7999,
+        "remaining": 2001,
+        "income": 0,
+        "balance": -7999,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "budget": 10000,
+            "spent": 7999,
+            "remaining": 2001,
+            "ratio": 0.7999,
+            "state": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ratio exactly 0.8 is near",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-a",
+              "amount": 10000,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -8000
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 10000,
+        "spent": 8000,
+        "remaining": 2000,
+        "income": 0,
+        "balance": -8000,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "budget": 10000,
+            "spent": 8000,
+            "remaining": 2000,
+            "ratio": 0.8,
+            "state": "near"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ratio just above 0.8 is near",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-a",
+              "amount": 10000,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -8001
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 10000,
+        "spent": 8001,
+        "remaining": 1999,
+        "income": 0,
+        "balance": -8001,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "budget": 10000,
+            "spent": 8001,
+            "remaining": 1999,
+            "ratio": 0.8001,
+            "state": "near"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ratio exactly 1 is near, not over",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-a",
+              "amount": 10000,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -10000
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 10000,
+        "spent": 10000,
+        "remaining": 0,
+        "income": 0,
+        "balance": -10000,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "budget": 10000,
+            "spent": 10000,
+            "remaining": 0,
+            "ratio": 1,
+            "state": "near"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ratio just above 1 is over",
+      "input": [
+        {
+          "month": "2026-10",
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            }
+          ],
+          "budgets": [
+            {
+              "categoryId": "c-a",
+              "amount": 10000,
+              "effectiveFrom": "2026-01"
+            }
+          ],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -10001
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "month": "2026-10",
+        "budgetTotal": 10000,
+        "spent": 10001,
+        "remaining": -1,
+        "income": 0,
+        "balance": -10001,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "budget": 10000,
+            "spent": 10001,
+            "remaining": -1,
+            "ratio": 1.0001,
+            "state": "over"
+          }
+        ]
+      }
     }
   ]
 }

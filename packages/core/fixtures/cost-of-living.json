@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared cases for costOfLiving. Each input is the argument list [CostOfLivingInput]. Amounts are signed integer cents; averages are rounded with Math.round (half up) into positive cents. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "$comment": "Shared cases for costOfLiving. Each input is the argument list [CostOfLivingInput]. Amounts are signed integer cents; averages use Math.round, which rounds .5 toward positive infinity (2.5 -> 3, -0.5 -> -0 and is skipped, -1.5 -> -1), unlike Dart round() which rounds half away from zero. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
   "cases": [
     {
       "name": "no months",
@@ -461,6 +461,202 @@
         "fixed": 0,
         "variable": 0,
         "categories": []
+      }
+    },
+    {
+      "name": "exact .5 average rounds half up",
+      "input": [
+        {
+          "months": ["2026-08", "2026-09"],
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            },
+            {
+              "id": "c-b",
+              "kind": "expense"
+            },
+            {
+              "id": "c-c",
+              "kind": "expense"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": -3,
+              "date": "2026-09-10"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 2,
+        "total": 2,
+        "fixed": 0,
+        "variable": 2,
+        "categories": [
+          {
+            "categoryId": "c-a",
+            "average": 2,
+            "type": "variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exact -0.5 average (net refund) rounds to zero and is skipped",
+      "input": [
+        {
+          "months": ["2026-08", "2026-09"],
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            },
+            {
+              "id": "c-b",
+              "kind": "expense"
+            },
+            {
+              "id": "c-c",
+              "kind": "expense"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": 1,
+              "date": "2026-09-10"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 2,
+        "total": 0,
+        "fixed": 0,
+        "variable": 0,
+        "categories": []
+      }
+    },
+    {
+      "name": "exact -1.5 average rounds toward positive infinity",
+      "input": [
+        {
+          "months": ["2026-08", "2026-09"],
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            },
+            {
+              "id": "c-b",
+              "kind": "expense"
+            },
+            {
+              "id": "c-c",
+              "kind": "expense"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-a",
+              "amount": 3,
+              "date": "2026-09-10"
+            },
+            {
+              "categoryId": "c-b",
+              "amount": -3,
+              "date": "2026-09-10"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 2,
+        "total": 1,
+        "fixed": 0,
+        "variable": 1,
+        "categories": [
+          {
+            "categoryId": "c-b",
+            "average": 2,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-a",
+            "average": -1,
+            "type": "variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "equal averages keep the category order",
+      "input": [
+        {
+          "months": ["2026-09"],
+          "categories": [
+            {
+              "id": "c-a",
+              "kind": "expense"
+            },
+            {
+              "id": "c-b",
+              "kind": "expense"
+            },
+            {
+              "id": "c-c",
+              "kind": "expense"
+            }
+          ],
+          "fixedCategoryIds": [],
+          "transactions": [
+            {
+              "categoryId": "c-c",
+              "amount": -500,
+              "date": "2026-09-10"
+            },
+            {
+              "categoryId": "c-a",
+              "amount": -500,
+              "date": "2026-09-10"
+            },
+            {
+              "categoryId": "c-b",
+              "amount": -900,
+              "date": "2026-09-10"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "months": 1,
+        "total": 1900,
+        "fixed": 0,
+        "variable": 1900,
+        "categories": [
+          {
+            "categoryId": "c-b",
+            "average": 900,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-a",
+            "average": 500,
+            "type": "variable"
+          },
+          {
+            "categoryId": "c-c",
+            "average": 500,
+            "type": "variable"
+          }
+        ]
       }
     }
   ]

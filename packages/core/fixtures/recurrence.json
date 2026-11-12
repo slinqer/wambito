@@ -168,6 +168,76 @@
         "2027-02"
       ],
       "expected": ["2027-02-28"]
+    },
+    {
+      "name": "yearly Feb 29 in a leap year",
+      "input": [
+        {
+          "frequency": "yearly",
+          "dayOfMonth": 29,
+          "monthOfYear": 2,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    },
+    {
+      "name": "monthly day 29 in a common February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 29,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2027-02"
+      ],
+      "expected": ["2027-02-28"]
+    },
+    {
+      "name": "monthly day 29 in a leap February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 29,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    },
+    {
+      "name": "monthly day 30 in a common February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 30,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2027-02"
+      ],
+      "expected": ["2027-02-28"]
+    },
+    {
+      "name": "monthly day 30 in a leap February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 30,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
     }
   ]
 }
