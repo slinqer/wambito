@@ -9,6 +9,8 @@ COPY deploy/personal/Caddyfile.direct /etc/caddy/Caddyfile.direct
 COPY deploy/personal/routes.caddy /etc/caddy/routes.caddy
 # /.well-known/assetlinks.json is filled from ANDROID_CERT_SHA256 each time the container starts.
 COPY deploy/personal/assetlinks.json.template /etc/caddy/assetlinks.json.template
+# /.well-known/apple-app-site-association (iOS Universal Links and passkeys), from IOS_TEAM_ID.
+COPY deploy/personal/apple-app-site-association.template /etc/caddy/apple-app-site-association.template
 COPY deploy/personal/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 COPY apps/web/build-personal/client /srv
 ENTRYPOINT ["/usr/local/bin/web-entrypoint.sh"]

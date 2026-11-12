@@ -8,6 +8,7 @@ import '../capture_auto/capture_platform.dart';
 import '../home/home_cache.dart';
 import '../home/widget_sync.dart';
 import '../offline/pending_saves.dart';
+import '../storage/secure_storage.dart';
 import 'auth_api.dart';
 import 'client.dart';
 import 'device.dart';
@@ -48,7 +49,7 @@ class StoredSession {
 /// The session token in `flutter_secure_storage`, which encrypts it with a key kept in the Android
 /// Keystore (spec section 6.3).
 class SessionStore {
-  SessionStore([FlutterSecureStorage storage = const FlutterSecureStorage()]) : _storage = storage;
+  SessionStore([FlutterSecureStorage storage = appSecureStorage]) : _storage = storage;
 
   static const tokenKey = 'session.token';
   static const guestKey = 'session.guest';
@@ -169,6 +170,8 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<StoredSession?> _restore() async {
+    // Before the first read: items kept with the old accessibility are rewritten (iOS only).
+    await migrateKeychainAccessibility(appSecureStorage, backgroundReadableKeys);
     final stored = await _store.read();
     state = stored == null ? SessionState.signedOut : SessionState.signedIn(stored);
     return stored;

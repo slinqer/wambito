@@ -91,6 +91,15 @@ handle /.well-known/assetlinks.json {
 	file_server
 }
 
+# --- iOS Universal Links and passkeys: the app's team id and bundle id. Written when the container
+# starts (web-entrypoint.sh, from IOS_TEAM_ID); empty lists when none is set, never a 404. Apple
+# fetches it without redirects and wants JSON, though the path has no extension.
+handle /.well-known/apple-app-site-association {
+	header Content-Type "application/json"
+	header Cache-Control "no-cache"
+	file_server
+}
+
 # --- The landing, roadmap, automatic capture page, privacy policy and account deletion page live on their own site: send visitors there (same path and query).
 # A temporary redirect, so the landing can move without browsers remembering the old answer.
 @pages path / /en /en/ /it /it/ /pt /pt/ /roadmap /roadmap/ /en/roadmap /en/roadmap/ /it/roadmap /it/roadmap/ /pt/roadmap /pt/roadmap/ /automatic-capture /automatic-capture/ /en/automatic-capture /en/automatic-capture/ /it/automatic-capture /it/automatic-capture/ /pt/automatic-capture /pt/automatic-capture/ /privacy /privacy/ /delete-account /delete-account/ /en/privacy /en/privacy/ /en/delete-account /en/delete-account/ /it/privacy /it/privacy/ /it/delete-account /it/delete-account/ /pt/privacy /pt/privacy/ /pt/delete-account /pt/delete-account/

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,7 +45,10 @@ final noticePromptProvider = Provider<NoticePrompt>((ref) {
       children: [
         _NoticeQuestion(
           why: switch (reason) {
-            NoticeReason.due => l10n.noticeAskDue,
+            NoticeReason.due =>
+              defaultTargetPlatform == TargetPlatform.iOS
+                  ? l10n.noticeAskDueIos
+                  : l10n.noticeAskDue,
             NoticeReason.guest => l10n.noticeAskGuest,
           },
           allowLabel: l10n.noticeAskAllow,

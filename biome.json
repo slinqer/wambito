@@ -10,7 +10,8 @@
       "!apps/web/app/api/schema.d.ts",
       "!apps/mcp/src/api/schema.d.ts",
       "!apps/web/build",
-      "!**/.claude"
+      "!**/.claude",
+      "!apps/mobile/ios/**/*.xcassets/**"
     ]
   },
   "css": { "parser": { "tailwindDirectives": true } },

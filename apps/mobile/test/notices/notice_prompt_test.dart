@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +70,19 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('notices.askWhy'))).data,
       'Así Wambito puede avisarte si pasan 45 días sin abrirlo y tu cuenta no tiene correo, antes de que se borren tus datos.',
     );
+  });
+
+  testWidgets('on iOS, the sentence says around 9:00', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await pump(tester);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('notices.askWhy'))).data,
+        'Así Wambito puede avisarte hacia las 9:00 los días en que vence un pago recurrente.',
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('in English', (tester) async {

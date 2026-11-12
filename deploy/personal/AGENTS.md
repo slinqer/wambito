@@ -10,7 +10,9 @@ app and proxying), optional cloudflared. Full runbook: `README.md` here; short v
   client IP from `Cf-Connecting-Ip`) + `cloudflared.yml`.
 - Direct (the VPS, `app.wambito.com`): `COMPOSE_FILE=docker-compose.yml:docker-compose.direct.yml`,
   `Caddyfile.direct` (Let's Encrypt, HSTS, client IP = TCP peer), no cloudflared.
-- Both import `routes.caddy`: `/mcp` → mcp, `/api/*` → api, `/.well-known/…`, assets, `/email/*`
+- Both import `routes.caddy`: `/mcp` → mcp, `/api/*` → api, `/.well-known/…` (`assetlinks.json` from
+  `ANDROID_CERT_SHA256`, `apple-app-site-association` from `IOS_TEAM_ID`, both written by
+  `web-entrypoint.sh` at start, never a 404, tested by `test-web-entrypoint.sh`), assets, `/email/*`
   (CORS, for the emails' fonts), pages, the landing paths redirect (302) to `LANDING_URL`.
 
 ## Scripts

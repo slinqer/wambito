@@ -10,7 +10,8 @@
 //   NODE_PATH=/tmp/wambito-icon/node_modules node docs/brand/tools/gen-icon.cjs
 //
 // It writes the SVGs in docs/brand, the Android adaptive icon (vector drawables) and legacy
-// mipmaps, the F-Droid icon, the web favicon.svg/.ico and apple-touch-icon, and the review sheet
+// mipmaps, the F-Droid icon, the web favicon.svg/.ico and apple-touch-icon, the iOS app icon set
+// (apps/mobile/ios, the 1024 light, dark and tinted images its Contents.json lists), and the review sheet
 // docs/brand/wambito-icon-preview.png (quantised with ImageMagick when `magick` is installed).
 // `--svg-only` skips the PNGs. The module also exports the builders (used by the fitting script).
 
@@ -23,6 +24,7 @@ const ROOT = path.resolve(__dirname, "../../..");
 const BRAND = path.join(ROOT, "docs/brand");
 const RES = path.join(ROOT, "apps/mobile/android/app/src/main/res");
 const PUBLIC = path.join(ROOT, "apps/web/public");
+const IOS_ICONS = path.join(ROOT, "apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset");
 
 /** Sampled from the concept (medians of its flat areas). Plum and gold come from tokens.json. */
 const TOKENS = JSON.parse(
@@ -401,6 +403,26 @@ async function renderPngs(files) {
   // Solid, no transparency: iOS rounds the corners itself.
   const touch = path.join(PUBLIC, "apple-touch-icon.png");
   fs.writeFileSync(touch, await shot(iconSvg(P, { square: true }), 180, COLORS.plum));
+  // The iOS app icon set, one image per entry of Contents.json (single size, 1024): the light
+  // icon solid plum without alpha (iOS rounds the corners); the dark one is the coin alone on
+  // transparency (iOS lays its dark background under it); the tinted one is the monochrome
+  // silhouette in white on transparency (iOS tints its luminance).
+  const iosFiles = [];
+  for (const img of JSON.parse(fs.readFileSync(path.join(IOS_ICONS, "Contents.json"), "utf8"))
+    .images) {
+    const px = Math.round(Number.parseFloat(img.size) * Number.parseInt(img.scale ?? "1", 10));
+    const look = img.appearances?.find((a) => a.appearance === "luminosity")?.value ?? "light";
+    const file = path.join(IOS_ICONS, img.filename);
+    if (look === "dark") {
+      fs.writeFileSync(file, await shot(svg(1024, 1024, "Wambito dark", svgPaths(P)), px));
+    } else if (look === "tinted") {
+      const mono = `  <path fill="#FFFFFF" fill-rule="evenodd" d="${monoPath()}"/>\n`;
+      fs.writeFileSync(file, await shot(svg(1024, 1024, "Wambito tinted", mono), px));
+    } else {
+      fs.writeFileSync(file, await shot(iconSvg(P, { square: true }), px, COLORS.plum));
+      iosFiles.push(file);
+    }
+  }
   const sizes = [16, 32, 48];
   const pngs = [];
   for (const size of sizes) pngs.push({ size, data: await shot(icon, size) });
@@ -425,6 +447,21 @@ async function renderPngs(files) {
     "off",
     `PNG24:${touch}`,
   ]);
+  for (const file of iosFiles) {
+    const flat = spawnSync("magick", [
+      file,
+      "-background",
+      COLORS.plum,
+      "-alpha",
+      "remove",
+      "-alpha",
+      "off",
+      `PNG24:${file}`,
+    ]);
+    if (flat.error || flat.status !== 0) {
+      console.warn(`magick failed: ${path.basename(file)} may still carry alpha`);
+    }
+  }
 }
 
 /** The review sheet: each size masked as square, circle and squircle, light and dark, plus the

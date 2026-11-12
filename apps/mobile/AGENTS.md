@@ -1,8 +1,9 @@
-# apps/mobile: the Android app (Flutter, Dart package `wambito`)
+# apps/mobile: the phone app (Flutter, Dart package `wambito`)
 
-Android only, `com.wambito.app`. No Play Services or Firebase (`scripts/check-no-google.sh`);
+Android and iOS, both `com.wambito.app`. No Play Services or Firebase (`scripts/check-no-google.sh`);
 deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 17:
-`docs/mobile/setup.md`. Release and signing: `docs/mobile/release.md`.
+`docs/mobile/setup.md`. Release and signing: `docs/mobile/release.md`; iOS: `docs/mobile/ios.md`.
+iOS is the base only (see "iOS" below): no automatic capture, widgets or voice yet.
 
 ## Dart entry points (`lib/`)
 
@@ -26,7 +27,7 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
-  (`x-wambito-timezone`, `-locale`, `-client: android`); server defaults to `https://app.wambito.com`,
+  (`x-wambito-timezone`, `-locale`, `-client: android` on both phones, the API's word for the app); server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Storage: secure storage for session and settings; widget snapshot JSON under
   `wambito.widget.snapshot` in `HomeWidgetPreferences` (`lib/home/widget_snapshot.dart`).
@@ -92,6 +93,49 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   Vosk's `result`s and `done`; methods `deviceQualifies({minRamBytes?})` (Parakeet asks 5 GiB, else 3), `warmUp`/`isWarm` with `precisePath`/
   `language`, `releaseModels` frees both. `CanaryRecognizer` and `ParakeetRecognizer` are in `src/precise` only. Passkeys: androidx.credentials.
 
+## iOS (`ios/`)
+
+- `ios/Runner/`: one Swift folder per channel, all registered in `AppDelegate.swift`
+  `registerChannels(messenger:)` (called from `didInitializeImplicitFlutterEngine`); names match the
+  Dart constants, as on Android. The app uses a UIScene `SceneDelegate` (a `FlutterSceneDelegate`),
+  so a link arriving on a scene reaches Dart through `LaunchSceneHandler` (in `Launch/`), not
+  through `AppDelegate`.
+  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`); `Haptics/`: `wambito/haptics` (`vibrate`);
+    `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
+    `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
+    (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
+    `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
+    AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `cancelDue`,
+    `scheduleGuest`, `cancelGuest`, `permission`, `requestPermission`), local notices only
+    (`UNUserNotificationCenter`; `KeychainSession` reads the session `flutter_secure_storage` keeps).
+  - Words of the notices: `{es,en,it,pt}.lproj/Notices.strings`, generated from the Android
+    `strings.xml` by `dart run scripts/gen-ios-strings.dart` (CI fails when stale), so both phones say
+    the same words. `InfoPlist.strings` are the permission texts. `PrivacyInfo.xcprivacy` and
+    `Runner.entitlements` (Associated Domains for passkeys and links) live beside them.
+  - Adding a channel: a Swift file per area under `ios/Runner/`, one `private var` and one line in
+    `registerChannels`. The Runner target is not a synchronized folder group: add every new file by
+    hand to `ios/Runner.xcodeproj/project.pbxproj` (file reference, group per area, build file, the
+    Sources or Resources phase), IDs unique (grep first).
+- `ios/WambitoNative/`: Swift package with the logic that needs no UIKit (`NoticeTimes`, `DueToday`,
+  `LaunchLinks`, `ExternalLinks`, `FileTransfer`, `HapticSpec`, `WebAuthnJSON`); the Runner imports
+  it. Put new pure logic here with a test in `Tests/WambitoNativeTests/` (`swift test`); a channel
+  file stays a thin wrapper. Dart twins (`launch_links.dart`, notice times) are pinned by the same
+  cases.
+- Signing: the team id lives only in `ios/Flutter/Signing.xcconfig` (git-ignored; copy
+  `Signing.xcconfig.example`), never in the pbxproj: `scripts/check-ios-signing.sh` (tested by
+  `scripts/test-check-ios-signing.sh`) fails on a team id there or a tracked `Signing.xcconfig`.
+  `ios/ExportOptions.plist` is for the release; `.github/workflows/ios-release.yml` builds on a
+  `mobile-v*` tag and uploads to App Store Connect (`docs/mobile/ios.md`).
+- Native channels on both phones: `scripts/check-channels.sh` (repo root; CI `check`) fails when a
+  channel or method Dart calls is missing from the Kotlin or the Swift side; what one phone cannot
+  have is listed with a reason in `.github/channel-allowlist.txt` (`ios-impossible`, `ios-part-two`,
+  `android-only`).
+- iOS lacks, by design: automatic capture (`wambito/capture`, no API for it), widgets (the setting
+  is hidden on iOS), and voice until part two (`wambito/voice*`). Dart hides them when the channel
+  or platform is absent.
+- `ios/**` is in `analysis_options.yaml`'s excludes (Flutter writes it on every `pub get` once `ios/`
+  exists; keep it committed). Do not run `flutter create` again.
+
 ## Generated
 
 - See root `AGENTS.md` (`lib/api/gen`, `tokens.g.dart`, l10n). `scripts/gen-api.sh` needs root
@@ -106,6 +150,11 @@ deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 1
   parity:fixtures|parity:shots [id]`, `flutter test --update-goldens test/parity`,
   `dart run tool/parity/compose.dart --max 2 [id]`.
 - Kotlin: `cd android && JAVA_HOME=<JDK 17> ./gradlew :app:testDebugUnitTest --console=plain`.
+- iOS (macOS, Xcode): `swift test --package-path ios/WambitoNative`; unsigned build `flutter build ios
+  --release --no-codesign`; `scripts/check-ios-signing.sh`, `scripts/test-check-ios-signing.sh`;
+  `dart run scripts/gen-ios-strings.dart` after changing a notice string; `../../scripts/check-channels.sh`.
+  CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
+  `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
   `node tool/store_shots/compose.cjs`.

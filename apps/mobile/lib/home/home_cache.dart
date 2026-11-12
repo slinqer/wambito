@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/gen/wambito_api.dart';
 import '../api/session.dart';
+import '../storage/secure_storage.dart';
 
 /// Where the cache is kept: one string. The app uses `flutter_secure_storage` (app-private, and
 /// encrypted with a Keystore key, like the session token); tests use memory.
@@ -17,7 +18,7 @@ abstract interface class HomeCacheStore {
 
 /// [HomeCacheStore] over `flutter_secure_storage`.
 class SecureHomeCacheStore implements HomeCacheStore {
-  const SecureHomeCacheStore([this._storage = const FlutterSecureStorage()]);
+  const SecureHomeCacheStore([this._storage = appSecureStorage]);
 
   static const key = 'home.cache';
 

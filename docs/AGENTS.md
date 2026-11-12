@@ -11,7 +11,9 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   chosen concept, `wambito-icon.svg` (master, 1024), `-foreground`/`-monochrome` (Android adaptive,
   108 dp), `wambito-logo.svg` and `-logo-dark.svg` (wordmark as outlines), `wambito-icon-preview.png`.
   `docs/brand/tools/gen-icon.cjs` holds the one geometry and writes all of them plus the icon PNGs
-  (`mipmap-*`, F-Droid `icon.png`, web `favicon.ico`/`apple-touch-icon.png`) and
+  (`mipmap-*`, F-Droid `icon.png`, web `favicon.ico`/`apple-touch-icon.png`, the iOS
+  `AppIcon.appiconset`: the 1024 light icon solid plum without alpha, the dark one on transparency,
+  the tinted one the monochrome silhouette in white) and
   `drawable/ic_launcher_{foreground,monochrome}.xml`; never hand-edit those (usage in its header).
   `docs/brand/tools/gen-email-images.cjs` writes the emails' `apps/web/public/email/*` (Wambi,
   the wordmark day/night, the fonts) from the landing's sprite and Fredoka; a changed image needs
@@ -37,7 +39,8 @@ Human docs. Live docs are kept current; `superpowers/` is history.
 - `docs/mobile/`: `setup.md` (toolchain, JDK 17, emulator, tests), `release.md` (signing, APK
   build; the founder copies its commands), `parity.md` (web/app visual parity ledger), `fdroid.md`
   (how Wambito is built on F-Droid), `play.md` (Google Play: account, Play App Signing, the Console
-  forms' answers, each release).
+  forms' answers, each release), `ios.md` (App Store Connect: App ID, certificate, API key, the
+  `app-store` secrets, TestFlight from a `mobile-v*` tag).
 
 ## History: `docs/superpowers/` (read only when needed, never edit after the fact)
 

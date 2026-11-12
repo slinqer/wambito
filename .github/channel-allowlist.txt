@@ -1,0 +1,12 @@
+# Channels that need not exist on both phones, checked by scripts/check-channels.sh.
+# One entry per line: `<channel>  # <reason>`. Lines starting with # are comments. The guard fails
+# on a line with no reason or one not listed here.
+#
+# Reasons:
+#   ios-impossible  iOS has no API for it (notification capture).
+#   ios-part-two    iOS gets it in a later part of the iOS plan (voice).
+#   android-only    debug test hooks that exist on Android only.
+wambito/capture  # ios-impossible
+wambito/voice  # ios-part-two
+wambito/voice/events  # ios-part-two
+wambito/test  # android-only

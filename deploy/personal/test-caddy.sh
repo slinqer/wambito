@@ -86,6 +86,8 @@ printf '<!doctype html><title>index</title>\n' >"$tmp/srv/index.html"
 printf '<!doctype html><title>app</title>\n' >"$tmp/srv/__spa-fallback.html"
 mkdir -p "$tmp/srv/email/fonts"
 printf 'font\n' >"$tmp/srv/email/fonts/f.woff2"
+mkdir -p "$tmp/srv/.well-known"
+printf '{"applinks":{"details":[]},"webcredentials":{"apps":[]}}\n' >"$tmp/srv/.well-known/apple-app-site-association"
 
 upstream="caddytest-upstream-$id"
 containers="$containers $upstream"
@@ -176,6 +178,9 @@ cases_tunnel() {
     "$(curl_web -I http://web:80/email/fonts/f.woff2 | header_of Access-Control-Allow-Origin)"
   check "tunnel: email files cached a day" "public, max-age=86400" \
     "$(curl_web -I http://web:80/email/fonts/f.woff2 | header_of Cache-Control)"
+  # Apple reads the association file as JSON though its name has no extension.
+  check "tunnel: apple-app-site-association is JSON" "200 application/json" \
+    "$(curl_web -o /dev/null -w '%{http_code} %{content_type}' http://web:80/.well-known/apple-app-site-association)"
   check "tunnel: schema not public" 404 \
     "$(curl_web -o /dev/null -w '%{http_code}' http://web:80/api/openapi.json)"
   check "tunnel: landing redirect" "302 $LANDING_URL/pt?x=1" \
@@ -260,6 +265,8 @@ cases_direct() {
   check "direct: HSTS" "max-age=31536000" \
     "$(curl_app -I "$app/sign-in" | header_of Strict-Transport-Security)"
   check "direct: the app over HTTPS" 200 "$(curl_app -o /dev/null -w '%{http_code}' "$app/sign-in")"
+  check "direct: apple-app-site-association is JSON" "200 application/json" \
+    "$(curl_app -o /dev/null -w '%{http_code} %{content_type}' "$app/.well-known/apple-app-site-association")"
   check "direct: schema not public" 404 \
     "$(curl_app -o /dev/null -w '%{http_code}' "$app/api/openapi.json")"
   check "direct: landing redirect" "302 $LANDING_URL/pt?x=1" \

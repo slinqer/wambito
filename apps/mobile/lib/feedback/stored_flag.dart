@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../storage/secure_storage.dart';
+
 /// Where one on/off setting is kept. The app uses `flutter_secure_storage` (already in the app for
 /// the session, so no new dependency); tests use memory.
 abstract interface class FlagStore {
@@ -15,7 +17,7 @@ abstract interface class FlagStore {
 }
 
 class SecureFlagStore implements FlagStore {
-  const SecureFlagStore(this.key, [this._storage = const FlutterSecureStorage()]);
+  const SecureFlagStore(this.key, [this._storage = appSecureStorage]);
 
   final String key;
   final FlutterSecureStorage _storage;

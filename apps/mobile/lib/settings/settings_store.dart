@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../storage/secure_storage.dart';
+
 /// Where the app's keyed text settings are kept: the server URL, the theme and the language.
 /// The app uses `flutter_secure_storage` (already in the app for the session, so no new
 /// dependency); tests use memory.
@@ -11,7 +13,7 @@ abstract interface class SettingsStore {
 }
 
 class SecureSettingsStore implements SettingsStore {
-  const SecureSettingsStore([this._storage = const FlutterSecureStorage()]);
+  const SecureSettingsStore([this._storage = appSecureStorage]);
 
   final FlutterSecureStorage _storage;
 

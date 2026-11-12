@@ -12,6 +12,7 @@ import '../capture/capture_repository.dart';
 import '../home/home_cache.dart' show sessionOwnerOf;
 import '../home/home_controller.dart';
 import '../home/home_repository.dart';
+import '../storage/secure_storage.dart';
 
 /// Where the queue is kept: one string. The app uses `flutter_secure_storage`, like the home
 /// cache; tests use memory.
@@ -23,7 +24,7 @@ abstract interface class PendingSavesStore {
 
 /// [PendingSavesStore] over `flutter_secure_storage`.
 class SecurePendingSavesStore implements PendingSavesStore {
-  const SecurePendingSavesStore([this._storage = const FlutterSecureStorage()]);
+  const SecurePendingSavesStore([this._storage = appSecureStorage]);
 
   static const key = 'saves.pending';
 

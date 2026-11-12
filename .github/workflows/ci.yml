@@ -25,6 +25,10 @@ jobs:
       - run: scripts/check-old-name.sh
       # The guard's own test: each allowlist reason must be one the guard knows.
       - run: scripts/test-check-old-name.sh
+      # Every native channel and method the Dart code calls exists on both phones (Kotlin and Swift),
+      # unless .github/channel-allowlist.txt says why not.
+      - run: scripts/check-channels.sh
+      - run: scripts/test-check-channels.sh
       # The Chromium install script's own test (stub install commands).
       - run: scripts/test-ci-install-chromium.sh
       - run: pnpm lint
@@ -56,6 +60,8 @@ jobs:
       # The unit installs (wambito-* units, the old ones stopped and removed first), against stub
       # sudo, systemctl and launchctl and a temporary unit folder.
       - run: deploy/personal/test-install-units.sh
+      # The web container's start-up files (/.well-known/assetlinks.json and apple-app-site-association).
+      - run: deploy/personal/test-web-entrypoint.sh
       # The web container's Caddy config (client address to the API and MCP, routes), in Docker.
       - run: deploy/personal/test-caddy.sh
       # The personal install's two ways (tunnel by default, direct with COMPOSE_FILE): compose files,
@@ -226,6 +232,14 @@ jobs:
             echo "::error::lib/theme/tokens.g.dart is stale: run 'dart run scripts/gen-tokens.dart' in apps/mobile and commit it."
             exit 1
           fi
+      - name: ios/Runner/*.lproj/Notices.strings is up to date
+        run: |
+          dart run scripts/gen-ios-strings.dart
+          if [ -n "$(git status --porcelain -- ios/Runner/es.lproj/Notices.strings ios/Runner/en.lproj/Notices.strings ios/Runner/it.lproj/Notices.strings ios/Runner/pt.lproj/Notices.strings)" ]; then
+            git diff -- ios/Runner
+            echo "::error::ios/Runner/*.lproj/Notices.strings is stale: run 'dart run scripts/gen-ios-strings.dart' in apps/mobile and commit it."
+            exit 1
+          fi
       - name: lib/api/gen is up to date
         run: |
           scripts/gen-api.sh
@@ -252,6 +266,40 @@ jobs:
       - run: scripts/test-fdroid-checks.sh
       - run: scripts/check-fdroid-recipe.sh
       - run: scripts/check-fdroid-lock.sh
+
+  # The iOS app (docs/mobile/ios.md): the signing guard, the Swift package's tests and an unsigned
+  # release build. Same filter as the Android jobs, so it is skipped when nothing it depends on
+  # changed.
+  ios:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    concurrency:
+      group: ios-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the pinned Flutter version
+        id: flutter-version
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: The signing guard catches a team id
+        run: scripts/test-check-ios-signing.sh
+      - name: No team id in the iOS project
+        run: scripts/check-ios-signing.sh
+      - name: Swift package tests
+        run: swift test --package-path ios/WambitoNative
+      - name: Release build without signing
+        run: flutter build ios --release --no-codesign
 
   # The Android app's builds, beside the quick checks above (each took as long as the other, one
   # after the other): no Google dependencies, the debug build and the Kotlin tests, and the release

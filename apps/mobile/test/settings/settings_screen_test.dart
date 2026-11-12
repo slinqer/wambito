@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -265,6 +266,52 @@ void main() {
       await _tap(tester, 'settings.vibration');
       expect(env.container.read(vibrationEnabledProvider), isFalse);
       expect(env.flags['setting.vibration']?.value, isFalse);
+    });
+
+    testWidgets('the due notice hint gives the exact hour on Android', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSettingsApp(tester, location: '/settings');
+      await _scrollTo(tester, 'settings.dueNotice');
+      expect(
+        tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
+        'A las 9:00, un aviso con los pagos recurrentes que vencen hoy.',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('the due notice hint says around 9:00 on iOS', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final handle = tester.ensureSemantics();
+        await pumpSettingsApp(tester, location: '/settings');
+        await _scrollTo(tester, 'settings.dueNotice');
+        expect(
+          tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
+          'Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. '
+          'iOS decide la hora exacta.',
+        );
+        handle.dispose();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('the widget\'s amount switch is Android\'s, and iOS has none', (tester) async {
+      await pumpSettingsApp(tester, location: '/settings');
+      await _scrollTo(tester, 'settings.guestNotice');
+      expect(find.byKey(const Key('settings.hideAmount')), findsOneWidget);
+    });
+
+    testWidgets('on iOS there is no widget setting', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await pumpSettingsApp(tester, location: '/settings');
+        await _scrollTo(tester, 'settings.guestNotice');
+        expect(find.byKey(const Key('settings.hideAmount')), findsNothing);
+        expect(find.text('Ocultar el monto en el widget'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
