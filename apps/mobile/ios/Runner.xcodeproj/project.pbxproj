@@ -35,6 +35,9 @@
 		B7C8D9E0F1A2B3C4000000C3 /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000C2 /* VoiceRecorder.swift */; };
 		B7C8D9E0F1A2B3C4000000C5 /* PreciseRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000C4 /* PreciseRecognizer.swift */; };
 		B7C8D9E0F1A2B3C4000000C7 /* VoiceRun.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000C6 /* VoiceRun.swift */; };
+		B7C8D9E0F1A2B3C4000000D1 /* VoiceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000D0 /* VoiceModelTests.swift */; };
+		B7C8D9E0F1A2B3C4000000D3 /* voice-es.wav in Resources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000D2 /* voice-es.wav */; };
+		B7C8D9E0F1A2B3C4000000D5 /* voice-pt.wav in Resources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000D4 /* voice-pt.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +106,9 @@
 		B7C8D9E0F1A2B3C4000000C2 /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000000C4 /* PreciseRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreciseRecognizer.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000000C6 /* VoiceRun.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRun.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4000000D0 /* VoiceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModelTests.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4000000D2 /* voice-es.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "voice-es.wav"; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4000000D4 /* voice-pt.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "voice-pt.wav"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,6 +199,8 @@
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
+				B7C8D9E0F1A2B3C4000000D0 /* VoiceModelTests.swift */,
+				B7C8D9E0F1A2B3C4000000D6 /* Fixtures */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -254,6 +262,15 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		B7C8D9E0F1A2B3C4000000D6 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C4000000D2 /* voice-es.wav */,
+				B7C8D9E0F1A2B3C4000000D4 /* voice-pt.wav */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -352,6 +369,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B7C8D9E0F1A2B3C4000000D3 /* voice-es.wav in Resources */,
+				B7C8D9E0F1A2B3C4000000D5 /* voice-pt.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -426,6 +445,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */,
+				B7C8D9E0F1A2B3C4000000D1 /* VoiceModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -603,6 +623,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -620,6 +648,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -635,6 +671,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
