@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'entry/passkey_offer_page.dart';
 import 'entry/entry_screen.dart';
 import 'entry/verify_link_screen.dart';
 import 'budgets/category_detail_screen.dart';
+import 'debug/prf_probe_screen.dart';
 import 'home/home_screen.dart';
 import 'import/import_screen.dart';
 import 'insights/insights_screen.dart';
@@ -154,6 +156,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: _offerPath, builder: (context, state) => const PasskeyOfferPage()),
+      // The passkey PRF probe: debug builds only.
+      if (kDebugMode)
+        GoRoute(path: '/debug/prf', builder: (context, state) => const PrfProbeScreen()),
       GoRoute(
         path: '/auth/verify',
         builder: (context, state) => VerifyLinkScreen(

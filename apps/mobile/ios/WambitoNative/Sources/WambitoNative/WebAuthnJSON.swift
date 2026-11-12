@@ -16,6 +16,8 @@ public enum WebAuthnJSON {
         /// Empty when the request names no credential (any passkey for the site may answer).
         public let allowCredentialIds: [Data]
         public let userVerification: String?
+        /// The PRF salt (`extensions.prf.eval.first`) when the request asks for the passkey's PRF.
+        public let prfInput: Data?
     }
 
     /// The options for creating a passkey.
@@ -29,6 +31,8 @@ public enum WebAuthnJSON {
         public let userVerification: String
         /// `none`, `indirect`, `direct` or `enterprise`; `none` when the request does not say.
         public let attestation: String
+        /// The PRF salt (`extensions.prf.eval.first`) when the request asks for the passkey's PRF.
+        public let prfInput: Data?
     }
 
     public static func parseAssertion(_ json: String) throws -> AssertionRequest {
@@ -37,7 +41,8 @@ public enum WebAuthnJSON {
             challenge: try bytes(object["challenge"], "challenge"),
             rpId: try string(object["rpId"], "rpId"),
             allowCredentialIds: try credentialIds(object["allowCredentials"]),
-            userVerification: object["userVerification"] as? String)
+            userVerification: object["userVerification"] as? String,
+            prfInput: try prfInput(object["extensions"]))
     }
 
     public static func parseRegistration(_ json: String) throws -> RegistrationRequest {
@@ -52,12 +57,15 @@ public enum WebAuthnJSON {
             userId: try bytes(user["id"], "user.id"),
             excludeCredentialIds: try credentialIds(object["excludeCredentials"]),
             userVerification: selection?["userVerification"] as? String ?? "preferred",
-            attestation: object["attestation"] as? String ?? "none")
+            attestation: object["attestation"] as? String ?? "none",
+            prfInput: try prfInput(object["extensions"]))
     }
 
     /// The signed-in credential, as the API's verification wants it. `userHandle` is left out when nil.
+    /// `prfOutput` (the passkey's PRF) goes to `clientExtensionResults.prf.results.first`, as in a browser.
     public static func assertionResponse(
-        credentialId: Data, clientDataJSON: Data, authenticatorData: Data, signature: Data, userHandle: Data?
+        credentialId: Data, clientDataJSON: Data, authenticatorData: Data, signature: Data, userHandle: Data?,
+        prfOutput: Data? = nil
     ) -> String {
         var response: [String: Any] = [
             "clientDataJSON": base64url(clientDataJSON),
@@ -65,18 +73,20 @@ public enum WebAuthnJSON {
             "signature": base64url(signature),
         ]
         if let userHandle { response["userHandle"] = base64url(userHandle) }
-        return serialize(credential(credentialId, response))
+        return serialize(credential(credentialId, response, prf(enabled: false, output: prfOutput)))
     }
 
-    /// The new credential, as the API's verification wants it.
+    /// The new credential, as the API's verification wants it. `prfEnabled` says the passkey supports
+    /// the PRF (`prf.enabled`); `prfOutput` is its PRF when the registration already evaluated it.
     public static func registrationResponse(
-        credentialId: Data, clientDataJSON: Data, attestationObject: Data
+        credentialId: Data, clientDataJSON: Data, attestationObject: Data,
+        prfEnabled: Bool = false, prfOutput: Data? = nil
     ) -> String {
         serialize(credential(credentialId, [
             "clientDataJSON": base64url(clientDataJSON),
             "attestationObject": base64url(attestationObject),
             "transports": ["internal", "hybrid"],
-        ]))
+        ], prf(enabled: prfEnabled, output: prfOutput)))
     }
 
     /// Base64url without padding (RFC 4648 section 5), WebAuthn's byte encoding.
@@ -104,13 +114,30 @@ public enum WebAuthnJSON {
 
     // MARK: - Private
 
-    private static func credential(_ id: Data, _ response: [String: Any]) -> [String: Any] {
+    /// `clientExtensionResults`: empty without a PRF, as a browser without the extension.
+    private static func prf(enabled: Bool, output: Data?) -> [String: Any] {
+        var prf: [String: Any] = [:]
+        if enabled { prf["enabled"] = true }
+        if let output { prf["results"] = ["first": base64url(output)] }
+        return prf.isEmpty ? [:] : ["prf": prf]
+    }
+
+    /// `extensions.prf.eval.first`, the PRF salt; nil when absent, an error when it is not base64url.
+    private static func prfInput(_ extensions: Any?) throws -> Data? {
+        let eval = ((extensions as? [String: Any])?["prf"] as? [String: Any])?["eval"] as? [String: Any]
+        guard let first = eval?["first"] else { return nil }
+        return try bytes(first, "extensions.prf.eval.first")
+    }
+
+    private static func credential(
+        _ id: Data, _ response: [String: Any], _ extensionResults: [String: Any]
+    ) -> [String: Any] {
         [
             "id": base64url(id),
             "rawId": base64url(id),
             "type": "public-key",
             "authenticatorAttachment": "platform",
-            "clientExtensionResults": [String: Any](),
+            "clientExtensionResults": extensionResults,
             "response": response,
         ]
     }
