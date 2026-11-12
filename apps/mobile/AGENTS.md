@@ -38,6 +38,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   the add sheet's edit flow, whose save adds `needsReview: false` (`TransactionPatch.confirming`) so it
   confirms and teaches in one PATCH. Rows carry the mark "por revisar · de Revolut" (`reviewMarkOf`).
   Tests fake the server with `test/review/fakes.dart` (`pumpHome`/`pumpSettingsApp` override it).
+- `lib/crypto/`: the Dart port of `packages/crypto`, one file per TS file (`crypto.dart` exports them), on
+  `cryptography` (pure Dart in tests) and `cryptography_flutter` (native, registers itself). The device private
+  key is raw 32 bytes. `test/crypto/vectors_test.dart` must pass `packages/crypto/test-vectors.json`
+  byte for byte; a format change needs a new `enc_v` and vectors on both sides. `prfSalt` lives in `wraps.dart`.
 - `lib/local/`: the phone's end-to-end encryption, each file the twin of one in `apps/web/app/local/`
   (`prf.dart` = `prf.ts`: the passkey PRF over the `wambito/passkeys` channel, on iOS 18+ and Android).
   `lib/debug/prf_probe_screen.dart` is `/debug/prf`, registered only when `kDebugMode`.

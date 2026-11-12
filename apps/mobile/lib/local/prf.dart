@@ -3,19 +3,15 @@ import 'dart:typed_data';
 
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
+import '../crypto/wraps.dart' show prfSalt;
 import 'keys_error.dart';
 
-/// A passkey's PRF (WebAuthn `prf` extension): the 32 bytes a passkey gives for [prfSalt], which
-/// open that passkey's wrap of DK. Twin of apps/web/app/local/prf.ts. They are never stored.
+/// A passkey's PRF (WebAuthn `prf` extension): the 32 bytes a passkey gives for `prfSalt`
+/// (lib/crypto/wraps.dart, the one source), which open that passkey's wrap of DK. Twin of
+/// apps/web/app/local/prf.ts. They are never stored.
 ///
 /// Providers differ: some return `prf: {}`, and a registration may return `prf: {enabled: true}`
 /// without results (the PRF then needs a second touch).
-
-/// SHA-256("wambito/v1/prf"): the same salt for every passkey (`PRF_SALT` in packages/crypto).
-final Uint8List prfSalt = Uint8List.fromList([
-  for (var i = 0; i < _saltHex.length; i += 2) int.parse(_saltHex.substring(i, i + 2), radix: 16),
-]);
-const _saltHex = '999d11fd4d3213d08d6d21fd1e08fa663b32f6c21c4d60374015461bfcfdbedb';
 
 /// The credential that was touched (base64url, as Better Auth stores `credentialID`) and its PRF.
 class PasskeyPrf {
@@ -36,7 +32,7 @@ Uint8List? _fromB64url(Object? value) {
   }
 }
 
-/// The WebAuthn extension input: evaluate the PRF at [prfSalt], as the request JSON carries it.
+/// The WebAuthn extension input: evaluate the PRF at `prfSalt`, as the request JSON carries it.
 Map<String, Object?> prfExtension() => {
   'prf': {
     'eval': {'first': _b64url(prfSalt)},

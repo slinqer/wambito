@@ -297,6 +297,11 @@
       "license": "Apache-2.0"
     },
     {
+      "id": "androidx.security:security-crypto",
+      "version": "1.1.0",
+      "license": "Apache-2.0"
+    },
+    {
       "id": "androidx.sqlite:sqlite",
       "version": "2.5.0",
       "license": "Apache-2.0"

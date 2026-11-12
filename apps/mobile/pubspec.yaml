@@ -23,6 +23,14 @@ dependencies:
   # SHA-256 of the session token, which binds the home cache to its session (lib/home/home_cache.dart).
   # BSD-3-Clause, from the Dart team; already in the app through other packages.
   crypto: 3.0.7
+  # End-to-end encryption (lib/crypto, the Dart port of packages/crypto): AES-256-GCM, HKDF,
+  # HMAC, SHA-256 and X25519. Apache-2.0, pure Dart; the tests run on that implementation.
+  cryptography: 2.9.0
+  # Native AES-GCM, HKDF and X25519 for the same API (Android's JCA, Apple's CryptoKit). It
+  # registers itself as a Dart plugin (FlutterCryptography.enable() is deprecated), so
+  # Cryptography.instance is the native one in the app and the pure-Dart one in tests. Apache-2.0.
+  # Native code only, no Play Services.
+  cryptography_flutter: 2.3.4
   dio: 5.11.1
   flutter_riverpod: 3.4.3
   # The session's bearer token, encrypted with a key kept in the Android Keystore (spec section
