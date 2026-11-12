@@ -18,9 +18,13 @@ int parseDecimalToMinor(String input) {
   if (match == null) throw InvalidAmountError(input);
   final whole = match.group(2) ?? '0';
   final fraction = (match.group(3) ?? '').padRight(2, '0');
-  final minor = int.tryParse(whole) == null ? null : int.parse(whole) * 100 + int.parse(fraction);
-  // 2^53 - 1, the safe integer bound the TypeScript holds to.
-  if (minor == null || minor > 9007199254740991) throw InvalidAmountError(input);
+  // 2^53 - 1, the safe integer bound the TypeScript holds to. Dart ints are 64-bit and wrap, so
+  // the whole part is bounded before it is multiplied by 100.
+  const maxSafe = 9007199254740991;
+  final wholeInt = int.tryParse(whole);
+  if (wholeInt == null || wholeInt > maxSafe ~/ 100) throw InvalidAmountError(input);
+  final minor = wholeInt * 100 + int.parse(fraction);
+  if (minor > maxSafe) throw InvalidAmountError(input);
   return match.group(1) == '-' ? -minor : minor;
 }
 
