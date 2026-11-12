@@ -40,6 +40,7 @@ apps/mobile/test/settings/assistants_section_test.dart      # money
 apps/mobile/test/settings/time_money_test.dart              # money
 apps/mobile/test/tooling/android_strings_test.dart          # money
 apps/mobile/test/ui/amount_field_test.dart                  # money
+apps/mobile/ios/WambitoNative/Tests/WambitoNativeTests/LiveDecodeTests.swift  # money
 apps/mobile/fastlane/metadata/android/es-ES/changelogs/*    # money
 apps/mobile/fastlane/metadata/android/es-ES/full_description.txt  # money
 apps/mobile/fastlane/metadata/android/es-419/changelogs/*    # money
