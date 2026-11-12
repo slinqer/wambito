@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -150,8 +152,17 @@ class RawRecord {
   final int keyV;
 }
 
-/// The directory the vault files live in: the app's private files directory.
-Future<String> defaultVaultDirectory() async => (await getApplicationSupportDirectory()).path;
+/// The folder the vault files live in: `vault` in the app's private support folder (Android
+/// `files/vault`). One folder of its own, so the backup rules (Android XML) and the iOS exclusion
+/// cover the file and its SQLite side files (`-journal`, `-wal`, `-shm`) by naming it.
+Future<String> defaultVaultDirectory() async {
+  final dir = Directory(p.join((await getApplicationSupportDirectory()).path, vaultDirectoryName));
+  await dir.create(recursive: true);
+  return dir.path;
+}
+
+/// The vault folder's name under the support folder; `res/xml/backup_rules.xml` names it too.
+const vaultDirectoryName = 'vault';
 
 Future<String> _path(String userId, String? directory) async =>
     p.join(directory ?? await defaultVaultDirectory(), vaultFileName(userId));

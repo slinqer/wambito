@@ -43,6 +43,27 @@ void main() {
   runStoreContract('sqlite', fresh);
 
   group('the outbox', () {
+    test('readOutbox with a limit of zero or less reads nothing', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('A'));
+      expect(await store.readOutbox(0), isEmpty);
+      expect(await store.readOutbox(-1), isEmpty);
+      expect(await store.readOutbox(1), hasLength(1));
+    });
+
+    test('calling the store from inside a transaction throws instead of deadlocking', () async {
+      final store = await fresh();
+      await expectLater(
+        store.transaction((tx) async {
+          await store.list(RecordType.category);
+        }),
+        throwsA(isA<StateError>().having((e) => e.message, 'message', contains('transaction'))),
+      );
+      // The store still works afterwards.
+      await store.put(RecordType.category, 'a', _category('A'));
+      expect(await store.list(RecordType.category), hasLength(1));
+    });
+
     test('adds an entry with every key on create, in the same commit as the record', () async {
       final store = await fresh();
       await store.put(RecordType.category, 'a', _category('A'));

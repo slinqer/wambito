@@ -46,10 +46,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`prf.dart` = `prf.ts`: the passkey PRF over the `wambito/passkeys` channel, on iOS 18+ and Android).
   `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
   run by every store), `db.dart` + `sqlite_store.dart` (`SqliteStore.open(userId)`: the vault, file
-  `wambito-vault-<userId>.db` in the app support directory, one table per record type plus `outbox`,
+  `wambito-vault-<userId>.db` in the `vault` folder of the app support directory (Android `files/vault`), one table per record type plus `outbox`,
   `meta`, `quarantine`; a local write updates record and outbox in one SQLite transaction, all
   operations go through one queue; keys are not in it, they live in secure storage; tests use
-  `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments).
+  `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
+  vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
+  `res/xml/backup_rules.xml` + `data_extraction_rules.xml` (the `vault` folder and the secure storage
+  prefs; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
   `lib/debug/prf_probe_screen.dart` is `/debug/prf`, registered only when `kDebugMode`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
@@ -113,7 +116,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Dart constants, as on Android. The app uses a UIScene `SceneDelegate` (a `FlutterSceneDelegate`),
   so a link arriving on a scene reaches Dart through `LaunchSceneHandler` (in `Launch/`), not
   through `AppDelegate`.
-  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`); `Haptics/`: `wambito/haptics` (`vibrate`);
+  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`); `Haptics/`: `wambito/haptics` (`vibrate`);
     `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);

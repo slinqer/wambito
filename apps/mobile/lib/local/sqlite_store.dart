@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../core/records.dart' show Json;
 import '../crypto/records.dart' show RecordType;
+import 'backup.dart';
 import 'db.dart';
 import 'store.dart';
 
@@ -186,19 +187,29 @@ Future<void> _deleteOutbox(DatabaseExecutor db, String id) =>
 ///
 /// Every operation runs on one in-process queue, so SQLite transactions never overlap (sqflite
 /// transactions must not await foreign async work): do not call the store from inside the
-/// function handed to [transaction]; use the [StoreOps] it gets.
+/// function handed to [transaction]; use the [StoreOps] it gets (a call from there throws a
+/// [StateError]).
 ///
 /// Not ported from the web's store: the BroadcastChannel across tabs and `versionchange` (the phone
 /// has one process), `migrateLegacyKeys` and the `keys` store (the keys live in secure storage).
 class SqliteStore implements FinanceStore {
   SqliteStore._(this._db);
 
-  /// Opens the vault of [userId]. [directory] and [factory] are for tests; the app leaves them out.
+  /// Opens the vault of [userId] and asks [excludeFromBackup] (once, with the vault's folder) to
+  /// keep it out of backups. [directory], [factory] and [excludeFromBackup] are for tests; the app
+  /// leaves them out (a test directory is not excluded unless the test passes a callback).
   static Future<SqliteStore> open(
     String userId, {
     String? directory,
     DatabaseFactory? factory,
-  }) async => SqliteStore._(await openVault(userId, directory: directory, factory: factory));
+    Future<void> Function(String path)? excludeFromBackup,
+  }) async {
+    final dir = directory ?? await defaultVaultDirectory();
+    final exclude = excludeFromBackup ?? (directory == null ? excludeVaultFromBackup : null);
+    // Before the file exists, so even its first bytes are never in a backup.
+    await exclude?.call(dir);
+    return SqliteStore._(await openVault(userId, directory: dir, factory: factory));
+  }
 
   final Database _db;
   final Set<void Function()> _listeners = {};
@@ -214,6 +225,14 @@ class SqliteStore implements FinanceStore {
   }
 
   Future<R> _enqueue<R>(Future<R> Function() job) {
+    if (Zone.current[_inTransaction] == this) {
+      return Future<R>.error(
+        StateError(
+          'The store was called from inside a transaction callback, which would wait for itself '
+          'forever. Use the StoreOps the transaction gives you.',
+        ),
+      );
+    }
     final next = _queue.then((_) {
       _guard();
       return job();
@@ -232,7 +251,9 @@ class SqliteStore implements FinanceStore {
   /// throws, and subscribers hear of it after the commit when it wrote.
   Future<R> _write<R>(Future<R> Function(_Ops ops) fn) => _enqueue(() async {
     final wrote = _Wrote();
-    final result = await _db.transaction((txn) => fn(_Ops(txn, wrote)));
+    final result = await _db.transaction(
+      (txn) => runZoned(() => fn(_Ops(txn, wrote)), zoneValues: {_inTransaction: this}),
+    );
     if (wrote.value) _fire();
     return result;
   });
@@ -281,6 +302,8 @@ class SqliteStore implements FinanceStore {
 
   /// The pending changes, oldest first.
   Future<List<OutboxEntry>> readOutbox(int limit) => _enqueue(() async {
+    // SQLite reads a negative LIMIT as "no limit"; nothing is the safe answer.
+    if (limit <= 0) return <OutboxEntry>[];
     final rows = await _db.query(outboxTable, orderBy: 'seq', limit: limit);
     return rows.map(_entryOf).toList();
   });
@@ -536,6 +559,9 @@ class SqliteStore implements FinanceStore {
     return () => _closedListeners.remove(listener);
   }
 }
+
+/// The zone value that marks code running inside a transaction callback of a store.
+final Object _inTransaction = Object();
 
 class _Wrote {
   bool value = false;
