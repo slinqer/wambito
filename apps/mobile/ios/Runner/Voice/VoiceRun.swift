@@ -6,8 +6,11 @@ import WambitoNative
 /// decodes of the whole buffer so far ([LiveSchedule], [LiveText]) and, when it ends, one final
 /// decode with a 3 s limit.
 ///
-/// Threads: everything of the run's own (state, buffer, schedule) lives on [queue], a serial queue
-/// of its own. Decodes run on [decodeQueue], one serial queue for the whole channel, so the one
+/// Threads: everything of the run's own (state, buffer, schedule) and every start and stop of the
+/// recorder (the audio session and the engine) run on [queue], one serial queue for the whole
+/// channel: the audio session is the process's, so an earlier run's end (`.ambient`, deactivate)
+/// always completes before the next run's begin (`.record`, activate), and two taps are never live
+/// at once. Decodes run on [decodeQueue], one serial queue for the whole channel, so the one
 /// recognizer is never used twice at once, not even by a late final decode of an earlier run; the
 /// model cache loads on a third queue, so `acquire` (which blocks) never waits on its own queue.
 /// Events go through [send], which hops to the main thread and drops them once the run is no longer
@@ -28,7 +31,7 @@ final class VoiceRun {
   private let cache: ModelCache<PreciseRecognizer>
   private let decodeQueue: DispatchQueue
   private let send: ([String: Any]) -> Void
-  private let queue = DispatchQueue(label: "com.wambito.voice.run", qos: .userInitiated)
+  private let queue: DispatchQueue
   private let recorder = VoiceRecorder()
 
   private var state = State.starting
@@ -40,11 +43,12 @@ final class VoiceRun {
 
   init(
     precisePath: String, language: String, cache: ModelCache<PreciseRecognizer>,
-    decodeQueue: DispatchQueue, send: @escaping ([String: Any]) -> Void
+    queue: DispatchQueue, decodeQueue: DispatchQueue, send: @escaping ([String: Any]) -> Void
   ) {
     self.precisePath = precisePath
     self.key = ModelCache<PreciseRecognizer>.key(path: precisePath, language: language)
     self.cache = cache
+    self.queue = queue
     self.decodeQueue = decodeQueue
     self.send = send
   }

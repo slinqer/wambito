@@ -41,3 +41,22 @@ final class VoiceSessionTests: XCTestCase {
     XCTAssertEqual(session.begin(), [.category(record: true), .activate])
   }
 }
+
+final class SessionStepApplyTests: XCTestCase {
+  private struct Refused: Error {}
+
+  func testEveryStepRunsWhenOneFails() {
+    var ran: [SessionStep] = []
+    let failed = SessionStep.applyEach([.category(record: false), .deactivateNotifyingOthers]) { step in
+      ran.append(step)
+      if step == .category(record: false) { throw Refused() }
+    }
+    XCTAssertEqual(ran, [.category(record: false), .deactivateNotifyingOthers])
+    XCTAssertEqual(failed, [.category(record: false)])
+  }
+
+  func testNothingFailsWhenAllRun() {
+    let failed = SessionStep.applyEach([.category(record: true), .activate]) { _ in }
+    XCTAssertEqual(failed, [])
+  }
+}

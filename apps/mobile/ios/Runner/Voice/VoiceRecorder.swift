@@ -14,7 +14,8 @@ enum RecorderError: Error {
 /// it happens once whichever way the recording ends). `AVAudioEngine`'s input tap is converted with
 /// `AVAudioConverter` to 16 kHz mono Float32 and handed on in 40 ms chunks (640 samples).
 ///
-/// [start] and [stop] are called on the run's queue; [onChunk] is called on the audio thread.
+/// [start] and [stop] are called on the channel's one run queue (VoiceRun), never at once;
+/// [onChunk] is called on the audio thread.
 final class VoiceRecorder {
   static let chunkSamples = 640
 
@@ -71,18 +72,24 @@ final class VoiceRecorder {
       tapped = false
     }
     if engine.isRunning { engine.stop() }
-    try? apply(session.end())
+    // Every step on its own: when `.ambient` is refused the session is still deactivated, so
+    // other apps' audio resumes.
+    let audio = AVAudioSession.sharedInstance()
+    SessionStep.applyEach(session.end()) { try Self.apply($0, to: audio) }
   }
 
+  /// Taking the session stops at the first refused step (the start then fails and gives it back).
   private func apply(_ steps: [SessionStep]) throws {
     let audio = AVAudioSession.sharedInstance()
-    for step in steps {
-      switch step {
-      case .category(record: true): try audio.setCategory(.record, mode: .measurement, options: [])
-      case .category(record: false): try audio.setCategory(.ambient, mode: .default, options: [])
-      case .activate: try audio.setActive(true)
-      case .deactivateNotifyingOthers: try audio.setActive(false, options: .notifyOthersOnDeactivation)
-      }
+    for step in steps { try Self.apply(step, to: audio) }
+  }
+
+  private static func apply(_ step: SessionStep, to audio: AVAudioSession) throws {
+    switch step {
+    case .category(record: true): try audio.setCategory(.record, mode: .measurement, options: [])
+    case .category(record: false): try audio.setCategory(.ambient, mode: .default, options: [])
+    case .activate: try audio.setActive(true)
+    case .deactivateNotifyingOthers: try audio.setActive(false, options: .notifyOthersOnDeactivation)
     }
   }
 

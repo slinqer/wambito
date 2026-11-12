@@ -28,6 +28,8 @@ final class VoiceChannel: NSObject, FlutterStreamHandler {
   private let events: FlutterEventChannel
   /// Opens models (and waits for them in `warm`); never used for `acquire`, which blocks.
   private let loadQueue = DispatchQueue(label: "com.wambito.voice.load", qos: .userInitiated)
+  /// Every run's state and every recorder start and stop, of every run, in order (VoiceRun).
+  private let runQueue = DispatchQueue(label: "com.wambito.voice.run", qos: .userInitiated)
   /// Every decode, live or final, of every run: one recognizer, one decode at a time.
   private let decodeQueue = DispatchQueue(label: "com.wambito.voice.decode", qos: .userInitiated)
   private let files = DispatchQueue(label: "com.wambito.voice.files", qos: .utility)
@@ -141,7 +143,7 @@ final class VoiceChannel: NSObject, FlutterStreamHandler {
       return nil
     }
     let run = VoiceRun(
-      precisePath: path, language: language, cache: cache, decodeQueue: decodeQueue,
+      precisePath: path, language: language, cache: cache, queue: runQueue, decodeQueue: decodeQueue,
       send: { [weak self] event in
         DispatchQueue.main.async {
           guard let self, self.session == id else { return }

@@ -8,6 +8,18 @@ public enum SessionStep: Equatable {
   case activate
   /// `setActive(false, options: .notifyOthersOnDeactivation)`: music paused for the recording resumes.
   case deactivateNotifyingOthers
+
+  /// Runs [body] on every step, even after one throws (giving the session back must still
+  /// deactivate it when `.ambient` is refused, or other apps' audio never resumes). Returns the
+  /// steps that threw.
+  @discardableResult
+  public static func applyEach(_ steps: [SessionStep], _ body: (SessionStep) throws -> Void) -> [SessionStep] {
+    var failed: [SessionStep] = []
+    for step in steps {
+      do { try body(step) } catch { failed.append(step) }
+    }
+    return failed
+  }
 }
 
 /// The audio session of one recording, with no AVFoundation: [begin] takes it for recording once,
