@@ -173,6 +173,28 @@ void main() {
     });
   });
 
+  test('a full-text partial after refining stands when the precise pass fails', () {
+    fakeAsync((async) {
+      final heard = <String>[];
+      run(async, heard, () {
+        channel.send(const VoiceEvent.ready());
+        channel.send(const VoiceEvent.partial('almuerzo'));
+        // The native side ended the take itself (no stop from Dart), then sends the last live
+        // decode with its last word.
+        channel.send(const VoiceEvent.refining());
+        channel.send(const VoiceEvent.partial('almuerzo 18 lukas'));
+        async.elapse(const Duration(seconds: 2));
+        // No pause is armed while refining: nothing stops the take again.
+        expect(channel.stops, 0);
+        channel.send(const VoiceEvent.refineFailed('timeout'));
+        channel.send(const VoiceEvent.done());
+        async.flushMicrotasks();
+      });
+      expect(heard.last, 'almuerzo 18 lukas');
+      expect(channel.stops, 0);
+    });
+  });
+
   test('a short sentence with no partial ends with refined', () {
     fakeAsync((async) {
       final heard = <String>[];

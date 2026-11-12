@@ -32,6 +32,17 @@ final class LiveDecodeTests: XCTestCase {
     XCTAssertEqual(LiveText.shown("diec", final: false), "")
   }
 
+  func testFallbackIsTheFullLastDecode() {
+    XCTAssertEqual(
+      LiveText.fallback(lastRaw: " almuerzo 18 lukas ", lastPartial: "almuerzo 18"),
+      "almuerzo 18 lukas")
+  }
+
+  func testNoFallbackWhenNothingNew() {
+    XCTAssertNil(LiveText.fallback(lastRaw: "  ", lastPartial: ""))
+    XCTAssertNil(LiveText.fallback(lastRaw: "almuerzo 18 ", lastPartial: "almuerzo 18"))
+  }
+
   func testMemoryRule() {
     XCTAssertTrue(MemoryRule.qualifies(physical: 3 << 30, minimum: nil))
     XCTAssertFalse(MemoryRule.qualifies(physical: (3 << 30) - 1, minimum: nil))

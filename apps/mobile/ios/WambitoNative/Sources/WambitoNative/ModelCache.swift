@@ -38,6 +38,15 @@ public final class ModelCache<Model: AnyObject> {
     return model == nil ? nil : key
   }
 
+  /// The model for [key] when it is loaded now, else nil; never loads or waits. A run keeps what
+  /// it gets here for as long as it records, so a [drop] meanwhile frees the model only when that
+  /// run lets go (Android's lease).
+  public func current(_ key: String) -> Model? {
+    condition.lock()
+    defer { condition.unlock() }
+    return self.key == key ? model : nil
+  }
+
   /// Loads the model for [key] on the queue, unless it is loaded (or loading) already. [done] gets
   /// true once it is loaded, false when it failed or was dropped or replaced meanwhile.
   public func warm(_ key: String, done: @escaping (Bool) -> Void) {
@@ -71,7 +80,8 @@ public final class ModelCache<Model: AnyObject> {
     }
   }
 
-  /// Forgets the model; a later [acquire] loads it again. A load running now is thrown away.
+  /// Forgets the model; a later [acquire] loads it again. A load running now is thrown away. A
+  /// model a recording still holds is freed when that recording lets go of it.
   public func drop() {
     condition.lock()
     model = nil

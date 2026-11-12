@@ -16,6 +16,11 @@ import WambitoNative
 /// Events go through [send], which hops to the main thread and drops them once the run is no longer
 /// the channel's.
 ///
+/// The run holds the model it decodes with ([model], taken from the cache once loaded) until it
+/// ends, so a memory warning's `drop` while recording neither stops the live decodes nor makes the
+/// final decode load it again under pressure; the model is freed once the run lets go (Android's
+/// lease in `ModelCache.kt`).
+///
 /// Every way out ends the audio session through the recorder's [VoiceSession] (once): a start that
 /// fails, `stop`, the 30 s cap, an interruption, losing the input, `releaseModels`, the app going
 /// to the background, Dart cancelling. Only the first end counts: a second `stop`, or a `stop`
@@ -39,6 +44,11 @@ final class VoiceRun {
   private var schedule = LiveSchedule()
   private var busy = false
   private var lastPartial = ""
+  /// The last live decode's whole text, trimmed, its last word included: sent as a last partial
+  /// when the final decode fails or times out ([LiveText.fallback]).
+  private var lastRaw = ""
+  /// The model this run decodes with, from the cache once loaded; let go when the run ends.
+  private var model: PreciseRecognizer?
   private var observers: [NSObjectProtocol] = []
 
   init(
@@ -99,14 +109,19 @@ final class VoiceRun {
       // The 30 s cap: ends as `stop` would.
       return finish(refine: true)
     }
-    let loaded = cache.loadedKey() == key
-    guard schedule.shouldDecode(samples: buffer.samples.count, busy: busy || !loaded) else { return }
+    if model == nil { model = cache.current(key) }
+    guard let model,
+      schedule.shouldDecode(samples: buffer.samples.count, busy: busy)
+    else { return }
     busy = true
     let samples = buffer.samples
     decodeQueue.async { [self] in
-      let text = cache.acquire(key)?.transcribe(samples) ?? ""
+      let text = model.transcribe(samples)
       queue.async { [self] in
         busy = false
+        // Kept even after the end: a live decode that was running then is the freshest text.
+        let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !raw.isEmpty { lastRaw = raw }
         guard state == .recording else { return }
         let shown = LiveText.shown(text, final: false)
         if shown != lastPartial {
@@ -125,6 +140,9 @@ final class VoiceRun {
     recorder.stop()
     let samples = buffer.samples
     buffer = PcmBuffer()
+    // Let go of the model: the final decode below keeps its own reference until it ends.
+    let held = model
+    model = nil
     if !refine || samples.isEmpty {
       send(["type": "done"])
       return
@@ -134,23 +152,32 @@ final class VoiceRun {
     // is left to finish (the recognizer cannot be interrupted) and its text is dropped.
     let once = AnswerOnce()
     let send = self.send
-    decodeQueue.async { [cache, key] in
-      let text = cache.acquire(key)?.transcribe(samples)
+    decodeQueue.async { [self, cache, key] in
+      let text = (held ?? cache.acquire(key))?.transcribe(samples)
       once.run {
         if let text {
           send(["type": "refined", "text": text])
+          send(["type": "done"])
         } else {
-          send(["type": "refine_failed", "code": "failed"])
+          queue.async { [self] in failed("failed") }
         }
-        send(["type": "done"])
       }
     }
-    queue.asyncAfter(deadline: .now() + Self.finalLimit) {
-      once.run {
-        send(["type": "refine_failed", "code": "timeout"])
-        send(["type": "done"])
-      }
+    queue.asyncAfter(deadline: .now() + Self.finalLimit) { [self] in
+      once.run { failed("timeout") }
     }
+  }
+
+  /// The final decode failed or timed out, on [queue]: the last live decode's whole text goes out
+  /// as a last partial (the partials lack their last word, and Dart keeps the last one), then
+  /// `refine_failed` and `done`.
+  private func failed(_ code: String) {
+    if let full = LiveText.fallback(lastRaw: lastRaw, lastPartial: lastPartial) {
+      lastPartial = full
+      send(["type": "partial", "text": full])
+    }
+    send(["type": "refine_failed", "code": code])
+    send(["type": "done"])
   }
 
   /// An interruption (a call, Siri), a route change that leaves no input, or the engine stopping on

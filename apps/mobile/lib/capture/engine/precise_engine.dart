@@ -11,7 +11,7 @@ import 'vosk_engine.dart' show longestListen, nothingHeardLimit, refineLimit;
 /// side sends live partials (its last word hidden while recording); a pause after the last changed
 /// partial ends the recording, and the precise model rewrites the whole sentence, whose text is the
 /// final one. If the precise pass fails, is blank, or takes over [refineLimit], the last partial
-/// stands. See docs/superpowers/specs/2026-11-12-ios-voice-design.md, section 2.
+/// stands (on a failure the native side first sends the last live decode whole, last word included). See docs/superpowers/specs/2026-11-12-ios-voice-design.md, section 2.
 class PreciseEngine implements SpeechEngine {
   PreciseEngine({required this._channel, required this._models});
 
@@ -128,7 +128,11 @@ class _Session {
         _partial = text;
         _nothing?.cancel();
         _pause?.cancel();
-        _pause = Timer(PreciseEngine.endOfSpeechPause, () => unawaited(stop()));
+        // After `refining` the recording has ended: a partial then is the last live decode's
+        // whole text (sent before a failed final pass), the fallback, never a reason to stop.
+        if (!_refining) {
+          _pause = Timer(PreciseEngine.endOfSpeechPause, () => unawaited(stop()));
+        }
         out.add(text);
       case VoiceRefining():
         _refining = true;

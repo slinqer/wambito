@@ -58,6 +58,8 @@ final class VoiceChannel: NSObject, FlutterStreamHandler {
     }
     events.setStreamHandler(self)
     let center = NotificationCenter.default
+    // Memory pressure forgets the model; a recording keeps the one it holds until it ends, so its
+    // live text goes on and its final decode does not load the model again (VoiceRun).
     observers.append(
       center.addObserver(
         forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
@@ -119,8 +121,8 @@ final class VoiceChannel: NSObject, FlutterStreamHandler {
         }
       }
     case "releaseModels":
-      // A recording ends (done, without the final decode); a decode running now keeps its own
-      // reference to the model, which is freed after it.
+      // A recording ends (done, without the final decode) and lets go of its model; a decode
+      // running now keeps its own reference to it, which is freed after it.
       run?.stop(refine: false)
       cache.drop()
       result(nil)

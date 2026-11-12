@@ -29,6 +29,15 @@ public enum LiveText {
     guard let cut = trimmed.lastIndex(where: { $0.isWhitespace }) else { return "" }
     return String(trimmed[..<cut]).trimmingCharacters(in: .whitespacesAndNewlines)
   }
+
+  /// What to send as a last partial when the final decode fails or times out: the last live
+  /// decode's whole text, last word included ([lastRaw]), so the text that stands is not one word
+  /// short ("almuerzo 18 mil", not "almuerzo 18"). Nil when it is blank or was already sent
+  /// ([lastPartial]).
+  public static func fallback(lastRaw: String, lastPartial: String) -> String? {
+    let full = shown(lastRaw, final: true)
+    return full.isEmpty || full == lastPartial ? nil : full
+  }
 }
 
 /// Which phones may run the on-device voice model.

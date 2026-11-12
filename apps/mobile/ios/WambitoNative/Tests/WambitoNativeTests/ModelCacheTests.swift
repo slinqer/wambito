@@ -100,4 +100,16 @@ final class ModelCacheTests: XCTestCase {
   func testKeyFormat() {
     XCTAssertEqual(ModelCache<Box>.key(path: "/m/canary", language: "es"), "/m/canary#es")
   }
+
+  func testCurrentIsTheLoadedModelWithoutLoading() {
+    let opener = Opener()
+    let cache = cache(opener)
+    XCTAssertNil(cache.current("a#es"))
+    XCTAssertEqual(opener.count, 0)
+    let model = cache.acquire("a#es")
+    XCTAssertTrue(cache.current("a#es") === model)
+    XCTAssertNil(cache.current("b#es"))
+    cache.drop()
+    XCTAssertNil(cache.current("a#es"))
+  }
 }
