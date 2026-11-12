@@ -13,7 +13,7 @@
 #    native file that also contains the quoted name of any of the Dart file's channels.
 #  - Channels listed in the allowlist (default .github/channel-allowlist.txt, or CHANNEL_ALLOWLIST;
 #    one `<channel>  # <reason>` per line) are skipped. A line with no reason, or a reason not in
-#    ios-impossible, ios-part-two, android-only, fails.
+#    ios-impossible, android-only, fails.
 # POSIX sh and POSIX grep/sed only: it runs the same on macOS and Ubuntu.
 set -eu
 
@@ -22,7 +22,7 @@ mobile="${1:-apps/mobile}"
 case "$mobile" in /*) ;; *) mobile="${PWD}/${mobile}" ;; esac
 [ -d "$mobile/lib" ] || mobile="${root}/${1:-apps/mobile}"
 allowlist="${CHANNEL_ALLOWLIST:-$root/.github/channel-allowlist.txt}"
-known_reasons="ios-impossible ios-part-two android-only"
+known_reasons="ios-impossible android-only"
 kotlin="$mobile/android/app/src/main/kotlin"
 swift="$mobile/ios/Runner"
 

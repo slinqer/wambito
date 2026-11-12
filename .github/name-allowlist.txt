@@ -22,6 +22,7 @@ apps/mobile/test/capture/capture_layout_test.dart  # money
 apps/mobile/test/capture/capture_preview_test.dart  # money
 apps/mobile/test/capture/capture_sheet_test.dart  # money
 apps/mobile/test/capture/grammar_test.dart  # money
+apps/mobile/test/capture/precise_engine_test.dart  # money
 apps/mobile/test/capture/parser_helpers_test.dart  # money
 apps/mobile/lib/money/format.dart                           # money
 apps/mobile/test/money/format_test.dart                     # money

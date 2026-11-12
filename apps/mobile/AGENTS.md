@@ -3,7 +3,7 @@
 Android and iOS, both `com.wambito.app`. No Play Services or Firebase (`scripts/check-no-google.sh`);
 deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 17:
 `docs/mobile/setup.md`. Release and signing: `docs/mobile/release.md`; iOS: `docs/mobile/ios.md`.
-iOS is the base only (see "iOS" below): no automatic capture, widgets or voice yet.
+iOS has no automatic capture or widgets (see "iOS" below); its voice is the precise engine only.
 
 ## Dart entry points (`lib/`)
 
@@ -107,7 +107,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
     AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `cancelDue`,
     `scheduleGuest`, `cancelGuest`, `permission`, `requestPermission`), local notices only
-    (`UNUserNotificationCenter`; `KeychainSession` reads the session `flutter_secure_storage` keeps).
+    (`UNUserNotificationCenter`; `KeychainSession` reads the session `flutter_secure_storage` keeps);
+    `Voice/`: `wambito/voice` + `wambito/voice/events`, the same names as Android (`VoiceChannel`;
+    `VoiceRecorder` taps the mic, `PreciseRecognizer` runs Canary/Parakeet, `VoiceRun` is one
+    take; `SherpaOnnx.swift` is k2-fsa's Swift API for the C library, vendored, Apache-2.0). iOS has
+    only the precise model: Dart's `PreciseEngine` (`lib/capture/engine/precise_engine.dart`) is the
+    engine there, `modelStoreProvider` is the precise store, the precise offer and switch are off,
+    voice needs `preciseEligibleProvider`, and the licences list only what iOS ships.
   - Words of the notices: `{es,en,it,pt}.lproj/Notices.strings`, generated from the Android
     `strings.xml` by `dart run scripts/gen-ios-strings.dart` (CI fails when stale), so both phones say
     the same words. `InfoPlist.strings` are the permission texts. `PrivacyInfo.xcprivacy` and
@@ -117,7 +123,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     hand to `ios/Runner.xcodeproj/project.pbxproj` (file reference, group per area, build file, the
     Sources or Resources phase), IDs unique (grep first).
 - `ios/WambitoNative/`: Swift package with the logic that needs no UIKit (`NoticeTimes`, `DueToday`,
-  `LaunchLinks`, `ExternalLinks`, `FileTransfer`, `HapticSpec`, `WebAuthnJSON`); the Runner imports
+  `LaunchLinks`, `ExternalLinks`, `FileTransfer`, `HapticSpec`, `WebAuthnJSON`, and for voice
+  `AudioLevel`, `PcmBuffer`, `LiveSchedule`, `LiveText`, `MemoryRule`, `ModelCache`, `ZipExtract`,
+  `VoiceSession`/`SessionStep`); the Runner imports
   it. Put new pure logic here with a test in `Tests/WambitoNativeTests/` (`swift test`); a channel
   file stays a thin wrapper. Dart twins (`launch_links.dart`, notice times) are pinned by the same
   cases.
@@ -128,11 +136,23 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `mobile-v*` tag and uploads to App Store Connect (`docs/mobile/ios.md`).
 - Native channels on both phones: `scripts/check-channels.sh` (repo root; CI `check`) fails when a
   channel or method Dart calls is missing from the Kotlin or the Swift side; what one phone cannot
-  have is listed with a reason in `.github/channel-allowlist.txt` (`ios-impossible`, `ios-part-two`,
-  `android-only`).
+  have is listed with a reason in `.github/channel-allowlist.txt` (`ios-impossible`, `android-only`).
 - iOS lacks, by design: automatic capture (`wambito/capture`, no API for it), widgets (the setting
-  is hidden on iOS), and voice until part two (`wambito/voice*`). Dart hides them when the channel
+  is hidden on iOS), and Vosk's live voice (iOS has the precise engine only). Dart hides them when the channel
   or platform is absent.
+- sherpa-onnx for iOS: `scripts/build-sherpa-onnx-ios.sh` (macOS, cmake on PATH; run once by hand)
+  builds `sherpa-onnx-ios-2.0.1.zip` with upstream's `build-ios.sh`; it lives in the release
+  `ios-sherpa-onnx-2.0.1`. `scripts/fetch-sherpa-onnx-ios.sh [--from <zip>]` checks its pinned
+  SHA-256 and installs it in `ios/third_party/sherpa-onnx` (git-ignored); run it before any build,
+  `swift test` aside (CI and `ios-release.yml` do). `scripts/test-fetch-sherpa-onnx-ios.sh` (CI)
+  tests it offline. Runner and RunnerTests link through per-SDK `FRAMEWORK_SEARCH_PATHS` into the
+  xcframework slices `ios-arm64` and `ios-arm64_x86_64-simulator`: those names must match what the
+  build script produces. A Run Script phase fails the build naming the fetch script when the folder
+  is missing.
+- Real voice models on iOS (local only, skipped without the variable): from `ios`,
+  `TEST_RUNNER_WAMBITO_VOICE_MODELS=<folder with the unzipped voice-models-v2 Canary and Parakeet>
+  xcodebuild test -workspace Runner.xcworkspace -scheme Runner -destination 'platform=iOS
+  Simulator,name=iPhone 17' -only-testing:RunnerTests/VoiceModelTests`.
 - `ios/**` is in `analysis_options.yaml`'s excludes (Flutter writes it on every `pub get` once `ios/`
   exists; keep it committed). Do not run `flutter create` again.
 
@@ -153,7 +173,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - iOS (macOS, Xcode): `swift test --package-path ios/WambitoNative`; unsigned build `flutter build ios
   --release --no-codesign`; `scripts/check-ios-signing.sh`, `scripts/test-check-ios-signing.sh`;
   `dart run scripts/gen-ios-strings.dart` after changing a notice string; `../../scripts/check-channels.sh`.
-  CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
+  CI's `ios` job fetches sherpa-onnx, runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
