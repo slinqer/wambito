@@ -87,8 +87,9 @@ job in `ci.yml`. The Android side is `release.md`.
   User Content** (notes and categories), **Contact Info, Email Address** (the sign-in email; a guest
   has none) and **Identifiers, User ID** (the account id). The data is stored encrypted end to end;
   say so in the privacy policy link, which is the web app's.
-- **Required-reason APIs.** UserDefaults (reason CA92.1) and file timestamps (reason C617.1) are
-  declared in the same file; no answer is needed in the console.
+- **Required-reason APIs.** UserDefaults (reason CA92.1), file timestamps (reason C617.1) and disk
+  space (reason E174.1: the free space checked before a voice model download) are declared in the
+  same file; no answer is needed in the console.
 
 ## When it fails
 
