@@ -267,8 +267,8 @@ jobs:
       - run: scripts/check-fdroid-recipe.sh
       - run: scripts/check-fdroid-lock.sh
 
-  # The iOS app (docs/mobile/ios.md): the signing guard, the Swift package's tests and an unsigned
-  # release build. Same filter as the Android jobs, so it is skipped when nothing it depends on
+  # The iOS app (docs/mobile/ios.md): the sherpa-onnx fetch, the signing guard, the Swift package's
+  # tests and an unsigned release build. Same filter as the Android jobs, so it is skipped when nothing it depends on
   # changed.
   ios:
     needs: mobile-changes
@@ -292,6 +292,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
+      # The voice runtime (docs/mobile/ios.md): the Runner links it from ios/third_party, which is
+      # git-ignored, so the xcframeworks are installed before `swift test` and the build.
+      - name: The fetch script refuses a bad file
+        run: scripts/test-fetch-sherpa-onnx-ios.sh
+      - name: Fetch sherpa-onnx for iOS
+        run: scripts/fetch-sherpa-onnx-ios.sh
       - name: The signing guard catches a team id
         run: scripts/test-check-ios-signing.sh
       - name: No team id in the iOS project
