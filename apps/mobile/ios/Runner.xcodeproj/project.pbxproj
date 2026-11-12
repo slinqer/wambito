@@ -30,6 +30,7 @@
 		B7C8D9E0F1A2B3C4000000A3 /* KeychainSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000A2 /* KeychainSession.swift */; };
 		B7C8D9E0F1A2B3C400000092 /* Notices.strings in Resources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000091 /* Notices.strings */; };
 		B7C8D9E0F1A2B3C400000061 /* FilesChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000060 /* FilesChannel.swift */; };
+		B7C8D9E0F1A2B3C4000000B1 /* SherpaOnnx.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000B0 /* SherpaOnnx.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		B7C8D9E0F1A2B3C400000095 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Notices.strings; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000096 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Notices.strings; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000060 /* FilesChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesChannel.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4000000B0 /* SherpaOnnx.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SherpaOnnx.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +110,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B7C8D9E0F1A2B3C4000000B2 /* Voice */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C4000000B0 /* SherpaOnnx.swift */,
+			);
+			path = Voice;
+			sourceTree = "<group>";
+		};
 		B7C8D9E0F1A2B3C400000084 /* Notices */ = {
 			isa = PBXGroup;
 			children = (
@@ -227,6 +237,7 @@
 				B7C8D9E0F1A2B3C400000072 /* Passkeys */,
 				B7C8D9E0F1A2B3C400000022 /* Haptics */,
 				B7C8D9E0F1A2B3C400000032 /* Sounds */,
+				B7C8D9E0F1A2B3C4000000B2 /* Voice */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -257,6 +268,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
+				B7C8D9E0F1A2B3C4000000B7 /* Check sherpa-onnx */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
@@ -348,6 +360,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		B7C8D9E0F1A2B3C4000000B7 /* Check sherpa-onnx */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Check sherpa-onnx";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ ! -f \"${SRCROOT}/third_party/sherpa-onnx/SOURCES\" ]; then\n  echo \"error: sherpa-onnx for iOS is missing: run apps/mobile/scripts/fetch-sherpa-onnx-ios.sh\"\n  exit 1\nfi\n";
+		};
 		3B06AD1E1E4923F5004D2608 /* Thin Binary */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -405,6 +432,7 @@
 				B7C8D9E0F1A2B3C400000083 /* NoticePoster.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A1 /* DueTask.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A3 /* KeychainSession.swift in Sources */,
+				B7C8D9E0F1A2B3C4000000B1 /* SherpaOnnx.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);
@@ -528,6 +556,24 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+					"-framework",
+					SherpaOnnxC,
+					"-framework",
+					onnxruntime,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wambito.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -711,6 +757,24 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+					"-framework",
+					SherpaOnnxC,
+					"-framework",
+					onnxruntime,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wambito.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -733,6 +797,24 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+					"-framework",
+					SherpaOnnxC,
+					"-framework",
+					onnxruntime,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wambito.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
