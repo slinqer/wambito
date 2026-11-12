@@ -38,6 +38,11 @@ Uint8List _associatedData(RecordContext ctx) {
   );
 }
 
+/// The JSON is `jsonEncode`'s, which is not byte-identical to JS `JSON.stringify` for doubles like
+/// 1.0 (Dart writes `1.0`), NaN and Infinity (Dart throws, JS writes `null`), integer-like map
+/// keys and lone surrogates. Interop with the web is semantic (each side opens the other's
+/// bodies), not byte for byte; money is an int, so records carry no doubles.
+///
 /// body = nonce (12) || AES-256-GCM ciphertext and tag, over JSON padded with spaces to 64 bytes.
 /// [nonce] is only for test vectors: leave it out so a fresh random one is used.
 Future<Uint8List> sealRecord(

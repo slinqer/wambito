@@ -86,8 +86,8 @@ void main() {
     expect(await code(() => sealToDevice(a.publicKey, ctx, Uint8List(16))), 'bad_input');
   });
 
-  test('a raw private key opens what was sealed to its public key', () async {
-    // Twin of "imports a raw private key": the Dart private key is the raw 32 bytes.
+  test('imports a raw private key (native)', () async {
+    // In Dart the private key is the raw 32 bytes: there is no import step and no native/noble split.
     final raw = filled(32, 11);
     final pub = Uint8List.fromList(
       (await (await X25519().newKeyPairFromSeed(raw)).extractPublicKey()).bytes,
@@ -96,12 +96,29 @@ void main() {
     expect(await openFromDevice(raw, ctx, await sealToDevice(pub, ctx, dk)), dk);
   });
 
-  test('a private key that is not 32 bytes is bad_input', () async {
-    // Twin of "foreign objects are bad_input" (and importDevicePrivateKey(31 bytes)).
+  test('a structured clone of a fallback key still opens a seal; foreign objects are bad_input', () async {
+    // Dart has no clone or noble object: this is the foreign-object case (a key that is not 32 raw
+    // bytes, which also covers importDevicePrivateKey(31 bytes)).
     final a = await generateDeviceKeyPair();
     final sealed = await sealToDevice(a.publicKey, ctx, generateDataKey());
     for (final n in [0, 5, 31, 33]) {
       expect(await code(() => openFromDevice(Uint8List(n), ctx, sealed)), 'bad_input');
     }
+  });
+
+  test('a low-order (all-zero) public key is refused: seal bad_input, open cannot_open', () async {
+    final dk = generateDataKey();
+    final zero = Uint8List(32);
+    expect(await code(() => sealToDevice(zero, ctx, dk)), 'bad_input');
+    // A blob an attacker builds under the all-zero shared secret must not open.
+    final a = await generateDeviceKeyPair();
+    final good = await sealToDevice(a.publicKey, ctx, dk);
+    final forged = Uint8List.fromList([...zero, ...good.sublist(32)]);
+    expect(await code(() => openFromDevice(a.privateKey, ctx, forged)), 'cannot_open');
+    // Also as the approver key of pairing.
+    expect(await code(() => openFromPairing(a.privateKey, ctx, forged, zero)), 'cannot_open');
+    // Another low-order point (the u-coordinate 1) also gives an all-zero secret.
+    final one = Uint8List(32)..[0] = 1;
+    expect(await code(() => sealToDevice(one, ctx, dk)), 'bad_input');
   });
 }

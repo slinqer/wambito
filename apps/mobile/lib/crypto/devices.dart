@@ -39,7 +39,16 @@ Future<Uint8List> _ecdh(Uint8List privateKey, Uint8List publicKey) async {
     keyPair: pair,
     remotePublicKey: SimplePublicKey(publicKey, type: KeyPairType.x25519),
   );
-  return Uint8List.fromList(await shared.extractBytes());
+  final bytes = Uint8List.fromList(await shared.extractBytes());
+  // A low-order public key gives an all-zero secret, which anyone can compute. WebCrypto and
+  // noble both refuse it, so does this (sealToDevice: bad_input, as it wraps
+  // any failure; openFromDevice: cannot_open).
+  var any = 0;
+  for (final b in bytes) {
+    any |= b;
+  }
+  if (any == 0) throw const CryptoError('cannot_open', 'low-order public key');
+  return bytes;
 }
 
 /// Sealed = ephemeral public key (32) || nonce (12) || AES-256-GCM ciphertext and tag. The

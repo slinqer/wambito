@@ -43,6 +43,16 @@ void main() {
   test('has the documented shape and coverage', () {
     expect(vectors['_about'], matches(RegExp('never edit', caseSensitive: false)));
     expect(section('records').length, greaterThanOrEqualTo(3));
+    expect(
+      section('records').any((r) => jsonEncode(r['value']).runes.any((c) => c > 0x7f)),
+      isTrue,
+    );
+    expect(section('records').any((r) => utf8.encode(jsonEncode(r['value'])).length == 64), isTrue);
+    expect(section('wraps').map((w) => (w['ctx']! as Map)['kind']).toSet(), {
+      'passkey',
+      'recovery',
+      'assistant',
+    });
     expect(section('devices').length, greaterThanOrEqualTo(2));
     expect(section('rejects').length, greaterThanOrEqualTo(4));
   });
@@ -153,6 +163,10 @@ void main() {
               b(r['sealed']),
               b(r['approverKey']),
             );
+          case 'sealToDevice':
+            await sealToDevice(b(r['publicKey']), wrapCtx(r['ctx']), b(r['dataKey']));
+          case 'openFromDevice':
+            await openFromDevice(b(r['privateKey']), wrapCtx(r['ctx']), b(r['sealed']));
           case 'openKeyLink':
             await openKeyLink(b(r['newKey']), linkCtx(r['ctx']), b(r['link']));
           case 'parseRecoveryKey':
