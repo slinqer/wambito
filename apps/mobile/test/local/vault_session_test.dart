@@ -605,6 +605,42 @@ void main() {
       });
     }
 
+    // Signed in again and unlocked (the keys are written) before the gate opens the vault: no
+    // newer open exists yet, so only what the stale refresh wrote may go.
+    for (final unlockedAt in [1, 2]) {
+      test('keys an unlock wrote before a stale successful refresh returns stay (unlocked at '
+          'v$unlockedAt)', () async {
+        final net = FakeNetwork();
+        final profile = profileOf();
+        final refreshed = generateDataKey();
+        final (:session, :hold, :started) = await heldRefresh(profile, net, () async {
+          // what it kept went with the sign-out's wipe; it returns its keyring all the same
+          return LocalKeys(
+            keyring: Keyring(current: 2, byVersion: {2: await deriveRecordKeys(refreshed)}),
+          );
+        });
+        net.records = [rotated];
+        final syncing = session.sync();
+        await started.future;
+        await forgetVault(profile.id, storage, deleteStore: deleteStore);
+
+        // the unlock of the new sign-in keeps its keys; the gate has not opened the vault yet
+        final unlocked = generateDataKey();
+        await storage.writeDataKey(profile.id, unlockedAt, unlocked);
+        await storage.setDevicePrivateKey(profile.id, generateDataKey());
+        await storage.setDeviceWrap(profile.id, id: 'new-wrap', publicKey: 'pk');
+        await storage.setCurrent(profile.id, unlockedAt);
+        final kept = await storedEntries();
+
+        hold.complete();
+        expect((await syncing).error, SyncProblemCode.closed);
+        await wait(100);
+        expect(await storedEntries(), kept);
+        expect(await storage.readDataKey(profile.id, unlockedAt), unlocked);
+        expect(await storage.current(profile.id), unlockedAt);
+      });
+    }
+
     for (final ends in ['ok', 'device_removed']) {
       test('the same account opened again before a stale refresh ($ends) returns keeps its vault '
           'and keys', () async {

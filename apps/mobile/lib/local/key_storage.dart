@@ -66,6 +66,8 @@ class KeyStorage {
   Future<void> setCurrent(String userId, int v) =>
       _storage.write(key: '${_prefix(userId)}current', value: '$v');
 
+  Future<void> deleteCurrent(String userId) => _storage.delete(key: '${_prefix(userId)}current');
+
   /// The raw 32-byte X25519 private key of this phone's device wrap.
   Future<Uint8List?> devicePrivateKey(String userId) => _readBytes('${_prefix(userId)}device', 32);
 

@@ -211,6 +211,37 @@ bool _mayWipe(_Active mine) {
   return current == null || identical(current, mine) || current.userId != mine.userId;
 }
 
+/// What [KeyStorage] holds for an account before a key refresh.
+typedef _KeySnapshot = ({List<int> versions, int? current, String? deviceWrapId});
+
+Future<_KeySnapshot> _keySnapshot(String userId, KeyStorage storage) async => (
+  versions: await storage.versions(userId),
+  current: await storage.current(userId),
+  deviceWrapId: await storage.deviceWrapId(userId),
+);
+
+/// After a sign-out, deletes what a refresh that succeeded meanwhile wrote: the versions of its
+/// keyring that [before] lacked, and `current` only while it is still the refresh's version (and
+/// was not before). Nothing when another device wrap is kept now: an unlock of a new sign-in
+/// enrolled since the sign-out's wipe, and the keys are its own, whatever their versions (a refresh
+/// never writes the device wrap).
+Future<void> _forgetRefreshed(
+  String userId,
+  KeyStorage storage,
+  _KeySnapshot before,
+  LocalKeys refreshed,
+) async {
+  final wrapId = await storage.deviceWrapId(userId);
+  if (wrapId != null && wrapId != before.deviceWrapId) return;
+  final keyV = refreshed.keyring.current;
+  for (final v in refreshed.keyring.byVersion.keys) {
+    if (!before.versions.contains(v)) await storage.deleteDataKey(userId, v);
+  }
+  if (before.current != keyV && await storage.current(userId) == keyV) {
+    await storage.deleteCurrent(userId);
+  }
+}
+
 /// The namespace of the seeded records' ids; the account's own namespace is made from it.
 const _seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
 
@@ -323,6 +354,8 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
         keyring: options.keys.keyring,
         refreshKeys: () async {
           if (mine.forgotten) throw const VaultClosedError();
+          // What storage held before, to tell later what this refresh itself wrote.
+          final before = await _keySnapshot(userId, storage);
           final LocalKeys local;
           try {
             local = await (options.refreshKeys ?? refreshKeys)(
@@ -335,8 +368,10 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           }
           if (mine.forgotten) {
             // Signed out while the refresh ran: whatever it kept goes too, unless the account is
-            // open (or opening) again, whose keys these now are.
-            if (_mayWipe(mine)) await forgetDevice(userId, storage);
+            // open (or opening) again, whose keys these now are. Only what it wrote: a new sign-in
+            // may already have unlocked (and kept its keys) before its vault opens, which
+            // `_mayWipe` cannot see.
+            if (_mayWipe(mine)) await _forgetRefreshed(userId, storage, before, local);
             throw const VaultClosedError();
           }
           return local.keyring;

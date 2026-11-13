@@ -15,6 +15,7 @@ import 'device.dart';
 import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -487,11 +488,26 @@ final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 
 final sessionProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
 
-/// The API client for the signed-in session (rebuilt when the token changes).
-final apiClientProvider = Provider<ApiClient>(
+/// The network for the signed-in session (rebuilt when the token changes): never the vault's local
+/// backend. The vault's keys and sync, and the account's mode, go through it.
+final networkClientProvider = Provider<ApiClient>(
   (ref) => ApiClient.forServer(
     ref.watch(serverUrlProvider),
     token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
     hints: ref.watch(deviceHintsProvider),
   ),
 );
+
+/// The API client the screens use (rebuilt when the token changes): the network, with the open
+/// vault's interceptor in front when a `preview` account's vault is open, so its `/v1` routes are
+/// answered on the phone. A Dio of its own: [networkClientProvider]'s never gets the interceptor.
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final vault = ref.watch(vaultSessionProvider);
+  final client = ApiClient.forServer(
+    ref.watch(serverUrlProvider),
+    token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
+    hints: ref.watch(deviceHintsProvider),
+  );
+  if (vault != null) client.dio.interceptors.add(vault.interceptor);
+  return client;
+});
