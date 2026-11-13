@@ -3,8 +3,9 @@ import 'package:dio/dio.dart';
 import 'backend.dart';
 
 /// Answers the `/v1` finance routes from a [LocalBackend] instead of the server, for an account
-/// whose records live in the vault. Everything else (auth, `/v2/*`, `GET` and `DELETE` of
-/// `/v1/me`, routes the backend does not serve) goes on to the network adapter.
+/// whose records live in the vault, `GET` and `PATCH /v1/me` included (as on the web, only
+/// deleting the account goes to the server). Everything else (auth, `/v2/*`, `DELETE /v1/me`,
+/// routes the backend does not serve) goes on to the network adapter.
 class LocalBackendInterceptor extends Interceptor {
   LocalBackendInterceptor(this.backend, {this.afterWrite});
 
@@ -15,19 +16,18 @@ class LocalBackendInterceptor extends Interceptor {
 
   static const _writes = {'POST', 'PATCH', 'PUT', 'DELETE'};
 
-  /// The account itself comes from the server (the profile and its `encryption`), and deleting it
-  /// is the server's.
-  static bool _network(String method, String path) =>
-      path == '/v1/me' && (method == 'GET' || method == 'DELETE');
+  /// Deleting the account is the server's: its records and key wraps cascade from the user there.
+  static bool _network(String method, String path) => path == '/v1/me' && method == 'DELETE';
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final uri = options.uri;
-    // The base URL ends in `/api` (maybe under a sub-path): the backend's paths start at `/v1`.
-    final at = uri.path.indexOf('/v1/');
+    // The base URL ends in `/api` (maybe under a sub-path): the backend's paths start at `/v1`,
+    // right after it.
+    final base = Uri.parse(options.baseUrl).path.replaceFirst(RegExp(r'/+$'), '');
     final method = options.method.toUpperCase();
-    if (at < 0) return handler.next(options);
-    final path = uri.path.substring(at);
+    if (!uri.path.startsWith('$base/v1/')) return handler.next(options);
+    final path = uri.path.substring(base.length);
     if (_network(method, path)) return handler.next(options);
     LocalResponse? answer;
     try {
@@ -65,7 +65,13 @@ class LocalBackendInterceptor extends Interceptor {
         ),
       );
     }
-    if (_writes.contains(method)) afterWrite?.call();
     handler.resolve(response);
+    if (_writes.contains(method)) {
+      try {
+        afterWrite?.call();
+      } on Object {
+        // The answer is given; a failing hook (a sync that cannot start) must not undo it.
+      }
+    }
   }
 }

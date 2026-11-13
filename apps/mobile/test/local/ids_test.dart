@@ -41,7 +41,10 @@ void main() {
       final a = uuidv5(rule, '2026-10');
       expect(uuidv5(rule, '2026-10'), a);
       expect(uuidv5(rule, '2026-11'), isNot(a));
-      expect(a, matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
+      expect(
+        a,
+        matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+      );
     });
   });
 }

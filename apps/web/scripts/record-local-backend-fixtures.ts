@@ -11,17 +11,21 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createLocalBackend, type UnavailableRoute } from "../app/local/backend.ts";
+import { createLocalBackend } from "../app/local/backend.ts";
 import { createMemoryStore } from "../app/local/memory-store.ts";
 import type { RecordType } from "../app/local/store.ts";
+import { LOCAL_UNAVAILABLE } from "../app/local/vault-session.ts";
 
 const DIR = join(import.meta.dirname, "../../mobile/test/fixtures/local_backend");
 
-/** What `vault-session.ts` turns off (`LOCAL_UNAVAILABLE`). */
-const UNAVAILABLE: UnavailableRoute[] = [
-  { method: "*", path: "/v1/me/export" },
-  { method: "*", path: "/v1/imports", prefix: true },
-  { method: "*", path: "/v1/me/assistants", prefix: true },
+const TYPES: RecordType[] = [
+  "transaction",
+  "category",
+  "budget",
+  "recurrence",
+  "merchant",
+  "settings",
+  "account",
 ];
 
 const NOW = new Date("2026-10-21T18:00:00Z");
@@ -53,7 +57,7 @@ for (const scenario of scenarios) {
   const backend = createLocalBackend({
     store,
     now: () => new Date(NOW),
-    unavailable: UNAVAILABLE,
+    unavailable: LOCAL_UNAVAILABLE,
     profile: { id: "u1", email: "ana@example.test", isAnonymous: false, encryption: "preview" },
     newId: () => `01930000-0000-7000-8000-${(counter++).toString(16).padStart(12, "0")}`,
   });
@@ -67,10 +71,20 @@ for (const scenario of scenarios) {
     ...(hasBody ? { body: JSON.stringify(scenario.body) } : {}),
   });
   const text = await response.text();
+  // A write's side effects: every record, tombstones included, so the phone's store must end
+  // the same as this one.
+  const stored: Record<string, unknown[]> = {};
+  if (scenario.method !== "GET") {
+    for (const type of TYPES) {
+      const records = await store.list(type, { includeDeleted: true });
+      if (records.length > 0) stored[type] = records;
+    }
+  }
   const out = {
     name: scenario.name,
     status: response.status,
     body: text ? JSON.parse(text) : null,
+    ...(scenario.method !== "GET" ? { store: stored } : {}),
   };
   writeFileSync(join(DIR, `${scenario.name}.json`), `${JSON.stringify(out, null, 2)}\n`);
   console.log(`${scenario.name}: ${response.status}`);

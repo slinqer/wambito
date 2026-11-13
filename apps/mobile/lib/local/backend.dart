@@ -242,7 +242,9 @@ String _encodeCursor(_Tx row) =>
   } on FormatException {
     // Not base64: invalid like any other.
   }
-  throw _Problem(422, 'validation_failed', 'Invalid cursor', [const Issue('cursor', 'Invalid cursor')]);
+  throw _Problem(422, 'validation_failed', 'Invalid cursor', [
+    const Issue('cursor', 'Invalid cursor'),
+  ]);
 }
 
 // -- Query parameters -------------------------------------------------------------------------
@@ -265,7 +267,11 @@ class _Params {
     final raw = get(name);
     if (raw == null) return fallback;
     final value = raw.trim().isEmpty ? null : num.tryParse(raw.trim());
-    if (value == null || !value.isFinite || value != value.truncate() || value < min || value > max) {
+    if (value == null ||
+        !value.isFinite ||
+        value != value.truncate() ||
+        value < min ||
+        value > max) {
       throw _invalid(name, 'Expected an integer from $min to $max');
     }
     return value.toInt();
@@ -407,9 +413,10 @@ class _Backend implements LocalBackend {
   final Map<String, _Seen> _idempotency = {};
 
   /// The clock as the API stamps it: ISO 8601 UTC with milliseconds.
-  String stamp() =>
-      DateTime.fromMillisecondsSinceEpoch(now().millisecondsSinceEpoch, isUtc: true)
-          .toIso8601String();
+  String stamp() => DateTime.fromMillisecondsSinceEpoch(
+    now().millisecondsSinceEpoch,
+    isUtc: true,
+  ).toIso8601String();
 
   Future<_Env> _envOf(StoreOps s) async {
     final all = await s.list(RecordType.settings);
@@ -483,11 +490,16 @@ class _Backend implements LocalBackend {
   /// occurrence's id is the UUID v5 of its rule and month, so every device makes the same one.
   Future<void> _materialize(_Env e, List<String> months) async {
     final limit = addMonths(e.month, 1);
-    final wanted = [for (final m in months) if (m.compareTo(limit) <= 0) m];
+    final wanted = [
+      for (final m in months)
+        if (m.compareTo(limit) <= 0) m,
+    ];
     if (wanted.isEmpty) return;
     final rules = await _rows(e.s, RecordType.recurrence);
     if (rules.isEmpty) return;
-    final categories = {for (final c in await _rows(e.s, RecordType.category)) c['id']! as String: c};
+    final categories = {
+      for (final c in await _rows(e.s, RecordType.category)) c['id']! as String: c,
+    };
     final existing = await _txRows(e.s, const ReadOptions(includeDeleted: true));
     final byKey = <String, List<_Tx>>{};
     for (final t in existing) {
@@ -572,7 +584,11 @@ class _Backend implements LocalBackend {
       for (final t in kept) {
         if (t.recurrenceId != id || t.occurrenceMonth == null) continue;
         final moved = uuidv5(id, '${t.occurrenceMonth}:$rev');
-        final old = await s.get(RecordType.transaction, t.id, const ReadOptions(includeDeleted: true));
+        final old = await s.get(
+          RecordType.transaction,
+          t.id,
+          const ReadOptions(includeDeleted: true),
+        );
         if (old == null) continue;
         await s.put(RecordType.transaction, moved, old.body);
         await s.delete(RecordType.transaction, moved);
@@ -603,7 +619,10 @@ class _Backend implements LocalBackend {
     final next = {...e.settings};
     if (currency != null && currency != e.settings['currency']) {
       final used =
-          (await e.s.list(RecordType.transaction, const ReadOptions(includeDeleted: true))).isNotEmpty ||
+          (await e.s.list(
+            RecordType.transaction,
+            const ReadOptions(includeDeleted: true),
+          )).isNotEmpty ||
           (await e.s.list(RecordType.recurrence)).isNotEmpty;
       if (used) {
         throw _Problem(
@@ -624,7 +643,10 @@ class _Backend implements LocalBackend {
 
   Future<Object?> _summary(_Env e, String month) async {
     await _materialize(e, [month]);
-    final txs = [for (final t in await _txRows(e.s)) if (_inMonth(t, month)) t];
+    final txs = [
+      for (final t in await _txRows(e.s))
+        if (_inMonth(t, month)) t,
+    ];
     final used = {for (final t in txs) t.categoryId};
     final cats = [
       for (final c in stableSorted(await _rows(e.s, RecordType.category), _byOrder))
@@ -744,69 +766,124 @@ class _Backend implements LocalBackend {
     return _ok({'items': items});
   }
 
-  Future<_Answer> _createTransaction(_Env e, String raw, Object? body, String? key) async {
-    if (key != null) {
-      final seen = _idempotency[key];
-      if (seen != null) {
-        if (seen.body != raw) {
-          throw _Problem(
-            422,
-            'idempotency_key_reused',
-            'This Idempotency-Key was used with a different request',
-          );
-        }
-        return _ok(seen.payload, seen.status);
+  /// The API's `idempotent` middleware: the same key and body gets the first answer back, the same
+  /// key with another body is refused. With [required], a call without a key is a 400.
+  Future<_Answer> _idempotent(
+    String? key,
+    String raw,
+    Future<_Answer> Function() run, {
+    bool required = false,
+  }) async {
+    if (key == null) {
+      if (required) {
+        throw _Problem(
+          400,
+          'idempotency_key_required',
+          'Send an Idempotency-Key header with this request',
+        );
       }
+      return run();
     }
-    final input = _valid(createTransactionSchema, body);
-    final categoryId = input['categoryId']! as String;
-    await _requireActiveCategory(e.s, categoryId);
+    final seen = _idempotency[key];
+    if (seen != null) {
+      if (seen.body != raw) {
+        throw _Problem(
+          422,
+          'idempotency_key_reused',
+          'This Idempotency-Key was used with a different request',
+        );
+      }
+      return _ok(seen.payload, seen.status);
+    }
+    final answer = await run();
+    _idempotency[key] = _Seen(raw, answer.status, answer.body);
+    return answer;
+  }
+
+  /// The one insert path for single and batch create (the API's `insertTransactions`): every
+  /// category is checked first, then each input is written; one with `repeat` first makes its
+  /// recurrence and is saved as that rule's occurrence for its month.
+  Future<List<_Tx>> _insertTransactions(_Env e, List<Json> inputs) async {
+    for (final categoryId in {for (final i in inputs) i['categoryId']! as String}) {
+      await _requireActiveCategory(e.s, categoryId);
+    }
     final at = stamp();
-    final date = input['date']! as String;
-    // "Repetir": its recurrence first, and this row is that rule's occurrence for its month.
-    String? ruleId;
-    final repeat = input['repeat'] as Map?;
-    if (repeat != null) {
-      ruleId = newId();
-      await e.s.put(RecordType.recurrence, ruleId, {
+    final saved = <_Tx>[];
+    for (final input in inputs) {
+      final categoryId = input['categoryId']! as String;
+      final date = input['date']! as String;
+      String? ruleId;
+      final repeat = input['repeat'] as Map?;
+      if (repeat != null) {
+        ruleId = newId();
+        await e.s.put(RecordType.recurrence, ruleId, {
+          's': 1,
+          'name': input['name'],
+          'amount': input['amount'],
+          'categoryId': categoryId,
+          'frequency': repeat['frequency'],
+          'dayOfMonth': int.parse(date.substring(8, 10)),
+          'monthOfYear': repeat['frequency'] == 'yearly' ? int.parse(date.substring(5, 7)) : null,
+          'startDate': date,
+          'endDate': repeat['endDate'],
+          'rev': 0,
+          'createdAt': at,
+        });
+      }
+      final id = newId();
+      final record = <String, Object?>{
         's': 1,
         'name': input['name'],
         'amount': input['amount'],
+        'currency': e.settings['currency'],
+        'date': date,
+        'status': input['status'],
+        'note': input['note'],
         'categoryId': categoryId,
-        'frequency': repeat['frequency'],
-        'dayOfMonth': int.parse(date.substring(8, 10)),
-        'monthOfYear': repeat['frequency'] == 'yearly' ? int.parse(date.substring(5, 7)) : null,
-        'startDate': date,
-        'endDate': repeat['endDate'],
-        'rev': 0,
+        'accountId': null,
+        'recurrenceId': ruleId,
+        'occurrenceMonth': ruleId != null ? monthOf(date) : null,
+        'source': input['source'],
+        'needsReview': false,
+        'captureSource': null,
+        'capturedAt': null,
+        'captureMerchantKey': null,
         'createdAt': at,
-      });
+        'updatedAt': at,
+      };
+      await e.s.put(RecordType.transaction, id, record);
+      saved.add(_Tx(id, record));
     }
-    final id = newId();
-    final record = <String, Object?>{
-      's': 1,
-      'name': input['name'],
-      'amount': input['amount'],
-      'currency': e.settings['currency'],
-      'date': date,
-      'status': input['status'],
-      'note': input['note'],
-      'categoryId': categoryId,
-      'accountId': null,
-      'recurrenceId': ruleId,
-      'occurrenceMonth': ruleId != null ? monthOf(date) : null,
-      'source': input['source'],
-      'needsReview': false,
-      'captureSource': null,
-      'capturedAt': null,
-      'captureMerchantKey': null,
-      'createdAt': at,
-      'updatedAt': at,
-    };
-    await e.s.put(RecordType.transaction, id, record);
-    final payload = _Tx(id, record).toDto();
-    if (key != null) _idempotency[key] = _Seen(raw, 201, payload);
-    return _ok(payload, 201);
+    return saved;
+  }
+
+  Future<_Answer> _createTransaction(_Env e, String raw, Object? body, String? key) =>
+      _idempotent(key, raw, () async {
+        final input = _valid(createTransactionSchema, body);
+        final [saved] = await _insertTransactions(e, [input]);
+        return _ok(saved.toDto(), 201);
+      });
+
+  /// `POST /v1/transactions/batch` (quick capture): up to 20, all or nothing, the key mandatory.
+  Future<_Answer> _createBatch(_Env e, String raw, Object? body, String? key) =>
+      _idempotent(key, raw, required: true, () async {
+        final items = (_valid(createTransactionsBatchSchema, body)['items']! as List).cast<Json>();
+        final saved = await _insertTransactions(e, items);
+        return _ok({
+          'items': [for (final t in saved) t.toDto()],
+        }, 201);
+      });
+
+  /// `POST /v1/transactions/batch-delete`: soft-deletes the live ones among the ids, ignoring the
+  /// rest without a trace.
+  Future<_Answer> _deleteBatch(_Env e, Object? body) async {
+    final ids = (_valid(deleteTransactionsBatchSchema, body)['ids']! as List).cast<String>();
+    for (final id in ids) {
+      if (await e.s.get(RecordType.transaction, id) != null) {
+        await e.s.delete(RecordType.transaction, id);
+      }
+    }
+    return const _Answer(204);
   }
 
   Future<_Answer> _updateTransaction(_Env e, String id, Object? body) async {
@@ -867,9 +944,10 @@ class _Backend implements LocalBackend {
     final existing = await _findCategory(e.s, id);
     final kind = fields['kind'];
     if (kind != null && kind != existing['kind']) {
-      final used = (await _txRows(e.s, const ReadOptions(includeDeleted: true))).any(
-        (t) => t.categoryId == id,
-      );
+      final used = (await _txRows(
+        e.s,
+        const ReadOptions(includeDeleted: true),
+      )).any((t) => t.categoryId == id);
       if (used) {
         throw _Problem(
           409,
@@ -919,9 +997,10 @@ class _Backend implements LocalBackend {
     if (category['kind'] != 'expense') {
       throw _Problem(422, 'budget_category_not_expense', 'Only expense categories have budgets');
     }
-    final entry = (await _rows(e.s, RecordType.budget))
-        .where((b) => b['categoryId'] == id && b['effectiveFrom'] == effectiveFrom)
-        .firstOrNull;
+    final entry = (await _rows(
+      e.s,
+      RecordType.budget,
+    )).where((b) => b['categoryId'] == id && b['effectiveFrom'] == effectiveFrom).firstOrNull;
     await e.s.put(RecordType.budget, (entry?['id'] as String?) ?? newId(), {
       's': 1,
       'categoryId': id,
@@ -959,7 +1038,10 @@ class _Backend implements LocalBackend {
     final existing = await _findRecurrence(e.s, id);
     final categoryId = input['categoryId'];
     if (categoryId != null) await _requireActiveCategory(e.s, categoryId as String);
-    _valid(createRecurrenceSchema, {..._recurrenceDto(existing), ...input}, 'The recurrence is invalid');
+    _valid(createRecurrenceSchema, {
+      ..._recurrenceDto(existing),
+      ...input,
+    }, 'The recurrence is invalid');
     final next = {...existing, ...input};
     await e.s.put(RecordType.recurrence, id, _bodyOf(next));
     await _dropPending(e.s, [id], fromMonth: e.month);
@@ -971,7 +1053,10 @@ class _Backend implements LocalBackend {
     await _dropPending(e.s, [id], fromMonth: e.month, bump: false);
     await e.s.delete(RecordType.recurrence, id);
     // The rows it made stay, no longer tied to a rule (deleted ones too).
-    for (final t in await e.s.list(RecordType.transaction, const ReadOptions(includeDeleted: true))) {
+    for (final t in await e.s.list(
+      RecordType.transaction,
+      const ReadOptions(includeDeleted: true),
+    )) {
       if (t.body['recurrenceId'] != id) continue;
       await e.s.put(RecordType.transaction, t.id, {...t.body, 'recurrenceId': null});
       if (t.deleted) await e.s.delete(RecordType.transaction, t.id);
@@ -1042,7 +1127,10 @@ class _Backend implements LocalBackend {
           months: months,
           categories: [
             for (final c in categories)
-              SummaryCategory(id: c['id']! as String, kind: CategoryKind.parse(c['kind']! as String)),
+              SummaryCategory(
+                id: c['id']! as String,
+                kind: CategoryKind.parse(c['kind']! as String),
+              ),
           ],
           fixedCategoryIds: {
             for (final r in await _rows(e.s, RecordType.recurrence))
@@ -1099,6 +1187,10 @@ class _Backend implements LocalBackend {
     }
     if (path == '/v1/transactions/suggestions' && method == 'GET') return _suggestions(e, params);
     if (path == '/v1/transactions/review' && method == 'POST') return _reviewTransactions(e, body);
+    if (path == '/v1/transactions/batch' && method == 'POST') {
+      return _createBatch(e, raw, body, headers['idempotency-key']);
+    }
+    if (path == '/v1/transactions/batch-delete' && method == 'POST') return _deleteBatch(e, body);
     var match = _txById.firstMatch(path);
     if (match != null) {
       final id = idOf(match);
@@ -1112,7 +1204,11 @@ class _Backend implements LocalBackend {
     match = _txRestore.firstMatch(path);
     if (match != null && method == 'POST') {
       final id = idOf(match);
-      final deleted = await s.get(RecordType.transaction, id, const ReadOptions(includeDeleted: true));
+      final deleted = await s.get(
+        RecordType.transaction,
+        id,
+        const ReadOptions(includeDeleted: true),
+      );
       if (deleted != null && deleted.deleted) await s.put(RecordType.transaction, id, deleted.body);
       final found = deleted ?? await _findLive(s, id);
       return _ok(_Tx(id, found.body).toDto());
@@ -1164,14 +1260,16 @@ class _Backend implements LocalBackend {
     Map<String, String> headers = const {},
   }) async {
     final verb = method.toUpperCase();
+    // Decided before the body is touched: an import's multipart body is not JSON, and its
+    // answer is the 403, not a parse error.
     final unavailableRoute = _isUnavailable(verb, path);
     if (!unavailableRoute && !_serves(path)) return null;
     // Deleting the account is the server's: its records and key wraps cascade from the user there.
     if (verb == 'DELETE' && path == '/v1/me') return null;
     final lower = {for (final h in headers.entries) h.key.toLowerCase(): h.value};
     try {
-      final (raw, decoded) = _parseBody(body);
       if (unavailableRoute) throw _Problem(403, 'demo_unavailable', 'Not in the demo');
+      final (raw, decoded) = _parseBody(body);
       final params = _Params(query);
       final answer = await store.transaction(
         (s) => _route(s, verb, path, params, raw, decoded, lower),
@@ -1189,6 +1287,14 @@ class _Backend implements LocalBackend {
             for (final i in error.errors!) {'path': i.path, 'message': i.message},
           ],
       });
+    } on Object {
+      // A bug here must not look like being offline: answer as the API's 500.
+      return LocalResponse(500, {
+        'type': 'about:blank',
+        'title': _titles[500],
+        'status': 500,
+        'code': 'internal_error',
+      });
     }
   }
 
@@ -1204,6 +1310,10 @@ class _Backend implements LocalBackend {
         throw _Problem(400, 'bad_request', 'Malformed JSON in request body');
       }
     }
-    return (jsonEncode(body), body);
+    try {
+      return (jsonEncode(body), body);
+    } on JsonUnsupportedObjectError {
+      throw _Problem(400, 'bad_request', 'The request body is not JSON');
+    }
   }
 }

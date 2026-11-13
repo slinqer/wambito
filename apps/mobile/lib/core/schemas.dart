@@ -233,6 +233,23 @@ class ObjectSchema implements Schema<Json> {
   Field get field =>
       (v, path, ctx) => _parse(v, path, ctx);
 
+  /// This object as a field of another one, its refinements included (zod runs an object's
+  /// `.refine` wherever the object is nested). Their paths come out under [path].
+  Field get refinedField => (v, path, ctx) {
+    final sub = Ctx();
+    final out = _parse(v, '', sub);
+    if (!sub.aborted && out is Map<String, Object?>) {
+      for (final refine in refinements) {
+        refine(out, sub);
+      }
+    }
+    for (final i in sub.issues) {
+      ctx.add(i.path.isEmpty ? path : _join(path, i.path), i.message);
+    }
+    if (sub.aborted) ctx.aborted = true;
+    return out;
+  };
+
   Object? _parse(Object? v, String path, Ctx ctx) {
     if (v is! Map) {
       _typeError(ctx, path, 'object', v);
@@ -412,6 +429,14 @@ final updateProfileSchema = ObjectSchema(
   partial: true,
   refinements: [_requireOne],
 );
+
+/// `{ items: createTransaction[] 1..20 }`: the quick capture's batch.
+final createTransactionsBatchSchema = ObjectSchema({
+  'items': fArray(createTransactionSchema.refinedField, min: 1, max: 20),
+});
+
+/// `{ ids: uuid[] 1..20 }`: the undo of a batch.
+final deleteTransactionsBatchSchema = ObjectSchema({'ids': fArray(fUuid(), min: 1, max: 20)});
 
 /// `{ ids: uuid[] 1..50 }` (capture.ts).
 final reviewTransactionsSchema = ObjectSchema({'ids': fArray(fUuid(), min: 1, max: 50)});

@@ -38,5 +38,467 @@
         "updatedAt": "2026-10-20T15:00:00.000Z"
       }
     ]
+  },
+  "store": {
+    "transaction": [
+      {
+        "id": "01930000-0000-7000-8000-000000000201",
+        "body": {
+          "s": 1,
+          "name": "Almuerzo",
+          "amount": -1800000,
+          "currency": "COP",
+          "date": "2026-10-20",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-20T15:00:00.000Z",
+          "updatedAt": "2026-10-20T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000202",
+        "body": {
+          "s": 1,
+          "name": "Almuerzo",
+          "amount": -2200000,
+          "currency": "COP",
+          "date": "2026-10-12",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-12T15:00:00.000Z",
+          "updatedAt": "2026-10-12T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000203",
+        "body": {
+          "s": 1,
+          "name": "Bus ticket",
+          "amount": -300000,
+          "currency": "COP",
+          "date": "2026-10-18",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000101",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-18T15:00:00.000Z",
+          "updatedAt": "2026-10-18T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000204",
+        "body": {
+          "s": 1,
+          "name": "Salary",
+          "amount": 450000000,
+          "currency": "COP",
+          "date": "2026-10-01",
+          "status": "paid",
+          "note": "October pay",
+          "categoryId": "01930000-0000-7000-8000-000000000102",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-01T15:00:00.000Z",
+          "updatedAt": "2026-10-01T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000205",
+        "body": {
+          "s": 1,
+          "name": "Mercado",
+          "amount": -5400000,
+          "currency": "COP",
+          "date": "2026-10-15",
+          "status": "paid",
+          "note": "Weekly shop",
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-15T15:00:00.000Z",
+          "updatedAt": "2026-10-15T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000206",
+        "body": {
+          "s": 1,
+          "name": "Taxi",
+          "amount": -1500000,
+          "currency": "COP",
+          "date": "2026-10-22",
+          "status": "pending",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000101",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-22T15:00:00.000Z",
+          "updatedAt": "2026-10-22T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000207",
+        "body": {
+          "s": 1,
+          "name": "Cafe",
+          "amount": -900000,
+          "currency": "COP",
+          "date": "2026-10-21",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "capture",
+          "needsReview": false,
+          "captureSource": "notification",
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-21T15:00:00.000Z",
+          "updatedAt": "2026-10-21T18:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000208",
+        "body": {
+          "s": 1,
+          "name": "Mercado",
+          "amount": -4800000,
+          "currency": "COP",
+          "date": "2026-09-14",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-09-14T15:00:00.000Z",
+          "updatedAt": "2026-09-14T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000209",
+        "body": {
+          "s": 1,
+          "name": "Rent",
+          "amount": -120000000,
+          "currency": "COP",
+          "date": "2026-09-05",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000103",
+          "accountId": null,
+          "recurrenceId": "01930000-0000-7000-8000-000000000300",
+          "occurrenceMonth": "2026-09",
+          "source": "recurrence",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-09-05T15:00:00.000Z",
+          "updatedAt": "2026-09-05T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-00000000020a",
+        "body": {
+          "s": 1,
+          "name": "Salary",
+          "amount": 450000000,
+          "currency": "COP",
+          "date": "2026-09-01",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000102",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-09-01T15:00:00.000Z",
+          "updatedAt": "2026-09-01T15:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-00000000020b",
+        "body": {
+          "s": 1,
+          "name": "Concert",
+          "amount": -8000000,
+          "currency": "COP",
+          "date": "2026-10-10",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-10-10T15:00:00.000Z",
+          "updatedAt": "2026-10-10T15:00:00.000Z"
+        },
+        "deleted": true
+      },
+      {
+        "id": "01930000-0000-7000-8000-00000000020c",
+        "body": {
+          "s": 1,
+          "name": "Old gym",
+          "amount": -1000000,
+          "currency": "COP",
+          "date": "2026-09-10",
+          "status": "paid",
+          "note": null,
+          "categoryId": "01930000-0000-7000-8000-000000000104",
+          "accountId": null,
+          "recurrenceId": null,
+          "occurrenceMonth": null,
+          "source": "app",
+          "needsReview": false,
+          "captureSource": null,
+          "capturedAt": null,
+          "captureMerchantKey": null,
+          "createdAt": "2026-09-10T15:00:00.000Z",
+          "updatedAt": "2026-09-10T15:00:00.000Z"
+        },
+        "deleted": false
+      }
+    ],
+    "category": [
+      {
+        "id": "01930000-0000-7000-8000-000000000100",
+        "body": {
+          "s": 1,
+          "name": "Food",
+          "kind": "expense",
+          "icon": "fork",
+          "color": "#f90",
+          "sortOrder": 1,
+          "archivedAt": null,
+          "systemKey": null,
+          "createdAt": "2026-08-01T12:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000101",
+        "body": {
+          "s": 1,
+          "name": "Transport",
+          "kind": "expense",
+          "icon": "bus",
+          "color": "#09f",
+          "sortOrder": 2,
+          "archivedAt": null,
+          "systemKey": null,
+          "createdAt": "2026-08-01T12:00:01.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000102",
+        "body": {
+          "s": 1,
+          "name": "Salary",
+          "kind": "income",
+          "icon": "coin",
+          "color": "#0a0",
+          "sortOrder": 3,
+          "archivedAt": null,
+          "systemKey": null,
+          "createdAt": "2026-08-01T12:00:02.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000103",
+        "body": {
+          "s": 1,
+          "name": "Housing",
+          "kind": "expense",
+          "icon": "home",
+          "color": "#a0a",
+          "sortOrder": 4,
+          "archivedAt": null,
+          "systemKey": null,
+          "createdAt": "2026-08-01T12:00:03.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000104",
+        "body": {
+          "s": 1,
+          "name": "Old",
+          "kind": "expense",
+          "icon": "box",
+          "color": "#999",
+          "sortOrder": 5,
+          "archivedAt": "2026-09-15T12:00:00.000Z",
+          "systemKey": null,
+          "createdAt": "2026-08-01T12:00:04.000Z"
+        },
+        "deleted": false
+      }
+    ],
+    "budget": [
+      {
+        "id": "01930000-0000-7000-8000-000000000400",
+        "body": {
+          "s": 1,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "amount": 80000000,
+          "effectiveFrom": "2026-09"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000401",
+        "body": {
+          "s": 1,
+          "categoryId": "01930000-0000-7000-8000-000000000100",
+          "amount": 90000000,
+          "effectiveFrom": "2026-10"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000402",
+        "body": {
+          "s": 1,
+          "categoryId": "01930000-0000-7000-8000-000000000101",
+          "amount": 20000000,
+          "effectiveFrom": "2026-09"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000403",
+        "body": {
+          "s": 1,
+          "categoryId": "01930000-0000-7000-8000-000000000103",
+          "amount": 150000000,
+          "effectiveFrom": "2026-09"
+        },
+        "deleted": false
+      }
+    ],
+    "recurrence": [
+      {
+        "id": "01930000-0000-7000-8000-000000000300",
+        "body": {
+          "s": 1,
+          "name": "Rent",
+          "amount": -120000000,
+          "categoryId": "01930000-0000-7000-8000-000000000103",
+          "frequency": "monthly",
+          "dayOfMonth": 5,
+          "monthOfYear": null,
+          "startDate": "2026-08-05",
+          "endDate": null,
+          "rev": 0,
+          "createdAt": "2026-08-05T12:00:00.000Z"
+        },
+        "deleted": false
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000301",
+        "body": {
+          "s": 1,
+          "name": "Insurance",
+          "amount": -30000000,
+          "categoryId": "01930000-0000-7000-8000-000000000101",
+          "frequency": "yearly",
+          "dayOfMonth": 10,
+          "monthOfYear": 3,
+          "startDate": "2026-03-10",
+          "endDate": null,
+          "rev": 0,
+          "createdAt": "2026-08-05T12:00:01.000Z"
+        },
+        "deleted": false
+      }
+    ],
+    "settings": [
+      {
+        "id": "01930000-0000-7000-8000-000000000001",
+        "body": {
+          "s": 1,
+          "name": "Ana",
+          "currency": "COP",
+          "locale": "es",
+          "timezone": "America/Bogota",
+          "onboardingCompletedAt": "2026-08-01T12:00:00.000Z",
+          "revokedDevices": []
+        },
+        "deleted": false
+      }
+    ]
   }
 }

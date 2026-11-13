@@ -57,9 +57,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
   finance routes over a `FinanceStore`, one store transaction per request, 422 `validation_failed`,
   403 `demo_unavailable` for `localUnavailable`; `handle` returns null for a path it does not serve) and
-  `backend_interceptor.dart` (the Dio interceptor that answers those routes and sends the rest, `GET`
-  and `DELETE /v1/me` included, to the network). `test/local/backend_shapes_test.dart` compares each
-  scenario of `test/fixtures/local_backend/scenarios.json` over `seed.json` with the `<scenario>.json`
+  `backend_interceptor.dart` (the Dio interceptor that answers those routes, `GET`/`PATCH /v1/me` and the
+  quick capture's `/v1/transactions/batch` and `batch-delete` included, and sends the rest, `DELETE /v1/me`
+  among it, to the network; the web's backend has no batch routes, so those are tested by hand) `test/local/backend_shapes_test.dart` compares each
+  scenario (answer and the store's records after a write) of `test/fixtures/local_backend/scenarios.json` over `seed.json` with the `<scenario>.json`
   the web's backend recorded: after a change to `backend.ts` or a scenario, run
   `pnpm --filter @wambito/web record:local-backend` and keep the diff.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
