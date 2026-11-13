@@ -47,6 +47,9 @@ class FakeServer implements HttpClientAdapter {
 
   String mode;
   bool offline = false;
+
+  /// `GET /v1/me` answers this status (a problem) when set.
+  int? status;
   List<Object?> wraps = [];
   final calls = <String>[];
 
@@ -59,6 +62,7 @@ class FakeServer implements HttpClientAdapter {
     final call = '${options.method.toUpperCase()} ${options.uri.path}';
     calls.add(call);
     if (offline) throw DioException.connectionError(requestOptions: options, reason: 'offline');
+    if (status != null && call == 'GET /api/v1/me') return _json({'code': 'nope'}, status!);
     return switch (call) {
       'GET /api/v1/me' => _json({
         'id': 'vault_user',
@@ -131,6 +135,17 @@ void main() {
       );
       await expectLater(other.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
     });
+  });
+
+  test('a 401 or another 4xx is the answer: nothing kept stands in for it', () async {
+    await containerWith(FakeServer()).read(encryptionModeProvider.future);
+    final server = FakeServer()..status = 401;
+    final refused = containerWith(server);
+    await expectLater(refused.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
+    final bad = containerWith(FakeServer()..status = 400);
+    await expectLater(bad.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
+    final down = containerWith(FakeServer()..status = 503);
+    expect(await down.read(encryptionModeProvider.future), EncryptionMode.preview);
   });
 
   group('vaultGateProvider', () {

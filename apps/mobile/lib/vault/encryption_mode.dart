@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -14,12 +15,14 @@ import 'vault_gate.dart' show GateError;
 /// phone, end-to-end encrypted (`preview`): `GET /v1/me` → `encryption`.
 enum EncryptionMode { plain, preview }
 
-/// The signed-in account as the vault needs it: its profile and its mode.
+/// The signed-in account as the vault needs it: its profile and its mode, and the session it was
+/// read for ([owner], a hash of that session's token as [sessionOwnerOf] makes it).
 class VaultAccount {
-  const VaultAccount({required this.profile, required this.mode});
+  const VaultAccount({required this.profile, required this.mode, required this.owner});
 
   final VaultProfile profile;
   final EncryptionMode mode;
+  final String owner;
 }
 
 /// Where the phone keeps what it last heard of the account, so a start without network still knows
@@ -70,6 +73,7 @@ class EncryptionStore {
       final mode = EncryptionMode.values.asNameMap()[await _storage.read(key: modeKey(id))];
       if (mode == null) return null;
       return VaultAccount(
+        owner: sessionOwnerOf(token),
         profile: VaultProfile(
           id: id,
           email: doc['email']! as String,
@@ -97,9 +101,27 @@ class EncryptionStore {
 
 final encryptionStoreProvider = Provider<EncryptionStore>((ref) => const EncryptionStore());
 
+/// Whether a failed `GET /v1/me` means the server could not be asked (no network, a 5xx, an
+/// answer without a profile): then what was kept may stand in. A 401 or another 4xx is the
+/// server's answer, and nothing kept replaces it.
+bool _unanswered(Object error) {
+  if (error is GateError) return true;
+  if (error is! DioException) return false;
+  final status = error.response?.statusCode;
+  return status == null || status >= 500;
+}
+
+/// The hash of the signed-in session's token ([sessionOwnerOf]); null when signed out.
+final vaultOwnerProvider = Provider<String?>((ref) {
+  final token = ref.watch(sessionProvider.select((s) => s.stored?.token));
+  return token == null ? null : sessionOwnerOf(token);
+});
+
 /// The signed-in account (null when signed out): `GET /v1/me` on the network (never the vault's
-/// local backend), kept for the session; without an answer, what was kept for this session, else
-/// the error. No automatic retry: the app asks again when it is invalidated (a reload, a new token).
+/// local backend), kept for the session; when the server could not be asked, what was kept for
+/// this session, else the error. No automatic retry: the app asks again when it is invalidated (a
+/// reload, a new token). Riverpod keeps the previous value while it loads or after an error: read
+/// [currentVaultAccountProvider] for the account of the session signed in now.
 final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null, (ref) async {
   final token = ref.watch(sessionProvider.select((s) => s.stored?.token));
   if (token == null) return null;
@@ -110,12 +132,14 @@ final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null
     final data = (await api.getMe()).data;
     if (data == null) throw const GateError('server');
     me = data;
-  } on Object {
+  } on Object catch (error) {
+    if (!_unanswered(error)) rethrow;
     final kept = await store.recall(token);
     if (kept != null) return kept;
     rethrow;
   }
   final account = VaultAccount(
+    owner: sessionOwnerOf(token),
     profile: VaultProfile(
       id: me.id,
       email: me.email,
@@ -127,9 +151,24 @@ final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null
         ? EncryptionMode.preview
         : EncryptionMode.plain,
   );
-  await store.remember(token, account);
+  // A session that has meanwhile ended (or changed) keeps nothing.
+  if (ref.mounted) await store.remember(token, account);
   return account;
 });
+
+/// The account of the session signed in now, once known: never the previous session's value that
+/// [vaultAccountProvider] keeps while it loads or after an error. Null while unknown or signed out.
+final currentVaultAccountProvider = Provider<VaultAccount?>((ref) {
+  final owner = ref.watch(vaultOwnerProvider);
+  final account = ref.watch(vaultAccountProvider).value;
+  return owner != null && account?.owner == owner ? account : null;
+});
+
+/// Whether the signed-in session's account is known to be `plain`: its finance calls may go to the
+/// server. False when signed out, for `preview`, and while the mode is loading or failed.
+final knownPlainProvider = Provider<bool>(
+  (ref) => ref.watch(currentVaultAccountProvider)?.mode == EncryptionMode.plain,
+);
 
 /// The signed-in account's mode; null when signed out. An error when the server could not say and
 /// nothing was kept for this session (an offline first start).

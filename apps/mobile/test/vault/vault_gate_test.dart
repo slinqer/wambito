@@ -536,6 +536,25 @@ void main() {
         expect(h.gate.state, const Ready('unlocked'));
       });
 
+      test('dispose zeroes a pending PRF and tells nobody again (phone only)', () async {
+        final kept = stash();
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInPrf: () => kept,
+          unlockWithPasskey: (_) async => throw fail('no_passkey_wrap'),
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Unlock());
+        expect(zeroed(kept.prf), isFalse);
+        final seen = h.seen.length;
+        h.gate.dispose();
+        expect(zeroed(kept.prf), isTrue);
+        expect(h.gate.disposed, isTrue);
+        await h.gate.unlock('ABCD');
+        expect(h.seen, hasLength(seen));
+      });
+
       test('no stash shows Unlock', () async {
         var tries = 0;
         final h = gateWith(

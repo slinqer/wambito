@@ -15,6 +15,9 @@ import 'device.dart';
 import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
+import '../vault/encryption_mode.dart'
+    show EncryptionMode, knownPlainProvider, vaultAccountProvider, vaultOwnerProvider;
+import '../vault/finance_guard.dart';
 import '../vault/vault_providers.dart' show vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
@@ -501,13 +504,30 @@ final networkClientProvider = Provider<ApiClient>(
 /// The API client the screens use (rebuilt when the token changes): the network, with the open
 /// vault's interceptor in front when a `preview` account's vault is open, so its `/v1` routes are
 /// answered on the phone. A Dio of its own: [networkClientProvider]'s never gets the interceptor.
+///
+/// Signed in to an account not known to be `plain` (`preview`, or its mode still loading or
+/// failed), a [FinanceGuard] after it holds every `/v1` finance call the vault does not answer:
+/// nothing of a `preview` account's finances goes to the server in clear, even before its vault
+/// opens. The vault is always the signed-in session's ([vaultSessionProvider] is bound to it).
 final apiClientProvider = Provider<ApiClient>((ref) {
   final vault = ref.watch(vaultSessionProvider);
+  final owner = ref.watch(vaultOwnerProvider);
+  final plain = ref.watch(knownPlainProvider);
   final client = ApiClient.forServer(
     ref.watch(serverUrlProvider),
     token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
     hints: ref.watch(deviceHintsProvider),
   );
   if (vault != null) client.dio.interceptors.add(vault.interceptor);
+  if (owner != null && !plain) {
+    // The mode of this session's account, once known; an error or another session's is not plain.
+    final known = ref
+        .read(vaultAccountProvider.future)
+        .then<bool>(
+          (a) => a?.owner == owner && a?.mode == EncryptionMode.plain,
+          onError: (Object _) => false,
+        );
+    client.dio.interceptors.add(FinanceGuard(() => known));
+  }
   return client;
 });

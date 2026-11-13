@@ -27,15 +27,23 @@ typedef AppVaultGate = VaultGate<LocalKeys, VaultSession>;
 /// Where the vault's keys live: the Keystore / Keychain (lib/local/key_storage.dart).
 final keyStorageProvider = Provider<KeyStorage>((ref) => KeyStorage());
 
-/// The gate of the signed-in `preview` account, started; null for `plain`, while the mode is not
-/// known yet, and when signed out. A new gate only for another account (or mode): a new token of
-/// the same account keeps it, and its calls read the network client of the moment.
+/// Opens a vault session: [openVaultSession]; tests put their own store folder in.
+final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaultOptions)>(
+  (ref) => openVaultSession,
+);
+
+/// The gate of the signed-in `preview` account, started; null for `plain`, while the mode of the
+/// session signed in now is not known yet, and when signed out. It is bound to that session (the
+/// owner of [currentVaultAccountProvider]): another token, even a new one of the same account,
+/// disposes it, closes the vault session it opened (its file and keys stay), and a new gate starts
+/// once the new session's account is known. Its calls read the network client of the moment.
 final vaultGateProvider = Provider<AppVaultGate?>((ref) {
-  final id = ref.watch(vaultAccountProvider.select((a) => a.value?.profile.id));
-  final mode = ref.watch(vaultAccountProvider.select((a) => a.value?.mode));
-  final profile = ref.read(vaultAccountProvider).value?.profile;
-  if (id == null || mode != EncryptionMode.preview || profile == null) return null;
-  return _gateFor(ref, profile)..start();
+  final key = ref.watch(
+    currentVaultAccountProvider.select((a) => a == null ? null : (a.owner, a.profile.id, a.mode)),
+  );
+  final account = ref.read(currentVaultAccountProvider);
+  if (key == null || account == null || account.mode != EncryptionMode.preview) return null;
+  return _gateFor(ref, account.profile, account.owner)..start();
 });
 
 /// The gate's state (null without a gate); rebuilt on every change.
@@ -99,13 +107,18 @@ Future<prf.PasskeyPrf?> touchPasskey(
   }
 }
 
-AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
+AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
   final userId = profile.id;
   late final AppVaultGate gate;
 
-  /// The providers of the moment; a call of a gate whose provider is gone fails (nobody shows it).
+  /// Whether this gate is still the signed-in session's: its provider is there, the gate was not
+  /// disposed, and the session signed in now is the one it was made for.
+  bool current() => ref.mounted && !gate.disposed && ref.read(vaultOwnerProvider) == owner;
+
+  /// The providers of the moment; a call of a gate that is no longer the session's fails (nobody
+  /// shows it), so nothing is made, unlocked or wiped for another session.
   T read<T>(ProviderListenable<T> provider) {
-    if (!ref.mounted) throw const GateError('closed');
+    if (!current()) throw const GateError('closed');
     return ref.read(provider);
   }
 
@@ -119,7 +132,8 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
   /// The session ended under the vault (a 401): wipe it, then sign in again. The server already
   /// dropped the session, so even a guest's goes.
   Future<void> signInAgain() async {
-    if (!ref.mounted) return;
+    // A late 401 of a session that is gone never signs out the one signed in now.
+    if (!current()) return;
     final session = ref.read(sessionProvider.notifier);
     try {
       await forgetVault(userId, ref.read(keyStorageProvider));
@@ -166,7 +180,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
   /// Another account signed in: the account's providers again, for them (a new gate). No one: the
   /// session is gone, so sign in again.
   void reload() {
-    if (!ref.mounted) return;
+    if (!current()) return;
     if (nobody) {
       unawaited(signInAgain());
     } else {
@@ -174,8 +188,23 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
     }
   }
 
-  /// The session the gate's listeners are on, so a reused one is not wired twice.
+  /// The session the gate's listeners are on, so a reused one is not wired twice, and their
+  /// unsubscribes.
   VaultSession? wired;
+  final detach = <void Function()>[];
+
+  // Another session signed in (or none): the gate keeps nothing, tells nothing, and its vault
+  // session closes; the vault file and the keys stay (a sign-out deletes them, Task 14).
+  ref.onDispose(() {
+    gate.dispose();
+    for (final unsubscribe in detach) {
+      unsubscribe();
+    }
+    detach.clear();
+    final session = wired;
+    wired = null;
+    if (session != null) unawaited(session.close().catchError((Object _) {}));
+  });
 
   gate = AppVaultGate(
     VaultGateDeps(
@@ -194,7 +223,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
       evaluatePrf: (ids) => touchPasskey(read(authApiProvider), read(passkeysProvider), ids),
       accountPasskeyIds: () => accountPasskeyIds(network()),
       open: (localKeys, fresh) async {
-        final session = await openVaultSession(
+        final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(
             profile: profile,
             keys: localKeys,
@@ -202,17 +231,24 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile) {
             network: network(),
             storage: storage(),
             onUnauthorized: () => unawaited(signInAgain()),
-            onSessionChanged: () => gate.sessionChanged(),
+            onSessionChanged: () {
+              if (current()) gate.sessionChanged();
+            },
           ),
         );
+        if (!current()) {
+          // Opened for a session that is gone meanwhile: closed again, never handed out.
+          unawaited(session.close().catchError((Object _) {}));
+          throw const GateError('closed');
+        }
         if (!identical(wired, session)) {
           wired = session;
-          session
-            ..onClosed(gate.closed)
+          detach
+            ..add(session.onClosed(gate.closed))
             // Removed from the account by another device: the vault is gone, Unlock says so.
-            ..onRemoved(gate.removed)
+            ..add(session.onRemoved(gate.removed))
             // A new key version did not verify: the vault is kept, Unlock asks again.
-            ..onUnverified(gate.unverified);
+            ..add(session.onUnverified(gate.unverified));
         }
         return session;
       },

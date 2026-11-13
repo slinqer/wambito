@@ -313,7 +313,21 @@ class VaultGate<K, S> {
   /// A passkey without a wrap yet: its wrap is added once the vault is unlocked by other means.
   PasskeyPrf? _pendingPasskey;
 
+  bool _disposed = false;
+
   VaultGateState<S> get state => _state;
+
+  /// Whether [dispose] ran.
+  bool get disposed => _disposed;
+
+  /// The gate is no longer the app's (another session signed in, signed out): its pending passkey
+  /// PRF is zeroed and nobody is told of it again. A step still running ends quietly; the caller's
+  /// deps refuse what it asks for after this (phone only, the web's gate goes with its page).
+  void dispose() {
+    _disposed = true;
+    _keepPending(null);
+    _listeners.clear();
+  }
 
   /// Calls [listener] after every change of [state]. Returns the unsubscribe.
   void Function() subscribe(void Function() listener) {
@@ -332,6 +346,11 @@ class VaultGate<K, S> {
     final pending = _pendingPasskey;
     if (pending != null && !identical(pending, passkey)) _zero(pending);
     _pendingPasskey = passkey;
+    // A disposed gate keeps nothing.
+    if (_disposed && passkey != null) {
+      _zero(passkey);
+      _pendingPasskey = null;
+    }
   }
 
   /// Adds the pending passkey's wrap (a failure only leaves it without one), then zeroes it.
