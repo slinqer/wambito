@@ -32,6 +32,9 @@ const _finance = [
   ('GET', '/v1/me/export'),
 ];
 
+const (int?, String?) _locked = (423, 'vault_locked');
+const (int?, String?) _offline = (null, 'connectionError');
+
 /// Not finance: they go on.
 const _other = [
   ('GET', '/v1/me'),
@@ -40,15 +43,17 @@ const _other = [
 ];
 
 /// [method] [path] through the screens' client, its network recorded in [net]: the status, and the
-/// problem's code when refused.
+/// problem's code when refused (a refusal without a response: null and the Dio error type).
 Future<(int?, String?)> send(ProviderContainer c, Recorder net, String method, String path) async {
   final client = c.read(apiClientProvider)..dio.httpClientAdapter = net;
   try {
     final r = await client.dio.request<Object?>(path, options: Options(method: method));
     return (r.statusCode, null);
   } on DioException catch (e) {
-    final data = e.response?.data;
-    return (e.response?.statusCode, data is Map ? data['code'] as String? : null);
+    final response = e.response;
+    if (response == null) return (null, e.type.name);
+    final data = response.data;
+    return (response.statusCode, data is Map ? data['code'] as String? : null);
   }
 }
 
@@ -71,10 +76,11 @@ void main() {
     return container;
   }
 
-  Future<void> expectHeld(ProviderContainer c) async {
+  /// Every finance call refused as [refusal] with nothing sent; the rest goes on.
+  Future<void> expectHeld(ProviderContainer c, [(int?, String?) refusal = _locked]) async {
     final net = Recorder();
     for (final (method, path) in _finance) {
-      expect(await send(c, net, method, path), (423, 'vault_locked'), reason: '$method $path');
+      expect(await send(c, net, method, path), refusal, reason: '$method $path');
     }
     expect(net.calls, isEmpty);
     for (final (method, path) in _other) {
@@ -115,11 +121,67 @@ void main() {
     },
   );
 
-  test('when the mode failed (and nothing was kept), finance calls are refused', () async {
-    final server = FakeServer({'tok': _preview})..meStatus = 500;
-    final c = containerFor(server);
+  test(
+    'a mode that could not be learned (a 5xx, nothing kept) fails finance calls as offline',
+    () async {
+      final server = FakeServer({'tok': _preview})..meStatus = 500;
+      final c = containerFor(server);
+      await until(() => c.read(vaultAccountProvider).hasError);
+      await expectHeld(c, _offline);
+    },
+  );
+
+  test('a 4xx for the mode is no known preview either: offline too, never 423', () async {
+    final c = containerFor(FakeServer({'tok': _preview})..meStatus = 400);
     await until(() => c.read(vaultAccountProvider).hasError);
+    await expectHeld(c, _offline);
+  });
+
+  test("a plain account's offline first start (nothing kept) fails finance calls as offline, so "
+      'home takes its offline path', () async {
+    final c = containerFor(FakeServer({'tok': _plain})..offline.add('tok'));
+    await until(() => c.read(vaultAccountProvider).hasError);
+    final net = Recorder();
+    final client = c.read(apiClientProvider)..dio.httpClientAdapter = net;
+    try {
+      await client.dio.get<Object?>('/v1/summary');
+      fail('the call went through');
+    } on DioException catch (e) {
+      expect(e.type, DioExceptionType.connectionError);
+      expect(e.response, isNull);
+    }
+    expect(net.calls, isEmpty);
+  });
+
+  test('a plain account offline after a start that kept its mode: finance calls go on', () async {
+    await containerFor(FakeServer({'tok': _plain})).read(vaultAccountProvider.future);
+    final c = containerFor(FakeServer({'tok': _plain})..offline.add('tok'));
+    await until(() => c.read(knownPlainProvider));
+    final net = Recorder();
+    expect((await send(c, net, 'GET', '/v1/summary')).$1, 200);
+    expect(net.calls, ['GET /api/v1/summary']);
+  });
+
+  test('a preview account on Opening: finance calls are refused', () async {
+    await storage.writeDataKey('user_p', 1, generateDataKey());
+    await storage.setCurrent('user_p', 1);
+    final server = FakeServer({'tok': _preview})..holdSync = Completer();
+    final c = containerFor(server);
+    await until(() => c.read(vaultGateStateProvider)?.status == 'opening');
     await expectHeld(c);
+    expect(c.read(vaultGateStateProvider)?.status, 'opening');
+    server.holdSync!.complete();
+  });
+
+  test('a preview account on Committing: finance calls are refused', () async {
+    final server = FakeServer({'tok': _preview})..holdPut = Completer();
+    final c = containerFor(server);
+    await until(() => c.read(vaultGateStateProvider)?.status == 'setup');
+    unawaited(c.read(vaultGateProvider)!.confirmSetup());
+    await until(() => c.read(vaultGateStateProvider)?.status == 'committing');
+    await expectHeld(c);
+    expect(c.read(vaultGateStateProvider)?.status, 'committing');
+    server.holdPut!.complete();
   });
 
   test('a preview account on Unlock: finance calls are refused, the rest goes on', () async {

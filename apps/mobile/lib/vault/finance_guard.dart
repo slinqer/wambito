@@ -1,5 +1,17 @@
 import 'package:dio/dio.dart';
 
+/// What a [FinanceGuard] does with a finance call.
+enum FinanceVerdict {
+  /// The account is `plain`: the call goes on.
+  plain,
+
+  /// The account is `preview` and its vault is not open: 423 `vault_locked`.
+  locked,
+
+  /// The mode could not be learned: refused as an offline request fails.
+  unknown,
+}
+
 /// Holds the `/v1` finance calls of a session whose account is not known to be `plain` (a
 /// `preview` account, or one whose mode is still loading or failed): none of them reaches the
 /// network, so no finance field ever leaves the phone in clear. The vault's interceptor, in front
@@ -8,14 +20,16 @@ import 'package:dio/dio.dart';
 /// The paths are the API's `FINANCE_PATHS` (apps/api/src/http/preview.ts), which a `preview`
 /// account is refused anyway (403 `encrypted_account`). `GET /v1/me`, `/auth` and `/v2` go on.
 ///
-/// While the mode is loading, a call waits for it ([known]): `plain` lets it go on, anything else
-/// (`preview`, an error, another session by then) refuses it with a 423 `vault_locked` problem, so
-/// the screens show an error rather than "offline".
+/// While the mode is loading, a call waits for it ([verdict]): `plain` lets it go on; a known
+/// `preview` account (its vault not open) is refused with a 423 `vault_locked` problem, so the
+/// screens show an error; a mode that could not be learned (no network, a 5xx, another session by
+/// then) is refused exactly as an offline request fails, a `connectionError` without a response, so
+/// the screens take their offline path (a plain account's home cache on an offline first start).
 class FinanceGuard extends Interceptor {
-  FinanceGuard(this.known);
+  FinanceGuard(this.verdict);
 
-  /// Resolves true once the session's account is known to be `plain`; false otherwise.
-  final Future<bool> Function() known;
+  /// What the session's account allows, once known.
+  final Future<FinanceVerdict> Function() verdict;
 
   static final List<RegExp> financePaths = [
     RegExp(r'^/v1/transactions(/|$)'),
@@ -62,16 +76,26 @@ class FinanceGuard extends Interceptor {
     ),
   );
 
+  /// The refusal of an unknown mode: what Dio gives a request without network.
+  static DioException unknown(RequestOptions options) =>
+      DioException.connectionError(requestOptions: options, reason: 'vault_mode_unknown');
+
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     if (!isFinance(options)) return handler.next(options);
-    var plain = false;
+    FinanceVerdict outcome;
     try {
-      plain = await known();
+      outcome = await verdict();
     } on Object {
-      plain = false;
+      outcome = FinanceVerdict.unknown;
     }
-    if (plain) return handler.next(options);
-    handler.reject(locked(options));
+    switch (outcome) {
+      case FinanceVerdict.plain:
+        handler.next(options);
+      case FinanceVerdict.locked:
+        handler.reject(locked(options));
+      case FinanceVerdict.unknown:
+        handler.reject(unknown(options));
+    }
   }
 }

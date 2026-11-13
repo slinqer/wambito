@@ -520,14 +520,19 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   );
   if (vault != null) client.dio.interceptors.add(vault.interceptor);
   if (owner != null && !plain) {
-    // The mode of this session's account, once known; an error or another session's is not plain.
-    final known = ref
+    // The mode of this session's account, once known: plain goes, preview is locked, and a mode
+    // that could not be learned (an error, another session's by then) fails as offline.
+    final verdict = ref
         .read(vaultAccountProvider.future)
-        .then<bool>(
-          (a) => a?.owner == owner && a?.mode == EncryptionMode.plain,
-          onError: (Object _) => false,
+        .then<FinanceVerdict>(
+          (a) => a == null || a.owner != owner
+              ? FinanceVerdict.unknown
+              : a.mode == EncryptionMode.plain
+              ? FinanceVerdict.plain
+              : FinanceVerdict.locked,
+          onError: (Object _) => FinanceVerdict.unknown,
         );
-    client.dio.interceptors.add(FinanceGuard(() => known));
+    client.dio.interceptors.add(FinanceGuard(() => verdict));
   }
   return client;
 });

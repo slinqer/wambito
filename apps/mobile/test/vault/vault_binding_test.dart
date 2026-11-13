@@ -79,15 +79,16 @@ void main() {
       expect(c.read(vaultSessionProvider), isNull);
       expect(c.read(vaultGateProvider), isNull);
       expect(gateA.disposed, isTrue);
-      // A finance call waits for B's mode, never for A's vault: plain B goes, unknown B is held.
-      expect(await financeStatus(c), online ? 200 : 423);
+      // A finance call waits for B's mode, never for A's vault: plain B goes, an unknown mode
+      // fails as offline (no response).
+      expect(await financeStatus(c), online ? 200 : null);
 
       if (online) {
         await until(() => c.read(knownPlainProvider));
         expect(await financeStatus(c), 200);
       } else {
         await until(() => c.read(vaultAccountProvider).hasError);
-        expect(await financeStatus(c), 423);
+        expect(await financeStatus(c), isNull);
       }
       expect(c.read(vaultGateProvider), isNull);
       expect(c.read(apiClientProvider).dio.interceptors, isNot(contains(vaultA.interceptor)));

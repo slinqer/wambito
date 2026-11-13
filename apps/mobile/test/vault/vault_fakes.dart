@@ -74,6 +74,12 @@ class FakeServer implements HttpClientAdapter {
   /// `GET /v1/me` answers this status (a problem) when set.
   int? meStatus;
 
+  /// `GET /v2/sync` waits for this while set (the vault stays Opening).
+  Completer<void>? holdSync;
+
+  /// Every `PUT` waits for this while set (a setup stays Committing).
+  Completer<void>? holdPut;
+
   /// The wraps by account id.
   final wraps = <String, List<Object?>>{};
 
@@ -114,8 +120,10 @@ class FakeServer implements HttpClientAdapter {
         if (keysStatus != null) return json({'code': 'nope'}, keysStatus!);
         return json({'wraps': wraps[account?.id] ?? <Object?>[], 'links': <Object?>[]});
       case 'GET /api/v2/sync':
+        await holdSync?.future;
         return json({'records': <Object?>[], 'next': null, 'latest': 0});
       default:
+        if (options.method.toUpperCase() == 'PUT') await holdPut?.future;
         return json(<String, Object?>{});
     }
   }
