@@ -467,6 +467,16 @@ jobs:
           apk="$(ls "$RUNNER_TEMP"/dist/*/wambito-*-arm64-v8a.apk)"
           scripts/check-permissions.sh --apk "$apk"
           scripts/check-licenses.sh --apk "$apk"
+      # The vault uses the system SQLite (sqflite). sqlite3's own library comes only with the dev
+      # dependency sqflite_common_ffi, whose build hook Flutter skips in release builds: it must
+      # never reach a release APK (spec 2026-11-12 section 4.1, F-Droid).
+      - name: No libsqlite3.so in the release APKs
+        run: |
+          for apk in "$RUNNER_TEMP"/dist/*/wambito-*.apk; do
+            if unzip -l "$apk" | grep -q 'libsqlite3\.so'; then
+              echo "$apk ships libsqlite3.so"; exit 1
+            fi
+          done
 
   # The Android app on an emulator, against the dev stack (docs/mobile/setup.md, "Integration tests
   # against the dev stack"). A job of its own: it takes longest, and a slow emulator should not hold
