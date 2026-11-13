@@ -1,0 +1,11 @@
+{
+  "name": "transactions_delete_not_found",
+  "status": 404,
+  "body": {
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "code": "not_found",
+    "detail": "Transaction not found"
+  }
+}

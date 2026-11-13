@@ -1,0 +1,17 @@
+{
+  "name": "recurrences_update_invalid",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "validation_failed",
+    "detail": "The recurrence is invalid",
+    "errors": [
+      {
+        "path": "monthOfYear",
+        "message": "Yearly recurrences need monthOfYear"
+      }
+    ]
+  }
+}

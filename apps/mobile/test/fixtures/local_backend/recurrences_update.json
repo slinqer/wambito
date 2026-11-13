@@ -1,0 +1,15 @@
+{
+  "name": "recurrences_update",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000300",
+    "name": "Rent",
+    "amount": -130000000,
+    "categoryId": "01930000-0000-7000-8000-000000000103",
+    "frequency": "monthly",
+    "dayOfMonth": 5,
+    "monthOfYear": null,
+    "startDate": "2026-08-05",
+    "endDate": null
+  }
+}

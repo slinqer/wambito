@@ -1,0 +1,21 @@
+{
+  "name": "transactions_create_repeat",
+  "status": 201,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000901",
+    "name": "Netflix",
+    "amount": -3000000,
+    "currency": "COP",
+    "date": "2026-10-14",
+    "status": "pending",
+    "note": null,
+    "categoryId": "01930000-0000-7000-8000-000000000103",
+    "recurrenceId": "01930000-0000-7000-8000-000000000900",
+    "importId": null,
+    "source": "app",
+    "needsReview": false,
+    "captureSource": null,
+    "createdAt": "2026-10-21T18:00:00.000Z",
+    "updatedAt": "2026-10-21T18:00:00.000Z"
+  }
+}

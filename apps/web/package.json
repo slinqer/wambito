@@ -12,6 +12,7 @@
     "og": "tsx scripts/og/render.ts",
     "api:types": "tsx scripts/gen-api.ts",
     "storybook": "storybook dev --port 6006",
+    "record:local-backend": "tsx scripts/record-local-backend-fixtures.ts",
     "parity:fixtures": "tsx scripts/parity-fixtures.ts",
     "parity:shots": "tsx scripts/parity-shots.ts",
     "parity:insights-geometry": "tsx scripts/insights-geometry.ts",

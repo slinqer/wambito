@@ -1,0 +1,14 @@
+{
+  "name": "me_patch",
+  "status": 200,
+  "body": {
+    "id": "u1",
+    "email": "ana@example.test",
+    "timezone": "America/Bogota",
+    "locale": "en",
+    "onboardingCompletedAt": "2026-08-01T12:00:00.000Z",
+    "currency": "COP",
+    "isAnonymous": false,
+    "encryption": "preview"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "categories_budget_set",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000101",
+    "name": "Transport",
+    "kind": "expense",
+    "icon": "bus",
+    "color": "#09f",
+    "sortOrder": 2,
+    "archived": false,
+    "currentBudget": 25000000
+  }
+}

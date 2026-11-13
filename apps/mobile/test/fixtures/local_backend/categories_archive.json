@@ -1,0 +1,14 @@
+{
+  "name": "categories_archive",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000103",
+    "name": "Housing",
+    "kind": "expense",
+    "icon": "home",
+    "color": "#a0a",
+    "sortOrder": 4,
+    "archived": true,
+    "currentBudget": 150000000
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "recurrences_list",
+  "status": 200,
+  "body": [
+    {
+      "id": "01930000-0000-7000-8000-000000000300",
+      "name": "Rent",
+      "amount": -120000000,
+      "categoryId": "01930000-0000-7000-8000-000000000103",
+      "frequency": "monthly",
+      "dayOfMonth": 5,
+      "monthOfYear": null,
+      "startDate": "2026-08-05",
+      "endDate": null
+    },
+    {
+      "id": "01930000-0000-7000-8000-000000000301",
+      "name": "Insurance",
+      "amount": -30000000,
+      "categoryId": "01930000-0000-7000-8000-000000000101",
+      "frequency": "yearly",
+      "dayOfMonth": 10,
+      "monthOfYear": 3,
+      "startDate": "2026-03-10",
+      "endDate": null
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "categories_update",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000100",
+    "name": "Groceries",
+    "kind": "expense",
+    "icon": "fork",
+    "color": "#fa0",
+    "sortOrder": 1,
+    "archived": false,
+    "currentBudget": 90000000
+  }
+}

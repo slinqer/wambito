@@ -1,0 +1,21 @@
+{
+  "name": "transactions_update",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000201",
+    "name": "Lunch",
+    "amount": -1800000,
+    "currency": "COP",
+    "date": "2026-10-20",
+    "status": "pending",
+    "note": null,
+    "categoryId": "01930000-0000-7000-8000-000000000100",
+    "recurrenceId": null,
+    "importId": null,
+    "source": "app",
+    "needsReview": false,
+    "captureSource": null,
+    "createdAt": "2026-10-20T15:00:00.000Z",
+    "updatedAt": "2026-10-21T18:00:00.000Z"
+  }
+}

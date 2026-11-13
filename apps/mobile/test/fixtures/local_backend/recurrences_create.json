@@ -1,0 +1,15 @@
+{
+  "name": "recurrences_create",
+  "status": 201,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000900",
+    "name": "Gym",
+    "amount": -8000000,
+    "categoryId": "01930000-0000-7000-8000-000000000100",
+    "frequency": "monthly",
+    "dayOfMonth": 31,
+    "monthOfYear": null,
+    "startDate": "2026-10-01",
+    "endDate": null
+  }
+}

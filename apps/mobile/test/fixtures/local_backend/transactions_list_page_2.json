@@ -1,0 +1,60 @@
+{
+  "name": "transactions_list_page_2",
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "01930000-0000-7000-8000-000000000205",
+        "name": "Mercado",
+        "amount": -5400000,
+        "currency": "COP",
+        "date": "2026-10-15",
+        "status": "paid",
+        "note": "Weekly shop",
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "recurrenceId": null,
+        "importId": null,
+        "source": "app",
+        "needsReview": false,
+        "captureSource": null,
+        "createdAt": "2026-10-15T15:00:00.000Z",
+        "updatedAt": "2026-10-15T15:00:00.000Z"
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000202",
+        "name": "Almuerzo",
+        "amount": -2200000,
+        "currency": "COP",
+        "date": "2026-10-12",
+        "status": "paid",
+        "note": null,
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "recurrenceId": null,
+        "importId": null,
+        "source": "app",
+        "needsReview": false,
+        "captureSource": null,
+        "createdAt": "2026-10-12T15:00:00.000Z",
+        "updatedAt": "2026-10-12T15:00:00.000Z"
+      },
+      {
+        "id": "8d8900c2-7386-5e81-ba69-f81ead5d7ec6",
+        "name": "Rent",
+        "amount": -120000000,
+        "currency": "COP",
+        "date": "2026-10-05",
+        "status": "pending",
+        "note": null,
+        "categoryId": "01930000-0000-7000-8000-000000000103",
+        "recurrenceId": "01930000-0000-7000-8000-000000000300",
+        "importId": null,
+        "source": "recurrence",
+        "needsReview": false,
+        "captureSource": null,
+        "createdAt": "2026-10-21T18:00:00.000Z",
+        "updatedAt": "2026-10-21T18:00:00.000Z"
+      }
+    ],
+    "nextCursor": "MjAyNi0xMC0wNXw4ZDg5MDBjMi03Mzg2LTVlODEtYmE2OS1mODFlYWQ1ZDdlYzY"
+  }
+}

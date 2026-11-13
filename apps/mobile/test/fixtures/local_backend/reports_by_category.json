@@ -1,0 +1,41 @@
+{
+  "name": "reports_by_category",
+  "status": 200,
+  "body": {
+    "total": 257900000,
+    "items": [
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000103",
+        "name": "Housing",
+        "icon": "home",
+        "color": "#a0a",
+        "total": 240000000,
+        "share": 0.9306
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "name": "Food",
+        "icon": "fork",
+        "color": "#f90",
+        "total": 15100000,
+        "share": 0.0585
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000101",
+        "name": "Transport",
+        "icon": "bus",
+        "color": "#09f",
+        "total": 1800000,
+        "share": 0.007
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000104",
+        "name": "Old",
+        "icon": "box",
+        "color": "#999",
+        "total": 1000000,
+        "share": 0.0039
+      }
+    ]
+  }
+}

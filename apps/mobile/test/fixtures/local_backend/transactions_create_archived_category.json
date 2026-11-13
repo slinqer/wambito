@@ -1,0 +1,11 @@
+{
+  "name": "transactions_create_archived_category",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "category_not_found",
+    "detail": "Pick one of your active categories"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "reports_by_category_income",
+  "status": 200,
+  "body": {
+    "total": 450000000,
+    "items": [
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000102",
+        "name": "Salary",
+        "icon": "coin",
+        "color": "#0a0",
+        "total": 450000000,
+        "share": 1
+      }
+    ]
+  }
+}

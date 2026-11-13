@@ -1,0 +1,14 @@
+{
+  "name": "categories_create",
+  "status": 201,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000900",
+    "name": "Pets",
+    "kind": "expense",
+    "icon": "paw",
+    "color": "#f0f",
+    "sortOrder": 0,
+    "archived": false,
+    "currentBudget": null
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "transactions_create",
+  "status": 201,
+  "body": {
+    "id": "01930000-0000-7000-8000-000000000900",
+    "name": "Dinner",
+    "amount": -3500000,
+    "currency": "COP",
+    "date": "2026-10-21",
+    "status": "paid",
+    "note": "With friends",
+    "categoryId": "01930000-0000-7000-8000-000000000100",
+    "recurrenceId": null,
+    "importId": null,
+    "source": "app",
+    "needsReview": false,
+    "captureSource": null,
+    "createdAt": "2026-10-21T18:00:00.000Z",
+    "updatedAt": "2026-10-21T18:00:00.000Z"
+  }
+}

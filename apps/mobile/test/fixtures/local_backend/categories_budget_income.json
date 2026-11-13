@@ -1,0 +1,11 @@
+{
+  "name": "categories_budget_income",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "budget_category_not_expense",
+    "detail": "Only expense categories have budgets"
+  }
+}

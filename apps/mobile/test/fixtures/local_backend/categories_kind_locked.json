@@ -1,0 +1,11 @@
+{
+  "name": "categories_kind_locked",
+  "status": 409,
+  "body": {
+    "type": "about:blank",
+    "title": "Conflict",
+    "status": 409,
+    "code": "category_has_transactions",
+    "detail": "A category with transactions cannot change its kind"
+  }
+}

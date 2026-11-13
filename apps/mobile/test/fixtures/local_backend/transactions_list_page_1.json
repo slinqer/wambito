@@ -1,0 +1,65 @@
+{
+  "name": "transactions_list_page_1",
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "01930000-0000-7000-8000-000000000206",
+        "name": "Taxi",
+        "amount": -1500000,
+        "currency": "COP",
+        "date": "2026-10-22",
+        "status": "pending",
+        "note": null,
+        "categoryId": "01930000-0000-7000-8000-000000000101",
+        "recurrenceId": null,
+        "importId": null,
+        "source": "app",
+        "needsReview": false,
+        "captureSource": null,
+        "createdAt": "2026-10-22T15:00:00.000Z",
+        "updatedAt": "2026-10-22T15:00:00.000Z"
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000207",
+        "name": "Cafe",
+        "amount": -900000,
+        "currency": "COP",
+        "date": "2026-10-21",
+        "status": "paid",
+        "note": null,
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "recurrenceId": null,
+        "importId": null,
+        "source": "capture",
+        "needsReview": true,
+        "captureSource": "notification",
+        "createdAt": "2026-10-21T15:00:00.000Z",
+        "updatedAt": "2026-10-21T15:00:00.000Z"
+      },
+      {
+        "id": "01930000-0000-7000-8000-000000000201",
+        "name": "Almuerzo",
+        "amount": -1800000,
+        "currency": "COP",
+        "date": "2026-10-20",
+        "status": "paid",
+        "note": null,
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "recurrenceId": null,
+        "importId": null,
+        "source": "app",
+        "needsReview": false,
+        "captureSource": null,
+        "createdAt": "2026-10-20T15:00:00.000Z",
+        "updatedAt": "2026-10-20T15:00:00.000Z"
+      }
+    ],
+    "nextCursor": "MjAyNi0xMC0yMHwwMTkzMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAyMDE",
+    "totals": {
+      "count": 8,
+      "expense": 132100000,
+      "income": 450000000
+    }
+  }
+}

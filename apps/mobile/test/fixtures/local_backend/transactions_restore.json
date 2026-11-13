@@ -1,0 +1,21 @@
+{
+  "name": "transactions_restore",
+  "status": 200,
+  "body": {
+    "id": "01930000-0000-7000-8000-00000000020b",
+    "name": "Concert",
+    "amount": -8000000,
+    "currency": "COP",
+    "date": "2026-10-10",
+    "status": "paid",
+    "note": null,
+    "categoryId": "01930000-0000-7000-8000-000000000100",
+    "recurrenceId": null,
+    "importId": null,
+    "source": "app",
+    "needsReview": false,
+    "captureSource": null,
+    "createdAt": "2026-10-10T15:00:00.000Z",
+    "updatedAt": "2026-10-10T15:00:00.000Z"
+  }
+}

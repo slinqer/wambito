@@ -1,0 +1,29 @@
+{
+  "name": "transactions_create_invalid",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "validation_failed",
+    "detail": "The request is invalid",
+    "errors": [
+      {
+        "path": "name",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "amount",
+        "message": "Amount cannot be zero"
+      },
+      {
+        "path": "categoryId",
+        "message": "Invalid UUID"
+      },
+      {
+        "path": "date",
+        "message": "Expected a date as YYYY-MM-DD"
+      }
+    ]
+  }
+}

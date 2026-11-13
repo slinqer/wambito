@@ -1,0 +1,11 @@
+{
+  "name": "me_patch_currency_locked",
+  "status": 409,
+  "body": {
+    "type": "about:blank",
+    "title": "Conflict",
+    "status": 409,
+    "code": "currency_locked",
+    "detail": "The currency cannot change once the account has transactions or recurrences"
+  }
+}

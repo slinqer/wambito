@@ -1,0 +1,46 @@
+{
+  "name": "categories_list",
+  "status": 200,
+  "body": [
+    {
+      "id": "01930000-0000-7000-8000-000000000100",
+      "name": "Food",
+      "kind": "expense",
+      "icon": "fork",
+      "color": "#f90",
+      "sortOrder": 1,
+      "archived": false,
+      "currentBudget": 90000000
+    },
+    {
+      "id": "01930000-0000-7000-8000-000000000101",
+      "name": "Transport",
+      "kind": "expense",
+      "icon": "bus",
+      "color": "#09f",
+      "sortOrder": 2,
+      "archived": false,
+      "currentBudget": 20000000
+    },
+    {
+      "id": "01930000-0000-7000-8000-000000000102",
+      "name": "Salary",
+      "kind": "income",
+      "icon": "coin",
+      "color": "#0a0",
+      "sortOrder": 3,
+      "archived": false,
+      "currentBudget": null
+    },
+    {
+      "id": "01930000-0000-7000-8000-000000000103",
+      "name": "Housing",
+      "kind": "expense",
+      "icon": "home",
+      "color": "#a0a",
+      "sortOrder": 4,
+      "archived": false,
+      "currentBudget": 150000000
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "transactions_update_empty",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "validation_failed",
+    "detail": "The request is invalid",
+    "errors": [
+      {
+        "path": "",
+        "message": "Provide at least one field"
+      }
+    ]
+  }
+}

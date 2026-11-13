@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../crypto/crypto.dart';
+import 'ids.dart';
 import 'key_storage.dart';
 import 'keys_error.dart';
 import 'prf.dart';
@@ -463,27 +463,6 @@ Future<void> forgetDevice(String userId, KeyStorage storage) => storage.deleteAl
 // ---------------------------------------------------------------------------------------------
 // Setup and unlock (Task 10).
 
-final _random = Random.secure();
-
-/// A lower-case UUID v7 (48 bits of milliseconds, 74 random bits) for a new wrap's id, as keys.ts
-/// takes `uuidv7()` from ids.ts. The wrap ids need no in-process ordering, so this is not ids.ts's
-/// monotonic generator (Task 11's lib/local/ids.dart).
-String _uuidv7() {
-  final ms = DateTime.now().millisecondsSinceEpoch;
-  final b = Uint8List(16);
-  for (var i = 0; i < 6; i++) {
-    b[i] = (ms >> (8 * (5 - i))) & 0xff;
-  }
-  for (var i = 6; i < 16; i++) {
-    b[i] = _random.nextInt(256);
-  }
-  b[6] = (b[6] & 0x0f) | 0x70;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-      '${hex.substring(16, 20)}-${hex.substring(20)}';
-}
-
 /// A device wrap's label, so the person can tell their devices apart in Settings → Security. The
 /// web's is `"<browser> on <OS>"` (device-label.ts); the phone's is the app on its system.
 String _deviceLabel() => switch (defaultTargetPlatform) {
@@ -501,7 +480,7 @@ Future<_Device> _prepareDevice(
   int keyV,
   DeviceKeyPair pair,
 ) async {
-  final id = _uuidv7();
+  final id = uuidv7();
   final wrapped = await sealToDevice(
     pair.publicKey,
     WrapContext(kind: WrapKind.device, userId: userId, keyV: keyV),
@@ -664,7 +643,7 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
 
   final dataKey = generateDataKey();
   final secret = newRecoverySecret();
-  final recoveryId = _uuidv7();
+  final recoveryId = uuidv7();
   final Map<String, Object?> recoveryBody;
   final _Device device;
   final String? recoveryKey;
@@ -826,7 +805,7 @@ Future<void> addPasskeyWrap(KeysOptions options, PasskeyPrf passkey) =>
         dataKey,
       );
       await call(
-        '/v2/keys/${existing?.id ?? _uuidv7()}',
+        '/v2/keys/${existing?.id ?? uuidv7()}',
         method: 'PUT',
         data: {
           'kind': 'passkey',

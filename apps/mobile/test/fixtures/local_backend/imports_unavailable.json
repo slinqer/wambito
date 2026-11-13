@@ -1,0 +1,11 @@
+{
+  "name": "imports_unavailable",
+  "status": 403,
+  "body": {
+    "type": "about:blank",
+    "title": "Forbidden",
+    "status": 403,
+    "code": "demo_unavailable",
+    "detail": "Not in the demo"
+  }
+}
