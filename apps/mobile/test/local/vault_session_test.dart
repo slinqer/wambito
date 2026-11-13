@@ -207,6 +207,7 @@ Future<VaultSession> open(
   void Function()? onUnauthorized,
   void Function()? onSessionChanged,
   Future<SqliteStore> Function(String userId)? store,
+  Future<LocalKeys> Function(KeysOptions options)? refresh,
 }) {
   _opened.add(profile.id);
   return openVaultSession(
@@ -221,6 +222,7 @@ Future<VaultSession> open(
       openStore: store ?? openStore,
       deleteStore: deleteStore,
       syncDebounce: const Duration(milliseconds: 20),
+      refreshKeys: refresh,
     ),
   );
 }
@@ -519,6 +521,140 @@ void main() {
       expect(vaultExists(profile.id), isFalse);
       expect(await storedEntries(), isEmpty);
     });
+  });
+
+  group('a key refresh in flight at sign-out', () {
+    // A pulled record under key version 2 makes the run refresh the keys; the refresh is held
+    // across `forgetVault`, then ends as [outcome] says.
+    const rotated = {
+      'id': '01930000-0000-7000-8000-0000000000fe',
+      'type': 'category',
+      'version': 1,
+      'deleted': false,
+      'keyV': 2,
+      'encV': 1,
+      'body': 'AAAA',
+    };
+
+    Future<({VaultSession session, Completer<void> hold, Completer<void> started})> heldRefresh(
+      VaultProfile profile,
+      FakeNetwork net,
+      Future<LocalKeys> Function() outcome,
+    ) async {
+      final dk = generateDataKey();
+      await storage.writeDataKey(profile.id, 1, dk);
+      await storage.setCurrent(profile.id, 1);
+      final hold = Completer<void>();
+      final started = Completer<void>();
+      var first = true;
+      final session = await open(
+        profile,
+        net: net,
+        keys: LocalKeys(keyring: Keyring(current: 1, byVersion: {1: await deriveRecordKeys(dk)})),
+        refresh: (_) async {
+          if (!first) throw const KeysError('device_removed');
+          first = false;
+          started.complete();
+          await hold.future;
+          return outcome();
+        },
+      );
+      await wait(100); // the start's own run
+      return (session: session, hold: hold, started: started);
+    }
+
+    for (final (name, ends) in [
+      ('success', 'ok'),
+      ('device_removed', 'device_removed'),
+      ('tampered', 'tampered'),
+    ]) {
+      test('a refresh that ends in $name after sign-out ends closed and fires nothing', () async {
+        final net = FakeNetwork();
+        final profile = profileOf();
+        final dk2 = generateDataKey();
+        final (:session, :hold, :started) = await heldRefresh(profile, net, () async {
+          if (ends == 'device_removed') throw const KeysError('device_removed');
+          if (ends == 'tampered') throw const KeysError('tampered');
+          // a refresh that kept a newer version: it writes after the sign-out deleted the keys
+          await storage.writeDataKey(profile.id, 2, dk2);
+          await storage.setCurrent(profile.id, 2);
+          return LocalKeys(
+            keyring: Keyring(current: 2, byVersion: {2: await deriveRecordKeys(dk2)}),
+          );
+        });
+        var removed = 0;
+        var unverified = 0;
+        var closed = 0;
+        session
+          ..onRemoved(() => removed += 1)
+          ..onUnverified(() => unverified += 1)
+          ..onClosed(() => closed += 1);
+        net.records = [rotated];
+        final syncing = session.sync();
+        await started.future;
+        await forgetVault(profile.id, storage, deleteStore: deleteStore);
+        hold.complete();
+        final result = await syncing;
+        await wait(100);
+        expect(result.error, SyncProblemCode.closed);
+        expect(removed, 0);
+        expect(unverified, 0);
+        expect(closed, 0);
+        expect(vaultExists(profile.id), isFalse);
+        expect(await storedEntries(), isEmpty);
+      });
+    }
+
+    for (final ends in ['ok', 'device_removed']) {
+      test('the same account opened again before a stale refresh ($ends) returns keeps its vault '
+          'and keys', () async {
+        final net = FakeNetwork();
+        final profile = profileOf();
+        final stale = generateDataKey();
+        final (:session, :hold, :started) = await heldRefresh(profile, net, () async {
+          if (ends == 'device_removed') throw const KeysError('device_removed');
+          await storage.writeDataKey(profile.id, 2, stale);
+          await storage.setCurrent(profile.id, 2);
+          return LocalKeys(
+            keyring: Keyring(current: 2, byVersion: {2: await deriveRecordKeys(stale)}),
+          );
+        });
+        var removed = 0;
+        session.onRemoved(() => removed += 1);
+        net.records = [rotated];
+        final syncing = session.sync();
+        await started.future;
+        await forgetVault(profile.id, storage, deleteStore: deleteStore);
+
+        // signed in and unlocked again: a new session of the same account
+        net.records = [];
+        final dk = generateDataKey();
+        await storage.writeDataKey(profile.id, 1, dk);
+        await storage.setCurrent(profile.id, 1);
+        SqliteStore? store;
+        final again = await open(
+          profile,
+          net: net,
+          keys: LocalKeys(keyring: Keyring(current: 1, byVersion: {1: await deriveRecordKeys(dk)})),
+          store: (userId) async => store = await openStore(userId),
+        );
+        await wait(100);
+        final dio = appDio(again, net..mode = Mode.offline);
+        final first = ((await send(dio, 'GET', '/v1/categories')).data! as List).first as Map;
+        await send(dio, 'PATCH', '/v1/categories/${first['id']}', {'name': 'Unsynced'});
+
+        hold.complete();
+        expect((await syncing).error, SyncProblemCode.closed);
+        await wait(100);
+        expect(removed, 0);
+        expect(store!.isClosed, isFalse);
+        expect(vaultExists(profile.id), isTrue);
+        expect(await again.pendingChanges(), 1);
+        expect(await storage.current(profile.id), isNotNull);
+        expect(await storage.readDataKey(profile.id, 1), isNotNull);
+        await again.close();
+      });
+    }
   });
 
   group('this phone removed from the account', () {

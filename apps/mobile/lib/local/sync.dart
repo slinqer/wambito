@@ -335,18 +335,27 @@ Json _mergeBodies(Json? local, Json? server, List<String> touched) {
 typedef _Opened = ({Json? body, String? reason});
 
 /// Runs of one account, one at a time in this process (sync.ts takes a Web Lock across tabs).
-final Map<String, Future<void>> _locks = {};
+final Map<String, Completer<void>> _locks = {};
 
-Future<R> _locked<R>(String userId, Future<R> Function() fn) async {
-  final previous = _locks[userId] ?? Future<void>.value();
-  final done = Completer<void>();
-  final mine = done.future;
+/// Runs [fn] once no other run of [userId] holds the lock. A run whose [store] is closed (sign-out,
+/// a removal) lets the next one go at once: it can write nothing more, and a new session of the same
+/// account must not wait for its network.
+Future<R> _locked<R>(String userId, SqliteStore store, Future<R> Function() fn) async {
+  final previous = _locks[userId];
+  final mine = Completer<void>();
   _locks[userId] = mine;
+  void release() {
+    if (!mine.isCompleted) mine.complete();
+  }
+
+  final unsubscribe = store.onClosed(release);
+  if (store.isClosed) release();
   try {
-    await previous;
+    if (previous != null) await previous.future;
     return await fn();
   } finally {
-    done.complete();
+    unsubscribe();
+    release();
     if (identical(_locks[userId], mine)) _locks.remove(userId);
   }
 }
@@ -980,7 +989,7 @@ class _Engine implements SyncEngine {
     final future = () async {
       _running = true;
       try {
-        return await _locked(userId, () async {
+        return await _locked(userId, store, () async {
           // Key refreshes are counted per run, across its passes.
           resetRefreshes();
           SyncResult? last;

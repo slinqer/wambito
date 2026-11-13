@@ -63,6 +63,7 @@ class OpenVaultOptions {
     this.openStore,
     this.deleteStore,
     this.syncDebounce = const Duration(seconds: 1),
+    this.refreshKeys,
   });
 
   final VaultProfile profile;
@@ -90,6 +91,9 @@ class OpenVaultOptions {
 
   /// The wait between a local write and its sync.
   final Duration syncDebounce;
+
+  /// `keys.dart`'s `refreshKeys`; tests pass their own to hold or fail a refresh.
+  final Future<LocalKeys> Function(KeysOptions options)? refreshKeys;
 }
 
 /// The open vault of one account.
@@ -199,6 +203,13 @@ Future<void> _closeStore(String userId, SqliteStore store) {
 }
 
 Future<void> _defaultDelete(String userId) => deleteVault(userId);
+
+/// Whether a wipe by account id (the vault file, the keys) still belongs to [mine]: no newer open
+/// of the same account exists in the process.
+bool _mayWipe(_Active mine) {
+  final current = _active;
+  return current == null || identical(current, mine) || current.userId != mine.userId;
+}
 
 /// The namespace of the seeded records' ids; the account's own namespace is made from it.
 const _seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
@@ -312,12 +323,20 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
         keyring: options.keys.keyring,
         refreshKeys: () async {
           if (mine.forgotten) throw const VaultClosedError();
-          final local = await refreshKeys(
-            KeysOptions(userId: userId, dio: network, storage: storage),
-          );
+          final LocalKeys local;
+          try {
+            local = await (options.refreshKeys ?? refreshKeys)(
+              KeysOptions(userId: userId, dio: network, storage: storage),
+            );
+          } on Object {
+            // Signed out while it ran: its failure is the old session's, never reported.
+            if (mine.forgotten) throw const VaultClosedError();
+            rethrow;
+          }
           if (mine.forgotten) {
-            // Signed out while the refresh ran: whatever it kept goes too.
-            await forgetDevice(userId, storage);
+            // Signed out while the refresh ran: whatever it kept goes too, unless the account is
+            // open (or opening) again, whose keys these now are.
+            if (_mayWipe(mine)) await forgetDevice(userId, storage);
             throw const VaultClosedError();
           }
           return local.keyring;
@@ -325,6 +344,8 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
         dropKeyVersion: (v) => dropKeyVersion(userId, v, storage),
         debounce: options.syncDebounce,
         onError: (problem) {
+          // A signed-out or closing session tells nobody anything (a late run of it ends here).
+          if (mine.forgotten || (opened?._closing ?? false)) return;
           switch (problem.code) {
             case SyncProblemCode.unauthorized:
               options.onUnauthorized?.call();
@@ -347,8 +368,10 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     final first = await engine.run();
     if (first.problem == SyncProblemCode.deviceRemoved) {
       await _closeStore(userId, store);
-      await deleteStore(userId);
-      await forgetDevice(userId, storage);
+      if (_mayWipe(mine)) {
+        await deleteStore(userId);
+        await forgetDevice(userId, storage);
+      }
       throw const VaultOpenError(SyncProblemCode.deviceRemoved);
     }
     // Never opened on a key version that did not verify; the vault stays (the catch closes it).
@@ -390,10 +413,17 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     removed = () {
       removed = null;
       unawaited(() async {
-        await session.close();
         try {
-          await deleteStore(userId);
-          await forgetDevice(userId, storage);
+          await session.close();
+        } on Object {
+          // closed or not, the vault goes and the gate is told
+        }
+        try {
+          // Only while the vault is still this session's (a sign-out may have come first).
+          if (_mayWipe(mine)) {
+            await deleteStore(userId);
+            await forgetDevice(userId, storage);
+          }
         } on Object {
           // the gate still shows Unlock; sign-out deletes them again
         }

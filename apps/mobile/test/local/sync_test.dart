@@ -488,6 +488,8 @@ void main() {
       expect(server.rows, hasLength(3));
       expect(await one.store.readOutbox(10), isEmpty);
       expect(server.posts, 1);
+      // the held run's pull, its follow-up pass (push + pull), and exactly one more run's pull
+      expect(server.gets, 3);
       stop();
     });
 
