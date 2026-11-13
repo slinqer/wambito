@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../core/schemas.dart' show supportedLocales;
 import '../core/suggested_categories.dart';
@@ -189,8 +190,20 @@ _Active? _active;
 /// Stores closing, by account: the next open of the same account waits for the file.
 final Map<String, Future<void>> _closings = {};
 
+/// Closes a store: [SqliteStore.close]. A test seam (a close that never finishes); production code
+/// never changes it.
+@visibleForTesting
+Future<void> Function(SqliteStore store) vaultCloseStore = defaultVaultCloseStore;
+
+@visibleForTesting
+Future<void> defaultVaultCloseStore(SqliteStore store) => store.close();
+
+/// The most a sign-out waits for the vault to close before it deletes the file and the keys anyway
+/// (as `SessionController.signOutWait` for the server).
+const vaultCloseWait = Duration(seconds: 10);
+
 Future<void> _closeStore(String userId, SqliteStore store) {
-  final closing = store.close();
+  final closing = vaultCloseStore(store);
   _closings[userId] = closing;
   unawaited(
     closing
@@ -485,13 +498,15 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
   }
 }
 
-/// Sign-out (and a lost session): stops the sync, closes the store, deletes the vault file of
-/// [userId] and every one of its keys. A run still in flight ends `closed` and writes nothing.
+/// Sign-out (and a stale vault swept): stops the sync, closes the store (waiting at most
+/// [closeWait]), deletes the vault file of [userId] and every one of its keys. A run still in
+/// flight ends `closed` and writes nothing.
 /// [deleteStore] is for tests (default: the open session's, else the app's vault).
 Future<void> forgetVault(
   String userId,
   KeyStorage storage, {
   Future<void> Function(String userId)? deleteStore,
+  Duration closeWait = vaultCloseWait,
 }) async {
   var delete = deleteStore;
   final current = _active;
@@ -501,13 +516,24 @@ Future<void> forgetVault(
     delete ??= current.deleteStore;
     final session = current.session;
     final store = current.store;
-    if (session != null) {
-      await session.close();
-    } else if (store != null) {
-      await _closeStore(userId, store);
+    try {
+      if (session != null) {
+        await session.close().timeout(closeWait);
+      } else if (store != null) {
+        await _closeStore(userId, store).timeout(closeWait);
+      }
+    } on TimeoutException {
+      // A close that hangs never keeps the vault: the file and the keys go below all the same.
     }
   }
-  await _closings[userId];
+  final closing = _closings[userId];
+  if (closing != null) {
+    try {
+      await closing.timeout(closeWait);
+    } on TimeoutException {
+      // See above.
+    }
+  }
   await (delete ?? _defaultDelete)(userId);
   await forgetDevice(userId, storage);
 }

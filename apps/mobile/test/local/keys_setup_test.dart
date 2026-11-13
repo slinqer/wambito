@@ -169,6 +169,34 @@ void main() {
   });
 
   group('prepareAccount', () {
+    test('a preparation that fails zeroes the data key and the device private key', () async {
+      final made = <Uint8List>[];
+      keysGenerateDataKey = () {
+        final dataKey = generateDataKey();
+        made.add(dataKey);
+        return dataKey;
+      };
+      keysGenerateDeviceKeyPair = () async {
+        final pair = await generateDeviceKeyPair();
+        made.add(pair.privateKey);
+        return pair;
+      };
+      keysWrapDataKey = (secret, ctx, dk) async => throw StateError('the platform failed');
+      addTearDown(() {
+        keysGenerateDataKey = generateDataKey;
+        keysGenerateDeviceKeyPair = generateDeviceKeyPair;
+        keysWrapDataKey = wrapDataKey;
+      });
+      final api = FakeKeys();
+      await expectLater(
+        prepareAccount(optionsOf(api, newUser(), memoryKeyStorage()), guest: false),
+        throwsA(isA<StateError>()),
+      );
+      expect(made, hasLength(2));
+      expect(made.every(zeroed), isTrue);
+      expect(api.wraps, isEmpty);
+    });
+
     test('sends and stores nothing until commit()', () async {
       final api = FakeKeys();
       final storage = memoryKeyStorage();

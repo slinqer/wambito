@@ -121,6 +121,16 @@ keysOpenFromDevice = openFromDevice;
 @visibleForTesting
 Uint8List Function(String text) keysParseRecoveryKey = parseRecoveryKey;
 
+/// Test seams of [prepareAccount]: the keys it makes (to check they are zeroed) and the wrap that
+/// may fail. Production code never changes them.
+@visibleForTesting
+Uint8List Function() keysGenerateDataKey = generateDataKey;
+@visibleForTesting
+Future<DeviceKeyPair> Function() keysGenerateDeviceKeyPair = generateDeviceKeyPair;
+@visibleForTesting
+Future<Uint8List> Function(Uint8List secret, WrapContext ctx, Uint8List dataKey) keysWrapDataKey =
+    wrapDataKey;
+
 /// `/v2/keys` calls for the vault's account. Every call carries `x-wambito-user`: a session that
 /// now belongs to someone else gets a 409 `session_changed`.
 KeysApi api(KeysOptions options) {
@@ -632,7 +642,7 @@ class PreparedAccount {
 Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest}) async {
   final userId = options.userId;
   final storage = options.storage;
-  final pair = await generateDeviceKeyPair();
+  final pair = await keysGenerateDeviceKeyPair();
   final call = api(options);
   try {
     if ((await listWraps(call)).isNotEmpty) throw const KeysError('already_set_up');
@@ -641,7 +651,7 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
     rethrow;
   }
 
-  final dataKey = generateDataKey();
+  final dataKey = keysGenerateDataKey();
   final secret = newRecoverySecret();
   final recoveryId = uuidv7();
   final Map<String, Object?> recoveryBody;
@@ -652,7 +662,7 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
       'kind': 'recovery',
       'keyV': firstKeyV,
       'wrapped': toBase64Url(
-        await wrapDataKey(
+        await keysWrapDataKey(
           secret,
           WrapContext(kind: WrapKind.recovery, userId: userId, keyV: firstKeyV),
           dataKey,
@@ -661,6 +671,11 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
     };
     device = await _prepareDevice(userId, dataKey, firstKeyV, pair);
     recoveryKey = guest ? null : formatRecoveryKey(secret);
+  } on Object {
+    // Nothing was prepared: neither key is ever used.
+    _zero(dataKey);
+    _zero(pair.privateKey);
+    rethrow;
   } finally {
     _zero(secret);
   }

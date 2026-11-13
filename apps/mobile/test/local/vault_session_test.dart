@@ -488,6 +488,25 @@ void main() {
       await store.close();
     });
 
+    test('a close that never finishes is waited for only so long: the file and the keys still '
+        'go', () async {
+      final profile = profileOf();
+      await open(profile, net: FakeNetwork(), keys: await keys());
+      await storage.setCurrent(profile.id, 1);
+      final never = Completer<void>();
+      vaultCloseStore = (store) => never.future;
+      addTearDown(() => vaultCloseStore = defaultVaultCloseStore);
+      await forgetVault(
+        profile.id,
+        storage,
+        deleteStore: deleteStore,
+        closeWait: const Duration(milliseconds: 50),
+      ).timeout(const Duration(seconds: 5));
+      expect(vaultExists(profile.id), isFalse);
+      expect(await storage.current(profile.id), isNull);
+      expect(await storage.versions(profile.id), isEmpty);
+    });
+
     test('does nothing when the account never opened a vault here', () async {
       await expectLater(
         forgetVault('vault_user_never', storage, deleteStore: deleteStore),

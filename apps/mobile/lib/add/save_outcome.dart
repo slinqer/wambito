@@ -19,14 +19,17 @@ import 'add_form.dart';
 /// the words for a failure, and the toast with Deshacer (the web's `useTransactionActions`).
 
 /// Whether sending the same request again can work: no answer at all (offline, a lost
-/// connection), a server error or timeout, too many requests, or the first try still running. Not
-/// a refusal (a 4xx such as an invalid amount), which says the same every time.
+/// connection), a server error or timeout, too many requests, the first try still running, or a
+/// `preview` account's vault not open yet (423 `vault_locked`, lib/vault/finance_guard.dart: it
+/// opens once unlocked, and a save waiting for it is never dropped). Not a refusal (a 4xx such as
+/// an invalid amount), which says the same every time.
 bool canRetrySave(HomeFailure failure) =>
     failure.status == 0 ||
     failure.status >= 500 ||
     failure.status == 408 ||
     failure.status == 429 ||
-    failure.code == 'idempotency_in_progress';
+    failure.code == 'idempotency_in_progress' ||
+    (failure.status == 423 && failure.code == 'vault_locked');
 
 /// What the sheet says when a save fails.
 String saveFailureMessage(AppLocalizations l10n, HomeFailure failure) {
