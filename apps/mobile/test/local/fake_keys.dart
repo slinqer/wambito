@@ -3,8 +3,71 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/crypto/crypto.dart';
-import 'package:wambito/local/key_storage.dart';
+import 'package:wambito/local/keys.dart';
+
+const rec = '01930000-0000-7000-8000-00000000000a';
+RecordContext ctx(String userId, int keyV) =>
+    RecordContext(userId: userId, type: RecordType.category, id: rec, keyV: keyV);
+
+var _counter = 0;
+String newUser() => 'user_${++_counter}';
+
+RecordKeys currentKeys(LocalKeys? local) => local!.keyring.byVersion[local.keyring.current]!;
+
+bool zeroed(Uint8List key) => key.every((b) => b == 0);
+
+/// A record sealed under [dk] at [keyV] opens with the keyring's keys for [keyV].
+Future<bool> opensUnder(LocalKeys local, String userId, Uint8List dk, int keyV) async {
+  final keys = local.keyring.byVersion[keyV];
+  if (keys == null) return false;
+  final sealed = await sealRecord(await deriveRecordKeys(dk), ctx(userId, keyV), {'keyV': keyV});
+  try {
+    return (await openRecord(keys, ctx(userId, keyV), sealed) as Map)['keyV'] == keyV;
+  } on CryptoError {
+    return false;
+  }
+}
+
+Future<Object?> caught(Future<Object?> Function() run) async {
+  try {
+    await run();
+    return null;
+  } on Object catch (e) {
+    return e;
+  }
+}
+
+Matcher isKeysError(String code, [int? status]) =>
+    isA<KeysError>().having((e) => e.code, 'code', code).having((e) => e.status, 'status', status);
+
+/// Every older data key the link walk and every data key the device wrap handed out, to check
+/// that they are zeroed (the web's test mocks `openKeyLink` and `openFromDevice` the same way).
+final openedLinks = <Uint8List>[];
+final openedDevice = <Uint8List>[];
+
+/// Puts the recording seams in for each test of the calling file, and the real ones back after.
+void recordOpenedKeys() {
+  setUp(() {
+    openedLinks.clear();
+    openedDevice.clear();
+    keysOpenKeyLink = (newKey, c, link) async {
+      final key = await openKeyLink(newKey, c, link);
+      openedLinks.add(key);
+      return key;
+    };
+    keysOpenFromDevice = (privateKey, c, sealed) async {
+      final key = await openFromDevice(privateKey, c, sealed);
+      openedDevice.add(key);
+      return key;
+    };
+  });
+  tearDown(() {
+    keysOpenKeyLink = openKeyLink;
+    keysOpenFromDevice = openFromDevice;
+  });
+}
 
 /// A wrap as the fake `/v2/keys` keeps it (the twin of `Wrap` in apps/web/app/local/keys.test.ts).
 class FakeWrap {
@@ -75,6 +138,10 @@ class FakeKeys implements HttpClientAdapter {
   /// When set, every request fails as if the network were down.
   bool offline = false;
 
+  /// When set, sees each request once it is recorded: an answer (status, JSON body) replaces the
+  /// fake's, `null` lets it through, and a throw is a network failure.
+  (int, Object?)? Function(FakeCall call)? intercept;
+
   Dio dio() => Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = this;
 
   List<FakeCall> get puts => calls.where((c) => c.method == 'PUT').toList();
@@ -109,6 +176,8 @@ class FakeKeys implements HttpClientAdapter {
       FakeCall(method, path, options.headers['x-wambito-user'] as String?, ifNoneMatch, body),
     );
     if (answerAll != null) return _json(answerAll!.$2, answerAll!.$1);
+    final hooked = intercept?.call(calls.last);
+    if (hooked != null) return _json(hooked.$2, hooked.$1);
 
     if (path == '/api/v2/keys' && method == 'GET') {
       final sorted = links.keys.toList()..sort();

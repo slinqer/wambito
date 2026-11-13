@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../crypto/crypto.dart';
 import 'key_storage.dart';
 import 'keys_error.dart';
+import 'prf.dart';
 
 export 'key_storage.dart';
 export 'keys_error.dart';
@@ -18,13 +20,17 @@ export 'keys_error.dart';
 /// phone compares the two data keys in constant time. All network goes through [KeysOptions.dio]
 /// (base `<server>/api`), every call naming the vault's account.
 ///
-/// This file holds the loading and acceptance half (Task 9); the setup and unlock half (Task 10:
-/// enroll, prepareAccount, unlockWith*, addPasskeyWrap) builds on [olderForTrustedKey].
+/// The loading and acceptance half (Task 9) comes first; the setup and unlock half (Task 10:
+/// [enrollDevice], [prepareAccount], [unlockWithRecovery], [unlockWithPasskey], [addPasskeyWrap])
+/// builds on [olderForTrustedKey] at the end.
 ///
 /// Codes of [KeysError] (as `KeysErrorCode` in keys.ts): `already_set_up`, `bad_recovery_key`,
 /// `wrong_recovery_key`, `offline`, `server`, `unsupported_browser`, `session_changed`,
 /// `device_removed`, `rotated_elsewhere`, `no_prf`, `no_passkey_wrap`, `unknown_passkey`,
 /// `tampered`.
+
+/// The key version a new account starts at.
+const firstKeyV = 1;
 
 class KeysOptions {
   const KeysOptions({required this.userId, required this.dio, required this.storage});
@@ -110,6 +116,10 @@ Future<Uint8List> Function(Uint8List newKey, LinkContext ctx, Uint8List link) ke
 @visibleForTesting
 Future<Uint8List> Function(Uint8List privateKey, WrapContext ctx, Uint8List sealed)
 keysOpenFromDevice = openFromDevice;
+
+/// The test seam of the web's mock of `parseRecoveryKey` (to check that unlock zeroes the secret).
+@visibleForTesting
+Uint8List Function(String text) keysParseRecoveryKey = parseRecoveryKey;
 
 /// `/v2/keys` calls for the vault's account. Every call carries `x-wambito-user`: a session that
 /// now belongs to someone else gets a 409 `session_changed`.
@@ -296,7 +306,7 @@ Future<Map<int, Uint8List>> olderForTrustedKey(
       if (top.keyV < current) throw const KeysError('tampered');
     }
   }
-  return chainDown(userId, top, links, 1, false);
+  return chainDown(userId, top, links, firstKeyV, false);
 }
 
 /// The keys this phone kept for [userId], or `null` when it was never set up or lacks the current
@@ -449,3 +459,380 @@ Future<void> dropKeyVersion(String userId, int keyV, KeyStorage storage) =>
 /// Signing out: deletes every `wambito.vault.<userId>.*` key of this phone (the vault file is
 /// deleted by the vault session).
 Future<void> forgetDevice(String userId, KeyStorage storage) => storage.deleteAll(userId);
+
+// ---------------------------------------------------------------------------------------------
+// Setup and unlock (Task 10).
+
+final _random = Random.secure();
+
+/// A lower-case UUID v7 (48 bits of milliseconds, 74 random bits) for a new wrap's id, as keys.ts
+/// takes `uuidv7()` from ids.ts. The wrap ids need no in-process ordering, so this is not ids.ts's
+/// monotonic generator (Task 11's lib/local/ids.dart).
+String _uuidv7() {
+  final ms = DateTime.now().millisecondsSinceEpoch;
+  final b = Uint8List(16);
+  for (var i = 0; i < 6; i++) {
+    b[i] = (ms >> (8 * (5 - i))) & 0xff;
+  }
+  for (var i = 6; i < 16; i++) {
+    b[i] = _random.nextInt(256);
+  }
+  b[6] = (b[6] & 0x0f) | 0x70;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+      '${hex.substring(16, 20)}-${hex.substring(20)}';
+}
+
+/// A device wrap's label, so the person can tell their devices apart in Settings → Security. The
+/// web's is `"<browser> on <OS>"` (device-label.ts); the phone's is the app on its system.
+String _deviceLabel() => switch (defaultTargetPlatform) {
+  TargetPlatform.android => 'Wambito on Android',
+  TargetPlatform.iOS => 'Wambito on iOS',
+  _ => 'Wambito',
+};
+
+/// A device key pair and its wrap of DK, made in memory; nothing sent yet.
+typedef _Device = ({String id, Uint8List privateKey, String publicKey, Map<String, Object?> body});
+
+Future<_Device> _prepareDevice(
+  String userId,
+  Uint8List dataKey,
+  int keyV,
+  DeviceKeyPair pair,
+) async {
+  final id = _uuidv7();
+  final wrapped = await sealToDevice(
+    pair.publicKey,
+    WrapContext(kind: WrapKind.device, userId: userId, keyV: keyV),
+    dataKey,
+  );
+  final attestation = await deviceAttestation(
+    dataKey,
+    DeviceAttestationInput(userId: userId, wrapId: id, publicKey: pair.publicKey),
+  );
+  final publicKey = toBase64Url(pair.publicKey);
+  return (
+    id: id,
+    privateKey: pair.privateKey,
+    publicKey: publicKey,
+    body: {
+      'kind': 'device',
+      'ref': id,
+      'keyV': keyV,
+      'wrapped': toBase64Url(wrapped),
+      'publicKey': publicKey,
+      'attestation': toBase64Url(attestation),
+      'label': _deviceLabel(),
+    },
+  );
+}
+
+/// Keeps the data key of [keyV] (made current) and of every [older] version this phone does not
+/// hold yet (a held version is never replaced), the device private key and its wrap's id and public
+/// key. `current` is written last: a write that fails half-way leaves the previous state current
+/// (or, on a fresh phone, nothing loadable). The caller owns and zeroes the data keys.
+Future<LocalKeys> _keepLocally(
+  KeyStorage storage,
+  String userId,
+  Uint8List dataKey,
+  int keyV,
+  _Device device,
+  Map<int, Uint8List> older,
+) async {
+  for (final MapEntry(key: v, value: key) in {keyV: dataKey, ...older}.entries) {
+    final held = await storage.readDataKey(userId, v);
+    if (held != null) {
+      _zero(held);
+      continue;
+    }
+    await storage.writeDataKey(userId, v, key);
+  }
+  await storage.setDevicePrivateKey(userId, device.privateKey);
+  await storage.setDeviceWrap(userId, id: device.id, publicKey: device.publicKey);
+  await storage.setCurrent(userId, keyV);
+  final local = await loadLocalKeys(userId, storage);
+  if (local == null) throw StateError('no record keys for key version $keyV');
+  return local;
+}
+
+/// Enrolls with a trusted DK (passkey, recovery, pairing), after its walk; nothing sent before.
+/// With a vault held here (unlocking again after a key version that did not verify), the new device
+/// wrap replaces this phone's previous one: once the new one is kept, `DELETE /v2/keys/{previous}`
+/// (the server never ends the caller's own session). A failed delete only leaves the old wrap
+/// listed, for Settings to remove. The private key of [pair] is zeroed here.
+Future<LocalKeys> _enrollTrusted(
+  KeysOptions options,
+  KeysApi call,
+  Uint8List dataKey,
+  int keyV,
+  Map<int, Uint8List> links,
+  DeviceKeyPair pair,
+  HeldVault held,
+) async {
+  final userId = options.userId;
+  final storage = options.storage;
+  final LocalKeys local;
+  final String? previous;
+  try {
+    final older = await olderForTrustedKey(
+      userId,
+      (keyV: keyV, dataKey: dataKey),
+      links,
+      held,
+      storage,
+    );
+    try {
+      previous = await storage.deviceWrapId(userId);
+      final device = await _prepareDevice(userId, dataKey, keyV, pair);
+      await call('/v2/keys/${device.id}', method: 'PUT', data: device.body);
+      local = await _keepLocally(storage, userId, dataKey, keyV, device, older);
+    } finally {
+      _zeroKeys(older);
+    }
+  } finally {
+    _zero(pair.privateKey);
+  }
+  if (previous != null) {
+    try {
+      await call('/v2/keys/$previous', method: 'DELETE');
+    } on Object catch (error) {
+      // The unlock stands: the old wrap only stays listed (Settings can remove it). Said once,
+      // with the error's code only (never an id or a key).
+      debugPrint(
+        'The previous device wrap could not be removed: '
+        '${error is KeysError ? error.code : 'unknown'}',
+      );
+    }
+  }
+  return local;
+}
+
+/// Adds this phone as a device: a key pair, a wrap of DK sealed to its own public key with an
+/// attestation of that key under DK, then the data keys, the private key and the wrap's id and
+/// public key kept locally. The caller owns [dataKey] and zeroes it. The end of pairing: DK came
+/// authenticated by the number, and the links bring the older versions it reaches
+/// ([olderForTrustedKey]; with a vault held here strictly down to its key, else `tampered`).
+Future<LocalKeys> enrollDevice(KeysOptions options, Uint8List dataKey, int keyV) async {
+  final pair = await generateDeviceKeyPair();
+  final call = api(options);
+  final Map<int, Uint8List> links;
+  try {
+    links = (await listKeys(call)).links;
+  } on Object {
+    _zero(pair.privateKey);
+    rethrow;
+  }
+  return _enrollTrusted(options, call, dataKey, keyV, links, pair, HeldVault.strict);
+}
+
+/// A new account's keys, made but not yet sent: see [prepareAccount].
+class PreparedAccount {
+  const PreparedAccount({required this.recoveryKey, required this.commit});
+
+  /// The formatted recovery key to show; `null` for a guest (nothing to show).
+  final String? recoveryKey;
+
+  /// Sends the recovery wrap, then the device wrap, then keeps the keys on this phone. Retry-safe:
+  /// after a failure, calling it again sends the same wraps under the same ids. After success DK is
+  /// zeroed, and a further call only returns the same keys. A double tap shares the call in flight.
+  final Future<LocalKeys> Function() commit;
+}
+
+/// First run of an account (spec 2026-11-08 section 7.1): DK, the recovery secret and this
+/// device's key pair, all in memory. Nothing reaches the server until `commit()`, which the setup
+/// screen calls only once the person has typed back four characters of the key, so the account
+/// never ends up with a recovery wrap whose key nobody saw. The recovery wrap goes first (the
+/// server refuses any other kind first), then the device wrap. A guest has no recovery key to show
+/// (E2E design section 10): its recovery secret is never shown, which still satisfies the server's
+/// first-wrap rule, and the caller commits at once; turning the guest into a real account later
+/// replaces that wrap with a recovery key the person keeps. Throws `already_set_up` when the
+/// account has wraps: the caller shows Unlock. The recovery wrap goes with `If-None-Match: *`: if
+/// another setup (another phone or browser) made the account's keys between this check and the
+/// commit, `commit()` throws `already_set_up` too and this data key is dropped for good.
+Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest}) async {
+  final userId = options.userId;
+  final storage = options.storage;
+  final pair = await generateDeviceKeyPair();
+  final call = api(options);
+  try {
+    if ((await listWraps(call)).isNotEmpty) throw const KeysError('already_set_up');
+  } on Object {
+    _zero(pair.privateKey);
+    rethrow;
+  }
+
+  final dataKey = generateDataKey();
+  final secret = newRecoverySecret();
+  final recoveryId = _uuidv7();
+  final Map<String, Object?> recoveryBody;
+  final _Device device;
+  final String? recoveryKey;
+  try {
+    recoveryBody = {
+      'kind': 'recovery',
+      'keyV': firstKeyV,
+      'wrapped': toBase64Url(
+        await wrapDataKey(
+          secret,
+          WrapContext(kind: WrapKind.recovery, userId: userId, keyV: firstKeyV),
+          dataKey,
+        ),
+      ),
+    };
+    device = await _prepareDevice(userId, dataKey, firstKeyV, pair);
+    recoveryKey = guest ? null : formatRecoveryKey(secret);
+  } finally {
+    _zero(secret);
+  }
+
+  var recoverySent = false;
+  var lost = false;
+  LocalKeys? done;
+  Future<LocalKeys>? running;
+
+  void drop() {
+    _zero(dataKey);
+    _zero(device.privateKey);
+  }
+
+  Future<LocalKeys> run() async {
+    final kept = done;
+    if (kept != null) return kept;
+    // Another setup won: this data key was zeroed and is never sent again.
+    if (lost) throw const KeysError('already_set_up', status: 409);
+    if (!recoverySent) {
+      try {
+        // Create-only: of two setups at once, one makes the account's data key.
+        await call(
+          '/v2/keys/$recoveryId',
+          method: 'PUT',
+          data: recoveryBody,
+          headers: {'if-none-match': '*'},
+        );
+      } on KeysError catch (error) {
+        if (error.code == 'already_set_up') {
+          lost = true;
+          drop();
+        }
+        rethrow;
+      }
+      recoverySent = true;
+    }
+    await call('/v2/keys/${device.id}', method: 'PUT', data: device.body);
+    final local = await _keepLocally(storage, userId, dataKey, firstKeyV, device, const {});
+    done = local;
+    drop();
+    return local;
+  }
+
+  return PreparedAccount(
+    recoveryKey: recoveryKey,
+    commit: () => running ??= run().whenComplete(() => running = null),
+  );
+}
+
+/// Unlocks this phone with the typed recovery key: opens the recovery wrap, enrolls this device
+/// and keeps the data keys, of the older versions the links reach too ([olderForTrustedKey], not
+/// strict: the recovery secret authenticates the key, so with a vault held here a chain that does
+/// not reach its key is no error, its held versions stay as they are; a recovery wrap below its
+/// current version is `tampered`, nothing sent or kept). The caller then runs a full sync.
+/// `bad_recovery_key` is a key that does not parse (nothing was sent); `wrong_recovery_key` one
+/// that parses but opens nothing. Parsing accepts lower case, spaces and dashes, O for 0 and I or L
+/// for 1.
+Future<LocalKeys> unlockWithRecovery(KeysOptions options, String text) async {
+  final userId = options.userId;
+  final Uint8List secret;
+  try {
+    secret = keysParseRecoveryKey(text);
+  } on Object {
+    throw const KeysError('bad_recovery_key');
+  }
+  try {
+    final pair = await generateDeviceKeyPair();
+    final call = api(options);
+    Uint8List? dataKey;
+    try {
+      final (:wraps, :links) = await listKeys(call);
+      final wrap = wraps.where((w) => w.kind == 'recovery').firstOrNull;
+      if (wrap == null) throw const KeysError('wrong_recovery_key');
+      try {
+        dataKey = await unwrapDataKey(
+          secret,
+          WrapContext(kind: WrapKind.recovery, userId: userId, keyV: wrap.keyV),
+          fromBase64Url(wrap.wrapped),
+        );
+      } on Object {
+        throw const KeysError('wrong_recovery_key');
+      }
+      return await _enrollTrusted(options, call, dataKey, wrap.keyV, links, pair, HeldVault.secret);
+    } finally {
+      _zero(dataKey);
+      _zero(pair.privateKey);
+    }
+  } finally {
+    _zero(secret);
+  }
+}
+
+/// Unlocks this phone with a passkey's PRF (spec 2026-11-08 section 7.2): opens the passkey wrap
+/// whose `ref` is the credential, enrolls this device and keeps the data keys, as
+/// [unlockWithRecovery] (the same walk of the links, not strict; `tampered` only for a wrap below a
+/// held vault's current version). The caller owns the PRF and zeroes it. `no_passkey_wrap` when no
+/// wrap has that `ref` or the PRF does not open it (nothing is sent).
+Future<LocalKeys> unlockWithPasskey(KeysOptions options, PasskeyPrf passkey) async {
+  final userId = options.userId;
+  final pair = await generateDeviceKeyPair();
+  final call = api(options);
+  Uint8List? dataKey;
+  try {
+    final (:wraps, :links) = await listKeys(call);
+    final wrap = wraps
+        .where((w) => w.kind == 'passkey' && w.ref == passkey.credentialId)
+        .firstOrNull;
+    if (wrap == null) throw const KeysError('no_passkey_wrap');
+    try {
+      dataKey = await unwrapDataKey(
+        passkey.prf,
+        WrapContext(kind: WrapKind.passkey, userId: userId, keyV: wrap.keyV),
+        fromBase64Url(wrap.wrapped),
+      );
+    } on Object {
+      throw const KeysError('no_passkey_wrap');
+    }
+    return await _enrollTrusted(options, call, dataKey, wrap.keyV, links, pair, HeldVault.secret);
+  } finally {
+    _zero(dataKey);
+    _zero(pair.privateKey);
+  }
+}
+
+/// Adds (or replaces) the wrap of DK for one passkey: DK from this phone's own device wrap
+/// ([withDataKey], Ruling 1 of stage 2b; the touch on that passkey is the confirmation), wrapped
+/// under its PRF at the current `keyV`, PUT as `kind: "passkey"`, `ref: credentialId`. A passkey
+/// that already has a wrap keeps its id. The caller owns the PRF and zeroes it. The server stores
+/// it only for one of the signed-in account's passkeys: another credential is
+/// `KeysError('unknown_passkey')`, so a wrap is never made under someone else's passkey; a rotation
+/// by another device in between is `rotated_elsewhere`.
+Future<void> addPasskeyWrap(KeysOptions options, PasskeyPrf passkey) =>
+    withDataKey(options, (dataKey, keyV) async {
+      final call = api(options);
+      final existing = (await listWraps(call))
+          .where((w) => w.kind == 'passkey' && w.ref == passkey.credentialId)
+          .firstOrNull;
+      final wrapped = await wrapDataKey(
+        passkey.prf,
+        WrapContext(kind: WrapKind.passkey, userId: options.userId, keyV: keyV),
+        dataKey,
+      );
+      await call(
+        '/v2/keys/${existing?.id ?? _uuidv7()}',
+        method: 'PUT',
+        data: {
+          'kind': 'passkey',
+          'ref': passkey.credentialId,
+          'keyV': keyV,
+          'wrapped': toBase64Url(wrapped),
+        },
+      );
+    });

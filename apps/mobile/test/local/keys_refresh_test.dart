@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/local/keys.dart';
@@ -8,46 +9,6 @@ import 'fake_keys.dart';
 
 /// The loading-and-acceptance half of apps/web/app/local/keys.test.ts (Task 9). The setup and
 /// unlock flows are Task 10's (keys_setup_test.dart); here an enrolled phone is seeded directly.
-
-const rec = '01930000-0000-7000-8000-00000000000a';
-RecordContext ctx(String userId, int keyV) =>
-    RecordContext(userId: userId, type: RecordType.category, id: rec, keyV: keyV);
-
-var _counter = 0;
-String newUser() => 'user_${++_counter}';
-
-RecordKeys currentKeys(LocalKeys? local) => local!.keyring.byVersion[local.keyring.current]!;
-
-bool zeroed(Uint8List key) => key.every((b) => b == 0);
-
-/// A record sealed under [dk] at [keyV] opens with the keyring's keys for [keyV].
-Future<bool> opensUnder(LocalKeys local, String userId, Uint8List dk, int keyV) async {
-  final keys = local.keyring.byVersion[keyV];
-  if (keys == null) return false;
-  final sealed = await sealRecord(await deriveRecordKeys(dk), ctx(userId, keyV), {'keyV': keyV});
-  try {
-    return (await openRecord(keys, ctx(userId, keyV), sealed) as Map)['keyV'] == keyV;
-  } on CryptoError {
-    return false;
-  }
-}
-
-Future<Object?> caught(Future<Object?> Function() run) async {
-  try {
-    await run();
-    return null;
-  } on Object catch (e) {
-    return e;
-  }
-}
-
-Matcher isKeysError(String code, [int? status]) =>
-    isA<KeysError>().having((e) => e.code, 'code', code).having((e) => e.status, 'status', status);
-
-/// Every older data key the link walk and every data key the device wrap handed out, to check
-/// that they are zeroed (the web's test mocks `openKeyLink` and `openFromDevice` the same way).
-final openedLinks = <Uint8List>[];
-final openedDevice = <Uint8List>[];
 
 class Enrolled {
   Enrolled(this.api, this.storage, this.userId, this.dk, this.device);
@@ -80,24 +41,7 @@ Future<Enrolled> enrolledAccount() async {
 }
 
 void main() {
-  setUp(() {
-    openedLinks.clear();
-    openedDevice.clear();
-    keysOpenKeyLink = (newKey, c, link) async {
-      final key = await openKeyLink(newKey, c, link);
-      openedLinks.add(key);
-      return key;
-    };
-    keysOpenFromDevice = (privateKey, c, sealed) async {
-      final key = await openFromDevice(privateKey, c, sealed);
-      openedDevice.add(key);
-      return key;
-    };
-  });
-  tearDown(() {
-    keysOpenKeyLink = openKeyLink;
-    keysOpenFromDevice = openFromDevice;
-  });
+  recordOpenedKeys();
 
   group('KeyStorage', () {
     test('keeps each key under wambito.vault.<userId>.*, base64url', () async {
@@ -119,6 +63,14 @@ void main() {
       expect(await storage.current('user_a'), 2);
       expect(await storage.devicePrivateKey('user_a'), priv);
       expect(await storage.versions('user_a'), [2]);
+    });
+
+    test('refuses a device private key that is not 32 bytes', () async {
+      final storage = memoryKeyStorage();
+      for (final length in [0, 31, 33, 64]) {
+        expect(() => storage.setDevicePrivateKey('user_a', Uint8List(length)), throwsArgumentError);
+      }
+      expect(await storedEntries(), isEmpty);
     });
 
     test('refuses a user id that could reach into another account\'s names', () async {
@@ -154,6 +106,11 @@ void main() {
       final a = await enrolledAccount();
       expect(await loadLocalKeys(a.userId, a.storage), isNotNull);
       final b = newUser();
+      // B has a current version and device names of its own, but only A holds `dk.1`
+      await a.storage.setCurrent(b, 1);
+      await a.storage.setDevicePrivateKey(b, generateDataKey());
+      await a.storage.setDeviceWrap(b, id: a.device.id, publicKey: a.device.publicKey!);
+      expect(await a.storage.versions(b), isEmpty);
       expect(await loadLocalKeys(b, a.storage), isNull);
       // and B's refresh finds no keys of its own: it never opens A's device wrap
       final err = await caught(
@@ -268,6 +225,19 @@ void main() {
       );
       expect((err! as StateError).message, 'boom');
       expect(zeroed(seen!), isTrue);
+    });
+
+    test('a device key with no current version is tampered: fn never runs', () async {
+      final a = await enrolledAccount();
+      await const FlutterSecureStorage().delete(key: 'wambito.vault.${a.userId}.current');
+      final before = await storedEntries();
+      var ran = false;
+      final err = await caught(() => withDataKey(a.options, (_, _) async => ran = true));
+      expect(err, isKeysError('tampered'));
+      expect(ran, isFalse);
+      expect(openedDevice, hasLength(1));
+      expect(openedDevice.every(zeroed), isTrue);
+      expect(await storedEntries(), before);
     });
 
     test('withDataKey throws device_removed when no device wrap has this browser\'s id', () async {

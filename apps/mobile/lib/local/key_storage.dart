@@ -69,8 +69,10 @@ class KeyStorage {
   /// The raw 32-byte X25519 private key of this phone's device wrap.
   Future<Uint8List?> devicePrivateKey(String userId) => _readBytes('${_prefix(userId)}device', 32);
 
-  Future<void> setDevicePrivateKey(String userId, Uint8List bytes) =>
-      _storage.write(key: '${_prefix(userId)}device', value: toBase64Url(bytes));
+  Future<void> setDevicePrivateKey(String userId, Uint8List bytes) {
+    if (bytes.length != 32) throw ArgumentError.value(bytes.length, 'bytes', 'not a device key');
+    return _storage.write(key: '${_prefix(userId)}device', value: toBase64Url(bytes));
+  }
 
   /// The id of this phone's device wrap, kept at enroll.
   Future<String?> deviceWrapId(String userId) =>
