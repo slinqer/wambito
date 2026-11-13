@@ -31,6 +31,14 @@ class _Native implements NativeEncryptionMode {
   Future<void> write(String? mode) async => writes.add(mode);
 }
 
+/// A native write that waits for [release], to dispose the container while it is in flight.
+class _SlowNative implements NativeEncryptionMode {
+  final release = Completer<void>();
+
+  @override
+  Future<void> write(String? mode) => release.future;
+}
+
 class _Session extends SessionController {
   _Session(this.initial);
 
@@ -68,6 +76,7 @@ void main() {
   ProviderContainer make({
     SessionState initial = signedIn,
     Future<VaultAccount?> Function()? account,
+    NativeEncryptionMode? nativeMode,
   }) {
     session = _Session(initial);
     final c = ProviderContainer(
@@ -77,7 +86,7 @@ void main() {
           ref.watch(sessionProvider.select((s) => s.stored?.token));
           return account!();
         }),
-        nativeEncryptionModeProvider.overrideWithValue(native),
+        nativeEncryptionModeProvider.overrideWithValue(nativeMode ?? native),
         autoCapturePlatformProvider.overrideWithValue(capture),
         widgetStoreProvider.overrideWithValue(widget),
         flagStoreProvider.overrideWith((ref, key) => FakeFlagStore()..value = false),
@@ -113,6 +122,21 @@ void main() {
     expect(doc['signedIn'], false);
     expect(doc['line'], 'Próximamente con cifrado');
     expect(doc.containsKey('remaining'), isFalse);
+  });
+
+  test('the queue is still cleared when the container goes before the native write ends', () async {
+    final slow = _SlowNative();
+    final c = make(
+      account: () => SynchronousFuture(_account(EncryptionMode.preview)),
+      nativeMode: slow,
+    );
+    c.listen(previewSyncProvider, (_, _) {});
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    c.dispose();
+    slow.release.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(capture.callsNamed('clearQueue'), ['clearQueue']);
   });
 
   test('plain: the jobs are told, and nothing is cleared or written to the widget', () async {

@@ -34,6 +34,7 @@ suggested categories, Wambi's messages. No I/O.
   `dates`): shared cases for the Dart port, each `{ "$comment", "cases": [{ name, input, expected }] }`
   with `input` the argument list (plus `fn` where a file covers several functions). Run by
   `src/fixtures.test.ts`. `todayIn` takes an ISO instant string instead of a `Date`.
+  Dart reads them in `apps/mobile/test/core/fixtures_test.dart` by relative path: never copied.
 
 ## Test
 

@@ -42,6 +42,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `cryptography` (pure Dart in tests) and `cryptography_flutter` (native, registers itself). The device private
   key is raw 32 bytes. `test/crypto/vectors_test.dart` must pass `packages/crypto/test-vectors.json`
   byte for byte; a format change needs a new `enc_v` and vectors on both sides. `prfSalt` lives in `wraps.dart`.
+- `lib/core/`: the Dart port of `packages/core` (money, dates, budgets, summaries, movement search, reports).
+  Shared-fixtures rule: the Dart tests read the TypeScript side's fixtures by relative path and never
+  copy them (`packages/core/fixtures/*.json`, `reports/cases.json`, `quick-capture/cases.json`,
+  `packages/crypto/test-vectors.json`); a change to a fixture changes what Dart must return, and a
+  Dart-only expectation is a bug in one of the two.
 - `lib/local/`: the phone's end-to-end encryption, each file the twin of one in `apps/web/app/local/`
   (`prf.dart` = `prf.ts`: the passkey PRF over the `wambito/passkeys` channel, on iOS 18+ and Android).
   `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
@@ -52,8 +57,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
   vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
   `res/xml/backup_rules.xml` + `data_extraction_rules.xml` (the `vault` folder and the secure storage
-  prefs; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
-  `lib/debug/prf_probe_screen.dart` is `/debug/prf`, registered only when `kDebugMode`.
+  prefs, `FlutterSecureStorageConfiguration:FlutterSecureStorage` included; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
+  `lib/debug/prf_probe_screen.dart` is the PRF probe, `/debug/prf`, registered only when `kDebugMode`: it
+  creates a passkey and evaluates its PRF on a real phone, to check that the platform gives one.
   `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
   finance routes over a `FinanceStore`, one store transaction per request, 422 `validation_failed`,
   403 `demo_unavailable` for `localUnavailable`; `handle` returns null for a path it does not serve) and
@@ -203,7 +209,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Commands (from `apps/mobile`, `export PATH="$HOME/development/flutter/bin:$PATH"`)
 
-- `flutter pub get --enforce-lockfile`, `flutter analyze`, `flutter test --exclude-tags golden` (CI).
+- `flutter pub get --enforce-lockfile`, `flutter analyze`, `flutter test --exclude-tags golden,stack` (CI).
 - Goldens: `flutter test --tags golden` (`--update-goldens`); on macOS without PingFang set
   `PARITY_PINGFANG` to a `PingFang.ttc` (see `test/support/parity.dart`). CI skips goldens.
 - Parity (`docs/mobile/parity.md`, list `test/parity/parity.json`): `pnpm --filter @wambito/web
@@ -216,6 +222,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
+- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`):
+  `scripts/run-vault-e2e.sh` resets the preview account (`seed:e2e-preview` in the api container), runs
+  `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit code, set up through `VaultGate`,
+  add a movement, sync, a second empty phone unlocks with the recovery key) and checks with `psql` that no
+  `records.body` holds the plain text (must print 0). `test_stack/` is outside `test/`, so `flutter test`
+  never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
   `node tool/store_shots/compose.cjs`.
 - F-Droid (`docs/mobile/fdroid.md` explains the whole build):

@@ -162,6 +162,7 @@ jobs:
       pull-requests: read
     outputs:
       mobile: ${{ steps.filter.outputs.mobile }}
+      vault: ${{ steps.filter.outputs.vault }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v4.0.3
@@ -177,6 +178,16 @@ jobs:
               - 'apps/web/public/wambi/capture-step*.webp'
               - 'docs/design/system/project/tokens.json'
               - 'packages/core/**'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci.yml'
+            # The phone's vault against the real API (mobile-e2e): the app, the whole API, and the
+            # packages the API and the Dart port share (crypto, core, db).
+            vault:
+              - 'apps/mobile/**'
+              - 'apps/api/**'
+              - 'packages/crypto/**'
+              - 'packages/core/**'
+              - 'packages/db/**'
               - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
 
@@ -222,7 +233,8 @@ jobs:
       - run: flutter analyze
       # Golden images (tag `golden`, apps/mobile/dart_test.yaml) are pixels from the Mac that made
       # them; this Linux runner rasterizes text and shadows a little differently, so it skips them.
-      - run: flutter test --exclude-tags golden
+      # Nor the `stack` tag: test_stack/ needs the dev stack, which `mobile-e2e` starts.
+      - run: flutter test --exclude-tags golden,stack
       # Generated files must be committed as generated: run the generator and commit its output.
       - name: lib/theme/tokens.g.dart is up to date
         run: |
@@ -300,6 +312,49 @@ jobs:
         run: swift test --package-path ios/WambitoNative
       - name: Release build without signing
         run: flutter build ios --release --no-codesign
+
+  # The phone's vault against the real API (apps/mobile/test_stack, scripts/run-vault-e2e.sh): the
+  # seeded preview account signs in with an email code from Mailpit, sets up its keys, adds a
+  # movement, syncs, and a second phone unlocks with the recovery key; Postgres must hold no
+  # plain text. Plain `flutter test` on the runner (sqflite_common_ffi), no emulator. Same skip rule
+  # as `mobile` (a skipped job counts as passing).
+  mobile-e2e:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.vault == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: mobile-e2e-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the pinned Flutter version
+        id: flutter-version
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      # The dev stack as in the e2e job, on the real clock: Postgres, Mailpit and the API (which
+      # applies the migrations on start).
+      - name: Start the dev stack
+        working-directory: .
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+          timeout 120 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
+          timeout 60 sh -c 'until curl -sf http://localhost:8025/api/v1/info >/dev/null; do sleep 1; done'
+      # Resets the preview account (seed:e2e-preview), runs the test, then counts the records whose
+      # body holds the movement's name in the clear: it must print 0.
+      - run: scripts/run-vault-e2e.sh
+      - if: failure()
+        working-directory: .
+        run: docker compose logs api
 
   # The Android app's builds, beside the quick checks above (each took as long as the other, one
   # after the other): no Google dependencies, the debug build and the Kotlin tests, and the release

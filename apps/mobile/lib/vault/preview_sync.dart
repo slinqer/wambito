@@ -68,13 +68,12 @@ final previewSyncProvider = Provider<void>((ref) {
         : native.write(nativeModeOf(now.owner, now.mode)).catchError((Object _) {});
     ref.read(widgetSyncProvider).modeChanged(preview: now.mode == EncryptionMode.preview);
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
+      // Read now, not after the native write: the container may be gone by then.
+      final capture = ref.read(autoCapturePlatformProvider);
       // After the mode is written: the jobs already refuse before the queue is cleared.
       unawaited(
         written.then<void>(
-          (_) => ref
-              .read(autoCapturePlatformProvider)
-              .clearQueue()
-              .then<void>((_) {}, onError: (Object _) {}),
+          (_) => capture.clearQueue().then<void>((_) {}, onError: (Object _) {}),
         ),
       );
     } else {

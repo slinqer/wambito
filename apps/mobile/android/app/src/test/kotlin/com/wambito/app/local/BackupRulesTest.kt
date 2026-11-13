@@ -34,19 +34,20 @@ class BackupRulesTest {
     private val vault = "file" to "vault"
     private val keys = "sharedpref" to "FlutterSecureStorage.xml"
     private val wrappedKey = "sharedpref" to "FlutterSecureKeyStorage.xml"
+    private val config = "sharedpref" to "FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"
 
     @Test
     fun `the Android 12 rules exclude the vault and the secure storage from cloud backup and transfer`() {
         for (scope in listOf("cloud-backup", "device-transfer")) {
             val found = excludes("data_extraction_rules.xml", scope)
-            assertTrue("$scope: $found", found.containsAll(listOf(vault, keys, wrappedKey)))
+            assertTrue("$scope: $found", found.containsAll(listOf(vault, keys, wrappedKey, config)))
         }
     }
 
     @Test
     fun `the older full backup rules exclude the same files`() {
         val found = excludes("backup_rules.xml", null)
-        assertTrue(found.toString(), found.containsAll(listOf(vault, keys, wrappedKey)))
+        assertTrue(found.toString(), found.containsAll(listOf(vault, keys, wrappedKey, config)))
     }
 
     @Test
