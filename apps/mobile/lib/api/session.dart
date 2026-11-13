@@ -18,14 +18,16 @@ import 'passkeys.dart';
 import '../vault/encryption_mode.dart'
     show
         EncryptionMode,
+        VaultAccount,
         encryptionStoreProvider,
+        freshVaultAccountProvider,
         knownAccountProvider,
         knownPlainProvider,
         vaultAccountProvider,
         vaultOwnerProvider;
 import '../vault/finance_guard.dart';
 import '../vault/vault_providers.dart'
-    show forgetVaultProvider, keyStorageProvider, vaultSessionProvider;
+    show forgetVaultProvider, keyStorageProvider, staleVaultsProvider, vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -185,7 +187,21 @@ class SessionController extends Notifier<SessionState> {
     await migrateKeychainAccessibility(appSecureStorage, backgroundReadableKeys);
     final stored = await _store.read();
     state = stored == null ? SessionState.signedOut : SessionState.signedIn(stored);
+    if (stored == null) unawaited(_sweepSignedOut());
     return stored;
+  }
+
+  /// A signed-out start: the vaults of sessions that ended without a sign-out go (the web's
+  /// `deleteStaleVaults(null)`), but the one of the account kept last, whose session expired: it
+  /// waits for that account's next sign-in ([sessionExpired]). Not waited for; never fails.
+  Future<void> _sweepSignedOut() async {
+    try {
+      final keep = await ref.read(encryptionStoreProvider).keptAccountId();
+      if (!ref.mounted) return;
+      await ref.read(staleVaultsProvider)(keep);
+    } on Object {
+      // Left for the next start.
+    }
   }
 
   /// Asks the server who the stored token belongs to: a token it no longer knows signs out; a guest
@@ -211,12 +227,9 @@ class SessionController extends Notifier<SessionState> {
         _sendQueuedCaptures(stored.token, standing.userId);
       }
     } on AuthFailure catch (failure) {
+      // The vault stays for the account's next sign-in ([sessionExpired]).
       if (failure.status == 401 && state.stored?.token == stored.token) {
-        // The vault and what is kept of the account are bound to this token: now or never.
-        await _forgetVault(token: stored.token);
-        await _forgetWidget();
-        await _store.clear();
-        state = SessionState.signedOut;
+        await sessionExpired(token: stored.token);
       }
     }
   }
@@ -454,6 +467,26 @@ class SessionController extends Notifier<SessionState> {
     state = SessionState.signedOut;
   }
 
+  /// The server no longer knows the session (it expired, or the account signed out everywhere): it
+  /// ends here without telling the server, as [_refresh] does on a 401. The home cache, the saves
+  /// waiting for the network and the widget's figures go, as at a sign-out; the vault of a `preview`
+  /// account does not (spec 2026-11-12 sections 3 and 6.5 wipe it only at a sign-out and when this
+  /// device was removed): its file, its keys and what was kept of the account wait for the same
+  /// account's next sign-in, which finds them and sends the changes not sent yet. Another account's
+  /// sign-in, or a signed-out start once another account was kept, sweeps them
+  /// ([staleVaultsProvider]). The captures queued for the account stay for it too. [token] is the
+  /// session that got the 401: a newer one is never ended by it.
+  Future<void> sessionExpired({String? token}) async {
+    await ready;
+    final stored = state.stored?.token;
+    if (stored == null || (token != null && token != stored)) return;
+    await _forgetWidget();
+    // A sign-in meanwhile (another token) is not undone.
+    if (state.stored?.token != stored) return;
+    await _store.clear();
+    if (state.stored?.token == stored) state = SessionState.signedOut;
+  }
+
   /// The account was deleted on the server (or the server says the session is gone, which comes to
   /// the same for this phone): its session ends here without asking the server to end it. The home
   /// cache and the saves waiting for the network go first and are waited for, then the widget says
@@ -569,16 +602,21 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   if (owner != null && !plain) {
     // The mode of this session's account, once known: plain goes, preview is locked, and a mode
     // that could not be learned (an error, another session's by then) fails as offline.
+    FinanceVerdict of(VaultAccount? a) => a == null || a.owner != owner
+        ? FinanceVerdict.unknown
+        : a.mode == EncryptionMode.plain
+        ? FinanceVerdict.plain
+        : FinanceVerdict.locked;
+    // An account only inferred `plain` (from its cache) waits for the server's word: a `preview`
+    // one is refused, and without an answer the calls fail as offline (the cache's path).
     final verdict = ref
         .read(vaultAccountProvider.future)
         .then<FinanceVerdict>(
-          (a) => a == null || a.owner != owner
-              ? FinanceVerdict.unknown
-              : a.mode == EncryptionMode.plain
-              ? FinanceVerdict.plain
-              : FinanceVerdict.locked,
-          onError: (Object _) => FinanceVerdict.unknown,
-        );
+          (a) => a != null && a.inferred
+              ? ref.read(freshVaultAccountProvider.future).then(of)
+              : of(a),
+        )
+        .catchError((Object _) => FinanceVerdict.unknown);
     client.dio.interceptors.add(FinanceGuard(() => verdict));
   }
   return client;

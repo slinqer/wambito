@@ -16,6 +16,7 @@ import 'encryption_mode.dart';
 import 'locked_view.dart';
 import 'recovery_key_setup_view.dart';
 import 'unlock_view.dart';
+import 'unsynced_sheet.dart';
 import 'vault_gate.dart';
 import 'vault_providers.dart';
 
@@ -40,10 +41,14 @@ class VaultScreen extends ConsumerWidget {
 
   final List<int>? positions;
 
-  Future<void> _signOut(WidgetRef ref) async {
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    // The vault is not open, yet it may be kept with changes not sent (a key version that did not
+    // verify, a failed open): they are counted from its file and asked about, as at Settings'
+    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). A guest is not
+    // warned otherwise: a sign-out from here loses only what this sheet counts.
+    final count = ref.read(unsentChangesProvider);
+    if (!await confirmUnsentSignOut(context, count: count)) return;
     try {
-      // The vault is not open, so there is nothing unsent to ask about; a guest is not warned
-      // either: its data lives on another device, and this phone holds none of it.
       await ref.read(sessionProvider.notifier).signOut(discardGuest: true);
     } on Object {
       // The session is forgotten here all the same once the server cannot be told.
@@ -63,7 +68,7 @@ class VaultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gate = ref.watch(vaultGateProvider);
     final state = ref.watch(vaultGateStateProvider);
-    void signOut() => unawaited(_signOut(ref));
+    void signOut() => unawaited(_signOut(context, ref));
     if (gate == null || state == null) {
       // No gate: the mode of the account is not known yet, or could not be learned (an offline
       // first start with nothing kept). A `plain` account never stays here (the router).
@@ -72,7 +77,10 @@ class VaultScreen extends ConsumerWidget {
         return LockedView(
           kind: LockedKind.offline,
           retrying: account.isLoading,
-          onRetry: () => ref.invalidate(vaultAccountProvider),
+          // The server is asked again (what was kept is read again too).
+          onRetry: () => ref
+            ..invalidate(keptVaultAccountProvider)
+            ..invalidate(freshVaultAccountProvider),
           onSignOut: signOut,
         );
       }

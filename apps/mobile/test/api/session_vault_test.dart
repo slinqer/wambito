@@ -165,7 +165,8 @@ void main() {
       expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
     });
 
-    test('a 401 at start wipes the vault and the kept account too', () async {
+    test('a 401 at start ends the session but keeps the vault, its keys and the kept account, for '
+        'the same account to find at its next sign-in', () async {
       auth.failures['isGuest'] = const AuthFailure(status: 401);
       final container = containerWith();
       final controller = container.read(sessionProvider.notifier);
@@ -173,12 +174,66 @@ void main() {
       await controller.refreshed;
 
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
-      expect(deleted, ['user_p']);
+      expect(deleted, isEmpty);
+      expect(_log, isNot(contains('vault wiped')));
+      expect(_log, contains('token gone'));
       final left = await kept();
-      expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
-      expect(left.containsKey(EncryptionStore.accountKey), isFalse);
-      expect(left.containsKey('wambito.encryption.user_p'), isFalse);
-      expect(_log.indexOf('vault wiped'), lessThan(_log.indexOf('token gone')));
+      expect(left['wambito.vault.user_p.current'], '1');
+      expect(left['wambito.vault.user_p.dk.1'], 'AAAA');
+      expect(left.containsKey(EncryptionStore.accountKey), isTrue);
+      expect(left['wambito.encryption.user_p'], 'preview');
+      expect(left.containsKey(SessionStore.tokenKey), isFalse);
+    });
+
+    test('a signed-out start sweeps every vault but the one of the account kept last', () async {
+      final swept = <String?>[];
+      FlutterSecureStorage.setMockInitialValues({
+        'wambito.vault.user_p.current': '1',
+        'wambito.account': '{"owner":"x","id":"user_p"}',
+      });
+      final container = ProviderContainer(
+        overrides: [
+          authApiProvider.overrideWithValue(auth),
+          passkeysProvider.overrideWithValue(FakePasskeys()),
+          staleVaultsProvider.overrideWithValue((keep) async => swept.add(keep)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(sessionProvider.notifier).ready;
+      await pumpEventQueue();
+      expect(swept, ['user_p']);
+    });
+
+    test('a signed-out start with nothing kept sweeps every vault', () async {
+      final swept = <String?>[];
+      FlutterSecureStorage.setMockInitialValues({'wambito.vault.user_z.current': '1'});
+      final container = ProviderContainer(
+        overrides: [
+          authApiProvider.overrideWithValue(auth),
+          passkeysProvider.overrideWithValue(FakePasskeys()),
+          staleVaultsProvider.overrideWithValue((keep) async => swept.add(keep)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(sessionProvider.notifier).ready;
+      await pumpEventQueue();
+      expect(swept, [null]);
+    });
+
+    test('a signed-in start sweeps nothing before the server says who it is', () async {
+      final swept = <String?>[];
+      final container = ProviderContainer(
+        overrides: [
+          authApiProvider.overrideWithValue(auth),
+          passkeysProvider.overrideWithValue(FakePasskeys()),
+          widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+          staleVaultsProvider.overrideWithValue((keep) async => swept.add(keep)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(sessionProvider.notifier).ready;
+      await pumpEventQueue();
+      expect(swept, isEmpty);
     });
 
     test('with wambito.account missing, the account the app knows is wiped', () async {

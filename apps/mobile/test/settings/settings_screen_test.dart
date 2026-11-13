@@ -15,6 +15,8 @@ import 'package:wambito/settings/settings_parts.dart' show LkSwitch;
 import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/sheet.dart' show LkSheetScope;
 import 'package:wambito/api/server_url.dart';
+import 'package:wambito/local/vault_session.dart' show VaultSession;
+import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
 
 import '../home/fakes.dart';
 import 'harness.dart';
@@ -524,6 +526,39 @@ void main() {
       expect(find.byType(EntryScreen), findsOneWidget);
     });
 
+    testWidgets('a preview account with changes not synced is asked first, as at a sign-out', (
+      tester,
+    ) async {
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [vaultSessionProvider.overrideWithValue(_Unsynced(2))],
+      );
+      Future<void> change() async {
+        await _tap(tester, 'settings.server');
+        await tester.enterText(
+          find.byKey(const Key('settings.server.field')),
+          'https://my.server.org',
+        );
+        await tester.tap(find.byKey(const Key('settings.server.change')));
+        await tester.pumpAndSettle();
+      }
+
+      await change();
+      expect(find.text('Tienes 2 cambios sin sincronizar'), findsOneWidget);
+      // Backing out keeps the server, the session and the vault.
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider), defaultServerUrl);
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedIn);
+
+      await change();
+      await tester.tap(find.byKey(const Key('vault.signOutAnyway')));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider).toString(), 'https://my.server.org');
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
+    });
+
     testWidgets('the dev stack\'s http address is accepted', (tester) async {
       final env = await pumpSettingsApp(tester, location: '/settings');
       await _tap(tester, 'settings.server');
@@ -769,4 +804,14 @@ void main() {
       }
     });
   });
+}
+
+/// An open vault with [pending] changes not sent yet.
+class _Unsynced extends Fake implements VaultSession {
+  _Unsynced(this.pending);
+
+  final int pending;
+
+  @override
+  Future<int> pendingChanges() async => pending;
 }

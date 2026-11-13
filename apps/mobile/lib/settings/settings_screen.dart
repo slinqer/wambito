@@ -143,6 +143,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
     }
+    // Another server signs out (and wipes the vault): a `preview` account's changes not sent yet
+    // are asked about first, as at a sign-out.
+    if (next != ref.read(serverUrlProvider) &&
+        !await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) {
+      return;
+    }
+    if (!mounted) return;
     final toasts = ToastHost.of(context);
     final l10n = AppLocalizations.of(context);
     setState(() => _busy = true);

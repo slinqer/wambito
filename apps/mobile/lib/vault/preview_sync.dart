@@ -58,7 +58,11 @@ final previewSyncProvider = Provider<void>((ref) {
   ({bool loading, String? owner, EncryptionMode? mode}) standing() => (
     loading: ref.read(sessionProvider).status == SessionStatus.loading,
     owner: ref.read(vaultOwnerProvider),
-    mode: ref.read(currentVaultAccountProvider)?.mode,
+    // An account only inferred `plain` (its cache) is not known yet: the jobs wait.
+    mode: switch (ref.read(currentVaultAccountProvider)) {
+      final a? when !a.inferred => a.mode,
+      _ => null,
+    },
   );
   void apply(EncryptionMode? before, ({bool loading, String? owner, EncryptionMode? mode}) now) {
     // While the stored session is being read nobody is known to be signed in or out: what the jobs

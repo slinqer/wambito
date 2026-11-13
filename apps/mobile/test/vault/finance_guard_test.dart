@@ -1,5 +1,6 @@
 // No finance call of an account not known to be plain reaches the network before its vault opens.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +8,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/crypto/crypto.dart';
+import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/vault/encryption_mode.dart';
 import 'package:wambito/vault/vault_providers.dart';
 
+import '../home/fakes.dart' show FakeCacheStore;
 import 'vault_fakes.dart';
 
 const FakeAccount _preview = (id: 'user_p', mode: 'preview');
@@ -160,6 +163,52 @@ void main() {
     final net = Recorder();
     expect((await send(c, net, 'GET', '/v1/summary')).$1, 200);
     expect(net.calls, ['GET /api/v1/summary']);
+  });
+
+  group('a home cache of this session (the first start after the update, nothing kept)', () {
+    ProviderContainer withCache(FakeServer server) {
+      final cache = FakeCacheStore()
+        ..value = jsonEncode({'v': 1, 'owner': sessionOwnerOf('tok'), 'userId': 'user_q'});
+      final container = appContainer(
+        server,
+        signedIn('tok'),
+        storage: storage,
+        overrides: [homeCacheStoreProvider.overrideWithValue(cache)],
+      );
+      addTearDown(container.dispose);
+      container.listen(apiClientProvider, (_, _) {});
+      return container;
+    }
+
+    test('routes as plain, yet a finance call waits for the server: preview refuses it', () async {
+      final server = FakeServer({'tok': _preview})..holdMe = Completer();
+      final c = withCache(server);
+      await until(() => c.read(currentVaultAccountProvider) != null);
+      expect(c.read(currentVaultAccountProvider)!.mode, EncryptionMode.plain);
+      expect(c.read(knownPlainProvider), isFalse);
+      final net = Recorder();
+      final call = send(c, net, 'GET', '/v1/transactions');
+      await pumpEventQueue();
+      expect(net.calls, isEmpty);
+      server.holdMe!.complete();
+      expect(await call, _locked);
+      expect(net.calls, isEmpty);
+    });
+
+    test('offline: finance calls fail as offline (home shows its cache)', () async {
+      final c = withCache(FakeServer({'tok': _plain})..offline.add('tok'));
+      await until(() => c.read(currentVaultAccountProvider) != null);
+      final net = Recorder();
+      expect(await send(c, net, 'GET', '/v1/summary'), _offline);
+      expect(net.calls, isEmpty);
+    });
+
+    test('a plain answer lets them go', () async {
+      final c = withCache(FakeServer({'tok': _plain}));
+      await until(() => c.read(knownPlainProvider));
+      final net = Recorder();
+      expect((await send(c, net, 'GET', '/v1/summary')).$1, 200);
+    });
   });
 
   test('a preview account on Opening: finance calls are refused', () async {

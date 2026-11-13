@@ -15,10 +15,21 @@ import '../ui/press_button.dart';
 /// given up without a "Sign out anyway".
 Future<bool> confirmUnsyncedSignOut(BuildContext context, VaultSession? vault) async {
   if (vault == null) return true;
+  return confirmUnsentSignOut(context, count: vault.pendingChanges, sync: vault.sync);
+}
+
+/// The sheet of [confirmUnsyncedSignOut] over any count of changes not sent: [count] says how many,
+/// [sync] sends them. Without [sync] (a vault kept but not open: Unlock, Locked) it offers only
+/// "Sign out anyway" and backing out.
+Future<bool> confirmUnsentSignOut(
+  BuildContext context, {
+  required Future<int> Function() count,
+  Future<Object?> Function()? sync,
+}) async {
   while (true) {
     final int pending;
     try {
-      pending = await vault.pendingChanges();
+      pending = await count();
     } on Object {
       // The count is a courtesy: a store that will not answer never keeps someone signed in.
       return true;
@@ -31,12 +42,13 @@ Future<bool> confirmUnsyncedSignOut(BuildContext context, VaultSession? vault) a
       title: l10n.settingsSignOut,
       body: l10n.vaultUnsyncedChanges(pending),
       choices: [
-        SheetChoice(
-          key: const Key('vault.syncAndSignOut'),
-          label: l10n.vaultSyncAndSignOut,
-          value: _Unsynced.sync,
-          tone: PressTone.primary,
-        ),
+        if (sync != null)
+          SheetChoice(
+            key: const Key('vault.syncAndSignOut'),
+            label: l10n.vaultSyncAndSignOut,
+            value: _Unsynced.sync,
+            tone: PressTone.primary,
+          ),
         SheetChoice(
           key: const Key('vault.signOutAnyway'),
           label: l10n.vaultSignOutAnyway,
@@ -52,7 +64,7 @@ Future<bool> confirmUnsyncedSignOut(BuildContext context, VaultSession? vault) a
         return false;
       case _Unsynced.sync:
         try {
-          await vault.sync();
+          await sync!();
         } on Object {
           // Counted again below: what is still there is asked about again.
         }

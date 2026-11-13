@@ -85,9 +85,13 @@ class FakeServer implements HttpClientAdapter {
 
 const _signedIn = SessionState.signedIn(StoredSession(token: 'tok', guest: false));
 
+/// The account each sweep of stale vaults kept.
+final swept = <String?>[];
+
 ProviderContainer containerWith(FakeServer server, {SessionState session = _signedIn}) {
   final container = ProviderContainer(
     overrides: [
+      staleVaultsProvider.overrideWithValue((keep) async => swept.add(keep)),
       sessionProvider.overrideWith(() => _Session(session)),
       networkClientProvider.overrideWith(
         (ref) =>
@@ -100,9 +104,31 @@ ProviderContainer containerWith(FakeServer server, {SessionState session = _sign
   return container;
 }
 
+/// Waits (a bounded number of turns) until [condition] holds.
+Future<void> until(bool Function() condition) async {
+  final stop = DateTime.now().add(const Duration(seconds: 5));
+  while (!condition()) {
+    if (DateTime.now().isAfter(stop)) throw TimeoutException('condition not met');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    swept.clear();
+  });
+
+  test("each answer of GET /v1/me sweeps every other account's vault; no answer sweeps nothing",
+      () async {
+    final offline = containerWith(FakeServer()..offline = true);
+    await expectLater(offline.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
+    expect(swept, isEmpty);
+    await containerWith(FakeServer()).read(encryptionModeProvider.future);
+    await pumpEventQueue();
+    expect(swept, ['vault_user']);
+  });
 
   group('encryptionModeProvider', () {
     test('is null when signed out, and asks nothing', () async {
@@ -137,15 +163,26 @@ void main() {
     });
   });
 
-  test('a 401 or another 4xx is the answer: nothing kept stands in for it', () async {
+  test('what was kept answers at once; then a 401 or another 4xx is the answer, and a 5xx is not',
+      () async {
     await containerWith(FakeServer()).read(encryptionModeProvider.future);
-    final server = FakeServer()..status = 401;
-    final refused = containerWith(server);
-    await expectLater(refused.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
-    final bad = containerWith(FakeServer()..status = 400);
-    await expectLater(bad.read(encryptionModeProvider.future), throwsA(isA<DioException>()));
+    for (final status in [401, 400]) {
+      final refused = containerWith(FakeServer()..status = status);
+      final sub = refused.listen(vaultAccountProvider, (_, _) {});
+      // Stale-while-revalidate: the kept mode first, without waiting for the server.
+      expect(await refused.read(encryptionModeProvider.future), EncryptionMode.preview);
+      await until(() => refused.read(vaultAccountProvider).hasError);
+      expect(refused.read(vaultAccountProvider).error, isA<DioException>());
+      sub.close();
+    }
     final down = containerWith(FakeServer()..status = 503);
+    final sub = down.listen(vaultAccountProvider, (_, _) {});
     expect(await down.read(encryptionModeProvider.future), EncryptionMode.preview);
+    await down.read(freshVaultAccountProvider.future).then((_) {}, onError: (Object _) {});
+    await Future<void>.delayed(Duration.zero);
+    expect(down.read(vaultAccountProvider).hasError, isFalse);
+    expect(down.read(vaultAccountProvider).value?.mode, EncryptionMode.preview);
+    sub.close();
   });
 
   group('vaultGateProvider', () {

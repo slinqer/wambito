@@ -289,6 +289,7 @@ Future<ProviderContainer> pumpApp(
   Locale locale = const Locale('es'),
   List<Override> overrides = const [],
   bool plain = true,
+  HomeCacheStore? homeCache,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -304,7 +305,7 @@ Future<ProviderContainer> pumpApp(
       homeRepositoryProvider.overrideWithValue(FakeHomeRepository()),
       reviewRepositoryProvider.overrideWithValue(FakeReviewRepository(FakeHomeRepository())),
       widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
-      homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+      homeCacheStoreProvider.overrideWithValue(homeCache ?? FakeCacheStore()),
       widgetSnapshotWriterProvider.overrideWithValue(
         (summary, {required currency, required locale, required timezone}) async {},
       ),

@@ -8,11 +8,13 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
+import '../local/db.dart' show pendingChangesInVault;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
 import '../local/keys.dart' show KeysOptions, LocalKeys;
 import '../local/keys_error.dart';
 import '../local/prf.dart' as prf;
+import '../local/stale_vaults.dart';
 import '../local/vault_session.dart';
 import 'encryption_mode.dart';
 import 'vault_gate.dart';
@@ -148,21 +150,21 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
 
   KeysOptions options() => KeysOptions(userId: userId, dio: network(), storage: storage());
 
-  /// The session ended under the vault (a 401): wipe it, then sign in again. The server already
-  /// dropped the session, so even a guest's goes.
+  /// The session ended under the vault (a 401: it expired, or the account signed out
+  /// everywhere): the session ends here, then sign in again. The vault, its keys and its changes not
+  /// sent yet stay for this account's next sign-in ([SessionController.sessionExpired]); unlike the
+  /// web's `signInAgain`, which wipes them (spec 2026-11-12 sections 3 and 6.5: only a sign-out and
+  /// a removed device wipe the vault). The server already dropped the session, so even a guest's
+  /// goes.
   Future<void> signInAgain() async {
-    // A late 401 of a session that is gone never signs out the one signed in now.
+    // A late 401 of a session that is gone never ends the one signed in now.
     if (!current()) return;
     final session = ref.read(sessionProvider.notifier);
+    final token = ref.read(sessionProvider).stored?.token;
     try {
-      await forgetVault(userId, ref.read(keyStorageProvider));
+      await session.sessionExpired(token: token);
     } on Object {
-      // Sign-in still has to happen; the next sign-out tries the wipe again.
-    }
-    try {
-      await session.signOut(discardGuest: true);
-    } on Object {
-      // Forgotten here all the same at the next start (the server says 401).
+      // Ended here all the same at the next start (the server says 401).
     }
   }
 
@@ -203,7 +205,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     if (nobody) {
       unawaited(signInAgain());
     } else {
-      ref.invalidate(vaultAccountProvider);
+      ref.invalidate(freshVaultAccountProvider);
     }
   }
 
@@ -279,3 +281,23 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
   );
   return gate;
 }
+
+/// Deletes the vault (file, keys, kept mode and account) of every account on this phone but
+/// [keepUserId] ([deleteStaleVaults]): at each answer of `GET /v1/me` with the signed-in account, and
+/// on a signed-out start with the account whose session ended without a sign-out. Never throws.
+final staleVaultsProvider = Provider<Future<void> Function(String? keepUserId)>((ref) {
+  final keys = ref.read(keyStorageProvider);
+  final forget = ref.read(forgetVaultProvider);
+  return (keep) => deleteStaleVaults(keep, forget: (id) => forget(id, keys));
+});
+
+/// How many changes not sent yet the signed-in account's vault file holds, read without opening the
+/// vault ([pendingChangesInVault]); 0 when the account is not known. For Unlock and Locked, whose
+/// vault may be kept with changes (a key version that did not verify, a failed open).
+final unsentChangesProvider = Provider<Future<int> Function()>((ref) {
+  return () async {
+    final account = ref.read(currentVaultAccountProvider);
+    if (account == null || account.mode != EncryptionMode.preview) return 0;
+    return pendingChangesInVault(account.profile.id);
+  };
+});

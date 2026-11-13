@@ -75,22 +75,37 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
   (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
-  every key). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
+  every key, waiting at most `vaultCloseWait` for the store to close). `stale_vaults.dart` =
+  `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
+  `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s).
+  `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
+  Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
   `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
-  `unlockPasskeyOfferedProvider`, `forgetVaultProvider`), `encryption_mode.dart` holds the account and
-  its mode (`vaultAccountProvider`; the router reads `currentVaultAccountProvider`, never the mode
-  provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
+  `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`
+  holds the account and its mode, stale-while-revalidate (`vaultAccountProvider`: what was kept for
+  the session, `keptVaultAccountProvider`, at once; then `GET /v1/me`, `freshVaultAccountProvider`,
+  which wins when it differs and sweeps the other accounts' vaults on each answer; with nothing kept
+  the start waits for the server. A home cache or a pending-saves queue of this session proves the
+  account `plain` (`VaultAccount.inferred`: routing and the offline path only; `knownPlainProvider`
+  stays false, so its finance calls wait for the server's answer). The router reads
+  `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
   `unlock_view.dart`, `locked_view.dart` (guest: delete the account); Checking, Opening and Committing
   show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
   gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
-  while the mode is unknown the `/loading` route; a mode nobody could tell is Locked(offline) with a
-  retry. Sign-out and a deleted account (`session.dart`) wipe the vault (`forgetVault`), the kept
-  account and mode, before the token goes; Settings asks `confirmUnsyncedSignOut`
-  (`unsynced_sheet.dart`) first. Tests of screens that are not about the vault pass
+  while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
+  Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
+  (`forgetVault`), the kept account and mode, before the token goes; Settings asks
+  `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
+  A 401 (session expired, signed out everywhere: `_refresh` at start, the gate's `signInAgain`) ends
+  the session only (`SessionController.sessionExpired`): the vault, its keys and the kept account stay
+  for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
+  them, and so does a signed-out start unless they are the account kept last (`_sweepSignedOut`).
+  Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
+  is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
   What stage 3a leaves out for a `preview` account (automatic capture, the home widget, due notices,
   export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
@@ -225,8 +240,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`):
   `scripts/run-vault-e2e.sh` resets the preview account (`seed:e2e-preview` in the api container), runs
   `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit code, set up through `VaultGate`,
-  add a movement, sync, a second empty phone unlocks with the recovery key) and checks with `psql` that no
-  `records.body` holds the plain text (must print 0). `test_stack/` is outside `test/`, so `flutter test`
+  add a movement, sync, a second empty phone unlocks with the recovery key) and checks with `psql` that
+  `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
+  `records.body` holds the plain text (must print 0). CI's `mobile-build` fails when a release APK
+  lists `libsqlite3.so` (sqflite uses the system SQLite; the ffi dev dependency must stay out). `test_stack/` is outside `test/`, so `flutter test`
   never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
   `node tool/store_shots/compose.cjs`.

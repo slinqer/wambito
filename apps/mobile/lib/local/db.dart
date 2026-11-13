@@ -223,3 +223,29 @@ Future<Database> openVault(String userId, {String? directory, DatabaseFactory? f
 Future<void> deleteVault(String userId, {String? directory, DatabaseFactory? factory}) async {
   await (factory ?? databaseFactory).deleteDatabase(await _path(userId, directory));
 }
+
+/// The person's changes not sent yet in [userId]'s vault file, read without opening the vault (no
+/// keys needed): what Unlock and Locked count before a sign-out, when a kept vault (a key version
+/// that did not verify, a failed open) may still hold some. Re-seals and given-up changes are not
+/// counted (as `VaultSession.pendingChanges`). 0 when there is no file; throws when it cannot be
+/// read.
+Future<int> pendingChangesInVault(
+  String userId, {
+  String? directory,
+  DatabaseFactory? factory,
+}) async {
+  final path = await _path(userId, directory);
+  if (!File(path).existsSync()) return 0;
+  final db = await (factory ?? databaseFactory).openDatabase(
+    path,
+    options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+  );
+  try {
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM $outboxTable WHERE reseal = 0 AND abandoned = 0',
+    );
+    return (rows.first['n'] as int?) ?? 0;
+  } finally {
+    await db.close();
+  }
+}

@@ -5,11 +5,13 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/client.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/sqlite_store.dart';
+import 'package:wambito/local/stale_vaults.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/vault/vault_providers.dart';
 
@@ -22,6 +24,9 @@ class FixedSession extends SessionController {
 
   /// The token of each session [signOut] ended.
   final signOuts = <String?>[];
+
+  /// The token of each session [sessionExpired] ended (the server said 401).
+  final expiries = <String?>[];
 
   @override
   SessionState build() {
@@ -36,6 +41,12 @@ class FixedSession extends SessionController {
   @override
   Future<void> signOut({bool discardGuest = false}) async {
     signOuts.add(state.stored?.token);
+    state = SessionState.signedOut;
+  }
+
+  @override
+  Future<void> sessionExpired({String? token}) async {
+    expiries.add(state.stored?.token);
     state = SessionState.signedOut;
   }
 }
@@ -63,6 +74,13 @@ class FakeServer implements HttpClientAdapter {
 
   /// Tokens whose calls fail as without network.
   final offline = <String>{};
+
+  /// Tokens the server no longer knows: every call answers 401.
+  final expired = <String>{};
+
+  /// The number of changes of each `POST /v2/sync`, with its token.
+  final pushes = <(String?, int)>[];
+  var _version = 0;
 
   /// `GET /v1/me` waits for this while set.
   Completer<void>? holdMe;
@@ -99,8 +117,21 @@ class FakeServer implements HttpClientAdapter {
     if (offline.contains(token)) {
       throw DioException.connectionError(requestOptions: options, reason: 'offline');
     }
+    if (expired.contains(token)) return json({'code': 'unauthenticated'}, 401);
     final account = accounts[token];
     switch (call) {
+      case 'POST /api/v2/sync':
+        final data = options.data;
+        final changes = data is Map ? data['changes'] : null;
+        final list = changes is List ? changes : const <Object?>[];
+        pushes.add((token, list.length));
+        // Every change is taken, at a new version.
+        return json({
+          'results': [
+            for (final change in list)
+              if (change is Map) {'id': change['id'], 'version': ++_version},
+          ],
+        });
       case 'GET /api/v1/me':
         await holdMe?.future;
         if (meStatus != null) return json({'code': 'bad'}, meStatus!);
@@ -169,11 +200,20 @@ ProviderContainer appContainer(
   FakeServer server,
   SessionState session, {
   required KeyStorage storage,
+  List<Override> overrides = const [],
 }) {
   final container = ProviderContainer(
     overrides: [
+      ...overrides,
       sessionProvider.overrideWith(() => FixedSession(session)),
       keyStorageProvider.overrideWithValue(storage),
+      staleVaultsProvider.overrideWithValue(
+        (keep) => deleteStaleVaults(
+          keep,
+          forget: (id) => forgetVault(id, storage, deleteStore: deleteTestStore),
+          directory: () async => vaultDir.path,
+        ),
+      ),
       networkClientProvider.overrideWith(
         (ref) => ApiClient.forServer(
           Uri.parse('http://x'),

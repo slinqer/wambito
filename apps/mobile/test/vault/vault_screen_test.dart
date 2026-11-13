@@ -102,6 +102,7 @@ void main() {
     bool passkeyOffered = false,
     List<int>? positions,
     Locale locale = const Locale('es'),
+    int unsent = 0,
   }) async {
     final gate = FakeGate(state);
     session = FixedSession(signedIn('t'));
@@ -118,6 +119,7 @@ void main() {
           filesChannelProvider.overrideWithValue(files),
           accountDeletionProvider.overrideWithValue(deletion),
           sessionProvider.overrideWith(() => session),
+          unsentChangesProvider.overrideWithValue(() async => unsent),
         ],
         child: uiApp(
           locale: locale,
@@ -382,6 +384,28 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('No pudimos eliminarla. Inténtalo de nuevo.'), findsOneWidget);
     });
+
+    for (final state in <VaultGateState<VaultSession>>[
+      const Unlock(notice: 'unverified'),
+      const Locked(LockedKind.error, false),
+    ]) {
+      testWidgets('${state.runtimeType}: changes the kept vault never sent are asked about first '
+          '(no sync: the vault is not open)', (tester) async {
+        await pumpScreen(tester, state, unsent: 2);
+        await tester.tap(find.byKey(const Key('vault.signOut')));
+        await tester.pumpAndSettle();
+        expect(find.text('Tienes 2 cambios sin sincronizar'), findsOneWidget);
+        expect(find.byKey(const Key('vault.syncAndSignOut')), findsNothing);
+        await tester.tap(find.text('CANCELAR'));
+        await tester.pumpAndSettle();
+        expect(session.signOuts, isEmpty);
+        await tester.tap(find.byKey(const Key('vault.signOut')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('vault.signOutAnyway')));
+        await tester.pumpAndSettle();
+        expect(session.signOuts, ['t']);
+      });
+    }
 
     testWidgets('signing out signs out', (tester) async {
       await pumpScreen(tester, const Locked(LockedKind.error, false));
