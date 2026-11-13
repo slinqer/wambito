@@ -145,6 +145,28 @@ class RefreshWorkerTest {
     }
 
     @Test
+    fun `a preview account is never asked and keeps the snapshot the app wrote`() {
+        com.wambito.app.account.AccountMode(context).value = "preview"
+        store(earlier)
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("encrypted account", outcome.getString(RefreshWorker.OUTCOME))
+        assertTrue(requests.isEmpty())
+        assertEquals(earlier, stored())
+    }
+
+    @Test
+    fun `a mode the app has not learned yet is not asked either`() {
+        com.wambito.app.account.AccountMode(context).value = "unknown"
+        store(earlier)
+        val outcome = (runWorker() as androidx.work.ListenableWorker.Result.Success).outputData
+        assertEquals("mode unknown", outcome.getString(RefreshWorker.OUTCOME))
+        assertTrue(requests.isEmpty())
+        assertEquals(earlier, stored())
+    }
+
+    @Test
     fun `the server chosen in Settings is used, with any path it has`() {
         session.serverUrl = "http://127.0.0.1:${server.port}/wambito/"
         store(earlier)

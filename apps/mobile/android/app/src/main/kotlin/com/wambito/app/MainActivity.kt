@@ -139,6 +139,9 @@ class MainActivity : FlutterActivity() {
                 // the phone's browser, or a message in its email app, as any link does. True when an
                 // app took it; any other address is refused.
                 "openUrl" -> result.success(openExternal(call.arguments as? String))
+                // The vault stays out of backups (lib/local/backup.dart). Android does it by XML
+                // (res/xml/backup_rules.xml and data_extraction_rules.xml); nothing to do here.
+                "excludeFromBackup" -> result.success(true)
                 // The version the build was given, for the email to the founder.
                 "appVersion" -> result.success(
                     try {

@@ -18,6 +18,7 @@ import '../ui/css_text.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/toast.dart';
+import '../vault/preview.dart';
 import 'account_repository.dart';
 import 'profile_settings.dart';
 import 'settings_parts.dart';
@@ -118,6 +119,17 @@ class ExportBlock extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
     final busy = ref.watch(exportBusyProvider);
+    // The export is the server's (`GET /v1/me/export`); an encrypted account's data is on the phone.
+    if (ref.watch(isPreviewProvider)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: WambitoTokens.space2,
+        children: [
+          SettingLabel(label: l10n.settingsExportTitle),
+          const ComingSoonNotice(key: Key('settings.export.comingSoon')),
+        ],
+      );
+    }
     VoidCallback? press(ExportFormat format) =>
         guest || busy != null ? null : () => unawaited(runExport(context, format));
     return Column(

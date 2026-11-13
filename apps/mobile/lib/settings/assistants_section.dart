@@ -23,6 +23,7 @@ import '../ui/offset_underline.dart';
 import '../ui/pressable.dart' show PressSurface;
 import '../ui/press_button.dart';
 import '../ui/toast.dart';
+import '../vault/preview.dart';
 import 'assistants_repository.dart';
 import 'passkeys_section.dart' show passkeyDay;
 import 'profile_settings.dart' show profileFailureMessage;
@@ -94,6 +95,15 @@ class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
     final colors = lk.colors;
     final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
     final inkSm = LkText.bodySm.copyWith(color: colors.ink);
+    // The assistants read the server's data, and an encrypted account's lives on the phone: no
+    // address to connect to and no list (`GET /v1/me/assistants` is not asked).
+    if (ref.watch(isPreviewProvider)) {
+      return SettingsSection(
+        key: const Key('settings.card.assistants'),
+        title: l10n.settingsAssistantsTitle,
+        children: const [ComingSoonNotice(key: Key('settings.assistants.comingSoon'))],
+      );
+    }
     final url = mcpUrl(ref.watch(serverUrlProvider));
     final guest = widget.guest;
 

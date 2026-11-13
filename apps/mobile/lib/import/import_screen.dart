@@ -20,6 +20,7 @@ import '../home/home_repository.dart' show HomeFailure;
 import '../home/wambi_face.dart';
 import '../home/shell_navigation.dart';
 import '../l10n/app_localizations.dart';
+import '../vault/preview.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/lk_theme.dart';
@@ -140,6 +141,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     final home = ref.watch(homeProvider);
     final data = home.data;
     final phase = flow.phase;
+    final preview = ref.watch(isPreviewProvider);
 
     ref.listen(importFlowProvider.select((s) => s.phase is ImportImported), (before, imported) {
       if (imported && before != true) _showBudgets();
@@ -195,18 +197,22 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
             ),
           ],
         ),
-        if (phase is ImportSources)
+        // The import is the server's (`POST /v1/imports`); an encrypted account's data is on the
+        // phone, so the page says it waits for encryption and offers no picker.
+        if (preview) const ComingSoonNotice(key: Key('import.comingSoon')),
+        if (!preview && phase is ImportSources)
           Text(l10n.importPageLead, style: LkText.copy.copyWith(color: colors.inkMuted)),
-        ImportPanel(
-          state: phase,
-          onChoose: () => unawaited(notifier.chooseFile()),
-          onDiscard: () => unawaited(notifier.discard()),
-          onSource: ({required budge}) => notifier.chooseSource(budge: budge),
-          onRetry: () => notifier.retry(locale),
-          onConfirm: () => unawaited(notifier.confirm(locale)),
-          showPrefill: false,
-        ),
-        if (done)
+        if (!preview)
+          ImportPanel(
+            state: phase,
+            onChoose: () => unawaited(notifier.chooseFile()),
+            onDiscard: () => unawaited(notifier.discard()),
+            onSource: ({required budge}) => notifier.chooseSource(budge: budge),
+            onRetry: () => notifier.retry(locale),
+            onConfirm: () => unawaited(notifier.confirm(locale)),
+            showPrefill: false,
+          ),
+        if (done && !preview)
           Column(
             key: const Key('import.budgets'),
             crossAxisAlignment: CrossAxisAlignment.stretch,

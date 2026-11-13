@@ -11,6 +11,7 @@ import 'package:wambito/notices/notice_sync.dart';
 import 'package:wambito/settings/preferences.dart';
 
 import '../settings/harness.dart';
+import '../support/preview_account.dart';
 import 'fakes.dart';
 
 /// The permission prompt in memory: what it was asked for, and what the person answers.
@@ -91,6 +92,34 @@ FakeNoticeBackend withRule({String timezone = 'America/Bogota'}) =>
     FakeNoticeBackend(timezone: timezone, hasRecurring: true);
 
 void main() {
+  group('a preview account (its payments live only in the vault on the phone)', () {
+    testWidgets('"Hoy vence…" is cancelled and the server is asked nothing', (tester) async {
+      final env = await _pump(
+        tester,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: previewOpen(),
+      );
+      expect(env.backend.calls, 0);
+      expect(env.platform.callsNamed('scheduleDue'), isEmpty);
+      expect(env.platform.callsNamed('cancelDue'), isNotEmpty);
+      expect(env.prompt.reasons, isEmpty, reason: 'no permission is asked for a notice not posted');
+    });
+
+    testWidgets('a guest on a preview account is not asked either', (tester) async {
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: previewOpen(),
+      );
+      expect(env.backend.calls, 0);
+      expect(env.platform.callsNamed('scheduleDue'), isEmpty);
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+    });
+  });
+
   group('Hoy vence… at 9:00', () {
     testWidgets('it is scheduled for the profile\'s zone, in the app\'s language, for someone with a recurring payment who allowed notices', (
       tester,

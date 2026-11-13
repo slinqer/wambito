@@ -30,13 +30,20 @@ suggested categories, Wambi's messages. No I/O.
   parser. There is no parser here: `src/quick-capture-cases.test.ts` only validates the file; the
   Dart parser runs every case in `apps/mobile/test/capture/parser_cases_test.dart`.
 
+- `fixtures/*.json` (`summary`, `budget`, `recurrence`, `cost-of-living`, `movement-search`,
+  `dates`): shared cases for the Dart port, each `{ "$comment", "cases": [{ name, input, expected }] }`
+  with `input` the argument list (plus `fn` where a file covers several functions). Run by
+  `src/fixtures.test.ts`. `todayIn` takes an ISO instant string instead of a `Date`.
+  Dart reads them in `apps/mobile/test/core/fixtures_test.dart` by relative path: never copied.
+
 ## Test
 
 - `pnpm vitest run --project @wambito/core`.
 
 ## Rules
 
-- Changing `reports/cases.json` changes what the Dart reports must return.
+- Changing `reports/cases.json` or `fixtures/*.json` changes what the Dart port must return; the
+  Dart tests read these files by relative path, so keep the names.
 - Money slang (see root `AGENTS.md`) lives in `quick-capture/`: never change it.
 - Changing `cases.json` changes what the mobile parser must accept: run
   `flutter test test/capture/parser_cases_test.dart` in `apps/mobile` too.

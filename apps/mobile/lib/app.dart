@@ -13,6 +13,7 @@ import 'settings/locale_resolution.dart';
 import 'settings/preferences.dart';
 import 'theme/theme.dart';
 import 'ui/toast.dart';
+import 'vault/preview_sync.dart';
 
 /// What goes above every screen and sheet: the celebration (the web's `Celebration`) over the toasts
 /// (`ToastProvider`), so that it keeps clear of them. Tests that build their own `MaterialApp` put
@@ -42,6 +43,9 @@ class WambitoApp extends ConsumerWidget {
     // Schedules the two local notices ("Hoy vence…" at 9:00, the guest warning) and asks the
     // notification permission, once, when one first becomes relevant.
     ref.watch(noticeSyncProvider);
+    // Tells the phone's background jobs and the widget whether the account is encrypted (`preview`):
+    // none of them may send or fetch finance data for it.
+    ref.watch(previewSyncProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       theme: dayTheme,

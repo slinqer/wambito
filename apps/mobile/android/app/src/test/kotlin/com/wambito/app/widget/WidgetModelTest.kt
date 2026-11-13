@@ -98,6 +98,19 @@ class WidgetModelTest {
     }
 
     @Test
+    fun `a signed-out snapshot with a line says that line, with no figure`() {
+        val json = """{"v":3,"signedIn":false,"locale":"es","theme":"dark","hideAmount":false,"line":"Próximamente con cifrado"}"""
+        val parsed = WidgetSnapshot.parse(json)!!
+        assertEquals("Próximamente con cifrado", parsed.line)
+        val model = widgetModel(context, parsed, now, zone)
+        assertEquals("Próximamente con cifrado", (model as WidgetModel.SignedOut).message)
+        // It survives a write and a read, and a signed-in snapshot never carries one.
+        assertEquals("Próximamente con cifrado", WidgetSnapshot.parse(parsed.toJson())!!.line)
+        assertNull(WidgetSnapshot.parse("""{"v":3,"signedIn":false,"line":""}""")!!.line)
+        assertNull(snapshot().copy(line = "x").toJson().let { WidgetSnapshot.parse(it)!!.line })
+    }
+
+    @Test
     fun `hace un rato only after a refresh failed, or after twice the refresh period`() {
         // A late run on a working connection is not "a while ago".
         assertNull(figures(snapshot(updatedAt = now.minusSeconds(4 * 3600))).stale)

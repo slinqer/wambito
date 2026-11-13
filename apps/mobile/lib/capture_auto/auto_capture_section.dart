@@ -16,6 +16,7 @@ import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/press_link.dart';
 import '../ui/sheet.dart';
+import '../vault/preview.dart';
 import 'capture_platform.dart';
 import 'how_capture_works.dart';
 
@@ -125,6 +126,15 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
     if (status == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
+    // An encrypted (`preview`) account's finances never leave the phone, and capture sends them to
+    // the server: the switches wait for encryption.
+    if (ref.watch(isPreviewProvider)) {
+      return SettingsSection(
+        key: const Key('settings.card.autoCapture'),
+        title: l10n.autoCaptureTitle,
+        children: const [ComingSoonNotice(key: Key('autoCapture.comingSoon'))],
+      );
+    }
     final missing = status.anyOn && !status.access;
     return SettingsSection(
       key: const Key('settings.card.autoCapture'),

@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
+import com.wambito.app.account.AccountMode
 import com.wambito.app.notices.ApiResult
 import com.wambito.app.widget.ServerSetting
 import com.wambito.app.widget.SessionSource
@@ -121,6 +122,59 @@ class CaptureWorkersTest {
     }
 
     private fun posts() = requests.filter { it.method == "POST" }
+
+    @Test
+    fun `a preview account sends nothing and keeps the queue`() {
+        AccountMode(context).value = "preview"
+        queue.add(sampleCapture("Mercadona"))
+
+        val result = runSend()
+
+        assertEquals(ListenableWorker.Result.success().javaClass, result.javaClass)
+        assertTrue(requests.isEmpty())
+        assertEquals(1, queue.all().size)
+        assertTrue(notifier.shown.isEmpty())
+        assertTrue(notifier.signIn.isEmpty())
+    }
+
+    @Test
+    fun `a mode the app has not learned yet sends nothing and tries again later`() {
+        AccountMode(context).value = "unknown"
+        queue.add(sampleCapture("Mercadona"))
+
+        assertEquals(ListenableWorker.Result.retry(), runSend())
+        assertTrue(requests.isEmpty())
+        assertEquals(1, queue.all().size)
+
+        AccountMode(context).value = "plain"
+        assertEquals(ListenableWorker.Result.success().javaClass, runSend().javaClass)
+        assertTrue(queue.all().isEmpty())
+    }
+
+    @Test
+    fun `a mode that stays unknown stops retrying after the last attempt`() {
+        AccountMode(context).value = "unknown"
+        queue.add(sampleCapture("Mercadona"))
+        val last = runBlocking {
+            TestListenableWorkerBuilder<SendCapturesWorker>(context)
+                .setRunAttemptCount(ConfirmCaptureWorker.MAX_ATTEMPTS - 1).build().doWork()
+        }
+        assertEquals(ListenableWorker.Result.success(workDataOf(CAPTURE_OUTCOME to "mode unknown")), last)
+        assertTrue(requests.isEmpty())
+        assertEquals(1, queue.all().size)
+    }
+
+    @Test
+    fun `a preview account confirms nothing with the server`() {
+        AccountMode(context).value = "preview"
+        val result = runBlocking {
+            TestListenableWorkerBuilder<ConfirmCaptureWorker>(context)
+                .setInputData(workDataOf(ConfirmCaptureWorker.ID to "t-1"))
+                .build().doWork()
+        }
+        assertEquals(ListenableWorker.Result.success().javaClass, result.javaClass)
+        assertTrue(requests.isEmpty())
+    }
 
     @Test
     fun `sends and removes on 201`() {

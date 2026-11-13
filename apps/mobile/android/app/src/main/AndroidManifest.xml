@@ -29,9 +29,12 @@
          purpose; whoever needs one deletes its line and allows it in scripts/check-permissions.sh. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove"/>
     <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove"/>
-    <!-- No backup: the session token is encrypted with a Keystore key, which never leaves this phone, so it cannot be restored on another device. -->
+    <!-- No backup: the session token is encrypted with a Keystore key, which never leaves this phone, so it cannot be restored on another device.
+         The rules say the same for the vault and the secure storage, should backup ever be turned on, and for a device transfer. -->
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:label="Wambito"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

@@ -15,6 +15,19 @@ import 'device.dart';
 import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
+import '../vault/encryption_mode.dart'
+    show
+        EncryptionMode,
+        VaultAccount,
+        encryptionStoreProvider,
+        freshVaultAccountProvider,
+        knownAccountProvider,
+        knownPlainProvider,
+        vaultAccountProvider,
+        vaultOwnerProvider;
+import '../vault/finance_guard.dart';
+import '../vault/vault_providers.dart'
+    show forgetVaultProvider, keyStorageProvider, staleVaultsProvider, vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -174,7 +187,21 @@ class SessionController extends Notifier<SessionState> {
     await migrateKeychainAccessibility(appSecureStorage, backgroundReadableKeys);
     final stored = await _store.read();
     state = stored == null ? SessionState.signedOut : SessionState.signedIn(stored);
+    if (stored == null) unawaited(_sweepSignedOut());
     return stored;
+  }
+
+  /// A signed-out start: the vaults of sessions that ended without a sign-out go (the web's
+  /// `deleteStaleVaults(null)`), but the one of the account kept last, whose session expired: it
+  /// waits for that account's next sign-in ([sessionExpired]). Not waited for; never fails.
+  Future<void> _sweepSignedOut() async {
+    try {
+      final keep = await ref.read(encryptionStoreProvider).keptAccountId();
+      if (!ref.mounted) return;
+      await ref.read(staleVaultsProvider)(keep);
+    } on Object {
+      // Left for the next start.
+    }
   }
 
   /// Asks the server who the stored token belongs to: a token it no longer knows signs out; a guest
@@ -200,10 +227,9 @@ class SessionController extends Notifier<SessionState> {
         _sendQueuedCaptures(stored.token, standing.userId);
       }
     } on AuthFailure catch (failure) {
+      // The vault stays for the account's next sign-in ([sessionExpired]).
       if (failure.status == 401 && state.stored?.token == stored.token) {
-        await _forgetWidget();
-        await _store.clear();
-        state = SessionState.signedOut;
+        await sessionExpired(token: stored.token);
       }
     }
   }
@@ -434,10 +460,31 @@ class SessionController extends Notifier<SessionState> {
         // whatever went wrong there, the session is forgotten here all the same.
       }
     }
+    await _forgetVault();
     await _forgetWidget();
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// The server no longer knows the session (it expired, or the account signed out everywhere): it
+  /// ends here without telling the server, as [_refresh] does on a 401. The home cache, the saves
+  /// waiting for the network and the widget's figures go, as at a sign-out; the vault of a `preview`
+  /// account does not (spec 2026-11-12 sections 3 and 6.5 wipe it only at a sign-out and when this
+  /// device was removed): its file, its keys and what was kept of the account wait for the same
+  /// account's next sign-in, which finds them and sends the changes not sent yet. Another account's
+  /// sign-in, or a signed-out start once another account was kept, sweeps them
+  /// ([staleVaultsProvider]). The captures queued for the account stay for it too. [token] is the
+  /// session that got the 401: a newer one is never ended by it.
+  Future<void> sessionExpired({String? token}) async {
+    await ready;
+    final stored = state.stored?.token;
+    if (stored == null || (token != null && token != stored)) return;
+    await _forgetWidget();
+    // A sign-in meanwhile (another token) is not undone.
+    if (state.stored?.token != stored) return;
+    await _store.clear();
+    if (state.stored?.token == stored) state = SessionState.signedOut;
   }
 
   /// The account was deleted on the server (or the server says the session is gone, which comes to
@@ -450,10 +497,47 @@ class SessionController extends Notifier<SessionState> {
     await ready;
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
+    await _forgetVault();
     await ref.read(widgetSyncProvider).signedOut().timeout(widgetWait, onTimeout: () {});
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// A signed-in `preview` account's vault does not outlive its session: the vault file and every
+  /// key of the account ([forgetVault]), then what the phone kept of the account (its profile and
+  /// its mode). Waited for, and before the token goes: a process that dies in between still finds
+  /// the session and puts the rest right at the next start. The account is the one the phone kept
+  /// for this session ([EncryptionStore.recall]): no network is asked, and an account whose mode
+  /// was never learned has no vault. A failure never keeps the person signed in; the keys go anyway.
+  Future<void> _forgetVault({String? token}) async {
+    token ??= state.stored?.token;
+    if (token == null) return;
+    final store = ref.read(encryptionStoreProvider);
+    final String userId;
+    try {
+      // The account the app knows now, else what the phone kept for this session.
+      final known = ref.read(knownAccountProvider);
+      final id = known.owner == sessionOwnerOf(token) ? known.id : null;
+      final account = id == null ? await store.recall(token) : null;
+      final found = id ?? account?.profile.id;
+      if (found == null) return;
+      userId = found;
+    } on Object {
+      return;
+    }
+    final keys = ref.read(keyStorageProvider);
+    try {
+      await ref.read(forgetVaultProvider)(userId, keys);
+    } on Object {
+      // The file would not go: the keys still do, so what is left cannot be opened.
+      try {
+        await keys.deleteAll(userId);
+      } on Object {
+        // Nothing more to do; the next sign-in of this account finds it as it was.
+      }
+    }
+    await store.forget(userId);
   }
 
   /// The captures detected from notifications and still waiting to be sent belong to the account
@@ -487,11 +571,53 @@ final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 
 final sessionProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
 
-/// The API client for the signed-in session (rebuilt when the token changes).
-final apiClientProvider = Provider<ApiClient>(
+/// The network for the signed-in session (rebuilt when the token changes): never the vault's local
+/// backend. The vault's keys and sync, and the account's mode, go through it.
+final networkClientProvider = Provider<ApiClient>(
   (ref) => ApiClient.forServer(
     ref.watch(serverUrlProvider),
     token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
     hints: ref.watch(deviceHintsProvider),
   ),
 );
+
+/// The API client the screens use (rebuilt when the token changes): the network, with the open
+/// vault's interceptor in front when a `preview` account's vault is open, so its `/v1` routes are
+/// answered on the phone. A Dio of its own: [networkClientProvider]'s never gets the interceptor.
+///
+/// Signed in to an account not known to be `plain` (`preview`, or its mode still loading or
+/// failed), a [FinanceGuard] after it holds every `/v1` finance call the vault does not answer:
+/// nothing of a `preview` account's finances goes to the server in clear, even before its vault
+/// opens. The vault is always the signed-in session's ([vaultSessionProvider] is bound to it).
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final vault = ref.watch(vaultSessionProvider);
+  final owner = ref.watch(vaultOwnerProvider);
+  final plain = ref.watch(knownPlainProvider);
+  final client = ApiClient.forServer(
+    ref.watch(serverUrlProvider),
+    token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
+    hints: ref.watch(deviceHintsProvider),
+  );
+  if (vault != null) client.dio.interceptors.add(vault.interceptor);
+  if (owner != null && !plain) {
+    // The mode of this session's account, once known: plain goes, preview is locked, and a mode
+    // that could not be learned (an error, another session's by then) fails as offline.
+    FinanceVerdict of(VaultAccount? a) => a == null || a.owner != owner
+        ? FinanceVerdict.unknown
+        : a.mode == EncryptionMode.plain
+        ? FinanceVerdict.plain
+        : FinanceVerdict.locked;
+    // An account only inferred `plain` (from its cache) waits for the server's word: a `preview`
+    // one is refused, and without an answer the calls fail as offline (the cache's path).
+    final verdict = ref
+        .read(vaultAccountProvider.future)
+        .then<FinanceVerdict>(
+          (a) => a != null && a.inferred
+              ? ref.read(freshVaultAccountProvider.future).then(of)
+              : of(a),
+        )
+        .catchError((Object _) => FinanceVerdict.unknown);
+    client.dio.interceptors.add(FinanceGuard(() => verdict));
+  }
+  return client;
+});

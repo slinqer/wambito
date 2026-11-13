@@ -23,6 +23,14 @@ dependencies:
   # SHA-256 of the session token, which binds the home cache to its session (lib/home/home_cache.dart).
   # BSD-3-Clause, from the Dart team; already in the app through other packages.
   crypto: 3.0.7
+  # End-to-end encryption (lib/crypto, the Dart port of packages/crypto): AES-256-GCM, HKDF,
+  # HMAC, SHA-256 and X25519. Apache-2.0, pure Dart; the tests run on that implementation.
+  cryptography: 2.9.0
+  # Native AES-GCM, HKDF and X25519 for the same API (Android's JCA, Apple's CryptoKit). It
+  # registers itself as a Dart plugin (FlutterCryptography.enable() is deprecated), so
+  # Cryptography.instance is the native one in the app and the pure-Dart one in tests. Apache-2.0.
+  # Native code only, no Play Services.
+  cryptography_flutter: 2.3.4
   dio: 5.11.1
   flutter_riverpod: 3.4.3
   # The session's bearer token, encrypted with a key kept in the Android Keystore (spec section
@@ -38,6 +46,15 @@ dependencies:
   intl: 0.20.3
   one_of: 1.5.0
   one_of_serializer: 1.5.0
+  # The encrypted vault's local database (lib/local/sqlite_store.dart): the opened records, the
+  # outbox and the sync cursors, in one SQLite file per account. BSD-2-Clause; native SQLite from
+  # the platform (Android's framework SQLite, Apple's libsqlite3). No Play Services.
+  sqflite: 2.4.5
+  # Joins the vault file's directory and name. BSD-3-Clause, from the Dart team.
+  path: 1.9.1
+  # The app's private files directory, where the vault file lives (getApplicationSupportDirectory).
+  # BSD-3-Clause, from the Flutter team; already in the app through flutter_secure_storage.
+  path_provider: 2.1.6
   # Time zone rules for the profile's "today" (lib/capture/parser/dates.dart), from the bundled
   # database, with no network. BSD-2-Clause.
   timezone: 0.11.1
@@ -54,6 +71,8 @@ dev_dependencies:
   build_runner: 2.16.2
   built_value_generator: 8.13.0
   flutter_lints: 6.0.0
+  # SQLite through FFI, so the vault's tests run on the host (test/local). BSD-2-Clause.
+  sqflite_common_ffi: 2.4.5
 
 flutter:
   uses-material-design: true

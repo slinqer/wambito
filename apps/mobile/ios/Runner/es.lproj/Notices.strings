@@ -4,4 +4,4 @@
 "notice_due_many" = "Hoy vencen %@";
 "notice_and" = "y";
 "notice_and_i" = "e";
-"notice_guest" = "Tus datos se borrarán en 15 días si no agregas tu correo";
+"notice_guest" = "Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.";

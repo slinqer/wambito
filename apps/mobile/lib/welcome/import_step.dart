@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../import/import_panel.dart';
 import '../import/import_state.dart';
 import '../l10n/app_localizations.dart';
+import '../vault/preview.dart';
 import 'step_frame.dart';
 import 'steps.dart';
 
@@ -26,6 +27,7 @@ class ImportStep extends StatelessWidget {
     required this.onSkip,
     this.busy = false,
     this.locked = false,
+    this.preview = false,
   });
 
   final ImportState state;
@@ -55,6 +57,10 @@ class ImportStep extends StatelessWidget {
   /// A file is being read, confirmed or discarded: SALTAR and Back wait.
   final bool locked;
 
+  /// The account is `preview` (lib/vault/preview.dart): its data is on the phone and the server's
+  /// import is not offered; the step says it waits for encryption and moves on.
+  final bool preview;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -80,21 +86,24 @@ class ImportStep extends StatelessWidget {
     return StepFrame(
       step: StepId.import,
       title: l10n.welcomeImportTitle,
-      lead: state is ImportSources ? l10n.welcomeImportLead : null,
+      lead: !preview && state is ImportSources ? l10n.welcomeImportLead : null,
       onBack: onBack,
       backDisabled: busy || locked,
-      skip: state is ImportImported ? null : skip,
-      next: next,
+      skip: preview || state is ImportImported ? null : skip,
+      next: preview ? plain() : next,
       children: [
-        ImportPanel(
-          state: state,
-          onChoose: onChoose,
-          onDiscard: onDiscard,
-          onSource: onSource,
-          onRetry: onRetry,
-          prefillBasis: prefillBasis,
-          onFresh: busy || locked ? null : onSkip,
-        ),
+        if (preview)
+          const ComingSoonNotice(key: Key('welcome.import.comingSoon'))
+        else
+          ImportPanel(
+            state: state,
+            onChoose: onChoose,
+            onDiscard: onDiscard,
+            onSource: onSource,
+            onRetry: onRetry,
+            prefillBasis: prefillBasis,
+            onFresh: busy || locked ? null : onSkip,
+          ),
       ],
     );
   }

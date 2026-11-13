@@ -40,7 +40,7 @@
     <!-- "A, B y C"; "e" instead of "y" before a word that starts with the sound i. -->
     <string name="notice_and">y</string>
     <string name="notice_and_i">e</string>
-    <string name="notice_guest">Tus datos se borrarán en 15 días si no agregas tu correo</string>
+    <string name="notice_guest">Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.</string>
     <!-- One notification channel per notice: their names and what they are for, in the phone's settings. -->
     <string name="notice_channel_due">Pagos que vencen hoy</string>
     <string name="notice_channel_due_description">A las 9:00, un aviso con los pagos recurrentes que vencen ese día.</string>

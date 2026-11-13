@@ -1,0 +1,360 @@
+[
+  {
+    "name": "me_get",
+    "method": "GET",
+    "path": "/v1/me"
+  },
+  {
+    "name": "me_patch",
+    "method": "PATCH",
+    "path": "/v1/me",
+    "body": {
+      "locale": "en",
+      "timezone": "America/Bogota"
+    }
+  },
+  {
+    "name": "me_patch_currency_locked",
+    "method": "PATCH",
+    "path": "/v1/me",
+    "body": {
+      "currency": "EUR"
+    }
+  },
+  {
+    "name": "summary",
+    "method": "GET",
+    "path": "/v1/summary"
+  },
+  {
+    "name": "summary_month",
+    "method": "GET",
+    "path": "/v1/summary",
+    "query": {
+      "month": "2026-09"
+    }
+  },
+  {
+    "name": "transactions_list",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "month": "2026-10"
+    }
+  },
+  {
+    "name": "transactions_list_search",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "q": ["almuerzo", "bus"],
+      "match": "any",
+      "totals": "true"
+    }
+  },
+  {
+    "name": "transactions_list_needs_review",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "needsReview": "true"
+    }
+  },
+  {
+    "name": "transactions_list_page_1",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "month": "2026-10",
+      "limit": "3",
+      "totals": "true"
+    }
+  },
+  {
+    "name": "transactions_list_page_2",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "month": "2026-10",
+      "limit": "3",
+      "cursor": "MjAyNi0xMC0xOHwwMTkzMDAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAyMDM"
+    }
+  },
+  {
+    "name": "transactions_list_bad_month",
+    "method": "GET",
+    "path": "/v1/transactions",
+    "query": {
+      "month": "2026-13"
+    }
+  },
+  {
+    "name": "transactions_suggestions",
+    "method": "GET",
+    "path": "/v1/transactions/suggestions",
+    "query": {
+      "q": "al"
+    }
+  },
+  {
+    "name": "transactions_create",
+    "method": "POST",
+    "path": "/v1/transactions",
+    "body": {
+      "name": "Dinner",
+      "amount": -3500000,
+      "categoryId": "01930000-0000-7000-8000-000000000100",
+      "date": "2026-10-21",
+      "note": "With friends"
+    }
+  },
+  {
+    "name": "transactions_create_repeat",
+    "method": "POST",
+    "path": "/v1/transactions",
+    "body": {
+      "name": "Netflix",
+      "amount": -3000000,
+      "categoryId": "01930000-0000-7000-8000-000000000103",
+      "date": "2026-10-14",
+      "status": "pending",
+      "repeat": {
+        "frequency": "monthly"
+      }
+    }
+  },
+  {
+    "name": "transactions_create_invalid",
+    "method": "POST",
+    "path": "/v1/transactions",
+    "body": {
+      "name": "",
+      "amount": 0,
+      "categoryId": "nope",
+      "date": "2026-02-31"
+    }
+  },
+  {
+    "name": "transactions_create_archived_category",
+    "method": "POST",
+    "path": "/v1/transactions",
+    "body": {
+      "name": "Gym",
+      "amount": -100000,
+      "categoryId": "01930000-0000-7000-8000-000000000104",
+      "date": "2026-10-21"
+    }
+  },
+  {
+    "name": "transactions_update",
+    "method": "PATCH",
+    "path": "/v1/transactions/01930000-0000-7000-8000-000000000201",
+    "body": {
+      "name": "Lunch",
+      "status": "pending"
+    }
+  },
+  {
+    "name": "transactions_update_empty",
+    "method": "PATCH",
+    "path": "/v1/transactions/01930000-0000-7000-8000-000000000201",
+    "body": {}
+  },
+  {
+    "name": "transactions_review",
+    "method": "POST",
+    "path": "/v1/transactions/review",
+    "body": {
+      "ids": ["01930000-0000-7000-8000-000000000207", "01930000-0000-7000-8000-000000000201"]
+    }
+  },
+  {
+    "name": "transactions_delete",
+    "method": "DELETE",
+    "path": "/v1/transactions/01930000-0000-7000-8000-000000000201"
+  },
+  {
+    "name": "transactions_delete_not_found",
+    "method": "DELETE",
+    "path": "/v1/transactions/01930000-0000-7000-8000-0000000002ff"
+  },
+  {
+    "name": "transactions_restore",
+    "method": "POST",
+    "path": "/v1/transactions/01930000-0000-7000-8000-00000000020b/restore"
+  },
+  {
+    "name": "categories_list",
+    "method": "GET",
+    "path": "/v1/categories"
+  },
+  {
+    "name": "categories_list_archived",
+    "method": "GET",
+    "path": "/v1/categories",
+    "query": {
+      "includeArchived": "true"
+    }
+  },
+  {
+    "name": "categories_create",
+    "method": "POST",
+    "path": "/v1/categories",
+    "body": {
+      "name": "Pets",
+      "kind": "expense",
+      "icon": "paw",
+      "color": "#f0f"
+    }
+  },
+  {
+    "name": "categories_name_taken",
+    "method": "POST",
+    "path": "/v1/categories",
+    "body": {
+      "name": "food",
+      "kind": "expense",
+      "icon": "fork",
+      "color": "#f90"
+    }
+  },
+  {
+    "name": "categories_update",
+    "method": "PATCH",
+    "path": "/v1/categories/01930000-0000-7000-8000-000000000100",
+    "body": {
+      "name": "Groceries",
+      "color": "#fa0"
+    }
+  },
+  {
+    "name": "categories_archive",
+    "method": "PATCH",
+    "path": "/v1/categories/01930000-0000-7000-8000-000000000103",
+    "body": {
+      "archived": true
+    }
+  },
+  {
+    "name": "categories_kind_locked",
+    "method": "PATCH",
+    "path": "/v1/categories/01930000-0000-7000-8000-000000000100",
+    "body": {
+      "kind": "income"
+    }
+  },
+  {
+    "name": "categories_budget_set",
+    "method": "PUT",
+    "path": "/v1/categories/01930000-0000-7000-8000-000000000101/budget",
+    "body": {
+      "amount": 25000000,
+      "effectiveFrom": "2026-10"
+    }
+  },
+  {
+    "name": "categories_budget_income",
+    "method": "PUT",
+    "path": "/v1/categories/01930000-0000-7000-8000-000000000102/budget",
+    "body": {
+      "amount": 1,
+      "effectiveFrom": "2026-10"
+    }
+  },
+  {
+    "name": "recurrences_list",
+    "method": "GET",
+    "path": "/v1/recurrences"
+  },
+  {
+    "name": "recurrences_create",
+    "method": "POST",
+    "path": "/v1/recurrences",
+    "body": {
+      "name": "Gym",
+      "amount": -8000000,
+      "categoryId": "01930000-0000-7000-8000-000000000100",
+      "frequency": "monthly",
+      "dayOfMonth": 31,
+      "startDate": "2026-10-01"
+    }
+  },
+  {
+    "name": "recurrences_update",
+    "method": "PATCH",
+    "path": "/v1/recurrences/01930000-0000-7000-8000-000000000300",
+    "body": {
+      "amount": -130000000
+    }
+  },
+  {
+    "name": "recurrences_update_invalid",
+    "method": "PATCH",
+    "path": "/v1/recurrences/01930000-0000-7000-8000-000000000301",
+    "body": {
+      "monthOfYear": null
+    }
+  },
+  {
+    "name": "recurrences_delete",
+    "method": "DELETE",
+    "path": "/v1/recurrences/01930000-0000-7000-8000-000000000300"
+  },
+  {
+    "name": "reports_by_category",
+    "method": "GET",
+    "path": "/v1/reports/by-category",
+    "query": {
+      "from": "2026-09",
+      "to": "2026-10"
+    }
+  },
+  {
+    "name": "reports_by_category_income",
+    "method": "GET",
+    "path": "/v1/reports/by-category",
+    "query": {
+      "from": "2026-10",
+      "to": "2026-10",
+      "kind": "income",
+      "status": "paid"
+    }
+  },
+  {
+    "name": "reports_trend",
+    "method": "GET",
+    "path": "/v1/reports/trend",
+    "query": {
+      "from": "2026-08",
+      "to": "2026-11"
+    }
+  },
+  {
+    "name": "reports_range_too_large",
+    "method": "GET",
+    "path": "/v1/reports/trend",
+    "query": {
+      "from": "2020-01",
+      "to": "2026-10"
+    }
+  },
+  {
+    "name": "reports_cost_of_living",
+    "method": "GET",
+    "path": "/v1/reports/cost-of-living",
+    "query": {
+      "months": "2"
+    }
+  },
+  {
+    "name": "export_unavailable",
+    "method": "GET",
+    "path": "/v1/me/export"
+  },
+  {
+    "name": "imports_unavailable",
+    "method": "POST",
+    "path": "/v1/imports/csv",
+    "body": {}
+  }
+]

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.os.Build
+import com.wambito.app.account.AccountMode
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -39,6 +40,12 @@ class NoticesChannel(private val activity: Activity, messenger: BinaryMessenger)
             }
             "cancelGuest" -> {
                 NoticeScheduler.cancelGuest(activity)
+                result.success(null)
+            }
+            // The account's mode for the background jobs (capture, widget, due notice): `plain`,
+            // `preview`, `unknown`, or null when signed out. See account/AccountMode.kt.
+            "setEncryptionMode" -> {
+                AccountMode(activity).value = call.argument<String>("mode")
                 result.success(null)
             }
             "permission" -> result.success(permission())

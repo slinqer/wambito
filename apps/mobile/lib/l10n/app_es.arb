@@ -3779,5 +3779,249 @@
         "type": "String"
       }
     }
+  },
+  "vaultLoading": "Abriendo tus datos…",
+  "@vaultLoading": {
+    "description": "The vault is opening: the loading line under the title."
+  },
+  "vaultSetupTitle": "Guarda tu clave de recuperación",
+  "@vaultSetupTitle": {
+    "description": "Recovery key setup: the title."
+  },
+  "vaultSetupLead": "Es la única forma de volver a tus datos si pierdes todos tus dispositivos y llaves de acceso. Nadie la puede recuperar por ti, ni siquiera Wambito.",
+  "@vaultSetupLead": {
+    "description": "Recovery key setup: why the key matters."
+  },
+  "vaultSetupKeyLabel": "Tu clave de recuperación",
+  "@vaultSetupKeyLabel": {
+    "description": "Recovery key setup: the key group is named this for screen readers."
+  },
+  "vaultSetupCopy": "Copiar",
+  "@vaultSetupCopy": {
+    "description": "Recovery key setup: copies the key."
+  },
+  "vaultSetupCopied": "Copiada",
+  "@vaultSetupCopied": {
+    "description": "Recovery key setup: the copy button after copying."
+  },
+  "vaultSetupShare": "Compartir",
+  "@vaultSetupShare": {
+    "description": "Recovery key setup: opens the share sheet with the key, for a password manager say."
+  },
+  "vaultSetupSaved": "Ya la guardé",
+  "@vaultSetupSaved": {
+    "description": "Recovery key setup: the person kept the key; asks to confirm it."
+  },
+  "vaultSetupFileTitle": "Clave de recuperación de Wambito",
+  "@vaultSetupFileTitle": {
+    "description": "The first line of the file shared with the key."
+  },
+  "vaultSetupFileLine": "Guárdala en un lugar seguro. Sin ella, nadie puede recuperar tus datos.",
+  "@vaultSetupFileLine": {
+    "description": "The file shared with the key: one line on keeping it."
+  },
+  "vaultSetupFileDate": "Creada el {date}",
+  "@vaultSetupFileDate": {
+    "description": "The file shared with the key: the date it was made.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSetupConfirmTitle": "Confirma que la guardaste",
+  "@vaultSetupConfirmTitle": {
+    "description": "Recovery key check: the title."
+  },
+  "vaultSetupConfirmLead": "Escribe estos cuatro caracteres de tu clave. Cada uno dice en qué grupo está y cuál es dentro del grupo.",
+  "@vaultSetupConfirmLead": {
+    "description": "Recovery key check: what to type."
+  },
+  "vaultSetupCharsGroup": "Caracteres a confirmar",
+  "@vaultSetupCharsGroup": {
+    "description": "Recovery key check: the four boxes are named this for screen readers."
+  },
+  "vaultSetupGroup": "Grupo {group}",
+  "@vaultSetupGroup": {
+    "description": "Recovery key check: which group of the key a character is in.",
+    "placeholders": {
+      "group": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupCharInGroup": "carácter {char}",
+  "@vaultSetupCharInGroup": {
+    "description": "Recovery key check: which character within the group.",
+    "placeholders": {
+      "char": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupCharLabel": "Grupo {group}, carácter {char}",
+  "@vaultSetupCharLabel": {
+    "description": "Recovery key check: a box named for screen readers.",
+    "placeholders": {
+      "group": {
+        "type": "int"
+      },
+      "char": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupMismatch": "No coinciden. Revisa la clave que guardaste.",
+  "@vaultSetupMismatch": {
+    "description": "Recovery key check: the typed characters are wrong."
+  },
+  "vaultSetupShowAgain": "Ver la clave otra vez",
+  "@vaultSetupShowAgain": {
+    "description": "Recovery key check: goes back to the key."
+  },
+  "vaultSetupContinue": "Continuar",
+  "@vaultSetupContinue": {
+    "description": "Recovery key check: goes on, enabled once the characters match."
+  },
+  "vaultUnlockTitle": "Abre tus datos aquí",
+  "@vaultUnlockTitle": {
+    "description": "Unlock: the title."
+  },
+  "vaultUnlockLead": "Tus datos están cifrados. Escribe tu clave de recuperación para abrirlos en este teléfono.",
+  "@vaultUnlockLead": {
+    "description": "Unlock: asks for the recovery key."
+  },
+  "vaultUnlockLabel": "Clave de recuperación",
+  "@vaultUnlockLabel": {
+    "description": "Unlock: the recovery key field."
+  },
+  "vaultUnlockPlaceholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+  "@vaultUnlockPlaceholder": {
+    "description": "Unlock: the shape of a recovery key."
+  },
+  "vaultUnlockSubmit": "Abrir mis datos",
+  "@vaultUnlockSubmit": {
+    "description": "Unlock: tries the typed key."
+  },
+  "vaultUnlockBusy": "Abriendo…",
+  "@vaultUnlockBusy": {
+    "description": "Unlock: while the key is tried."
+  },
+  "vaultUnlockErrorBadKey": "Esa clave no tiene el formato correcto. Revisa que la copiaste completa.",
+  "@vaultUnlockErrorBadKey": {
+    "description": "Unlock: the typed text is not a recovery key."
+  },
+  "vaultUnlockErrorWrongKey": "Esa clave no abre esta cuenta",
+  "@vaultUnlockErrorWrongKey": {
+    "description": "Unlock: a recovery key that opens nothing."
+  },
+  "vaultUnlockErrorNoPrf": "Esta llave de acceso no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
+  "@vaultUnlockErrorNoPrf": {
+    "description": "Unlock: the passkey gives no way to open the data."
+  },
+  "vaultUnlockErrorNoPasskeyWrap": "Esta llave de acceso todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
+  "@vaultUnlockErrorNoPasskeyWrap": {
+    "description": "Unlock: the passkey does not open the data yet."
+  },
+  "vaultUnlockErrorOffline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
+  "@vaultUnlockErrorOffline": {
+    "description": "Unlock: no network."
+  },
+  "vaultUnlockErrorServer": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+  "@vaultUnlockErrorServer": {
+    "description": "Unlock: the server failed."
+  },
+  "vaultUnlockPasskey": "Usar una llave de acceso",
+  "@vaultUnlockPasskey": {
+    "description": "Unlock: opens the data with a passkey."
+  },
+  "vaultLockedTitle": "No pudimos abrir tus datos",
+  "@vaultLockedTitle": {
+    "description": "Locked: the title when the vault could not open."
+  },
+  "vaultLockedLead": "Siguen a salvo. Inténtalo de nuevo.",
+  "@vaultLockedLead": {
+    "description": "Locked: it is safe, try again."
+  },
+  "vaultLockedOfflineTitle": "Sin conexión",
+  "@vaultLockedOfflineTitle": {
+    "description": "Locked: the title without a connection."
+  },
+  "vaultLockedOfflineLead": "Necesitamos conexión para abrir tus datos en este teléfono.",
+  "@vaultLockedOfflineLead": {
+    "description": "Locked: a connection is needed."
+  },
+  "vaultLockedRetry": "Reintentar",
+  "@vaultLockedRetry": {
+    "description": "Locked: tries to open again."
+  },
+  "vaultLockedRetrying": "Reintentando…",
+  "@vaultLockedRetrying": {
+    "description": "Locked: while it tries again."
+  },
+  "vaultLockedUnsupportedTitle": "Este teléfono no puede guardar tu clave",
+  "@vaultLockedUnsupportedTitle": {
+    "description": "Locked: this phone cannot keep the key safely."
+  },
+  "vaultLockedUnsupportedLead": "Para cuidar tus datos, Wambito necesita que el teléfono guarde la clave de forma segura. Actualiza el sistema o abre Wambito en otro dispositivo.",
+  "@vaultLockedUnsupportedLead": {
+    "description": "Locked: why, and what to do."
+  },
+  "vaultLockedGuestTitle": "Tus datos no se pueden abrir aquí",
+  "@vaultLockedGuestTitle": {
+    "description": "Locked: a guest whose data lives on another device."
+  },
+  "vaultLockedGuestLead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allí. Apruébalo desde ese dispositivo, o cierra sesión.",
+  "@vaultLockedGuestLead": {
+    "description": "Locked: a guest whose data lives on another device, what to do."
+  },
+  "vaultLockedDeleteAccount": "Eliminar esta cuenta",
+  "@vaultLockedDeleteAccount": {
+    "description": "Locked, guest: asks to delete the account."
+  },
+  "vaultLockedDeleteLead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
+  "@vaultLockedDeleteLead": {
+    "description": "Locked, guest: what deleting means."
+  },
+  "vaultLockedDeleteConfirm": "Sí, eliminarla",
+  "@vaultLockedDeleteConfirm": {
+    "description": "Locked, guest: confirms deleting."
+  },
+  "vaultLockedDeleting": "Eliminando…",
+  "@vaultLockedDeleting": {
+    "description": "Locked, guest: while deleting."
+  },
+  "vaultLockedDeleteFailed": "No pudimos eliminarla. Inténtalo de nuevo.",
+  "@vaultLockedDeleteFailed": {
+    "description": "Locked, guest: deleting failed."
+  },
+  "vaultRemoved": "Este teléfono se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
+  "@vaultRemoved": {
+    "description": "Unlock: this phone was removed from the account by another device."
+  },
+  "vaultUnverified": "Este teléfono no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación.",
+  "@vaultUnverified": {
+    "description": "Unlock: this phone could not verify the account's new key and stopped syncing."
+  },
+  "vaultUnsyncedChanges": "{count, plural, =1{Tienes 1 cambio sin sincronizar} other{Tienes {count} cambios sin sincronizar}}",
+  "@vaultUnsyncedChanges": {
+    "description": "Sign-out sheet: changes made here and not yet sent.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSyncAndSignOut": "Sincronizar y cerrar sesión",
+  "@vaultSyncAndSignOut": {
+    "description": "Sign-out sheet: sends the changes, then signs out."
+  },
+  "vaultSignOutAnyway": "Cerrar sesión de todos modos",
+  "@vaultSignOutAnyway": {
+    "description": "Sign-out sheet: signs out and gives up the unsent changes."
+  },
+  "comingSoonWithEncryption": "Próximamente con cifrado",
+  "@comingSoonWithEncryption": {
+    "description": "What an encrypted (preview) account sees in place of what is not ported to it yet: automatic capture, the widget, due notices, export, import and assistants."
   }
 }

@@ -49,10 +49,13 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   `e2e:landing-only`, `e2e:landing-only-app`.
 - `deploy-landing`: push to `main` after `check` + `e2e`; `wrangler deploy` from `deploy/landing`.
 - `mobile` / `mobile-build` (only when mobile paths change): pub get, analyze, tests without
-  goldens, tokens and `apps/mobile/lib/api/gen` staleness, release self-tests, `build-native-deps.sh`
+  goldens and the `stack` tag, tokens and `apps/mobile/lib/api/gen` staleness, release self-tests, `build-native-deps.sh`
   `--abi` and `build-sherpa-onnx.sh` argument tests, F-Droid recipe and lock checks (`check-fdroid-recipe.sh`,
   `check-fdroid-lock.sh`, tested by `test-fdroid-checks.sh`), no-Google check, debug build, Gradle
   lock check, Gradle unit tests, native-switch test (`test-native-switch.sh`), release build.
+- `mobile-e2e` (filter: the `mobile` paths plus `apps/api/**` and `packages/{crypto,core,db}/**`): Flutter,
+  the root stack on the real clock, then `apps/mobile/scripts/run-vault-e2e.sh`: the phone's vault
+  (`test_stack/`, tag `stack`) against the real API, and `psql` finds no plain text in `records`.
 - `ios` (same filter; macOS runner): pub get, the signing guard and its test
   (`apps/mobile/scripts/check-ios-signing.sh`), `swift test` on `ios/WambitoNative`,
   `flutter build ios --release --no-codesign`.

@@ -24,7 +24,7 @@
     <string name="notice_due_many">%1$s are due today</string>
     <string name="notice_and">and</string>
     <string name="notice_and_i">and</string>
-    <string name="notice_guest">Your data will be deleted in 15 days if you don\'t add your email</string>
+    <string name="notice_guest">Your data will be deleted in 15 days if you don\'t add your email. If you delete the app, you lose them too.</string>
     <string name="notice_channel_due">Payments due today</string>
     <string name="notice_channel_due_description">At 9:00, one notice with the recurring payments due that day.</string>
     <string name="notice_channel_guest">Warning if you have no email</string>

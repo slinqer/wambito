@@ -2,6 +2,7 @@ package com.wambito.app.capture
 
 import android.app.Notification
 import android.content.Context
+import com.wambito.app.account.AccountMode
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import java.time.Instant
@@ -29,6 +30,8 @@ class CaptureListener : NotificationListenerService() {
         fun handle(context: Context, packageName: String, title: String?, text: String?, postedAt: Instant) {
             val source = CaptureSource.forPackage(packageName) ?: return
             if (!CaptureSettings(context).isEnabled(source)) return
+            // A `preview` account's finances never leave the phone: its notifications are not read.
+            if (AccountMode(context).isPreview()) return
             val capture = BankParsers.parse(source, title, text, postedAt) ?: return
             CaptureQueue(context).add(capture)
             CaptureScheduler.enqueueSend(context)

@@ -38,6 +38,87 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   the add sheet's edit flow, whose save adds `needsReview: false` (`TransactionPatch.confirming`) so it
   confirms and teaches in one PATCH. Rows carry the mark "por revisar · de Revolut" (`reviewMarkOf`).
   Tests fake the server with `test/review/fakes.dart` (`pumpHome`/`pumpSettingsApp` override it).
+- `lib/crypto/`: the Dart port of `packages/crypto`, one file per TS file (`crypto.dart` exports them), on
+  `cryptography` (pure Dart in tests) and `cryptography_flutter` (native, registers itself). The device private
+  key is raw 32 bytes. `test/crypto/vectors_test.dart` must pass `packages/crypto/test-vectors.json`
+  byte for byte; a format change needs a new `enc_v` and vectors on both sides. `prfSalt` lives in `wraps.dart`.
+- `lib/core/`: the Dart port of `packages/core` (money, dates, budgets, summaries, movement search, reports).
+  Shared-fixtures rule: the Dart tests read the TypeScript side's fixtures by relative path and never
+  copy them (`packages/core/fixtures/*.json`, `reports/cases.json`, `quick-capture/cases.json`,
+  `packages/crypto/test-vectors.json`); a change to a fixture changes what Dart must return, and a
+  Dart-only expectation is a bug in one of the two.
+- `lib/local/`: the phone's end-to-end encryption, each file the twin of one in `apps/web/app/local/`
+  (`prf.dart` = `prf.ts`: the passkey PRF over the `wambito/passkeys` channel, on iOS 18+ and Android).
+  `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
+  run by every store), `db.dart` + `sqlite_store.dart` (`SqliteStore.open(userId)`: the vault, file
+  `wambito-vault-<userId>.db` in the `vault` folder of the app support directory (Android `files/vault`), one table per record type plus `outbox`,
+  `meta`, `quarantine`; a local write updates record and outbox in one SQLite transaction, all
+  operations go through one queue; keys are not in it, they live in secure storage; tests use
+  `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
+  vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
+  `res/xml/backup_rules.xml` + `data_extraction_rules.xml` (the `vault` folder and the secure storage
+  prefs, `FlutterSecureStorageConfiguration:FlutterSecureStorage` included; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
+  `lib/debug/prf_probe_screen.dart` is the PRF probe, `/debug/prf`, registered only when `kDebugMode`: it
+  creates a passkey and evaluates its PRF on a real phone, to check that the platform gives one.
+  `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
+  finance routes over a `FinanceStore`, one store transaction per request, 422 `validation_failed`,
+  403 `demo_unavailable` for `localUnavailable`; `handle` returns null for a path it does not serve) and
+  `backend_interceptor.dart` (the Dio interceptor that answers those routes, `GET`/`PATCH /v1/me` and the
+  quick capture's `/v1/transactions/batch` and `batch-delete` included, and sends the rest, `DELETE /v1/me`
+  among it, to the network; the web's backend has no batch routes, so those are tested by hand) `test/local/backend_shapes_test.dart` compares each
+  scenario (answer and the store's records after a write) of `test/fixtures/local_backend/scenarios.json` over `seed.json` with the `<scenario>.json`
+  the web's backend recorded: after a change to `backend.ts` or a scenario, run
+  `pnpm --filter @wambito/web record:local-backend` and keep the diff.
+  `sync.dart` = `sync.ts` (`createSyncEngine`: push the outbox, pull `/v2/sync`; one run per account in
+  the process; triggers: start, `AppLifecycleListener` resume, a minute in the foreground, and
+  `afterLocalWrite`, which the session wires to the interceptor's `afterWrite`; tests port `sync.test.ts`
+  over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
+  (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
+  `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
+  every key, waiting at most `vaultCloseWait` for the store to close). `stale_vaults.dart` =
+  `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
+  `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s).
+  `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
+  Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
+  every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
+  `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall.
+- `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
+  deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
+  `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`
+  holds the account and its mode, stale-while-revalidate (`vaultAccountProvider`: what was kept for
+  the session, `keptVaultAccountProvider`, at once; then `GET /v1/me`, `freshVaultAccountProvider`,
+  which wins when it differs and sweeps the other accounts' vaults on each answer; with nothing kept
+  the start waits for the server. A home cache or a pending-saves queue of this session proves the
+  account `plain` (`VaultAccount.inferred`: routing and the offline path only; `knownPlainProvider`
+  stays false, so its finance calls wait for the server's answer). The router reads
+  `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
+  `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
+  `unlock_view.dart`, `locked_view.dart` (guest: delete the account); Checking, Opening and Committing
+  show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
+  while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
+  Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
+  (`forgetVault`), the kept account and mode, before the token goes; Settings asks
+  `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
+  A 401 (session expired, signed out everywhere: `_refresh` at start, the gate's `signInAgain`) ends
+  the session only (`SessionController.sessionExpired`): the vault, its keys and the kept account stay
+  for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
+  them, and so does a signed-out start unless they are the account kept last (`_sweepSignedOut`).
+  Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
+  is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
+  `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
+  What stage 3a leaves out for a `preview` account (automatic capture, the home widget, due notices,
+  export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
+  `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
+  `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
+  reads it (`wambito/notices` `setEncryptionMode`, key `wambito.encryption.mode`: `plain`, `preview`,
+  `unknown` while the account is not known, cleared on sign-out; untouched while the session loads),
+  tells `WidgetSync.modeChanged` (the widget snapshot gets no figures and a `line`) and calls the capture
+  channel's `clearQueue()` once. Native: Android `account/AccountMode.kt` (prefs `wambito.encryption`),
+  asked first by `SendCapturesWorker`, `ConfirmCaptureWorker`, `CaptureListener`, `RefreshWorker` and
+  `DueWorker` (`preview` or `unknown` ⇒ no API call; absent = an install from before the vault ⇒ as
+  before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
+  screens pass `previewOpen()` (`test/support/preview_account.dart`).
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,
@@ -100,7 +181,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Dart constants, as on Android. The app uses a UIScene `SceneDelegate` (a `FlutterSceneDelegate`),
   so a link arriving on a scene reaches Dart through `LaunchSceneHandler` (in `Launch/`), not
   through `AppDelegate`.
-  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`); `Haptics/`: `wambito/haptics` (`vibrate`);
+  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`); `Haptics/`: `wambito/haptics` (`vibrate`);
     `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
@@ -143,7 +224,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Commands (from `apps/mobile`, `export PATH="$HOME/development/flutter/bin:$PATH"`)
 
-- `flutter pub get --enforce-lockfile`, `flutter analyze`, `flutter test --exclude-tags golden` (CI).
+- `flutter pub get --enforce-lockfile`, `flutter analyze`, `flutter test --exclude-tags golden,stack` (CI).
 - Goldens: `flutter test --tags golden` (`--update-goldens`); on macOS without PingFang set
   `PARITY_PINGFANG` to a `PingFang.ttc` (see `test/support/parity.dart`). CI skips goldens.
 - Parity (`docs/mobile/parity.md`, list `test/parity/parity.json`): `pnpm --filter @wambito/web
@@ -156,6 +237,14 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
+- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`):
+  `scripts/run-vault-e2e.sh` resets the preview account (`seed:e2e-preview` in the api container), runs
+  `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit code, set up through `VaultGate`,
+  add a movement, sync, a second empty phone unlocks with the recovery key) and checks with `psql` that
+  `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
+  `records.body` holds the plain text (must print 0). CI's `mobile-build` fails when a release APK
+  lists `libsqlite3.so` (sqflite uses the system SQLite; the ffi dev dependency must stay out). `test_stack/` is outside `test/`, so `flutter test`
+  never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
   `node tool/store_shots/compose.cjs`.
 - F-Droid (`docs/mobile/fdroid.md` explains the whole build):

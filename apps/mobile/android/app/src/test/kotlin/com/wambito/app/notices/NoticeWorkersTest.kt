@@ -9,6 +9,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.wambito.app.account.AccountMode
 import com.wambito.app.widget.ServerSetting
 import com.wambito.app.widget.SessionSource
 import com.wambito.app.widget.TinyHttpServer
@@ -236,6 +237,40 @@ class NoticeWorkersTest {
     }
 
     @Test
+    fun `a preview account asks the server nothing, posts nothing and is not scheduled again`() {
+        AccountMode(context).value = "preview"
+        pages[""] = page(item("Arriendo", "2026-10-22"))
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "encrypted account")), result)
+        assertTrue("nothing is asked of the server", requests.isEmpty())
+        assertTrue(posted().isEmpty())
+        assertTrue(work(NoticeScheduler.DUE).none { !it.state.isFinished })
+    }
+
+    @Test
+    fun `a mode the app has not learned yet asks nothing today and looks again tomorrow`() {
+        AccountMode(context).value = "unknown"
+        pages[""] = page(item("Arriendo", "2026-10-22"))
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "mode unknown")), result)
+        assertTrue(requests.isEmpty())
+        assertTrue(posted().isEmpty())
+        assertEquals(1, enqueued(NoticeScheduler.DUE).size)
+    }
+
+    @Test
+    fun `a plain account is asked as ever`() {
+        AccountMode(context).value = "plain"
+        pages[""] = page(item("Arriendo", "2026-10-22"))
+        runDue()
+        assertEquals("Hoy vence Arriendo", text(posted().single()))
+    }
+
+    @Test
     fun `signed out, nothing is asked, posted or scheduled again`() {
         session.stored = null
         runDue()
@@ -451,7 +486,10 @@ class NoticeWorkersTest {
     @Test
     fun `a guest not opening the app for 44 days gets the warning, with no call to the server`() {
         runGuest()
-        assertEquals("Tus datos se borrarán en 15 días si no agregas tu correo", text(posted().single()))
+        assertEquals(
+            "Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.",
+            text(posted().single()),
+        )
         // A request would count as activity and move the deletion 60 days on: it makes none.
         assertTrue(requests.isEmpty())
     }

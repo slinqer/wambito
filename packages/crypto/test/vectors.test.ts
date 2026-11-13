@@ -19,6 +19,7 @@ import {
   type RecordContext,
   sealKeyLink,
   sealRecord,
+  sealToDevice,
   toBase64Url,
   unwrapDataKey,
   verifyDeviceAttestation,
@@ -178,6 +179,10 @@ describe("shared test vectors", () => {
             b(r.sealed),
             b(r.approverKey),
           );
+        } else if (r.op === "sealToDevice") {
+          await sealToDevice(b(r.publicKey), r.ctx, b(r.dataKey));
+        } else if (r.op === "openFromDevice") {
+          await openFromDevice(await importDevicePrivateKey(b(r.privateKey)), r.ctx, b(r.sealed));
         } else if (r.op === "openKeyLink") {
           await openKeyLink(b(r.newKey), r.ctx, b(r.link));
         } else if (r.op === "parseRecoveryKey") {

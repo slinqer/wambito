@@ -4,4 +4,4 @@
 "notice_due_many" = "%@ are due today";
 "notice_and" = "and";
 "notice_and_i" = "and";
-"notice_guest" = "Your data will be deleted in 15 days if you don't add your email";
+"notice_guest" = "Your data will be deleted in 15 days if you don't add your email. If you delete the app, you lose them too.";

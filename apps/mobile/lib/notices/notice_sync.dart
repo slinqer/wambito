@@ -7,6 +7,7 @@ import '../api/session.dart';
 import '../feedback/stored_flag.dart';
 import '../home/widget_sync.dart';
 import '../settings/preferences.dart';
+import '../vault/encryption_mode.dart';
 import 'notice_backend.dart';
 import 'notice_platform.dart';
 import 'notice_prompt.dart';
@@ -77,6 +78,15 @@ class NoticeSync with WidgetsBindingObserver {
       _facts = null;
       await platform.cancelDue();
       await platform.cancelGuest();
+      return;
+    }
+    // A `preview` account's payments live only in the vault on this phone: nothing is asked of the
+    // server for them (no recurrence list), and "Hoy vence…" waits for encryption. The guest
+    // warning needs no finances but is only (re)scheduled on proof the server saw the person, which
+    // a pass that asks nothing cannot give: it stays as it is.
+    if (_ref.read(currentVaultAccountProvider)?.mode == EncryptionMode.preview) {
+      _facts = null;
+      await platform.cancelDue();
       return;
     }
     final due = _ref.read(dueNoticeEnabledProvider.notifier);
@@ -186,6 +196,11 @@ final noticeSyncProvider = Provider<NoticeSync>((ref) {
   });
   ref.listen(localeOverrideProvider, (previous, next) {
     if (previous != next) sync.request();
+  });
+  // The account turning out to be `preview`: "Hoy vence…" is cancelled and the server asked nothing.
+  // (`plain` needs no pass of its own: until the mode is known the guard holds every finance call.)
+  ref.listen(currentVaultAccountProvider.select((a) => a?.mode), (previous, next) {
+    if (next == EncryptionMode.preview && previous != next) sync.request();
   });
   // While the stored session is being read the listener above asks as soon as it is known.
   if (ref.read(sessionProvider).status != SessionStatus.loading) sync.request();

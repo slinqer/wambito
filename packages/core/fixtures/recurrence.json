@@ -1,0 +1,243 @@
+{
+  "$comment": "Shared cases for occurrences. Each input is [rule, month]; expected is a list of 0 or 1 ISO dates. Days past the month's end clamp to its last day. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "monthly day 31 in January",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 31,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2026-01"
+      ],
+      "expected": ["2026-01-31"]
+    },
+    {
+      "name": "monthly day 31 in February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 31,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2026-02"
+      ],
+      "expected": ["2026-02-28"]
+    },
+    {
+      "name": "monthly day 31 in February of a leap year",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 31,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    },
+    {
+      "name": "monthly day 31 in April",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 31,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2026-04"
+      ],
+      "expected": ["2026-04-30"]
+    },
+    {
+      "name": "monthly day 15",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 15,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2026-06"
+      ],
+      "expected": ["2026-06-15"]
+    },
+    {
+      "name": "before the start date",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 5,
+          "monthOfYear": null,
+          "startDate": "2026-03-10",
+          "endDate": null
+        },
+        "2026-03"
+      ],
+      "expected": []
+    },
+    {
+      "name": "on the start date",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 10,
+          "monthOfYear": null,
+          "startDate": "2026-03-10",
+          "endDate": null
+        },
+        "2026-03"
+      ],
+      "expected": ["2026-03-10"]
+    },
+    {
+      "name": "after the end date",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 20,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": "2026-04-19"
+        },
+        "2026-04"
+      ],
+      "expected": []
+    },
+    {
+      "name": "on the end date",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 19,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": "2026-04-19"
+        },
+        "2026-04"
+      ],
+      "expected": ["2026-04-19"]
+    },
+    {
+      "name": "yearly in its month",
+      "input": [
+        {
+          "frequency": "yearly",
+          "dayOfMonth": 8,
+          "monthOfYear": 3,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2027-03"
+      ],
+      "expected": ["2027-03-08"]
+    },
+    {
+      "name": "yearly in another month",
+      "input": [
+        {
+          "frequency": "yearly",
+          "dayOfMonth": 8,
+          "monthOfYear": 3,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2027-04"
+      ],
+      "expected": []
+    },
+    {
+      "name": "yearly Feb 29 clamps in a common year",
+      "input": [
+        {
+          "frequency": "yearly",
+          "dayOfMonth": 29,
+          "monthOfYear": 2,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        "2027-02"
+      ],
+      "expected": ["2027-02-28"]
+    },
+    {
+      "name": "yearly Feb 29 in a leap year",
+      "input": [
+        {
+          "frequency": "yearly",
+          "dayOfMonth": 29,
+          "monthOfYear": 2,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    },
+    {
+      "name": "monthly day 29 in a common February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 29,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2027-02"
+      ],
+      "expected": ["2027-02-28"]
+    },
+    {
+      "name": "monthly day 29 in a leap February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 29,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    },
+    {
+      "name": "monthly day 30 in a common February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 30,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2027-02"
+      ],
+      "expected": ["2027-02-28"]
+    },
+    {
+      "name": "monthly day 30 in a leap February",
+      "input": [
+        {
+          "frequency": "monthly",
+          "dayOfMonth": 30,
+          "monthOfYear": null,
+          "startDate": "2024-01-01",
+          "endDate": null
+        },
+        "2028-02"
+      ],
+      "expected": ["2028-02-29"]
+    }
+  ]
+}

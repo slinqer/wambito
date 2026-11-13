@@ -9,7 +9,7 @@
 // line on what it is, and the web's switches and buttons.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +38,9 @@ import '../ui/press_link.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import '../ui/web_text_field.dart';
+import '../vault/preview.dart';
+import '../vault/unsynced_sheet.dart';
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'assistants_section.dart';
 import 'delete_account.dart';
 import 'export_settings.dart';
@@ -76,6 +79,10 @@ final settingsEmailProvider = FutureProvider.autoDispose<String?>((ref) async {
 /// widget, the voice models, the server, About, "Más en la web" and sign out.
 /// A guest also finds "Guarda tu progreso" at the top, and is warned before anything that would
 /// leave their account behind (signing out, changing server).
+/// Whether Settings shows its debug-only rows (the passkey PRF probe): debug builds only. A provider
+/// so a test can switch it.
+final debugToolsProvider = Provider<bool>((ref) => kDebugMode);
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.webSectionsOnly = false});
 
@@ -108,6 +115,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
     }
+    // A `preview` account with changes not sent yet: sync them first, or sign out anyway.
+    if (!await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await session.signOut(discardGuest: true);
@@ -133,6 +143,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
     }
+    // Another server signs out (and wipes the vault): a `preview` account's changes not sent yet
+    // are asked about first, as at a sign-out.
+    if (next != ref.read(serverUrlProvider) &&
+        !await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) {
+      return;
+    }
+    if (!mounted) return;
     final toasts = ToastHost.of(context);
     final l10n = AppLocalizations.of(context);
     setState(() => _busy = true);
@@ -374,15 +391,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: WambitoTokens.space2,
               children: [
-                SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
-                _SelfStart(
-                  child: PressLink.text(
-                    l10n.settingsImportAction,
-                    key: const Key('settings.import'),
-                    tone: PressTone.secondary,
-                    onPressed: () => unawaited(context.push<void>('/import')),
+                // An encrypted account's data is on the phone: the server's import waits for encryption.
+                if (ref.watch(isPreviewProvider)) ...[
+                  SettingLabel(label: l10n.settingsImportTitle),
+                  const ComingSoonNotice(key: Key('settings.import.comingSoon')),
+                ] else ...[
+                  SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
+                  _SelfStart(
+                    child: PressLink.text(
+                      l10n.settingsImportAction,
+                      key: const Key('settings.import'),
+                      tone: PressTone.secondary,
+                      onPressed: () => unawaited(context.push<void>('/import')),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             ExportBlock(guest: guest),
@@ -402,15 +425,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: vibration,
                 onChanged: (on) => unawaited(ref.read(vibrationEnabledProvider.notifier).set(on)),
               ),
-              SettingSwitch(
-                key: const Key('settings.dueNotice'),
-                label: l10n.settingsDueNotice,
-                hint: defaultTargetPlatform == TargetPlatform.iOS
-                    ? l10n.settingsDueNoticeHintIos
-                    : l10n.settingsDueNoticeHint,
-                value: ref.watch(dueNoticeEnabledProvider),
-                onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
-              ),
+              // An encrypted account's payments are on the phone: "Hoy vence…" waits for encryption.
+              if (ref.watch(isPreviewProvider))
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: WambitoTokens.space2,
+                  children: [
+                    SettingLabel(label: l10n.settingsDueNotice),
+                    const ComingSoonNotice(key: Key('settings.dueNotice.comingSoon')),
+                  ],
+                )
+              else
+                SettingSwitch(
+                  key: const Key('settings.dueNotice'),
+                  label: l10n.settingsDueNotice,
+                  hint: defaultTargetPlatform == TargetPlatform.iOS
+                      ? l10n.settingsDueNoticeHintIos
+                      : l10n.settingsDueNoticeHint,
+                  value: ref.watch(dueNoticeEnabledProvider),
+                  onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
+                ),
               SettingSwitch(
                 key: const Key('settings.guestNotice'),
                 label: l10n.settingsGuestNotice,
@@ -505,6 +539,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () => context.push('/settings/about'),
                 ),
               ),
+              if (ref.watch(debugToolsProvider))
+                _SelfStart(
+                  child: PressButton.text(
+                    'PRF probe',
+                    key: const Key('settings.prfProbe'),
+                    tone: PressTone.secondary,
+                    onPressed: () => context.push('/debug/prf'),
+                  ),
+                ),
             ],
           ),
           SettingsSection(
