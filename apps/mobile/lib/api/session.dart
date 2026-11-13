@@ -19,6 +19,7 @@ import '../vault/encryption_mode.dart'
     show
         EncryptionMode,
         encryptionStoreProvider,
+        knownAccountProvider,
         knownPlainProvider,
         vaultAccountProvider,
         vaultOwnerProvider;
@@ -211,6 +212,8 @@ class SessionController extends Notifier<SessionState> {
       }
     } on AuthFailure catch (failure) {
       if (failure.status == 401 && state.stored?.token == stored.token) {
+        // The vault and what is kept of the account are bound to this token: now or never.
+        await _forgetVault(token: stored.token);
         await _forgetWidget();
         await _store.clear();
         state = SessionState.signedOut;
@@ -474,15 +477,19 @@ class SessionController extends Notifier<SessionState> {
   /// the session and puts the rest right at the next start. The account is the one the phone kept
   /// for this session ([EncryptionStore.recall]): no network is asked, and an account whose mode
   /// was never learned has no vault. A failure never keeps the person signed in; the keys go anyway.
-  Future<void> _forgetVault() async {
-    final token = state.stored?.token;
+  Future<void> _forgetVault({String? token}) async {
+    token ??= state.stored?.token;
     if (token == null) return;
     final store = ref.read(encryptionStoreProvider);
     final String userId;
     try {
-      final account = await store.recall(token);
-      if (account == null) return;
-      userId = account.profile.id;
+      // The account the app knows now, else what the phone kept for this session.
+      final known = ref.read(knownAccountProvider);
+      final id = known.owner == sessionOwnerOf(token) ? known.id : null;
+      final account = id == null ? await store.recall(token) : null;
+      final found = id ?? account?.profile.id;
+      if (found == null) return;
+      userId = found;
     } on Object {
       return;
     }

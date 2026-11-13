@@ -68,10 +68,10 @@ class VaultScreen extends ConsumerWidget {
       // No gate: the mode of the account is not known yet, or could not be learned (an offline
       // first start with nothing kept). A `plain` account never stays here (the router).
       final account = ref.watch(vaultAccountProvider);
-      if (account.hasError && !account.isLoading) {
+      if (account.hasError) {
         return LockedView(
           kind: LockedKind.offline,
-          retrying: false,
+          retrying: account.isLoading,
           onRetry: () => ref.invalidate(vaultAccountProvider),
           onSignOut: signOut,
         );

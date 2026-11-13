@@ -47,7 +47,8 @@ VaultRoute vaultRouteOf(Ref ref) {
   final account = ref.read(currentVaultAccountProvider);
   if (account == null) {
     final asked = ref.read(vaultAccountProvider);
-    return asked.hasError && !asked.isLoading ? VaultRoute.locked : VaultRoute.loading;
+    // A retry after an error keeps the Locked view (retrying) instead of flashing a blank route.
+    return asked.hasError ? VaultRoute.locked : VaultRoute.loading;
   }
   if (account.mode == EncryptionMode.plain) return VaultRoute.open;
   return ref.read(vaultGateStateProvider) is Ready ? VaultRoute.open : VaultRoute.locked;

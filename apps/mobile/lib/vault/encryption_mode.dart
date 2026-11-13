@@ -102,6 +102,16 @@ class EncryptionStore {
   }
 }
 
+/// Who the app last learned the session's account to be: written by [vaultAccountProvider], read by
+/// the sign-out (which cannot read that provider: it depends on the session). [owner] is the
+/// session it was learned for.
+class KnownAccount {
+  String? owner;
+  String? id;
+}
+
+final knownAccountProvider = Provider<KnownAccount>((ref) => KnownAccount());
+
 final encryptionStoreProvider = Provider<EncryptionStore>((ref) => const EncryptionStore());
 
 /// Whether a failed `GET /v1/me` means the server could not be asked (no network, a 5xx, an
@@ -129,6 +139,7 @@ final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null
   final token = ref.watch(sessionProvider.select((s) => s.stored?.token));
   if (token == null) return null;
   final store = ref.watch(encryptionStoreProvider);
+  final known = ref.read(knownAccountProvider);
   final api = ref.watch(networkClientProvider).api.getDefaultApi();
   final Profile me;
   try {
@@ -138,7 +149,12 @@ final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null
   } on Object catch (error) {
     if (!_unanswered(error)) rethrow;
     final kept = await store.recall(token);
-    if (kept != null) return kept;
+    if (kept != null) {
+      known
+        ..owner = kept.owner
+        ..id = kept.profile.id;
+      return kept;
+    }
     rethrow;
   }
   final account = VaultAccount(
@@ -154,6 +170,9 @@ final vaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null
         ? EncryptionMode.preview
         : EncryptionMode.plain,
   );
+  known
+    ..owner = account.owner
+    ..id = me.id;
   // A session that has meanwhile ended (or changed) keeps nothing.
   if (ref.mounted) await store.remember(token, account);
   return account;

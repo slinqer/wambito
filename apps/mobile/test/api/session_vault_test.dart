@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/api/auth_api.dart' show AuthFailure;
 import 'package:wambito/api/session.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
@@ -160,6 +161,55 @@ void main() {
       await controller.signOut();
 
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      final left = await kept();
+      expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
+    });
+
+    test('a 401 at start wipes the vault and the kept account too', () async {
+      auth.failures['isGuest'] = const AuthFailure(status: 401);
+      final container = containerWith();
+      final controller = container.read(sessionProvider.notifier);
+      await controller.ready;
+      await controller.refreshed;
+
+      expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      expect(deleted, ['user_p']);
+      final left = await kept();
+      expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
+      expect(left.containsKey(EncryptionStore.accountKey), isFalse);
+      expect(left.containsKey('wambito.encryption.user_p'), isFalse);
+      expect(_log.indexOf('vault wiped'), lessThan(_log.indexOf('token gone')));
+    });
+
+    test('with wambito.account missing, the account the app knows is wiped', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        SessionStore.tokenKey: 'tok',
+        SessionStore.guestKey: 'false',
+        'wambito.vault.user_p.current': '1',
+        'wambito.encryption.user_p': 'preview',
+      });
+      final container = ProviderContainer(
+        overrides: [
+          authApiProvider.overrideWithValue(auth),
+          passkeysProvider.overrideWithValue(FakePasskeys()),
+          widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+          homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+          knownAccountProvider.overrideWithValue(
+            KnownAccount()
+              ..owner = sessionOwnerOf('tok')
+              ..id = 'user_p',
+          ),
+          forgetVaultProvider.overrideWithValue(
+            (userId, storage) =>
+                forgetVault(userId, storage, deleteStore: (id) async => deleted.add(id)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(sessionProvider.notifier);
+      await controller.ready;
+      await controller.signOut();
+      expect(deleted, ['user_p']);
       final left = await kept();
       expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
     });
