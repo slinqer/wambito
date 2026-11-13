@@ -16,9 +16,15 @@ import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
 import '../vault/encryption_mode.dart'
-    show EncryptionMode, knownPlainProvider, vaultAccountProvider, vaultOwnerProvider;
+    show
+        EncryptionMode,
+        encryptionStoreProvider,
+        knownPlainProvider,
+        vaultAccountProvider,
+        vaultOwnerProvider;
 import '../vault/finance_guard.dart';
-import '../vault/vault_providers.dart' show vaultSessionProvider;
+import '../vault/vault_providers.dart'
+    show forgetVaultProvider, keyStorageProvider, vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -438,6 +444,7 @@ class SessionController extends Notifier<SessionState> {
         // whatever went wrong there, the session is forgotten here all the same.
       }
     }
+    await _forgetVault();
     await _forgetWidget();
     _forgetCaptures();
     await _store.clear();
@@ -454,10 +461,43 @@ class SessionController extends Notifier<SessionState> {
     await ready;
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
+    await _forgetVault();
     await ref.read(widgetSyncProvider).signedOut().timeout(widgetWait, onTimeout: () {});
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// A signed-in `preview` account's vault does not outlive its session: the vault file and every
+  /// key of the account ([forgetVault]), then what the phone kept of the account (its profile and
+  /// its mode). Waited for, and before the token goes: a process that dies in between still finds
+  /// the session and puts the rest right at the next start. The account is the one the phone kept
+  /// for this session ([EncryptionStore.recall]): no network is asked, and an account whose mode
+  /// was never learned has no vault. A failure never keeps the person signed in; the keys go anyway.
+  Future<void> _forgetVault() async {
+    final token = state.stored?.token;
+    if (token == null) return;
+    final store = ref.read(encryptionStoreProvider);
+    final String userId;
+    try {
+      final account = await store.recall(token);
+      if (account == null) return;
+      userId = account.profile.id;
+    } on Object {
+      return;
+    }
+    final keys = ref.read(keyStorageProvider);
+    try {
+      await ref.read(forgetVaultProvider)(userId, keys);
+    } on Object {
+      // The file would not go: the keys still do, so what is left cannot be opened.
+      try {
+        await keys.deleteAll(userId);
+      } on Object {
+        // Nothing more to do; the next sign-in of this account finds it as it was.
+      }
+    }
+    await store.forget(userId);
   }
 
   /// The captures detected from notifications and still waiting to be sent belong to the account

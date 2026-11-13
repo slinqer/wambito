@@ -37,9 +37,10 @@ class FileInstallMarker implements InstallMarker {
   }
 }
 
-/// On the first start of an install (no marker): deletes every `wambito.vault.*` and
-/// `wambito.encryption.*` item of secure storage, then writes the marker. Call it before anything
-/// reads secure storage. A failure leaves the marker unwritten, so the next start tries again.
+/// On the first start of an install (no marker): deletes every `wambito.vault.*`,
+/// `wambito.encryption.*` and `wambito.account` item of secure storage (the kept account is
+/// personal data, which must not survive an iOS reinstall), then writes the marker. Call it before
+/// anything reads secure storage. A failure leaves the marker unwritten, so the next start tries again.
 Future<void> clearKeysAfterReinstall(KeyStorage storage, InstallMarker marker) async {
   if (await marker.exists()) return;
   await storage.deleteAllVaultKeys();

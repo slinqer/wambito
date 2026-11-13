@@ -4,4 +4,4 @@
 "notice_due_many" = "Hoje vencem %@";
 "notice_and" = "e";
 "notice_and_i" = "e";
-"notice_guest" = "Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email";
+"notice_guest" = "Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email. Se apagares a app, perdes os dados na mesma.";

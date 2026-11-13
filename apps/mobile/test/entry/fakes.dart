@@ -17,6 +17,7 @@ import 'package:wambito/review/review_repository.dart';
 
 import '../home/fakes.dart';
 import '../review/fakes.dart' show FakeReviewRepository;
+import '../support/plain_account.dart';
 
 /// An auth server in memory: records every call, answers with made-up tokens, and fails a call
 /// when told to.
@@ -287,11 +288,14 @@ Future<ProviderContainer> pumpApp(
   FakePasskeys? passkeys,
   Locale locale = const Locale('es'),
   List<Override> overrides = const [],
+  bool plain = true,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   final container = ProviderContainer(
     overrides: [
+      // The account is `plain`: the vault's screens are test/vault's business, not these.
+      if (plain) plainAccount(),
       // The tests settle the frames: a running time bar would wait a toast's life out.
       toastBarAnimatesProvider.overrideWithValue(false),
       authApiProvider.overrideWithValue(auth),

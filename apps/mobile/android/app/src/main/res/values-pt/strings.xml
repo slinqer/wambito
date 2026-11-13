@@ -24,7 +24,7 @@
     <string name="notice_due_many">Hoje vencem %1$s</string>
     <string name="notice_and">e</string>
     <string name="notice_and_i">e</string>
-    <string name="notice_guest">Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email</string>
+    <string name="notice_guest">Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email. Se apagares a app, perdes os dados na mesma.</string>
     <string name="notice_channel_due">Pagamentos que vencem hoje</string>
     <string name="notice_channel_due_description">Às 9:00, um aviso com os pagamentos recorrentes que vencem nesse dia.</string>
     <string name="notice_channel_guest">Aviso se não tiveres email</string>

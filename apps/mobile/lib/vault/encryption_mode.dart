@@ -88,13 +88,16 @@ class EncryptionStore {
     }
   }
 
-  /// Forgets the kept profile (sign-out). The mode of each account may stay: it says nothing of
-  /// its finances, and a reinstall deletes it (`KeyStorage.deleteAllVaultKeys`).
-  Future<void> forget() async {
-    try {
-      await _storage.delete(key: accountKey);
-    } on Object {
-      // Bound to the old session's token: nobody else reads it.
+  /// Forgets what was kept of [userId] (sign-out, a deleted account): the profile and the mode.
+  /// Neither says anything of the finances, but both are personal (an email, an id): a sign-out
+  /// leaves none of them on the phone.
+  Future<void> forget(String userId) async {
+    for (final key in [accountKey, modeKey(userId)]) {
+      try {
+        await _storage.delete(key: key);
+      } on Object {
+        // Bound to the old session's token: nobody else reads it.
+      }
     }
   }
 }

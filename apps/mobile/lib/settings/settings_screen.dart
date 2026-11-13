@@ -38,6 +38,8 @@ import '../ui/press_link.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import '../ui/web_text_field.dart';
+import '../vault/unsynced_sheet.dart';
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'assistants_section.dart';
 import 'delete_account.dart';
 import 'export_settings.dart';
@@ -112,6 +114,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
     }
+    // A `preview` account with changes not sent yet: sync them first, or sign out anyway.
+    if (!await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await session.signOut(discardGuest: true);

@@ -70,8 +70,22 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
   every key). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
-  every `wambito.vault.*` / `wambito.encryption.*` item when `wambito.installed` (Application Support) is
-  missing, since the iOS Keychain outlives a reinstall.
+  every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
+  `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall.
+- `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
+  deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
+  `unlockPasskeyOfferedProvider`, `forgetVaultProvider`), `encryption_mode.dart` holds the account and
+  its mode (`vaultAccountProvider`; the router reads `currentVaultAccountProvider`, never the mode
+  provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
+  `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
+  `unlock_view.dart`, `locked_view.dart` (guest: delete the account); Checking, Opening and Committing
+  show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
+  while the mode is unknown the `/loading` route; a mode nobody could tell is Locked(offline) with a
+  retry. Sign-out and a deleted account (`session.dart`) wipe the vault (`forgetVault`), the kept
+  account and mode, before the token goes; Settings asks `confirmUnsyncedSignOut`
+  (`unsynced_sheet.dart`) first. Tests of screens that are not about the vault pass
+  `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,

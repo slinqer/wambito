@@ -32,6 +32,12 @@ final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaul
   (ref) => openVaultSession,
 );
 
+/// Wipes an account's vault (its file and its keys): [forgetVault]; tests put their own in.
+final forgetVaultProvider = Provider<Future<void> Function(String userId, KeyStorage storage)>(
+  (ref) =>
+      (userId, storage) => forgetVault(userId, storage),
+);
+
 /// The gate of the signed-in `preview` account, started; null for `plain`, while the mode of the
 /// session signed in now is not known yet, and when signed out. It is bound to that session (the
 /// owner of [currentVaultAccountProvider]): another token, even a new one of the same account,
@@ -58,6 +64,19 @@ final vaultGateStateProvider = Provider<VaultGateState<VaultSession>?>((ref) {
 final vaultSessionProvider = Provider<VaultSession?>((ref) {
   final state = ref.watch(vaultGateStateProvider);
   return state is Ready<VaultSession> ? state.session : null;
+});
+
+/// Whether Unlock offers "Use a passkey": this phone can use passkeys and the account has some
+/// (the web's `passkeysSupported()` and `accountPasskeyIds`; whether one gives a PRF is known only
+/// when it is touched, and Unlock then says so). A list that cannot be read leaves the button there:
+/// the gate asks again, and the server refuses a credential that is not the account's.
+final unlockPasskeyOfferedProvider = FutureProvider.autoDispose<bool>((ref) async {
+  if (!await ref.watch(passkeysSupportedProvider.future)) return false;
+  try {
+    return (await accountPasskeyIds(ref.read(networkClientProvider).dio)).isNotEmpty;
+  } on Object {
+    return true;
+  }
 });
 
 /// The signed-in account's passkey credential ids (Better Auth's list, `credentialID`, as the

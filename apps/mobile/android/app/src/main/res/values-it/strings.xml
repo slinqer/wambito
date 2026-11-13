@@ -24,7 +24,7 @@
     <string name="notice_due_many">Oggi scadono %1$s</string>
     <string name="notice_and">e</string>
     <string name="notice_and_i">e</string>
-    <string name="notice_guest">I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email</string>
+    <string name="notice_guest">I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email. Se elimini l\'app, li perdi comunque.</string>
     <string name="notice_channel_due">Pagamenti in scadenza oggi</string>
     <string name="notice_channel_due_description">Alle 9:00, un avviso con i pagamenti ricorrenti in scadenza quel giorno.</string>
     <string name="notice_channel_guest">Avviso se non hai un\'email</string>

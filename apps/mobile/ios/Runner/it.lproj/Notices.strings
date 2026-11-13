@@ -4,4 +4,4 @@
 "notice_due_many" = "Oggi scadono %@";
 "notice_and" = "e";
 "notice_and_i" = "e";
-"notice_guest" = "I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email";
+"notice_guest" = "I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email. Se elimini l'app, li perdi comunque.";
