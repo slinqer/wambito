@@ -303,4 +303,79 @@ void main() {
     await container.read(hideWidgetAmountProvider.notifier).set(false);
     await container.read(widgetSyncProvider).idle;
   });
+  group('a preview account (its figures live only in the vault on the phone)', () {
+    test(
+      'the widget gets no figures and says "Próximamente con cifrado", and nothing else is written',
+      () async {
+        hide.gate.complete();
+        container = make();
+        final sync = container.read(widgetSyncProvider);
+        await sync.modeChanged(preview: true);
+        await sync.idle;
+        expect(doc(), {
+          'v': 3,
+          'signedIn': false,
+          'hideAmount': true,
+          'theme': 'dark',
+          'locale': 'es',
+          'line': 'Próximamente con cifrado',
+        });
+
+        // The month home loads comes from the vault: no figure of it reaches the widget.
+        await sync.summaryLoaded(
+          summary(budgetTotal: 200000000, spent: 50000000),
+          currency: 'COP',
+          timezone: 'America/Bogota',
+        );
+        expect(doc().containsKey('remaining'), isFalse);
+        expect(doc().containsKey('spent'), isFalse);
+        expect(doc()['line'], 'Próximamente con cifrado');
+      },
+    );
+
+    test('the line is in the widget\'s language', () async {
+      hide.gate.complete();
+      container = make(locale: const Locale('en'));
+      final sync = container.read(widgetSyncProvider);
+      await sync.modeChanged(preview: true);
+      await sync.idle;
+      expect(doc()['line'], 'Coming soon with encryption');
+      expect(doc()['locale'], 'en');
+    });
+
+    test('the hide-amount and theme choices keep the line', () async {
+      hide.gate.complete();
+      container = make();
+      final sync = container.read(widgetSyncProvider);
+      await sync.modeChanged(preview: true);
+      await container.read(themeModeProvider.notifier).set(ThemeMode.light);
+      await sync.idle;
+      expect(doc()['theme'], 'light');
+      expect(doc()['line'], 'Próximamente con cifrado');
+      expect(doc()['signedIn'], isFalse);
+    });
+
+    test('signed out, the widget is the usual signed-out one with no line', () async {
+      hide.gate.complete();
+      container = make();
+      final sync = container.read(widgetSyncProvider);
+      await sync.modeChanged(preview: true);
+      await sync.idle;
+      await sync.signedOut();
+      expect(doc().containsKey('line'), isFalse);
+      expect(widgetSignedOut(store), isTrue);
+    });
+
+    test('a plain account is never touched by modeChanged', () async {
+      hide.gate.complete();
+      container = make();
+      final sync = container.read(widgetSyncProvider);
+      await sync.modeChanged(preview: false);
+      await sync.idle;
+      expect(store.saved, isEmpty);
+      await sync.summaryLoaded(summary(), currency: 'COP', timezone: 'America/Bogota');
+      expect(doc()['signedIn'], isTrue);
+      expect(doc().containsKey('line'), isFalse);
+    });
+  });
 }

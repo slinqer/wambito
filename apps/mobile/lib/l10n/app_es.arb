@@ -4019,5 +4019,9 @@
   "vaultSignOutAnyway": "Cerrar sesión de todos modos",
   "@vaultSignOutAnyway": {
     "description": "Sign-out sheet: signs out and gives up the unsent changes."
+  },
+  "comingSoonWithEncryption": "Próximamente con cifrado",
+  "@comingSoonWithEncryption": {
+    "description": "What an encrypted (preview) account sees in place of what is not ported to it yet: automatic capture, the widget, due notices, export, import and assistants."
   }
 }

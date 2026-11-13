@@ -87,7 +87,7 @@ fun widgetModel(context: Context, snapshot: WidgetSnapshot?, now: Instant, zone:
     val theme = themeOf(snapshot?.theme)
     val strings = snapshot?.locale?.let { localized(context, it) } ?: context
     if (snapshot == null || !snapshot.signedIn) {
-        return WidgetModel.SignedOut(strings.getString(R.string.widget_signed_out), theme)
+        return WidgetModel.SignedOut(snapshot?.line ?: strings.getString(R.string.widget_signed_out), theme)
     }
     val language = snapshot.locale ?: Locale.getDefault().language.takeIf { it in AppLanguages.ALL } ?: "es"
     val month = try {

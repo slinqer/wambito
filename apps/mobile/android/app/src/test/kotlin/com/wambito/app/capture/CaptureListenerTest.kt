@@ -80,6 +80,19 @@ class CaptureListenerTest {
     }
 
     @Test
+    fun `a preview account queues nothing and reads no text`() {
+        CaptureSettings(context).setEnabled(CaptureSource.REVOLUT, true)
+        val parser = RecordingParser(CaptureSource.REVOLUT, sampleCapture())
+        BankParsers.parsers = listOf(parser)
+        com.wambito.app.account.AccountMode(context).value = "preview"
+
+        CaptureListener.handle(context, revolut, "title", "text", postedAt)
+
+        assertEquals(0, parser.calls)
+        assertTrue(CaptureQueue(context).all().isEmpty())
+    }
+
+    @Test
     fun `drops unparsed`() {
         CaptureSettings(context).setEnabled(CaptureSource.REVOLUT, true)
         BankParsers.parsers = listOf(RecordingParser(CaptureSource.REVOLUT, null))

@@ -86,6 +86,18 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   account and mode, before the token goes; Settings asks `confirmUnsyncedSignOut`
   (`unsynced_sheet.dart`) first. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
+  What stage 3a leaves out for a `preview` account (automatic capture, the home widget, due notices,
+  export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
+  `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
+  `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
+  reads it (`wambito/notices` `setEncryptionMode`, key `wambito.encryption.mode`: `plain`, `preview`,
+  `unknown` while the account is not known, cleared on sign-out; untouched while the session loads),
+  tells `WidgetSync.modeChanged` (the widget snapshot gets no figures and a `line`) and calls the capture
+  channel's `clearQueue()` once. Native: Android `account/AccountMode.kt` (prefs `wambito.encryption`),
+  asked first by `SendCapturesWorker`, `ConfirmCaptureWorker`, `CaptureListener`, `RefreshWorker` and
+  `DueWorker` (`preview` or `unknown` ⇒ no API call; absent = an install from before the vault ⇒ as
+  before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
+  screens pass `previewOpen()` (`test/support/preview_account.dart`).
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,

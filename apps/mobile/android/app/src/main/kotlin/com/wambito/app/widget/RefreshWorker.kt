@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.R
+import com.wambito.app.account.AccountMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -73,6 +74,9 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 withContext(dependencies.writeContext) { writeSignedOut(context) }
                 return "signed out"
             }
+            // A `preview` account's figures live only on the phone: the app writes the snapshot
+            // (no figure) and nothing is asked of the server. Not learned yet: nothing either.
+            if (!AccountMode(context).allowsApi()) return "encrypted account"
             // The currency and language come from the app's last snapshot: without one, the app
             // writes everything at its next start.
             val known = WidgetSnapshot.read(context)

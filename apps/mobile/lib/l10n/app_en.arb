@@ -2054,5 +2054,6 @@
   "vaultUnverified": "This phone couldn't verify your account's new key, so it stopped syncing. Your data here is safe. To keep going, use your passkey or type your recovery key.",
   "vaultUnsyncedChanges": "{count, plural, =1{You have 1 change not synced yet} other{You have {count} changes not synced yet}}",
   "vaultSyncAndSignOut": "Sync and sign out",
-  "vaultSignOutAnyway": "Sign out anyway"
+  "vaultSignOutAnyway": "Sign out anyway",
+  "comingSoonWithEncryption": "Coming soon with encryption"
 }

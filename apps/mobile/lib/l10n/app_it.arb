@@ -857,5 +857,6 @@
   "vaultUnverified": "Questo telefono non è riuscito a verificare la nuova chiave del tuo account, quindi ha smesso di sincronizzare. I tuoi dati qui sono al sicuro. Per continuare, usa la tua passkey o scrivi la tua chiave di recupero.",
   "vaultUnsyncedChanges": "{count, plural, =1{Hai 1 modifica non ancora sincronizzata} other{Hai {count} modifiche non ancora sincronizzate}}",
   "vaultSyncAndSignOut": "Sincronizza ed esci",
-  "vaultSignOutAnyway": "Esci comunque"
+  "vaultSignOutAnyway": "Esci comunque",
+  "comingSoonWithEncryption": "Presto con la crittografia"
 }

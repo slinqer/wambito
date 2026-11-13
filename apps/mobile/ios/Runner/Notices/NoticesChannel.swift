@@ -12,6 +12,7 @@ import WambitoNative
 ///  * `scheduleGuest({language})` / `cancelGuest` -> nil: the guest warning, 44 days from now.
 ///  * `scheduleDue({zone, language})` / `cancelDue` -> nil: "Hoy vence…", the daily background run
 ///    at 9:00 in the profile's zone (DueTask.swift); its settings are kept in `DueSettings`.
+///  * `setEncryptionMode({mode})` -> nil: the account's mode for the background runs.
 final class NoticesChannel {
   private let channel: FlutterMethodChannel
   private let center = UNUserNotificationCenter.current()
@@ -40,6 +41,11 @@ final class NoticesChannel {
         result(nil)
       case "cancelGuest":
         NoticePoster.cancelGuest(center: self.center)
+        result(nil)
+      case "setEncryptionMode":
+        // The account's mode for the background runs (DueTask): `plain`, `preview`, `unknown`, or
+        // nil when signed out. See AccountMode.swift in WambitoNative.
+        AccountMode.write(arguments?["mode"] as? String)
         result(nil)
       case "permission":
         self.center.getNotificationSettings { settings in

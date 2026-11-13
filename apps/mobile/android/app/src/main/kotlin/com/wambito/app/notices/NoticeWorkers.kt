@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.R
+import com.wambito.app.account.AccountMode
 import com.wambito.app.widget.SecureStorageSession
 import com.wambito.app.widget.ServerSetting
 import com.wambito.app.widget.SessionSource
@@ -77,6 +78,11 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             val mark = dependencies.session.mark()
             if (mark == null) {
                 outcome = "signed out"
+            } else if (!AccountMode(context).allowsApi()) {
+                // A `preview` account's payments live only on the phone: nothing is asked. While
+                // the app has not learned the mode yet, tomorrow's run looks again.
+                outcome = "encrypted account"
+                keepGoing = !AccountMode(context).isPreview()
             } else if (!NoticePoster(context).canPost()) {
                 // Nothing could be said: nothing is asked of the server either.
                 outcome = "not allowed"

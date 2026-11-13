@@ -857,5 +857,6 @@
   "vaultUnverified": "Este telemóvel não conseguiu verificar a chave nova da tua conta, por isso deixou de sincronizar. Os teus dados aqui estão seguros. Para continuar, usa a tua chave de acesso ou escreve a tua chave de recuperação.",
   "vaultUnsyncedChanges": "{count, plural, =0{Tens 0 alterações por sincronizar} =1{Tens 1 alteração por sincronizar} other{Tens {count} alterações por sincronizar}}",
   "vaultSyncAndSignOut": "Sincronizar e terminar sessão",
-  "vaultSignOutAnyway": "Terminar sessão mesmo assim"
+  "vaultSignOutAnyway": "Terminar sessão mesmo assim",
+  "comingSoonWithEncryption": "Em breve com encriptação"
 }

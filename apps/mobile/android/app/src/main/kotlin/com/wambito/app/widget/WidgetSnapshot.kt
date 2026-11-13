@@ -45,6 +45,12 @@ data class WidgetSnapshot(
      * reads its own figures. Null (or not a zone): the phone's.
      */
     val timezone: String? = null,
+    /**
+     * Signed out only: the sentence the widget says in place of "Abre Wambito para empezar", in the
+     * app's language (a `preview` account's "Próximamente con cifrado": its figures live only on
+     * the phone). Written by the app; never by [RefreshWorker]. Null: the usual sentence.
+     */
+    val line: String? = null,
 ) {
     /** The profile's zone, or [fallback] (the phone's) without a valid one. */
     fun zone(fallback: ZoneId): ZoneId = timezone?.let {
@@ -62,6 +68,7 @@ data class WidgetSnapshot(
             .put("hideAmount", hideAmount)
             .put("theme", theme)
         if (locale != null) doc.put("locale", locale)
+        if (!signedIn && line != null) doc.put("line", line)
         if (signedIn) {
             doc.put("remaining", remaining)
                 .put("spent", spent)
@@ -98,6 +105,7 @@ data class WidgetSnapshot(
                 locale = locale,
                 hideAmount = hideAmount,
                 theme = theme,
+                line = doc.optString("line", "").takeIf { it.isNotEmpty() },
             )
             if (!doc.optBoolean("signedIn", false)) return signedOut
             val figures = listOf("remaining", "spent", "budgetTotal", "currency", "month")

@@ -133,16 +133,22 @@ Map<String, Object?> signedInSnapshot(
 /// What the widget shows with nobody signed in: "Abre Wambito para empezar", in the app's theme
 /// and language. It holds no figure at all, so after a sign-out nothing of the previous person is
 /// left for the widget (or its refresh job) to draw (Review Focus 4).
+///
+/// A `preview` account's figures live only in the vault on the phone, so the widget holds none of
+/// them either: it gets this same shape with a `line`, the sentence it says in place of "Abre Wambito
+/// para empezar" ("Coming soon with encryption", in the app's language).
 Map<String, Object?> signedOutSnapshot({
   required bool hideAmount,
   required String theme,
   String? locale,
+  String? line,
 }) => {
   'v': widgetSnapshotVersion,
   'signedIn': false,
   'hideAmount': hideAmount,
   'theme': theme,
   'locale': ?locale,
+  'line': ?line,
 };
 
 /// The stored snapshot [json] with the person's new choices, its figures and their time

@@ -38,6 +38,7 @@ import '../ui/press_link.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import '../ui/web_text_field.dart';
+import '../vault/preview.dart';
 import '../vault/unsynced_sheet.dart';
 import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'assistants_section.dart';
@@ -383,15 +384,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: WambitoTokens.space2,
               children: [
-                SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
-                _SelfStart(
-                  child: PressLink.text(
-                    l10n.settingsImportAction,
-                    key: const Key('settings.import'),
-                    tone: PressTone.secondary,
-                    onPressed: () => unawaited(context.push<void>('/import')),
+                // An encrypted account's data is on the phone: the server's import waits for encryption.
+                if (ref.watch(isPreviewProvider)) ...[
+                  SettingLabel(label: l10n.settingsImportTitle),
+                  const ComingSoonNotice(key: Key('settings.import.comingSoon')),
+                ] else ...[
+                  SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
+                  _SelfStart(
+                    child: PressLink.text(
+                      l10n.settingsImportAction,
+                      key: const Key('settings.import'),
+                      tone: PressTone.secondary,
+                      onPressed: () => unawaited(context.push<void>('/import')),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             ExportBlock(guest: guest),

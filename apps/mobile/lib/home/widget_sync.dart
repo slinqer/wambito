@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/device.dart';
 import '../api/gen/wambito_api.dart';
 import '../api/session.dart';
+import '../l10n/app_localizations.dart';
 import '../settings/preferences.dart';
 import 'home_controller.dart';
 import 'widget_snapshot.dart';
@@ -52,10 +53,41 @@ class WidgetSync {
   /// which means the session still reads as signed in for a moment: this covers that moment.
   var _closed = false;
 
+  /// The signed-in account is `preview` (set by lib/vault/preview_sync.dart): its figures live only
+  /// in the vault on this phone, so none is written to the widget, which says "Coming soon with
+  /// encryption" instead. A plain account never sets it.
+  var _preview = false;
+
   WidgetStore get _store => _ref.read(widgetStoreProvider);
   bool get _signedIn => _ref.read(sessionProvider).status == SessionStatus.signedIn;
   bool get _hideAmount => _ref.read(hideWidgetAmountProvider);
   String get _theme => widgetTheme(_ref.read(themeModeProvider));
+
+  /// The sentence of a `preview` account's widget, in the widget's language.
+  String _previewLine() =>
+      lookupAppLocalizations(Locale(widgetLanguage(_ref))).comingSoonWithEncryption;
+
+  Map<String, Object?> _previewSnapshot() => signedOutSnapshot(
+    hideAmount: _hideAmount,
+    theme: _theme,
+    locale: widgetLanguage(_ref),
+    line: _previewLine(),
+  );
+
+  /// The account's mode is now known to be `preview` or not. For `preview` the widget gets its
+  /// no-figure snapshot with "Coming soon with encryption" (dropped when the session is gone), and
+  /// no figure is written until the mode changes. Never called for, nor affects, a `plain` account.
+  Future<void> modeChanged({required bool preview}) {
+    final was = _preview;
+    _preview = preview;
+    if (!preview || was) return _queue;
+    final session = _session;
+    return _enqueue(() async {
+      await _ref.read(hideWidgetAmountProvider.notifier).ready;
+      if (_closed || !_signedIn || session != _session || !_preview) return;
+      await saveWidgetSnapshot(_store, _previewSnapshot());
+    });
+  }
 
   /// Completes when every write asked so far is done (tests wait on it).
   Future<void> get idle => _queue;
@@ -86,6 +118,11 @@ class WidgetSync {
     return _enqueue(() async {
       await _ref.read(hideWidgetAmountProvider.notifier).ready;
       if (_closed || !_signedIn || session != _session) return;
+      // The month's figures came from the vault on this phone: they stay there.
+      if (_preview) {
+        await saveWidgetSnapshot(_store, _previewSnapshot());
+        return;
+      }
       await saveWidgetSnapshot(
         _store,
         signedInSnapshot(
@@ -107,6 +144,7 @@ class WidgetSync {
   Future<void> signedOut() async {
     _session++;
     _closed = true;
+    _preview = false;
     try {
       await saveWidgetSnapshot(
         _store,
@@ -136,6 +174,8 @@ class WidgetSync {
             _store,
             signedOutSnapshot(hideAmount: _hideAmount, theme: _theme, locale: widgetLanguage(_ref)),
           );
+        } else if (_preview && !_closed && session == _session) {
+          await saveWidgetSnapshot(_store, _previewSnapshot());
         }
         return;
       }

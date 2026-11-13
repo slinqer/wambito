@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.wambito.app.account.AccountMode
 import com.wambito.app.notices.ApiResult
 import com.wambito.app.notices.serverOf
 import com.wambito.app.widget.SecureStorageSession
@@ -127,6 +128,10 @@ class ConfirmCaptureWorker(context: Context, params: WorkerParameters) : Corouti
     override suspend fun doWork(): Result {
         val context = applicationContext
         val id = inputData.getString(ID)?.takeIf { it.isNotEmpty() } ?: return done("no id")
+        // A `preview` account's finances never leave the phone: nothing is confirmed with the server.
+        val mode = AccountMode(context)
+        if (mode.isPreview()) return done("encrypted account")
+        if (!mode.allowsApi()) return if (runAttemptCount + 1 >= MAX_ATTEMPTS) done("gave up") else Result.retry()
         val dependencies = CaptureHooks.of(context)
         val token = dependencies.session.token()
         if (dependencies.session.mark() == null || token == null) return done("signed out")
@@ -181,6 +186,12 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
         val dependencies = CaptureHooks.of(context)
         val queue = CaptureQueue(context)
         if (mine(queue).isEmpty()) return done("empty")
+        // A `preview` account's finances live only on the phone: nothing queued goes to the server
+        // (the app clears the queue; until it does, it just stays). A mode the app has not learned
+        // yet waits: the job runs again, and nothing is sent meanwhile.
+        val mode = AccountMode(context)
+        if (mode.isPreview()) return done("encrypted account")
+        if (!mode.allowsApi()) return Result.retry()
         val mark = dependencies.session.mark()
         val token = dependencies.session.token()
         if (mark == null || token == null) {
