@@ -63,6 +63,15 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   scenario (answer and the store's records after a write) of `test/fixtures/local_backend/scenarios.json` over `seed.json` with the `<scenario>.json`
   the web's backend recorded: after a change to `backend.ts` or a scenario, run
   `pnpm --filter @wambito/web record:local-backend` and keep the diff.
+  `sync.dart` = `sync.ts` (`createSyncEngine`: push the outbox, pull `/v2/sync`; one run per account in
+  the process; triggers: start, `AppLifecycleListener` resume, a minute in the foreground, and
+  `afterLocalWrite`, which the session wires to the interceptor's `afterWrite`; tests port `sync.test.ts`
+  over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
+  (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
+  `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
+  every key). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
+  every `wambito.vault.*` / `wambito.encryption.*` item when `wambito.installed` (Application Support) is
+  missing, since the iOS Keychain outlives a reinstall.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,

@@ -107,4 +107,19 @@ class KeyStorage {
       await _storage.delete(key: name);
     }
   }
+
+  /// The prefixes [deleteAllVaultKeys] removes: every account's keys, and the cached
+  /// `wambito.encryption.<userId>` (`plain` | `preview`) kept in the same storage.
+  static const vaultKeyPrefixes = ['wambito.vault.', 'wambito.encryption.'];
+
+  /// Deletes every `wambito.vault.*` and `wambito.encryption.*` item, of every account (keys left
+  /// by an earlier install of the app; see `clearKeysAfterReinstall`). Nothing else is touched.
+  Future<void> deleteAllVaultKeys() async {
+    final names = (await _storage.readAll()).keys
+        .where((n) => vaultKeyPrefixes.any(n.startsWith))
+        .toList();
+    for (final name in names) {
+      await _storage.delete(key: name);
+    }
+  }
 }
