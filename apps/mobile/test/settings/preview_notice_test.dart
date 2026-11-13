@@ -79,6 +79,17 @@ void main() {
     });
   });
 
+  group('due notice', () {
+    testWidgets('Settings shows the notice in place of the "Hoy vence…" switch', (t) async {
+      final handle = t.ensureSemantics();
+      await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
+      await _show(t, 'settings.dueNotice.comingSoon');
+      expect(said('Próximamente con cifrado'), findsWidgets);
+      expect(find.byKey(const Key('settings.dueNotice')), findsNothing);
+      handle.dispose();
+    });
+  });
+
   group('assistants', () {
     testWidgets('no address to connect and no list: the notice, and the list is never read', (
       t,

@@ -5,11 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/capture_auto/capture_platform.dart';
 
+import 'package:wambito/vault/preview_sync.dart';
+
 import '../settings/harness.dart';
 import '../support/preview_account.dart';
 import 'fakes.dart';
 
 Finder said(String part) => find.bySemanticsLabel(RegExp(RegExp.escape(part)));
+
+class _Native implements NativeEncryptionMode {
+  final writes = <String?>[];
+
+  @override
+  Future<void> write(String? mode) async => writes.add(mode);
+}
 
 void main() {
   testWidgets('the section says "Próximamente con cifrado" in place of the switches', (t) async {
@@ -40,11 +49,17 @@ void main() {
     t,
   ) async {
     final fake = FakeAutoCapturePlatform(sources: {'revolut'});
+    final native = _Native();
     await pumpSettingsApp(
       t,
       location: '/settings',
-      overrides: [...previewOpen(), autoCapturePlatformProvider.overrideWithValue(fake)],
+      overrides: [
+        ...previewOpen(),
+        autoCapturePlatformProvider.overrideWithValue(fake),
+        nativeEncryptionModeProvider.overrideWithValue(native),
+      ],
     );
+    expect(native.writes.last, 'preview');
     expect(fake.callsNamed('clearQueue'), ['clearQueue']);
   });
 

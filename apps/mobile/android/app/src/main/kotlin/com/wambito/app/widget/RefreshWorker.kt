@@ -76,7 +76,8 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             }
             // A `preview` account's figures live only on the phone: the app writes the snapshot
             // (no figure) and nothing is asked of the server. Not learned yet: nothing either.
-            if (!AccountMode(context).allowsApi()) return "encrypted account"
+            val mode = AccountMode(context)
+            if (!mode.allowsApi()) return if (mode.isPreview()) "encrypted account" else "mode unknown"
             // The currency and language come from the app's last snapshot: without one, the app
             // writes everything at its next start.
             val known = WidgetSnapshot.read(context)

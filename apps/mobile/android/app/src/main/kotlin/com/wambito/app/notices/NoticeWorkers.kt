@@ -71,6 +71,7 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         val context = applicationContext
         val dependencies = NoticeHooks.of(context)
         val settings = NoticeSettings(context)
+        val mode = AccountMode(context)
         var zone = NoticeTimes.zoneOr(settings.zone, ZoneId.systemDefault())
         var outcome = "off"
         var keepGoing = true
@@ -78,11 +79,11 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             val mark = dependencies.session.mark()
             if (mark == null) {
                 outcome = "signed out"
-            } else if (!AccountMode(context).allowsApi()) {
+            } else if (!mode.allowsApi()) {
                 // A `preview` account's payments live only on the phone: nothing is asked. While
                 // the app has not learned the mode yet, tomorrow's run looks again.
-                outcome = "encrypted account"
-                keepGoing = !AccountMode(context).isPreview()
+                outcome = if (mode.isPreview()) "encrypted account" else "mode unknown"
+                keepGoing = !mode.isPreview()
             } else if (!NoticePoster(context).canPost()) {
                 // Nothing could be said: nothing is asked of the server either.
                 outcome = "not allowed"

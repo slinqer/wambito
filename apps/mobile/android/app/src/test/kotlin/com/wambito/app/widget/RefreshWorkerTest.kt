@@ -160,7 +160,8 @@ class RefreshWorkerTest {
     fun `a mode the app has not learned yet is not asked either`() {
         com.wambito.app.account.AccountMode(context).value = "unknown"
         store(earlier)
-        runWorker()
+        val outcome = (runWorker() as androidx.work.ListenableWorker.Result.Success).outputData
+        assertEquals("mode unknown", outcome.getString(RefreshWorker.OUTCOME))
         assertTrue(requests.isEmpty())
         assertEquals(earlier, stored())
     }

@@ -254,8 +254,9 @@ class NoticeWorkersTest {
         AccountMode(context).value = "unknown"
         pages[""] = page(item("Arriendo", "2026-10-22"))
 
-        runDue()
+        val result = runDue()
 
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "mode unknown")), result)
         assertTrue(requests.isEmpty())
         assertTrue(posted().isEmpty())
         assertEquals(1, enqueued(NoticeScheduler.DUE).size)
@@ -485,7 +486,10 @@ class NoticeWorkersTest {
     @Test
     fun `a guest not opening the app for 44 days gets the warning, with no call to the server`() {
         runGuest()
-        assertEquals("Tus datos se borrarán en 15 días si no agregas tu correo", text(posted().single()))
+        assertEquals(
+            "Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.",
+            text(posted().single()),
+        )
         // A request would count as activity and move the deletion 60 days on: it makes none.
         assertTrue(requests.isEmpty())
     }

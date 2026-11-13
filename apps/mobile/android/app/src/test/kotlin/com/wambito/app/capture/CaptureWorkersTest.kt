@@ -152,6 +152,19 @@ class CaptureWorkersTest {
     }
 
     @Test
+    fun `a mode that stays unknown stops retrying after the last attempt`() {
+        AccountMode(context).value = "unknown"
+        queue.add(sampleCapture("Mercadona"))
+        val last = runBlocking {
+            TestListenableWorkerBuilder<SendCapturesWorker>(context)
+                .setRunAttemptCount(ConfirmCaptureWorker.MAX_ATTEMPTS - 1).build().doWork()
+        }
+        assertEquals(ListenableWorker.Result.success(workDataOf(CAPTURE_OUTCOME to "mode unknown")), last)
+        assertTrue(requests.isEmpty())
+        assertEquals(1, queue.all().size)
+    }
+
+    @Test
     fun `a preview account confirms nothing with the server`() {
         AccountMode(context).value = "preview"
         val result = runBlocking {

@@ -5,7 +5,7 @@ import android.content.Context
 /**
  * Whether the signed-in account's finances live on the server (`plain`) or only in the vault on the
  * phone, end-to-end encrypted (`preview`), kept where the background jobs can read it: the app
- * writes it (`wambito/notices` `setEncryptionMode`, from lib/vault/encryption_mode_native.dart)
+ * writes it (`wambito/notices` `setEncryptionMode`, from lib/vault/preview_sync.dart)
  * whenever it knows the mode, and clears it on sign-out. The jobs (capture, widget, due notice)
  * call the API on their own with the stored session, outside the app's finance guard, so each asks
  * here first: for a `preview` account none of them may send or fetch finance data.

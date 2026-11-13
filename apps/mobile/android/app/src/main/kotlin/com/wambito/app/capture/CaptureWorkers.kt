@@ -191,7 +191,9 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
         // yet waits: the job runs again, and nothing is sent meanwhile.
         val mode = AccountMode(context)
         if (mode.isPreview()) return done("encrypted account")
-        if (!mode.allowsApi()) return Result.retry()
+        if (!mode.allowsApi()) {
+            return if (runAttemptCount + 1 >= ConfirmCaptureWorker.MAX_ATTEMPTS) done("mode unknown") else Result.retry()
+        }
         val mark = dependencies.session.mark()
         val token = dependencies.session.token()
         if (mark == null || token == null) {

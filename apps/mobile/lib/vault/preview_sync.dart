@@ -63,17 +63,22 @@ final previewSyncProvider = Provider<void>((ref) {
   void apply(EncryptionMode? before, ({bool loading, String? owner, EncryptionMode? mode}) now) {
     // While the stored session is being read nobody is known to be signed in or out: what the jobs
     // were told last stands (a `preview` account is never turned loose by a cold start).
-    if (!now.loading) {
-      unawaited(native.write(nativeModeOf(now.owner, now.mode)).catchError((Object _) {}));
-    }
+    final written = now.loading
+        ? Future<void>.value()
+        : native.write(nativeModeOf(now.owner, now.mode)).catchError((Object _) {});
     ref.read(widgetSyncProvider).modeChanged(preview: now.mode == EncryptionMode.preview);
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
+      // After the mode is written: the jobs already refuse before the queue is cleared.
       unawaited(
-        ref
-            .read(autoCapturePlatformProvider)
-            .clearQueue()
-            .then<void>((_) {}, onError: (Object _) {}),
+        written.then<void>(
+          (_) => ref
+              .read(autoCapturePlatformProvider)
+              .clearQueue()
+              .then<void>((_) {}, onError: (Object _) {}),
+        ),
       );
+    } else {
+      unawaited(written);
     }
   }
 

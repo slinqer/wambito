@@ -418,15 +418,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: vibration,
                 onChanged: (on) => unawaited(ref.read(vibrationEnabledProvider.notifier).set(on)),
               ),
-              SettingSwitch(
-                key: const Key('settings.dueNotice'),
-                label: l10n.settingsDueNotice,
-                hint: defaultTargetPlatform == TargetPlatform.iOS
-                    ? l10n.settingsDueNoticeHintIos
-                    : l10n.settingsDueNoticeHint,
-                value: ref.watch(dueNoticeEnabledProvider),
-                onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
-              ),
+              // An encrypted account's payments are on the phone: "Hoy vence…" waits for encryption.
+              if (ref.watch(isPreviewProvider))
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: WambitoTokens.space2,
+                  children: [
+                    SettingLabel(label: l10n.settingsDueNotice),
+                    const ComingSoonNotice(key: Key('settings.dueNotice.comingSoon')),
+                  ],
+                )
+              else
+                SettingSwitch(
+                  key: const Key('settings.dueNotice'),
+                  label: l10n.settingsDueNotice,
+                  hint: defaultTargetPlatform == TargetPlatform.iOS
+                      ? l10n.settingsDueNoticeHintIos
+                      : l10n.settingsDueNoticeHint,
+                  value: ref.watch(dueNoticeEnabledProvider),
+                  onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
+                ),
               SettingSwitch(
                 key: const Key('settings.guestNotice'),
                 label: l10n.settingsGuestNotice,
