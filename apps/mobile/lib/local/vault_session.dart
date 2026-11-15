@@ -187,6 +187,9 @@ class _Active {
 /// The account whose vault is open (or opening) in this process.
 _Active? _active;
 
+/// Whether the vault of [userId] is open or opening in this process (a sweep leaves it alone).
+bool vaultInUse(String userId) => _active?.userId == userId;
+
 /// Stores closing, by account: the next open of the same account waits for the file.
 final Map<String, Future<void>> _closings = {};
 
@@ -499,7 +502,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
 }
 
 /// Sign-out (and a stale vault swept): stops the sync, closes the store (waiting at most
-/// [closeWait]), deletes the vault file of [userId] and every one of its keys. A run still in
+/// [closeWait] in all), deletes the vault file of [userId] and every one of its keys. A run still in
 /// flight ends `closed` and writes nothing.
 /// [deleteStore] is for tests (default: the open session's, else the app's vault).
 Future<void> forgetVault(
@@ -509,6 +512,13 @@ Future<void> forgetVault(
   Duration closeWait = vaultCloseWait,
 }) async {
   var delete = deleteStore;
+  // One deadline for the whole close: the session's close, then the store's closing, share it.
+  final watch = Stopwatch()..start();
+  Duration left() {
+    final rest = closeWait - watch.elapsed;
+    return rest.isNegative ? Duration.zero : rest;
+  }
+
   final current = _active;
   if (current != null && current.userId == userId) {
     _active = null;
@@ -518,9 +528,9 @@ Future<void> forgetVault(
     final store = current.store;
     try {
       if (session != null) {
-        await session.close().timeout(closeWait);
+        await session.close().timeout(left());
       } else if (store != null) {
-        await _closeStore(userId, store).timeout(closeWait);
+        await _closeStore(userId, store).timeout(left());
       }
     } on TimeoutException {
       // A close that hangs never keeps the vault: the file and the keys go below all the same.
@@ -529,7 +539,7 @@ Future<void> forgetVault(
   final closing = _closings[userId];
   if (closing != null) {
     try {
-      await closing.timeout(closeWait);
+      await closing.timeout(left());
     } on TimeoutException {
       // See above.
     }

@@ -53,6 +53,10 @@ class EncryptionStore {
   static String modeKey(String userId) => 'wambito.encryption.$userId';
   static const accountKey = 'wambito.account';
 
+  /// The session (a hash of its token) that survived a reinstall in the Keychain ([markReinstalled]).
+  /// Outside the prefixes a sweep or a reinstall deletes.
+  static const reinstalledKey = 'wambito.reinstalledSession';
+
   final FlutterSecureStorage _storage;
 
   /// Keeps [account] for the session of [token]. A failure is ignored: it only costs the offline
@@ -74,6 +78,28 @@ class EncryptionStore {
       );
     } on Object {
       // See above.
+    }
+  }
+
+  /// At the first start of an install (`clearKeysAfterReinstall`), once what was kept of the
+  /// account is gone: marks the session still in the Keychain (iOS keeps it, with its home cache
+  /// and its saves, across a reinstall). Nothing to mark without one. A failure is ignored.
+  Future<void> markReinstalled() async {
+    try {
+      final token = await _storage.read(key: SessionStore.tokenKey);
+      if (token == null) return;
+      await _storage.write(key: reinstalledKey, value: sessionOwnerOf(token));
+    } on Object {
+      // At worst the cache still proves plain for this session, as before.
+    }
+  }
+
+  /// Whether the session of [token] is the one that survived a reinstall ([markReinstalled]).
+  Future<bool> reinstalledSession(String token) async {
+    try {
+      return await _storage.read(key: reinstalledKey) == sessionOwnerOf(token);
+    } on Object {
+      return false;
     }
   }
 
@@ -193,8 +219,11 @@ final freshVaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) =>
 });
 
 /// Whether this session holds plaintext `/v1` data: a home cache or a queue of saves bound to its
-/// token. Only a `plain` account ever received any.
+/// token. Only a `plain` account ever received any, before this build. A session that survived a
+/// reinstall proves nothing: a `preview` account that was Ready wrote its home cache too (and may
+/// have a save waiting after a 423), and what said it was `preview` went with the reinstall.
 Future<bool> _holdsPlainData(Ref ref, String token) async {
+  if (await ref.read(encryptionStoreProvider).reinstalledSession(token)) return false;
   final owner = sessionOwnerOf(token);
   for (final read in [
     ref.read(homeCacheStoreProvider).read,

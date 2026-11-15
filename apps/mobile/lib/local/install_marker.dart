@@ -39,10 +39,18 @@ class FileInstallMarker implements InstallMarker {
 
 /// On the first start of an install (no marker): deletes every `wambito.vault.*`,
 /// `wambito.encryption.*` and `wambito.account` item of secure storage (the kept account is
-/// personal data, which must not survive an iOS reinstall), then writes the marker. Call it before
-/// anything reads secure storage. A failure leaves the marker unwritten, so the next start tries again.
-Future<void> clearKeysAfterReinstall(KeyStorage storage, InstallMarker marker) async {
+/// personal data, which must not survive an iOS reinstall), then [markSession] marks the session
+/// that survived in the Keychain, if any (`EncryptionStore.markReinstalled`: with its account
+/// gone, its home cache and saves no longer prove it `plain`), then writes the marker. Call it
+/// before anything reads secure storage. A failure leaves the marker unwritten, so the next start
+/// tries again.
+Future<void> clearKeysAfterReinstall(
+  KeyStorage storage,
+  InstallMarker marker, {
+  Future<void> Function()? markSession,
+}) async {
   if (await marker.exists()) return;
   await storage.deleteAllVaultKeys();
+  await markSession?.call();
   await marker.write();
 }

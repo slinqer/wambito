@@ -288,7 +288,12 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
 final staleVaultsProvider = Provider<Future<void> Function(String? keepUserId)>((ref) {
   final keys = ref.read(keyStorageProvider);
   final forget = ref.read(forgetVaultProvider);
-  return (keep) => deleteStaleVaults(keep, forget: (id) => forget(id, keys));
+  return (keep) => deleteStaleVaults(
+    keep,
+    forget: (id) => forget(id, keys),
+    // Asked again before each delete: an account that signed in meanwhile keeps its vault.
+    inUse: (id) => vaultInUse(id) || ref.read(knownAccountProvider).id == id,
+  );
 });
 
 /// How many changes not sent yet the signed-in account's vault file holds, read without opening the
