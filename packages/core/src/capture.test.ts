@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCaptureSchema, merchantKey, reviewTransactionsSchema } from "./capture.ts";
+import {
+  createCaptureSchema,
+  merchantKey,
+  merchantKeyPrefixes,
+  reviewTransactionsSchema,
+} from "./capture.ts";
 import { updateTransactionSchema } from "./schemas.ts";
 
 describe("merchantKey", () => {
@@ -16,6 +21,25 @@ describe("merchantKey", () => {
   it("throws when nothing is left", () => {
     expect(() => merchantKey("   ")).toThrow();
     expect(() => merchantKey("1234 *")).toThrow();
+  });
+});
+
+describe("merchantKeyPrefixes", () => {
+  it("lists the shorter leading words, longest first", () => {
+    expect(merchantKeyPrefixes("lidl casal ribeiro")).toEqual(["lidl casal", "lidl"]);
+  });
+
+  it("has none for one word", () => {
+    expect(merchantKeyPrefixes("lidl")).toEqual([]);
+  });
+
+  it("has none when the first word is shorter than 3 letters", () => {
+    expect(merchantKeyPrefixes("el corte ingles")).toEqual([]);
+    expect(merchantKeyPrefixes("la tagliatella madrid")).toEqual([]);
+  });
+
+  it("keeps a first word of exactly 3 letters", () => {
+    expect(merchantKeyPrefixes("bar pepe")).toEqual(["bar"]);
   });
 });
 
