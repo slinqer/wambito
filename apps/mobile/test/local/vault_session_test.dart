@@ -507,6 +507,25 @@ void main() {
       expect(await storage.versions(profile.id), isEmpty);
     });
 
+    test('the close is waited for at most closeWait in all, not once per step', () async {
+      final profile = profileOf();
+      await open(profile, net: FakeNetwork(), keys: await keys());
+      final never = Completer<void>();
+      vaultCloseStore = (store) => never.future;
+      addTearDown(() => vaultCloseStore = defaultVaultCloseStore);
+      final watch = Stopwatch()..start();
+      await forgetVault(
+        profile.id,
+        storage,
+        deleteStore: deleteStore,
+        closeWait: const Duration(milliseconds: 400),
+      ).timeout(const Duration(seconds: 5));
+      // Once is 400 ms; the session's close and then the store's closing, each waited for in full,
+      // would be 800.
+      expect(watch.elapsedMilliseconds, lessThan(700));
+      expect(vaultExists(profile.id), isFalse);
+    });
+
     test('does nothing when the account never opened a vault here', () async {
       await expectLater(
         forgetVault('vault_user_never', storage, deleteStore: deleteStore),

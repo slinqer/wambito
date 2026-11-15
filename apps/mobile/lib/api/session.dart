@@ -520,7 +520,9 @@ class SessionController extends Notifier<SessionState> {
       final known = ref.read(knownAccountProvider);
       final id = known.owner == sessionOwnerOf(token) ? known.id : null;
       final account = id == null ? await store.recall(token) : null;
-      final found = id ?? account?.profile.id;
+      // Else the account kept last: a session that expired kept it, and the person signed in
+      // again but the server has not said who they are yet. Sign-out leaves no vault behind.
+      final found = id ?? account?.profile.id ?? await store.keptAccountId();
       if (found == null) return;
       userId = found;
     } on Object {
@@ -612,9 +614,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     final verdict = ref
         .read(vaultAccountProvider.future)
         .then<FinanceVerdict>(
-          (a) => a != null && a.inferred
-              ? ref.read(freshVaultAccountProvider.future).then(of)
-              : of(a),
+          (a) =>
+              a != null && a.inferred ? ref.read(freshVaultAccountProvider.future).then(of) : of(a),
         )
         .catchError((Object _) => FinanceVerdict.unknown);
     client.dio.interceptors.add(FinanceGuard(() => verdict));

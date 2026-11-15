@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/client.dart';
 import 'package:wambito/api/session.dart';
@@ -277,6 +278,29 @@ void main() {
         ..value = jsonEncode({'v': 1, 'owner': sessionOwnerOf('tok'), 'saves': <Object?>[]});
       final c = await pump(tester, extra: [pendingSavesStoreProvider.overrideWithValue(saves)]);
       expect(where(c), '/');
+    });
+
+    testWidgets('after a reinstall, offline, a home cache of the surviving session proves nothing: '
+        'Locked', (tester) async {
+      // iOS keeps the token, the home cache and the saves in the Keychain across a reinstall, but
+      // not what was kept of the account: a preview account must not be taken for plain.
+      mockStorage(token: 'tok');
+      await const FlutterSecureStorage().write(
+        key: EncryptionStore.reinstalledKey,
+        value: sessionOwnerOf('tok'),
+      );
+      server = FakeServer({'tok': (id: 'user_p', mode: 'preview')})..offline.add('tok');
+      final cache = FakeCacheStore()
+        ..value = jsonEncode({'v': 1, 'owner': sessionOwnerOf('tok'), 'userId': 'user_p'});
+      final saves = FakePendingSavesStore()
+        ..value = jsonEncode({'v': 1, 'owner': sessionOwnerOf('tok'), 'saves': <Object?>[]});
+      final c = await pump(
+        tester,
+        cache: cache,
+        extra: [pendingSavesStoreProvider.overrideWithValue(saves)],
+      );
+      expect(where(c), '/unlock');
+      expect(find.text('Sin conexión'), findsOneWidget);
     });
 
     testWidgets("another session's home cache proves nothing: offline, Locked", (tester) async {

@@ -21,11 +21,14 @@ import 'db.dart' show vaultDirectoryName;
 /// signed-out start with the account kept last (whose session ended without a sign-out). A sign-out
 /// deletes its own vault itself. Never throws: what cannot be deleted now is left for the next time.
 /// [forget] deletes one account's file and keys (`forgetVault`); [directory] is the vault folder.
+/// [inUse] is asked again right before each account is deleted: an account that signed in while the
+/// sweep ran (its vault open or opening) is left alone.
 Future<void> deleteStaleVaults(
   String? keepUserId, {
   required Future<void> Function(String userId) forget,
   FlutterSecureStorage storage = appSecureStorage,
   Future<String> Function()? directory,
+  bool Function(String userId)? inUse,
 }) async {
   final ids = <String>{};
   try {
@@ -51,6 +54,11 @@ Future<void> deleteStaleVaults(
   }
   ids.remove(keepUserId);
   for (final id in ids) {
+    try {
+      if (inUse?.call(id) ?? false) continue;
+    } on Object {
+      continue; // Cannot tell: left for the next time.
+    }
     try {
       await forget(id);
     } on Object {

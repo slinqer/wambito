@@ -53,6 +53,21 @@ void main() {
   Future<List<String>> names() async =>
       (await const FlutterSecureStorage().readAll()).keys.toList()..sort();
 
+  test('a vault that comes into use during the sweep is left alone', () async {
+    // Another account signs in while the sweep runs and opens its leftover vault: it is asked
+    // again right before each delete.
+    await deleteStaleVaults(
+      'ana',
+      forget: forget,
+      directory: () async => dir.path,
+      inUse: (id) => id == 'bea',
+    );
+    expect(forgotten..sort(), ['cid', 'dan']);
+    expect(files(), containsAll([vaultFileName('ana'), vaultFileName('bea')]));
+    final left = await names();
+    expect(left, containsAll(['wambito.vault.bea.current', 'wambito.encryption.bea']));
+  });
+
   test('signed out: deletes every vault, its keys and what was kept, and only those', () async {
     await sweep(null);
     expect(files(), ['something-else.db']);

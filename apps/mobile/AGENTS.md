@@ -75,13 +75,16 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
   (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
-  every key, waiting at most `vaultCloseWait` for the store to close). `stale_vaults.dart` =
+  every key, waiting at most `vaultCloseWait` in all for the store to close). `stale_vaults.dart` =
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
-  `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s).
+  `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
+  `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault).
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
   Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
-  `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall.
+  `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall;
+  it then marks the session that survived (`wambito.reinstalledSession`), whose home cache and saves
+  no longer prove the account `plain`.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
   `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`

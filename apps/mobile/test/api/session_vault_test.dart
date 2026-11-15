@@ -269,6 +269,25 @@ void main() {
       expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
     });
 
+    test(
+      'a sign-out before the server said who a new session is still wipes the kept vault',
+      () async {
+        // The session expired (vault kept, wambito.account bound to the old token), the same person
+        // signed in again and GET /v1/me failed: nothing names the account but what was kept last.
+        await const FlutterSecureStorage().write(key: SessionStore.tokenKey, value: 'tok2');
+        final container = containerWith();
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.signOut();
+
+        expect(deleted, ['user_p']);
+        final left = await kept();
+        expect(left.keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
+        expect(left.containsKey(EncryptionStore.accountKey), isFalse);
+        expect(left['wambito.vault.user_q.current'], '1');
+      },
+    );
+
     test('a plain account with nothing kept signs out as before', () async {
       FlutterSecureStorage.setMockInitialValues({
         SessionStore.tokenKey: 'tok',
@@ -294,8 +313,48 @@ void main() {
         'session.token': 't',
       });
       final marker = FileInstallMarker(Directory.systemTemp.createTempSync('wambito-marker').path);
-      await clearKeysAfterReinstall(storage, marker);
-      expect(await const FlutterSecureStorage().readAll(), {'session.token': 't'});
+      await clearKeysAfterReinstall(
+        storage,
+        marker,
+        markSession: const EncryptionStore().markReinstalled,
+      );
+      expect(await const FlutterSecureStorage().readAll(), {
+        'session.token': 't',
+        EncryptionStore.reinstalledKey: sessionOwnerOf('t'),
+      });
+    });
+
+    test('the session that survived a reinstall is marked, and only on the first start', () async {
+      final storage = KeyStorage(const FlutterSecureStorage());
+      FlutterSecureStorage.setMockInitialValues({'session.token': 't'});
+      final marker = FileInstallMarker(Directory.systemTemp.createTempSync('wambito-marker').path);
+      await clearKeysAfterReinstall(
+        storage,
+        marker,
+        markSession: const EncryptionStore().markReinstalled,
+      );
+      expect(await const EncryptionStore().reinstalledSession('t'), isTrue);
+      expect(await const EncryptionStore().reinstalledSession('other'), isFalse);
+
+      await const FlutterSecureStorage().delete(key: EncryptionStore.reinstalledKey);
+      await clearKeysAfterReinstall(
+        storage,
+        marker,
+        markSession: const EncryptionStore().markReinstalled,
+      );
+      expect(await const EncryptionStore().reinstalledSession('t'), isFalse);
+    });
+
+    test('with no session, a reinstall marks nothing', () async {
+      final storage = KeyStorage(const FlutterSecureStorage());
+      FlutterSecureStorage.setMockInitialValues({});
+      final marker = FileInstallMarker(Directory.systemTemp.createTempSync('wambito-marker').path);
+      await clearKeysAfterReinstall(
+        storage,
+        marker,
+        markSession: const EncryptionStore().markReinstalled,
+      );
+      expect(await const FlutterSecureStorage().readAll(), isEmpty);
     });
   });
 
