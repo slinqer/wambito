@@ -15,7 +15,7 @@ suggested categories, Wambi's messages. No I/O.
 - `src/capture.ts` (+ `src/capture-sources.ts`): automatic capture from bank notifications:
   `CAPTURE_SOURCES` (`revolut`, `google_wallet`), `createCaptureSchema` (`POST /v1/captures`),
   `reviewTransactionsSchema` (1–50 ids), `FALLBACK_CATEGORY_NAMES`, `merchantKey` (the merchant
-  memory's key). The privacy policy's `capture` section (`apps/web`, four languages) describes what
+  memory's key), `merchantKeyPrefixes` (its leading words, so a chain's branch matches the chain). The privacy policy's `capture` section (`apps/web`, four languages) describes what
   reaches the server: changing these fields means changing it too.
 - `src/records.ts`: zod bodies of the encrypted records (`transaction`, `category`, `budget`,
   `recurrence`, `merchant`, `settings`, `account`), each `{ s: 1, ...fields }` without `id`,

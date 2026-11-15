@@ -44,6 +44,11 @@ How to add to it:
 
 ### Fixed
 
+- `POST /v1/captures`: a merchant named with its branch (`LIDL CASAL RIBEIRO`, as Google Wallet
+  notifies it) now gets the category learned for the chain (`Lidl`): when the exact name was never
+  learned, the longest learned name made of its leading words is used, if its first word has 3
+  letters or more.
+
 - MCP `list_transactions` category filter: it was sent as `categoryId` and the API ignored it.
 
 ## 1.0.0 - 2026-11-05
