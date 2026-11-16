@@ -31,8 +31,8 @@ function lookup(tree: Record<string, unknown>, key: string): string {
 }
 
 /**
- * A catalog message as HTML: the text escaped, and its rich-text tags (`<mark>lukas</mark>`, the
- * ones the page renders with `t.rich`) as `<span class="rich-mark">` for the template to style.
+ * A catalog message as HTML: the text escaped, and its rich-text tags (`<mark>lukas</mark>`,
+ * `<lead>…</lead>`, the ones the page renders with `t.rich`) as `<span class="rich-mark">` for the template to style.
  */
 function richHtml(message: string): string {
   const escaped = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -60,7 +60,7 @@ try {
     );
     await page.evaluate(async () => {
       await document.fonts.ready;
-      await Promise.all(["700 74px Fredoka", "800 22px Nunito"].map((f) => document.fonts.load(f)));
+      await Promise.all(["700 74px Fredoka", "800 26px Nunito"].map((f) => document.fonts.load(f)));
     });
     const out = fileURLToPath(new URL(`../../public/og-${locale}.png`, import.meta.url));
     await page.screenshot({ path: out, clip: { x: 0, y: 0, width: 1200, height: 630 } });
