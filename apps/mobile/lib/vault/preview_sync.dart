@@ -82,7 +82,9 @@ final previewSyncProvider = Provider<void>((ref) {
     final written = now.loading
         ? Future<void>.value()
         : native.write(nativeModeOf(now.owner, now.mode), now.userId).catchError((Object _) {});
-    ref.read(widgetSyncProvider).modeChanged(preview: now.mode == EncryptionMode.preview);
+    ref
+        .read(widgetSyncProvider)
+        .modeChanged(preview: now.mode == EncryptionMode.preview, userId: now.userId);
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
       // Read now, not after the native write: the container may be gone by then.
       final capture = ref.read(autoCapturePlatformProvider);

@@ -46,14 +46,15 @@ data class WidgetSnapshot(
      */
     val timezone: String? = null,
     /**
-     * Signed out only: the sentence the widget says in place of "Abre Wambito para empezar", in the
-     * app's language (a `preview` account's "Próximamente con cifrado": its figures live only on
-     * the phone). Written by the app; never by [RefreshWorker]. Null: the usual sentence.
+     * Signed out only: a sentence the widget says in place of "Abre Wambito para empezar", in the
+     * app's language. The app no longer writes one (a locked `preview` account gets the usual
+     * sentence); kept so an older snapshot still reads. Never written by [RefreshWorker]. Null: the
+     * usual sentence.
      */
     val line: String? = null,
     /**
      * Signed in, `preview` accounts only: the user id the figures belong to (the app and the
-     * headless run write it, D10). [RefreshWorker] draws nothing whose owner is not
+     * headless run write it, D10). [RefreshWorker] and the widget draw nothing whose owner is not
      * [com.wambito.app.account.AccountMode.owner]. Null for a `plain` account.
      */
     val owner: String? = null,

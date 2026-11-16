@@ -85,7 +85,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             if (mode.isPreview()) {
                 val owned = withContext(dependencies.writeContext) {
                     val latest = WidgetSnapshot.read(context)
-                    if (latest != null && latest.signedIn && latest.owner != mode.owner) {
+                    if (latest != null && latest.signedIn && (mode.owner == null || latest.owner != mode.owner)) {
                         writeSignedOut(context)
                         false
                     } else {

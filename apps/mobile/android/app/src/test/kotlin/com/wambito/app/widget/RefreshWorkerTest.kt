@@ -199,6 +199,18 @@ class RefreshWorkerTest {
     }
 
     @Test
+    fun `a preview mode with no owner keeps no unowned figured snapshot`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        com.wambito.app.account.AccountMode(context).write("preview", null)
+        store(earlier)
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("owner mismatch", outcome.getString(RefreshWorker.OUTCOME))
+        assertEquals(false, stored()!!.signedIn)
+    }
+
+    @Test
     fun `a preview snapshot with no owner is not drawn either`() {
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         com.wambito.app.account.AccountMode(context).write("preview", "u1")

@@ -139,8 +139,8 @@ Map<String, Object?> signedInSnapshot(
 /// left for the widget (or its refresh job) to draw (Review Focus 4).
 ///
 /// A `preview` account's figures are drawn from its vault by Dart (`vault_widget.dart`); until the
-/// vault is open (locked, not unlocked yet) the widget gets this same shape with a `line`, the
-/// sentence it says in place of "Abre Wambito para empezar".
+/// vault is open (locked, not unlocked yet) it gets this same shape, with no `line`: the usual
+/// "Abre Wambito para empezar".
 Map<String, Object?> signedOutSnapshot({
   required bool hideAmount,
   required String theme,

@@ -98,7 +98,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
   widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
-  Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`, KEEP: one ask waits, a second is dropped, so the widget's refresh jobs never chain engines;
+  Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`, KEEP: while an ask waits or runs, a second is dropped, so the widget's refresh jobs never chain engines;
   `AccountMode.write(mode, owner)` schedules for `preview` and cancels for `plain`/none), `SyncWorker` (runs
   `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`), `HeadlessRunner` (a `FlutterEngine`
   with no activity, 9 min budget, destroyed in every case; `HeadlessHooks.runner` replaces it in tests) and
@@ -137,7 +137,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
-  What stage 3a leaves out for a `preview` account (automatic capture, the home widget, due notices,
+  What stage 3a leaves out for a `preview` account (automatic capture, due notices,
   export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
   `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
   `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code

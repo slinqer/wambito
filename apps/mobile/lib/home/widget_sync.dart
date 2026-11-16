@@ -79,10 +79,10 @@ class WidgetSync {
       signedOutSnapshot(hideAmount: _hideAmount, theme: _theme, locale: widgetLanguage(_ref));
 
   /// The account's mode is now known to be `preview` or not. For `preview` the widget gets its
-  /// vault's figures once the vault is open ([vaultOpened]); until then a stored snapshot of an
-  /// owner stays, and any other becomes the signed-out one. Never called for, nor affects, a
+  /// vault's figures once the vault is open ([vaultOpened]); until then a stored snapshot of [userId] stays,
+  /// and any other (another account's, or none) becomes the signed-out one. Never called for, nor affects, a
   /// `plain` account.
-  Future<void> modeChanged({required bool preview}) {
+  Future<void> modeChanged({required bool preview, String? userId}) {
     final was = _preview;
     _preview = preview;
     if (!preview || was) return _queue;
@@ -91,7 +91,7 @@ class WidgetSync {
       await _ref.read(hideWidgetAmountProvider.notifier).ready;
       if (_closed || !_signedIn || session != _session || !_preview) return;
       if (_backend != null) return _writeVault(session);
-      if (await _storedOwner() != null) return;
+      if (userId != null && await _storedOwner() == userId) return;
       await saveWidgetSnapshot(_store, _previewSnapshot());
     });
   }

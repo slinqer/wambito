@@ -342,7 +342,7 @@ void main() {
       hide.gate.complete();
       container = make();
       final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: true);
+      await sync.modeChanged(preview: true, userId: 'u1');
       await sync.idle;
       return sync;
     }
@@ -376,6 +376,21 @@ void main() {
       expect(doc()['hideAmount'], isTrue);
     });
 
+    test("another account's figures never stay: the signed-out snapshot replaces them", () async {
+      store.saved[widgetSnapshotKey] = jsonEncode({
+        'v': 3,
+        'signedIn': true,
+        'remaining': 1,
+        'spent': 2,
+        'budgetTotal': 3,
+        'currency': 'COP',
+        'month': '2026-10',
+        'owner': 'u9',
+      });
+      await previewSync();
+      expect(widgetSignedOut(store), isTrue);
+    });
+
     test('a figured snapshot of an owner stays while the vault opens', () async {
       store.saved[widgetSnapshotKey] = jsonEncode({
         'v': 3,
@@ -397,7 +412,7 @@ void main() {
       hide.gate.complete();
       container = make();
       final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: true);
+      await sync.modeChanged(preview: true, userId: 'u1');
       sync.vaultOpened(userId: 'u1', backend: backend);
       await sync.idle;
       store.updates = 0;
@@ -456,7 +471,7 @@ void main() {
       hide.gate.complete();
       container = make();
       final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: false);
+      await sync.modeChanged(preview: false, userId: 'u1');
       await sync.idle;
       expect(store.saved, isEmpty);
       await sync.summaryLoaded(summary(), currency: 'COP', timezone: 'America/Bogota');
