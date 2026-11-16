@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/session.dart';
 import '../capture_auto/capture_platform.dart';
 import '../home/widget_sync.dart';
+import '../local/vault_session.dart';
 import 'encryption_mode.dart';
+import 'vault_providers.dart';
 
 /// Where the account's mode is kept for the phone's own background jobs (Android's capture, widget
 /// and due-notice workers, iOS's due-notice task), which call the API with the stored session
@@ -51,7 +53,8 @@ String? nativeModeOf(String? owner, EncryptionMode? mode) =>
 /// Keeps the phone's background jobs and the widget in step with the account's mode, for as long
 /// as the app runs (app.dart watches it):
 ///  * the mode is written where the jobs read it ([NativeEncryptionMode]);
-///  * the widget is told whether to draw figures ([WidgetSync.modeChanged]);
+///  * the widget is told whether to draw figures ([WidgetSync.modeChanged]) and follows the open
+///    vault ([WidgetSync.vaultOpened], [WidgetSync.vaultChanged]);
 ///  * once the mode becomes `preview` the captures waiting are handed over (`sendQueued`): the
 ///    queue becomes this account's and the headless engine saves them in the vault (D8). Nothing
 ///    is cleared, and nothing goes to the server.
@@ -106,6 +109,24 @@ final previewSyncProvider = Provider<void>((ref) {
     last = now;
     apply(before, now);
   }
+
+  // The widget is drawn from the open vault, and again after each commit to it.
+  void Function()? unsubscribe;
+  void follow(VaultSession? vault) {
+    unsubscribe?.call();
+    unsubscribe = null;
+    final widget = ref.read(widgetSyncProvider);
+    if (vault == null) {
+      widget.vaultClosed();
+      return;
+    }
+    widget.vaultOpened(userId: vault.userId, backend: vault.backend);
+    unsubscribe = vault.subscribe(widget.vaultChanged);
+  }
+
+  follow(ref.read(vaultSessionProvider));
+  ref.listen(vaultSessionProvider, (_, vault) => follow(vault));
+  ref.onDispose(() => unsubscribe?.call());
 
   ref.listen(sessionProvider.select((s) => s.status), (_, _) => check());
   ref.listen(vaultOwnerProvider, (_, _) => check());

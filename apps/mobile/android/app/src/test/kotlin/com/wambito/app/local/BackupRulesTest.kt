@@ -34,6 +34,8 @@ class BackupRulesTest {
     private val vault = "file" to "vault"
     private val keys = "sharedpref" to "FlutterSecureStorage.xml"
     private val wrappedKey = "sharedpref" to "FlutterSecureKeyStorage.xml"
+    private val widgetFigures = "sharedpref" to "HomeWidgetPreferences.xml"
+    private val dueList = "sharedpref" to "wambito.notice.duelist.xml"
     private val config = "sharedpref" to "FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"
 
     @Test
@@ -48,6 +50,17 @@ class BackupRulesTest {
     fun `the older full backup rules exclude the same files`() {
         val found = excludes("backup_rules.xml", null)
         assertTrue(found.toString(), found.containsAll(listOf(vault, keys, wrappedKey, config)))
+    }
+
+    @Test
+    fun `the widget figures and the due list, which hold a preview account's data, are excluded`() {
+        val own = listOf(widgetFigures, dueList)
+        for (scope in listOf("cloud-backup", "device-transfer")) {
+            val found = excludes("data_extraction_rules.xml", scope)
+            assertTrue("$scope: $found", found.containsAll(own))
+        }
+        val found = excludes("backup_rules.xml", null)
+        assertTrue(found.toString(), found.containsAll(own))
     }
 
     @Test

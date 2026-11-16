@@ -8,15 +8,20 @@ import '../api/client.dart';
 import '../api/device.dart';
 import '../api/session.dart' show SessionStore;
 import '../capture_auto/capture_platform.dart';
+import '../feedback/stored_flag.dart' show SecureFlagStore;
+import '../home/home_controller.dart' show languageOfTag;
+import '../home/widget_snapshot.dart' show HomeWidgetStore;
+import '../home/widget_sync.dart' show widgetTheme;
 import '../local/keys.dart';
 import '../local/sqlite_store.dart';
 import '../local/vault_lock.dart';
 import '../settings/initial_settings.dart';
 import '../settings/settings_store.dart';
-import '../vault/encryption_mode.dart' show EncryptionStore, VaultAccount;
+import '../vault/encryption_mode.dart' show EncryptionMode, EncryptionStore, VaultAccount;
 import 'background_channel.dart';
 import 'background_run.dart';
 import 'queued_capture.dart';
+import 'widget_effect.dart';
 
 /// How long a headless run waits for the vault's lease before it reports `busy` (the app or another
 /// worker is syncing; the queue is retried, D23).
@@ -27,7 +32,8 @@ const _leaseWait = Duration(seconds: 5);
 /// [runBackground] and tells native code how it ended with `wambito/background` `finished`; an
 /// error anywhere is the outcome `failed`, never an uncaught one.
 ///
-/// The widget and due-list effects are no-ops here until their tasks (9 and 10) fill them.
+/// The widget effect draws the home widget from the vault ([widgetEffect]); the due-list effect is a
+/// no-op until its task (10) fills it.
 Future<void> backgroundMain(String kind) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
@@ -66,7 +72,21 @@ Future<BackgroundReport> _run(String kind) async {
     dropKeyVersion: (userId, v) => dropKeyVersion(userId, v, keyStorage),
   );
   final effects = BackgroundEffects(
-    widget: (userId, backend) async {},
+    widget: widgetEffect(
+      store: const HomeWidgetStore(),
+      hideAmount: () => _hideAmount(),
+      theme: widgetTheme(settings.themeMode),
+      locale: settings.locale?.languageCode ?? languageOfTag(hints.locale),
+      now: DateTime.now,
+      owns: (userId) async {
+        final token = (await sessions.read())?.token;
+        if (token == null) return false;
+        final account = await encryption.recall(token);
+        return account != null &&
+            account.mode == EncryptionMode.preview &&
+            account.profile.id == userId;
+      },
+    ),
     due: (userId, backend) async {},
   );
 
@@ -89,6 +109,16 @@ Future<BackgroundReport> _run(String kind) async {
     confirms: confirms,
     ack: platform.ackQueued,
   );
+}
+
+/// The "hide the amount in the widget" choice (Settings): never made reads as shown, one that
+/// cannot be read as hidden.
+Future<bool> _hideAmount() async {
+  try {
+    return await const SecureFlagStore('setting.widget.hideAmount').read() ?? false;
+  } on Object {
+    return true;
+  }
 }
 
 /// The headless Dio (D14): the API at `<server>/api` with the bearer token and the phone's

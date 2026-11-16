@@ -98,7 +98,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
   widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
-  Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`;
+  Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`, KEEP: one ask waits, a second is dropped, so the widget's refresh jobs never chain engines;
   `AccountMode.write(mode, owner)` schedules for `preview` and cancels for `plain`/none), `SyncWorker` (runs
   `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`), `HeadlessRunner` (a `FlutterEngine`
   with no activity, 9 min budget, destroyed in every case; `HeadlessHooks.runner` replaces it in tests) and
@@ -143,10 +143,16 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
   reads it (`wambito/notices` `setEncryptionMode {mode, owner}`, keys `wambito.encryption.mode`: `plain`, `preview`,
   `unknown` while the account is not known, and `wambito.encryption.owner`: the user id; both cleared on sign-out; untouched while the session loads),
-  tells `WidgetSync.modeChanged` (the widget snapshot gets no figures and a `line`) and calls the capture
+  tells `WidgetSync` (`modeChanged`; `vaultOpened`/`vaultChanged` follow the open `VaultSession`, `session.backend`,
+  and the widget is drawn from the vault by `home/vault_widget.dart` `writeVaultWidget`: 2 s after each commit, the
+  snapshot carries `owner` = the user id; until the vault is open a `preview` widget is the signed-out one, no line).
+  The headless run draws it too (`background/widget_effect.dart`, even offline). `RefreshWorker` for `preview` calls
+  no API: it asks `SyncScheduler.now` (`sync asked`), and a snapshot whose `owner` is not `AccountMode.owner` becomes
+  the signed-out one (`owner mismatch`). `HomeWidgetPreferences.xml` and `wambito.notice.duelist.xml` are excluded
+  from backups (`backup_rules.xml`, `data_extraction_rules.xml`). It also calls the capture
   channel's `clearQueue()` once. Native: Android `account/AccountMode.kt` (prefs `wambito.encryption`),
   asked first by `SendCapturesWorker`, `ConfirmCaptureWorker`, `CaptureListener`, `RefreshWorker` and
-  `DueWorker` (`preview` or `unknown` ⇒ no API call; absent = an install from before the vault ⇒ as
+  `DueWorker` (`preview` or `unknown` ⇒ no API call (`RefreshWorker` asks the headless sync); absent = an install from before the vault ⇒ as
   before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
   screens pass `previewOpen()` (`test/support/preview_account.dart`).
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the

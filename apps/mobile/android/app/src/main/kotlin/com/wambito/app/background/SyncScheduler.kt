@@ -33,12 +33,16 @@ object SyncScheduler {
             .enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
-    /** One sync now, with no constraint. A second one waits for the first rather than cutting it. */
+    /**
+     * One sync now, with no constraint. One already waiting or running is kept and a second ask is
+     * dropped (KEEP): the widget's refresh jobs ask every 3 hours and at midnight, and each ask must
+     * not queue another engine behind the last. A run that finished leaves the name free.
+     */
     fun now(context: Context) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, request)
     }
 
     /** Signed out, or the account is not a `preview` one: no sync of either kind. */

@@ -246,6 +246,16 @@ class WidgetModelTest {
     }
 
     @Test
+    fun `the owner is read and written, and a signed-out snapshot keeps none`() {
+        val written = snapshot(updatedAt = Instant.parse("2026-10-22T15:30:00Z")).copy(owner = "u1")
+        assertEquals("u1", org.json.JSONObject(written.toJson()).getString("owner"))
+        assertEquals(written, WidgetSnapshot.parse(written.toJson()))
+        assertNull(org.json.JSONObject(snapshot().toJson()).optString("owner", "").takeIf { it.isNotEmpty() })
+        assertNull(WidgetSnapshot.parse(snapshot().toJson())!!.owner)
+        assertNull(WidgetSnapshot(signedIn = false, owner = "u1").let { org.json.JSONObject(it.toJson()).opt("owner") })
+    }
+
+    @Test
     fun `the snapshot reads back what it wrote, and a signed-out one keeps no figure`() {
         val written = snapshot(updatedAt = Instant.parse("2026-10-22T15:30:00Z"), timezone = "America/Bogota")
         assertEquals(written, WidgetSnapshot.parse(written.toJson()))

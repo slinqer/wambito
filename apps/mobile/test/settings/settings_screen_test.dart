@@ -15,6 +15,8 @@ import 'package:wambito/settings/settings_parts.dart' show LkSwitch;
 import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/sheet.dart' show LkSheetScope;
 import 'package:wambito/api/server_url.dart';
+import 'package:wambito/local/backend.dart' show LocalBackend, createLocalBackend;
+import 'package:wambito/local/memory_store.dart' show createMemoryStore;
 import 'package:wambito/local/vault_session.dart' show VaultSession;
 import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
 
@@ -811,6 +813,15 @@ class _Unsynced extends Fake implements VaultSession {
   _Unsynced(this.pending);
 
   final int pending;
+
+  @override
+  String get userId => 'u1';
+
+  @override
+  LocalBackend get backend => createLocalBackend(store: createMemoryStore(), now: DateTime.now);
+
+  @override
+  void Function() subscribe(void Function() listener) => () {};
 
   @override
   Future<int> pendingChanges() async => pending;

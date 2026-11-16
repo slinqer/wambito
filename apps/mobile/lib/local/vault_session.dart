@@ -105,7 +105,14 @@ class OpenVaultOptions {
 
 /// The open vault of one account.
 class VaultSession {
-  VaultSession._(this.userId, this.interceptor, this._store, this._engine, this._storage);
+  VaultSession._(
+    this.userId,
+    this.interceptor,
+    this.backend,
+    this._store,
+    this._engine,
+    this._storage,
+  );
 
   final String userId;
 
@@ -113,6 +120,10 @@ class VaultSession {
   /// included); deleting the account and everything outside `/v1` go on to the network. Its
   /// local writes start a sync.
   final Interceptor interceptor;
+
+  /// The local backend behind [interceptor], for what reads the vault without a request: the home
+  /// widget ([writeVaultWidget]).
+  final LocalBackend backend;
   final SqliteStore _store;
   final SyncEngine _engine;
   final KeyStorage _storage;
@@ -456,6 +467,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     final session = VaultSession._(
       userId,
       LocalBackendInterceptor(backend, afterWrite: engine.afterLocalWrite),
+      backend,
       store,
       engine,
       storage,

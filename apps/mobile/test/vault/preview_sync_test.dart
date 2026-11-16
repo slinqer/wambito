@@ -19,6 +19,7 @@ import 'package:wambito/settings/initial_settings.dart';
 import 'package:wambito/settings/settings_store.dart';
 import 'package:wambito/vault/encryption_mode.dart';
 import 'package:wambito/vault/preview_sync.dart';
+import 'package:wambito/vault/vault_providers.dart';
 
 import '../capture_auto/fakes.dart';
 import '../home/fakes.dart';
@@ -93,6 +94,7 @@ void main() {
         nativeEncryptionModeProvider.overrideWithValue(nativeMode ?? native),
         autoCapturePlatformProvider.overrideWithValue(capture),
         widgetStoreProvider.overrideWithValue(widget),
+        vaultSessionProvider.overrideWithValue(null),
         flagStoreProvider.overrideWith((ref, key) => FakeFlagStore()..value = false),
         settingsStoreProvider.overrideWithValue(FakeSettingsStore()),
         initialSettingsProvider.overrideWithValue(
@@ -115,7 +117,7 @@ void main() {
   });
 
   test(
-    'preview: the jobs are told, the queue is sent not cleared, the widget says it waits',
+    'preview: the jobs are told, the queue is sent not cleared, the widget waits for the vault',
     () async {
       final c = make(account: () => SynchronousFuture(_account(EncryptionMode.preview)));
       c.listen(previewSyncProvider, (_, _) {});
@@ -127,7 +129,7 @@ void main() {
       expect(capture.callsNamed('clearQueue'), isEmpty);
       final doc = jsonDecode(widget.saved[widgetSnapshotKey]!) as Map<String, Object?>;
       expect(doc['signedIn'], false);
-      expect(doc['line'], 'Próximamente con cifrado');
+      expect(doc.containsKey('line'), isFalse);
       expect(doc.containsKey('remaining'), isFalse);
     },
   );

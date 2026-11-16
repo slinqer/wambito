@@ -51,6 +51,12 @@ data class WidgetSnapshot(
      * the phone). Written by the app; never by [RefreshWorker]. Null: the usual sentence.
      */
     val line: String? = null,
+    /**
+     * Signed in, `preview` accounts only: the user id the figures belong to (the app and the
+     * headless run write it, D10). [RefreshWorker] draws nothing whose owner is not
+     * [com.wambito.app.account.AccountMode.owner]. Null for a `plain` account.
+     */
+    val owner: String? = null,
 ) {
     /** The profile's zone, or [fallback] (the phone's) without a valid one. */
     fun zone(fallback: ZoneId): ZoneId = timezone?.let {
@@ -79,6 +85,7 @@ data class WidgetSnapshot(
                 .put("updatedAt", updatedAt?.toString())
             if (refreshFailedAt != null) doc.put("refreshFailedAt", refreshFailedAt.toString())
             if (timezone != null) doc.put("timezone", timezone)
+            if (owner != null) doc.put("owner", owner)
         }
         return doc.toString()
     }
@@ -125,6 +132,7 @@ data class WidgetSnapshot(
                     hideAmount = hideAmount,
                     theme = theme,
                     timezone = doc.optString("timezone", "").takeIf { it.isNotEmpty() },
+                    owner = doc.optString("owner", "").takeIf { it.isNotEmpty() },
                 )
             } catch (_: JSONException) {
                 signedOut
