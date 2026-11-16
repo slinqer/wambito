@@ -23,7 +23,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `test/parity/capture_how_parity_test.dart`.
   `capture_platform.dart` wraps the `wambito/capture` channel (`autoCapturePlatformProvider`; no channel ⇒ `status()` null ⇒ the section
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
-  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue).
+  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue). A `preview` account has
+  the same switches: `previewSyncProvider` hands the queue over with `sendQueued` (never `clearQueue`), and Android's
+  `SendCapturesWorker` / `ConfirmCaptureWorker` run `captureMain` (no `CaptureApi`, no network constraint). Only a
+  `done`/`changed` run changes the queue (Dart's `ackQueued`); any other outcome or `timeout` keeps it and retries up to
+  8 runs, then `kept`. A capture a finished run leaves unacked is counted (`CaptureQueue.refuse`, apart from the items)
+  and dropped at 8, never for an engine failure. Notifications are deduped by transaction id.
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`

@@ -58,4 +58,18 @@ class CaptureQueueChannelTest {
         CaptureQueueChannel.ack(context, emptyList(), emptyList())
         assertEquals(added.map { it.key }, CaptureQueue(context).all().map { it.key })
     }
+
+    @Test
+    fun `takeQueued hands over the confirms and ackQueued removes the ones it names`() {
+        queueFor("u1", "Mercadona")
+        val queue = CaptureQueue(context)
+        queue.addConfirm("t-1")
+        queue.addConfirm("t-2")
+        assertEquals(listOf("t-1", "t-2"), CaptureQueueChannel.take(context, "u1")["confirms"])
+
+        CaptureQueueChannel.ack(context, emptyList(), listOf("t-1"))
+
+        assertEquals(listOf("t-2"), queue.confirms())
+        assertEquals(1, queue.all().size)
+    }
 }

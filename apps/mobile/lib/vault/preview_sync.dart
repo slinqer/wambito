@@ -52,8 +52,9 @@ String? nativeModeOf(String? owner, EncryptionMode? mode) =>
 /// as the app runs (app.dart watches it):
 ///  * the mode is written where the jobs read it ([NativeEncryptionMode]);
 ///  * the widget is told whether to draw figures ([WidgetSync.modeChanged]);
-///  * the captures waiting to be sent are forgotten once the mode becomes `preview`
-///    (`clearQueue`): nothing queued may go out, and the server would refuse it anyway (403).
+///  * once the mode becomes `preview` the captures waiting are handed over (`sendQueued`): the
+///    queue becomes this account's and the headless engine saves them in the vault (D8). Nothing
+///    is cleared, and nothing goes to the server.
 final previewSyncProvider = Provider<void>((ref) {
   final native = ref.read(nativeEncryptionModeProvider);
   ({bool loading, String? owner, String? userId, EncryptionMode? mode}) standing() => (
@@ -82,9 +83,14 @@ final previewSyncProvider = Provider<void>((ref) {
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
       // Read now, not after the native write: the container may be gone by then.
       final capture = ref.read(autoCapturePlatformProvider);
-      // After the mode is written: the jobs already refuse before the queue is cleared.
+      final userId = now.userId;
+      // After the mode is written: the jobs already know the account when the queue is handed over.
       unawaited(
-        written.then<void>((_) => capture.clearQueue().then<void>((_) {}, onError: (Object _) {})),
+        written.then<void>(
+          (_) => userId == null
+              ? null
+              : capture.sendQueued(userId).then<void>((_) {}, onError: (Object _) {}),
+        ),
       );
     } else {
       unawaited(written);

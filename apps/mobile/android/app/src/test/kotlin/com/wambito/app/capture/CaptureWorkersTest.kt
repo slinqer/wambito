@@ -10,6 +10,8 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
 import com.wambito.app.account.AccountMode
+import com.wambito.app.background.HeadlessHooks
+import com.wambito.app.background.HeadlessResult
 import com.wambito.app.notices.ApiResult
 import com.wambito.app.widget.ServerSetting
 import com.wambito.app.widget.SessionSource
@@ -107,6 +109,7 @@ class CaptureWorkersTest {
 
     @After
     fun tearDown() {
+        HeadlessHooks.runner = null
         CaptureHooks.dependencies = null
         CaptureHooks.notifier = object : CaptureNotifier {
             override fun show(context: Context, answer: CaptureAnswer) = Unit
@@ -123,18 +126,152 @@ class CaptureWorkersTest {
 
     private fun posts() = requests.filter { it.method == "POST" }
 
-    @Test
-    fun `a preview account sends nothing and keeps the queue`() {
+    /** What the fake headless run does to the queue, as Dart's `captureMain` would. */
+    private class FakeRun(val outcome: String, val saves: (List<QueuedCapture>) -> List<QueuedCapture> = { emptyList() })
+
+    private val entrypoints = mutableListOf<String>()
+
+    private fun headless(run: FakeRun, context: Context = this.context) {
+        HeadlessHooks.runner = { _, entry ->
+            entrypoints += entry
+            val saved = run.saves(CaptureQueue(context).all())
+            CaptureQueueChannel.ack(context, saved.map { it.key }, emptyList())
+            HeadlessResult(
+                run.outcome,
+                saved.map { answer(false, it.capture.merchant, it.capture.amountCents) },
+            )
+        }
+    }
+
+    private fun previewQueue(vararg merchants: String): List<QueuedCapture> {
         AccountMode(context).value = "preview"
-        queue.add(sampleCapture("Mercadona"))
+        return merchants.map { queue.add(sampleCapture(it)) }
+    }
 
-        val result = runSend()
+    private fun runSendAt(attempt: Int): ListenableWorker.Result = runBlocking {
+        TestListenableWorkerBuilder<SendCapturesWorker>(context).setRunAttemptCount(attempt).build().doWork()
+    }
 
-        assertEquals(ListenableWorker.Result.success().javaClass, result.javaClass)
+    @Test
+    fun `preview capture never reaches the api`() {
+        previewQueue("Mercadona", "Café")
+        headless(FakeRun("changed") { it })
+
+        assertEquals(ListenableWorker.Result.success().javaClass, runSend().javaClass)
+
+        assertEquals(listOf("captureMain"), entrypoints)
         assertTrue(requests.isEmpty())
-        assertEquals(1, queue.all().size)
-        assertTrue(notifier.shown.isEmpty())
+        assertEquals(listOf("t-Mercadona", "t-Café"), notifier.shown.map { it.id })
+        assertTrue(queue.all().isEmpty())
         assertTrue(notifier.signIn.isEmpty())
+    }
+
+    @Test
+    fun `the same transaction is announced once`() {
+        previewQueue("Mercadona")
+        HeadlessHooks.runner = { _, _ ->
+            val twice = answer(false, "Mercadona", 1250)
+            HeadlessResult("done", listOf(twice, twice))
+        }
+        runSend()
+        assertEquals(listOf("t-Mercadona"), notifier.shown.map { it.id })
+    }
+
+    @Test
+    fun `a merged capture already confirmed asks nothing`() {
+        previewQueue("Mercadona")
+        confirmed += "Mercadona"
+        HeadlessHooks.runner = { _, _ -> HeadlessResult("changed", listOf(answer(true, "Mercadona", 1250))) }
+        runSend()
+        assertTrue(notifier.shown.isEmpty())
+        assertEquals(listOf("t-Mercadona"), notifier.dismissed)
+    }
+
+    @Test
+    fun `engine failure keeps the queue and never sends anything`() {
+        previewQueue("Mercadona", "Café")
+        headless(FakeRun("failed"))
+
+        assertEquals(ListenableWorker.Result.retry(), runSend())
+        assertEquals(2, queue.all().size)
+        assertTrue(requests.isEmpty())
+
+        val last = runSendAt(SendCapturesWorker.MAX_ATTEMPTS - 1)
+        assertEquals(ListenableWorker.Result.success(workDataOf(CAPTURE_OUTCOME to "kept")), last)
+        assertEquals(2, queue.all().size)
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `every outcome but done and changed keeps the queue`() {
+        for (outcome in listOf("signedOut", "notPreview", "locked", "busy", "failed", "timeout")) {
+            queue.clear()
+            queue.adopt("user-1", session.mark())
+            previewQueue("Mercadona")
+            headless(FakeRun(outcome))
+            assertEquals(outcome, ListenableWorker.Result.retry(), runSend())
+            assertEquals(outcome, 1, queue.all().size)
+        }
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `timeout keeps the queue`() {
+        previewQueue("Mercadona", "Café")
+        HeadlessHooks.runner = { _, _ -> HeadlessResult("timeout", emptyList()) }
+
+        assertEquals(ListenableWorker.Result.retry(), runSend())
+        assertEquals(2, queue.all().size)
+        val last = runSendAt(SendCapturesWorker.MAX_ATTEMPTS - 1)
+        assertEquals(ListenableWorker.Result.success(workDataOf(CAPTURE_OUTCOME to "kept")), last)
+        assertEquals(2, queue.all().size)
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `a capture the vault refuses is dropped at the eighth finished run, engine failures never count`() {
+        val items = previewQueue("Mercadona", "Café")
+        // The vault takes the first and refuses the second, run after run.
+        headless(FakeRun("done") { all -> all.filter { it.capture.merchant == "Mercadona" } })
+
+        // Failed runs in between do not count.
+        repeat(5) {
+            HeadlessHooks.runner = { _, _ -> HeadlessResult("failed", emptyList()) }
+            runSend()
+        }
+        headless(FakeRun("done") { all -> all.filter { it.capture.merchant == "Mercadona" } })
+        for (run in 1 until CaptureQueue.MAX_REFUSALS) {
+            assertEquals(ListenableWorker.Result.retry(), runSend())
+            assertEquals("run $run", listOf(items[1].key), queue.all().map { it.key })
+        }
+        val last = runSendAt(SendCapturesWorker.MAX_ATTEMPTS - 1)
+        assertEquals(ListenableWorker.Result.success().javaClass, last.javaClass)
+        assertTrue(queue.all().isEmpty())
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `a refused capture is dropped without a trace of its finances in the log`() {
+        previewQueue("Mercadona")
+        headless(FakeRun("done"))
+        val lines = mutableListOf<String>()
+        SendCapturesWorker.log = { lines += it }
+        try {
+            repeat(CaptureQueue.MAX_REFUSALS) { runSend() }
+        } finally {
+            SendCapturesWorker.log = { }
+        }
+        assertTrue(queue.all().isEmpty())
+        assertEquals(1, lines.size)
+        assertTrue(lines.none { it.contains("Mercadona") || it.contains("1250") })
+    }
+
+    @Test
+    fun `the send for a preview account waits for no network`() {
+        previewQueue("Mercadona")
+        CaptureScheduler.enqueueSend(context)
+        val work = WorkManager.getInstance(context).getWorkInfosForUniqueWork(CaptureScheduler.SEND).get()
+        assertEquals(NetworkType.NOT_REQUIRED, work[0].constraints.requiredNetworkType)
     }
 
     @Test
@@ -165,15 +302,52 @@ class CaptureWorkersTest {
     }
 
     @Test
-    fun `a preview account confirms nothing with the server`() {
-        AccountMode(context).value = "preview"
+    fun `Bien on preview goes to the vault, never to the api`() {
+        previewQueue()
+        var seen: List<String> = emptyList()
+        HeadlessHooks.runner = { _, entry ->
+            entrypoints += entry
+            seen = queue.confirms()
+            CaptureQueueChannel.ack(context, emptyList(), seen)
+            HeadlessResult("changed", emptyList())
+        }
+        showOne()
+        assertEquals(1, notifications().activeNotifications.size)
+
         val result = runBlocking {
             TestListenableWorkerBuilder<ConfirmCaptureWorker>(context)
                 .setInputData(workDataOf(ConfirmCaptureWorker.ID to "t-1"))
                 .build().doWork()
         }
+
         assertEquals(ListenableWorker.Result.success().javaClass, result.javaClass)
+        assertEquals(listOf("t-1"), seen)
+        assertEquals(listOf("captureMain"), entrypoints)
         assertTrue(requests.isEmpty())
+        assertTrue(queue.confirms().isEmpty())
+        assertTrue(notifications().activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun `Bien on preview keeps the confirm through an engine failure`() {
+        previewQueue()
+        HeadlessHooks.runner = { _, _ -> HeadlessResult("failed", emptyList()) }
+        assertEquals(ListenableWorker.Result.retry(), runConfirm())
+        assertEquals(listOf("t-1"), queue.confirms())
+        val last = runConfirm(attempt = ConfirmCaptureWorker.MAX_ATTEMPTS - 1)
+        assertEquals(ListenableWorker.Result.success(workDataOf(CAPTURE_OUTCOME to "kept")), last)
+        assertEquals(listOf("t-1"), queue.confirms())
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun `Bien on preview that a finished run never acks is dropped at the last attempt`() {
+        previewQueue()
+        HeadlessHooks.runner = { _, _ -> HeadlessResult("done", emptyList()) }
+        assertEquals(ListenableWorker.Result.retry(), runConfirm())
+        assertEquals(listOf("t-1"), queue.confirms())
+        runConfirm(attempt = ConfirmCaptureWorker.MAX_ATTEMPTS - 1)
+        assertTrue(queue.confirms().isEmpty())
     }
 
     @Test

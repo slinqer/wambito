@@ -50,19 +50,18 @@ class CaptureQueueChannel(private val context: Context, messenger: BinaryMesseng
     }
 
     companion object {
-        /** The queued captures of [userId], oldest first; the confirms of "Bien" are Task 7's. */
+        /** The queued captures of [userId], oldest first, and the "Bien" ids waiting for the vault. */
         fun take(context: Context, userId: String): Map<String, Any> {
             val captures = CaptureQueue(context).all().filter { it.userId == userId }.map { item ->
                 val json: JSONObject = item.capture.toJson().put("key", item.key)
                 json.keys().asSequence().associateWith { json.get(it) }
             }
-            return mapOf("captures" to captures, "confirms" to emptyList<String>())
+            return mapOf("captures" to captures, "confirms" to CaptureQueue(context).confirms())
         }
 
-        /** Removes the captures [keys] names; [confirms] has no store yet (Task 7). */
+        /** Removes the captures [keys] and the confirms [confirms] name. */
         fun ack(context: Context, keys: List<String>, confirms: List<String>) {
-            val queue = CaptureQueue(context)
-            keys.forEach { queue.remove(it) }
+            CaptureQueue(context).ack(keys, confirms)
         }
     }
 }

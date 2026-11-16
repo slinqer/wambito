@@ -114,21 +114,25 @@ void main() {
     widget = FakeWidgetStore();
   });
 
-  test('preview: the jobs are told, the queue is cleared once, the widget says it waits', () async {
-    final c = make(account: () => SynchronousFuture(_account(EncryptionMode.preview)));
-    c.listen(previewSyncProvider, (_, _) {});
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+  test(
+    'preview: the jobs are told, the queue is sent not cleared, the widget says it waits',
+    () async {
+      final c = make(account: () => SynchronousFuture(_account(EncryptionMode.preview)));
+      c.listen(previewSyncProvider, (_, _) {});
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(native.writes.last, 'preview');
-    expect(native.writes, isNot(contains('plain')));
-    expect(capture.callsNamed('clearQueue'), ['clearQueue']);
-    final doc = jsonDecode(widget.saved[widgetSnapshotKey]!) as Map<String, Object?>;
-    expect(doc['signedIn'], false);
-    expect(doc['line'], 'Próximamente con cifrado');
-    expect(doc.containsKey('remaining'), isFalse);
-  });
+      expect(native.writes.last, 'preview');
+      expect(native.writes, isNot(contains('plain')));
+      expect(capture.callsNamed('sendQueued'), ['sendQueued user-1']);
+      expect(capture.callsNamed('clearQueue'), isEmpty);
+      final doc = jsonDecode(widget.saved[widgetSnapshotKey]!) as Map<String, Object?>;
+      expect(doc['signedIn'], false);
+      expect(doc['line'], 'Próximamente con cifrado');
+      expect(doc.containsKey('remaining'), isFalse);
+    },
+  );
 
-  test('the queue is still cleared when the container goes before the native write ends', () async {
+  test('the queue is still sent when the container goes before the native write ends', () async {
     final slow = _SlowNative();
     final c = make(
       account: () => SynchronousFuture(_account(EncryptionMode.preview)),
@@ -140,7 +144,8 @@ void main() {
     slow.release.complete();
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(capture.callsNamed('clearQueue'), ['clearQueue']);
+    expect(capture.callsNamed('sendQueued'), ['sendQueued user-1']);
+    expect(capture.callsNamed('clearQueue'), isEmpty);
   });
 
   test('the native write carries the owner: the account\'s user id', () async {
@@ -159,6 +164,7 @@ void main() {
 
     expect(native.writes.last, 'plain');
     expect(capture.callsNamed('clearQueue'), isEmpty);
+    expect(capture.callsNamed('sendQueued'), isEmpty);
     expect(widget.saved, isEmpty);
   });
 
@@ -172,7 +178,8 @@ void main() {
     answer.complete(_account(EncryptionMode.preview));
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(native.writes.last, 'preview');
-    expect(capture.callsNamed('clearQueue'), hasLength(1));
+    expect(capture.callsNamed('sendQueued'), hasLength(1));
+    expect(capture.callsNamed('clearQueue'), isEmpty);
   });
 
   test(
