@@ -76,6 +76,7 @@ class WrapDto {
     this.publicKey,
     this.attestation,
     this.label,
+    this.createdAt,
   });
 
   factory WrapDto.fromJson(Map<String, Object?> json) => WrapDto(
@@ -87,6 +88,7 @@ class WrapDto {
     publicKey: json['publicKey'] as String?,
     attestation: json['attestation'] as String?,
     label: json['label'] as String?,
+    createdAt: json['createdAt'] as String?,
   );
 
   final String id;
@@ -97,6 +99,9 @@ class WrapDto {
   final String? publicKey;
   final String? attestation;
   final String? label;
+
+  /// When the server stored it (ISO), for Settings → Security's "Added on".
+  final String? createdAt;
 }
 
 /// A data key and its version, at the top of a walk down the links.

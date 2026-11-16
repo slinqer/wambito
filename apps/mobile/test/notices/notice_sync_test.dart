@@ -15,6 +15,7 @@ import 'package:wambito/notices/notice_platform.dart';
 import 'package:wambito/notices/notice_prompt.dart';
 import 'package:wambito/notices/notice_sync.dart';
 import 'package:wambito/settings/preferences.dart';
+import 'package:wambito/settings/security/security_api.dart' show securityApiProvider;
 
 import '../settings/harness.dart';
 import '../support/preview_account.dart';
@@ -175,6 +176,8 @@ List<Override> _previewWith(_Vault vault) => [
   previewAccount(),
   vaultGateStateProvider.overrideWithValue(Ready<VaultSession>(vault)),
   vaultSessionProvider.overrideWithValue(vault),
+  // Settings' Security card would read the keys from the network: not what these tests are about.
+  securityApiProvider.overrideWithValue(null),
   clockProvider.overrideWithValue(() => _now),
 ];
 

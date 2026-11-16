@@ -642,6 +642,24 @@ void main() {
       expect(a.api.posts, hasLength(1));
     });
 
+    test('forget() zeroes the held new DK and refuses a later commit; nothing is posted', () async {
+      final a = await account();
+      final prepared = await a.rotate(recovery: const FreshRecovery());
+      expect(zeroed(dataKeys.single), isFalse);
+      prepared.forget();
+      expect(zeroed(dataKeys.single), isTrue);
+      expect(await caught(prepared.commit), isKeysError('abandoned'));
+      expect(a.api.posts, isEmpty);
+    });
+
+    test('forget() after the commit is done changes nothing', () async {
+      final a = await account();
+      final prepared = await a.rotate();
+      final result = await prepared.commit();
+      prepared.forget();
+      expect((await prepared.commit()).keyV, result.keyV);
+    });
+
     test('this phone cannot remove itself', () async {
       final a = await account();
       await addDevice(a, 'Chrome on Android');

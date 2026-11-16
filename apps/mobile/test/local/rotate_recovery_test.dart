@@ -131,6 +131,18 @@ void main() {
       expect(zeroed(madeSecrets.single), isTrue);
     });
 
+    test(
+      'forget() zeroes the verifier hashes and refuses a later commit; nothing is sent',
+      () async {
+        final a = await account();
+        final prepared = await newRecoveryKey(a.options);
+        prepared.forget();
+        expect(await caught(prepared.commit), isKeysError('abandoned'));
+        expect(a.api.calls.where((c) => c.method == 'PUT'), isEmpty);
+        expect(a.api.verifierPuts, isEmpty);
+      },
+    );
+
     test('the verifier follows the wrap', () async {
       final a = await account();
       final prepared = await newRecoveryKey(a.options);

@@ -142,12 +142,21 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
   stops polling); Checking, Opening and Committing show a loading line. The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
-  "Approve a new device" as `vaultPairLead` tells the new phone; Task 16 adds its Settings → Security entry): type the
+  "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
   code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
   `scan` → the first `wambito://pair?` QR, or null for a close or a refused permission), then the number, then
   "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
-  `scan`. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only; a guest only gets "Approve a new device"):
+  `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
+  wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
+  `security_section.dart` (devices, Remove, Approve, "New recovery key"), `remove_device_sheet.dart` (typed key or a new one),
+  `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
+  Remove and "New recovery key" ask `confirmSensitive` first (D17: no key is made or shown before it passes). After a rotation
+  commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
+  prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
+  "Opens your data" per passkey, offers "Turn on" (`evaluatePrf` + `addPasskeyWrap`) and adds a new passkey with its wrap
+  (`SettingsPasskeys.add(prf:)`: PRF from the registration, else a second touch). `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
   gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
   while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault

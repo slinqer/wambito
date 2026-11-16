@@ -11,6 +11,7 @@ import 'backend_interceptor.dart';
 import 'ids.dart';
 import 'keys.dart';
 import 'sqlite_store.dart';
+import 'store.dart' show FinanceStore;
 import 'sync.dart';
 import 'vault_lock.dart';
 
@@ -132,6 +133,13 @@ class VaultSession {
   final Set<void Function()> _unverifiedListeners = {};
   bool _closing = false;
   late final void Function() _drop;
+
+  /// The vault's store, for what changes the keys on this phone ([rotateKeys] writes
+  /// `settings.revokedDevices` through it) and Settings → Security's reads.
+  FinanceStore get store => _store;
+
+  /// How many records the sync could not open (the quarantine), for Settings → Security.
+  Future<int> unreadableCount() => _store.quarantineCount();
 
   /// Called after every commit to the store (the screens refetch). Returns the unsubscribe.
   void Function() subscribe(void Function() listener) => _store.subscribe(listener);

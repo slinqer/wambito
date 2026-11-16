@@ -40,9 +40,18 @@ class AccountStanding {
 
 /// One of the person's passkeys, as Settings lists it (the web's `PasskeyItem`).
 class PasskeyItem {
-  const PasskeyItem({required this.id, this.name, required this.createdAt, this.synced = false});
+  const PasskeyItem({
+    required this.id,
+    this.credentialId,
+    this.name,
+    required this.createdAt,
+    this.synced = false,
+  });
 
   final String id;
+
+  /// The WebAuthn credential id (base64url, Better Auth's `credentialID`): a passkey wrap's `ref`.
+  final String? credentialId;
 
   /// The name it was given, if any.
   final String? name;
@@ -267,6 +276,7 @@ class HttpAuthApi implements AuthApi {
         if (entry is Map && entry['id'] is String)
           PasskeyItem(
             id: entry['id']! as String,
+            credentialId: entry['credentialID'] is String ? entry['credentialID']! as String : null,
             name: entry['name'] is String && (entry['name']! as String).isNotEmpty
                 ? entry['name']! as String
                 : null,

@@ -93,7 +93,7 @@ class _NoPasskeys implements SettingsPasskeys {
   Future<List<PasskeyItem>> list() async => [];
 
   @override
-  Future<PasskeyOutcome> add() async => PasskeyOutcome.added;
+  Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async => PasskeyOutcome.added;
 
   @override
   Future<void> remove(String id) async {}

@@ -61,7 +61,7 @@ class _StoryPasskeys implements SettingsPasskeys {
   Future<List<PasskeyItem>> list() async => List.of(items);
 
   @override
-  Future<PasskeyOutcome> add() async => PasskeyOutcome.added;
+  Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async => PasskeyOutcome.added;
 
   @override
   Future<void> remove(String id) async => items.removeWhere((item) => item.id == id);

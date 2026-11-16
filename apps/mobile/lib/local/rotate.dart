@@ -78,7 +78,7 @@ final class FreshRecovery extends RotateRecovery {
 
 /// A rotation, made but not yet sent: see [rotateKeys].
 class PreparedRotation {
-  const PreparedRotation({required this.recoveryKey, required this.commit});
+  const PreparedRotation({required this.recoveryKey, required this.commit, this.forget = _nothing});
 
   /// The new recovery key to show ([FreshRecovery]); `null` for a typed one.
   final String? recoveryKey;
@@ -86,7 +86,14 @@ class PreparedRotation {
   /// Posts the rotation, keeps it on this phone, then (a fresh key) PUTs its verifier. Retry-safe:
   /// a step done is not done again, and a double tap shares the call in flight.
   final Future<RotateResult> Function() commit;
+
+  /// The person gave up before committing: zeroes the new DK held for `commit()`, which then
+  /// throws `abandoned` (nothing is posted). Nothing happens once the commit is done, or while one
+  /// is in flight (its own end zeroes the key).
+  final void Function() forget;
 }
+
+void _nothing() {}
 
 /// `wrong_recovery_key` unless [secret] opens the account's current recovery wrap.
 Future<void> _checkRecovery(String userId, List<WrapDto> wraps, Uint8List secret) async {
@@ -395,6 +402,13 @@ Future<PreparedRotation> rotateKeys(
     return PreparedRotation(
       recoveryKey: recoveryKey,
       commit: () => running ??= run().whenComplete(() => running = null),
+      forget: () {
+        if (done == null && running == null && refused == null) {
+          drop(const KeysError('abandoned'));
+          _zero(verifier?.lookupHash);
+          _zero(verifier?.authHash);
+        }
+      },
     );
   } finally {
     _zero(secret);
@@ -441,7 +455,7 @@ Future<void> _keepRotated(
 
 /// A new recovery key, made but not yet sent: see [newRecoveryKey].
 class NewRecoveryKey {
-  const NewRecoveryKey({required this.recoveryKey, required this.commit});
+  const NewRecoveryKey({required this.recoveryKey, required this.commit, this.forget = _nothing});
 
   /// The formatted recovery key to show.
   final String recoveryKey;
@@ -449,6 +463,11 @@ class NewRecoveryKey {
   /// Puts the recovery wrap, then the verifier. Retry-safe: the same wrap id and bytes on every
   /// try, a wrap already saved is not put again, and a double tap shares the call in flight.
   final Future<void> Function() commit;
+
+  /// The person gave up before committing: zeroes the verifier hashes held for `commit()`, which
+  /// then throws `abandoned` (nothing is sent). The wrap's bytes are no secret and just go. Nothing
+  /// happens once the commit is done, or while one is in flight.
+  final void Function() forget;
 }
 
 /// A new recovery key (spec 7.5: no rotation): a new secret wraps DK, opened from this phone's own
@@ -506,12 +525,27 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
     }
 
     Future<void>? sent;
+    var abandoned = false;
+    var done = false;
     return NewRecoveryKey(
       recoveryKey: recoveryKey,
-      commit: () => sent ??= send().catchError((Object error) {
-        sent = null;
-        throw error;
-      }),
+      commit: () {
+        if (abandoned) return Future<void>.error(const KeysError('abandoned'));
+        return sent ??= send()
+            .then<void>((_) {
+              done = true;
+            })
+            .catchError((Object error) {
+              sent = null;
+              throw error;
+            });
+      },
+      forget: () {
+        if (done || sent != null || abandoned) return;
+        abandoned = true;
+        _zero(hashes.lookupHash);
+        _zero(hashes.authHash);
+      },
     );
   } finally {
     _zero(secret);

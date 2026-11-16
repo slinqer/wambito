@@ -50,6 +50,7 @@ import 'server_status.dart';
 import 'locale_resolution.dart';
 import 'preferences.dart';
 import 'profile_settings.dart';
+import 'security/security_section.dart';
 import 'settings_parts.dart';
 import 'time_money_section.dart';
 import 'url_opener.dart';
@@ -373,6 +374,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
           guest: guest && !webOnly,
         ),
+        // An encrypted account's devices and recovery key (Settings → Security). Plain accounts see
+        // nothing of it; a guest only approves a new device.
+        if (!webOnly && ref.watch(isPreviewProvider))
+          SecuritySection(
+            timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
+            guest: guest,
+          ),
         // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
         // pairs yet, so the web-only pictures leave it out.
         if (!webOnly)
