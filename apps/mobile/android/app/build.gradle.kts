@@ -244,13 +244,13 @@ dependencies {
     // already brings these exact versions, they are named here because the app's own code uses them.
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
-    // The QR scanner (scanner/, Task 14): CameraX shows the camera and hands every frame's luminance
-    // plane over, ZXing core reads the QR in it. All Apache-2.0, none with Play Services or ML Kit
+    // The QR scanner (scanner/, Task 14): CameraX opens the camera and hands every frame's luminance
+    // plane over, ZXing core reads the QR in it. No camera-view: it would bring camera-video, media3
+    // and the whole of Guava just to show a preview, which scanner/ScannerActivity draws itself. All Apache-2.0, none with Play Services or ML Kit
     // (CameraX's camera-mlkit-vision and mobile_scanner are what scripts/check-no-google.sh refuses);
     // ZXing core is plain Java on Maven Central. Pinned exactly, as everything here.
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
-    implementation("androidx.camera:camera-view:1.6.2")
     implementation("com.google.zxing:core:3.5.4")
 
     // JVM unit tests (src/test): the voice model unzip, the haptics, and the widget. EPL-1.0, tests only.

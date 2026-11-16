@@ -12,7 +12,7 @@ import io.flutter.plugin.common.MethodChannel
  * The QR scanner, on the `wambito/scanner` channel (lib/scanner/qr_scanner.dart). The camera is
  * only ever opened by `scan`, and its permission only asked there.
  *
- *  * `isAvailable` → true when the phone has a camera.
+ *  * `isAvailable` → true when the phone has a back camera (the one the scanner opens).
  *  * `scan` → the text of the first `wambito://pair?` QR read ([ScannerActivity], full screen), or
  *    null when the person closed it or refused the camera permission (no error, no crash). Errors:
  *    `failed` (the camera could not start), `busy` (a scan is already open).
@@ -37,7 +37,7 @@ class ScannerChannel(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "isAvailable" -> result.success(
-                activity.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
+                activity.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA),
             )
             "scan" -> scan(result)
             else -> result.notImplemented()

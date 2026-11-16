@@ -111,15 +111,6 @@ releaseRuntimeClasspath - Runtime classpath of '/release'.
       }
     });
 
-    test(
-      'the MIT licence (the Checker Framework annotations Guava brings, with CameraX) is MIT',
-      () {
-        for (final name in ['The MIT License', 'MIT', 'MIT License']) {
-          expect(normalizeLicenses([name]), 'MIT', reason: name);
-        }
-      },
-    );
-
     test('BSD-3-Clause stays BSD-3-Clause; a dual licence names both, in a fixed order', () {
       expect(normalizeLicenses(['BSD-3-Clause']), 'BSD-3-Clause');
       expect(

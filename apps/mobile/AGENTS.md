@@ -197,8 +197,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - `scanner/`: `wambito/scanner` (`isAvailable`, `scan`): `ScannerChannel` asks the `CAMERA` permission at scan time
   only (a refusal answers null) and starts `ScannerActivity` (not exported): CameraX `Preview` + `ImageAnalysis`
   (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first `wambito://pair?` text
-  goes back. CameraX 1.6.2 and ZXing core 3.5.4 are pinned exactly; never `camera-mlkit-vision`, ML Kit or
-  `mobile_scanner` (`check-no-google.sh`). Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
+  goes back. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
+  and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
+  `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
   local notices only. A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)

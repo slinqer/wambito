@@ -1400,6 +1400,15 @@
   "licenseNoticeOpenBlas": "OpenBLAS (https://github.com/OpenMathLib/OpenBLAS), las rutinas de álgebra lineal que van dentro de la biblioteca nativa de Vosk, bajo la licencia BSD de 3 cláusulas.",
   "licenseNoticeClapack": "CLAPACK (https://www.netlib.org/clapack), la versión en C de LAPACK que va dentro de la biblioteca nativa de Vosk, bajo una licencia BSD. Trae libf2c, cuyo aviso va después de la licencia.",
   "licenseNoticeLibffi": "libffi (https://github.com/libffi/libffi), que va dentro de la biblioteca nativa de JNA, bajo la licencia MIT.",
+  "licenseNoticeLibyuv": "libyuv (https://chromium.googlesource.com/libyuv/libyuv), dentro de la biblioteca nativa de androidx.camera:camera-core {version} (la cámara que lee el QR), bajo la licencia BSD de tres cláusulas.",
+  "@licenseNoticeLibyuv": {
+    "description": "About: the libyuv notice (inside CameraX camera-core).",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "licenseNoticeJna": "Java Native Access (https://github.com/java-native-access/jna), por donde Vosk llega a su biblioteca nativa. Tiene doble licencia: Apache 2.0 o LGPL 2.1. Wambito la usa bajo la licencia Apache 2.0.",
   "licenseNoticeCanary": "El modelo de voz preciso de la captura rápida, Canary-180M flash (https://huggingface.co/nvidia/canary-180m-flash), de NVIDIA, bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0). No viene en la app: se descarga al teléfono si aceptas, y reconoce la voz sin salir de él. Atribución: Canary-180M flash by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. Se usa convertido a ONNX, sin otros cambios de Wambito.",
   "licenseNoticeParakeet": "El modelo de voz preciso de la captura rápida en italiano y portugués, Parakeet TDT 0.6B v3 (https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), de NVIDIA, bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0). No viene en la app: se descarga al teléfono si aceptas, y reconoce la voz sin salir de él. Atribución: Parakeet TDT 0.6B v3 by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. Se usa convertido a ONNX, sin otros cambios de Wambito.",

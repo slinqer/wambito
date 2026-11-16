@@ -52,11 +52,6 @@
       "license": "Apache-2.0"
     },
     {
-      "id": "androidx.camera.viewfinder:viewfinder-core",
-      "version": "1.5.1",
-      "license": "Apache-2.0"
-    },
-    {
       "id": "androidx.camera:camera-camera2",
       "version": "1.6.2",
       "license": "Apache-2.0"
@@ -73,16 +68,6 @@
     },
     {
       "id": "androidx.camera:camera-lifecycle",
-      "version": "1.6.2",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "androidx.camera:camera-video",
-      "version": "1.6.2",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "androidx.camera:camera-view",
       "version": "1.6.2",
       "license": "Apache-2.0"
     },
@@ -312,21 +297,6 @@
       "license": "Apache-2.0"
     },
     {
-      "id": "androidx.media3:media3-common",
-      "version": "1.9.0",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "androidx.media3:media3-container",
-      "version": "1.9.0",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "androidx.media3:media3-muxer",
-      "version": "1.9.0",
-      "license": "Apache-2.0"
-    },
-    {
       "id": "androidx.profileinstaller:profileinstaller",
       "version": "1.3.1",
       "license": "Apache-2.0"
@@ -487,23 +457,8 @@
       "license": "Apache-2.0"
     },
     {
-      "id": "com.google.guava:failureaccess",
-      "version": "1.0.2",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "com.google.guava:guava",
-      "version": "33.3.1-android",
-      "license": "Apache-2.0"
-    },
-    {
       "id": "com.google.guava:listenablefuture",
-      "version": "9999.0-empty-to-avoid-conflict-with-guava",
-      "license": "Apache-2.0"
-    },
-    {
-      "id": "com.google.j2objc:j2objc-annotations",
-      "version": "3.0.0",
+      "version": "1.0",
       "license": "Apache-2.0"
     },
     {
@@ -530,16 +485,6 @@
       "id": "net.java.dev.jna:jna",
       "version": "5.18.1",
       "license": "Apache-2.0 OR LGPL-2.1-or-later"
-    },
-    {
-      "id": "org.checkerframework:checker-qual",
-      "version": "3.43.0",
-      "license": "MIT"
-    },
-    {
-      "id": "org.jetbrains.kotlin:kotlin-bom",
-      "version": "1.8.0",
-      "license": "Apache-2.0"
     },
     {
       "id": "org.jetbrains.kotlin:kotlin-stdlib",

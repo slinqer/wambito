@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/l10n/app_localizations.dart';
@@ -37,10 +38,11 @@ class FakeApprover implements ApproverPairing {
 }
 
 class FakeScanner implements QrScanner {
-  FakeScanner({this.available = true, this.text});
+  FakeScanner({this.available = true, this.text, this.error});
 
   final bool available;
   String? text;
+  final Object? error;
   int scans = 0;
 
   @override
@@ -49,6 +51,7 @@ class FakeScanner implements QrScanner {
   @override
   Future<String?> scan() async {
     scans += 1;
+    if (error != null) throw error!;
     return text;
   }
 }
@@ -163,6 +166,19 @@ void main() {
     expect(find.byKey(const Key('approve.code')), findsOneWidget);
     expect(find.text('We couldn\'t use the camera. Type the code instead.'), findsNothing);
   });
+
+  testWidgets(
+    'a scan that throws a PlatformException shows the camera message and keeps the field',
+    (tester) async {
+      final scanner = FakeScanner(error: PlatformException(code: 'failed'));
+      await open(tester, scanner);
+      await tester.tap(find.byKey(const Key('approve.scan')));
+      await tester.pumpAndSettle();
+      expect(find.text("We couldn't use the camera. Type the code instead."), findsOneWidget);
+      expect(find.byKey(const Key('approve.code')), findsOneWidget);
+      expect(finds, isEmpty);
+    },
+  );
 
   testWidgets('a typed code goes to findPairing(code:)', (tester) async {
     await open(tester, FakeScanner(available: false));

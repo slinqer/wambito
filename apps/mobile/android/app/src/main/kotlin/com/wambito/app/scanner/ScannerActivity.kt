@@ -3,9 +3,13 @@ package com.wambito.app.scanner
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
+import android.view.Surface
+import android.view.TextureView
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
@@ -14,9 +18,11 @@ import androidx.activity.ComponentActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraState
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,12 +43,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ScannerActivity : ComponentActivity() {
     private lateinit var analysisExecutor: ExecutorService
+    private var provider: ProcessCameraProvider? = null
+    private var analysis: ImageAnalysis? = null
     private val answered = AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         analysisExecutor = Executors.newSingleThreadExecutor()
-        val preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
+        val preview = TextureView(this)
         val density = resources.displayMetrics.density
         val hint = TextView(this).apply {
             text = getString(com.wambito.app.R.string.scanner_hint)
@@ -89,25 +97,77 @@ class ScannerActivity : ComponentActivity() {
         start(preview)
     }
 
-    private fun start(preview: PreviewView) {
+    private fun start(preview: TextureView) {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener(
             {
                 try {
-                    val provider = future.get()
-                    val view = Preview.Builder().build().also { it.surfaceProvider = preview.surfaceProvider }
-                    val analysis = ImageAnalysis.Builder()
+                    val cameras = future.get()
+                    provider = cameras
+                    val view = Preview.Builder().build().also {
+                        it.setSurfaceProvider(ContextCompat.getMainExecutor(this)) { request -> show(preview, request) }
+                    }
+                    val frames = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                         .also { it.setAnalyzer(analysisExecutor, ::analyze) }
-                    provider.unbindAll()
-                    provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, view, analysis)
+                    analysis = frames
+                    cameras.unbindAll()
+                    val camera: Camera =
+                        cameras.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, view, frames)
+                    // A camera that cannot open or stops (in use by another app, disabled by policy):
+                    // answered as failed, so Dart can say so and leave the typed code.
+                    camera.cameraInfo.cameraState.observe(this) { state ->
+                        if (state.error != null) answer(RESULT_FAILED, null)
+                    }
                 } catch (_: Exception) {
                     answer(RESULT_FAILED, null)
                 }
             },
             ContextCompat.getMainExecutor(this),
         )
+    }
+
+    /**
+     * CameraX's preview on [view], with no preview library: the surface comes from the texture, and the
+     * picture is turned upright ([SurfaceRequest.setTransformationInfoListener]) and scaled to fill
+     * the screen, cropping the overflow. The analysis does not depend on it.
+     */
+    private fun show(view: TextureView, request: SurfaceRequest) {
+        val size = request.resolution
+        val executor = ContextCompat.getMainExecutor(this)
+        fun provide(texture: SurfaceTexture) {
+            texture.setDefaultBufferSize(size.width, size.height)
+            val surface = Surface(texture)
+            request.provideSurface(surface, executor) { surface.release() }
+        }
+        request.setTransformationInfoListener(executor) { info ->
+            val width = view.width.toFloat()
+            val height = view.height.toFloat()
+            if (width == 0f || height == 0f) return@setTransformationInfoListener
+            val turned = info.rotationDegrees % 180 != 0
+            val shownWidth = if (turned) size.height else size.width
+            val shownHeight = if (turned) size.width else size.height
+            val matrix = Matrix()
+            // The texture fills the view stretched: undo that, turn it upright, then cover the view.
+            matrix.postScale(size.width / width, size.height / height, width / 2, height / 2)
+            matrix.postRotate(info.rotationDegrees.toFloat(), width / 2, height / 2)
+            val cover = maxOf(width / shownWidth, height / shownHeight)
+            matrix.postScale(cover, cover, width / 2, height / 2)
+            view.setTransform(matrix)
+        }
+        val ready = view.surfaceTexture
+        if (ready != null) {
+            provide(ready)
+        } else {
+            view.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) = provide(texture)
+                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
+                // CameraX releases the Surface it was given; the texture is let go with the view.
+                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture) = true
+                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+            }
+        }
     }
 
     /** One frame, on the analysis thread: its Y plane through ZXing. Always closes the frame. */
@@ -132,13 +192,17 @@ class ScannerActivity : ComponentActivity() {
     private fun answer(code: Int, text: String?) {
         if (!answered.compareAndSet(false, true)) return
         runOnUiThread {
+            // The camera stops with the answer, not when the activity is finally destroyed.
+            analysis?.clearAnalyzer()
+            provider?.unbindAll()
             setResult(code, text?.let { Intent().putExtra(EXTRA_TEXT, it) })
             finish()
         }
     }
 
     override fun onDestroy() {
-        // Anything still pending is closed with the activity; the camera is released by the lifecycle.
+        // The analyzer goes before its executor: no frame is handed to a thread that is gone.
+        analysis?.clearAnalyzer()
         analysisExecutor.shutdown()
         super.onDestroy()
     }

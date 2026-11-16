@@ -65,7 +65,15 @@ final class ScannerChannel: NSObject {
       }
     }
     scanner.modalPresentationStyle = .fullScreen
+    // A presentation already moving on this controller would be ignored, leaving the call open.
+    if top.isBeingPresented || top.isBeingDismissed {
+      return fail("failed", "Another screen is moving; try again")
+    }
     top.present(scanner, animated: true)
+    // UIKit refuses quietly (nothing presented): answer, so Dart is never left waiting.
+    if scanner.presentingViewController == nil {
+      fail("failed", "The camera screen could not be shown")
+    }
   }
 
   private func finish(_ text: String?) {

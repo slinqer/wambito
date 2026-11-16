@@ -86,7 +86,6 @@ String _normalizeOne(String name) {
   final lower = name.toLowerCase();
   if (lower.contains('apache') && lower.contains('2')) return 'Apache-2.0';
   if (lower == 'bsd-3-clause') return 'BSD-3-Clause';
-  if (lower == 'the mit license' || lower == 'mit license' || lower == 'mit') return 'MIT';
   if (lower == 'lgpl-2.1-or-later') return 'LGPL-2.1-or-later';
   throw UnknownLicense([name]);
 }
