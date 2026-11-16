@@ -306,5 +306,22 @@ void main() {
       expect(hashes.lookupHash, hasLength(32));
       expect(hashes.authHash, hasLength(32));
     });
+
+    test('verifierHashesOf zeroes the two HKDF outputs', () async {
+      final derived = <RecoveryVerifier>[];
+      keysRecoveryVerifier = (secret) async {
+        final verifier = await recoveryVerifier(secret);
+        derived.add(verifier);
+        return verifier;
+      };
+      addTearDown(() => keysRecoveryVerifier = recoveryVerifier);
+      final secret = Uint8List.fromList(List.generate(16, (i) => i + 1));
+      await verifierHashesOf(secret);
+      expect(derived, hasLength(1));
+      expect(zeroed(derived.single.lookup), isTrue);
+      expect(zeroed(derived.single.auth), isTrue);
+      // the caller owns the secret
+      expect(zeroed(secret), isFalse);
+    });
   });
 }

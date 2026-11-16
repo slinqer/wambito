@@ -140,6 +140,18 @@ class FakeKeys implements HttpClientAdapter {
   /// When set, `PUT /v2/recovery/verifier` answers 503 (and stores nothing).
   bool failVerifier = false;
 
+  /// Every `POST /v2/keys/rotate` body, kept before any check (refused ones too).
+  final List<Map<String, Object?>> posts = [];
+
+  /// The rotations the fake committed: their bodies.
+  final List<Map<String, Object?>> rotations = [];
+
+  /// Another device rotated first: the next rotate gets 409 `key_version_mismatch`.
+  bool rotatedElsewhere = false;
+
+  /// The next rotate commits, then its answer is lost: the network is down from then on.
+  bool loseNextAnswer = false;
+
   /// The next wrap PUT is kept, then its answer is lost (the network stays up).
   bool losePutAnswer = false;
 
@@ -212,6 +224,55 @@ class FakeKeys implements HttpClientAdapter {
       }
       verifier = (lookupHash: body['lookupHash']! as String, authHash: body['authHash']! as String);
       return ResponseBody.fromString('', 204);
+    }
+    if (path == '/api/v2/keys/rotate' && method == 'POST' && body != null) {
+      posts.add(body);
+      final keyV = body['keyV']! as int;
+      final current = wraps.isEmpty ? 0 : wraps.map((w) => w.keyV).reduce(max);
+      if (rotatedElsewhere || keyV != current + 1) {
+        return _json({'code': 'key_version_mismatch'}, 409);
+      }
+      final posted = [for (final w in body['wraps']! as List) (w as Map).cast<String, Object?>()];
+      if (posted.where((w) => w['kind'] == 'recovery').length != 1) {
+        return _json({'code': 'recovery_required'}, 422);
+      }
+      if (posted.any(
+        (w) => w['kind'] == 'device' && (w['publicKey'] == null || w['attestation'] == null),
+      )) {
+        return _json({'code': 'attestation_required'}, 422);
+      }
+      if (current > 0 && body['link'] == null) return _json({'code': 'link_required'}, 422);
+      final next = [
+        for (final w in posted)
+          FakeWrap(
+            id: w['id']! as String,
+            kind: w['kind']! as String,
+            ref: w['ref'] as String?,
+            keyV: w['keyV']! as int,
+            wrapped: w['wrapped']! as String,
+            publicKey: w['publicKey'] as String?,
+            attestation: w['attestation'] as String?,
+            label: w['label'] as String?,
+          ),
+      ];
+      expect(next.every((w) => w.keyV == keyV), isTrue);
+      rotations.add(body);
+      if (body['link'] != null) links[keyV] = body['link']! as String;
+      wraps
+        ..clear()
+        ..addAll(next);
+      if (loseNextAnswer) {
+        loseNextAnswer = false;
+        offline = true;
+        throw DioException.connectionError(requestOptions: options, reason: 'answer lost');
+      }
+      final sorted = links.keys.toList()..sort();
+      return _json({
+        'wraps': [for (final w in wraps) w.toJson()],
+        'links': [
+          for (final v in sorted) {'keyV': v, 'link': links[v]},
+        ],
+      });
     }
     final match = RegExp(r'^/api/v2/keys/([0-9a-f-]{36})$').firstMatch(path);
     if (match != null && method == 'DELETE') {

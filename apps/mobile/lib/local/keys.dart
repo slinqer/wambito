@@ -8,10 +8,11 @@ import 'ids.dart';
 import 'key_storage.dart';
 import 'keys_error.dart';
 import 'prf.dart';
-import 'rotate.dart';
+import 'recovery_verifier.dart';
 
 export 'key_storage.dart';
 export 'keys_error.dart';
+export 'recovery_verifier.dart';
 
 /// Keys on the phone: the twin of apps/web/app/local/keys.ts (specs 2026-11-08 sections 4.1, 5.2,
 /// 7.1, 7.2, 7.4, 7.5; 2026-11-10 key links; 2026-11-12 section 3). The phone keeps the raw data
@@ -205,6 +206,18 @@ Future<({List<WrapDto> wraps, Map<int, Uint8List> links})> listKeys(KeysApi call
 }
 
 Future<List<WrapDto>> listWraps(KeysApi call) async => (await listKeys(call)).wraps;
+
+/// `PUT /v2/recovery/verifier {lookupHash, authHash}` (base64url, as `recovery.ts` reads them):
+/// replaces the account's verifier (D16; the hashes come from [verifierHashesOf]). The server needs
+/// the account's recovery wrap first (409 `recovery_required`) and refuses a lookup another account
+/// holds (409 `verifier_taken`); both are `server` here, and no network is `offline`.
+Future<void> putRecoveryVerifier(KeysOptions options, VerifierHashes hashes) async {
+  await api(options)(
+    '/v2/recovery/verifier',
+    method: 'PUT',
+    data: {'lookupHash': toBase64Url(hashes.lookupHash), 'authHash': toBase64Url(hashes.authHash)},
+  );
+}
 
 /// Zeroes every data key in the map.
 void _zeroKeys(Map<int, Uint8List> keys) {

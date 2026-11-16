@@ -84,6 +84,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
   `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault).
+  `rotate.dart` = `rotate.ts` (`rotateKeys`: removing a device rotates the data key; this phone never removes
+  itself and its own wrap is always posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
+  a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`), on `keys.dart` only;
+  `recovery_verifier.dart` holds the verifier hashes (pure crypto) and `keys.dart` `putRecoveryVerifier` sends them.
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
   Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/prf.dart';
-import 'package:wambito/local/rotate.dart';
 
 import 'fake_keys.dart';
 
