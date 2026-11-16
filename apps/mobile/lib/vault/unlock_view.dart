@@ -154,6 +154,7 @@ class _UnlockViewState extends State<UnlockView> {
                 invalid: _error != null,
                 readOnly: _busy,
                 autofocus: true,
+                enableIMEPersonalizedLearning: false,
                 textInputAction: TextInputAction.done,
                 onChanged: (_) {
                   if (_error != null) setState(() => _error = null);

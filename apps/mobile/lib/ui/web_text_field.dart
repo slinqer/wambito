@@ -30,6 +30,7 @@ class WebTextField extends StatefulWidget {
     this.maxLines = 1,
     this.inputMinHeight = 36,
     this.enableSuggestions = false,
+    this.enableIMEPersonalizedLearning = true,
     this.leading,
     this.onSubmitted,
     this.onChanged,
@@ -60,6 +61,9 @@ class WebTextField extends StatefulWidget {
   /// Whether the keyboard's suggestion strip shows. Off for a code or an address; on for a sentence
   /// the person types. Autocorrect stays off either way: it must never rewrite an amount.
   final bool enableSuggestions;
+
+  /// Whether the keyboard may learn from what is typed. Off for a secret (a recovery key).
+  final bool enableIMEPersonalizedLearning;
 
   /// Something before the text inside the box (the search field's 🔍), 8px from it.
   final Widget? leading;
@@ -164,6 +168,7 @@ class _WebTextFieldState extends State<WebTextField> {
                     autofillHints: widget.autofillHints,
                     autocorrect: false,
                     enableSuggestions: widget.enableSuggestions,
+                    enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
                     onSubmitted: widget.onSubmitted,
                     onChanged: widget.onChanged,
                   ),

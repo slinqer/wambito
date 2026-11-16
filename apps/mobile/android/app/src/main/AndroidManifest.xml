@@ -15,9 +15,9 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- The screen lock before a sensitive operation (lib/security/screen_lock.dart, local_auth) needs
          USE_BIOMETRIC, which local_auth_android's own manifest brings and merges in (scripts/check-permissions.sh
-         requires it). USE_FINGERPRINT is the pre-Android 9 fingerprint API, still removed by decision:
-         on Android 8 the prompt falls back to the PIN. -->
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove"/>
+         requires it). On Android 8 and 9 (API 26-28) androidx.biometric asks the platform's FingerprintManager,
+         which needs USE_FINGERPRINT (ruling R16): kept for those versions only, so newer phones never see it. -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" android:maxSdkVersion="28" tools:replace="android:maxSdkVersion"/>
     <!-- The widget's refresh job (widget/RefreshWorker.kt) runs on WorkManager, which asks for
          these two. Normal permissions, granted at install: nothing is asked of the person.
          ACCESS_NETWORK_STATE lets the job wait for a network; RECEIVE_BOOT_COMPLETED lets

@@ -123,6 +123,19 @@ void main() {
     },
   );
 
+  test(
+    'release permissions: USE_FINGERPRINT (API 28 and below, for the lock prompt) passes',
+    () async {
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$_vibrate"
+        "uses-permission-sdk-23: name='android.permission.USE_FINGERPRINT'\n"
+        "uses-permission: name='android.permission.USE_FINGERPRINT' maxSdkVersion='28'\n$_receiver",
+      );
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    },
+  );
+
   for (final unwanted in ['WAKE_LOCK', 'FOREGROUND_SERVICE']) {
     test("release permissions: WorkManager's $unwanted stays out", () async {
       final result = await _check(

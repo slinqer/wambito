@@ -1,6 +1,7 @@
 // The screen lock before a sensitive operation (spec section 7.7, D15/D18): the phone's own lock when
 // it has one, else the current recovery key.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
@@ -127,6 +128,12 @@ void main() {
     expect(find.textContaining('not in the right format'), findsOneWidget);
   });
 
+  testWidgets('no lock: the key field does not feed keyboard learning', (t) async {
+    await _open(t, LockCheck.noLock);
+    final editable = t.widget<EditableText>(find.byType(EditableText));
+    expect(editable.enableIMEPersonalizedLearning, isFalse);
+  });
+
   testWidgets('no lock: closing the sheet returns false', (t) async {
     final (_, result, _) = await _open(t, LockCheck.noLock);
     await t.tap(find.text('CANCEL'));
@@ -166,6 +173,14 @@ void main() {
         await lock(error: LocalAuthExceptionCode.noCredentialsSet).confirm('why'),
         LockCheck.noLock,
       );
+    });
+
+    test('any other error is cancelled, never thrown', () async {
+      final broken = LocalAuthScreenLock(
+        isSupported: () async => throw PlatformException(code: 'boom'),
+        authenticate: (_) async => true,
+      );
+      expect(await broken.confirm('why'), LockCheck.cancelled);
     });
 
     test('a refusal or a cancel is cancelled', () async {

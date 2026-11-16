@@ -1,5 +1,6 @@
 // The screen lock before a sensitive operation (spec section 7.7, D15, D18): removing a device,
-// making a new recovery key, approving a device. The phone's own lock (biometrics or the PIN, through
+// making a new recovery key and showing it. (Approving a device is not one of them; Task 16 does not
+// use this for it.) The phone's own lock (biometrics or the PIN, through
 // `local_auth`) stands in for the web's passkey touch; a phone with no lock asks the current
 // recovery key instead.
 import 'dart:async';
@@ -60,6 +61,9 @@ class LocalAuthScreenLock implements ScreenLock {
       return error.code == LocalAuthExceptionCode.noCredentialsSet
           ? LockCheck.noLock
           : LockCheck.cancelled;
+    } on Object {
+      // A platform failure (a PlatformException from the support check): never escapes to the caller.
+      return LockCheck.cancelled;
     }
   }
 }
@@ -167,6 +171,7 @@ class _RecoveryKeyBodyState extends State<_RecoveryKeyBody> {
             invalid: _error != null,
             readOnly: _busy,
             autofocus: true,
+            enableIMEPersonalizedLearning: false,
             textInputAction: TextInputAction.done,
             onChanged: (_) {
               if (_error != null) setState(() => _error = null);

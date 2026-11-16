@@ -48,8 +48,10 @@ ALLOWED=(
   "android.permission.CAMERA"
   # The screen lock before a sensitive operation (lib/security/screen_lock.dart, local_auth, spec
   # section 7.7): androidx.biometric's prompt, fingerprint or face, or the PIN. A normal permission.
-  # USE_FINGERPRINT (the old API) stays out: the manifest removes it.
+  # USE_FINGERPRINT (the pre-Android 10 fingerprint API) is declared for API 28 and below only
+  # (maxSdkVersion 28): androidx.biometric uses it on Android 8 and 9.
   "android.permission.USE_BIOMETRIC"
+  "android.permission.USE_FINGERPRINT"
   # androidx.core's own signature permission for receivers registered as not exported.
   "${PACKAGE}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 )
