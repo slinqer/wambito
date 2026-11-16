@@ -6,9 +6,8 @@ import {
   type RecordBodies,
   todayIn,
 } from "@wambito/core";
-import { createLocalBackend, DEMO_UNAVAILABLE } from "../local/backend.ts";
-import { createMemoryStore } from "../local/memory-store.ts";
-import type { FinanceStore } from "../local/store.ts";
+import type { FinanceStore } from "@wambito/vault";
+import { createLocalBackend, createMemoryStore, DEMO_UNAVAILABLE } from "@wambito/vault";
 import type { DemoSeed } from "./demo-data.ts";
 
 /**

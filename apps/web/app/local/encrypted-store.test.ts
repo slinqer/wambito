@@ -6,11 +6,11 @@ import {
   openRecord,
   sealRecord,
 } from "@wambito/crypto";
+import type { RecordBodies } from "@wambito/vault";
+import { storeContract } from "@wambito/vault/contract";
 import { describe, expect, it, vi } from "vitest";
 import { deleteVault, vaultName } from "./db.ts";
 import { createEncryptedStore, VaultClosedError } from "./encrypted-store.ts";
-import type { RecordBodies } from "./store.ts";
-import { storeContract } from "./store-contract.ts";
 
 let counter = 0;
 const fresh = () => createEncryptedStore(`user-${++counter}`);

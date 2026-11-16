@@ -13,9 +13,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
 - `app/routes/*` thin route modules; `app/features/<feature>/` screens, models, stories;
   `app/ui/` shared components; `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
   the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/` (the seed over a memory store);
-  `app/local/` the local backend: `FinanceStore` (`store.ts`, contract tests in `store-contract.ts`),
-  `memory-store.ts`, `backend.ts` (`createLocalBackend`: the `/v1` routes over a store, one store
-  transaction per request), `ids.ts` (UUID v7 and v5), `db.ts` (promise wrapper over IndexedDB:
+  `app/local/` the browser side of the vault; the store contract (`FinanceStore`), the memory
+  store, the local backend (`createLocalBackend`: the `/v1` routes over a store, one store
+  transaction per request) and the ids (UUID v7 and v5) live in `packages/vault`
+  (`@wambito/vault`, contract tests from `@wambito/vault/contract`); `db.ts` (promise wrapper over IndexedDB:
   database `wambito-vault-<userId>`, one store per record type plus `outbox`, `meta`,
   `quarantine`, `keys`; `deleteVault`), `encrypted-store.ts` (`createEncryptedStore(userId)`: a
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB

@@ -18,10 +18,10 @@ import {
   unwrapDataKey,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
 import { deleteVault } from "./db.ts";
 import { deviceLabel } from "./device-label.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
 
 /**
  * Keys on the web (spec 2026-11-08 sections 4.1, 5.2, 7.1, 7.2, 7.4, 7.5). This browser keeps only

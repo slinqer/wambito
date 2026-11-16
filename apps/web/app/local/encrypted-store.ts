@@ -1,5 +1,12 @@
 import type { RecordBodies, RecordType } from "@wambito/core";
 import { RECORD_TYPES } from "@wambito/core";
+import type {
+  FinanceStore,
+  ReadOptions,
+  StoredRecord,
+  StoreOps,
+  WriteOptions,
+} from "@wambito/vault";
 import {
   committed,
   DATA_STORES,
@@ -14,7 +21,6 @@ import {
   request,
   type StoredRow,
 } from "./db.ts";
-import type { FinanceStore, ReadOptions, StoredRecord, StoreOps, WriteOptions } from "./store.ts";
 
 /** What the sync engine reads about a record: the plaintext and its envelope. */
 export interface RawRecord<T extends RecordType = RecordType> {

@@ -1,8 +1,7 @@
 import { SUGGESTED_CATEGORIES } from "@wambito/core";
+import { createLocalBackend, type UnavailableRoute, uuidv5 } from "@wambito/vault";
 import { isLocale, type Locale } from "../i18n/format.ts";
-import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv5 } from "./ids.ts";
 import { forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
 import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 

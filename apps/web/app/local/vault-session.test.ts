@@ -11,9 +11,9 @@ import {
   unwrapDataKey,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv5 } from "@wambito/vault";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv5 } from "./ids.ts";
 import { type LocalKeys, loadLocalKeys, prepareAccount, unlockWithRecovery } from "./keys.ts";
 import {
   forgetVault,

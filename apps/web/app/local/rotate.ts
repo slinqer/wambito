@@ -16,8 +16,8 @@ import {
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
 import { createEncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
 import {
   api,
   dedupeKeyName,

@@ -8,10 +8,10 @@ import {
   sealRecord,
   toBase64Url,
 } from "@wambito/crypto";
+import type { RecordBodies } from "@wambito/vault";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { type Keyring, KeysError } from "./keys.ts";
-import type { RecordBodies } from "./store.ts";
 import { createSyncEngine } from "./sync.ts";
 
 const USER = "user_sync";

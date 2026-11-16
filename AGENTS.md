@@ -15,6 +15,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 | `packages/ai-assistant-tools` | MCP tools, prompts, instructions | `packages/ai-assistant-tools/AGENTS.md` |
 | `packages/core` | shared domain: money, dates, budgets, quick-capture cases | `packages/core/AGENTS.md` |
 | `packages/crypto` | end-to-end encryption: data key, record sealing, dedupe tags | `packages/crypto/AGENTS.md` |
+| `packages/vault` | browser-free vault: store contract, memory store, local `/v1` backend, ids | `packages/vault/AGENTS.md` |
 | `packages/db` | Drizzle schema, migrations, RLS | `packages/db/AGENTS.md` |
 | `packages/importers` | CSV importers | `packages/importers/AGENTS.md` |
 | `deploy/personal` | the VPS / home install: compose, Caddy, backups, auto-deploy | `deploy/personal/AGENTS.md` |
