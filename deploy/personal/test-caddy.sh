@@ -149,14 +149,22 @@ log_line_of() {
   grep -F -- "\"uri\":\"$1\"" "$tmp/web.log" | tail -n 1
 }
 
-# check_log_visitor NAME URI IP: the log line of the request for URI names IP as the visitor.
-check_log_visitor() {
-  local line
-  line="$(log_line_of "$2")"
+# check_log_no_ip NAME URI IP...: the log line of the request for URI holds none of the IPs, and
+# no address field at all (no IP is stored anywhere, logs included: spec 2026-11-15 section 9).
+check_log_no_ip() {
+  local name="$1" uri="$2" line ip
+  shift 2
+  line="$(log_line_of "$uri")"
+  if [ -z "$line" ]; then
+    fail "$name (no log line for $uri)"
+    return
+  fi
+  for ip in "$@"; do
+    case "$line" in *"$ip"*) fail "$name ($ip in: $line)"; return ;; esac
+  done
   case "$line" in
-    *"\"visitor_ip\":\"$3\""*) ok "$1" ;;
-    "") fail "$1 (no log line for $2)" ;;
-    *) fail "$1 (expected \"visitor_ip\":\"$3\" in: $line)" ;;
+    *'"remote_ip"'* | *'"client_ip"'* | *'"visitor_ip"'* | *'"remote_port"'*) fail "$name (an address field in: $line)" ;;
+    *) ok "$name" ;;
   esac
 }
 
@@ -190,16 +198,15 @@ cases_tunnel() {
     check "tunnel: $path redirect" "302 $LANDING_URL$path" \
       "$(curl_web -o /dev/null -w '%{http_code} %{redirect_url}' "http://web:80$path")"
   done
-  if web_log_has '"visitor_ip":"203.0.113.7"'; then
-    ok "tunnel: log has the visitor"
-  else
-    fail "tunnel: log has the visitor (no \"visitor_ip\":\"203.0.113.7\" in docker logs)"
-  fi
-  # Without Cloudflare the visitor in the log is the peer too. (This pins the behavior, not the
-  # @notViaCloudflare line: Caddy itself starts every request with client_ip set to the peer, since
-  # no trusted_proxies is configured, so the log would say the same without that line.)
+  # The access log keeps when, what path and what status, never who: no address of the visitor,
+  # the peer or a forwarded one.
+  curl_web -o /dev/null -H 'Cf-Connecting-Ip: 203.0.113.7' -H 'X-Forwarded-For: 198.51.100.9' \
+    http://web:80/api/log-cloudflare
+  check_log_no_ip "tunnel: the log has no IP (via Cloudflare)" /api/log-cloudflare \
+    203.0.113.7 198.51.100.9 "$CLIENT_IP"
   curl_web -o /dev/null -H 'X-Forwarded-For: 198.51.100.9' http://web:80/api/log-no-cloudflare
-  check_log_visitor "tunnel: without Cloudflare, the log has the peer" /api/log-no-cloudflare "$CLIENT_IP"
+  check_log_no_ip "tunnel: the log has no IP (without Cloudflare)" /api/log-no-cloudflare \
+    198.51.100.9 "$CLIENT_IP"
 }
 
 # --- direct: Caddyfile.direct, on a server with its own public address. -------------------------
@@ -295,11 +302,11 @@ cases_direct() {
   nothing "direct: other hosts get nothing (HTTPS for other.example)" other.example -k \
     --resolve "other.example:443:$WEB_IP" "https://other.example/sign-in"
 
-  # Last, so every request above has been logged: the peer, never the spoofed address. Requests
+  # Last, so every request above has been logged: no address at all, peer or spoofed. Requests
   # naming another host are not logged at all (Caddy's default access log would keep their headers
   # and query strings, where sign-in codes travel); the app's host keeps its minimal log.
   curl_app -o /dev/null -H 'Cf-Connecting-Ip: 203.0.113.7' -H 'X-Forwarded-For: 198.51.100.9' "$app/api/log-direct"
-  check_log_visitor "direct: log has the peer" /api/log-direct "$CLIENT_IP"
+  check_log_no_ip "direct: the log has no IP" /api/log-direct "$CLIENT_IP" 203.0.113.7 198.51.100.9
   if grep -qF 203.0.113.7 "$tmp/web.log"; then
     fail "direct: log never has the spoofed address ($(grep -F 203.0.113.7 "$tmp/web.log" | head -n 1))"
   else
@@ -323,7 +330,7 @@ cases_direct() {
   fi
   # And the local listener keeps its log too.
   curl_web -o /dev/null http://web:8080/api/log-local
-  check_log_visitor "direct: local listener logged" /api/log-local "$CLIENT_IP"
+  check_log_no_ip "direct: local listener logged, without IP" /api/log-local "$CLIENT_IP"
 }
 
 for s in $run_sets; do "cases_$s"; done

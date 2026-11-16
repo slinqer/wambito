@@ -3,20 +3,25 @@
 # {vars.client_ip}: every site that imports this file must set client_ip first.
 encode zstd gzip
 
-# A minimal access log on stdout (docker compose logs web): when, who (the visitor's address,
-# client_ip), what path, what status. Query strings are cut, so a sign-in code in a link never
-# lands in a log, and no request or response headers are kept (cookies, tokens).
+# A minimal access log on stdout (docker compose logs web): when, what path, what status. Never
+# who: no address is stored anywhere, logs included (spec 2026-11-15 phone-first accounts, section
+# 9), so Caddy's own remote_ip, remote_port and client_ip go too. The address still reaches the API
+# and the MCP in X-Forwarded-For below, for rate limits kept in memory only. Query strings are cut,
+# so a sign-in code in a link never lands in a log, and no request or response headers are kept
+# (cookies, tokens).
 log {
 	output stdout
 	format filter {
 		wrap json
 		request>uri regexp \?.* ""
+		request>remote_ip delete
+		request>remote_port delete
+		request>client_ip delete
 		request>headers delete
 		request>tls delete
 		resp_headers delete
 	}
 }
-log_append visitor_ip {vars.client_ip}
 
 # Same set as apps/web/public/_headers (which Cloudflare Pages reads and Caddy cannot), plus
 # noindex: this is one person's install, not the public site.

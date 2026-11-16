@@ -162,7 +162,7 @@ direct way's settings apply too):
 ```sh
 docker compose ps                  # what is running
 docker compose logs -f api         # follow the API (also: web, mcp, cloudflared, postgres)
-docker compose logs web | tail     # access log: time, visitor address, path (no query string), status
+docker compose logs web | tail     # access log: time, path (no query string), status; never an address
 docker compose restart api
 docker compose stop                # stop everything, keep everything
 ./up.sh --skip-web                 # start it again
@@ -516,12 +516,14 @@ registers a passkey again after signing in.
      `docker compose logs -f web` until it says the certificate was obtained.
    - `./smoke.sh` on the server, then from outside: `https://app.wambito.com/sign-in` answers with
      `Strict-Transport-Security`, and `http://` redirects to it. Check that the API sees real client
-     addresses over IPv4 (`curl -4` from another network, then `docker compose logs web | tail`):
-     `visitor_ip` must be the address you came from, not a Docker address (172.x). Fix that
-     before the phones move: sign-in limits count by that address. (See
+     addresses over IPv4: from another network, ask `curl -4` for six sign-in codes for one test
+     email; the sixth is 429, and a request from a second network right after is not (the limit
+     counts per address; a shared Docker address, 172.x, would refuse both). The access log keeps
+     no address, so this is the check. Fix it before the phones move: sign-in limits count by that
+     address. (See
      [How the client address gets to the API](#how-the-client-address-gets-to-the-api).)
    - The rest of the outside checks: a request with a made-up `Cf-Connecting-Ip` or
-     `X-Forwarded-For` is logged under your real address, not the made-up one; the certificate's
+     `X-Forwarded-For` is counted under your real address, not the made-up one (the same check); the certificate's
      issuer is Let's Encrypt (`openssl s_client -connect app.wambito.com:443 -servername app.wambito.com </dev/null 2>/dev/null | openssl x509 -noout -issuer`);
      and a port scan from outside shows only 22, 80 and 443.
    - Until the landing is deployed at `wambito.com`, `/` on the server redirects to an empty site.
@@ -773,7 +775,7 @@ the old tunnel, if one exists (`cloudflared tunnel delete lukitas-personal`).
 
 Sign-in limits (5 codes per 10 minutes per address) count by client address. Caddy writes it as
 the only `X-Forwarded-For` entry to the API and the MCP, replacing anything the client sent, and
-logs it as `visitor_ip`. The API cannot see the TCP peer, so it relies on that: only Caddy can reach
+never logs it: no address is stored, logs included. The API cannot see the TCP peer, so it relies on that: only Caddy can reach
 it, and Caddy always overwrites the header. `TRUSTED_PROXIES=<NETWORK_PREFIX>.10` (Caddy's fixed address, `172.28.77.10` by default)
 is the matching setting, but the guarantee is the network layout. Publishing the API's port or
 adding another proxy would make the header spoofable. See `docs/deploy/api.md`.
