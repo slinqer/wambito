@@ -140,7 +140,14 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   delete the account), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
   groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
   a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
-  stops polling); Checking, Opening and Committing show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  stops polling); Checking, Opening and Committing show a loading line. The other side of a pairing is
+  `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
+  "Approve a new device" as `vaultPairLead` tells the new phone; Task 16 adds its Settings → Security entry): type the
+  code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
+  `scan` → the first `wambito://pair?` QR, or null for a close or a refused permission), then the number, then
+  "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
+  failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
+  `scan`. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
   gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
   while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
@@ -187,6 +194,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 - `MainActivity.kt`: takes the launch link. Channels:
   `wambito/*`, registered in `MainActivity.kt`; names match the Dart constants (rename both at once).
+- `scanner/`: `wambito/scanner` (`isAvailable`, `scan`): `ScannerChannel` asks the `CAMERA` permission at scan time
+  only (a refusal answers null) and starts `ScannerActivity` (not exported): CameraX `Preview` + `ImageAnalysis`
+  (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first `wambito://pair?` text
+  goes back. CameraX 1.6.2 and ZXing core 3.5.4 are pinned exactly; never `camera-mlkit-vision`, ML Kit or
+  `mobile_scanner` (`check-no-google.sh`). Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
   local notices only. A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)
@@ -242,12 +254,14 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
+    `Scanner/`: `wambito/scanner` (`isAvailable`, `scan`: `AVCaptureMetadataOutput` for `.qr`, full screen;
+    `CameraAccess.state` in WambitoNative maps the permission; `NSCameraUsageDescription` in `InfoPlist.strings`);
     `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
     AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `scheduleDueList`, `cancelDue`,
     `scheduleGuest`, `cancelGuest`, `permission`, `requestPermission`), local notices only
     (`UNUserNotificationCenter`; `KeychainSession` reads the session `flutter_secure_storage` keeps).
   - Words of the notices: `{es,en,it,pt}.lproj/Notices.strings`, generated from the Android
-    `strings.xml` by `dart run scripts/gen-ios-strings.dart` (CI fails when stale), so both phones say
+    `strings.xml` by `dart run scripts/gen-ios-strings.dart` (CI fails when stale; the scanner's two words too), so both phones say
     the same words. `InfoPlist.strings` are the permission texts. `PrivacyInfo.xcprivacy` and
     `Runner.entitlements` (Associated Domains for passkeys and links) live beside them.
   - Adding a channel: a Swift file per area under `ios/Runner/`, one `private var` and one line in

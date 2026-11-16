@@ -44,4 +44,8 @@
     <string name="capture_change">Change</string>
     <string name="capture_channel">Detected transactions</string>
     <string name="capture_channel_description">One notice for each expense or income Wambito detects in your bank apps.</string>
+    <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt, ScannerViewController.swift on iOS):
+         the words of the web's approve-a-device scan. -->
+    <string name="scanner_hint">Point the camera at the QR on the new device.</string>
+    <string name="scanner_close">Turn off the camera</string>
 </resources>

@@ -80,6 +80,9 @@ void main() {
             isNot(contains('Apache License')),
             reason: '${library.id} is BSD, not Apache',
           );
+        } else if (library.license == 'MIT') {
+          expect(text, contains('MIT License'), reason: library.id);
+          expect(text, isNot(contains('Apache License')), reason: '${library.id} is MIT');
         } else {
           expect(text, contains('Apache License'), reason: library.id);
         }
@@ -96,6 +99,31 @@ void main() {
         );
         expect(entry.packages, hasLength(1));
         expect(_text(entry), contains('BSD'));
+      },
+    );
+
+    test(
+      "the Checker Framework's MIT annotations (Guava's, with CameraX) have their published text",
+      () async {
+        final entry = (await _extras()).singleWhere(
+          (e) => e.packages.any((p) => p.startsWith('org.checkerframework:checker-qual ')),
+        );
+        expect(entry.packages, hasLength(1));
+        expect(_text(entry), contains('MIT License'));
+        expect(_text(entry), contains('Checker Framework'));
+      },
+    );
+
+    test(
+      'CameraX and ZXing core, which scan the QR, are listed with the Apache libraries',
+      () async {
+        final entry = (await _extras(
+          'en',
+        )).singleWhere((e) => e.packages.any((p) => p.startsWith('androidx.camera:camera-core ')));
+        expect(_text(entry), contains('Version 2.0, January 2004'));
+        for (final id in ['androidx.camera:camera-camera2', 'com.google.zxing:core']) {
+          expect(entry.packages.any((p) => p.startsWith('$id ')), isTrue, reason: id);
+        }
       },
     );
 
@@ -410,6 +438,7 @@ void main() {
           'boost-1.0.txt',
           'eigen-mpl-2.0.txt',
           'kissfft-bsd-3-clause.txt',
+          'checker-qual-mit.txt',
         ]),
       );
       final shown = [for (final e in await _extras()) _text(e)].join('\n');

@@ -4013,6 +4013,118 @@
   "@vaultPairBack": {
     "description": "Pairing: goes back to where the person came from."
   },
+  "vaultApproveTitle": "Aprobar un dispositivo nuevo",
+  "@vaultApproveTitle": {
+    "description": "Approve a device: the screen title (Settings \u2192 Security)."
+  },
+  "vaultApproveLead": "En el dispositivo nuevo, elige «Desde otro dispositivo». Luego escribe el código que muestra, o escanea su QR.",
+  "@vaultApproveLead": {
+    "description": "Approve a device: what to do first."
+  },
+  "vaultApproveCodeLabel": "Código del dispositivo nuevo",
+  "@vaultApproveCodeLabel": {
+    "description": "Approve a device: the code field label."
+  },
+  "vaultApprovePlaceholder": "XXXX XXXX",
+  "@vaultApprovePlaceholder": {
+    "description": "Approve a device: the code field placeholder."
+  },
+  "vaultApproveSubmit": "Continuar",
+  "@vaultApproveSubmit": {
+    "description": "Approve a device: looks the code up."
+  },
+  "vaultApproveFinding": "Buscando…",
+  "@vaultApproveFinding": {
+    "description": "Approve a device: while the code is looked up."
+  },
+  "vaultApproveScan": "Escanear el QR",
+  "@vaultApproveScan": {
+    "description": "Approve a device: opens the camera to scan the QR."
+  },
+  "vaultApproveCameraFailed": "No pudimos usar la cámara. Escribe el código.",
+  "@vaultApproveCameraFailed": {
+    "description": "Approve a device: the camera could not be used."
+  },
+  "vaultApproveErrorBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el dispositivo nuevo.",
+  "@vaultApproveErrorBadCode": {
+    "description": "Approve a device: the code matches no request."
+  },
+  "vaultApproveWaiting": "Esperando al dispositivo nuevo…",
+  "@vaultApproveWaiting": {
+    "description": "Approve a device: waiting for the number."
+  },
+  "vaultApproveNumberTitle": "Comprueba que las dos pantallas muestran el mismo número",
+  "@vaultApproveNumberTitle": {
+    "description": "Approve a device: the number to compare."
+  },
+  "vaultApproveNumberLead": "Aprueba solo si el número del dispositivo nuevo es exactamente este.",
+  "@vaultApproveNumberLead": {
+    "description": "Approve a device: when to approve."
+  },
+  "vaultApproveMatch": "Coinciden",
+  "@vaultApproveMatch": {
+    "description": "Approve a device: the numbers match, approves."
+  },
+  "vaultApproveApproving": "Aprobando…",
+  "@vaultApproveApproving": {
+    "description": "Approve a device: while approving."
+  },
+  "vaultApproveNoMatch": "No coinciden",
+  "@vaultApproveNoMatch": {
+    "description": "Approve a device: the numbers differ, shares nothing."
+  },
+  "vaultApproveMismatchTitle": "No se compartió nada",
+  "@vaultApproveMismatchTitle": {
+    "description": "Approve a device: nothing was shared (title)."
+  },
+  "vaultApproveMismatchLead": "El dispositivo nuevo no recibió nada. Si querías añadirlo, empieza de nuevo en él.",
+  "@vaultApproveMismatchLead": {
+    "description": "Approve a device: nothing was shared."
+  },
+  "vaultApproveDoneTitle": "Listo",
+  "@vaultApproveDoneTitle": {
+    "description": "Approve a device: done (title)."
+  },
+  "vaultApproveDoneLead": "El dispositivo nuevo ya puede abrir tus datos.",
+  "@vaultApproveDoneLead": {
+    "description": "Approve a device: done."
+  },
+  "vaultApproveExpiredTitle": "La solicitud caducó",
+  "@vaultApproveExpiredTitle": {
+    "description": "Approve a device: the request expired (title)."
+  },
+  "vaultApproveExpiredLead": "Empieza de nuevo en el dispositivo nuevo y escribe el código nuevo.",
+  "@vaultApproveExpiredLead": {
+    "description": "Approve a device: what to do after it expired."
+  },
+  "vaultApproveFailedTitle": "No se pudo aprobar",
+  "@vaultApproveFailedTitle": {
+    "description": "Approve a device: it failed (title)."
+  },
+  "vaultApproveTampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+  "@vaultApproveTampered": {
+    "description": "Approve a device: the server relayed something that does not match."
+  },
+  "vaultApproveOffline": "No hay conexión. Inténtalo cuando vuelvas a tenerla.",
+  "@vaultApproveOffline": {
+    "description": "Approve a device: no connection."
+  },
+  "vaultApproveServer": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+  "@vaultApproveServer": {
+    "description": "Approve a device: the server failed."
+  },
+  "vaultApproveRestart": "Empezar de nuevo",
+  "@vaultApproveRestart": {
+    "description": "Approve a device: type another code."
+  },
+  "vaultApproveCancel": "Cancelar",
+  "@vaultApproveCancel": {
+    "description": "Approve a device: leaves the screen."
+  },
+  "vaultApproveClose": "Cerrar",
+  "@vaultApproveClose": {
+    "description": "Approve a device: closes the result."
+  },
   "vaultLockedTitle": "No pudimos abrir tus datos",
   "@vaultLockedTitle": {
     "description": "Locked: the title when the vault could not open."

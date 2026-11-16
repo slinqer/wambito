@@ -27,6 +27,8 @@
 		A1B2C3D4E5F6071800000005 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071800000004 /* InfoPlist.strings */; };
 		B7C8D9E0F1A2B3C400000041 /* LaunchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000040 /* LaunchChannel.swift */; };
 		B7C8D9E0F1A2B3C400000071 /* PasskeyChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000070 /* PasskeyChannel.swift */; };
+		B7C8D9E0F1A2B3C400000101 /* ScannerChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000100 /* ScannerChannel.swift */; };
+		B7C8D9E0F1A2B3C400000103 /* ScannerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000102 /* ScannerViewController.swift */; };
 		B7C8D9E0F1A2B3C400000081 /* NoticesChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000080 /* NoticesChannel.swift */; };
 		B7C8D9E0F1A2B3C400000083 /* NoticePoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C400000082 /* NoticePoster.swift */; };
 		B7C8D9E0F1A2B3C4000000A1 /* DueTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000A0 /* DueTask.swift */; };
@@ -90,6 +92,8 @@
 		A1B2C3D4E5F6071800000013 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000040 /* LaunchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchChannel.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000070 /* PasskeyChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyChannel.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C400000100 /* ScannerChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerChannel.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C400000102 /* ScannerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerViewController.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000080 /* NoticesChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesChannel.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C400000082 /* NoticePoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticePoster.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000000A0 /* DueTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DueTask.swift; sourceTree = "<group>"; };
@@ -149,6 +153,15 @@
 				B7C8D9E0F1A2B3C400000020 /* HapticsChannel.swift */,
 			);
 			path = Haptics;
+			sourceTree = "<group>";
+		};
+		B7C8D9E0F1A2B3C400000104 /* Scanner */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C400000100 /* ScannerChannel.swift */,
+				B7C8D9E0F1A2B3C400000102 /* ScannerViewController.swift */,
+			);
+			path = Scanner;
 			sourceTree = "<group>";
 		};
 		B7C8D9E0F1A2B3C400000072 /* Passkeys */ = {
@@ -242,6 +255,7 @@
 				B7C8D9E0F1A2B3C400000084 /* Notices */,
 				B7C8D9E0F1A2B3C4000000B2 /* Background */,
 				B7C8D9E0F1A2B3C400000072 /* Passkeys */,
+				B7C8D9E0F1A2B3C400000104 /* Scanner */,
 				B7C8D9E0F1A2B3C400000022 /* Haptics */,
 				B7C8D9E0F1A2B3C400000032 /* Sounds */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
@@ -418,6 +432,8 @@
 				B7C8D9E0F1A2B3C400000041 /* LaunchChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000061 /* FilesChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000071 /* PasskeyChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C400000101 /* ScannerChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C400000103 /* ScannerViewController.swift in Sources */,
 				B7C8D9E0F1A2B3C400000081 /* NoticesChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000C3 /* HeadlessRunner.swift in Sources */,

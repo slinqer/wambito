@@ -1,1 +1,2 @@
+"NSCameraUsageDescription" = "O Wambito usa a câmera apenas enquanto você lê o QR de um dispositivo novo para aprová-lo. Nada do que a câmera vê é guardado nem sai do telefone.";
 "NSMicrophoneUsageDescription" = "O Wambito usa o microfone apenas enquanto você mantém o botão pressionado, para entender o que você diz no telefone. O áudio nunca sai do telefone.";
