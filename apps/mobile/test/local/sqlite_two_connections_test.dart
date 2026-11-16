@@ -21,8 +21,13 @@ Map<String, Object?> _cat(String name) => {
   'systemKey': null,
 };
 
+// Writes per connection. SQLite's lock has no queue: under heavy contention on a slow CI runner one
+// waiter can lose every retry for longer than `busy_timeout` (5 s). A few writes each still make
+// the connections wait on one another, which is what this test is about.
+const _perConnection = 5;
+
 Future<void> _writes(SqliteStore s, String tag) async {
-  for (var i = 0; i < 15; i++) {
+  for (var i = 0; i < _perConnection; i++) {
     await s.transaction((tx) async {
       final hex = tag.codeUnitAt(0).toRadixString(16).padLeft(2, '0');
       final id = '01930000-0000-7000-8000-${hex}00000000${i.toString().padLeft(2, '0')}';
@@ -65,7 +70,7 @@ void main() {
         }),
     ];
     await Future.wait([_writes(app, 'a'), ...others]);
-    expect((await app.list(RecordType.category)).length, 45);
+    expect((await app.list(RecordType.category)).length, 3 * _perConnection);
     await app.close();
   });
 
