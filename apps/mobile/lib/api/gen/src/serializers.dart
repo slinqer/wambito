@@ -76,6 +76,9 @@ import 'package:wambito/api/gen/src/model/push_rejected.dart';
 import 'package:wambito/api/gen/src/model/push_result.dart';
 import 'package:wambito/api/gen/src/model/push_results.dart';
 import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/put_recovery_verifier.dart';
+import 'package:wambito/api/gen/src/model/recovery_sign_in.dart';
+import 'package:wambito/api/gen/src/model/recovery_signed_in.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/rotate_keys.dart';
@@ -165,6 +168,9 @@ part 'serializers.g.dart';
   PushResult,
   PushResults,
   PutKeyWrap,
+  PutRecoveryVerifier,
+  RecoverySignIn,
+  RecoverySignedIn,
   Recurrence,
   ReviewTransactions,
   RotateKeys,

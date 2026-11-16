@@ -20,6 +20,7 @@ import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { anonymous, bearer, emailOTP, jwt } from "better-auth/plugins";
+import { wambitoSessions } from "./auth-sessions.ts";
 import { apiPathPrefix, type Config, isPreviewAccount } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
@@ -716,6 +717,8 @@ export function createAuth(deps: AppDeps) {
         fetchClientMetadataResource: deps.fetchClientMetadata ?? fetchClientMetadataResource,
         metadataProfile: "mcp-2026-07-28",
       }),
+      // `createServerSession`, server-only: the sessions our own routes make (auth-sessions.ts).
+      wambitoSessions(),
     ],
   });
 }

@@ -99,6 +99,22 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id, 0))`.
   `purgeExpiredPairings` runs with the daily tombstone purge (`scheduleTombstonePurge`). Assistant
   tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2/recovery` (`src/routes/recovery.ts`, `src/services/recovery.ts`; spec 2026-11-15): the
+  recovery key's verifier, `recovery_verifiers` (SHA-256 of the key's 16-byte lookup and 32-byte
+  auth, `recoveryVerifier` in `@wambito/crypto`; one per person, no RLS). `PUT /v2/recovery/verifier`
+  replaces it (409 `recovery_required` without a recovery wrap, `verifier_taken` for another
+  user's lookup hash; under the `key_wraps` lock). `putKeyWrap` deletes it when a recovery wrap is
+  replaced with other `wrapped` bytes (a new recovery key); a retry of the same PUT and a rotation
+  keep it. `POST /v2/recovery/sign-in` is public (`recoverySignInRoutes`, mounted before
+  `requireUser`): per-IP limit first (`RECOVERY_SIGNIN_LIMIT`, 10 per 10 min, in memory), then
+  `findVerifiedUser` (constant-time auth compare; one 401 `recovery_key_invalid` for every miss),
+  then `signInAs` with `lifetimeFor(user, platformOf(headers))`.
+- Sessions made by our routes: `signInAs(auth, c, userId, lifetime)` (`src/http/sign-in-response.ts`)
+  calls the server-only Better Auth endpoint `createServerSession` (`src/auth-sessions.ts`, plugin
+  `wambitoSessions`, `POST /wambito/server-session` with `metadata: { SERVER_ONLY: true }`, so the
+  router never serves it) and copies its `set-cookie` and `set-auth-token` onto the response. The
+  session hooks apply (a suspended account: 403 `account_suspended`); `short` is Better Auth's
+  `dont_remember` (no `Max-Age`).
 - `/v2` rules: record and key-wrap ids are lower-case UUIDs (`lowerCaseUuid` in `http/schemas.ts`,
   the `@wambito/crypto` rule; never lower-cased, upper case is 422); a live record body is at least
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
@@ -117,7 +133,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   routes (transactions, categories, recurrences, summary, reports, captures, imports,
   `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
   403 too (the currency lives in the settings record). `DELETE /v1/me` still works:
-  `records`, `key_wraps`, `record_purges` and `pairing_requests` cascade from `user`.
+  `records`, `key_wraps`, `record_purges`, `pairing_requests` and `recovery_verifiers` cascade from `user`.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

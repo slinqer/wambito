@@ -380,6 +380,27 @@ export const recordPurges = pgTable("record_purges", {
   throughVersion: bigint("through_version", { mode: "number" }).notNull(),
 });
 
+/**
+ * What lets a recovery key sign in (spec 2026-11-15): the SHA-256 of the key's lookup and auth
+ * bytes (HKDF of the recovery secret, `recoveryVerifier` in @wambito/crypto), one per person. No
+ * row-level security: it is read before the user is known, by `lookup_hash`.
+ */
+export const recoveryVerifiers = pgTable(
+  "recovery_verifiers",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    lookupHash: bytea("lookup_hash").notNull().unique(),
+    authHash: bytea("auth_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("recovery_verifiers_lookup_hash_len", sql`octet_length(${t.lookupHash}) = 32`),
+    check("recovery_verifiers_auth_hash_len", sql`octet_length(${t.authHash}) = 32`),
+  ],
+);
+
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [
   "accounts",

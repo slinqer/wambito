@@ -23,6 +23,8 @@ How to add to it:
 
 ### Added
 
+- `PUT /v2/recovery/verifier` (`putRecoveryVerifier`): stores `{ lookupHash, authHash }`, the SHA-256 of what the recovery key derives (32 bytes each, base64url), replacing the earlier one; 204. Needs the account's recovery wrap (409 `recovery_required`); a `lookupHash` another account holds is 409 `verifier_taken`. Sessions only (assistant tokens get 403).
+- `POST /v2/recovery/sign-in` (`recoverySignIn`, public): `{ lookup, auth }` (16 and 32 bytes, base64url) signs in to the account whose verifier they match: 200 `{ userId }` with the session in `set-cookie` and `set-auth-token` (from the app, an encrypted account without an email gets the 25-month session). 401 `recovery_key_invalid` for any key that does not sign in (unknown or wrong, the same answer), 403 `account_suspended`, 429 after 10 tries per address in 10 minutes (`retry-after`).
 - `NEW_USERS_ENCRYPTED` (env, `true` or `false`, default `false`): while on, every user created from then on (guest or email) is `encrypted`: no default account or categories are seeded, its `/v1` finance routes answer 403 `encrypted_account`, and `GET /v1/me` says `encryption: "preview"` (as for `E2E_PREVIEW_USER_IDS`). Users that exist keep what they have. The user row records `encryption` (`plain` or `encrypted`) and `platform` (`android`, `ios` or `web`, from `x-wambito-client`; null for users made before).
 - Removing a device (deleting its wrap, or a rotation that leaves it out) ends the session that registered it, unless another device wrap still uses it.
 - `POST /v2/keys/rotate` requires `link`, the previous data key sealed under the new one (422 `link_required`, `link_unexpected`, `invalid_link`).
@@ -38,6 +40,7 @@ How to add to it:
 
 ### Changed
 
+- `PUT /v2/keys/{id}`: a recovery wrap that replaces the stored one with other `wrapped` bytes (a new recovery key) deletes the recovery verifier, so the old key no longer signs in; a retry of the same PUT and `POST /v2/keys/rotate` keep it.
 - An encrypted user without an email gets a 25-month (760-day) session on the phone (`x-wambito-client: android` or `ios`), renewed at most once a day while it is used (never by a `x-wambito-background: 1` request); claiming an email brings it back to the standard 60 days. Every user's activity is stamped now, with an email or not (before, only guests').
 - Sessions store no IP address, and rate limits are kept in memory instead of the `rate_limit` table (a restart forgets the counts); a migration clears the old rows and addresses. Limits are unchanged, including `POST /v1/email-change/confirm` (10 per 10 minutes per address).
 - `x-wambito-client: ios` is accepted and marks the app like `android` (the sign-in link carries `from=app`).

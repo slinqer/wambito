@@ -425,3 +425,32 @@ export const PairingPickup = z
     keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
   })
   .openapi("PairingPickup");
+
+/** The recovery key's lookup bytes (HKDF, `wambito/v1/recovery/lookup`). */
+export const RECOVERY_LOOKUP_BYTES = 16;
+/** The recovery key's auth bytes (HKDF, `wambito/v1/recovery/auth`), and every SHA-256. */
+export const RECOVERY_AUTH_BYTES = 32;
+
+const sha256Of = (what: string) =>
+  base64urlBytes(32, 32).openapi({
+    description: `SHA-256 of the recovery key's ${what} bytes, 32 bytes, base64url`,
+  });
+
+export const PutRecoveryVerifier = z
+  .object({ lookupHash: sha256Of("lookup"), authHash: sha256Of("auth") })
+  .openapi("PutRecoveryVerifier");
+
+export const RecoverySignIn = z
+  .object({
+    lookup: base64urlBytes(RECOVERY_LOOKUP_BYTES, RECOVERY_LOOKUP_BYTES).openapi({
+      description: `HKDF-SHA256 of the recovery secret under \`wambito/v1/recovery/lookup\`, ${RECOVERY_LOOKUP_BYTES} bytes, base64url`,
+    }),
+    auth: base64urlBytes(RECOVERY_AUTH_BYTES, RECOVERY_AUTH_BYTES).openapi({
+      description: `HKDF-SHA256 of the recovery secret under \`wambito/v1/recovery/auth\`, ${RECOVERY_AUTH_BYTES} bytes, base64url`,
+    }),
+  })
+  .openapi("RecoverySignIn");
+
+export const RecoverySignedIn = z
+  .object({ userId: z.string().openapi({ description: "The account signed in to" }) })
+  .openapi("RecoverySignedIn");

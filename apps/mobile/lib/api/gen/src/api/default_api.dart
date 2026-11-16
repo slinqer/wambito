@@ -41,6 +41,9 @@ import 'package:wambito/api/gen/src/model/pulled_records.dart';
 import 'package:wambito/api/gen/src/model/push_records.dart';
 import 'package:wambito/api/gen/src/model/push_results.dart';
 import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/put_recovery_verifier.dart';
+import 'package:wambito/api/gen/src/model/recovery_sign_in.dart';
+import 'package:wambito/api/gen/src/model/recovery_signed_in.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/rotate_keys.dart';
@@ -2603,6 +2606,149 @@ class DefaultApi {
     }
 
     return Response<KeyWrap>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// putRecoveryVerifier
+  /// Stores what lets the recovery key sign in: the SHA-256 of its &#x60;lookup&#x60; and of its &#x60;auth&#x60;. Replaces the earlier verifier, so only the newest key signs in; a new recovery wrap with other bytes deletes it too (store the new key&#39;s verifier after it). Needs the account&#39;s recovery wrap (409 &#x60;recovery_required&#x60;); a &#x60;lookupHash&#x60; another account holds is 409 &#x60;verifier_taken&#x60;.
+  ///
+  /// Parameters:
+  /// * [putRecoveryVerifier]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> putRecoveryVerifier({
+    required PutRecoveryVerifier putRecoveryVerifier,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/recovery/verifier';
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(PutRecoveryVerifier);
+      _bodyData = _serializers.serialize(putRecoveryVerifier, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// recoverySignIn
+  /// Signs in with the recovery key: &#x60;lookup&#x60; and &#x60;auth&#x60; are what it derives. On success the session travels in the &#x60;set-cookie&#x60; headers (the web) and the &#x60;set-auth-token&#x60; header (the app&#39;s bearer token); from the app (&#x60;x-wambito-client&#x60;), an encrypted account without an email gets a 25-month session. 401 &#x60;recovery_key_invalid&#x60; for a key that does not sign in, whatever the reason; 403 &#x60;account_suspended&#x60;; 429 after 10 tries per address in 10 minutes.
+  ///
+  /// Parameters:
+  /// * [recoverySignIn]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RecoverySignedIn] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RecoverySignedIn>> recoverySignIn({
+    required RecoverySignIn recoverySignIn,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/recovery/sign-in';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RecoverySignIn);
+      _bodyData = _serializers.serialize(recoverySignIn, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RecoverySignedIn? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(RecoverySignedIn))
+                as RecoverySignedIn;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RecoverySignedIn>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -5,6 +5,7 @@ import {
   keyWraps,
   oauthConsent,
   passkey,
+  recoveryVerifiers,
   session,
   type Tx,
   withUser,
@@ -64,7 +65,7 @@ export function toKeyWrap(row: KeyWrapRow): KeyWrapDto {
  * Takes the transaction-level lock on one person's wraps. Every write to `key_wraps` takes it
  * first, so the current keyV a write checks cannot change before it commits.
  */
-async function lockWraps(tx: Tx, userId: string): Promise<void> {
+export async function lockWraps(tx: Tx, userId: string): Promise<void> {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`key_wraps:${userId}`}, 0))`,
   );
@@ -259,6 +260,18 @@ export async function putKeyWrap(
       wrap.kind === "recovery"
         ? eq(keyWraps.kind, "recovery")
         : and(eq(keyWraps.kind, wrap.kind), eq(keyWraps.ref, row.ref ?? ""));
+    // A recovery wrap with other bytes is taken for a new recovery key (plan decision 10): the
+    // old key's verifier goes, so that key no longer signs in to an account it cannot open. A retry
+    // of the same PUT keeps it; so does a rotation (`rotateKeys`: same key, new data key).
+    if (wrap.kind === "recovery") {
+      const [old] = await tx
+        .select({ wrapped: keyWraps.wrapped })
+        .from(keyWraps)
+        .where(own(userId, eq(keyWraps.kind, "recovery")));
+      if (old && !Buffer.from(old.wrapped).equals(Buffer.from(row.wrapped))) {
+        await tx.delete(recoveryVerifiers).where(eq(recoveryVerifiers.userId, userId));
+      }
+    }
     await tx.delete(keyWraps).where(own(userId, ne(keyWraps.id, id), duplicate));
 
     const [existing] = await tx

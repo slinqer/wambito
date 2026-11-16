@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/recovery/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Signs in with the recovery key: `lookup` and `auth` are what it derives. On success the session travels in the `set-cookie` headers (the web) and the `set-auth-token` header (the app's bearer token); from the app (`x-wambito-client`), an encrypted account without an email gets a 25-month session. 401 `recovery_key_invalid` for a key that does not sign in, whatever the reason; 403 `account_suspended`; 429 after 10 tries per address in 10 minutes. */
+        post: operations["recoverySignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -841,6 +858,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/recovery/verifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Stores what lets the recovery key sign in: the SHA-256 of its `lookup` and of its `auth`. Replaces the earlier verifier, so only the newest key signs in; a new recovery wrap with other bytes deletes it too (store the new key's verifier after it). Needs the account's recovery wrap (409 `recovery_required`); a `lookupHash` another account holds is 409 `verifier_taken`. */
+        put: operations["putRecoveryVerifier"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -956,6 +990,16 @@ export interface components {
         };
         EmailChangeConfirm: {
             token: string;
+        };
+        RecoverySignedIn: {
+            /** @description The account signed in to */
+            userId: string;
+        };
+        RecoverySignIn: {
+            /** @description HKDF-SHA256 of the recovery secret under `wambito/v1/recovery/lookup`, 16 bytes, base64url */
+            lookup: string;
+            /** @description HKDF-SHA256 of the recovery secret under `wambito/v1/recovery/auth`, 32 bytes, base64url */
+            auth: string;
         };
         Profile: {
             id: string;
@@ -1485,6 +1529,12 @@ export interface components {
             sealed: string;
             /** @description The data key version the seal is bound to */
             keyV: number;
+        };
+        PutRecoveryVerifier: {
+            /** @description SHA-256 of the recovery key's lookup bytes, 32 bytes, base64url */
+            lookupHash: string;
+            /** @description SHA-256 of the recovery key's auth bytes, 32 bytes, base64url */
+            authHash: string;
         };
     };
     responses: never;
@@ -2175,6 +2225,66 @@ export interface operations {
             };
             /** @description Problem */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    recoverySignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoverySignIn"];
+            };
+        };
+        responses: {
+            /** @description Signed in; the session is in the headers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoverySignedIn"];
+                };
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3956,6 +4066,46 @@ export interface operations {
             };
             /** @description Problem */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    putRecoveryVerifier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutRecoveryVerifier"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
