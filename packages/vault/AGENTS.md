@@ -23,8 +23,8 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   `EncryptedStore` (the MCP's, per request); passes both contracts.
 - `src/keyring.ts`: `Keyring`, `recordKeyName`, `dedupeKeyName`, `KeysError`.
 - `src/sync.ts`: `createSyncEngine` over an `EncryptedStore`; option `upgrade: false` skips the
-  re-seal pass (the MCP). Its tests stay in `apps/web/app/local/sync.test.ts` (over IndexedDB); `src/sync.test.ts` is a smoke
-  test over the memory store.
+  re-seal pass (the MCP). Its tests stay in `apps/web/app/local/sync.test.ts` (over IndexedDB);
+  `src/sync.test.ts` is a smoke test over the memory store.
 - `src/ids.ts`: `uuidv7`, `uuidv5`.
 - `src/backend.ts`: `createLocalBackend` (the `/v1` routes over a store, one store transaction per
   request), `DEMO_UNAVAILABLE`. Its round-trip tests need the web's typed API client, so they stay in

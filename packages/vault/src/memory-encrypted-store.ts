@@ -63,23 +63,39 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
   let queue: Promise<unknown> = Promise.resolve();
   let closed = false;
   const fire = () => {
-    for (const listener of [...listeners]) listener();
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch {
+        // a subscriber must not undo a commit or stop the others
+      }
+    }
   };
   const guard = () => {
     if (closed) throw new VaultClosedError();
   };
+  /** The state a running transaction started from, taken by its first write only. */
+  let saved: State | undefined;
+  const dirty = () => {
+    saved ??= snapshot(state);
+  };
 
-  /** Runs `fn` after every earlier operation; a throw rolls the state back. */
-  function serial<R>(fn: () => Promise<R>): Promise<R> {
+  /** Runs `fn` after every earlier operation; a throw restores what `dirty()` saved. */
+  function serial<R>(fn: () => Promise<R>, afterCommit?: () => void): Promise<R> {
     const run = async () => {
       guard();
-      const before = snapshot(state);
+      saved = undefined;
+      let result: R;
       try {
-        return await fn();
+        result = await fn();
       } catch (error) {
-        state = before;
+        if (saved) state = saved;
         throw error;
+      } finally {
+        saved = undefined;
       }
+      afterCommit?.();
+      return result;
     };
     const next = queue.then(run, run);
     queue = next.catch(() => undefined);
@@ -171,6 +187,7 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
       ) {
         const remote = opts?.origin === "remote";
         if (remote && remoteBlocked(id, opts)) return;
+        dirty();
         const prev = table(type).get(id);
         const stored = clone(body);
         table(type).set(id, {
@@ -188,11 +205,15 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
         const remote = opts?.origin === "remote";
         if (!prev) {
           // A tombstone of a record this store never opened: its quarantine rows go.
-          if (remote) clearAbandoned(type, id);
+          if (remote) {
+            dirty();
+            clearAbandoned(type, id);
+          }
           return;
         }
         if (!remote && prev.deleted) return;
         if (remote && remoteBlocked(id, opts)) return;
+        dirty();
         table(type).set(id, {
           ...prev,
           deleted: true,
@@ -204,6 +225,7 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
         else clearAbandoned(type, id);
       },
       restore(entry, outcome) {
+        dirty();
         const prev = table(entry.type).get(entry.id);
         if ("drop" in outcome || ("delete" in outcome && (!prev || prev.deleted))) {
           state.outbox.delete(entry.id);
@@ -236,12 +258,13 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
   }
 
   function transaction<R>(fn: (tx: StoreOps) => Promise<R>): Promise<R> {
-    return serial(async () => {
-      const wrote = { value: false };
-      const result = await fn(ops(wrote));
-      if (wrote.value) fire();
-      return result;
-    });
+    const wrote = { value: false };
+    return serial(
+      () => fn(ops(wrote)),
+      () => {
+        if (wrote.value) fire();
+      },
+    );
   }
 
   return {
