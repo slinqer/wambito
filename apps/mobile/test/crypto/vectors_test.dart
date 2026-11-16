@@ -53,6 +53,7 @@ void main() {
       'recovery',
       'assistant',
     });
+    expect(section('recoveryVerifiers').length, 4);
     expect(section('devices').length, greaterThanOrEqualTo(2));
     expect(section('rejects').length, greaterThanOrEqualTo(4));
   });
@@ -82,6 +83,16 @@ void main() {
     for (final r in section('recovery')) {
       expect(parseRecoveryKey(r['text']! as String), b(r['secret']));
       expect(formatRecoveryKey(b(r['secret'])), r['text']);
+    }
+  });
+
+  test('recoveryVerifiers: lookup, auth and both hashes are exact', () async {
+    for (final v in section('recoveryVerifiers')) {
+      final got = await recoveryVerifier(b(v['secret']));
+      expect(toBase64Url(got.lookup), v['lookup']);
+      expect(toBase64Url(got.auth), v['auth']);
+      expect(toBase64Url(await verifierHash(got.lookup)), v['lookupHash']);
+      expect(toBase64Url(await verifierHash(got.auth)), v['authHash']);
     }
   });
 
@@ -169,6 +180,8 @@ void main() {
             await openFromDevice(b(r['privateKey']), wrapCtx(r['ctx']), b(r['sealed']));
           case 'openKeyLink':
             await openKeyLink(b(r['newKey']), linkCtx(r['ctx']), b(r['link']));
+          case 'recoveryVerifier':
+            await recoveryVerifier(b(r['secret']));
           case 'parseRecoveryKey':
             parseRecoveryKey(r['text']! as String);
           default:

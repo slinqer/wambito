@@ -30,6 +30,15 @@ Future<SecretKey> hkdfKey(Uint8List secret, String info) {
   ).deriveKey(secretKey: SecretKey(secret), nonce: _zeroSalt, info: utf8.encode(info));
 }
 
+/// Same derivation as [hkdfKey] (same salt), to [length] bytes returned as bytes.
+Future<Uint8List> hkdfBytes(Uint8List secret, String info, int length) async {
+  final key = await Hkdf(
+    hmac: Hmac.sha256(),
+    outputLength: length,
+  ).deriveKey(secretKey: SecretKey(secret), nonce: _zeroSalt, info: utf8.encode(info));
+  return Uint8List.fromList(await key.extractBytes());
+}
+
 final Uint8List _zeroSalt = Uint8List(32);
 
 /// Both keys come from the data key by HKDF-SHA-256 with an empty salt and a fixed info.

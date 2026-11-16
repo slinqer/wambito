@@ -1,6 +1,8 @@
 import 'dart:math';
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/crypto/crypto.dart';
 
@@ -95,5 +97,34 @@ void main() {
 
   test('rejects non-16-byte secrets when formatting', () {
     expect(codeSync(() => formatRecoveryKey(Uint8List(15))), 'bad_input');
+  });
+
+  test(
+    'recoveryVerifier gives 16 and 32 bytes, deterministic, and neither equals the wrap key',
+    () async {
+      final secret = newRecoverySecret();
+      final v = await recoveryVerifier(secret);
+      expect(v.lookup, hasLength(16));
+      expect(v.auth, hasLength(32));
+      final again = await recoveryVerifier(secret);
+      expect(again.lookup, v.lookup);
+      expect(again.auth, v.auth);
+      final wrap = Uint8List.fromList(
+        await (await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+          secretKey: SecretKey(secret),
+          nonce: Uint8List(32),
+          info: utf8.encode('wambito/v1/wrap/recovery'),
+        )).extractBytes(),
+      );
+      expect(v.auth, isNot(wrap));
+      expect(v.lookup, isNot(v.auth.sublist(0, 16)));
+      expect(v.lookup, isNot(wrap.sublist(0, 16)));
+    },
+  );
+
+  test('a secret that is not 16 bytes is bad_input', () async {
+    for (final n in [0, 15, 17, 32]) {
+      expect(await code(() => recoveryVerifier(Uint8List(n))), 'bad_input');
+    }
   });
 }
