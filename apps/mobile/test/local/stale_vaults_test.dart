@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:wambito/local/db.dart' show vaultFileName;
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/stale_vaults.dart';
+import 'package:wambito/local/vault_lock.dart' show vaultLockFileName;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -96,6 +97,13 @@ void main() {
       'wambito.vault.ana.current',
       'wambito.vault.ana.dk.1',
     ]);
+  });
+
+  test('a vault whose only file left is its lock is swept too', () async {
+    File(p.join(dir.path, vaultLockFileName('eve'))).writeAsStringSync('x');
+    File(p.join(dir.path, '${vaultLockFileName('fay')}.claim-ab12')).writeAsStringSync('x');
+    await sweep('bea');
+    expect(forgotten, containsAll(['eve', 'fay']));
   });
 
   test('a folder that cannot be listed still sweeps the keys', () async {

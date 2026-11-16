@@ -9,6 +9,7 @@ import '../crypto/crypto.dart';
 import 'keys.dart' show Keyring, KeysError;
 import 'sqlite_store.dart';
 import 'store.dart' show WriteOptions;
+import 'vault_lock.dart' show VaultLease;
 
 /// The sync engine: the Dart twin of `apps/web/app/local/sync.ts`. It pushes the outbox to
 /// `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the vault equal to the server (spec
@@ -102,7 +103,11 @@ enum SyncProblemCode {
   deviceRemoved('device_removed'),
 
   /// A newer key version's links do not lead back to the held key (`tampered`): the engine stops.
-  keyUnverified('key_unverified');
+  keyUnverified('key_unverified'),
+
+  /// Another holder has the vault's lease (another engine syncs it): the run did nothing and is
+  /// retried like `offline`.
+  busy('busy');
 
   const SyncProblemCode(this.wire);
 
@@ -206,6 +211,7 @@ class SyncEngineOptions {
     this.interval = const Duration(minutes: 1),
     this.watchResume,
     this.isForeground,
+    this.lease,
   });
 
   final SqliteStore store;
@@ -241,6 +247,10 @@ class SyncEngineOptions {
 
   /// [SyncEngine.start] only: whether the timer may run now. Default: the app is resumed.
   final bool Function()? isForeground;
+
+  /// Takes the vault's lease for one run (`vault_lock.dart`): null is another holder having it (the
+  /// run is `busy`). No option, no lease (the tests of 3a).
+  final Future<VaultLease?> Function()? lease;
 }
 
 abstract interface class SyncEngine {
@@ -990,22 +1000,20 @@ class _Engine implements SyncEngine {
       _running = true;
       try {
         return await _locked(userId, store, () async {
-          // Key refreshes are counted per run, across its passes.
-          resetRefreshes();
-          SyncResult? last;
-          do {
-            _again = false;
-            final start = await mark();
-            last = combine(last, await once());
-            // Only what the person wrote during the run gets one more pass: a change left
-            // pending (parked, set aside, waiting) waits for the next trigger.
-            if (last.ok && !_again) {
-              final outbox = await store.readOutbox(_all);
-              // The upgrade pass's own entries are not the person's: they wait for the next run.
-              if (outbox.any((e) => e.seq > start && !e.reseal)) _again = true;
+          final take = o.lease;
+          final lease = take == null ? null : await take();
+          if (take != null && lease == null) {
+            return SyncResult(ok: false, error: SyncProblemCode.busy);
+          }
+          try {
+            return await _passes();
+          } finally {
+            try {
+              await lease?.release();
+            } on Object {
+              // The lease expires by itself.
             }
-          } while (_again && last.ok);
-          return last;
+          }
         });
       } finally {
         _running = false;
@@ -1015,6 +1023,26 @@ class _Engine implements SyncEngine {
     }();
     _current = future;
     return future;
+  }
+
+  /// The passes of one run, with the lease held.
+  Future<SyncResult> _passes() async {
+    // Key refreshes are counted per run, across its passes.
+    resetRefreshes();
+    SyncResult? last;
+    do {
+      _again = false;
+      final start = await mark();
+      last = combine(last, await once());
+      // Only what the person wrote during the run gets one more pass: a change left
+      // pending (parked, set aside, waiting) waits for the next trigger.
+      if (last.ok && !_again) {
+        final outbox = await store.readOutbox(_all);
+        // The upgrade pass's own entries are not the person's: they wait for the next run.
+        if (outbox.any((e) => e.seq > start && !e.reseal)) _again = true;
+      }
+    } while (_again && last.ok);
+    return last;
   }
 
   // ---- triggers --------------------------------------------------------------------------------

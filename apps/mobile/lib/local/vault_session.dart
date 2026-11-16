@@ -12,6 +12,7 @@ import 'ids.dart';
 import 'keys.dart';
 import 'sqlite_store.dart';
 import 'sync.dart';
+import 'vault_lock.dart';
 
 /// A preview account's open vault on this phone: the Dart twin of
 /// `apps/web/app/local/vault-session.ts`. It ties the store, the keys, the local backend the
@@ -65,6 +66,7 @@ class OpenVaultOptions {
     this.deleteStore,
     this.syncDebounce = const Duration(seconds: 1),
     this.refreshKeys,
+    this.lease,
   });
 
   final VaultProfile profile;
@@ -95,6 +97,10 @@ class OpenVaultOptions {
 
   /// `keys.dart`'s `refreshKeys`; tests pass their own to hold or fail a refresh.
   final Future<LocalKeys> Function(KeysOptions options)? refreshKeys;
+
+  /// The lease a sync run takes (vault_lock.dart). Default: the app's (`waitLease`, holder `app`)
+  /// on the real vault folder; none when a test passes its own `openStore`.
+  final Future<VaultLease?> Function()? lease;
 }
 
 /// The open vault of one account.
@@ -139,6 +145,12 @@ class VaultSession {
   void Function() onUnverified(void Function() listener) {
     _unverifiedListeners.add(listener);
     return () => _unverifiedListeners.remove(listener);
+  }
+
+  /// A headless engine changed the vault file: the subscribers refetch, then a sync is scheduled.
+  void externalChange() {
+    _store.notifyExternalChange();
+    _engine.afterLocalWrite();
   }
 
   /// A sync now (pull-to-refresh). Shares a run in flight.
@@ -390,6 +402,9 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           return local.keyring;
         },
         dropKeyVersion: (v) => dropKeyVersion(userId, v, storage),
+        lease:
+            options.lease ??
+            (options.openStore == null ? () => waitLease(userId, holder: 'app') : null),
         debounce: options.syncDebounce,
         onError: (problem) {
           // A signed-out or closing session tells nobody anything (a late run of it ends here).
