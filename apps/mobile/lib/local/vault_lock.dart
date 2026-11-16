@@ -160,13 +160,13 @@ Future<VaultLease?> tryLease(
       final claimStat = _stat(claim);
       final theirs = _read(claim);
       if (claimStat == null ||
-          theirs == null ||
           clock().difference(claimStat.modified) <= _claimGrace ||
           stale.length >= 3) {
         return null;
       }
       stale.add(claim);
-      claim = File('${claim.path}.${theirs.token}');
+      // An empty claim (its claimant died between create and write) has no token: a fixed suffix.
+      claim = File('${claim.path}.${theirs?.token ?? 'unwritten'}');
     }
     try {
       final still = _read(file);

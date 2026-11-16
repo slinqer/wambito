@@ -87,6 +87,30 @@ void main() {
     }
   });
 
+  test('an empty claim of a dead taker is recovered by exactly one taker', () async {
+    final path = dir.path;
+    for (var round = 0; round < 5; round++) {
+      final old = DateTime.now().subtract(const Duration(minutes: 1));
+      lockFile().writeAsStringSync(
+        jsonEncode({'holder': 'gone', 'token': 'T1', 'expiresAt': old.millisecondsSinceEpoch}),
+      );
+      File('${lockFile().path}.claim-T1')
+        ..createSync()
+        ..setLastModifiedSync(old);
+      final wins = await Future.wait([
+        for (var i = 0; i < 6; i++)
+          Isolate.run(() async {
+            final lease = await tryLease('ana', holder: 'isolate-$i', directory: path);
+            return lease != null;
+          }),
+      ]);
+      expect(wins.where((w) => w).length, 1, reason: 'round $round: $wins');
+      expect(await tryLease('ana', holder: 'late', directory: path), isNull);
+      expect(dir.listSync().map((f) => p.basename(f.path)), [vaultLockFileName('ana')]);
+      lockFile().deleteSync();
+    }
+  });
+
   test('renew extends a live lease and fails once it was taken over or expired', () async {
     var clock = DateTime.utc(2026, 11, 16, 10);
     final lease = await tryLease('ana', holder: 'app', directory: dir.path, now: () => clock);
