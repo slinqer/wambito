@@ -49,6 +49,8 @@ void main() {
         .firstMatch(manifest)!
         .group(0)!;
     expect(activity, contains('android:exported="false"'));
+    // The preview's transform assumes a portrait screen: a rotation would distort it.
+    expect(activity, contains('android:screenOrientation="portrait"'));
     // Only the app's own channel starts it: no intent filter on it, and no Google scanner anywhere.
     expect(activity, isNot(contains('intent-filter')));
     final kotlin = Directory('android/app/src/main/kotlin')

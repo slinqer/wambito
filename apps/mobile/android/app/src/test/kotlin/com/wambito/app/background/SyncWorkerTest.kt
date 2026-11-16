@@ -5,7 +5,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import androidx.work.WorkManager
 import com.wambito.app.account.AccountMode
+import com.wambito.app.capture.CaptureQueue
+import com.wambito.app.capture.CaptureScheduler
+import com.wambito.app.capture.sampleCapture
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.StandardMethodCodec
@@ -52,6 +56,7 @@ class SyncWorkerTest {
 
     @After
     fun tearDown() {
+        CaptureQueue(context).clear()
         HeadlessHooks.runner = null
         BackgroundChannel.app = null
         AccountMode(context).write(null, null)
@@ -131,5 +136,42 @@ class SyncWorkerTest {
         BackgroundChannel.app = null
         answer = HeadlessResult("changed", emptyList())
         assertEquals("changed", outcomeOf(run()))
+    }
+
+    private fun sendJobs() = WorkManager.getInstance(context)
+        .getWorkInfosForUniqueWork(CaptureScheduler.SEND).get()
+
+    private fun queueOne() {
+        val queue = CaptureQueue(context)
+        queue.adopt("u1")
+        queue.add(sampleCapture())
+    }
+
+    @Test
+    fun `a finished sync with captures still queued enqueues the send (D23)`() {
+        AccountMode(context).write("preview", "u1")
+        queueOne()
+        for (outcome in listOf("done", "changed")) {
+            answer = HeadlessResult(outcome, emptyList())
+            run()
+            assertEquals(outcome, 1, sendJobs().size)
+            WorkManager.getInstance(context).cancelUniqueWork(CaptureScheduler.SEND).result.get()
+            WorkManager.getInstance(context).pruneWork().result.get()
+        }
+    }
+
+    @Test
+    fun `an empty queue or an unfinished sync enqueues no send`() {
+        AccountMode(context).write("preview", "u1")
+        answer = HeadlessResult("changed", emptyList())
+        run()
+        assertTrue(sendJobs().isEmpty())
+
+        queueOne()
+        for (outcome in listOf("busy", "failed", "timeout", "signedOut", "locked")) {
+            answer = HeadlessResult(outcome, emptyList())
+            run()
+        }
+        assertTrue(sendJobs().isEmpty())
     }
 }

@@ -44,10 +44,12 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt). Not exported: only the app's own
-             scanner channel starts it, so no other app can open the camera through it. -->
+             scanner channel starts it, so no other app can open the camera through it. Portrait only:
+             the preview's transform (PreviewTransform.kt) would distort on a rotation. -->
         <activity
             android:name=".scanner.ScannerActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/NormalTheme"
             android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|density|uiMode"/>
         <activity

@@ -1,5 +1,6 @@
 package com.wambito.app.local
 
+import com.wambito.app.capture.CaptureQueue
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -36,6 +37,7 @@ class BackupRulesTest {
     private val wrappedKey = "sharedpref" to "FlutterSecureKeyStorage.xml"
     private val widgetFigures = "sharedpref" to "HomeWidgetPreferences.xml"
     private val dueList = "sharedpref" to "wambito.notice.duelist.xml"
+    private val captureQueue = "sharedpref" to "${CaptureQueue.FILE}.xml"
     private val config = "sharedpref" to "FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"
 
     @Test
@@ -61,6 +63,17 @@ class BackupRulesTest {
         }
         val found = excludes("backup_rules.xml", null)
         assertTrue(found.toString(), found.containsAll(own))
+    }
+
+    @Test
+    fun `the capture queue, which holds amounts and merchants, is excluded`() {
+        assertEquals("wambito.capture.queue.xml", captureQueue.second)
+        for (scope in listOf("cloud-backup", "device-transfer")) {
+            val found = excludes("data_extraction_rules.xml", scope)
+            assertTrue("$scope: $found", found.contains(captureQueue))
+        }
+        val found = excludes("backup_rules.xml", null)
+        assertTrue(found.toString(), found.contains(captureQueue))
     }
 
     @Test

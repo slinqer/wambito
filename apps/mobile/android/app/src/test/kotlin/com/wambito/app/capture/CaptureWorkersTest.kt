@@ -10,6 +10,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
 import com.wambito.app.account.AccountMode
+import com.wambito.app.background.BackgroundChannel
 import com.wambito.app.background.HeadlessHooks
 import com.wambito.app.background.HeadlessResult
 import com.wambito.app.notices.ApiResult
@@ -26,6 +27,24 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLooper
+import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.StandardMethodCodec
+import java.nio.ByteBuffer
+
+/** A messenger that records the methods the app's engine is sent. */
+private class AppMessenger : BinaryMessenger {
+    val sent = mutableListOf<Pair<String, String>>()
+
+    override fun send(channel: String, message: ByteBuffer?) = send(channel, message, null)
+
+    override fun send(channel: String, message: ByteBuffer?, callback: BinaryMessenger.BinaryReply?) {
+        message?.rewind()
+        sent += channel to StandardMethodCodec.INSTANCE.decodeMethodCall(message!!).method
+    }
+
+    override fun setMessageHandler(channel: String, handler: BinaryMessenger.BinaryMessageHandler?) = Unit
+}
 
 private class FakeSession(var stored: String?, var serverUrl: String?) : SessionSource {
     var serverUnreadable = false
@@ -109,6 +128,7 @@ class CaptureWorkersTest {
 
     @After
     fun tearDown() {
+        BackgroundChannel.app = null
         HeadlessHooks.runner = null
         CaptureHooks.dependencies = null
         CaptureHooks.notifier = object : CaptureNotifier {
@@ -326,6 +346,38 @@ class CaptureWorkersTest {
         assertTrue(requests.isEmpty())
         assertTrue(queue.confirms().isEmpty())
         assertTrue(notifications().activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun `a preview save that changed the vault tells the app's engine (D7), done tells nobody`() {
+        previewQueue("Mercadona")
+        val app = AppMessenger()
+        BackgroundChannel.app = BackgroundChannel(app)
+        headless(FakeRun("changed") { it })
+        runSend()
+        ShadowLooper.idleMainLooper()
+        assertEquals(listOf("wambito/background" to "vaultChanged"), app.sent)
+
+        app.sent.clear()
+        previewQueue("Café")
+        headless(FakeRun("done") { it })
+        runSend()
+        ShadowLooper.idleMainLooper()
+        assertTrue(app.sent.isEmpty())
+    }
+
+    @Test
+    fun `Bien on preview that changed the vault tells the app's engine (D7)`() {
+        previewQueue()
+        val app = AppMessenger()
+        BackgroundChannel.app = BackgroundChannel(app)
+        HeadlessHooks.runner = { _, _ ->
+            CaptureQueueChannel.ack(context, emptyList(), queue.confirms())
+            HeadlessResult("changed", emptyList())
+        }
+        runConfirm()
+        ShadowLooper.idleMainLooper()
+        assertEquals(listOf("wambito/background" to "vaultChanged"), app.sent)
     }
 
     @Test

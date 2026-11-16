@@ -2,8 +2,8 @@
 <!-- Android 12+: the vault (files/vault: the opened finance records) and the secure storage (the
      data key, the session) stay on this phone, in a cloud backup and in a device transfer. The
      Keystore key that wraps them never leaves it, so a copy could not be opened anyway. The widget's
-     figures (HomeWidgetPreferences) and the due-notice names (wambito.notice.duelist) stay too: for
-     a `preview` account they are finance data. -->
+     figures (HomeWidgetPreferences), the due-notice names (wambito.notice.duelist) and the capture
+     queue (wambito.capture.queue: amounts and merchants) stay too: they are finance data. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="vault"/>
@@ -12,6 +12,7 @@
         <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"/>
         <exclude domain="sharedpref" path="HomeWidgetPreferences.xml"/>
         <exclude domain="sharedpref" path="wambito.notice.duelist.xml"/>
+        <exclude domain="sharedpref" path="wambito.capture.queue.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="vault"/>
@@ -20,5 +21,6 @@
         <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"/>
         <exclude domain="sharedpref" path="HomeWidgetPreferences.xml"/>
         <exclude domain="sharedpref" path="wambito.notice.duelist.xml"/>
+        <exclude domain="sharedpref" path="wambito.capture.queue.xml"/>
     </device-transfer>
 </data-extraction-rules>

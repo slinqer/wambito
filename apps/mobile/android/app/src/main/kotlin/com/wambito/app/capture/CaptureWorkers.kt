@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.account.AccountMode
+import com.wambito.app.background.BackgroundChannel
 import com.wambito.app.background.HeadlessHooks
 import com.wambito.app.notices.ApiResult
 import com.wambito.app.notices.serverOf
@@ -164,7 +165,7 @@ class ConfirmCaptureWorker(context: Context, params: WorkerParameters) : Corouti
 
     /**
      * D9: the id joins the queue's confirms and `captureMain` posts it to the local
-     * `/v1/transactions/review`. Only a run that finished (`done`, `changed`) can say it was
+     * `/v1/transactions/review`; a `changed` run tells the app's engine (D7). Only a run that finished (`done`, `changed`) can say it was
      * taken; any other outcome keeps the id (retried up to [MAX_ATTEMPTS], then it waits for the
      * next engine run, which reads it again). An id a finished run never acknowledged is dropped
      * at the last attempt.
@@ -173,6 +174,7 @@ class ConfirmCaptureWorker(context: Context, params: WorkerParameters) : Corouti
         val queue = CaptureQueue(context)
         queue.addConfirm(id)
         val result = HeadlessHooks.run(context, CAPTURE_ENTRYPOINT)
+        if (result.outcome == "changed") BackgroundChannel.notifyVaultChanged()
         announceCaptured(context, result.captured)
         val last = runAttemptCount + 1 >= MAX_ATTEMPTS
         if (!finished(result.outcome)) return if (last) done("kept") else Result.retry()
@@ -285,6 +287,7 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
      * through the local `POST /v1/captures`, and acknowledges the ones it saved (`ackQueued`).
      * This worker never calls [CaptureApi] and never touches the queue itself, except to count.
      *
+     *  * `changed` tells the app's engine, if it is alive, with `vaultChanged` (D7).
      *  * `done` or `changed`: the answers become notifications, once per transaction. A capture
      *    the run did not acknowledge is one the vault refuses: its count goes up and at
      *    [CaptureQueue.MAX_REFUSALS] it is dropped, logged with no finance field (R8). While some
@@ -296,6 +299,7 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
     private suspend fun saveInVault(context: Context, queue: CaptureQueue): Result {
         val before = mine(queue).map { it.key }
         val result = HeadlessHooks.run(context, CAPTURE_ENTRYPOINT)
+        if (result.outcome == "changed") BackgroundChannel.notifyVaultChanged()
         announceCaptured(context, result.captured)
         val last = runAttemptCount + 1 >= MAX_ATTEMPTS
         if (!finished(result.outcome)) return if (last) done("kept") else Result.retry()
