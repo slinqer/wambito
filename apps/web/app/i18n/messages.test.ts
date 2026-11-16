@@ -117,7 +117,7 @@ function apiErrorCodes(): string[] {
 describe("message catalogs", () => {
   it("come in two parts, the public pages' and the app's, each namespace in one part only", () => {
     // What the landing, roadmap and legal pages render (Landing, Roadmap, LegalPage, SiteHeader,
-    // Footer, ThemeToggle, HeroMascot): the root's IntlProvider holds only these, so the landing
+    // Footer, ThemeToggle, Wambi): the root's IntlProvider holds only these, so the landing
     // ships nothing else.
     const site = ["app", "landing", "language", "legal", "mascot", "roadmap", "theme"];
     for (const language of LANGUAGES) {
@@ -371,11 +371,12 @@ describe("the privacy answer claims only what open code shows", () => {
     it: flatten(siteIt as Tree),
     pt: flatten(sitePt as Tree),
   } as const;
+  // The encryption happens on the device, in the open code, so anyone can check how it works.
   const ANSWER = {
-    es: "El código es abierto: cualquiera puede leer el código que los maneja.",
-    en: "The code is open source: anyone can read the code that handles it.",
-    it: "Il codice è open source: chiunque può leggere il codice che li gestisce.",
-    pt: "O código é aberto: qualquer pessoa pode ler o código que os trata.",
+    es: "El código es abierto: cualquiera puede revisar cómo se cifran.",
+    en: "The code is open source: anyone can check how it is encrypted.",
+    it: "Il codice è open source: chiunque può verificare come vengono cifrati.",
+    pt: "O código é aberto: qualquer pessoa pode verificar como são encriptados.",
   } as const;
 
   for (const locale of LANGUAGES) {
@@ -483,9 +484,9 @@ describe("the automatic capture copy", () => {
       }
     });
 
-    it(`${locale}: says Android, Revolut and Google Wallet`, () => {
+    it(`${locale}: says Revolut and Google Wallet, with no "soon" badge on the card`, () => {
       const copy = site[locale];
-      expect(copy["landing.capture.card.badge"]).toContain("Android");
+      expect(copy["landing.capture.card.badge"]).toBeUndefined();
       expect(copy["landing.capture.card.body"]).toContain("Revolut");
       expect(copy["landing.capture.card.body"]).toContain("Google Wallet");
       expect(copy["landing.capture.steps.next.body"]).toContain("Revolut");

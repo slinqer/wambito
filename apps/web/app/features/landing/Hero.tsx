@@ -3,17 +3,15 @@ import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
 import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
-import { HeroMascot } from "./HeroMascot.tsx";
 import { appLinkProps, demoLinkProps } from "./links.ts";
 import { MoneyHeadline } from "./MoneyHeadline.tsx";
 import { NewTabHint } from "./NewTabHint.tsx";
-import { CodeLink } from "./OpenSource.tsx";
 
 /**
  * The headline with "lukas" ("money", "dinheiro", "soldi") on a gold marker, taking turns with what
- * money is called elsewhere, one line that introduces Wambi, one primary action and "Pruébalo sin cuenta" (the demo)
- * beside it, with the perks under them, and Wambi waving. Without an app to open (landing-only, coming soon) there
- * is no demo either, so only the primary action shows.
+ * money is called elsewhere, one line about what Wambito does, one primary action and "Pruébalo sin
+ * cuenta" (the demo) beside it. Without an app to open
+ * (landing-only, coming soon) there is no demo either, so only the primary action shows.
  */
 export function Hero() {
   const t = useTranslations("landing.hero");
@@ -41,12 +39,8 @@ export function Hero() {
               </PressLink>
             )}
           </div>
-          <p className="lk-landing-perks">
-            {t.rich("perks", { github: (chunks) => <CodeLink>{chunks}</CodeLink> })}
-          </p>
         </div>
       </div>
-      <HeroMascot />
     </section>
   );
 }

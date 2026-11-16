@@ -2,13 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { expectEdge, expectFocusRing, expectTarget } from "../../../.storybook/story-utils.ts";
+import { AgentDemo } from "./AgentDemo.tsx";
+import { AutomaticCapture } from "./AutomaticCapture.tsx";
 import { Faq } from "./Faq.tsx";
 import { Footer } from "./Footer.tsx";
 import { Hero } from "./Hero.tsx";
 import { HowItWorks } from "./HowItWorks.tsx";
 import { Landing } from "./Landing.tsx";
-import { ANDROID_APK_HREF, ANDROID_RELEASE_HREF } from "./links.ts";
-import { NoMoreSpreadsheet } from "./NoMoreSpreadsheet.tsx";
+import { ANDROID_APK_HREF } from "./links.ts";
 import { OpenSource } from "./OpenSource.tsx";
 import { SiteHeader } from "./SiteHeader.tsx";
 import { UseItYourWay } from "./UseItYourWay.tsx";
@@ -72,7 +73,7 @@ export const PageDayEnglish: Story = {
 /**
  * Hero: no handwritten note any more, the headline with "lukas" on the gold marker (taking turns with
  * what money is called elsewhere, each with its flag), one primary action
- * on its edge with the perks (open source links to GitHub), Wambi waving.
+ * on its edge, no perks line under it, and Wambi standing still.
  */
 export const HeroSection: Story = {
   render: () => <Hero />,
@@ -84,9 +85,12 @@ export const HeroSection: Story = {
     await expect(headline).toHaveAccessibleName("Tus lukas, por fin claras.");
     await expect(headline.querySelector(".lk-landing-marker")).toHaveTextContent("lukas");
     await expect(headline.querySelector(".lk-landing-flag")).toHaveTextContent("🇨🇴");
-    await expect(
-      canvas.getByRole("link", { name: "Código abierto (se abre en una pestaña nueva)" }),
-    ).toHaveAttribute("href", "https://github.com/slinqer/wambito");
+    // No perks line under the actions any more (free, open source, no passwords).
+    await expect(canvasElement.querySelector(".lk-landing-perks")).toBeNull();
+    await expect(canvas.queryByRole("link", { name: /Código abierto/ })).toBeNull();
+    // Two app-icon tiles inside the headline, decorative.
+    const tiles = [...headline.querySelectorAll("[aria-hidden='true'] [data-tile]")];
+    await expect(tiles.map((tile) => tile.getAttribute("data-tile"))).toEqual(["app", "notice"]);
     await expect(canvas.getByRole("link", { name: "Pruébalo sin cuenta" })).toHaveAttribute(
       "href",
       "/demo?lang=es",
@@ -96,11 +100,8 @@ export const HeroSection: Story = {
     await expectTarget(cta);
     await userEvent.tab();
     await expectFocusRing(cta);
-    const mascot = canvas.getByRole("img", { name: /Wambi/ });
-    await expect(mascot).toHaveAttribute("data-slot", "hero-mascot");
-    await expect(mascot.querySelector(".lk-wambi")).toHaveAttribute("aria-hidden", "true");
-    // He waves once and rests: the hero's sprite plays its sheet a single time.
-    await expect(mascot.querySelector(".lk-wambi-sprite")).toHaveClass("is-once");
+    // No Wambi in the hero any more: he jumps further down, by the feature grid's title.
+    await expect(canvasElement.querySelector(".lk-wambi")).toBeNull();
   },
 };
 
@@ -153,112 +154,212 @@ export const HeadlineItalian: Story = {
   play: headlineTurns("soldi", "grana", "🇮🇹", "La tua grana🇮🇹, finalmente chiara."),
 };
 
-/** Hero under reduced motion: Wambi holds still. */
-export const HeroReducedMotion: Story = {
-  render: () => <Hero />,
-  parameters: { reducedMotion: true },
-  play: async ({ canvasElement }) => {
-    const wambi = canvasElement.querySelector(".lk-wambi") as HTMLElement;
-    await expect(wambi.getAnimations({ subtree: true })).toHaveLength(0);
-  },
-};
-
-/** Web is live; Android downloads the APK (iOS is coming); the AI assistants are coming soon. */
+/**
+ * Android downloads the APK from GitHub (Google Play coming soon), iOS is coming soon on the App
+ * Store; no web card, and no agent card (the agent has its own section).
+ */
 export const UseItYourWaySection: Story = {
   render: () => <UseItYourWay />,
   globals: { theme: "day" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("listitem")).toHaveLength(3);
-    const start = canvas.getByRole("link", { name: "Empezar" });
-    await expect(start).toHaveAttribute("href", "/sign-in?lang=es");
-    await expectTarget(start);
-    await expect(canvas.getAllByText("Pronto")).toHaveLength(1);
-    const apk = canvas.getByRole("link", { name: "Descargar para Android" });
+    await expect(canvas.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+      "App para Android",
+      "App para iOS",
+    ]);
+    await expect(canvas.queryByRole("link", { name: "Empezar" })).toBeNull();
+    await expect(canvas.getAllByText("Pronto")).toHaveLength(2);
+    await expect(canvas.getByText("Google Play").parentElement).toHaveTextContent(
+      "Google PlayPronto",
+    );
+    await expect(canvas.getByText("App Store").parentElement).toHaveTextContent("App StorePronto");
+    const apk = canvas.getByRole("link", { name: "Desde GitHub" });
     await expect(apk).toHaveAttribute("href", ANDROID_APK_HREF);
     await expect(apk).not.toHaveAttribute("target");
-    const all = canvas.getByRole("link", { name: /Otras versiones/ });
-    await expect(all).toHaveAttribute("href", ANDROID_RELEASE_HREF);
-    await expect(all).toHaveAttribute("target", "_blank");
-    await expect(canvas.getByText("En iOS, pronto.")).toBeVisible();
-    await expect(canvas.getByText("Claude / ChatGPT")).toBeVisible();
-    await expect(canvas.getByRole("heading", { name: "App para Android y iOS" })).toBeVisible();
+    // No "other versions" link: the stores are button-shaped, not links.
+    await expect(canvas.queryByRole("link", { name: /Otras versiones/ })).toBeNull();
+    await expect(canvas.getAllByRole("link")).toHaveLength(1);
+    await expect(canvas.queryByText("Claude / ChatGPT")).toBeNull();
+    // Each card shows its brands' logos, decorative: the heading already names them.
+    const logos = [...canvasElement.querySelectorAll("#ways li")].map((card) =>
+      [...card.querySelectorAll("[data-logo]")].map((logo) => logo.getAttribute("data-logo")),
+    );
+    await expect(logos).toEqual([
+      ["android", "github", "googleplay"],
+      ["apple", "appstore"],
+    ]);
+    for (const logo of canvasElement.querySelectorAll("[data-logo]")) {
+      await expect(logo.closest("[aria-hidden='true']")).not.toBeNull();
+      await expect(logo.querySelector("path")?.getAttribute("d")).toMatch(/^[Mm]/);
+    }
   },
 };
 
-/** No more spreadsheet: a heading, Wambi shredding a spreadsheet, and three before/after rows. */
-export const NoMoreSpreadsheetSection: Story = {
-  render: () => <NoMoreSpreadsheet />,
+/**
+ * Automatic capture, under the hero: its heading, the line naming Revolut and Google Wallet, a
+ * real link to its page, and the notification turning into an expense, decorative.
+ */
+export const AutomaticCaptureSection: Story = {
+  render: () => <AutomaticCapture pace={0.2} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { level: 2 })).toHaveAccessibleName(
-      "Chao al Excel de gastos.",
+    await expect(canvas.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "¡Wambi anota los gastos por ti!",
     );
-    // Light: no subtitle and no column labels, only the heading, Wambi and the rows.
-    await expect(canvasElement).not.toHaveTextContent("Sin fórmulas");
-    await expect(canvasElement.querySelector(".lk-landing-compare-labels")).toBeNull();
-    const art = canvas.getByRole("img", {
-      name: "Wambi, contento, mete una hoja de cálculo en una trituradora de papel",
+    await expect(canvasElement).toHaveTextContent("Revolut");
+    await expect(canvasElement).toHaveTextContent("Google Wallet");
+    await expect(canvas.getByRole("link", { name: "¿Cómo funciona?" })).toHaveAttribute(
+      "href",
+      "/automatic-capture",
+    );
+    await expect(canvasElement.querySelector(".lk-landing-panel")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    // No "soon" badge: the capture is in the Android app today.
+    await expect(canvasElement.querySelector(".lk-landing-soon")).toBeNull();
+    // Google Wallet's notification, in pesos in Spanish (the demo currency per language).
+    const panel = canvasElement.querySelector<HTMLElement>(".lk-landing-capture-play");
+    if (!panel) throw new Error("no panel");
+    await expect(panel.querySelector(".lk-capture-notif")).toHaveAttribute(
+      "data-source",
+      "googlewallet",
+    );
+    await expect(panel.querySelector(".lk-capture-notif")).toHaveTextContent("Google Wallet");
+    await expect(panel.querySelector(".lk-capture-notif")).toHaveTextContent("$50.000");
+    // On a loop while on screen: the notification drops in, the arrow, then "logged", and again.
+    const seen = new Set<string>();
+    await waitFor(
+      () => {
+        seen.add(panel.dataset.phase ?? "");
+        expect([...seen]).toEqual(expect.arrayContaining(["notify", "arrow", "logged"]));
+      },
+      { timeout: 4000, interval: 20 },
+    );
+    await waitFor(() => expect(panel.dataset.phase).toBe("notify"), {
+      timeout: 2000,
+      interval: 20,
     });
-    await expect(art).toHaveAttribute("src", "/wambi/shredder.webp");
-    await expect(art).toHaveAttribute("loading", "lazy");
-    // The scroll film: eight poses, from shredding the sheet to showing Wambito on a phone, decorative (the still says it).
-    const poses = canvasElement.querySelectorAll<HTMLImageElement>(".lk-landing-nosheet-pose");
-    await expect(poses).toHaveLength(8);
-    for (const [index, pose] of [...poses].entries()) {
-      await expect(pose).toHaveAttribute("src", `/wambi/shredder/${index + 1}.webp`);
-      await expect(pose).toHaveAttribute("alt", "");
-      await expect(pose).toHaveAttribute("loading", "lazy");
-    }
-    await expect(canvas.getAllByRole("img")).toHaveLength(1);
-    // Three pains of a spreadsheet, each beside how Wambito solves it; screen readers hear which is which.
-    const rows = canvas.getAllByRole("listitem");
-    await expect(rows).toHaveLength(3);
-    await expect(rows[0]).toHaveTextContent(
-      "Con un Excel: Abres el computador, buscas el archivo y bajas hasta la última fila.",
-    );
-    await expect(rows[0]).toHaveTextContent(
-      "Con Wambito: Lo anotas en segundos, también desde el celular.",
-    );
-    await expect(rows[2]).toHaveTextContent("Con Wambito: Tus presupuestos te avisan antes.");
   },
 };
 
-/** Four steps with decorative illustrations, money in the locale's format. */
+/**
+ * Your agent: the heading, the way in and the two assistants' logos, and a chat whose three
+ * examples take turns while it is on screen: Uber this month, the budgets, where the money went.
+ */
+export const AgentDemoSection: Story = {
+  render: () => <AgentDemo pace={0.1} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Tu agente analiza tus gastos.",
+    );
+    await expect(canvas.getByRole("link", { name: /Conecta tu agente/ })).toHaveAttribute(
+      "href",
+      "/sign-in?lang=es",
+    );
+    const logos = [...canvasElement.querySelectorAll("[data-logo]")].map((logo) =>
+      logo.getAttribute("data-logo"),
+    );
+    await expect(logos).toEqual(["claude", "openai"]);
+    const chat = canvasElement.querySelector<HTMLElement>(".lk-landing-chat");
+    if (!chat) throw new Error("no chat");
+    await expect(chat).toHaveAttribute("aria-hidden", "true");
+    // In view, three examples take turns, each with its question, Wambito thinking, then its answer.
+    const answer = (example: string) =>
+      waitFor(
+        () => {
+          expect(chat.dataset.example).toBe(example);
+          expect(chat.dataset.phase).toBe("answer");
+        },
+        { timeout: 2000, interval: 20 },
+      );
+    await answer("uber");
+    await expect(chat).toHaveTextContent("¿Cuánto me gasté en Uber este mes?");
+    // Pesos in Spanish (the demo currency per language).
+    await expect(chat).toHaveTextContent("Este mes llevas $345.600 en Uber, en 7 viajes");
+    await expect(chat.querySelectorAll(".lk-landing-chat-card li")).toHaveLength(3);
+    await expect(chat.querySelector(".lk-landing-shimmer")).toBeNull();
+    await expect(chat.querySelectorAll(".lk-landing-chat-dots > .is-on")).toHaveLength(1);
+    await answer("budgets");
+    await expect(chat).toHaveTextContent("¿Cómo van mis presupuestos?");
+    await expect(chat.querySelectorAll(".lk-landing-chat-card .lk-bar")).toHaveLength(3);
+    // Near its limit (85%), restaurants' bar is yellow.
+    await expect(chat.querySelector(".lk-landing-budget .lk-bar")).toHaveClass("is-near");
+    await answer("top");
+    await expect(chat).toHaveTextContent("¿En qué se me fue más plata este mes?");
+    await expect(chat.querySelectorAll(".lk-landing-column")).toHaveLength(4);
+    // Then round again.
+    await answer("uber");
+  },
+};
+
+/** Six features, each with its name, a line and a decorative illustration, money in the locale's format. */
 export const HowItWorksSection: Story = {
   render: () => <HowItWorks />,
   globals: { locale: "en" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
-      "Log your expenses by voice",
+    const title = canvas.getByRole("heading", { level: 2 });
+    await expect(title).toHaveAccessibleName("Your whole month, in one app.");
+    // Wambi jumps for joy after the title: one still frame, decorative.
+    const wambi = title.querySelector("[data-wambi-spot='how']");
+    await expect(wambi).toHaveAttribute("aria-hidden", "true");
+    const sprite = wambi?.querySelector<HTMLElement>(".lk-wambi-sprite");
+    await expect(sprite).not.toHaveClass("is-playing");
+    await expect(sprite?.getAnimations() ?? []).toHaveLength(0);
+    // Each card's name (the badge aside).
+    const names = canvas
+      .getAllByRole("heading", { level: 3 })
+      .map((h) => h.firstChild?.textContent);
+    await expect(names).toEqual([
       "See where it goes",
       "Budgets that give you a heads-up",
+      "Fixed payments, no surprises",
+      "Only you can read your data",
       "Bring your history",
-      "Wambi logs your expenses for you!",
+      "Sign in without passwords",
     ]);
-    for (const demo of canvasElement.querySelectorAll(".lk-landing-demo")) {
+    const demos = canvasElement.querySelectorAll(".lk-landing-demo");
+    await expect(demos).toHaveLength(6);
+    for (const demo of demos) {
       await expect(demo).toHaveAttribute("aria-hidden", "true");
     }
-    // The voice card: what you say to Wambi, then the expense it logs.
-    await expect(canvasElement).toHaveTextContent("I spent 3 euros on coffee");
-    await expect(canvasElement).toHaveTextContent("Coffee−€3.00");
-    await expect(canvasElement).toHaveTextContent("From the Android app's widget.");
-    await expect(canvasElement).toHaveTextContent("€46.33 left");
+    // Automatic capture has its own section now, and the voice and month cards are gone.
+    await expect(canvasElement).not.toHaveTextContent("Wambi logs your expenses for you!");
+    await expect(canvasElement).not.toHaveTextContent("I spent 3 euros on coffee");
+    await expect(canvasElement).not.toHaveTextContent("Your month at a glance");
+    await expect(canvasElement).toHaveTextContent("Due in 3 days");
+    await expect(canvasElement).toHaveTextContent("Due in 9 days");
+    // End-to-end encryption, live (no "soon"): not even Wambito reads it; the expense on the phone,
+    // scrambled on the server.
+    const vault = canvas
+      .getByRole("heading", { name: "Only you can read your data" })
+      .closest("li");
+    await expect(vault).toHaveTextContent("not even Wambito");
+    await expect(vault).not.toHaveTextContent("Soon");
+    await expect(vault).toHaveTextContent("On your phone");
+    await expect(vault).toHaveTextContent("What the server sees");
+    // Dollars in English (the demo currency per language).
+    await expect(vault).toHaveTextContent("−$4.50");
+    await expect(canvasElement).toHaveTextContent("482 913");
+    await expect(canvasElement).toHaveTextContent("$46.33 left");
     await expect(canvasElement).toHaveTextContent("1,248 transactions ready");
     await expect(canvasElement).toHaveTextContent("Budge today, Buddy and others soon.");
   },
 };
 
 /**
- * "How it works" cards come alive on hover (and on tap, on phones): the mic pulses, what you said
- * and the expense slide in and "¡Anotado!" bounces; the donut sweeps in clockwise from the top as
- * in the app's insights; the budget bars fill up; the file pushes the arrow. Once per hover.
+ * The cards play by themselves once on screen, no pointer needed, and again every few seconds
+ * while they stay there: the donut sweeps in clockwise from the top as in the app's insights; the
+ * budget bars fill up; the file pushes the arrow; the expense is locked and leaves scrambled.
+ * Nothing waits for a hover any more. `pace` runs it fast here.
  */
-export const HowItWorksHover: Story = {
-  render: () => <HowItWorks />,
-  play: async () => {
-    const hovered = new Map<string, string>();
+export const HowItWorksPlays: Story = {
+  render: () => <HowItWorks pace={0.1} />,
+  play: async ({ canvasElement }) => {
+    const playing = new Map<string, string>();
+    const hovered: string[] = [];
     for (const sheet of document.styleSheets) {
       let rules: CSSRuleList;
       try {
@@ -268,12 +369,13 @@ export const HowItWorksHover: Story = {
       }
       const walk = (list: CSSRuleList) => {
         for (const rule of list) {
-          if (
-            rule instanceof CSSStyleRule &&
-            rule.selectorText.includes(".lk-landing-card:hover")
-          ) {
+          if (rule instanceof CSSStyleRule && rule.selectorText.includes(".lk-landing-card")) {
             // With var() in the shorthand the longhands read empty, so take the whole declaration.
-            hovered.set(rule.selectorText, rule.style.getPropertyValue("animation"));
+            const animation = rule.style.getPropertyValue("animation");
+            if (rule.selectorText.includes("[data-play]"))
+              playing.set(rule.selectorText, animation);
+            if (/:hover|:active/.test(rule.selectorText) && animation)
+              hovered.push(rule.selectorText);
           }
           if ("cssRules" in rule) walk((rule as CSSGroupingRule).cssRules);
         }
@@ -281,46 +383,56 @@ export const HowItWorksHover: Story = {
       walk(rules);
     }
     const animated = (part: string) =>
-      [...hovered].some(([selector, name]) => selector.includes(part) && /lk-landing-/.test(name));
+      [...playing].some(([selector, name]) => selector.includes(part) && /lk-landing-/.test(name));
     for (const part of [
-      ".lk-landing-saved",
       ".lk-landing-donut",
       ".lk-landing-legend",
       ".lk-bar",
       ".lk-landing-arrow",
-      ".lk-landing-mic",
-      ".lk-landing-said",
+      ".lk-landing-lock",
+      ".lk-landing-sealed",
     ]) {
       await expect(animated(part), part).toBe(true);
+    }
+    await expect(hovered).toEqual([]);
+
+    // Each card on screen plays, then plays again while it stays there.
+    const cards = [...canvasElement.querySelectorAll<HTMLElement>(".lk-landing-cards.is-how > li")];
+    await expect(cards).toHaveLength(6);
+    for (const card of cards) {
+      card.scrollIntoView({ block: "center" });
+      await waitFor(() => expect(card).toHaveAttribute("data-play"));
+      const first = Number(card.dataset.play);
+      await waitFor(() => expect(Number(card.dataset.play)).toBeGreaterThan(first), {
+        timeout: 2000,
+      });
     }
   },
 };
 
 /**
- * "Bring your history": under the pointer the count runs from 0 up to 1248 transactions, then a
- * check pops to confirm. The budget card's near bar turns from green to yellow as it fills.
+ * "Bring your history": once on screen the count runs from 0 up to 1248 transactions, then a check
+ * pops to confirm. Without JavaScript it shows the final count, confirmed. The budget card's near
+ * bar turns from green to yellow as it fills.
  */
 export const HowItWorksImportCount: Story = {
-  render: () => <HowItWorks />,
+  render: () => <HowItWorks pace={0.5} />,
   play: async ({ canvasElement }) => {
-    const imported = canvasElement.querySelector<HTMLElement>(".lk-landing-imported");
-    const card = imported?.closest("li");
-    if (!imported || !card) throw new Error("no import card");
-    // Without a hover it shows the final count, confirmed.
-    await expect(imported).toHaveTextContent("1248 movimientos listos");
-    await expect(imported).toHaveAttribute("data-state", "done");
-    card.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
-    await waitFor(() => expect(imported).toHaveAttribute("data-state", "counting"));
-    const midway = Number(imported.textContent?.replace(/\D/g, ""));
+    const card = canvasElement.querySelector<HTMLElement>(".lk-landing-imported")?.closest("li");
+    if (!card) throw new Error("no import card");
+    const imported = () => card.querySelector<HTMLElement>(".lk-landing-imported");
+    card.scrollIntoView({ block: "center" });
+    await waitFor(() => expect(imported()).toHaveAttribute("data-state", "counting"));
+    const midway = Number(imported()?.textContent?.replace(/\D/g, ""));
     await expect(midway).toBeLessThan(1248);
     await waitFor(
       () => {
-        expect(imported).toHaveAttribute("data-state", "done");
-        expect(imported).toHaveTextContent("1248 movimientos listos");
+        expect(imported()).toHaveAttribute("data-state", "done");
+        expect(imported()).toHaveTextContent("1248 movimientos listos");
       },
       { timeout: 4000 },
     );
-    await expect(imported.querySelector(".lk-landing-imported-check")).not.toBeNull();
+    await expect(imported()?.querySelector(".lk-landing-imported-check")).not.toBeNull();
 
     // The near bar's fill changes color on the way: green first, yellow at the end.
     const fillNear = [...document.styleSheets]
@@ -398,7 +510,7 @@ export const HeaderLanguageMenu: Story = {
 };
 
 /**
- * Scroll reveals: cards, section headings, FAQ questions and the before/after rows rise into place
+ * Scroll reveals: cards, section headings and FAQ questions rise into place
  * as they scroll in, driven by the scroll itself (CSS view timelines, no JavaScript). The hero and
  * the closing hold still: the traveling Wambi lands on their spots.
  */
@@ -413,31 +525,9 @@ export const ScrollReveal: Story = {
       "#ways .lk-landing-card",
       "#how .lk-landing-section-head",
       "#faq .lk-landing-faq > li",
-      "#spreadsheet .lk-landing-compare-row .is-before",
-      "#spreadsheet .lk-landing-compare-row .is-after",
     ]) {
       await expect(scrollDriven(canvasElement.querySelector(selector)), selector).toHaveLength(1);
     }
-    // The before/after rows slide in from opposite sides.
-    const startX = (selector: string) => {
-      const [animation] = scrollDriven(canvasElement.querySelector(selector));
-      const from = (animation?.effect as KeyframeEffect | undefined)?.getKeyframes()[0];
-      return String(from?.translate ?? "").split(" ")[0];
-    };
-    await expect(startX("#spreadsheet .lk-landing-compare-row .is-before")).toBe("-24px");
-    await expect(startX("#spreadsheet .lk-landing-compare-row .is-after")).toBe("24px");
-    // Wambi's poses cross-fade with the scroll of the spreadsheet's stage, one after the other.
-    const poses = [...canvasElement.querySelectorAll("#spreadsheet .lk-landing-nosheet-pose")];
-    await expect(poses).toHaveLength(8);
-    for (const pose of poses) {
-      await expect(scrollDriven(pose)).toHaveLength(1);
-    }
-    // `rangeStart` is not in TypeScript's DOM types yet.
-    type Ranged = Animation & { rangeStart?: { offset?: unknown } };
-    const starts = poses.map((pose) =>
-      String((scrollDriven(pose)[0] as Ranged | undefined)?.rangeStart?.offset ?? ""),
-    );
-    await expect(new Set(starts).size).toBe(8);
     await expect(scrollDriven(canvasElement.querySelector("#hero"))).toHaveLength(0);
     await expect(scrollDriven(canvasElement.querySelector(".lk-landing-closing"))).toHaveLength(0);
   },

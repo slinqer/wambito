@@ -4,16 +4,14 @@ import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
 import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
-import { LiveWambiBoundary, useLiveWambiReady } from "../../wambi/live-support.tsx";
-import { TravelingWambi as TravelingWambi2D } from "../../wambi/TravelingWambi.tsx";
-import { LANDING_ART, Wambi } from "../../wambi/Wambi.tsx";
+import { AgentDemo } from "./AgentDemo.tsx";
+import { AutomaticCapture } from "./AutomaticCapture.tsx";
 import { Faq } from "./Faq.tsx";
 import { Footer } from "./Footer.tsx";
 import { Hero } from "./Hero.tsx";
 import { HowItWorks } from "./HowItWorks.tsx";
 import { appLinkProps } from "./links.ts";
 import { NewTabHint } from "./NewTabHint.tsx";
-import { NoMoreSpreadsheet } from "./NoMoreSpreadsheet.tsx";
 import { OpenSource } from "./OpenSource.tsx";
 import { useButtonGlow } from "./pointer-glow.ts";
 import { SiteHeader } from "./SiteHeader.tsx";
@@ -21,54 +19,61 @@ import { UseItYourWay } from "./UseItYourWay.tsx";
 import "./landing.css";
 
 /**
- * The live, 2.5D Wambi (the founder's sprite sheets plus CSS depth), mounted once the page has
- * loaded and the browser is idle. He stands on the page's two Wambi spots, the hero and the
- * closing: he waves once there, then goes straight to the closing and celebrates once. Until then,
- * under reduced motion and without JavaScript, the prerendered 2D Wambi in both spots stays. (The 3D Wambi is an experiment in
- * `app/wambi/experimental/` and never loads here.)
+ * A button label in two halves around Wambi, which read back as the label with a space between
+ * them: after " ·" when there is one ("Muy pronto ·" / "Síguelo en GitHub"), else at the first
+ * space ("Empieza" / "ahora").
  */
-function TravelingWambi() {
-  const ready = useLiveWambiReady();
-  if (!ready) return null;
-  return (
-    <LiveWambiBoundary>
-      <TravelingWambi2D />
-    </LiveWambiBoundary>
-  );
+export function seatHalves(label: string): [string, string] {
+  const dot = label.indexOf(" · ");
+  if (dot >= 0) return [label.slice(0, dot + 2), label.slice(dot + 3)];
+  const space = label.indexOf(" ");
+  if (space < 0) return [label, ""];
+  return [label.slice(0, space), label.slice(space + 1)];
 }
 
-/** The last nudge, where Wambi lands to celebrate. */
+/**
+ * The last nudge: a big title, where Wambito comes from (or, before the app opens, that it is being
+ * built in the open), and one big "Empieza ahora" with Wambi sitting in its middle, resting, eyes
+ * closed (`docs/brand/wambi-resting.webp`): the label splits around him, "EMPIEZA · AHORA", and his
+ * legs hang in the gap. He is a picture on top of the button that lets the pointer through: the
+ * whole button stays pressable under him, and its name is the label as it reads.
+ */
 function Closing() {
   const t = useTranslations("landing");
   const { locale } = useLocale();
   const app = appLinkProps(locale);
   // Honest about where the app is: not open yet, or open to everyone.
   const closingBody = COMING_SOON ? "closing.body_soon" : "closing.body";
+  const [before, after] = seatHalves(t(COMING_SOON ? "hero.cta_soon" : "hero.cta"));
   return (
     <section id="closing" className="lk-landing-section" aria-labelledby="closing-title">
       <div className="lk-landing-closing">
-        <span
-          className="lk-landing-spot is-closing"
-          data-wambi-spot="closing"
-          data-wambi-pose="celebrate"
-          aria-hidden="true"
-        >
-          {/* He celebrates once (frame 4, fists up, at rest); nothing on the landing loops. */}
-          <Wambi
-            mood="celebrating"
-            size="100%"
-            decorative
-            deferUntilNear
-            art={LANDING_ART.celebrate}
-            playOnce
-          />
-        </span>
         <h2 id="closing-title">{t("closing.title")}</h2>
         <p>{t(closingBody)}</p>
-        <PressLink {...app} className={cx(COMING_SOON && "is-soon")}>
-          {t(COMING_SOON ? "hero.cta_soon" : "hero.cta")}
-          <NewTabHint target={app.target} />
-        </PressLink>
+        <div className="lk-landing-seat">
+          <PressLink {...app} className={cx("lk-landing-seat-cta", COMING_SOON && "is-soon")}>
+            <span className="lk-landing-seat-before">{before}</span>{" "}
+            <span className="lk-landing-seat-gap" aria-hidden="true" />
+            <span className="lk-landing-seat-after">{after}</span>
+            <NewTabHint target={app.target} />
+          </PressLink>
+          <span
+            className="lk-landing-spot is-closing"
+            data-wambi-spot="closing"
+            data-wambi-pose="resting"
+            aria-hidden="true"
+          >
+            <img
+              className="lk-landing-resting"
+              src="/wambi/resting.webp"
+              alt=""
+              width={512}
+              height={512}
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
+        </div>
       </div>
     </section>
   );
@@ -86,15 +91,15 @@ export function Landing() {
       <SiteHeader page="landing" />
       <main className="lk-landing-wrap">
         <Hero />
-        <NoMoreSpreadsheet />
+        <AutomaticCapture />
         <HowItWorks />
+        <AgentDemo />
         <UseItYourWay />
         <OpenSource />
         <Faq />
         <Closing />
       </main>
       <Footer />
-      <TravelingWambi />
     </div>
   );
 }

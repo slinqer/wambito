@@ -38,6 +38,27 @@ export function MoneyHeadline() {
   );
 }
 
+/** Wambito's own icon as a tile between the words: decorative. */
+function AppTile() {
+  return (
+    <span className="lk-landing-tile is-app" data-tile="app">
+      <img src="/favicon.svg" alt="" width={64} height={64} decoding="async" />
+    </span>
+  );
+}
+
+/** A bank notification turning into a logged expense (a bell with a check): decorative. */
+function NoticeTile() {
+  return (
+    <span className="lk-landing-tile is-notice" data-tile="notice">
+      <svg viewBox="0 0 24 24">
+        <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+        <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+      </svg>
+    </span>
+  );
+}
+
 /** The headline around a word, with `piece` for each part that turns. */
 function Words({
   locale,
@@ -62,9 +83,9 @@ function Words({
         </span>
         ,
       </span>{" "}
-      {middle}{" "}
+      <AppTile /> {middle}{" "}
       <span className="lk-swap-word">
-        {last[0]}
+        <NoticeTile /> {last[0]}
         {piece(last[1])}.
       </span>
     </>
