@@ -6,6 +6,10 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' show sha1;
 
+/// The namespace of the seeded records' ids and of the merchant memory's: an account's own
+/// namespace is `uuidv5(seedNamespace, userId)`.
+const seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
+
 final Random _random = Random.secure();
 
 String _hex(Uint8List bytes) {

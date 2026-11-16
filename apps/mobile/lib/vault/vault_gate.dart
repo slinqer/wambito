@@ -5,7 +5,7 @@ import '../local/prf.dart';
 import '../local/vault_session.dart' show VaultOpenError;
 
 /// The vault gate's state machine: what a preview account sees before the app. The Dart twin of
-/// apps/web/app/features/vault/vault-gate.ts, without pairing (stage 3b). No Flutter and no
+/// apps/web/app/features/vault/vault-gate.ts. No Flutter and no
 /// storage here; every effect comes in as a dependency ([VaultGateDeps]), so the tests drive it
 /// with fakes.
 ///
@@ -14,7 +14,17 @@ import '../local/vault_session.dart' show VaultOpenError;
 ///        ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
 ///        │     (a guest commits at once, nothing to show)                │
 ///        └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
+///                                │     └─ "Add this phone from another device" ─▶ pairing
+///                                │                                  └─ finish() ─▶ opening
 ///                                └─ the sign-in's passkey PRF opens a wrap ─▶ opening
+///
+/// Pairing: Unlock's "Add this phone from another device" (and a guest's Locked, which has
+/// nothing else to open with) enters [Pairing]. The screen starts a request through
+/// [VaultGate.startPairing] (again for "Start again": the previous one is cancelled) and shows its
+/// QR and code; the gate watches the request's `finish()`, and a finished pairing opens like a
+/// recovery unlock (the pending passkey gets its wrap, the vault opens fresh). A failed pairing
+/// stays on its screen, which shows why; [VaultGate.leavePairing] cancels it and goes back, and a
+/// disposed gate cancels it too: a pairing that ended, was left or expired never keeps polling.
 ///
 /// Passkeys: a passkey sign-in's PRF, when the app keeps one ([VaultGateDeps.takeSignInPrf]), is
 /// tried first on an account with keys elsewhere; when it opens nothing, Unlock shows, and once the
@@ -51,7 +61,8 @@ enum LockedKind { error, offline, unsupported, guest }
 sealed class VaultGateState<S> {
   const VaultGateState();
 
-  /// The TS `status`: `checking`, `setup`, `committing`, `unlock`, `opening`, `ready`, `locked`.
+  /// The TS `status`: `checking`, `setup`, `committing`, `unlock`, `pairing`, `opening`, `ready`,
+  /// `locked`.
   String get status;
 }
 
@@ -130,6 +141,28 @@ final class Unlock<S> extends VaultGateState<S> {
   String toString() => 'Unlock(notice: $notice)';
 }
 
+/// Where the person came from to pair: Unlock, or a guest's Locked.
+enum PairingFrom { unlock, guest }
+
+/// The pairing screen: this phone asks another device to open its data (QR and code).
+final class Pairing<S> extends VaultGateState<S> {
+  const Pairing(this.from);
+
+  final PairingFrom from;
+
+  @override
+  String get status => 'pairing';
+
+  @override
+  bool operator ==(Object other) => other is Pairing && other.from == from;
+
+  @override
+  int get hashCode => Object.hash(status, from);
+
+  @override
+  String toString() => 'Pairing($from)';
+}
+
 final class Opening<S> extends VaultGateState<S> {
   const Opening();
 
@@ -202,6 +235,24 @@ class GatePrepared<K> {
   final Future<K> Function() commit;
 }
 
+/// A new phone's pairing request (`local/pairing.dart` `NewDevicePairing`, keys opaque): what the
+/// screen shows and what the gate waits on. [finish] resolves once this phone holds the keys.
+abstract interface class GatePairing<K> {
+  String get id;
+
+  /// 8 Crockford characters, to type on the approving device.
+  String get code;
+
+  /// `wambito://pair?id=<id>&key=<base64url N.pub>`
+  String get qr;
+  String get expiresAt;
+
+  /// The 6 digits both devices show, once the other device answered.
+  Future<String> number();
+  Future<K> finish();
+  void cancel();
+}
+
 class VaultGateDeps<K, S> {
   const VaultGateDeps({
     required this.loadLocalKeys,
@@ -217,6 +268,7 @@ class VaultGateDeps<K, S> {
     this.addPasskeyWrap,
     this.evaluatePrf,
     this.accountPasskeyIds,
+    this.startPairing,
   });
 
   /// The keys this phone kept, or null.
@@ -259,6 +311,9 @@ class VaultGateDeps<K, S> {
 
   /// The account's passkey credential ids, so Unlock offers only those; throws when unknown.
   final Future<List<String>> Function()? accountPasskeyIds;
+
+  /// Asks the relay for a pairing request; another unlocked device approves it.
+  final Future<GatePairing<K>> Function()? startPairing;
 }
 
 /// The codes Unlock shows; anything else is `server`.
@@ -280,7 +335,8 @@ String? gateErrorCode(Object? error) => switch (error) {
 };
 
 LockedKind _lockedKind(Object? error) => switch (gateErrorCode(error)) {
-  'offline' => LockedKind.offline,
+  // `busy`: a headless engine holds the vault's lease for now; like offline, a retry opens.
+  'offline' || 'busy' => LockedKind.offline,
   'unsupported_browser' => LockedKind.unsupported,
   _ => LockedKind.error,
 };
@@ -315,6 +371,13 @@ class VaultGate<K, S> {
 
   bool _disposed = false;
 
+  /// The pairing request the screen shows now; only its `finish()` opens the vault.
+  GatePairing<K>? _pairing;
+
+  /// Bumped by every [startPairing] and by [leavePairing]: only the latest call's request becomes
+  /// current (a quick "Start again", answers out of order).
+  int _pairingCall = 0;
+
   VaultGateState<S> get state => _state;
 
   /// Whether [dispose] ran.
@@ -325,6 +388,8 @@ class VaultGate<K, S> {
   /// deps refuse what it asks for after this (phone only, the web's gate goes with its page).
   void dispose() {
     _disposed = true;
+    _pairingCall++;
+    _dropPairing();
     _keepPending(null);
     _listeners.clear();
   }
@@ -340,6 +405,34 @@ class VaultGate<K, S> {
     for (final listener in List.of(_listeners)) {
       listener();
     }
+  }
+
+  void _dropPairing() {
+    _pairing?.cancel();
+    _pairing = null;
+  }
+
+  /// A finished pairing opens like a recovery unlock; a failed one stays for the screen.
+  Future<void> _watchPairing(GatePairing<K> current) async {
+    final K keys;
+    try {
+      keys = await current.finish();
+    } on Object catch (error) {
+      if (!identical(_pairing, current) || _state is! Pairing) return;
+      switch (gateErrorCode(error)) {
+        case 'session_changed':
+          _pairing = null;
+          await _changed(error, _check);
+        case 'unsupported_browser':
+          _pairing = null;
+          _lock(error, _check);
+      }
+      return;
+    }
+    if (!identical(_pairing, current) || _state is! Pairing) return;
+    _pairing = null;
+    await _wrapPending();
+    await _open(keys, true);
   }
 
   void _keepPending(PasskeyPrf? passkey) {
@@ -615,6 +708,58 @@ class VaultGate<K, S> {
         return null;
     }
     return _unlockError(tried.error);
+  }
+
+  /// "Add this phone from another device" (Unlock, or a guest's Locked): the pairing screen.
+  Future<void> pair() async {
+    final from = switch (_state) {
+      Unlock() => PairingFrom.unlock,
+      Locked(kind: LockedKind.guest) => PairingFrom.guest,
+      _ => null,
+    };
+    if (from == null || _deps.startPairing == null) return;
+    if (!await _sameSession()) return;
+    _set(Pairing(from));
+  }
+
+  /// The pairing screen asks for a request (again for "Start again": the previous one is
+  /// cancelled). Throws a `cancelled` [GateError] when the screen was left or a newer call won.
+  Future<GatePairing<K>> startPairing() async {
+    final start = _deps.startPairing;
+    if (_state is! Pairing || start == null) throw const GateError('cancelled');
+    _dropPairing();
+    final call = ++_pairingCall;
+    final GatePairing<K> next;
+    try {
+      next = await start();
+    } on Object catch (error) {
+      if (call == _pairingCall && gateErrorCode(error) == 'session_changed') {
+        await _changed(error, _check);
+      }
+      rethrow;
+    }
+    if (call != _pairingCall || _state is! Pairing || _disposed) {
+      // A newer call started (it wins), or the screen was left, while this one was made.
+      next.cancel();
+      throw const GateError('cancelled');
+    }
+    _dropPairing();
+    _pairing = next;
+    unawaited(_watchPairing(next));
+    return next;
+  }
+
+  /// The pairing screen's back: cancels the request and returns to where it came from.
+  void leavePairing() {
+    final state = _state;
+    if (state is! Pairing<S>) return;
+    _pairingCall++;
+    _dropPairing();
+    if (state.from == PairingFrom.guest) {
+      _set(const Locked(LockedKind.guest, false));
+    } else {
+      _set(const Unlock());
+    }
   }
 
   /// Locked's retry.

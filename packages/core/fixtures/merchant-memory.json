@@ -1,0 +1,133 @@
+{
+  "$comment": "Shared cases for merchantKey and merchantKeyPrefixes (a merchant name to the key merchant memory matches on, and the shorter keys it may be saved under). A throws expected means the function rejects the input. Run by packages/core/src/fixtures.test.ts and by the Dart port.",
+  "cases": [
+    {
+      "name": "merchantKey accents folded",
+      "fn": "merchantKey",
+      "input": ["Café Ñandú"],
+      "expected": "cafe nandu"
+    },
+    {
+      "name": "merchantKey digit-only tokens dropped",
+      "fn": "merchantKey",
+      "input": ["LIDL 0423 Casal Ribeiro"],
+      "expected": "lidl casal ribeiro"
+    },
+    {
+      "name": "merchantKey punctuation becomes spaces",
+      "fn": "merchantKey",
+      "input": ["McDonald's - Plaza (Centro)"],
+      "expected": "mcdonald s plaza centro"
+    },
+    {
+      "name": "merchantKey uppercase lowered",
+      "fn": "merchantKey",
+      "input": ["NETFLIX.COM"],
+      "expected": "netflix com"
+    },
+    {
+      "name": "merchantKey mixed digits and letters kept",
+      "fn": "merchantKey",
+      "input": ["Uber 3x Trip 24h"],
+      "expected": "uber 3x trip 24h"
+    },
+    {
+      "name": "merchantKey repeated spaces collapsed",
+      "fn": "merchantKey",
+      "input": ["  El   Corte    Inglés  "],
+      "expected": "el corte ingles"
+    },
+    {
+      "name": "merchantKey slashes and underscores",
+      "fn": "merchantKey",
+      "input": ["RAPPI_*COLOMBIA/BOGOTA"],
+      "expected": "rappi colombia bogota"
+    },
+    {
+      "name": "merchantKey portuguese cedilla and tilde",
+      "fn": "merchantKey",
+      "input": ["Pão de Açúcar"],
+      "expected": "pao de acucar"
+    },
+    {
+      "name": "merchantKey italian grave accents",
+      "fn": "merchantKey",
+      "input": ["Caffè Città"],
+      "expected": "caffe citta"
+    },
+    {
+      "name": "merchantKey non latin letters kept",
+      "fn": "merchantKey",
+      "input": ["Мосты 24"],
+      "expected": "мосты"
+    },
+    {
+      "name": "merchantKey only punctuation throws",
+      "fn": "merchantKey",
+      "input": ["*** --- ###"],
+      "expected": {
+        "throws": true
+      }
+    },
+    {
+      "name": "merchantKey blank throws",
+      "fn": "merchantKey",
+      "input": ["   "],
+      "expected": {
+        "throws": true
+      }
+    },
+    {
+      "name": "merchantKey digits only throws",
+      "fn": "merchantKey",
+      "input": ["0423 99"],
+      "expected": {
+        "throws": true
+      }
+    },
+    {
+      "name": "merchantKey empty throws",
+      "fn": "merchantKey",
+      "input": [""],
+      "expected": {
+        "throws": true
+      }
+    },
+    {
+      "name": "merchantKeyPrefixes three words",
+      "fn": "merchantKeyPrefixes",
+      "input": ["lidl casal ribeiro"],
+      "expected": ["lidl casal", "lidl"]
+    },
+    {
+      "name": "merchantKeyPrefixes two words",
+      "fn": "merchantKeyPrefixes",
+      "input": ["lidl casal"],
+      "expected": ["lidl"]
+    },
+    {
+      "name": "merchantKeyPrefixes one word",
+      "fn": "merchantKeyPrefixes",
+      "input": ["lidl"],
+      "expected": []
+    },
+    {
+      "name": "merchantKeyPrefixes short first word",
+      "fn": "merchantKeyPrefixes",
+      "input": ["el corte ingles"],
+      "expected": []
+    },
+    {
+      "name": "merchantKeyPrefixes four words",
+      "fn": "merchantKeyPrefixes",
+      "input": ["mercado de la ciudad vieja"],
+      "expected": ["mercado de la ciudad", "mercado de la", "mercado de", "mercado"]
+    },
+    {
+      "name": "merchantKeyPrefixes three letter first word",
+      "fn": "merchantKeyPrefixes",
+      "input": ["bim bam bom"],
+      "expected": ["bim bam", "bim"]
+    }
+  ]
+}

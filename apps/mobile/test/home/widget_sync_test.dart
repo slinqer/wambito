@@ -17,6 +17,7 @@ import 'package:wambito/settings/settings_store.dart';
 import '../settings/fakes.dart';
 import 'fakes.dart';
 import 'fixtures.dart';
+import 'vault_backend.dart';
 
 /// A session already read, which the test signs out by hand.
 class _Session extends SessionController {
@@ -47,6 +48,30 @@ class _SlowFlagStore extends FakeFlagStore {
   }
 }
 
+class _FakeTimer implements Timer {
+  _FakeTimer(this.delay, this._run);
+
+  final Duration delay;
+  final void Function() _run;
+  var cancelled = false;
+  var _fired = false;
+
+  void fire() {
+    if (cancelled || _fired) return;
+    _fired = true;
+    _run();
+  }
+
+  @override
+  void cancel() => cancelled = true;
+
+  @override
+  bool get isActive => !cancelled && !_fired;
+
+  @override
+  int get tick => _fired ? 1 : 0;
+}
+
 void main() {
   final now = DateTime.utc(2026, 10, 22, 15, 30);
   const signedIn = SessionState.signedIn(StoredSession(token: 't', guest: false));
@@ -55,6 +80,7 @@ void main() {
   late _SlowFlagStore hide;
   late _Session session;
   late ProviderContainer container;
+  final timers = <_FakeTimer>[];
 
   Map<String, Object?> doc() => jsonDecode(store.saved[widgetSnapshotKey]!) as Map<String, Object?>;
 
@@ -80,6 +106,11 @@ void main() {
           DeviceHints(timezone: 'America/Bogota', locale: deviceLocale),
         ),
         clockProvider.overrideWithValue(() => now),
+        widgetDebounceProvider.overrideWithValue((delay, run) {
+          final timer = _FakeTimer(delay, run);
+          timers.add(timer);
+          return timer;
+        }),
       ],
     );
     addTearDown(c.dispose);
@@ -93,6 +124,7 @@ void main() {
 
   setUp(() {
     store = FakeWidgetStore();
+    timers.clear();
     hide = _SlowFlagStore(true);
   });
 
@@ -303,64 +335,133 @@ void main() {
     await container.read(hideWidgetAmountProvider.notifier).set(false);
     await container.read(widgetSyncProvider).idle;
   });
-  group('a preview account (its figures live only in the vault on the phone)', () {
-    test(
-      'the widget gets no figures and says "Próximamente con cifrado", and nothing else is written',
-      () async {
-        hide.gate.complete();
-        container = make();
-        final sync = container.read(widgetSyncProvider);
-        await sync.modeChanged(preview: true);
-        await sync.idle;
-        expect(doc(), {
-          'v': 3,
-          'signedIn': false,
-          'hideAmount': true,
-          'theme': 'dark',
-          'locale': 'es',
-          'line': 'Próximamente con cifrado',
-        });
+  group('a preview account (its figures are drawn from the vault on the phone)', () {
+    final vaultNow = DateTime.utc(2026, 10, 21, 18);
 
-        // The month home loads comes from the vault: no figure of it reaches the widget.
-        await sync.summaryLoaded(
-          summary(budgetTotal: 200000000, spent: 50000000),
-          currency: 'COP',
-          timezone: 'America/Bogota',
-        );
-        expect(doc().containsKey('remaining'), isFalse);
-        expect(doc().containsKey('spent'), isFalse);
-        expect(doc()['line'], 'Próximamente con cifrado');
-      },
-    );
-
-    test('the line is in the widget\'s language', () async {
-      hide.gate.complete();
-      container = make(locale: const Locale('en'));
-      final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: true);
-      await sync.idle;
-      expect(doc()['line'], 'Coming soon with encryption');
-      expect(doc()['locale'], 'en');
-    });
-
-    test('the hide-amount and theme choices keep the line', () async {
+    Future<WidgetSync> previewSync() async {
       hide.gate.complete();
       container = make();
       final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: true);
+      await sync.modeChanged(preview: true, userId: 'u1');
+      await sync.idle;
+      return sync;
+    }
+
+    test('until the vault is open the widget asks to open Wambito, with no line', () async {
+      final sync = await previewSync();
+      expect(doc(), {
+        'v': 3,
+        'signedIn': false,
+        'hideAmount': true,
+        'theme': 'dark',
+        'locale': 'es',
+      });
+      // The month home loads comes from the vault, but nothing of it is sent from here.
+      await sync.summaryLoaded(
+        summary(budgetTotal: 200000000, spent: 50000000),
+        currency: 'COP',
+        timezone: 'America/Bogota',
+      );
+      expect(doc().containsKey('remaining'), isFalse);
+    });
+
+    test('an open vault writes its figures with the owner', () async {
+      final sync = await previewSync();
+      final backend = await seededVaultBackend(vaultNow);
+      sync.vaultOpened(userId: 'u1', backend: backend);
+      await sync.idle;
+      expect(doc()['signedIn'], isTrue);
+      expect(doc()['spent'], 5000000);
+      expect(doc()['owner'], 'u1');
+      expect(doc()['hideAmount'], isTrue);
+    });
+
+    test("another account's figures never stay: the signed-out snapshot replaces them", () async {
+      store.saved[widgetSnapshotKey] = jsonEncode({
+        'v': 3,
+        'signedIn': true,
+        'remaining': 1,
+        'spent': 2,
+        'budgetTotal': 3,
+        'currency': 'COP',
+        'month': '2026-10',
+        'owner': 'u9',
+      });
+      await previewSync();
+      expect(widgetSignedOut(store), isTrue);
+    });
+
+    test('a figured snapshot of an owner stays while the vault opens', () async {
+      store.saved[widgetSnapshotKey] = jsonEncode({
+        'v': 3,
+        'signedIn': true,
+        'remaining': 1,
+        'spent': 2,
+        'budgetTotal': 3,
+        'currency': 'COP',
+        'month': '2026-10',
+        'owner': 'u1',
+      });
+      await previewSync();
+      expect(doc()['signedIn'], isTrue);
+      expect(doc()['owner'], 'u1');
+    });
+
+    test('a commit writes after 2 s, once for a burst; a sync commit too', () async {
+      final backend = await seededVaultBackend(vaultNow);
+      hide.gate.complete();
+      container = make();
+      final sync = container.read(widgetSyncProvider);
+      await sync.modeChanged(preview: true, userId: 'u1');
+      sync.vaultOpened(userId: 'u1', backend: backend);
+      await sync.idle;
+      store.updates = 0;
+
+      sync.vaultChanged();
+      sync.vaultChanged();
+      expect(timers.map((t) => t.cancelled), [true, false], reason: 'a commit restarts the wait');
+      expect(timers.last.delay, const Duration(seconds: 2));
+      expect(store.updates, 0);
+
+      timers.last.fire();
+      await sync.idle;
+      expect(store.updates, 1);
+
+      // A sync's commit is a commit too.
+      sync.vaultChanged();
+      timers.last.fire();
+      await sync.idle;
+      expect(store.updates, 2);
+    });
+
+    test('a sign-out stops the writes', () async {
+      final sync = await previewSync();
+      sync.vaultOpened(userId: 'u1', backend: await seededVaultBackend(vaultNow));
+      await sync.idle;
+      sync.vaultChanged();
+      final waiting = timers.last;
+      await sync.signedOut();
+      expect(waiting.cancelled, isTrue);
+      expect(widgetSignedOut(store), isTrue);
+      expect(doc().containsKey('owner'), isFalse);
+      final before = timers.length;
+      sync.vaultChanged();
+      expect(timers.length, before, reason: 'no vault, nothing to wait for');
+    });
+
+    test('the hide-amount and theme choices keep the figures and the owner', () async {
+      final sync = await previewSync();
+      sync.vaultOpened(userId: 'u1', backend: await seededVaultBackend(vaultNow));
+      await sync.idle;
       await container.read(themeModeProvider.notifier).set(ThemeMode.light);
       await sync.idle;
       expect(doc()['theme'], 'light');
-      expect(doc()['line'], 'Próximamente con cifrado');
-      expect(doc()['signedIn'], isFalse);
+      expect(doc()['owner'], 'u1');
+      expect(doc()['signedIn'], isTrue);
     });
 
     test('signed out, the widget is the usual signed-out one with no line', () async {
-      hide.gate.complete();
-      container = make();
-      final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: true);
-      await sync.idle;
+      final sync = await previewSync();
       await sync.signedOut();
       expect(doc().containsKey('line'), isFalse);
       expect(widgetSignedOut(store), isTrue);
@@ -370,12 +471,12 @@ void main() {
       hide.gate.complete();
       container = make();
       final sync = container.read(widgetSyncProvider);
-      await sync.modeChanged(preview: false);
+      await sync.modeChanged(preview: false, userId: 'u1');
       await sync.idle;
       expect(store.saved, isEmpty);
       await sync.summaryLoaded(summary(), currency: 'COP', timezone: 'America/Bogota');
       expect(doc()['signedIn'], isTrue);
-      expect(doc().containsKey('line'), isFalse);
+      expect(doc().containsKey('owner'), isFalse);
     });
   });
 }

@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/core/budget.dart';
+import 'package:wambito/core/capture.dart';
 import 'package:wambito/core/cost_of_living.dart';
 import 'package:wambito/core/dates.dart';
 import 'package:wambito/core/default_currency.dart';
@@ -89,6 +90,20 @@ void main() {
       'movementTotals': (i) => movementTotals(
         (i[0] as List).map((e) => (e as Map<String, dynamic>)['amount'] as int).toList(),
       ).toJson(),
+    });
+  });
+
+  group('merchant-memory.json', () {
+    _run('merchant-memory.json', {
+      // The fixture writes a rejected input as {"throws": true}.
+      'merchantKey': (i) {
+        try {
+          return merchantKey(i[0] as String);
+        } on FormatException {
+          return {'throws': true};
+        }
+      },
+      'merchantKeyPrefixes': (i) => merchantKeyPrefixes(i[0] as String),
     });
   });
 

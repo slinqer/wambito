@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.R
 import com.wambito.app.account.AccountMode
+import com.wambito.app.background.SyncScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -30,6 +31,8 @@ class RefreshDependencies(
  * 7.1): about every 3 hours on a network, and just after midnight ([RefreshScheduler]). It reads
  * the token where the app keeps it ([SecureStorageSession]: no second copy) and the server picked
  * in Settings.
+ *
+ * For a `preview` account it asks `wambito.sync.now` instead and calls no API.
  *
  * It never brings a signed-out person's figures back (Review Focus 4): no token, it writes the
  * signed-out snapshot; and what it fetched is dropped when, by the time it writes, the token
@@ -74,10 +77,26 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 withContext(dependencies.writeContext) { writeSignedOut(context) }
                 return "signed out"
             }
-            // A `preview` account's figures live only on the phone: the app writes the snapshot
-            // (no figure) and nothing is asked of the server. Not learned yet: nothing either.
             val mode = AccountMode(context)
-            if (!mode.allowsApi()) return if (mode.isPreview()) "encrypted account" else "mode unknown"
+            // A `preview` account's figures live only in the vault on the phone: nothing is asked of
+            // the server. Dart draws the widget from the vault, so the headless sync is asked (it
+            // draws it even offline, D11), after a snapshot of another account is taken down (D10).
+            // The sync waits for the last ask rather than chaining one run after another.
+            if (mode.isPreview()) {
+                val owned = withContext(dependencies.writeContext) {
+                    val latest = WidgetSnapshot.read(context)
+                    if (latest != null && latest.signedIn && (mode.owner == null || latest.owner != mode.owner)) {
+                        writeSignedOut(context)
+                        false
+                    } else {
+                        true
+                    }
+                }
+                SyncScheduler.now(context)
+                return if (owned) "sync asked" else "owner mismatch"
+            }
+            // Not learned yet: nothing either.
+            if (!mode.allowsApi()) return "mode unknown"
             // The currency and language come from the app's last snapshot: without one, the app
             // writes everything at its next start.
             val known = WidgetSnapshot.read(context)

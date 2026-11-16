@@ -50,6 +50,7 @@ import 'server_status.dart';
 import 'locale_resolution.dart';
 import 'preferences.dart';
 import 'profile_settings.dart';
+import 'security/security_section.dart';
 import 'settings_parts.dart';
 import 'time_money_section.dart';
 import 'url_opener.dart';
@@ -373,6 +374,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
           guest: guest && !webOnly,
         ),
+        // An encrypted account's devices and recovery key (Settings → Security). Plain accounts see
+        // nothing of it; a guest only approves a new device.
+        if (!webOnly && ref.watch(isPreviewProvider))
+          SecuritySection(
+            timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
+            guest: guest,
+          ),
         // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
         // pairs yet, so the web-only pictures leave it out.
         if (!webOnly)
@@ -425,26 +433,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: vibration,
                 onChanged: (on) => unawaited(ref.read(vibrationEnabledProvider.notifier).set(on)),
               ),
-              // An encrypted account's payments are on the phone: "Hoy vence…" waits for encryption.
-              if (ref.watch(isPreviewProvider))
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: WambitoTokens.space2,
-                  children: [
-                    SettingLabel(label: l10n.settingsDueNotice),
-                    const ComingSoonNotice(key: Key('settings.dueNotice.comingSoon')),
-                  ],
-                )
-              else
-                SettingSwitch(
-                  key: const Key('settings.dueNotice'),
-                  label: l10n.settingsDueNotice,
-                  hint: defaultTargetPlatform == TargetPlatform.iOS
-                      ? l10n.settingsDueNoticeHintIos
-                      : l10n.settingsDueNoticeHint,
-                  value: ref.watch(dueNoticeEnabledProvider),
-                  onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
-                ),
+              // "Hoy vence…" is computed on the phone for an encrypted account (lib/notices/due_list.dart).
+              SettingSwitch(
+                key: const Key('settings.dueNotice'),
+                label: l10n.settingsDueNotice,
+                hint: defaultTargetPlatform == TargetPlatform.iOS
+                    ? l10n.settingsDueNoticeHintIos
+                    : l10n.settingsDueNoticeHint,
+                value: ref.watch(dueNoticeEnabledProvider),
+                onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
+              ),
               SettingSwitch(
                 key: const Key('settings.guestNotice'),
                 label: l10n.settingsGuestNotice,

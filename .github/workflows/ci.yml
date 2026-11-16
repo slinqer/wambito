@@ -313,11 +313,13 @@ jobs:
       - name: Release build without signing
         run: flutter build ios --release --no-codesign
 
-  # The phone's vault against the real API (apps/mobile/test_stack, scripts/run-vault-e2e.sh): the
-  # seeded preview account signs in with an email code from Mailpit, sets up its keys, adds a
-  # movement, syncs, and a second phone unlocks with the recovery key; Postgres must hold no
-  # plain text. Plain `flutter test` on the runner (sqflite_common_ffi), no emulator. Same skip rule
-  # as `mobile` (a skipped job counts as passing).
+  # The phone's vault against the real API (apps/mobile/test_stack, scripts/run-vault-e2e.sh):
+  # the seeded preview account signs in with an email code from Mailpit, sets up its keys, adds
+  # a movement, syncs, and a second phone unlocks with the recovery key; then (stage 3b) two
+  # phones pair, a background run saves a capture that the other reads, a device is removed and
+  # a new recovery key replaces the old one; Postgres must hold no plain text. Plain `flutter
+  # test` on the runner (sqflite_common_ffi), no emulator. Same skip rule as `mobile` (a skipped
+  # job counts as passing).
   mobile-e2e:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.vault == 'true'
@@ -349,8 +351,8 @@ jobs:
           docker compose up -d --build
           timeout 120 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
           timeout 60 sh -c 'until curl -sf http://localhost:8025/api/v1/info >/dev/null; do sleep 1; done'
-      # Resets the preview account (seed:e2e-preview), runs the test, then counts the records whose
-      # body holds the movement's name in the clear: it must print 0.
+      # Resets the preview account (seed:e2e-preview), runs each of the two tests, then counts the
+      # records whose body holds that test's word in the clear: it must print 0.
       - run: scripts/run-vault-e2e.sh
       - if: failure()
         working-directory: .

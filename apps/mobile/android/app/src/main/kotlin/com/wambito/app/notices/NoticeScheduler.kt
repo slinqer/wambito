@@ -74,6 +74,8 @@ object NoticeScheduler {
         settings.dueEnabled = false
         // Another person, or the switch on again later, starts with no day recorded.
         settings.lastDueDay = null
+        // A preview account's list names its payments: it goes with the notice.
+        DueList.clear(context)
         WorkManager.getInstance(context).cancelUniqueWork(DUE)
         // One already on the shade goes too: after a sign-out it names the previous person's
         // payments.

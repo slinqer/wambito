@@ -5,3 +5,5 @@
 "notice_and" = "and";
 "notice_and_i" = "and";
 "notice_guest" = "Your data will be deleted in 15 days if you don't add your email. If you delete the app, you lose them too.";
+"scanner_hint" = "Point the camera at the QR on the new device.";
+"scanner_close" = "Turn off the camera";

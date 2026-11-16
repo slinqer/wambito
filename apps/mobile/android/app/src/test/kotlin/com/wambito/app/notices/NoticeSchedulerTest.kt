@@ -90,6 +90,14 @@ class NoticeSchedulerTest {
     }
 
     @Test
+    fun `cancelling it, a sign-out included, forgets a preview account's due list`() {
+        DueList.replace(context, "u1", listOf("2026-10-23" to listOf("Arriendo")))
+        NoticeScheduler.cancelDue(context)
+        assertNull(DueList.owner(context))
+        assertTrue(DueList.namesOn(context, java.time.LocalDate.parse("2026-10-23")).isEmpty())
+    }
+
+    @Test
     fun `the guest warning is a one-time job 44 days ahead, replaced at every app open`() {
         NoticeScheduler.scheduleGuest(context, "es")
         val first = active(NoticeScheduler.GUEST).single()

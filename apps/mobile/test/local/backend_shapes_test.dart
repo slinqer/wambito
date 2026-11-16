@@ -46,6 +46,10 @@ Future<FinanceStore> _seeded() async {
 Future<Map<String, Object?>> _dump(FinanceStore store) async {
   final out = <String, Object?>{};
   for (final type in RecordType.values) {
+    // The phone learns merchants (`POST /v1/transactions/review` of a capture row); the web's
+    // backend, which recorded the fixtures, does not until stage 4. test/local/captures_test.dart
+    // pins this record.
+    if (type == RecordType.merchant) continue;
     final records = await store.list(type, const ReadOptions(includeDeleted: true));
     if (records.isEmpty) continue;
     final sorted = [...records]..sort((a, b) => a.id.compareTo(b.id));

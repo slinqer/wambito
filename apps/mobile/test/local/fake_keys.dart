@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -132,6 +133,28 @@ class FakeKeys implements HttpClientAdapter {
   final List<String> deletes = [];
   bool failDeletes = false;
 
+  /// The stored recovery verifier (`lookupHash`, `authHash`, base64url), or `null`: as the server,
+  /// a recovery wrap with other bytes deletes it and a rotation keeps it.
+  ({String lookupHash, String authHash})? verifier;
+
+  /// When set, `PUT /v2/recovery/verifier` answers 503 (and stores nothing).
+  bool failVerifier = false;
+
+  /// Every `POST /v2/keys/rotate` body, kept before any check (refused ones too).
+  final List<Map<String, Object?>> posts = [];
+
+  /// The rotations the fake committed: their bodies.
+  final List<Map<String, Object?>> rotations = [];
+
+  /// Another device rotated first: the next rotate gets 409 `key_version_mismatch`.
+  bool rotatedElsewhere = false;
+
+  /// The next rotate commits, then its answer is lost: the network is down from then on.
+  bool loseNextAnswer = false;
+
+  /// The next wrap PUT is kept, then its answer is lost (the network stays up).
+  bool losePutAnswer = false;
+
   /// When set, every request gets this answer instead (status, JSON body).
   (int, Object?)? answerAll;
 
@@ -144,7 +167,13 @@ class FakeKeys implements HttpClientAdapter {
 
   Dio dio() => Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = this;
 
-  List<FakeCall> get puts => calls.where((c) => c.method == 'PUT').toList();
+  /// The wrap PUTs (`PUT /v2/keys/<id>`), not the verifier's.
+  List<FakeCall> get puts =>
+      calls.where((c) => c.method == 'PUT' && c.path.startsWith('/api/v2/keys/')).toList();
+
+  /// The `PUT /v2/recovery/verifier` calls, in order.
+  List<FakeCall> get verifierPuts =>
+      calls.where((c) => c.method == 'PUT' && c.path == '/api/v2/recovery/verifier').toList();
 
   ResponseBody _json(Object? body, [int status = 200]) => ResponseBody.fromString(
     jsonEncode(body),
@@ -188,6 +217,63 @@ class FakeKeys implements HttpClientAdapter {
         ],
       });
     }
+    if (path == '/api/v2/recovery/verifier' && method == 'PUT' && body != null) {
+      if (failVerifier) return _json({'code': 'unavailable'}, 503);
+      if (!wraps.any((w) => w.kind == 'recovery')) {
+        return _json({'code': 'recovery_required'}, 409);
+      }
+      verifier = (lookupHash: body['lookupHash']! as String, authHash: body['authHash']! as String);
+      return ResponseBody.fromString('', 204);
+    }
+    if (path == '/api/v2/keys/rotate' && method == 'POST' && body != null) {
+      posts.add(body);
+      final keyV = body['keyV']! as int;
+      final current = wraps.isEmpty ? 0 : wraps.map((w) => w.keyV).reduce(max);
+      if (rotatedElsewhere || keyV != current + 1) {
+        return _json({'code': 'key_version_mismatch'}, 409);
+      }
+      final posted = [for (final w in body['wraps']! as List) (w as Map).cast<String, Object?>()];
+      if (posted.where((w) => w['kind'] == 'recovery').length != 1) {
+        return _json({'code': 'recovery_required'}, 422);
+      }
+      if (posted.any(
+        (w) => w['kind'] == 'device' && (w['publicKey'] == null || w['attestation'] == null),
+      )) {
+        return _json({'code': 'attestation_required'}, 422);
+      }
+      if (current > 0 && body['link'] == null) return _json({'code': 'link_required'}, 422);
+      final next = [
+        for (final w in posted)
+          FakeWrap(
+            id: w['id']! as String,
+            kind: w['kind']! as String,
+            ref: w['ref'] as String?,
+            keyV: w['keyV']! as int,
+            wrapped: w['wrapped']! as String,
+            publicKey: w['publicKey'] as String?,
+            attestation: w['attestation'] as String?,
+            label: w['label'] as String?,
+          ),
+      ];
+      expect(next.every((w) => w.keyV == keyV), isTrue);
+      rotations.add(body);
+      if (body['link'] != null) links[keyV] = body['link']! as String;
+      wraps
+        ..clear()
+        ..addAll(next);
+      if (loseNextAnswer) {
+        loseNextAnswer = false;
+        offline = true;
+        throw DioException.connectionError(requestOptions: options, reason: 'answer lost');
+      }
+      final sorted = links.keys.toList()..sort();
+      return _json({
+        'wraps': [for (final w in wraps) w.toJson()],
+        'links': [
+          for (final v in sorted) {'keyV': v, 'link': links[v]},
+        ],
+      });
+    }
     final match = RegExp(r'^/api/v2/keys/([0-9a-f-]{36})$').firstMatch(path);
     if (match != null && method == 'DELETE') {
       final id = match.group(1)!;
@@ -200,6 +286,9 @@ class FakeKeys implements HttpClientAdapter {
       final id = match.group(1)!;
       if (ifNoneMatch == '*' && wraps.any((w) => w.id != id)) {
         return _json({'code': 'already_set_up'}, 409);
+      }
+      if (wraps.isNotEmpty && body['keyV'] != wraps.map((w) => w.keyV).reduce(max)) {
+        return _json({'code': 'key_version_mismatch'}, 409);
       }
       if (wraps.isEmpty && body['kind'] != 'recovery') {
         return _json({'code': 'recovery_required'}, 422);
@@ -220,6 +309,10 @@ class FakeKeys implements HttpClientAdapter {
         attestation: body['attestation'] as String?,
         label: body['label'] as String?,
       );
+      if (wrap.kind == 'recovery' &&
+          wraps.any((w) => w.kind == 'recovery' && w.wrapped != wrap.wrapped)) {
+        verifier = null;
+      }
       wraps.removeWhere(
         (w) =>
             w.id == id ||
@@ -227,6 +320,10 @@ class FakeKeys implements HttpClientAdapter {
             (w.kind == 'passkey' && wrap.kind == 'passkey' && w.ref == wrap.ref),
       );
       wraps.add(wrap);
+      if (losePutAnswer) {
+        losePutAnswer = false;
+        throw DioException.connectionError(requestOptions: options, reason: 'answer lost');
+      }
       return _json(wrap.toJson());
     }
     return ResponseBody.fromString('', 404);

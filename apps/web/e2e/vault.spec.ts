@@ -359,7 +359,14 @@ test("a passkey unlocks with PRF", async ({ browser }) => {
     authenticatorId: authenticator.authenticatorId,
     enabled: true,
   });
-  await first.page.getByRole("button", { name: "Entrar con huella" }).click();
+  // With presence back on, the page's pending autofill request may answer first and sign in by
+  // itself (the button is then disabled and gone). Either way the same passkey and its PRF must
+  // land on the movements with the vault open.
+  const click = first.page
+    .getByRole("button", { name: "Entrar con huella" })
+    .click({ timeout: 20_000 });
+  click.catch(() => {});
+  await Promise.race([first.page.waitForURL(/\/app$/, { timeout: 20_000 }), click]);
   await expect(first.page).toHaveURL(/\/app$/, { timeout: 20_000 });
   await expect(first.page.getByText(NAME, { exact: true })).toBeVisible();
   await expect(first.page.getByRole("heading", { name: "Abre tus datos aquí" })).toHaveCount(0);

@@ -21,6 +21,7 @@ class LockedView extends StatelessWidget {
     required this.onRetry,
     required this.onSignOut,
     this.onDeleteAccount,
+    this.onPair,
   });
 
   final LockedKind kind;
@@ -30,6 +31,9 @@ class LockedView extends StatelessWidget {
 
   /// A guest's way out for good: deletes the account. Resolves to whether it worked.
   final Future<bool> Function()? onDeleteAccount;
+
+  /// A guest's way back to its data: "Add this phone from another device". Without it, no button.
+  final VoidCallback? onPair;
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +60,23 @@ class LockedView extends StatelessWidget {
               onPressed: retrying ? null : onRetry,
             ),
           ),
+        if (kind == LockedKind.guest && onPair != null)
+          SizedBox(
+            width: double.infinity,
+            child: PressButton.text(
+              l10n.vaultUnlockPair,
+              key: const Key('vault.pair'),
+              onPressed: onPair,
+            ),
+          ),
         SizedBox(
           width: double.infinity,
           child: PressButton.text(
             l10n.settingsSignOut,
             key: const Key('vault.signOut'),
-            tone: canRetry ? PressTone.ghost : PressTone.primary,
+            tone: canRetry || (kind == LockedKind.guest && onPair != null)
+                ? PressTone.ghost
+                : PressTone.primary,
             onPressed: onSignOut,
           ),
         ),

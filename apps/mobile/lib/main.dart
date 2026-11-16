@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'api/device.dart';
 import 'app.dart';
+import 'background/background_main.dart';
 import 'local/install_marker.dart';
 import 'local/key_storage.dart';
 import 'vault/encryption_mode.dart' show EncryptionStore;
@@ -14,6 +15,14 @@ import 'settings/settings_store.dart';
 Future<void> main() async {
   runApp(await bootstrap());
 }
+
+/// The headless entry points native code starts in a background engine (D22): a periodic or
+/// one-off sync, and a run that saves the queued notification captures first.
+@pragma('vm:entry-point')
+Future<void> syncMain() => backgroundMain('sync');
+
+@pragma('vm:entry-point')
+Future<void> captureMain() => backgroundMain('capture');
 
 /// The app with the phone's time zone and language read first (every request sends them), and the
 /// server, theme and language the person chose in Settings.

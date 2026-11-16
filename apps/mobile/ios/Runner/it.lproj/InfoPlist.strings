@@ -1,1 +1,3 @@
+"NSCameraUsageDescription" = "Wambito usa la fotocamera solo mentre scansioni il QR di un nuovo dispositivo per approvarlo. Nulla di ciò che la fotocamera vede viene conservato né lascia il telefono.";
+"NSFaceIDUsageDescription" = "Wambito usa Face ID solo per confermare che sei tu prima di un'operazione delicata, come rimuovere un dispositivo. Il tuo volto non lascia il telefono e Wambito non lo vede.";
 "NSMicrophoneUsageDescription" = "Wambito usa il microfono solo mentre tieni premuto il pulsante, per capire ciò che dici sul telefono. L'audio non lascia mai il telefono.";

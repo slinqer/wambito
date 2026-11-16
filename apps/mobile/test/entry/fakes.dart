@@ -237,16 +237,24 @@ class FakePasskeys implements Passkeys {
   /// While set, `create` waits for it (the person has the prompt open).
   Completer<void>? holdCreate;
 
+  /// What `create` answers (the attestation JSON), and what `get` answers (the assertion JSON).
+  String createJson = '{"attestation":true}';
+  String getJson = '{"assertion":true}';
+
+  /// Thrown by `get` only (not `create`), then cleared.
+  Object? getFailure;
+
   @override
   Future<bool> supported() async => isSupported;
 
   @override
   Future<String> get(String optionsJson) async {
     calls.add('get $optionsJson');
-    final error = failure;
+    final error = getFailure ?? failure;
+    getFailure = null;
     failure = null;
     if (error != null) throw error;
-    return '{"assertion":true}';
+    return getJson;
   }
 
   @override
@@ -266,7 +274,7 @@ class FakePasskeys implements Passkeys {
     final error = failure;
     failure = null;
     if (error != null) throw error;
-    return '{"attestation":true}';
+    return createJson;
   }
 }
 

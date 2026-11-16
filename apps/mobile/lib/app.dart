@@ -14,6 +14,7 @@ import 'settings/preferences.dart';
 import 'theme/theme.dart';
 import 'ui/toast.dart';
 import 'vault/preview_sync.dart';
+import 'vault/vault_providers.dart';
 
 /// What goes above every screen and sheet: the celebration (the web's `Celebration`) over the toasts
 /// (`ToastProvider`), so that it keeps clear of them. Tests that build their own `MaterialApp` put
@@ -46,6 +47,7 @@ class WambitoApp extends ConsumerWidget {
     // Tells the phone's background jobs and the widget whether the account is encrypted (`preview`):
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
+    ref.watch(vaultChangedProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       theme: dayTheme,

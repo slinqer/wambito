@@ -5,3 +5,5 @@
 "notice_and" = "y";
 "notice_and_i" = "e";
 "notice_guest" = "Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.";
+"scanner_hint" = "Apunta la cámara al QR del dispositivo nuevo.";
+"scanner_close" = "Apagar la cámara";

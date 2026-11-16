@@ -1,3 +1,4 @@
+import 'package:wambito/background/queued_capture.dart';
 import 'package:wambito/capture_auto/capture_platform.dart';
 
 /// Android's side of automatic capture in memory.
@@ -55,11 +56,26 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
   final keepBefore = <DateTime>[];
 
   @override
-  Future<void> dismissNotifications(List<String> ids) async => calls.add('dismiss ${ids.join(',')}');
+  Future<void> dismissNotifications(List<String> ids) async =>
+      calls.add('dismiss ${ids.join(',')}');
 
   @override
   Future<void> keepOnlyNotifications(List<String> ids, DateTime before) async {
     calls.add('keepOnly ${ids.join(',')}');
     keepBefore.add(before);
   }
+
+  /// What [takeQueued] hands out.
+  List<QueuedCapture> queuedCaptures = [];
+  List<String> queuedConfirms = [];
+
+  @override
+  Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId) async {
+    calls.add('takeQueued $userId');
+    return (captures: [...queuedCaptures], confirms: [...queuedConfirms]);
+  }
+
+  @override
+  Future<void> ackQueued(List<String> keys, List<String> confirms) async =>
+      calls.add('ackQueued ${keys.join(',')} | ${confirms.join(',')}');
 }

@@ -8,11 +8,13 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
+import '../background/background_channel.dart';
 import '../local/db.dart' show pendingChangesInVault;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
 import '../local/keys.dart' show KeysOptions, LocalKeys;
 import '../local/keys_error.dart';
+import '../local/pairing.dart' as pairing;
 import '../local/prf.dart' as prf;
 import '../local/stale_vaults.dart';
 import '../local/vault_session.dart';
@@ -28,6 +30,20 @@ typedef AppVaultGate = VaultGate<LocalKeys, VaultSession>;
 
 /// Where the vault's keys live: the Keystore / Keychain (lib/local/key_storage.dart).
 final keyStorageProvider = Provider<KeyStorage>((ref) => KeyStorage());
+
+/// Replaced in tests: where `vaultChanged` comes from.
+final backgroundListenerProvider = Provider<BackgroundListener>(
+  (ref) => const BackgroundListener(),
+);
+
+/// A headless run changed the vault file (D7): the open [VaultSession] re-notifies its listeners
+/// and schedules a sync. The app watches it for as long as it runs (app.dart).
+final vaultChangedProvider = Provider<void>((ref) {
+  final remove = ref.read(backgroundListenerProvider).listen(() {
+    ref.read(vaultSessionProvider)?.externalChange();
+  });
+  ref.onDispose(remove);
+});
 
 /// Opens a vault session: [openVaultSession]; tests put their own store folder in.
 final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaultOptions)>(
@@ -61,6 +77,11 @@ final vaultGateStateProvider = Provider<VaultGateState<VaultSession>?>((ref) {
   ref.onDispose(gate.subscribe(ref.invalidateSelf));
   return gate.state;
 });
+
+/// The account's time zone, for the time a pairing code stops working; UTC while it is not known.
+final pairingTimeZoneProvider = Provider<String>(
+  (ref) => ref.watch(currentVaultAccountProvider.select((a) => a?.profile.timezone)) ?? 'UTC',
+);
 
 /// The open vault while the gate is `Ready`; else null.
 final vaultSessionProvider = Provider<VaultSession?>((ref) {
@@ -126,6 +147,28 @@ Future<prf.PasskeyPrf?> touchPasskey(
   } on AuthFailure catch (error) {
     throw KeysError(error.code == 'NO_CREDENTIAL' ? 'no_passkey_wrap' : 'server');
   }
+}
+
+/// A new phone's request for the gate: `local/pairing.dart` with the keys it ends in.
+class _GatePairing implements GatePairing<LocalKeys> {
+  const _GatePairing(this._request);
+
+  final pairing.NewDevicePairing _request;
+
+  @override
+  String get id => _request.id;
+  @override
+  String get code => _request.code;
+  @override
+  String get qr => _request.qr;
+  @override
+  String get expiresAt => _request.expiresAt;
+  @override
+  Future<String> number() => _request.number();
+  @override
+  Future<LocalKeys> finish() => _request.finish();
+  @override
+  void cancel() => _request.cancel();
 }
 
 AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
@@ -243,6 +286,8 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       addPasskeyWrap: (passkey) => keys.addPasskeyWrap(options(), passkey),
       evaluatePrf: (ids) => touchPasskey(read(authApiProvider), read(passkeysProvider), ids),
       accountPasskeyIds: () => accountPasskeyIds(network()),
+      startPairing: () async =>
+          _GatePairing(await signInAgainOn401(() => pairing.startPairing(options()))),
       open: (localKeys, fresh) async {
         final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(

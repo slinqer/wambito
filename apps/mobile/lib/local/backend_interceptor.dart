@@ -4,7 +4,8 @@ import 'backend.dart';
 
 /// Answers the `/v1` finance routes from a [LocalBackend] instead of the server, for an account
 /// whose records live in the vault, `GET` and `PATCH /v1/me` included (as on the web, only
-/// deleting the account goes to the server). Everything else (auth, `/v2/*`, `DELETE /v1/me`,
+/// deleting the account goes to the server) and `POST /v1/captures` (phone-only: the server's
+/// copy is not used for a vault account). Everything else (auth, `/v2/*`, `DELETE /v1/me`,
 /// routes the backend does not serve) goes on to the network adapter.
 class LocalBackendInterceptor extends Interceptor {
   LocalBackendInterceptor(this.backend, {this.afterWrite});

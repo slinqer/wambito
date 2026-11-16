@@ -211,17 +211,38 @@ CREATE TABLE $quarantineTable (
 
 /// Opens (creating it on the first run) the vault file of [userId]. [directory] and [factory] are
 /// for tests; the app leaves them out.
-Future<Database> openVault(String userId, {String? directory, DatabaseFactory? factory}) async {
+///
+/// [singleInstance] false gives the caller its own connection: a headless engine in the app's
+/// process must not share (and so must not close) the app's (sqflite keeps single-instance
+/// databases in a map shared by every engine of the process). Both kinds wait up to 5 s for the
+/// file's write lock (`busy_timeout`) instead of failing with `database is locked`.
+Future<Database> openVault(
+  String userId, {
+  String? directory,
+  DatabaseFactory? factory,
+  bool singleInstance = true,
+}) async {
   final path = await _path(userId, directory);
   return (factory ?? databaseFactory).openDatabase(
     path,
-    options: OpenDatabaseOptions(version: 1, onCreate: _create),
+    options: OpenDatabaseOptions(
+      version: 1,
+      onConfigure: (db) async {
+        await db.rawQuery('PRAGMA busy_timeout = 5000');
+      },
+      onCreate: _create,
+      singleInstance: singleInstance,
+    ),
   );
 }
 
-/// Signing out: removes the file, the records and the outbox in it. Close the store first.
+/// Signing out: removes the file, the records and the outbox in it, and the lock file. Close the store first.
 Future<void> deleteVault(String userId, {String? directory, DatabaseFactory? factory}) async {
-  await (factory ?? databaseFactory).deleteDatabase(await _path(userId, directory));
+  final path = await _path(userId, directory);
+  await (factory ?? databaseFactory).deleteDatabase(path);
+  // The lease file of the vault (vault_lock.dart) goes with it.
+  final lock = File('$path-lock');
+  if (lock.existsSync()) lock.deleteSync();
 }
 
 /// The person's changes not sent yet in [userId]'s vault file, read without opening the vault (no

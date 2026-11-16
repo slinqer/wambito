@@ -79,11 +79,16 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             val mark = dependencies.session.mark()
             if (mark == null) {
                 outcome = "signed out"
+            } else if (mode.isPreview()) {
+                // A `preview` account's payments live only on the phone: nothing is asked, today's
+                // entry of the list the app handed over is posted.
+                val run = previewRun(context, dependencies, settings, mode, zone)
+                outcome = run.outcome
+                zone = run.zone
+                keepGoing = run.keepGoing
             } else if (!mode.allowsApi()) {
-                // A `preview` account's payments live only on the phone: nothing is asked. While
-                // the app has not learned the mode yet, tomorrow's run looks again.
-                outcome = if (mode.isPreview()) "encrypted account" else "mode unknown"
-                keepGoing = !mode.isPreview()
+                // While the app has not learned the mode yet, tomorrow's run looks again.
+                outcome = "mode unknown"
             } else if (!NoticePoster(context).canPost()) {
                 // Nothing could be said: nothing is asked of the server either.
                 outcome = "not allowed"
@@ -105,6 +110,35 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             NoticeScheduler.enqueueNextDue(context, zone, dependencies.clock())
         }
         return Result.success(workDataOf(NOTICE_OUTCOME to outcome))
+    }
+
+    /**
+     * A `preview` account's run: today's entry of the [DueList], which carries the account it was
+     * read for. A list that is another account's, or has no owner, or an account whose owner the
+     * app has not told, posts nothing and is cleared, and the run is not scheduled again (the app
+     * hands the list over again, and schedules it, when it knows the account).
+     */
+    private fun previewRun(
+        context: Context,
+        dependencies: NoticeDependencies,
+        settings: NoticeSettings,
+        mode: AccountMode,
+        known: ZoneId,
+    ): Run {
+        val owner = mode.owner
+        if (owner == null || DueList.owner(context) != owner) {
+            DueList.clear(context)
+            return Run("owner mismatch", known, keepGoing = false)
+        }
+        val now = dependencies.clock()
+        if (now.atZone(known).toLocalTime().isBefore(NoticeTimes.DUE_AT)) return Run("before 9", known)
+        val today = LocalDate.ofInstant(now, known)
+        if (settings.lastDueDay == today.toString()) return Run("already today", known)
+        val names = DueList.namesOn(context, today)
+        if (names.isEmpty()) return Run("nothing due today", known)
+        if (!NoticePoster(context).postDue(names, settings.language)) return Run("not allowed", known)
+        settings.lastDueDay = today.toString()
+        return Run("posted", known)
     }
 
     private class Run(val outcome: String, val zone: ZoneId, val keepGoing: Boolean = true)

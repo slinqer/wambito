@@ -5,14 +5,19 @@
     <!-- Quick capture's microphone (voice/VoiceChannel.kt), asked at the first 🎤. The speech engine
          (Vosk) runs on the phone: the audio never leaves it. scripts/check-permissions.sh expects it. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- The QR scanner (scanner/, lib/scanner): the camera, asked at the moment of scanning a new
+         device's QR and never before; refusing it leaves the typed code. Not required: a phone
+         with no camera still installs the app. scripts/check-permissions.sh expects it. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <!-- The haptics (haptics/HapticsChannel.kt). A normal permission, granted at install: nothing is
          asked of the person. scripts/check-permissions.sh expects it. -->
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <!-- androidx.credentials brings androidx.biometric, whose manifest asks for these. They serve a
-         credential provider's own biometric prompt; this app only asks the platform's Credential
-         Manager, and the person's passkey provider checks the fingerprint in its own process. -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove"/>
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove"/>
+    <!-- The screen lock before a sensitive operation (lib/security/screen_lock.dart, local_auth) needs
+         USE_BIOMETRIC, which local_auth_android's own manifest brings and merges in (scripts/check-permissions.sh
+         requires it). On Android 8 and 9 (API 26-28) androidx.biometric asks the platform's FingerprintManager,
+         which needs USE_FINGERPRINT (ruling R16): kept for those versions only, so newer phones never see it. -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" android:maxSdkVersion="28" tools:replace="android:maxSdkVersion"/>
     <!-- The widget's refresh job (widget/RefreshWorker.kt) runs on WorkManager, which asks for
          these two. Normal permissions, granted at install: nothing is asked of the person.
          ACCESS_NETWORK_STATE lets the job wait for a network; RECEIVE_BOOT_COMPLETED lets
@@ -38,6 +43,15 @@
         android:label="Wambito"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt). Not exported: only the app's own
+             scanner channel starts it, so no other app can open the camera through it. Portrait only:
+             the preview's transform (PreviewTransform.kt) would distort on a rotation. -->
+        <activity
+            android:name=".scanner.ScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/NormalTheme"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|density|uiMode"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

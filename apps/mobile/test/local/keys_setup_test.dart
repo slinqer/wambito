@@ -168,6 +168,103 @@ void main() {
     });
   });
 
+  group('the recovery verifier', () {
+    test(
+      'a non-guest setup sends the verifier after the device wrap; a guest setup sends none',
+      () async {
+        final api = FakeKeys();
+        final userId = newUser();
+        final recoveryKey = await setUpAccount(optionsOf(api, userId, memoryKeyStorage()));
+        final writes = api.calls.where((c) => c.method == 'PUT').toList();
+        expect(writes.map((c) => c.body!['kind'] ?? 'verifier'), [
+          'recovery',
+          'device',
+          'verifier',
+        ]);
+        expect(writes.last.path, '/api/v2/recovery/verifier');
+        final hashes = await verifierHashesOf(parseRecoveryKey(recoveryKey!));
+        expect(api.verifier, (
+          lookupHash: toBase64Url(hashes.lookupHash),
+          authHash: toBase64Url(hashes.authHash),
+        ));
+
+        final guestApi = FakeKeys();
+        await setUpAccount(optionsOf(guestApi, newUser(), memoryKeyStorage()), guest: true);
+        expect(guestApi.verifierPuts, isEmpty);
+        expect(guestApi.verifier, isNull);
+      },
+    );
+
+    test('a setup whose verifier failed is retried: the wraps are put again under the same ids, then the verifier', () async {
+      final api = FakeKeys();
+      final storage = memoryKeyStorage();
+      final options = optionsOf(api, newUser(), storage);
+      final prepared = await prepareAccount(options, guest: false);
+      api.failVerifier = true;
+      expect(await caught(prepared.commit), isKeysError('server', 503));
+      expect(await loadLocalKeys(options.userId, storage), isNull);
+      api.failVerifier = false;
+      await prepared.commit();
+      expect(api.wraps.map((w) => w.kind), ['recovery', 'device']);
+      expect(api.verifier, isNotNull);
+      expect((await loadLocalKeys(options.userId, storage))?.keyring.current, 1);
+    });
+
+    test('a recovery unlock sends the verifier; its failure does not fail the unlock', () async {
+      final a = await accountWithKey();
+      a.api.verifier = null;
+      a.api.calls.clear();
+      await unlockWithRecovery(a.options, a.recoveryKey);
+      final hashes = await verifierHashesOf(parseRecoveryKey(a.recoveryKey));
+      expect(a.api.verifier, (
+        lookupHash: toBase64Url(hashes.lookupHash),
+        authHash: toBase64Url(hashes.authHash),
+      ));
+      expect(a.api.verifierPuts, hasLength(1));
+      expect(parsedSecrets.every(zeroed), isTrue);
+
+      final b = await accountWithKey();
+      b.api.verifier = null;
+      b.api.calls.clear();
+      b.api.failVerifier = true;
+      final local = await unlockWithRecovery(b.options, b.recoveryKey);
+      expect(local.keyring.current, 1);
+      expect(b.api.verifierPuts, hasLength(1));
+      expect(b.api.verifier, isNull);
+      expect(parsedSecrets.every(zeroed), isTrue);
+    });
+
+    test('a recovery unlock zeroes the verifier hashes after the put, sent or not', () async {
+      final made = <VerifierHashes>[];
+      keysVerifierHashes = (secret) async {
+        final hashes = await verifierHashesOf(secret);
+        made.add(hashes);
+        return hashes;
+      };
+      addTearDown(() => keysVerifierHashes = verifierHashesOf);
+      final a = await accountWithKey();
+      await unlockWithRecovery(a.options, a.recoveryKey);
+      final b = await accountWithKey();
+      b.api.failVerifier = true;
+      await unlockWithRecovery(b.options, b.recoveryKey);
+      expect(made, hasLength(2));
+      for (final hashes in made) {
+        expect(zeroed(hashes.lookupHash), isTrue);
+        expect(zeroed(hashes.authHash), isTrue);
+      }
+    });
+
+    test('a recovery unlock that fails sends no verifier', () async {
+      final a = await accountWithKey();
+      final stranger = formatRecoveryKey(newRecoverySecret());
+      expect(
+        await caught(() => unlockWithRecovery(a.options, stranger)),
+        isKeysError('wrong_recovery_key'),
+      );
+      expect(a.api.verifierPuts, hasLength(1)); // the setup's own, none from the failed unlock
+    });
+  });
+
   group('prepareAccount', () {
     test('a preparation that fails zeroes the data key and the device private key', () async {
       final made = <Uint8List>[];
@@ -776,7 +873,10 @@ void main() {
       expect(r.api.deletes, [previous]);
       expect(r.api.wraps.where((w) => w.kind == 'device').map((w) => w.id), [current]);
       // the delete came after the new wrap was sent
-      final methods = r.api.calls.map((c) => c.method).toList();
+      final methods = [
+        for (final c in r.api.calls)
+          if (c.method == 'DELETE' || r.api.puts.contains(c)) c.method,
+      ];
       expect(methods.lastIndexOf('PUT'), lessThan(methods.indexOf('DELETE')));
       await expectRefreshes(options);
     });
