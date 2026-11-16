@@ -140,92 +140,107 @@
     },
     "hero": {
       "headline": "I tuoi <mark>soldi</mark>, finalmente chiari.",
-      "description": "<lead>Wambi ti fa compagnia, così prenderti cura dei tuoi soldi è un piacere.</lead>",
+      "description": "<lead>Basta annotare a mano: Wambi legge i tuoi pagamenti e tiene il conto per te.</lead>",
       "cta": "Inizia ora",
       "cta_soon": "Presto · Seguilo su GitHub",
-      "cta_demo": "Provala senza account",
-      "perks": "Gratis per sempre · <github>Open source</github> · Senza password",
-      "mascot": "Wambi, una moneta d'oro sorridente, ti saluta"
-    },
-    "spreadsheet": {
-      "title": "Basta con l'Excel delle spese.",
-      "image": "Wambi, soddisfatto, infila un foglio di calcolo in un distruggidocumenti",
-      "before": "Con un foglio Excel",
-      "after": "Con Wambito",
-      "rows": {
-        "open": {
-          "before": "Accendi il computer, cerchi il file e scorri fino all'ultima riga.",
-          "after": "Lo segni in pochi secondi, anche dal telefono."
-        },
-        "formula": {
-          "before": "Una formula rotta e il totale non torna più.",
-          "after": "I conti si fanno da soli."
-        },
-        "budget": {
-          "before": "Scopri di aver sforato quando hai già sforato.",
-          "after": "I tuoi budget ti avvisano prima."
-        }
-      }
+      "cta_demo": "Provala senza account"
     },
     "ways": {
       "title": "Usala come preferisci",
       "soon": "Presto",
-      "web": {
-        "title": "Sul web",
-        "body": "Dal browser del telefono o del computer. Niente da installare.",
-        "cta": "Inizia"
-      },
-      "mobile": {
-        "title": "App per Android e iOS",
+      "android": {
+        "title": "App per Android",
         "body": "Con un widget per annotare una spesa senza aprire l'app.",
-        "cta": "Scarica per Android",
-        "other": "Altre versioni",
-        "ios": "Su iOS, presto."
+        "cta": "Da GitHub"
       },
-      "ai": {
-        "title": "Con la tua IA",
-        "with": "Claude / ChatGPT",
-        "body": "«Wambito, quanto ho speso al ristorante?», e il tuo assistente ti risponde con i tuoi numeri."
+      "ios": {
+        "title": "App per iOS",
+        "body": "Wambito sul tuo iPhone. La stiamo finendo."
       }
     },
     "how": {
-      "title": "Come funziona",
+      "title": "Tutto il tuo mese, in un'unica app.",
       "demo_categories": {
         "groceries": "Supermercato",
         "going_out": "Uscite",
         "home": "Casa",
         "transport": "Trasporti"
       },
-      "voice": {
-        "title": "Annota le spese con la voce",
-        "body": "Di' a Wambi «Ho speso 3 euro per un caffè» ed è annotato, senza scrivere niente. Dal widget dell'app per Android.",
-        "demo_said": "«Ho speso 3 euro per un caffè»",
-        "demo_name": "Caffè",
-        "demo_saved": "Annotato!"
-      },
       "spend": {
         "title": "Guarda dove vanno i tuoi soldi",
-        "body": "Ogni spesa finisce nella sua categoria. Con un'occhiata sai quanto va in spesa, in uscite o in trasporti, e quanto ti costa davvero vivere.",
+        "body": "Ogni spesa finisce nella sua categoria, e con un'occhiata sai quanto ti costa vivere.",
         "demo_label": "Questo mese"
       },
       "budgets": {
         "title": "Budget che ti avvisano",
-        "body": "Metti un tetto a ogni categoria. Le barre si riempiono con quello che spendi e cambiano colore prima che tu sfori, non dopo.",
+        "body": "Le barre cambiano colore prima che tu sfori, non dopo.",
         "demo_remaining": "Restano {amount}"
+      },
+      "recurring": {
+        "title": "Spese fisse senza sorprese",
+        "body": "L'affitto, gli abbonamenti e la palestra, con un avviso il giorno della scadenza.",
+        "demo": {
+          "rent": "Affitto",
+          "streaming": "Netflix",
+          "gym": "Palestra"
+        },
+        "demo_due": "{days, plural, one {Scade domani} other {Scade tra # giorni}}"
+      },
+      "encryption": {
+        "title": "Solo tu puoi leggere i tuoi dati",
+        "body": "Crittografia end-to-end: tutto viene cifrato sul tuo dispositivo. Nessun altro può leggerlo, nemmeno Wambito.",
+        "demo_item": "Caffè",
+        "demo_device": "Sul tuo telefono",
+        "demo_server": "Cosa vede il server"
       },
       "import": {
         "title": "Porta il tuo storico",
-        "body": "Importa i tuoi movimenti da altre app di finanze: oggi da Budge, e presto da Buddy e altre.",
+        "body": "Importa i tuoi movimenti da altre app: oggi da Budge, e presto da Buddy e altre.",
         "demo_file": "budge.csv",
         "demo_rows": "{count, plural, one {# movimento pronto} other {# movimenti pronti}}"
+      },
+      "passwords": {
+        "title": "Entra senza password",
+        "body": "Con un codice che ti arriva via email, o con la tua impronta.",
+        "demo_or": "o"
+      }
+    },
+    "agent": {
+      "title": "Il tuo agente analizza le tue spese.",
+      "body": "Collega Claude o ChatGPT a Wambito e chiedigli quello che vuoi sui tuoi soldi. Vede solo quello che autorizzi tu.",
+      "cta": "Collega il tuo agente",
+      "note": "Gratis, dalle Impostazioni",
+      "demo": {
+        "thinking": "Sto guardando i tuoi movimenti…",
+        "used": "Ha consultato i tuoi movimenti su Wambito",
+        "categories": {
+          "restaurants": "Ristoranti",
+          "leisure": "Svago",
+          "subscriptions": "Abbonamenti",
+          "groceries": "Spesa",
+          "transport": "Trasporti"
+        },
+        "uber": {
+          "question": "Quanto ho speso in <b>Uber</b> questo mese?",
+          "answer": "Questo mese hai speso <b>{amount}</b> in Uber, in {count} corse: {more} in più del mese scorso."
+        },
+        "budgets": {
+          "question": "Come vanno i miei <b>budget</b>?",
+          "answer": "Lo svago va bene. Per i <b>ristoranti</b> hai già usato il {percent} e mancano {days} giorni: ti restano {left}.",
+          "of": "{spent} su {limit}"
+        },
+        "top": {
+          "question": "Dove sono andati più soldi <b>questo mese</b>?",
+          "answer": "La voce più pesante è la <b>spesa</b>: {amount}, il {percent} delle tue uscite. Seguono i ristoranti."
+        }
       }
     },
     "capture": {
       "card": {
         "title": "Wambi annota le spese per te!",
-        "body": "Legge le notifiche di Revolut e Google Wallet e annota le tue spese, così devi solo rivederle.",
-        "badge": "Presto · Solo su Android",
-        "link": "Come funziona?"
+        "body": "Legge le notifiche di Google Wallet, Apple Wallet e delle tue banche, come Revolut, e annota le tue spese, così devi solo rivederle.",
+        "link": "Come funziona?",
+        "eyebrow": "Cattura automatica"
       },
       "page": {
         "title": "Come funziona la cattura automatica?",
@@ -292,7 +307,7 @@
       },
       "privacy": {
         "q": "Cosa fate con i miei dati?",
-        "a": "I tuoi dati viaggiano cifrati e non li vendiamo né li condividiamo mai con gli inserzionisti. Puoi esportarli o cancellare il tuo account quando vuoi. Il codice è open source: chiunque può leggere il codice che li gestisce. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
+        "a": "I tuoi dati sono cifrati end-to-end sul tuo dispositivo: nessun altro può leggerli, nemmeno Wambito. Non li vendiamo né li condividiamo mai con gli inserzionisti. Puoi esportarli o cancellare il tuo account quando vuoi. Il codice è open source: chiunque può verificare come vengono cifrati. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
       },
       "free": {
         "q": "È gratis?",
@@ -305,7 +320,7 @@
     },
     "closing": {
       "title": "Quando vuoi, partiamo.",
-      "body": "Crea il tuo account con la tua email in meno di un minuto. A renderlo divertente ci pensa Wambito.",
+      "body": "Wambito è nato nel 2026 dalla frustrazione di non sapere quanto spendevo in caffè ogni mese.",
       "body_soon": "Wambito è in costruzione, alla luce del sole. Guarda come avanza su GitHub e prova l'app appena apre."
     },
     "footer": {

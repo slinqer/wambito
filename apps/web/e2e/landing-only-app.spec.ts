@@ -25,14 +25,12 @@ const LOCALES = [
     cta: "Empieza ahora",
     demoCta: "Pruébalo sin cuenta",
     navCta: "Entrar",
-    webCta: "Empezar",
-    webTitle: "En la web",
     soon: "Pronto",
-    androidTitle: "App para Android y iOS",
-    androidCta: "Descargar para Android",
-    others: ["Con tu IA"],
+    androidTitle: "App para Android",
+    androidCta: "Desde GitHub",
+    others: ["App para iOS"],
     closingBody:
-      "Crea tu cuenta con tu correo en menos de un minuto. Wambito se encarga de que sea divertido.",
+      "Wambito nació en 2026 con la frustración de no saber cuánto gastaba en cafés al mes.",
     comingSoon: [/Muy pronto/, /Síguelo en GitHub/, /en construcción/],
     banned: [/\bjueg(o|a)\b/i],
   },
@@ -42,14 +40,12 @@ const LOCALES = [
     cta: "Get started",
     demoCta: "Try it without an account",
     navCta: "Sign in",
-    webCta: "Start",
-    webTitle: "On the web",
     soon: "Soon",
-    androidTitle: "Android & iOS app",
-    androidCta: "Download for Android",
-    others: ["With your AI"],
+    androidTitle: "Android app",
+    androidCta: "From GitHub",
+    others: ["iOS app"],
     closingBody:
-      "Create your account with your email in under a minute. Wambito takes care of making it fun.",
+      "Wambito was born in 2026 out of the frustration of not knowing how much I spent on coffee each month.",
     comingSoon: [/Coming soon/, /Follow on GitHub/, /being built in the open/],
     banned: [/\bgames?\b/i],
   },
@@ -115,14 +111,10 @@ for (const l of LOCALES) {
       await expect(nav.getByRole("button").last()).toBeVisible();
     });
 
-    test("the web card is a link to the app, not a badge; Android downloads the APK, the AI card stays soon", async ({
-      page,
-    }) => {
+    test("Android downloads the APK; iOS stays soon; no web or agent card", async ({ page }) => {
       await page.goto(l.path);
       const ways = page.locator("#ways").getByRole("listitem");
-      const web = ways.filter({ has: page.getByRole("heading", { name: l.webTitle }) });
-      await expectAppLink(web.getByRole("link", { name: l.webCta, exact: true }), l.locale);
-      await expect(web.getByText(l.soon, { exact: true })).toHaveCount(0);
+      await expect(ways).toHaveCount(2);
       for (const name of l.others) {
         const card = ways.filter({ has: page.getByRole("heading", { name }) });
         await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
@@ -133,7 +125,9 @@ for (const l of LOCALES) {
         "href",
         ANDROID_APK_HREF,
       );
-      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(0);
+      // Its one "soon" is Google Play's: the GitHub download is live.
+      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(1);
+      await expect(android.locator(".lk-landing-store")).toHaveText(`Google Play${l.soon}`);
     });
 
     test("nothing still says coming soon, and no link points at GitHub's 'follow' CTA", async ({
@@ -157,7 +151,7 @@ for (const l of LOCALES) {
         .locator("a[href]")
         .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
       const toApp = hrefs.filter((href) => /(^|\/)(sign-in|app|welcome)(\/|\?|#|$)/.test(href));
-      // Hero, header, web card and closing.
+      // Hero, header, the agent's "connect" and closing.
       expect(toApp).toEqual(Array(4).fill(`${APP}/sign-in?lang=${l.locale}`));
     });
 

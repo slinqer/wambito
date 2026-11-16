@@ -140,92 +140,107 @@
     },
     "hero": {
       "headline": "Your <mark>money</mark>, finally clear.",
-      "description": "<lead>Wambi keeps you company, so looking after your money feels good.</lead>",
+      "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
       "cta": "Get started",
       "cta_soon": "Coming soon · Follow on GitHub",
-      "cta_demo": "Try it without an account",
-      "perks": "Free forever · <github>Open source</github> · No passwords",
-      "mascot": "Wambi, a smiling gold coin, waves at you"
-    },
-    "spreadsheet": {
-      "title": "No more expenses in Excel.",
-      "image": "Wambi, pleased, feeds a spreadsheet into a paper shredder",
-      "before": "With a spreadsheet",
-      "after": "With Wambito",
-      "rows": {
-        "open": {
-          "before": "Open the laptop, find the file, scroll down to the last row.",
-          "after": "Log it in seconds, from your phone too."
-        },
-        "formula": {
-          "before": "One broken formula and the total stops adding up.",
-          "after": "The sums do themselves."
-        },
-        "budget": {
-          "before": "You find out you overspent once you already have.",
-          "after": "Your budgets give you a heads-up first."
-        }
-      }
+      "cta_demo": "Try it without an account"
     },
     "ways": {
       "title": "Use it your way",
       "soon": "Soon",
-      "web": {
-        "title": "On the web",
-        "body": "From the browser on your phone or computer. Nothing to install.",
-        "cta": "Start"
-      },
-      "mobile": {
-        "title": "Android & iOS app",
+      "android": {
+        "title": "Android app",
         "body": "With a widget to log an expense without opening the app.",
-        "cta": "Download for Android",
-        "other": "Other versions",
-        "ios": "On iOS, soon."
+        "cta": "From GitHub"
       },
-      "ai": {
-        "title": "With your AI",
-        "with": "Claude / ChatGPT",
-        "body": "“Wambito, how much have I spent on restaurants?” and your assistant answers with your numbers."
+      "ios": {
+        "title": "iOS app",
+        "body": "Wambito on your iPhone. We're finishing it."
       }
     },
     "how": {
-      "title": "How it works",
+      "title": "Your whole month, in one app.",
       "demo_categories": {
         "groceries": "Groceries",
         "going_out": "Going out",
         "home": "Home",
         "transport": "Getting around"
       },
-      "voice": {
-        "title": "Log your expenses by voice",
-        "body": "Tell Wambi “I spent 3 euros on coffee” and it's logged, no typing. From the Android app's widget.",
-        "demo_said": "“I spent 3 euros on coffee”",
-        "demo_name": "Coffee",
-        "demo_saved": "Logged!"
-      },
       "spend": {
         "title": "See where it goes",
-        "body": "Every expense lands in its category. At a glance you know how much went on groceries, going out or getting around, and what living really costs you.",
+        "body": "Every expense lands in its category, so at a glance you know what living costs you.",
         "demo_label": "This month"
       },
       "budgets": {
         "title": "Budgets that give you a heads-up",
-        "body": "Set a limit for each category. The bars fill up with what you spend and change color before you go over, not after.",
+        "body": "The bars change color before you go over, not after.",
         "demo_remaining": "{amount} left"
+      },
+      "recurring": {
+        "title": "Fixed payments, no surprises",
+        "body": "Rent, subscriptions and the gym, with a reminder on the day they're due.",
+        "demo": {
+          "rent": "Rent",
+          "streaming": "Netflix",
+          "gym": "Gym"
+        },
+        "demo_due": "{days, plural, one {Due tomorrow} other {Due in # days}}"
+      },
+      "encryption": {
+        "title": "Only you can read your data",
+        "body": "End-to-end encryption: everything is encrypted on your device. No one else can read it, not even Wambito.",
+        "demo_item": "Coffee",
+        "demo_device": "On your phone",
+        "demo_server": "What the server sees"
       },
       "import": {
         "title": "Bring your history",
-        "body": "Import your transactions from other finance apps: Budge today, Buddy and others soon.",
+        "body": "Import your transactions from other apps: Budge today, Buddy and others soon.",
         "demo_file": "budge.csv",
         "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}"
+      },
+      "passwords": {
+        "title": "Sign in without passwords",
+        "body": "With a code sent to your email, or your fingerprint.",
+        "demo_or": "or"
+      }
+    },
+    "agent": {
+      "title": "Your agent analyzes your spending.",
+      "body": "Connect Claude or ChatGPT to Wambito and ask it anything about your money. It only sees what you allow.",
+      "cta": "Connect your agent",
+      "note": "Free, from Settings",
+      "demo": {
+        "thinking": "Going through your transactions…",
+        "used": "Checked your transactions in Wambito",
+        "categories": {
+          "restaurants": "Restaurants",
+          "leisure": "Leisure",
+          "subscriptions": "Subscriptions",
+          "groceries": "Groceries",
+          "transport": "Transport"
+        },
+        "uber": {
+          "question": "How much did I spend on <b>Uber</b> this month?",
+          "answer": "This month you've spent <b>{amount}</b> on Uber, over {count} rides: {more} more than last month."
+        },
+        "budgets": {
+          "question": "How are my <b>budgets</b> doing?",
+          "answer": "Leisure is on track. You've used {percent} of <b>restaurants</b> with {days} days to go: {left} left.",
+          "of": "{spent} of {limit}"
+        },
+        "top": {
+          "question": "Where did most of my money go <b>this month</b>?",
+          "answer": "<b>Groceries</b> weigh the most: {amount}, {percent} of your spending. Restaurants come next."
+        }
       }
     },
     "capture": {
       "card": {
         "title": "Wambi logs your expenses for you!",
-        "body": "Reads Revolut and Google Wallet notifications and logs your expenses so you only review them.",
-        "badge": "Soon · Android only",
-        "link": "How does it work?"
+        "body": "Reads notifications from Google Wallet, Apple Wallet and your banks, like Revolut, and logs your expenses so you only review them.",
+        "link": "How does it work?",
+        "eyebrow": "Automatic capture"
       },
       "page": {
         "title": "How does automatic capture work?",
@@ -292,7 +307,7 @@
       },
       "privacy": {
         "q": "What do you do with my data?",
-        "a": "Your data travels encrypted, and we never sell it or share it with advertisers. You can export it or delete your account whenever you want. The code is open source: anyone can read the code that handles it. The details are in the <privacy>privacy policy</privacy>."
+        "a": "Your data is end-to-end encrypted on your device: no one else can read it, not even Wambito. We never sell it or share it with advertisers. You can export it or delete your account whenever you want. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
       },
       "free": {
         "q": "Is it free?",
@@ -305,7 +320,7 @@
     },
     "closing": {
       "title": "Ready when you are.",
-      "body": "Create your account with your email in under a minute. Wambito takes care of making it fun.",
+      "body": "Wambito was born in 2026 out of the frustration of not knowing how much I spent on coffee each month.",
       "body_soon": "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens."
     },
     "footer": {

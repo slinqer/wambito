@@ -140,92 +140,107 @@
     },
     "hero": {
       "headline": "O teu <mark>dinheiro</mark>, finalmente claro.",
-      "description": "<lead>O Wambi faz-te companhia para que cuidar do teu dinheiro seja um prazer.</lead>",
+      "description": "<lead>Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.</lead>",
       "cta": "Começa agora",
       "cta_soon": "Em breve · Segue no GitHub",
-      "cta_demo": "Experimenta sem conta",
-      "perks": "Grátis para sempre · <github>Código aberto</github> · Sem palavras-passe",
-      "mascot": "Wambi, uma moeda de ouro sorridente, cumprimenta-te"
-    },
-    "spreadsheet": {
-      "title": "Adeus ao Excel das despesas.",
-      "image": "O Wambi, satisfeito, põe uma folha de cálculo numa trituradora de papel",
-      "before": "Com um Excel",
-      "after": "Com o Wambito",
-      "rows": {
-        "open": {
-          "before": "Ligas o computador, procuras o ficheiro e desces até à última linha.",
-          "after": "Registas em segundos, também no telemóvel."
-        },
-        "formula": {
-          "before": "Uma fórmula partida e o total deixa de bater certo.",
-          "after": "As contas fazem-se sozinhas."
-        },
-        "budget": {
-          "before": "Descobres que gastaste demais quando já gastaste.",
-          "after": "Os teus orçamentos avisam-te antes."
-        }
-      }
+      "cta_demo": "Experimenta sem conta"
     },
     "ways": {
       "title": "Usa-o como preferires",
       "soon": "Em breve",
-      "web": {
-        "title": "Na web",
-        "body": "No navegador do telemóvel ou do computador. Nada para instalar.",
-        "cta": "Começar"
-      },
-      "mobile": {
-        "title": "App para Android e iOS",
+      "android": {
+        "title": "App para Android",
         "body": "Com um widget para registares uma despesa sem abrir a app.",
-        "cta": "Descarregar para Android",
-        "other": "Outras versões",
-        "ios": "No iOS, em breve."
+        "cta": "Do GitHub"
       },
-      "ai": {
-        "title": "Com a tua IA",
-        "with": "Claude / ChatGPT",
-        "body": "«Wambito, quanto gastei em restaurantes?», e o teu assistente responde-te com os teus números."
+      "ios": {
+        "title": "App para iOS",
+        "body": "O Wambito no teu iPhone. Estamos a terminá-la."
       }
     },
     "how": {
-      "title": "Como funciona",
+      "title": "Todo o teu mês, numa só app.",
       "demo_categories": {
         "groceries": "Supermercado",
         "going_out": "Saídas",
         "home": "Casa",
         "transport": "Transportes"
       },
-      "voice": {
-        "title": "Regista as despesas por voz",
-        "body": "Diz ao Wambi «Gastei 3 euros num café» e fica registado, sem escrever nada. No widget da app para Android.",
-        "demo_said": "«Gastei 3 euros num café»",
-        "demo_name": "Café",
-        "demo_saved": "Registado!"
-      },
       "spend": {
         "title": "Vê para onde vai o teu dinheiro",
-        "body": "Cada despesa cai na sua categoria. Num relance sabes quanto vai em supermercado, em saídas ou em transportes, e quanto te custa mesmo viver.",
+        "body": "Cada despesa cai na sua categoria, e num relance sabes quanto te custa viver.",
         "demo_label": "Este mês"
       },
       "budgets": {
         "title": "Orçamentos que te avisam",
-        "body": "Põe um limite em cada categoria. As barras enchem com o que gastas e mudam de cor antes de te excederes, não depois.",
+        "body": "As barras mudam de cor antes de te excederes, não depois.",
         "demo_remaining": "Restam {amount}"
+      },
+      "recurring": {
+        "title": "Pagamentos fixos sem surpresas",
+        "body": "A renda, as subscrições e o ginásio, com um aviso no dia em que vencem.",
+        "demo": {
+          "rent": "Renda",
+          "streaming": "Netflix",
+          "gym": "Ginásio"
+        },
+        "demo_due": "{days, plural, one {Vence amanhã} other {Vence daqui a # dias}}"
+      },
+      "encryption": {
+        "title": "Só tu podes ler os teus dados",
+        "body": "Encriptação de ponta a ponta: tudo é encriptado no teu dispositivo. Mais ninguém o consegue ler, nem mesmo o Wambito.",
+        "demo_item": "Café",
+        "demo_device": "No teu telemóvel",
+        "demo_server": "O que o servidor vê"
       },
       "import": {
         "title": "Traz o teu histórico",
-        "body": "Importa os teus movimentos de outras apps de finanças: hoje do Budge, e em breve do Buddy e de outras.",
+        "body": "Importa os teus movimentos de outras apps: hoje do Budge, e em breve do Buddy e de outras.",
         "demo_file": "budge.csv",
         "demo_rows": "{count, plural, one {# movimento pronto} other {# movimentos prontos}}"
+      },
+      "passwords": {
+        "title": "Entra sem palavras-passe",
+        "body": "Com um código que te chega por email, ou com a tua impressão digital.",
+        "demo_or": "ou"
+      }
+    },
+    "agent": {
+      "title": "O teu agente analisa as tuas despesas.",
+      "body": "Liga o Claude ou o ChatGPT ao Wambito e pergunta-lhe o que quiseres sobre o teu dinheiro. Só vê o que tu autorizas.",
+      "cta": "Liga o teu agente",
+      "note": "Grátis, nas Definições",
+      "demo": {
+        "thinking": "A rever os teus movimentos…",
+        "used": "Consultou os teus movimentos no Wambito",
+        "categories": {
+          "restaurants": "Restaurantes",
+          "leisure": "Lazer",
+          "subscriptions": "Subscrições",
+          "groceries": "Supermercado",
+          "transport": "Transportes"
+        },
+        "uber": {
+          "question": "Quanto gastei em <b>Uber</b> este mês?",
+          "answer": "Este mês já gastaste <b>{amount}</b> em Uber, em {count} viagens: mais {more} do que no mês passado."
+        },
+        "budgets": {
+          "question": "Como vão os meus <b>orçamentos</b>?",
+          "answer": "O lazer vai bem. Nos <b>restaurantes</b> já usaste {percent} e faltam {days} dias: restam-te {left}.",
+          "of": "{spent} de {limit}"
+        },
+        "top": {
+          "question": "Onde gastei mais <b>este mês</b>?",
+          "answer": "O que mais pesa é o <b>supermercado</b>: {amount}, {percent} das tuas despesas. Seguem-se os restaurantes."
+        }
       }
     },
     "capture": {
       "card": {
         "title": "O Wambi regista as despesas por ti!",
-        "body": "Lê as notificações do Revolut e do Google Wallet e regista as tuas despesas para só teres de as rever.",
-        "badge": "Em breve · Só no Android",
-        "link": "Como funciona?"
+        "body": "Lê as notificações do Google Wallet, do Apple Wallet e dos teus bancos, como o Revolut, e regista as tuas despesas para só teres de as rever.",
+        "link": "Como funciona?",
+        "eyebrow": "Captura automática"
       },
       "page": {
         "title": "Como funciona a captura automática?",
@@ -292,7 +307,7 @@
       },
       "privacy": {
         "q": "O que fazem com os meus dados?",
-        "a": "Os teus dados viajam cifrados e nunca os vendemos nem os partilhamos com anunciantes. Podes exportá-los ou apagar a tua conta quando quiseres. O código é aberto: qualquer pessoa pode ler o código que os trata. Os detalhes estão na <privacy>política de privacidade</privacy>."
+        "a": "Os teus dados são encriptados de ponta a ponta no teu dispositivo: mais ninguém os consegue ler, nem mesmo o Wambito. Nunca os vendemos nem os partilhamos com anunciantes. Podes exportá-los ou apagar a tua conta quando quiseres. O código é aberto: qualquer pessoa pode verificar como são encriptados. Os detalhes estão na <privacy>política de privacidade</privacy>."
       },
       "free": {
         "q": "É grátis?",
@@ -305,7 +320,7 @@
     },
     "closing": {
       "title": "Quando quiseres, começamos.",
-      "body": "Cria a tua conta com o teu email em menos de um minuto. Wambito encarrega-se de que seja divertido.",
+      "body": "O Wambito nasceu em 2026 da frustração de não saber quanto gastava em cafés por mês.",
       "body_soon": "Wambito está em construção, em aberto. Vê como avança no GitHub e experimenta a app assim que abrir."
     },
     "footer": {

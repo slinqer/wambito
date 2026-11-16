@@ -23,8 +23,7 @@ const LOCALES = [
     navCta: "Muy pronto",
     newTab: "(se abre en una pestaña nueva)",
     soon: "Pronto",
-    webTitle: "En la web",
-    ways: ["En la web", "App para Android y iOS", "Con tu IA"],
+    ways: ["App para Android", "App para iOS"],
     closingTitle: "Cuando quieras, arrancamos.",
     closingBody:
       "Wambito está en construcción, en abierto. Mira cómo avanza en GitHub y prueba la app en cuanto abra.",
@@ -41,8 +40,7 @@ const LOCALES = [
     navCta: "Coming soon",
     newTab: "(opens in a new tab)",
     soon: "Soon",
-    webTitle: "On the web",
-    ways: ["On the web", "Android & iOS app", "With your AI"],
+    ways: ["Android app", "iOS app"],
     closingTitle: "Ready when you are.",
     closingBody:
       "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens.",
@@ -289,17 +287,17 @@ for (const l of LOCALES) {
       }
     });
 
-    test("the web card is a coming-soon badge, like the other cards, with no link", async ({
-      page,
-    }) => {
+    test("both apps are coming-soon badges with no link", async ({ page }) => {
       await page.goto(l.path);
-      for (const name of l.ways) {
-        const card = page
+      const card = (name: string) =>
+        page
           .locator("#ways")
           .getByRole("listitem")
           .filter({ has: page.getByRole("heading", { name }) });
-        await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
-        await expect(card.getByRole("link")).toHaveCount(0);
+      const [android, ios] = l.ways;
+      for (const name of [android, ios] as string[]) {
+        await expect(card(name).getByText(l.soon, { exact: true })).toBeVisible();
+        await expect(card(name).getByRole("link")).toHaveCount(0);
       }
     });
 
@@ -327,8 +325,8 @@ for (const l of LOCALES) {
       expect(html).not.toMatch(l.oldClosing);
 
       const spot = closing.locator("[data-wambi-spot='closing']");
-      await expect(spot).toHaveAttribute("data-wambi-pose", "celebrate");
-      await expect(spot.locator(".lk-wambi")).toHaveCount(1);
+      await expect(spot).toHaveAttribute("data-wambi-pose", "resting");
+      await expect(spot.locator("img")).toHaveAttribute("src", "/wambi/resting.webp");
     });
 
     test("is called Wambito, in the text and in the share tags", async ({ page }) => {

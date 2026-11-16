@@ -81,15 +81,11 @@ export function landingMeta(locale: Locale): MetaDescriptor[] {
 
 /**
  * Canonical and `hreflang` alternates (each page lists every language, itself included, plus
- * `x-default` → Spanish), and a preload for the hero's Wambi sprite so it isn't discovered late
- * through CSS.
+ * `x-default` → Spanish), and the fonts' preloads. (No image preload: the hero has no Wambi any
+ * more; he waits further down the page.)
  */
 export function landingLinks(locale: Locale): LinkDescriptor[] {
-  return [
-    ...pageLinks("landing", locale),
-    ...landingFontPreloads(),
-    { rel: "preload", as: "image", href: "/wambi/wave.webp", type: "image/webp" },
-  ];
+  return [...pageLinks("landing", locale), ...landingFontPreloads()];
 }
 
 /** The i18n namespace holding each page's `meta` (title and description). */

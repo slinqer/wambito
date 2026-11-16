@@ -1,3 +1,4 @@
+import { createContext, type ReactNode, useContext } from "react";
 import { useTranslations } from "use-intl";
 import { formatMoney } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
@@ -13,10 +14,21 @@ const DEMO = {
   time: "17:06",
 } as const;
 
-function useMoney() {
+/** Formats a demo figure given in euro cents: `(cents, opts) => text`. */
+export type DemoMoney = (cents: number, opts?: { sign?: "always" }) => string;
+
+/**
+ * How the demos show money: euros unless a page says otherwise (the landing shows each
+ * language's own currency, `features/landing/demo-money.ts`). The capture page keeps euros, like
+ * its Flutter twin.
+ */
+export const DemoMoneyContext = createContext<DemoMoney | null>(null);
+
+function useMoney(): DemoMoney {
   const { locale } = useLocale();
+  const custom = useContext(DemoMoneyContext);
   // Negative amounts carry their minus; only the income amount gets a plus.
-  return (cents: number, opts?: { sign?: "always" }) => formatMoney(cents, "EUR", locale, opts);
+  return custom ?? ((cents, opts) => formatMoney(cents, "EUR", locale, opts));
 }
 
 const plus = (cents: number) => (cents > 0 ? ({ sign: "always" } as const) : undefined);
@@ -35,12 +47,41 @@ const ArrowDown = () => (
   </span>
 );
 
-function Notification({ title, cents }: { title: string; cents: number }) {
+/**
+ * The app whose notification the demo shows: Revolut (the capture page, and the Flutter twin's
+ * parity stories) or Google Wallet (the landing). Google Wallet gets a plain wallet glyph, not
+ * Google's artwork.
+ */
+export type NotificationSource = "revolut" | "googlewallet";
+
+const SOURCES: Record<NotificationSource, { name: string; icon: ReactNode }> = {
+  revolut: { name: DEMO.bank, icon: "R" },
+  googlewallet: {
+    name: "Google Wallet",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="6" width="18" height="13" rx="3" />
+        <path d="M3 10h18M16 14.5h2" />
+      </svg>
+    ),
+  },
+};
+
+function Notification({
+  title,
+  cents,
+  source,
+}: {
+  title: string;
+  cents: number;
+  source: NotificationSource;
+}) {
   const money = useMoney();
+  const app = SOURCES[source];
   return (
-    <div className="lk-capture-notif">
-      <span className="lk-capture-notif-icon">R</span>
-      <span className="lk-capture-notif-app">{DEMO.bank}</span>
+    <div className="lk-capture-notif" data-source={source}>
+      <span className="lk-capture-notif-icon">{app.icon}</span>
+      <span className="lk-capture-notif-app">{app.name}</span>
       <span className="lk-capture-notif-time">{DEMO.time}</span>
       <span className="lk-capture-notif-title">{title}</span>
       <span className="lk-capture-notif-line">💳 {money(cents, plus(cents))}</span>
@@ -76,11 +117,21 @@ function RegisteredRow({
   );
 }
 
-function Pair({ title, cents, category }: { title: string; cents: number; category?: string }) {
+function Pair({
+  title,
+  cents,
+  category,
+  source = "revolut",
+}: {
+  title: string;
+  cents: number;
+  category?: string;
+  source?: NotificationSource;
+}) {
   const t = useTranslations("landing.capture.demo");
   return (
     <>
-      <Notification title={title} cents={cents} />
+      <Notification title={title} cents={cents} source={source} />
       <ArrowDown />
       <div className="lk-capture-registered">
         <span className="lk-capture-registered-head">
@@ -94,11 +145,22 @@ function Pair({ title, cents, category }: { title: string; cents: number; catego
 }
 
 /** Step 1: the bank's notification becomes a movement marked "to review". */
-export function MainPicture({ income = false }: { income?: boolean }) {
+export function MainPicture({
+  income = false,
+  source = "revolut",
+}: {
+  income?: boolean;
+  source?: NotificationSource;
+}) {
   const t = useTranslations("landing.capture.demo");
   return (
     <div className="lk-capture-demo" aria-hidden="true">
-      <Pair title={DEMO.merchant} cents={DEMO.expense} category={t("other_expenses")} />
+      <Pair
+        title={DEMO.merchant}
+        cents={DEMO.expense}
+        category={t("other_expenses")}
+        source={source}
+      />
       {income ? (
         <Pair title={DEMO.payroll} cents={DEMO.income} category={t("other_income")} />
       ) : null}

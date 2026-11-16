@@ -67,6 +67,15 @@
     font-weight: 900;
     font-size: 18px;
   }
+  .lk-capture-notif-icon svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .lk-capture-notif-app,
   .lk-capture-notif-time {
     font-size: 12px;
