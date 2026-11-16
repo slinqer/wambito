@@ -83,7 +83,7 @@ job in `ci.yml`. The Android side is `release.md`.
   English in `Info.plist`): the camera is used only while someone scans the QR of a new device to
   approve it, and nothing it sees is kept or leaves the phone. It is asked at the first scan, not at launch.
 - **Face ID text.** `NSFaceIDUsageDescription` (same files): Face ID confirms it is the person before
-  a sensitive operation (removing a device, a new recovery key, approving one); the face never leaves
+  a sensitive operation (removing a device, making a new recovery key, showing it); the face never leaves
   the phone. A phone with no screen lock asks the current recovery key instead (`confirmSensitive`).
   Keep the three texts in step with the App Privacy answers below.
 

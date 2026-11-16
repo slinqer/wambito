@@ -156,7 +156,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
   `security_section.dart` (devices, Remove, Approve, "New recovery key"), `remove_device_sheet.dart` (typed key or a new one),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
-  Remove and "New recovery key" ask `confirmSensitive` first (D17: no key is made or shown before it passes). After a rotation
+  Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
   "Opens your data" per passkey, offers "Turn on" (`evaluatePrf` + `addPasskeyWrap`) and adds a new passkey with its wrap

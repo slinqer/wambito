@@ -49,10 +49,7 @@ Future<({int status, Object? code})> _recoverySignIn(String recoveryKey) async {
   final res = await Dio().postUri<Object?>(
     api.replace(path: '/api/v2/recovery/sign-in'),
     data: {'lookup': toBase64Url(verifier.lookup), 'auth': toBase64Url(verifier.auth)},
-    options: Options(
-      validateStatus: (_) => true,
-      headers: {'x-forwarded-for': '10.88.${DateTime.now().microsecond % 250}.1'},
-    ),
+    options: Options(validateStatus: (_) => true),
   );
   final body = res.data;
   return (status: res.statusCode!, code: body is Map ? body['code'] : null);
