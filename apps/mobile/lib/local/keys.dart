@@ -8,6 +8,7 @@ import 'ids.dart';
 import 'key_storage.dart';
 import 'keys_error.dart';
 import 'prf.dart';
+import 'rotate.dart';
 
 export 'key_storage.dart';
 export 'keys_error.dart';
@@ -117,8 +118,8 @@ Future<Uint8List> Function(Uint8List newKey, LinkContext ctx, Uint8List link) ke
 Future<Uint8List> Function(Uint8List privateKey, WrapContext ctx, Uint8List sealed)
 keysOpenFromDevice = openFromDevice;
 
-/// The test seam of the web's mock of `parseRecoveryKey` (to check that unlock zeroes the secret).
-@visibleForTesting
+/// The test seam of the web's mock of `parseRecoveryKey` (to check that unlock and
+/// `checkRecoveryKey` zero the secret). Production code never changes it.
 Uint8List Function(String text) keysParseRecoveryKey = parseRecoveryKey;
 
 /// Test seams of [prepareAccount]: the keys it makes (to check they are zeroed) and the wrap that
@@ -657,6 +658,8 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
   final Map<String, Object?> recoveryBody;
   final _Device device;
   final String? recoveryKey;
+  // The verifier of a shown key only: a guest's hidden key never gets one (D16).
+  VerifierHashes? verifier;
   try {
     recoveryBody = {
       'kind': 'recovery',
@@ -671,6 +674,7 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
     };
     device = await _prepareDevice(userId, dataKey, firstKeyV, pair);
     recoveryKey = guest ? null : formatRecoveryKey(secret);
+    if (!guest) verifier = await verifierHashesOf(secret);
   } on Object {
     // Nothing was prepared: neither key is ever used.
     _zero(dataKey);
@@ -681,6 +685,7 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
   }
 
   var recoverySent = false;
+  var deviceSent = false;
   var lost = false;
   LocalKeys? done;
   Future<LocalKeys>? running;
@@ -713,7 +718,13 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
       }
       recoverySent = true;
     }
-    await call('/v2/keys/${device.id}', method: 'PUT', data: device.body);
+    if (!deviceSent) {
+      await call('/v2/keys/${device.id}', method: 'PUT', data: device.body);
+      deviceSent = true;
+    }
+    // After the device wrap, so a failure here leaves the account as a retry finds it.
+    final hashes = verifier;
+    if (hashes != null) await putRecoveryVerifier(options, hashes);
     final local = await _keepLocally(storage, userId, dataKey, firstKeyV, device, const {});
     done = local;
     drop();
@@ -759,7 +770,23 @@ Future<LocalKeys> unlockWithRecovery(KeysOptions options, String text) async {
       } on Object {
         throw const KeysError('wrong_recovery_key');
       }
-      return await _enrollTrusted(options, call, dataKey, wrap.keyV, links, pair, HeldVault.secret);
+      final local = await _enrollTrusted(
+        options,
+        call,
+        dataKey,
+        wrap.keyV,
+        links,
+        pair,
+        HeldVault.secret,
+      );
+      // Best effort (D16): accounts made before the verifier existed get one at their next
+      // recovery unlock; a failure never fails the unlock.
+      try {
+        await putRecoveryVerifier(options, await verifierHashesOf(secret));
+      } on Object {
+        // the next unlock tries again
+      }
+      return local;
     } finally {
       _zero(dataKey);
       _zero(pair.privateKey);

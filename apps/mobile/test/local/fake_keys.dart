@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -132,6 +133,16 @@ class FakeKeys implements HttpClientAdapter {
   final List<String> deletes = [];
   bool failDeletes = false;
 
+  /// The stored recovery verifier (`lookupHash`, `authHash`, base64url), or `null`: as the server,
+  /// a recovery wrap with other bytes deletes it and a rotation keeps it.
+  ({String lookupHash, String authHash})? verifier;
+
+  /// When set, `PUT /v2/recovery/verifier` answers 503 (and stores nothing).
+  bool failVerifier = false;
+
+  /// The next wrap PUT is kept, then its answer is lost (the network stays up).
+  bool losePutAnswer = false;
+
   /// When set, every request gets this answer instead (status, JSON body).
   (int, Object?)? answerAll;
 
@@ -144,7 +155,13 @@ class FakeKeys implements HttpClientAdapter {
 
   Dio dio() => Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = this;
 
-  List<FakeCall> get puts => calls.where((c) => c.method == 'PUT').toList();
+  /// The wrap PUTs (`PUT /v2/keys/<id>`), not the verifier's.
+  List<FakeCall> get puts =>
+      calls.where((c) => c.method == 'PUT' && c.path.startsWith('/api/v2/keys/')).toList();
+
+  /// The `PUT /v2/recovery/verifier` calls, in order.
+  List<FakeCall> get verifierPuts =>
+      calls.where((c) => c.method == 'PUT' && c.path == '/api/v2/recovery/verifier').toList();
 
   ResponseBody _json(Object? body, [int status = 200]) => ResponseBody.fromString(
     jsonEncode(body),
@@ -188,6 +205,14 @@ class FakeKeys implements HttpClientAdapter {
         ],
       });
     }
+    if (path == '/api/v2/recovery/verifier' && method == 'PUT' && body != null) {
+      if (failVerifier) return _json({'code': 'unavailable'}, 503);
+      if (!wraps.any((w) => w.kind == 'recovery')) {
+        return _json({'code': 'recovery_required'}, 409);
+      }
+      verifier = (lookupHash: body['lookupHash']! as String, authHash: body['authHash']! as String);
+      return ResponseBody.fromString('', 204);
+    }
     final match = RegExp(r'^/api/v2/keys/([0-9a-f-]{36})$').firstMatch(path);
     if (match != null && method == 'DELETE') {
       final id = match.group(1)!;
@@ -200,6 +225,9 @@ class FakeKeys implements HttpClientAdapter {
       final id = match.group(1)!;
       if (ifNoneMatch == '*' && wraps.any((w) => w.id != id)) {
         return _json({'code': 'already_set_up'}, 409);
+      }
+      if (wraps.isNotEmpty && body['keyV'] != wraps.map((w) => w.keyV).reduce(max)) {
+        return _json({'code': 'key_version_mismatch'}, 409);
       }
       if (wraps.isEmpty && body['kind'] != 'recovery') {
         return _json({'code': 'recovery_required'}, 422);
@@ -220,6 +248,10 @@ class FakeKeys implements HttpClientAdapter {
         attestation: body['attestation'] as String?,
         label: body['label'] as String?,
       );
+      if (wrap.kind == 'recovery' &&
+          wraps.any((w) => w.kind == 'recovery' && w.wrapped != wrap.wrapped)) {
+        verifier = null;
+      }
       wraps.removeWhere(
         (w) =>
             w.id == id ||
@@ -227,6 +259,10 @@ class FakeKeys implements HttpClientAdapter {
             (w.kind == 'passkey' && wrap.kind == 'passkey' && w.ref == wrap.ref),
       );
       wraps.add(wrap);
+      if (losePutAnswer) {
+        losePutAnswer = false;
+        throw DioException.connectionError(requestOptions: options, reason: 'answer lost');
+      }
       return _json(wrap.toJson());
     }
     return ResponseBody.fromString('', 404);
