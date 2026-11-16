@@ -3,7 +3,7 @@
  * go after signing in (`next`), the device's time zone (`timezone`), `client` (`android`, `ios`; the web sends none), and
  * `background: 1` for jobs the person did not start, `user`: the account a `/v2` call means (a
  * tab whose cookie now belongs to someone else gets 409 `session_changed`), and `poll`: the poll
- * secret of a browser's `/v2/signin` request.
+ * secret of a browser's `/v2/signin` request, and `version`: the app's version (`/v2/me/seen`).
  */
 export type ClientHeaderName =
   | "locale"
@@ -12,7 +12,8 @@ export type ClientHeaderName =
   | "client"
   | "background"
   | "user"
-  | "poll";
+  | "poll"
+  | "version";
 
 /** A client header: `x-wambito-<name>`. */
 export function clientHeader(

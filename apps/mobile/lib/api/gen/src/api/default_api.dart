@@ -2441,6 +2441,46 @@ class DefaultApi {
     );
   }
 
+  /// markSeen
+  /// The app was opened by the person. The first call of their local day counts one in the daily activity numbers, which keep no per-person history; later calls the same day count nothing. &#x60;x-wambito-client&#x60; says the platform and &#x60;x-wambito-version&#x60; the app&#39;s version (up to 64 characters). A call with &#x60;x-wambito-background: 1&#x60; changes nothing: background work never calls this. Not for assistants.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> markSeen({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/me/seen';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
   /// pickupPairing
   /// The new device takes the sealed data key and its &#x60;keyV&#x60;; the request is deleted in the same transaction, so a second pickup is 404. 409 &#x60;not_ready&#x60; while the approving device has not sealed; 404 when unknown, expired or not the person&#39;s.
   ///

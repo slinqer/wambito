@@ -10,6 +10,7 @@ import { previewOnlyV2 } from "./http/preview.ts";
 import { notFound, onError, validationHook } from "./http/problem.ts";
 import { assistantScopes } from "./http/scopes.ts";
 import { requireUser } from "./http/session.ts";
+import { activityRoutes } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { assistantRoutes } from "./routes/assistants.ts";
 import { captureRoutes } from "./routes/captures.ts";
@@ -102,6 +103,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", keyRoutes(deps));
   app.route("/", pairingRoutes(deps));
   app.route("/", recoveryRoutes(deps));
+  app.route("/", activityRoutes(deps));
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

@@ -978,6 +978,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/me/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The app was opened by the person. The first call of their local day counts one in the daily activity numbers, which keep no per-person history; later calls the same day count nothing. `x-wambito-client` says the platform and `x-wambito-version` the app's version (up to 64 characters). A call with `x-wambito-background: 1` changes nothing: background work never calls this. Not for assistants. */
+        post: operations["markSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4649,6 +4666,42 @@ export interface operations {
             };
             /** @description Problem */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    markSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Noted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

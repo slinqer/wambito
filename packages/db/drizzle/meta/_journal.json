@@ -127,6 +127,13 @@
       "when": 1794822545240,
       "tag": "0017_signin_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794823454081,
+      "tag": "0018_activity_daily",
+      "breakpoints": true
     }
   ]
 }

@@ -421,6 +421,10 @@ export function createAuth(deps: AppDeps) {
         // The user's latest activity, kept on the user so it outlives a signed-out session; the
         // guest cleanup reads it (services/guest-cleanup.ts, `stampActivity`).
         lastActiveAt: { type: "date", required: false, input: false, returned: false },
+        // The app version that last called `/v2/me/seen` and the person's local day of that call
+        // (`YYYY-MM-DD`; services/activity.ts). Neither is sent back.
+        appVersion: { type: "string", required: false, input: false, returned: false },
+        lastSeenDay: { type: "string", required: false, input: false, returned: false },
         // Set by an admin's suspend (spec §5.4): no new session, no token works while it is set.
         suspendedAt: { type: "date", required: false, input: false, returned: false },
       },

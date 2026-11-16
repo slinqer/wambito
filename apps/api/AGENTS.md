@@ -160,9 +160,18 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 ## Talks to
 
+- `POST /v2/me/seen` (`src/routes/activity.ts`, `src/services/activity.ts`; spec 2026-11-15 §9): the
+  app says it is open. `markSeen` is ONE statement: it moves `user.last_seen_day` (text
+  `YYYY-MM-DD`, the person's local day by `userToday`) only when null or earlier, and in that same
+  statement upserts `count + 1` into `activity_daily` (day, platform from `platformOf`, version or
+  `''`, the user's cohort Monday, has email; no user id, no RLS), so two concurrent first calls of
+  a day count once and a zone where today is earlier neither counts nor moves the day back. It sets
+  `user.app_version` from `x-wambito-version` (trimmed, at most 64 characters, else ignored) and
+  always `stampActivity`s. A `background: 1` call is a 204 that changes nothing: background work
+  never calls it. Assistants get 403 (not in `ASSISTANT_PATHS`).
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
-- Client headers `x-wambito-{locale,next,timezone,client,background,user,poll}`, always read via
+- Client headers `x-wambito-{locale,next,timezone,client,background,user,poll,version}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
   session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` is the account the
   client means: another signed-in account gets 409 `session_changed` (`expectedUser` in

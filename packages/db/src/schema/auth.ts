@@ -32,6 +32,8 @@ export const user = pgTable("user", {
   encryption: text("encryption").default("plain").notNull(),
   platform: text("platform"),
   lastActiveAt: timestamp("last_active_at"),
+  appVersion: text("app_version"),
+  lastSeenDay: text("last_seen_day"),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
 });
 

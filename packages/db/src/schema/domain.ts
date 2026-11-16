@@ -438,6 +438,25 @@ export const recoveryVerifiers = pgTable(
   ],
 );
 
+/**
+ * The count of people active per local day (spec 2026-11-15 §9): an aggregate with no user id, so
+ * it keeps no per-person history. `cohort_week` is the Monday (UTC) of the user's `created_at`;
+ * `app_version` is `''` when the app sent none. No row-level security (plan decision 4): it has no
+ * user to filter on, and only `markSeen` and the admin metrics touch it.
+ */
+export const activityDaily = pgTable(
+  "activity_daily",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    platform: text("platform").notNull(),
+    appVersion: text("app_version").notNull().default(""),
+    cohortWeek: date("cohort_week", { mode: "string" }).notNull(),
+    hasEmail: boolean("has_email").notNull(),
+    count: integer("count").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.platform, t.appVersion, t.cohortWeek, t.hasEmail] })],
+);
+
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [
   "accounts",
