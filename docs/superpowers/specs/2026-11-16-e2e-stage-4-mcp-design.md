@@ -60,7 +60,10 @@ allows only ciphertext in memory, never plaintext or keys).
 What makes A cheap: the web's local backend (`apps/web/app/local/backend.ts`) is already a
 `fetch` that answers the `/api/v1/*` routes from a `FinanceStore` with the API's shapes, rules,
 validation and error codes, and the MCP's `apiWambito(baseUrl, token, fetchImpl)` already takes a
-`fetch`. The MCP can hand its tools that backend's `fetch` and keep `api-wambito.ts` as it is.
+`fetch`. The MCP can hand its tools that backend's `fetch` and keep `api-wambito.ts` almost as it
+is. The backend lacks three things the MCP uses today, which it gains (section 6): `POST
+/v1/transactions/batch`, `POST /v1/transactions/batch-delete` and the `Idempotent-Replayed`
+answer header.
 
 ## 3. Decisions taken with the founder
 
@@ -97,13 +100,18 @@ As built in the stage 0 spike, now in production code.
   - **Revoke and introspect**: strip the suffix before Better Auth sees the token (RFC 7009
     answers 200 for an unknown token, so a missed strip would revoke nothing).
 - **The `wk` claim** is `S` encrypted to the MCP: a compact JWE, `ECDH-ES` with `A256GCM`, to the
-  MCP's public key (`jose`, already a dependency of both apps). Only the MCP can read it; the
+  MCP's public key, with `jose` (already in `apps/mcp`; added to `apps/api`, pinned exactly). Only the MCP can read it; the
   refresh token carries `S` in the clear to the assistant's company, by design.
 - **Refusal instead of silent loss:** the token endpoint refuses (`400 invalid_grant`, the OAuth
   shape) to issue or refresh tokens for an account that `isPreviewAccount` marks as encrypted
-  when it has no `S` for the request (the map lost it on a restart, or an old connection without
-  `S` refreshes). The assistant then asks the person to connect again. A `plain` account without
-  `S` gets exactly today's tokens.
+  when it has no `S` for the request (the map lost it on a restart, an old connection without
+  `S` refreshes, or a reused refresh token killed the family). The refusal also revokes that
+  client for the account (consent, tokens, wrap: the revoke of section 8), so the next connect
+  starts clean. A `plain` account without `S` gets exactly today's tokens.
+- **The consent page always shows for encrypted accounts:** Better Auth skips the consent page
+  when a consent already covers the scopes, which would send a code without `S`. The wrapper adds
+  `prompt=consent` to `/auth/oauth2/authorize` when the signed-in account is encrypted, so every
+  connect of such an account goes through the page of section 5 and carries `S`.
 - **The account's state comes from the token's user** (the code's or the refresh token's), never
   from the request body.
 - **Never logged:** `S` travels only in POST bodies, the refresh token and the JWE; no log line,
@@ -116,6 +124,8 @@ As built in the stage 0 spike, now in production code.
   tokens without `S`.
 - **`GET /v2/keys/assistant`** also returns the account's key links (the previous data keys
   sealed under the newer ones), so the MCP can open a record still under an older key version.
+  This changes its answer's shape: OpenAPI, the generated types of the web and the MCP, and a
+  `CHANGELOG.md` line. (`GET /v2/keys`, which has the links, stays out of an assistant's reach.)
 - `CHANGELOG.md` (Unreleased): the consent body's `wk`, the refresh token's format for encrypted
   accounts, the `wk` claim, `400 invalid_grant` without `S`, `503 assistant_keys_missing`, the
   links on `GET /v2/keys/assistant`, and the revoke and rotation changes of section 8.
@@ -155,10 +165,17 @@ As built in the stage 0 spike, now in production code.
 New `packages/vault` (`@wambito/vault`, with its `AGENTS.md` and a row in the root map). It holds
 what the web and the MCP both run, with nothing tied to the browser:
 
-- the local backend (`backend.ts` today), unchanged in behaviour;
+- the local backend (`backend.ts` today), unchanged in behaviour for the web, plus:
+  - `POST /v1/transactions/batch` and `POST /v1/transactions/batch-delete`, with the API's
+    shapes and codes;
+  - the `Idempotent-Replayed: true` header on a replayed `Idempotency-Key`;
+  - an option that forces the `source` of every movement it creates (the MCP passes `mcp`, as the
+    API forces it for OAuth grants today), whatever the body says;
+  - an option that derives the ids of a batch create from its `Idempotency-Key` (section 7);
 - the store contract (`FinanceStore`, `StoreOps`, the shared contract tests) and the memory store;
 - the sync engine (`sync.ts`), over an `EncryptedStore` **interface** (outbox, cursors,
-  quarantine, set-aside) rather than the IndexedDB class;
+  quarantine, set-aside) rather than the IndexedDB class, with an option that turns off the
+  upgrade pass (re-sealing records under an older key version), which the MCP never runs;
 - an in-memory `EncryptedStore` that passes the same contract tests as the IndexedDB one;
 - `ids.ts` (UUID v5 and v7) and the keyring type.
 
@@ -188,8 +205,12 @@ before the MCP uses it. `pnpm --filter @wambito/web` imports change; behaviour d
   5. build the local backend over that store, with `now`, the profile from `GET /v1/me` (allowed
      for encrypted accounts) and `source: "mcp"` on every movement it creates;
   6. run the tool through `apiWambito(baseUrl, token, backend.fetch)`;
-  7. after a writing tool, one more sync pass pushes the changes; a push that fails is reported as
-     the tool's failure (nothing is kept to retry later: the MCP has no outbox between requests);
+  7. after a writing tool, one more sync pass pushes the changes. The tool fails if any change
+     it made is not acknowledged (parked, dropped, or the run stopped); its error says that part
+     of it may have been saved and that trying again is safe (ids are stable, section below).
+     Nothing is kept to retry later: the MCP has no outbox between requests. A read tool never
+     pushes (no re-seal: the upgrade pass is off), so a `finance:read` token never needs `POST
+     /v2/sync`;
   8. store the pulled ciphertext and the cursor back into the cache; drop DK, `S`, the keys and
      the decrypted store.
 - **The cache:** per account, in process memory, only what `/v2/sync` sent (encrypted bodies,
@@ -200,23 +221,29 @@ before the MCP uses it. `pnpm --filter @wambito/web` imports change; behaviour d
   push conflicting copies of the same record from two stores.
 - **Idempotency without plaintext:** the local backend keeps `Idempotency-Key` answers in memory,
   which do not survive the request. For `add_transactions`, the ids of the new movements are
-  derived from the key (UUID v5 of the user id, the key and the item's index), so a retried call
-  writes the same ids: the second push meets the first copy as a create conflict and the server's
-  copy is kept. Nothing about the request is cached.
-- **Records it cannot open or validate** are left out, as on the web, and counted; a tool answer
-  that depends on them says that some items could not be read.
+  derived from the key (UUID v5 of the user id, the key and the item's index). A retried call
+  finds every derived id already in the store after the pull, writes nothing and answers as a
+  replay (`Idempotent-Replayed`), so the tool says `alreadySaved` exactly as today. If only some
+  ids exist (the first push was partly acknowledged), the missing ones are created and the answer
+  is not a replay. Nothing about the request is cached.
+- **Records it cannot open or validate** are left out, as on the web. Tool answers do not change
+  shape for it: the person sees the "could not read N items" line on the web and the phone, as
+  today. The MCP logs only the count.
 - **Never logged:** no body, amount, name, `S` or key in a log line or error; only ids, types and
   counts, as the sync engine already does.
 
 ## 8. Revoking and rotation
 
-- **`DELETE /v1/me/assistants/{clientId}`** and "revoke all" also delete that client's
-  `assistant` wraps, in the same transaction as the tokens and consent. The next request of that
+- **`DELETE /v1/me/assistants/{clientId}`** also deletes that client's `assistant` wraps, in the
+  same transaction as the tokens and consent. So does `revokeAllAssistants` (the admin's suspend
+  action; people have no revoke-all route). The next request of that
   assistant gets 404 from `GET /v2/keys/assistant` and stops, even with an access token still
   inside its 15 minutes.
-- **`POST /v2/keys/rotate`** (removing a device, or "Change keys" in Security) already drops every
-  `assistant` wrap. It now also revokes those assistants (tokens and consent) in the same
-  transaction, so Settings → Assistants no longer lists them as connected.
+- **`POST /v2/keys/rotate`** (removing a device, or "Change keys" in Security) replaces every wrap
+  with the ones it carries, and no client can make an `assistant` wrap under the new key without
+  that assistant's `S`. So a rotation now refuses `assistant` wraps (`422 assistant_wrap_in_rotation`)
+  and revokes every assistant of the account (tokens and consent) in the same transaction, so
+  Settings → Assistants no longer lists them as connected.
 - **Copy:** the remove-device sheet (web and phone) and "Change keys" say that connected assistants
   are disconnected and must be connected again. The web's `rotate.ts` comment about assistants
   (stage 4) is updated.
@@ -224,7 +251,8 @@ before the MCP uses it. `pnpm --filter @wambito/web` imports change; behaviour d
 ## 9. Testing
 
 - **API** (testcontainers, extending `apps/api/test/oauth.test.ts` with the spike's assertions):
-  `S` round-trips through consent, exchange and three refreshes; every access token has a `wk`
+  `S` round-trips through consent, exchange and three refreshes; an encrypted account's authorize
+  always shows the consent page; a refusal without `S` revokes the client; every access token has a `wk`
   that the MCP key opens to `S`; reusing a refresh token kills the family; revoke with the
   suffixed token works; no table column holds `S` (base64url, hex or base64) after the run, with a
   positive control; an encrypted account without `S` gets `400 invalid_grant`; a `plain` account
@@ -235,7 +263,8 @@ before the MCP uses it. `pnpm --filter @wambito/web` imports change; behaviour d
 - **MCP:** against the real API (the existing stack tests' pattern): connect a `preview` account
   through the consent flow, then each of the 14 tools; the read tools' answers equal the web local
   backend's over the same records (one fixture, both paths); a write appears in `/v2/sync` sealed,
-  with `source: "mcp"` inside; a retried `add_transactions` with the same key writes once; a token
+  with `source: "mcp"` inside; a retried `add_transactions` with the same key writes once and says `alreadySaved`; a read tool
+  with a `finance:read` token sends no `POST /v2/sync`; a token
   without `wk` on an encrypted account gives the reconnect error; revoke, then the next call fails;
   a rotation, then the next call fails; `psql` finds no plaintext of the run's words in any table.
 - **Web:** unit tests of the consent page's three ways to the data key and of the order consent →
@@ -257,3 +286,13 @@ and 9 pointing here.
 - The cache's budget numbers.
 - Whether the MCP's per-request work is shared between the tools of one MCP request.
 - The JWK curve (X25519 or P-256), as long as both apps use `jose`'s compact JWE.
+
+## 12. Calls made while writing (not decided with the founder)
+
+- An encrypted account's authorize always shows the consent page, and a token refusal without `S`
+  revokes that client (section 4).
+- A retried `add_transactions` answers `alreadySaved` when every derived id exists (section 7).
+- Tool answers keep their shape; unreadable records show only on the web and the phone (section 7).
+- The MCP never re-seals and a read tool never pushes (sections 6 and 7).
+- A rotation refuses `assistant` wraps and revokes every assistant (section 8).
+- The shared backend gains the batch routes, the replay header and a forced `source` (section 6).
