@@ -177,6 +177,28 @@ describe("recovery-key sign-in", () => {
   });
 });
 
+describe("the server-only session endpoint", () => {
+  test("POST /auth/wambito/server-session is not served over HTTP: signed out, with another user's bearer, behind the proxy", async () => {
+    const victim = await withKey();
+    const other = await guest();
+    const before = await t.admin.select().from(session).where(eq(session.userId, victim.userId));
+    const body = { userId: victim.userId, lifetime: "long" };
+    for (const headers of [
+      {},
+      PHONE,
+      other.headers,
+      { ...other.headers, ...PHONE, "x-forwarded-for": "198.51.0.9, 10.0.0.1" },
+    ]) {
+      const res = await t.request("POST", "/auth/wambito/server-session", { body, headers });
+      expect(res.status).toBe(404);
+      expect(res.headers.getSetCookie()).toEqual([]);
+      expect(res.headers.get("set-auth-token")).toBeNull();
+    }
+    const after = await t.admin.select().from(session).where(eq(session.userId, victim.userId));
+    expect(after.map((row) => row.id).sort()).toEqual(before.map((row) => row.id).sort());
+  });
+});
+
 describe("PUT /v2/recovery/verifier", () => {
   test("PUT /v2/recovery/verifier without a recovery wrap is 409 recovery_required", async () => {
     const g = await guest();
