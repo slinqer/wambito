@@ -174,9 +174,10 @@ export interface SyncEngineOptions {
   /** The record keys this browser holds, by key version; changes are sealed under `current`. */
   keyring: Keyring;
   /**
-   * Fetches this browser's device wrap again and returns the keyring with any newer version
-   * (`keys.ts` `refreshKeys`). Throws `KeysError("device_removed")` when the wrap is gone,
-   * `KeysError("tampered")` when a newer version does not lead back to the held key.
+   * Fetches the caller's key wrap again and returns the keyring with any newer version (the web
+   * passes `keys.ts` `refreshKeys`, which refetches its device wrap). Throws
+   * `KeysError("device_removed")` when the wrap is gone, `KeysError("tampered")` when a newer
+   * version does not lead back to the held key.
    */
   refreshKeys: () => Promise<Keyring>;
   now?: () => number;

@@ -24,6 +24,7 @@ export {
   type KeysErrorCode,
   recordKeyName,
 } from "./keyring.ts";
+export { createMemoryEncryptedStore } from "./memory-encrypted-store.ts";
 export { createMemoryStore } from "./memory-store.ts";
 export type {
   FinanceStore,
