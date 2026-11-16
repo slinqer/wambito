@@ -124,6 +124,43 @@ describe("session lifetimes, NEW_USERS_ENCRYPTED on", () => {
     expect(await t.admin.select().from(user).where(eq(user.id, g.userId))).toHaveLength(1);
   });
 
+  test("a long session Better Auth shortened (30 days left, updated now) is slid back to 760 days", async () => {
+    const g = await guest(t, PHONE);
+    // As Better Auth's own refresh leaves it: updated_at now, expires_at within its 60-day window.
+    await t.admin
+      .update(session)
+      .set({ updatedAt: new Date(), expiresAt: new Date(Date.now() + 30 * DAY) })
+      .where(eq(session.userId, g.userId));
+
+    expect((await t.request("GET", "/v1/me", { headers: g.headers })).status).toBe(200);
+
+    const slid = await sessionOf(t, g.userId);
+    expect(slid.lifetime).toBe("long");
+    expect(daysUntil(slid.expiresAt)).toBeGreaterThan(760 - 0.01);
+    expect(daysUntil(slid.expiresAt)).toBeLessThanOrEqual(760);
+  });
+
+  test("a long session is never slid once its user has an email or is plain", async () => {
+    const withEmail = await guest(t, PHONE);
+    const plain = await guest(t, PHONE);
+    await t.admin
+      .update(user)
+      .set({ email: "slide-email@wambito.test", isAnonymous: false })
+      .where(eq(user.id, withEmail.userId));
+    await t.admin.update(user).set({ encryption: "plain" }).where(eq(user.id, plain.userId));
+    for (const g of [withEmail, plain]) {
+      await age(g.userId);
+      const before = await sessionOf(t, g.userId);
+      expect(before.lifetime).toBe("long");
+
+      expect((await t.request("GET", "/v1/me", { headers: g.headers })).status).toBe(200);
+
+      const after = await sessionOf(t, g.userId);
+      expect(after.updatedAt).toEqual(before.updatedAt);
+      expect(after.expiresAt).toEqual(before.expiresAt);
+    }
+  });
+
   test("a background request (x-wambito-background: 1) never slides a long session", async () => {
     const g = await guest(t, PHONE);
     await age(g.userId);

@@ -1,4 +1,4 @@
-import { type Db, session } from "@wambito/db";
+import { type Db, session, type Tx, user } from "@wambito/db";
 import { sql } from "@wambito/db/orm";
 import type { Encryption } from "./encryption.ts";
 import { stampActivity } from "./guest-cleanup.ts";
@@ -34,7 +34,10 @@ export function lifetimeFor(
  * Slides a `long` session: Better Auth only refreshes a session in the last 59 days before its
  * expiry, which a 760-day session used daily never reaches, so neither its `updatedAt` nor the
  * user's activity would move and the cleanup would delete a person who uses the app every day.
- * At most once a day (the `updated_at` condition), it renews the 760 days and stamps the user.
+ * At most once a day, it renews the 760 days and stamps the user: when `updated_at` is a day old,
+ * or when `expires_at` is more than a day short of 760 days (Better Auth's own refresh, after a
+ * long idle, cut it to 60 days and moved `updated_at` to now). Only while the user is still an
+ * encrypted user without an email, as `lifetimeFor` gives it.
  */
 export async function slideLongSession(
   db: Db,
@@ -47,16 +50,22 @@ export async function slideLongSession(
     set updated_at = ${at}::timestamp,
       expires_at = ${at}::timestamp + make_interval(secs => ${LONG_SESSION_SECONDS})
     where ${session.id} = ${sessionId} and ${session.userId} = ${userId}
-      and ${session.lifetime} = 'long' and ${session.updatedAt} < ${at}::timestamp - interval '1 day'
+      and ${session.lifetime} = 'long'
+      and (${session.updatedAt} < ${at}::timestamp - interval '1 day'
+        or ${session.expiresAt} < ${at}::timestamp + make_interval(secs => ${LONG_SESSION_SECONDS})
+          - interval '1 day')
+      and exists (select 1 from ${user} where ${user.id} = ${userId}
+        and ${user.isAnonymous} and ${user.encryption} = 'encrypted')
     returning ${session.id}`);
   if (moved.length > 0) await stampActivity(db, userId, now);
 }
 
 /**
  * Brings the user's `long` sessions back to `standard` (an email was added: the person can sign in
- * again with it), expiring at most 60 days from `now`; Better Auth slides them from then on.
+ * again with it), expiring at most 60 days from `now`; Better Auth slides them from then on. Run it
+ * in the transaction that adds the email.
  */
-export async function endLongSessions(db: Db, userId: string, now: Date): Promise<void> {
+export async function endLongSessions(db: Db | Tx, userId: string, now: Date): Promise<void> {
   // Raw SQL: an ORM update would also move `session.updatedAt`.
   await db.execute(sql`update ${session}
     set lifetime = 'standard',

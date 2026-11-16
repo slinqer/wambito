@@ -295,22 +295,24 @@ export function meRoutes(deps: AppDeps) {
       if (result !== "ok") throw CLAIM_CODE_PROBLEMS[result]();
       let claimed: { id: string }[];
       try {
-        // One statement in one transaction. A concurrent claim of the same email by another guest
-        // waits on the unique email index and then fails it: that one gets email_taken.
-        claimed = await withUser(deps.db, userId, (tx) =>
-          tx
+        // One transaction. A concurrent claim of the same email by another guest waits on the
+        // unique email index and then fails it: that one gets email_taken. With an email the
+        // person can sign in again: in the same transaction, a 25-month phone session goes back
+        // to 60 days.
+        claimed = await withUser(deps.db, userId, async (tx) => {
+          const rows = await tx
             .update(user)
             .set({ email, emailVerified: true, isAnonymous: false })
             .where(and(eq(user.id, userId), eq(user.isAnonymous, true)))
-            .returning({ id: user.id }),
-        );
+            .returning({ id: user.id });
+          if (rows.length > 0) await endLongSessions(tx, userId, new Date());
+          return rows;
+        });
       } catch (error) {
         if (isUniqueViolation(error)) throw emailTaken();
         throw error;
       }
       if (claimed.length === 0) throw notAGuest();
-      // With an email the person can sign in again: a 25-month phone session goes back to 60 days.
-      await endLongSessions(deps.db, userId, new Date());
       await dropClaimCodes(deps, userId);
       return c.json(await profile(deps, userId), 200);
     },

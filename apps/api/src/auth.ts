@@ -245,7 +245,7 @@ type Locale = "es" | "en" | "it" | "pt";
  *   language and where to go after.
  * - `x-wambito-timezone`: the device's IANA time zone, which the app sends with guest sign-up (and
  *   every request).
- * - `x-wambito-client: android`: the request is made by the Android app, from a screen the person
+ * - `x-wambito-client: android` or `ios`: the request is made by the app, from a screen the person
  *   is using. A sign-in started this way marks its magic link `from=app`, so the web page the link
  *   opens offers to open the app. (The timezone header does not say it: the widget's and the
  *   notices' requests send it too.)

@@ -149,6 +149,20 @@ describe("POST /v2/me/seen", () => {
     expect((await rows()).map((r) => r.appVersion).sort()).toEqual(["", "2.0.1"]);
   });
 
+  test("x-wambito-version keeps only [0-9A-Za-z.+_-]: a space or a control character is ignored", async () => {
+    await reset();
+    at("2026-03-10T12:00:00Z");
+    const p = await person();
+    await seen(p, { "x-wambito-version": "1.2.0+12" });
+    expect((await userRow(p.userId)).appVersion).toBe("1.2.0+12");
+    at("2026-03-11T12:00:00Z");
+    await seen(p, { "x-wambito-version": "1.2 beta" });
+    at("2026-03-12T12:00:00Z");
+    await seen(p, { "x-wambito-version": "1.2\u0001" });
+    expect((await userRow(p.userId)).appVersion).toBe("1.2.0+12");
+    expect((await rows()).map((r) => r.appVersion).sort()).toEqual(["", "", "1.2.0+12"]);
+  });
+
   test("a background request changes nothing: no row, last_seen_day unchanged", async () => {
     await reset();
     at("2026-03-10T12:00:00Z");

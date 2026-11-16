@@ -5,10 +5,13 @@ import { stampActivity } from "./guest-cleanup.ts";
 /** The longest app version `x-wambito-version` may carry; a longer one is ignored. */
 export const MAX_APP_VERSION = 64;
 
-/** The app version a request's header says: trimmed, up to 64 characters, else null. */
+/** What a version may hold: letters, digits and `.+_-`, 1 to 64 characters (`1.2.0+12`). */
+const APP_VERSION = new RegExp(`^[0-9A-Za-z.+_-]{1,${MAX_APP_VERSION}}$`);
+
+/** The app version a request's header says: trimmed, if it matches `APP_VERSION`, else null. */
 export function appVersionOf(header: string | undefined): string | null {
   const version = header?.trim();
-  return version && version.length <= MAX_APP_VERSION ? version : null;
+  return version && APP_VERSION.test(version) ? version : null;
 }
 
 export interface SeenInput {

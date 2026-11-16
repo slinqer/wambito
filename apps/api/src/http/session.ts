@@ -123,8 +123,9 @@ const UNAUTHENTICATED_DETAIL: Record<MissingSessionCode, string> = {
 /**
  * Why a request has no session (spec 2026-11-15 §10): `device_removed` when its token's hash is in
  * `ended_sessions` (a removed device), else `user_deleted` when its `x-wambito-user`'s hash is in
- * `deleted_users` (the cleanup deleted that account), else `unauthenticated`. It tells nothing
- * beyond what the token or the id the client sent already names.
+ * `deleted_users` (the cleanup deleted that account), else `unauthenticated`. `user_deleted` needs
+ * a presented token too (a phone that was signed in), so an id alone is never an oracle. It tells
+ * nothing beyond what the token or the id the client sent already names.
  */
 export async function missingSessionCode(
   db: Db,
@@ -139,15 +140,15 @@ export async function missingSessionCode(
       .where(eq(endedSessions.sessionHash, sha256(token)))
       .limit(1);
     if (ended) return "device_removed";
-  }
-  const userId = clientHeader(headers, "user");
-  if (userId) {
-    const [deleted] = await db
-      .select({ at: deletedUsers.deletedAt })
-      .from(deletedUsers)
-      .where(eq(deletedUsers.userHash, sha256(userId)))
-      .limit(1);
-    if (deleted) return "user_deleted";
+    const userId = clientHeader(headers, "user");
+    if (userId) {
+      const [deleted] = await db
+        .select({ at: deletedUsers.deletedAt })
+        .from(deletedUsers)
+        .where(eq(deletedUsers.userHash, sha256(userId)))
+        .limit(1);
+      if (deleted) return "user_deleted";
+    }
   }
   return "unauthenticated";
 }

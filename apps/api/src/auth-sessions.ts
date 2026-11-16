@@ -5,7 +5,7 @@ import {
   createAuthMiddleware,
   setShouldSkipSessionRefresh,
 } from "better-auth/api";
-import { parseCookies, setSessionCookie } from "better-auth/cookies";
+import { expireCookie, parseCookies, setSessionCookie } from "better-auth/cookies";
 import * as z from "zod";
 import type { SessionLifetime } from "./services/sessions.ts";
 
@@ -89,6 +89,9 @@ export const wambitoSessions = () =>
           if (!session) {
             throw new APIError("INTERNAL_SERVER_ERROR", { message: "No session was created" });
           }
+          // A remembered sign-in drops a `dont_remember` cookie left by an earlier unticked one:
+          // Better Auth would otherwise read it and stop refreshing this session's cookie.
+          if (!dontRememberMe) expireCookie(ctx, ctx.context.authCookies.dontRememberToken);
           await setSessionCookie(ctx, { session, user }, dontRememberMe);
           return ctx.json({ userId });
         },

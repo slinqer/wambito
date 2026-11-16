@@ -488,6 +488,29 @@ describe("/v2/signin", () => {
     expect(row.expiresAt.getTime()).toBeLessThanOrEqual(after + TWELVE_HOURS + 1000);
   });
 
+  test("a ticked pickup sent with a stale dont_remember cookie expires it", async () => {
+    const p = await phone();
+    const unticked = await sealed(p, { remember: false });
+    const first = await pickup(unticked.started.id, unticked.started.pollSecret);
+    expect(first.status).toBe(200);
+    const stale = cookieOf(first)
+      .split("; ")
+      .filter((c) => c.includes("dont_remember="))
+      .join("; ");
+    expect(stale).not.toBe("");
+
+    const ticked = await sealed(p, { remember: true });
+    const res = await t.request("POST", `/v2/signin/${ticked.started.id}/pickup`, {
+      headers: { ...poll(ticked.started.pollSecret), cookie: stale },
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(sessionCookieLine(res)).toMatch(/Max-Age=5184000/i);
+    const dontRemember = res.headers.getSetCookie().filter((c) => c.includes("dont_remember="));
+    expect(dontRemember).toHaveLength(1);
+    expect(dontRemember[0]).toMatch(/dont_remember=;/);
+    expect(dontRemember[0]).toMatch(/Max-Age=0/i);
+  });
+
   for (const client of ["android", "ios"]) {
     test(`a ticked pickup sent with x-wambito-client: ${client} still gets a standard session, never the phone's long one`, async () => {
       const p = await phone();

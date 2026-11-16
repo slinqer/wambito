@@ -14,7 +14,9 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   (12 hours); the session create hook keeps the lifetime `createServerSession` gives (any of
   the three, so no client header changes it), else picks it and sets `expiresAt` (constants `SESSION_SECONDS`, `LONG_SESSION_SECONDS`, `SHORT_SESSION_SECONDS`).
   Better Auth never refreshes a `long` session, so `requireUser` slides it (`slideLongSession`, at
-  most once a day, stamping activity); claiming an email ends it (`endLongSessions`). Every
+  most once a day or when `expires_at` is short of 759 days, only while the user is encrypted
+  without an email, stamping activity); claiming an email ends it (`endLongSessions`, in the
+  claim's transaction). Every
   user's activity is stamped on `user.lastActiveAt` (`stampActivity`, services/guest-cleanup.ts).
 - `src/services/guest-cleanup.ts` (`scheduleGuestCleanup`, daily from `server.ts`, real clock):
   `cleanupInactiveGuests` deletes `plain` guests idle over 60 days; `cleanupInactiveEncrypted`
@@ -29,8 +31,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - `src/http/session.ts`: `requireUser` (cookie or bearer session, or an OAuth JWT with `aud` =
   MCP_URL). Without one, its 401 code comes from `missingSessionCode`: `device_removed` when the
   presented token (`presentedSessionToken`: a non-JWT bearer, else the session cookie, without its
-  signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when `x-wambito-user`'s
-  SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+  signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when a token was presented
+  and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
   `src/services/`: domain services. `src/emails/sign-in.ts`: sign-in mail copy (es/en/it/pt);
   `src/emails/layout.ts`: the frame every email shares (Wambi, wordmark image, card, footer; day
@@ -60,7 +62,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `activity_daily` (`dailyActive`, `cohorts`, `installsByPlatform`, `versions`); no user row leaves
   the database, no IP or finance field is read; `guests` means "without an email".
 - `src/routes/email-change.ts`: public `POST /v1/email-change/confirm` (mounted before
-  `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP in the
+  `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP, kept
   in memory (`src/http/ip-limit.ts`: `IpWindowLimit`, and `IpOpenCount` for open-request counts).
 - `GET`/`POST /v2/sync` (`src/routes/sync.ts`, `src/services/sync.ts`; spec
   `docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md` §5–6): opaque encrypted
@@ -183,7 +185,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   statement upserts `count + 1` into `activity_daily` (day, platform from `platformOf`, version or
   `''`, the user's cohort Monday, has email; no user id, no RLS), so two concurrent first calls of
   a day count once and a zone where today is earlier neither counts nor moves the day back. It sets
-  `user.app_version` from `x-wambito-version` (trimmed, at most 64 characters, else ignored) and
+  `user.app_version` from `x-wambito-version` (trimmed, `[0-9A-Za-z.+_-]{1,64}`, else ignored) and
   always `stampActivity`s. A `background: 1` call is a 204 that changes nothing: background work
   never calls it. Assistants get 403 (not in `ASSISTANT_PATHS`).
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are

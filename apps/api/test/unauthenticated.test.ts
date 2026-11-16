@@ -165,6 +165,25 @@ describe("user_deleted", () => {
     expect(await answer(headers)).toEqual({ status: 401, code: "unauthenticated" });
   });
 
+  test("x-wambito-user alone, with no token, is 401 unauthenticated even for a deleted user", async () => {
+    const { userId } = await deletedGuest();
+    expect(await answer({ "x-wambito-user": userId })).toEqual({
+      status: 401,
+      code: "unauthenticated",
+    });
+  });
+
+  test("an ended token with a deleted user's x-wambito-user is 401 device_removed", async () => {
+    const { userId } = await deletedGuest();
+    const { a, b } = await twoDevices();
+    const wrap = await put(b, device(1));
+    expect((await t.request("DELETE", `/v2/keys/${wrap}`, { headers: a })).status).toBe(204);
+    expect(await answer({ ...b, "x-wambito-user": userId })).toEqual({
+      status: 401,
+      code: "device_removed",
+    });
+  });
+
   test("a live user's id in x-wambito-user with an unknown token is 401 unauthenticated", async () => {
     const { userId } = await twoDevices();
     expect(
