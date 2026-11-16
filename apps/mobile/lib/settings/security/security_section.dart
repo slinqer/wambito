@@ -120,6 +120,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         context,
         recoveryKey: prepared.recoveryKey,
         commit: prepared.commit,
+        refused: () => prepared.refused,
       );
       // Saved, gave up or refused for sure: whatever it held is let go.
       prepared.forget();

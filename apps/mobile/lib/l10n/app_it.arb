@@ -528,6 +528,7 @@
   "settingsSecurityRemoving": "Rimozione…",
   "settingsSecurityOrNew": "Non ce l'hai? Crea una nuova chiave di recupero",
   "settingsSecurityRotatedElsewhere": "Un altro dispositivo ha cambiato le tue chiavi nello stesso momento. Aspetta che si aggiornino qui, poi riprova.",
+  "settingsSecurityTampered": "Fermati: le nuove chiavi non corrispondono a quelle che ha questo telefono, quindi qui non è cambiato nulla. Qualcuno potrebbe interferire. Non riprovare.",
   "settingsSecurityRemoveFailed": "Non siamo riusciti a rimuoverlo. Riprova.",
   "settingsSecurityDoneTitle": "Fatto",
   "settingsSecurityDoneLead": "{name} non può più aprire i tuoi dati e la sua sessione è stata chiusa.",

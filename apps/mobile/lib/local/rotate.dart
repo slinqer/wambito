@@ -78,7 +78,12 @@ final class FreshRecovery extends RotateRecovery {
 
 /// A rotation, made but not yet sent: see [rotateKeys].
 class PreparedRotation {
-  const PreparedRotation({required this.recoveryKey, required this.commit, this.forget = _nothing});
+  const PreparedRotation({
+    required this.recoveryKey,
+    required this.commit,
+    this.forget = _nothing,
+    this.refusedForGood = _no,
+  });
 
   /// The new recovery key to show ([FreshRecovery]); `null` for a typed one.
   final String? recoveryKey;
@@ -92,9 +97,17 @@ class PreparedRotation {
   /// happens once a POST was attempted (the server may hold it, and only `commit()` keeps it here and
   /// writes `revokedDevices`; retry it), once the commit is done, or while one is in flight.
   final void Function() forget;
+
+  /// Asks whether the commit was refused for good (`rotated_elsewhere`, `tampered`, or given up):
+  /// every `commit()` now throws the same error, so a retry is pointless.
+  final bool Function() refusedForGood;
+
+  /// Whether the commit was refused for good; false after `offline` and other retryable failures.
+  bool get refused => refusedForGood();
 }
 
 void _nothing() {}
+bool _no() => false;
 
 /// `wrong_recovery_key` unless [secret] opens the account's current recovery wrap.
 Future<void> _checkRecovery(String userId, List<WrapDto> wraps, Uint8List secret) async {
@@ -407,6 +420,7 @@ Future<PreparedRotation> rotateKeys(
     return PreparedRotation(
       recoveryKey: recoveryKey,
       commit: () => running ??= run().whenComplete(() => running = null),
+      refusedForGood: () => refused != null,
       forget: () {
         if (done == null && running == null && refused == null && !attempted) {
           drop(const KeysError('abandoned'));
@@ -460,7 +474,12 @@ Future<void> _keepRotated(
 
 /// A new recovery key, made but not yet sent: see [newRecoveryKey].
 class NewRecoveryKey {
-  const NewRecoveryKey({required this.recoveryKey, required this.commit, this.forget = _nothing});
+  const NewRecoveryKey({
+    required this.recoveryKey,
+    required this.commit,
+    this.forget = _nothing,
+    this.refusedForGood = _no,
+  });
 
   /// The formatted recovery key to show.
   final String recoveryKey;
@@ -474,6 +493,11 @@ class NewRecoveryKey {
   /// happens once a PUT was attempted (the server may hold it: retry `commit()`), once the commit
   /// is done, or while one is in flight.
   final void Function() forget;
+
+  /// Asks whether the server refused it for sure (`rotated_elsewhere`): make the key again.
+  final bool Function() refusedForGood;
+
+  bool get refused => refusedForGood();
 }
 
 /// A new recovery key (spec 7.5: no rotation): a new secret wraps DK, opened from this phone's own
@@ -518,6 +542,7 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
 
     var wrapSent = false;
     var attempted = false;
+    var refusedSure = false;
     Future<void> send() async {
       if (!wrapSent) {
         attempted = true;
@@ -525,6 +550,7 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
           await call('/v2/keys/$id', method: 'PUT', data: body);
         } on KeysError catch (error) {
           // `rotated_elsewhere` was refused for sure; anything else may have been kept.
+          if (error.code == 'rotated_elsewhere') refusedSure = true;
           if (error.code == 'rotated_elsewhere' || !await landed()) rethrow;
         }
         wrapSent = true;
@@ -548,6 +574,7 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
               throw error;
             });
       },
+      refusedForGood: () => refusedSure || abandoned,
       forget: () {
         if (done || attempted || sent != null || abandoned) return;
         abandoned = true;

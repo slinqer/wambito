@@ -31,22 +31,32 @@ class SetupOutcome<T> {
 List<int>? setupPositions;
 
 class RecoverySetupPage<T> extends ConsumerStatefulWidget {
-  const RecoverySetupPage({super.key, required this.recoveryKey, required this.commit});
+  const RecoverySetupPage({
+    super.key,
+    required this.recoveryKey,
+    required this.commit,
+    this.refused,
+  });
 
   final String recoveryKey;
 
   /// Saves the key (retry-safe). Throws what the save threw.
   final Future<T> Function() commit;
 
+  /// Whether the last failure was a refusal for good (`tampered`): a retry would say the same.
+  final bool Function()? refused;
+
   /// Opens the page over [context]'s screen; the outcome, or null when the person gave up.
   static Future<SetupOutcome<T>?> open<T>(
     BuildContext context, {
     required String recoveryKey,
     required Future<T> Function() commit,
+    bool Function()? refused,
   }) => Navigator.of(context, rootNavigator: true).push(
     MaterialPageRoute<SetupOutcome<T>>(
       fullscreenDialog: true,
-      builder: (_) => RecoverySetupPage<T>(recoveryKey: recoveryKey, commit: commit),
+      builder: (_) =>
+          RecoverySetupPage<T>(recoveryKey: recoveryKey, commit: commit, refused: refused),
     ),
   );
 
@@ -68,7 +78,8 @@ class _RecoverySetupPageState<T> extends ConsumerState<RecoverySetupPage<T>> {
       value = await widget.commit();
     } on Object catch (error) {
       if (!mounted) return;
-      if (error is KeysError && error.code == 'rotated_elsewhere') {
+      if (error is KeysError &&
+          (error.code == 'rotated_elsewhere' || (widget.refused?.call() ?? false))) {
         Navigator.of(context).pop(SetupOutcome<T>.refused(error));
         return;
       }

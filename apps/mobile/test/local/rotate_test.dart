@@ -677,6 +677,28 @@ void main() {
       expect((await prepared.commit()).keyV, 2);
     });
 
+    test(
+      'refused says when a commit is refused for good: rotated_elsewhere and tampered, not offline',
+      () async {
+        final a = await account();
+        final offline = await a.rotate();
+        expect(offline.refused, isFalse);
+        a.api.offline = true;
+        expect(await caught(offline.commit), isKeysError('offline'));
+        expect(offline.refused, isFalse);
+        a.api.offline = false;
+        a.api.rotatedElsewhere = true;
+        expect(await caught(offline.commit), isKeysError('rotated_elsewhere', 409));
+        expect(offline.refused, isTrue);
+
+        final b = await account();
+        final tampered = await b.rotate();
+        await b.storage.writeDataKey(b.userId, 2, generateDataKey());
+        expect(await caught(tampered.commit), isKeysError('tampered'));
+        expect(tampered.refused, isTrue);
+      },
+    );
+
     test('forget() after the commit is done changes nothing', () async {
       final a = await account();
       final prepared = await a.rotate();

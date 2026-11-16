@@ -528,6 +528,7 @@
   "settingsSecurityRemoving": "A remover…",
   "settingsSecurityOrNew": "Não a tens? Cria uma chave de recuperação nova",
   "settingsSecurityRotatedElsewhere": "Outro dispositivo mudou as tuas chaves ao mesmo tempo. Espera um momento até que se atualizem aqui e tenta outra vez.",
+  "settingsSecurityTampered": "Pára: as chaves novas não coincidem com as que este telemóvel tem, por isso aqui nada mudou. Alguém pode estar a interferir. Não tentes outra vez.",
   "settingsSecurityRemoveFailed": "Não conseguimos removê-lo. Tenta outra vez.",
   "settingsSecurityDoneTitle": "Feito",
   "settingsSecurityDoneLead": "{name} já não consegue abrir os teus dados e a sessão nele foi terminada.",

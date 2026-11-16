@@ -107,17 +107,17 @@ void main() {
     },
   );
 
-  testWidgets('a double tap on Remove or New recovery key asks the lock once', (t) async {
-    final lock = _SlowLock();
-    await pumpSection(t, FakeSecurity(), lock);
-    for (final key in ['security.newKey', 'security.remove.$laptopId']) {
+  for (final key in ['security.newKey', 'security.remove.$laptopId']) {
+    testWidgets('a double tap on $key asks the lock once', (t) async {
+      final lock = _SlowLock();
+      await pumpSection(t, FakeSecurity(), lock);
       await t.ensureVisible(find.byKey(Key(key)));
       await t.tap(find.byKey(Key(key)));
       await t.tap(find.byKey(Key(key)));
       await t.pump();
-    }
-    expect(lock.asked, 1);
-  });
+      expect(lock.asked, 1);
+    });
+  }
 
   testWidgets('"Approve a new device" opens the approver screen', (t) async {
     await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));

@@ -91,13 +91,20 @@ class FakeSecurity implements SecurityApi {
     if (failure != null) throw failure;
     // as the library: once a commit was attempted, forget() is a no-op (R17)
     var attempted = false;
+    var refused = false;
     return PreparedRotation(
       recoveryKey: recovery is FreshRecovery ? recoveryKeyText : null,
+      refusedForGood: () => refused,
       commit: () async {
         attempted = true;
         calls.add('commit');
         if (commitFailures.isNotEmpty) {
           final failure = commitFailures.removeAt(0);
+          // as the library: these two are latched, every retry says the same
+          if (failure is KeysError &&
+              (failure.code == 'tampered' || failure.code == 'rotated_elsewhere')) {
+            refused = true;
+          }
           if (failure != null) throw failure;
         }
         return RotateResult(keyV: 3, dropped: dropped);

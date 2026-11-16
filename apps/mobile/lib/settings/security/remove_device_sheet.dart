@@ -28,10 +28,11 @@ import 'security_api.dart';
 import 'security_model.dart';
 
 /// Anything but a refused key, shown under the buttons.
-enum _Problem { rotatedElsewhere, offline, failed }
+enum _Problem { rotatedElsewhere, tampered, offline, failed }
 
 _Problem _problemOf(Object? error) => switch (codeOf(error)) {
   'rotated_elsewhere' => _Problem.rotatedElsewhere,
+  'tampered' => _Problem.tampered,
   'offline' => _Problem.offline,
   _ => _Problem.failed,
 };
@@ -117,7 +118,7 @@ class _RemoveBodyState extends State<_RemoveBody> {
 
   @override
   void dispose() {
-    _pending?.forget();
+    // `_pending` was attempted (its commit ran), so `forget()` would do nothing: it is just let go.
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -159,7 +160,6 @@ class _RemoveBodyState extends State<_RemoveBody> {
   }
 
   Future<void> _finish(RotateResult result) async {
-    _pending?.forget();
     _pending = null;
     try {
       await widget.security.reloadKeys();
@@ -184,10 +184,9 @@ class _RemoveBodyState extends State<_RemoveBody> {
     try {
       result = await prepared.commit();
     } on Object catch (error) {
-      if (codeOf(error) == 'rotated_elsewhere') {
-        prepared.forget();
-        _pending = null;
-      }
+      // Refused for good (rotated elsewhere, tampered): a retry would say the same, so the
+      // sheet is free again. Anything else may have been saved: "Try again" on the same rotation.
+      if (prepared.refused) _pending = null;
       _failed(error);
       return;
     }
@@ -237,6 +236,7 @@ class _RemoveBodyState extends State<_RemoveBody> {
       context,
       recoveryKey: prepared.recoveryKey!,
       commit: prepared.commit,
+      refused: () => prepared.refused,
     );
     final result = outcome?.value;
     if (result != null) {
@@ -363,6 +363,7 @@ class _RemoveBodyState extends State<_RemoveBody> {
           FieldError(switch (problem) {
             _Problem.offline => l10n.vaultUnlockErrorOffline,
             _Problem.rotatedElsewhere => l10n.settingsSecurityRotatedElsewhere,
+            _Problem.tampered => l10n.settingsSecurityTampered,
             _Problem.failed => l10n.settingsSecurityRemoveFailed,
           }),
       ],

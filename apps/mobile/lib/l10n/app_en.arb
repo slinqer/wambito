@@ -1469,6 +1469,7 @@
   "settingsSecurityRemoving": "Removing…",
   "settingsSecurityOrNew": "Don't have it? Make a new recovery key",
   "settingsSecurityRotatedElsewhere": "Another device changed your keys at the same time. Wait a moment while they refresh here, then try again.",
+  "settingsSecurityTampered": "Stop: the new keys do not match what this phone holds, so nothing was changed here. Someone may be interfering. Do not try again.",
   "settingsSecurityRemoveFailed": "We couldn't remove it. Try again.",
   "settingsSecurityDoneTitle": "Removed",
   "settingsSecurityDoneLead": "{name} can no longer open your data, and it was signed out.",

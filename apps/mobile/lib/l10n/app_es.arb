@@ -2382,6 +2382,7 @@
   "settingsSecurityRemoving": "Quitando…",
   "settingsSecurityOrNew": "¿No la tienes? Crea una clave de recuperación nueva",
   "settingsSecurityRotatedElsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
+  "settingsSecurityTampered": "Detente: las claves nuevas no coinciden con las que tiene este teléfono, así que aquí no se cambió nada. Puede que alguien esté interfiriendo. No lo intentes de nuevo.",
   "settingsSecurityRemoveFailed": "No pudimos quitarlo. Inténtalo otra vez.",
   "settingsSecurityDoneTitle": "Listo",
   "settingsSecurityDoneLead": "{name} ya no puede abrir tus datos y se cerró su sesión.",

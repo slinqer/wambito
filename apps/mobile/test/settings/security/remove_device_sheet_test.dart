@@ -249,6 +249,19 @@ void main() {
     expect(security.calls.where((c) => c == 'commit'), hasLength(2));
   });
 
+  testWidgets('a tampered commit frees the sheet and says to stop', (t) async {
+    final security = FakeSecurity()..commitFailures.add(keysError('tampered'));
+    await pumpSheet(t, security);
+    await typeKey(t);
+    await tapKey(t, 'security.remove.confirm');
+    expect(find.textContaining('Stop:'), findsOneWidget);
+    // no "Try again": it would say the same; the sheet closes again
+    expect(find.text('TRY AGAIN'), findsNothing);
+    await t.tapAt(const Offset(10, 10));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('security.remove.key')), findsNothing);
+  });
+
   testWidgets('a refused-for-good commit frees the sheet again', (t) async {
     final security = FakeSecurity()..commitFailures.add(keysError('rotated_elsewhere'));
     await pumpSheet(t, security);
