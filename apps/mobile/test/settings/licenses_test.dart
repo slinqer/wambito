@@ -34,6 +34,15 @@ void main() {
       }
     });
 
+    test('the Plump icons are credited to Streamline, with the CC BY 4.0 text', () async {
+      for (final language in ['es', 'en', 'it', 'pt']) {
+        final entries = await _extras(language);
+        final plump = entries.singleWhere((e) => e.packages.contains('Plump Free, Streamline'));
+        expect(_text(plump), contains('streamlinehq.com'), reason: language);
+        expect(_text(plump), contains('Attribution 4.0 International'), reason: language);
+      }
+    });
+
     test('the sounds say they are original work under the app\'s own licence, AGPL-3.0', () async {
       final entries = await _extras('en');
       final sounds = entries.singleWhere((e) => e.packages.contains('Wambito feedback sounds'));

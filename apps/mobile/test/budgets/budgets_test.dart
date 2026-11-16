@@ -21,6 +21,10 @@ import '../settings/harness.dart';
 import '../support/page_gradient.dart';
 import 'fakes.dart';
 
+import 'package:wambito/ui/lk_icons.dart';
+
+import '../support/icons.dart';
+
 /// Categorías, a category's detail and the budget sheet, in the whole app (the real router, home
 /// under the detail) against fakes of the server. How they look is the parity pairs' business
 /// (test/parity/budgets_parity_test.dart); here is what they do.
@@ -224,7 +228,7 @@ void main() {
       tester,
     ) async {
       final env = await pumpBudgets(tester);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.text('Septiembre'), findsOneWidget);
       await openDetail(tester, 'Supermercado');
@@ -410,7 +414,7 @@ void main() {
 
     testBudgets('a budget set from an earlier month applies from that month on', (tester) async {
       final env = await pumpBudgets(tester);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       await openDetail(tester, 'Supermercado');
       await openBudgetSheet(tester);
@@ -560,7 +564,7 @@ void main() {
       await openBudgetsTab(tester);
       expect(find.byType(CategoryRow), findsNWidgets(2));
       env.home.failures['summary'] = const HomeFailure(0);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.byType(CategoryRow), findsNothing);
       expect(find.textContaining('Sin conexión'), findsWidgets);

@@ -9,6 +9,7 @@ import '../money/format.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/month_picker.dart' show StepButton;
 import 'chart_geometry.dart';
@@ -189,7 +190,7 @@ class _TrendChartState extends State<TrendChart> {
             spacing: WambitoTokens.space2,
             children: [
               StepButton(
-                glyph: '‹',
+                icon: LkIconName.chevronLeft,
                 label: l10n.insightsTrendPrevious,
                 onPressed: selected <= 0 ? null : () => select(selected - 1),
               ),
@@ -211,7 +212,7 @@ class _TrendChartState extends State<TrendChart> {
                 ),
               ),
               StepButton(
-                glyph: '›',
+                icon: LkIconName.chevronRight,
                 label: l10n.insightsTrendNext,
                 onPressed: selected >= months.length - 1 ? null : () => select(selected + 1),
               ),

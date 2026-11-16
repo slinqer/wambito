@@ -33,6 +33,7 @@ import '../ui/web_text_field.dart';
 import 'recurring_actions.dart';
 import 'recurring_model.dart';
 import 'recurring_repository.dart';
+import '../ui/lk_icons.dart';
 
 /// The longest name a recurring payment has (the web's input `maxLength`).
 const recurrenceNameMaxLength = 120;
@@ -717,7 +718,7 @@ class _ChoiceRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (selected) ExcludeSemantics(child: Icon(Icons.check_rounded, color: colors.ink)),
+                if (selected) LkIcon(LkIconName.check, color: colors.ink),
               ],
             ),
           ),

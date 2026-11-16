@@ -35,6 +35,7 @@ import '../ui/wambi_bubble.dart';
 import '../ui/web_text_field.dart';
 import 'search_controller.dart';
 import 'search_repository.dart';
+import '../ui/lk_icons.dart';
 
 /// How a tapped result is edited; tests replace it.
 final searchOpenEditProvider = Provider<Future<void> Function(BuildContext, Transaction)>(
@@ -181,7 +182,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           autofocus: true,
           enableSuggestions: true,
           inputMinHeight: 24,
-          leading: const ExcludeSemantics(child: Text('🔍')),
+          leading: LkIcon(LkIconName.search, size: 18, color: context.lkColors.inkMuted),
           textInputAction: TextInputAction.search,
           inputFormatters: [LengthLimitingTextInputFormatter(searchMaxText)],
           onChanged: controller.setText,

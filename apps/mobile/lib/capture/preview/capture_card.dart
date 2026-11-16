@@ -19,6 +19,7 @@ import '../../ui/pressable.dart';
 import '../parser/parse.dart' as p;
 import 'capture_card_editor.dart';
 import 'capture_preview.dart';
+import '../../ui/lk_icons.dart';
 
 /// The glyph in the tile of a card with no category yet.
 const noCategoryGlyph = '🏷️';
@@ -342,8 +343,8 @@ class _RemoveButton extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Icon(
-                  Icons.close,
+                child: LkIcon(
+                  LkIconName.close,
                   size: 18,
                   color: onPressed == null
                       ? colors.inkMuted.withValues(alpha: 0.5)

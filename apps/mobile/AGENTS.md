@@ -11,6 +11,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   settings, then `WambitoApp` (`lib/app.dart`). Router: `lib/router.dart` (go_router).
 - One folder per feature (`lib/home/`, `lib/capture/`, `lib/budgets/`, …); Riverpod 3 providers
   sit next to their feature; tests override them.
+- Interface icons: `LkIcon` (`lib/ui/lk_icons.dart`) draws `lib/ui/lk_icon_shapes.dart`, a copy of
+  `docs/design/system/project/icons/icons.json` that `test/ui/lk_icon_test.dart` keeps equal to it;
+  tests find them with `findIcon` (`test/support/icons.dart`). Emoji only for categories.
 - `lib/capture_auto/`: Settings → "Captura automática" (switch per source, notification-access
   state, restricted-settings steps). "¿Cómo funciona?" (`how_capture_works.dart`, demos in
   `capture_demos.dart`, twin of `apps/web/app/features/capture/`): five steps in an `LkSheet`

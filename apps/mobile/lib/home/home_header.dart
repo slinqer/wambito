@@ -6,16 +6,15 @@ import '../l10n/app_localizations.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/month_picker.dart';
 import '../ui/pressable.dart';
 
-/// Home's header: the wordmark, the month (earlier ones browsable, never past [max]) and the face
-/// button, which opens the account menu ([menu]: the entries under it, as [HomeMenuLink]s). The
-/// wordmark, the month and the two buttons need about 470px on one row, so under 480px (every
-/// phone) the month gets its own centred row under the wordmark and the buttons, as on the web
-/// (`min-[480px]`). Large text needs more room: the width is compared with 480px scaled like text,
-/// so the buttons never wrap to a row of their own.
+/// Home's header, one row: the month (earlier ones browsable, never past [max]) on the left; the
+/// magnifier and the account button on the right, which opens the account menu ([menu]: the
+/// entries under it, as [HomeMenuLink]s). No wordmark: the app's icon already says where you are.
+/// The month's name gives way (cut with …) before the buttons do, down to 320px.
 ///
 /// The menu is a disclosure: its button says whether it is open, a tap outside (or Back) closes it.
 class HomeHeader extends StatefulWidget {
@@ -51,9 +50,6 @@ class _HomeHeaderState extends State<HomeHeader> {
   final _avatarKey = GlobalKey();
   var _open = false;
 
-  /// The web's `min-[480px]`, a width of the viewport (scaled with the text here).
-  static const _wide = 480.0;
-
   /// A finger came down at [position] with the menu open: anywhere but on the face button closes
   /// it (the button toggles it itself, as the web's `pointerdown` listener leaves it to).
   void _pressedOutside(Offset position) {
@@ -78,23 +74,22 @@ class _HomeHeaderState extends State<HomeHeader> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final wide = MediaQuery.sizeOf(context).width >= MediaQuery.textScalerOf(context).scale(_wide);
     final picker = MonthPicker(month: widget.month, onChange: widget.onMonth, max: widget.max);
-    // `<div className="flex items-center gap-(--space-2)">` with the search link and the face button.
+    // `<div className="flex items-center gap-(--space-2)">` with the search link and the account button.
     final avatar = Row(
       mainAxisSize: MainAxisSize.min,
       spacing: WambitoTokens.space2,
       children: [
         _Avatar(
           buttonKey: const Key('home.search'),
-          glyph: '🔍',
+          icon: LkIconName.search,
           label: l10n.searchTitle,
           onPressed: widget.onSearch,
         ),
         _Avatar(
           key: _avatarKey,
           buttonKey: const Key('home.account'),
-          glyph: '🙂',
+          icon: LkIconName.user,
           label: l10n.homeAccount,
           open: _open,
           onPressed: widget.menu == null ? null : () => _setOpen(!_open),
@@ -111,23 +106,15 @@ class _HomeHeaderState extends State<HomeHeader> {
       ),
       child: CompositedTransformTarget(
         link: _link,
+        // `flex items-center justify-between gap-x-(--space-2)`.
         child: SizedBox(
           width: double.infinity,
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            // `gap-x-(--space-2)`; the rows have no gap of their own.
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             spacing: WambitoTokens.space2,
             children: [
-              const LkWordmark(),
-              if (wide) picker,
+              Flexible(child: picker),
               avatar,
-              // Narrow: the month is last (`order-last`) and takes a row to itself.
-              if (!wide)
-                SizedBox(
-                  width: double.infinity,
-                  child: Center(child: picker),
-                ),
             ],
           ),
         ),
@@ -162,13 +149,13 @@ class LkWordmark extends StatelessWidget {
   }
 }
 
-/// A round button of the header (`.lk-avatar`): the face button and the magnifier. A 44px round button that sinks 3px into a 1px edge, like the
+/// A round button of the header (`.lk-avatar`): the account button and the magnifier. A 44px round button that sinks 3px into a 1px edge, like the
 /// month picker's arrows.
 class _Avatar extends StatelessWidget {
   const _Avatar({
     super.key,
     required this.buttonKey,
-    required this.glyph,
+    required this.icon,
     required this.label,
     this.open,
     required this.onPressed,
@@ -176,7 +163,7 @@ class _Avatar extends StatelessWidget {
 
   /// Finds the button (tests).
   final Key buttonKey;
-  final String glyph;
+  final LkIconName icon;
   final String label;
 
   /// Whether the menu it opens is open; null for a button that opens none.
@@ -207,7 +194,7 @@ class _Avatar extends StatelessWidget {
             ),
             ringRadius: state.focusVisible ? radius : null,
             ringColor: colors.focus,
-            child: ExcludeSemantics(child: Text(glyph, style: LkText.avatarGlyph)),
+            child: LkIcon(icon, size: 22, color: colors.ink),
           );
         },
       ),
