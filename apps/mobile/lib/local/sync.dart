@@ -759,6 +759,7 @@ class _Engine implements SyncEngine {
     final since0 = ((await store.getMeta('latest')) as int?) ?? 0;
     final base = ((await store.getMeta('base')) as int?) ?? since0;
     final latest = await pullPages(result, since0, base);
+    await fence();
     await store.setMeta('latest', latest);
     await store.setMeta('base', latest);
     if (_retryUnknown) await retryQuarantined(result, latest);
@@ -824,6 +825,7 @@ class _Engine implements SyncEngine {
         }
       }
       if (apply.isNotEmpty) {
+        await fence();
         await store.transaction((tx) async {
           for (final (:rec, :type, :body) in apply) {
             // Checked again here: the person may have written it since `pending` was read.
@@ -1005,9 +1007,11 @@ class _Engine implements SyncEngine {
           if (take != null && lease == null) {
             return SyncResult(ok: false, error: SyncProblemCode.busy);
           }
+          _lease = lease;
           try {
             return await _passes();
           } finally {
+            _lease = null;
             try {
               await lease?.release();
             } on Object {
@@ -1025,6 +1029,16 @@ class _Engine implements SyncEngine {
     return future;
   }
 
+  /// The lease of the run in flight (null: no lease option).
+  VaultLease? _lease;
+
+  /// Stops the run when the lease was lost (expired while the process was frozen, taken over):
+  /// nothing more is committed from it.
+  Future<void> fence() async {
+    final lease = _lease;
+    if (lease != null && !await lease.renew()) throw const _Stop(SyncProblemCode.busy);
+  }
+
   /// The passes of one run, with the lease held.
   Future<SyncResult> _passes() async {
     // Key refreshes are counted per run, across its passes.
@@ -1033,6 +1047,10 @@ class _Engine implements SyncEngine {
     do {
       _again = false;
       final start = await mark();
+      final lease = _lease;
+      if (lease != null && !await lease.renew()) {
+        return combine(last, SyncResult(ok: false, error: SyncProblemCode.busy));
+      }
       last = combine(last, await once());
       // Only what the person wrote during the run gets one more pass: a change left
       // pending (parked, set aside, waiting) waits for the next trigger.

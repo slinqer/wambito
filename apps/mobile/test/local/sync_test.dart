@@ -1403,6 +1403,26 @@ void main() {
       expect(server.requests, isEmpty);
     });
 
+    test('a lease lost mid-run stops the run as busy and writes nothing more', () async {
+      final server = FakeSync();
+      final other = await device(server);
+      await serverWrite(server, await getKeys(), a, 'Remote', 1);
+      var renews = 0;
+      final d = await device(
+        server,
+        // Held for the first check (before the pass), taken over by the time the pull commits.
+        lease: () async => _Lease(() {}, onRenew: () => ++renews < 2),
+      );
+      final result = await d.engine.run();
+      expect(result.ok, isFalse);
+      expect(result.error, SyncProblemCode.busy);
+      expect(renews, 2);
+      expect(await d.store.getMeta('latest'), isNull);
+      expect(await d.store.getMeta('lastSync'), isNull);
+      expect(await names(d.store), isEmpty);
+      expect(other.problems, isEmpty);
+    });
+
     test('a run takes the lease and releases it at its end', () async {
       final server = FakeSync();
       var taken = 0;
@@ -1424,9 +1444,13 @@ void main() {
 }
 
 class _Lease implements VaultLease {
-  _Lease(this.onRelease);
+  _Lease(this.onRelease, {this.onRenew});
 
   final void Function() onRelease;
+  final bool Function()? onRenew;
+
+  @override
+  Future<bool> renew() async => onRenew?.call() ?? true;
 
   @override
   Future<void> release() async => onRelease();

@@ -15,6 +15,11 @@ String vaultLockFileName(String userId) => '${vaultFileName(userId)}-lock';
 /// A lease on the vault of one account: [release] gives it up.
 abstract interface class VaultLease {
   Future<void> release();
+
+  /// Whether the lease is still ours: true when the lock file holds this lease's token and the
+  /// lease is live (it is then extended by the ttl); false once it expired or was taken over. A run
+  /// that gets false must stop writing: another engine may hold the vault now.
+  Future<bool> renew();
 }
 
 /// How long a lock file that is empty or unreadable counts as being written (its holder created
@@ -30,12 +35,41 @@ String _token() =>
     List.generate(16, (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
 
 class _Lease implements VaultLease {
-  _Lease(this._path, this._token, this._clock);
+  _Lease(this._path, this._token, this._holder, this._ttl, this._clock);
 
   final String _path;
   final String _token;
+  final String _holder;
+  final Duration _ttl;
   final DateTime Function() _clock;
   bool _released = false;
+
+  @override
+  Future<bool> renew() async {
+    if (_released) return false;
+    try {
+      final content = _read(File(_path));
+      if (content?.token != _token) return false;
+      if (content!.expiresAt - _releaseMargin.inMilliseconds <= _clock().millisecondsSinceEpoch) {
+        return false;
+      }
+      // A new file moved over ours (atomic): a reader never sees it half written. Only the holder
+      // touches a live lease, so nobody else is writing this path.
+      final next = File('$_path.$_token-renew');
+      next.writeAsStringSync(
+        jsonEncode({
+          'holder': _holder,
+          'token': _token,
+          'expiresAt': _clock().add(_ttl).millisecondsSinceEpoch,
+        }),
+        flush: true,
+      );
+      next.renameSync(_path);
+      return true;
+    } on Object {
+      return false;
+    }
+  }
 
   @override
   Future<void> release() async {
@@ -105,7 +139,7 @@ Future<VaultLease?> tryLease(
   final mine = _token();
   DateTime expiry() => clock().add(ttl);
   for (var attempt = 0; attempt < 3; attempt++) {
-    if (_create(file, holder, mine, expiry())) return _Lease(path, mine, clock);
+    if (_create(file, holder, mine, expiry())) return _Lease(path, mine, holder, ttl, clock);
     final seen = _read(file);
     final stat = _stat(file);
     if (stat == null) continue; // released between the create and the read: try again
@@ -115,30 +149,45 @@ Future<VaultLease?> tryLease(
     } else if (seen.expiresAt > clock().millisecondsSinceEpoch) {
       return null;
     }
-    // Expired. One taker wins the claim on this expired lease; the others ask again later.
-    final claim = File('$path.claim-${seen?.token ?? 'unwritten'}');
-    if (!_create(claim, holder, mine, expiry())) {
+    // Expired. One taker wins the claim on this expired lease; the others ask again later. A claim
+    // left by a dead claimant is never deleted by path (two takers could each delete the other's
+    // fresh claim): a taker that finds it stale claims on top of it, named after the stale claim's
+    // own token, so exactly one taker recovers it; that winner deletes the stale claims only after
+    // it has replaced the lock.
+    final stale = <File>[];
+    var claim = File('$path.claim-${seen?.token ?? 'unwritten'}');
+    while (!_create(claim, holder, mine, expiry())) {
       final claimStat = _stat(claim);
-      // A claimant that died between its claim and its end leaves the claim behind.
-      if (claimStat != null && clock().difference(claimStat.modified) > _claimGrace) {
-        _drop(claim);
-        continue;
+      final theirs = _read(claim);
+      if (claimStat == null ||
+          theirs == null ||
+          clock().difference(claimStat.modified) <= _claimGrace ||
+          stale.length >= 3) {
+        return null;
       }
-      return null;
+      stale.add(claim);
+      claim = File('${claim.path}.${theirs.token}');
     }
     try {
       final still = _read(file);
       final unchanged = seen == null ? still == null : still?.token == seen.token;
+      // A claimant delayed past the grace may have been recovered meanwhile: only a claim that is
+      // still ours may act.
+      if (_read(claim)?.token != mine) return null;
       if (_stat(file) != null && unchanged) {
         final away = '$path.${_token()}';
         file.renameSync(away);
         _drop(File(away));
       }
-      if (_create(file, holder, mine, expiry())) return _Lease(path, mine, clock);
+      if (_create(file, holder, mine, expiry())) {
+        return _Lease(path, mine, holder, ttl, clock);
+      }
     } on FileSystemException {
       // Another caller changed the file under us: ask again later.
     } finally {
       _drop(claim);
+      // After the lock was replaced, so a new claim on the old token finds another token.
+      stale.forEach(_drop);
     }
     return null;
   }
