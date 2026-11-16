@@ -352,7 +352,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `app/features/landing/money-words.ts` / `MoneyHeadline.tsx` hold money words per language: edit
   with care.
 - The landing header must fit one row at 320px in every language (e2e checks it).
-- The landing's copy has three copies outside the page: `landing.meta` (title and description, the
+- The landing's copy is repeated outside the page: `landing.meta` (title and description, the
   `<title>` and the share text, `features/landing/seo.ts`), and the share images
   `public/og-{es,en,it,pt}.png`, drawn by `scripts/og/og.html` from `landing.hero.headline` and
   `landing.hero.description`. When the hero or what the landing promises changes, rewrite
