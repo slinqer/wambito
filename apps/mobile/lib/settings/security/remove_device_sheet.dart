@@ -156,6 +156,8 @@ class _RemoveBodyState extends State<_RemoveBody> {
       unawaited(widget.security.reloadKeys().catchError((Object _) {}));
       widget.onChanged();
     }
+    // The keys' links do not check out: the message says to stop, and the list shows what is there.
+    if (problem == _Problem.tampered) widget.onChanged();
     _asking(problem: problem);
   }
 
@@ -316,6 +318,8 @@ class _RemoveBodyState extends State<_RemoveBody> {
     final colors = context.lkColors;
     final problem = _problem;
     final retrying = _pending != null;
+    // After `tampered` the message says not to try again: nothing to press.
+    final stopped = problem == _Problem.tampered;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -342,17 +346,18 @@ class _RemoveBodyState extends State<_RemoveBody> {
           onSubmitted: (_) => unawaited(_withKey()),
         ),
         if (_keyError != null) FieldError(unlockErrorText(l10n, _keyError!)),
-        PressButton.text(
-          _busy
-              ? l10n.settingsSecurityRemoving
-              : retrying
-              ? l10n.retry
-              : l10n.settingsSecurityRemoveConfirm,
-          key: const Key('security.remove.confirm'),
-          tone: PressTone.secondary,
-          onPressed: _canSubmit ? () => unawaited(_withKey()) : null,
-        ),
-        if (!retrying)
+        if (!stopped)
+          PressButton.text(
+            _busy
+                ? l10n.settingsSecurityRemoving
+                : retrying
+                ? l10n.retry
+                : l10n.settingsSecurityRemoveConfirm,
+            key: const Key('security.remove.confirm'),
+            tone: PressTone.secondary,
+            onPressed: _canSubmit ? () => unawaited(_withKey()) : null,
+          ),
+        if (!retrying && !stopped)
           PressButton.text(
             l10n.settingsSecurityOrNew,
             key: const Key('security.remove.newKey'),

@@ -234,6 +234,26 @@ void main() {
       expect(parsedSecrets.every(zeroed), isTrue);
     });
 
+    test('a recovery unlock zeroes the verifier hashes after the put, sent or not', () async {
+      final made = <VerifierHashes>[];
+      keysVerifierHashes = (secret) async {
+        final hashes = await verifierHashesOf(secret);
+        made.add(hashes);
+        return hashes;
+      };
+      addTearDown(() => keysVerifierHashes = verifierHashesOf);
+      final a = await accountWithKey();
+      await unlockWithRecovery(a.options, a.recoveryKey);
+      final b = await accountWithKey();
+      b.api.failVerifier = true;
+      await unlockWithRecovery(b.options, b.recoveryKey);
+      expect(made, hasLength(2));
+      for (final hashes in made) {
+        expect(zeroed(hashes.lookupHash), isTrue);
+        expect(zeroed(hashes.authHash), isTrue);
+      }
+    });
+
     test('a recovery unlock that fails sends no verifier', () async {
       final a = await accountWithKey();
       final stranger = formatRecoveryKey(newRecoverySecret());

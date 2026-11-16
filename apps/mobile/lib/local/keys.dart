@@ -755,6 +755,11 @@ Future<PreparedAccount> prepareAccount(KeysOptions options, {required bool guest
   );
 }
 
+/// The test seam of [verifierHashesOf] for [unlockWithRecovery] (to check that it zeroes the hashes
+/// it sent). Production code never changes it.
+@visibleForTesting
+Future<VerifierHashes> Function(Uint8List secret) keysVerifierHashes = verifierHashesOf;
+
 /// Unlocks this phone with the typed recovery key: opens the recovery wrap, enrolls this device
 /// and keeps the data keys, of the older versions the links reach too ([olderForTrustedKey], not
 /// strict: the recovery secret authenticates the key, so with a vault held here a chain that does
@@ -799,10 +804,15 @@ Future<LocalKeys> unlockWithRecovery(KeysOptions options, String text) async {
       );
       // Best effort (D16): accounts made before the verifier existed get one at their next
       // recovery unlock; a failure never fails the unlock.
+      VerifierHashes? hashes;
       try {
-        await putRecoveryVerifier(options, await verifierHashesOf(secret));
+        hashes = await keysVerifierHashes(secret);
+        await putRecoveryVerifier(options, hashes);
       } on Object {
         // the next unlock tries again
+      } finally {
+        _zero(hashes?.lookupHash);
+        _zero(hashes?.authHash);
       }
       return local;
     } finally {

@@ -262,6 +262,33 @@ void main() {
     expect(find.byKey(const Key('security.remove.key')), findsNothing);
   });
 
+  testWidgets(
+    'after tampered neither "Remove it" nor "Make a new recovery key" is offered, and the '
+    'list reloads',
+    (t) async {
+      final security = FakeSecurity()..commitFailures.add(keysError('tampered'));
+      await pumpSheet(t, security);
+      await typeKey(t);
+      await tapKey(t, 'security.remove.confirm');
+      expect(find.textContaining('Stop:'), findsOneWidget);
+      expect(find.byKey(const Key('security.remove.confirm')), findsNothing);
+      expect(find.byKey(const Key('security.remove.newKey')), findsNothing);
+      expect(changed, 1);
+    },
+  );
+
+  testWidgets('tampered on the new key comes back the same way', (t) async {
+    final security = FakeSecurity()..commitFailures.add(keysError('tampered'));
+    await pumpSheet(t, security);
+    await tapKey(t, 'security.remove.newKey');
+    await typeCheck(t);
+    await tapKey(t, 'vault.continue');
+    expect(find.textContaining('Stop:'), findsOneWidget);
+    expect(find.byKey(const Key('security.remove.confirm')), findsNothing);
+    expect(find.byKey(const Key('security.remove.newKey')), findsNothing);
+    expect(changed, 1);
+  });
+
   testWidgets('a refused-for-good commit frees the sheet again', (t) async {
     final security = FakeSecurity()..commitFailures.add(keysError('rotated_elsewhere'));
     await pumpSheet(t, security);
