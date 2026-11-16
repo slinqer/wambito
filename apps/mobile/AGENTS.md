@@ -111,6 +111,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
   widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
+  The vault lease (`lib/local/vault_lock.dart`, `tryLease` / `waitLease`) is what lets the app and a headless engine
+  share one vault file: a lock file `wambito-vault-<userId>.db-lock` in the vault folder, holder `app` or `background`,
+  TTL 10 minutes (renewed by the sync), taken over atomically once expired; the app waits at most 30 s for it, a
+  headless run that cannot take it ends `busy` and touches nothing. Tests give each phone its own folder, so its own lock.
   Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`, KEEP: while an ask waits or runs, a second is dropped, so the widget's refresh jobs never chain engines;
   `AccountMode.write(mode, owner)` schedules for `preview` and cancels for `plain`/none), `SyncWorker` (runs
   `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`), `HeadlessRunner` (a `FlutterEngine`
@@ -324,12 +328,21 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
-- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`):
-  `scripts/run-vault-e2e.sh` resets the preview account (`seed:e2e-preview` in the api container), runs
-  `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit code, set up through `VaultGate`,
-  add a movement, sync, a second empty phone unlocks with the recovery key) and checks with `psql` that
-  `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
-  `records.body` holds the plain text (must print 0). CI's `mobile-build` fails when a release APK
+- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`,
+  and `docker compose up -d --build api` after the API code changed: a stale image 404s the newer routes):
+  `scripts/run-vault-e2e.sh` runs two stack tests one after the other (they share the account), each after
+  `seed:e2e-preview` in the api container: `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
+  code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
+  `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
+  `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
+  removes B with `TypedRecovery`, a background sync re-seals under the new key version and B's next sync ends
+  `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
+  `recovery_key_invalid`). `test_stack/support.dart` holds the shared phone, gate and sign-in helpers; a vault
+  session is one per process and account, so only one phone has its session open at a time. After each it checks
+  with `psql` that `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
+  `records.body` holds the test's word (`almuerzo`, `panaderia`) in the clear (must print 0; a byte search, as a
+  sealed body is not UTF-8). Each test signs in with an email code and the API allows 5 per address in 10 minutes
+  (in memory): after a third run, `docker compose restart api`. CI's `mobile-build` fails when a release APK
   lists `libsqlite3.so` (sqflite uses the system SQLite; the ffi dev dependency must stay out). `test_stack/` is outside `test/`, so `flutter test`
   never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
@@ -399,7 +412,16 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
   at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
-  (renaming removes placed widgets), the snapshot key. Changing any needs a migration.
+  (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
+  Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;
+  WorkManager works `wambito.sync.periodic` and `wambito.sync.now`; iOS task id `wambito.sync`
+  (`BGTaskSchedulerPermittedIdentifiers`) and pending notice ids `wambito.due.<yyyy-MM-dd>`; prefs file
+  `wambito.notice.duelist`; key `wambito.encryption.owner` in `wambito.encryption`; key `confirms` in
+  `wambito.capture.queue`; the snapshot's `owner` field; the lock file `wambito-vault-<userId>.db-lock`; the
+  merchant record id `uuidv5(uuidv5(seedNamespace, userId), "merchant:<key>")`.
+- The due list (`lib/background/due_effect.dart`) belongs to the headless run for a `preview` account (14 days at
+  9:00 local, written to `wambito.notice.duelist`; `DueWorker` / iOS `DueTask` only read it and never call the API),
+  and the widget snapshot belongs to the vault (`writeVaultWidget`, `widget_effect.dart`), never to the `/v1` caches.
 - No `gradlew` is tracked; Kotlin-only runs can skip the Flutter compile with `-x compileFlutterBuildDebug`.
 - Never block on a WorkManager future (`.get()`) in code a Worker runs: deadlocks in tests.
 - `test/tooling/*` reads Android files; `widget_android_test.dart` there pins Dart = Kotlin.
