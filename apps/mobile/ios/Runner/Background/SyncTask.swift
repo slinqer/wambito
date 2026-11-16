@@ -49,22 +49,22 @@ enum SyncTask {
   private static func handle(_ task: BGAppRefreshTask) {
     // First, whatever follows: the next run is on the calendar even if this one dies.
     schedule()
-    // Ends the task once, on the main thread (the system may call the expiration at any time).
-    var ended = false
+    // Ends the task once, on the main thread (the system may call the expiration at any time,
+    // even before the start below has run: `once` then keeps the engine from ever starting).
+    let once = TaskOnce()
     let end: (Bool) -> Void = { success in
-      guard !ended else { return }
-      ended = true
-      task.setTaskCompleted(success: success)
+      if once.end() { task.setTaskCompleted(success: success) }
     }
     task.expirationHandler = {
-      // Ends the engine; its completion then completes the task. Queued on the main queue after
-      // the start below, so it never comes before it.
+      // Ends the engine if one runs (its completion then completes the task), and keeps one that
+      // has not started yet from starting after `setTaskCompleted`.
       DispatchQueue.main.async {
         HeadlessRunner.abort()
-        end(false)
+        if once.abort() { task.setTaskCompleted(success: false) }
       }
     }
     DispatchQueue.main.async {
+      guard once.mayStart else { return }
       // A `plain` account (or none) has nothing to sync: no engine, and nothing left waiting.
       guard AccountMode.read() == "preview" else {
         end(true)

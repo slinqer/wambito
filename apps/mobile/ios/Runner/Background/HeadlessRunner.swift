@@ -60,7 +60,9 @@ final class HeadlessRunner {
     GeneratedPluginRegistrant.register(with: engine)
     let messenger = engine.binaryMessenger
     background = BackgroundChannel(messenger: messenger) { [weak self] outcome in
-      self?.finish(outcome)
+      // Not inside the engine's own `finished` handler: destroying the engine there would tear it
+      // down under the call that is still answering. The next turn of the main queue ends it.
+      DispatchQueue.main.async { self?.finish(outcome) }
     }
     notices = NoticesChannel(messenger: messenger)
     let item = DispatchWorkItem { [weak self] in self?.finish("timeout") }
