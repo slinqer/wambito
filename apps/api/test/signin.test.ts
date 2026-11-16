@@ -488,6 +488,21 @@ describe("/v2/signin", () => {
     expect(row.expiresAt.getTime()).toBeLessThanOrEqual(after + TWELVE_HOURS + 1000);
   });
 
+  for (const client of ["android", "ios"]) {
+    test(`a ticked pickup sent with x-wambito-client: ${client} still gets a standard session, never the phone's long one`, async () => {
+      const p = await phone();
+      const { started } = await sealed(p, { remember: true });
+      const res = await t.request("POST", `/v2/signin/${started.id}/pickup`, {
+        headers: { ...poll(started.pollSecret), "x-wambito-client": client },
+      });
+      expect(res.status, await res.clone().text()).toBe(200);
+      expect(sessionCookieLine(res)).toMatch(/Max-Age=5184000/i);
+      const row = await sessionByToken(res.headers.get("set-auth-token") ?? "");
+      expect(row.lifetime).toBe("standard");
+      expect(row.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 60 * 24 * HOUR + 1000);
+    });
+  }
+
   test("an unticked session is 401 after 13 hours, and no response to it ever sets Max-Age", async () => {
     const p = await phone();
     const { started } = await sealed(p, { remember: false });

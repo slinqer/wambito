@@ -11,8 +11,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP. Sessions carry a `lifetime`
   (`src/services/sessions.ts`): `standard` (60 days, slid by Better Auth at most once a day),
   `long` (760 days: an encrypted user without an email on the phone, `lifetimeFor`), `short`
-  (12 hours); the session create hook keeps a given `long`/`short`, else picks it and sets
-  `expiresAt` (constants `SESSION_SECONDS`, `LONG_SESSION_SECONDS`, `SHORT_SESSION_SECONDS`).
+  (12 hours); the session create hook keeps the lifetime `createServerSession` gives (any of
+  the three, so no client header changes it), else picks it and sets `expiresAt` (constants `SESSION_SECONDS`, `LONG_SESSION_SECONDS`, `SHORT_SESSION_SECONDS`).
   Better Auth never refreshes a `long` session, so `requireUser` slides it (`slideLongSession`, at
   most once a day, stamping activity); claiming an email ends it (`endLongSessions`). Every
   user's activity is stamped on `user.lastActiveAt` (`stampActivity`, services/guest-cleanup.ts).

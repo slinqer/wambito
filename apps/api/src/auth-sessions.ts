@@ -11,6 +11,9 @@ import type { SessionLifetime } from "./services/sessions.ts";
 
 const LIFETIMES = ["standard", "long", "short"] as const satisfies readonly SessionLifetime[];
 
+/** The server-only endpoint's path: the session create hook keeps the lifetime it gives. */
+export const SERVER_SESSION_PATH = "/wambito/server-session";
+
 /**
  * The session token a request presents, from `Authorization: Bearer` (the app) or the session
  * cookie (the web), without its signature; null without one. Better Auth checks the signature;
@@ -34,8 +37,8 @@ function presentedToken(headers: Headers | undefined, cookieName: string): strin
  * proved who the person is.
  *
  * The lifetime travels on the session row (`overrideAll`, so Better Auth's `standard` default does
- * not replace it), and the session create hook in auth.ts keeps a `long` or `short` one (a
- * `standard` one is computed there again). A `short` session is Better Auth's "don't remember me":
+ * not replace it), and the session create hook in auth.ts keeps it as given, `standard` included
+ * (it recomputes only sessions Better Auth makes itself). A `short` session is Better Auth's "don't remember me":
  * a signed `dont_remember` cookie and a session cookie without `Max-Age`.
  */
 export const wambitoSessions = () =>
@@ -66,7 +69,7 @@ export const wambitoSessions = () =>
     },
     endpoints: {
       createServerSession: createAuthEndpoint(
-        "/wambito/server-session",
+        SERVER_SESSION_PATH,
         {
           method: "POST",
           body: z.object({ userId: z.string().min(1), lifetime: z.enum(LIFETIMES) }),

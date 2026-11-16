@@ -20,7 +20,7 @@ import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { anonymous, bearer, emailOTP, jwt } from "better-auth/plugins";
-import { wambitoSessions } from "./auth-sessions.ts";
+import { SERVER_SESSION_PATH, wambitoSessions } from "./auth-sessions.ts";
 import { apiPathPrefix, type Config, isPreviewAccount } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
@@ -528,9 +528,11 @@ export function createAuth(deps: AppDeps) {
           // Every sign-in (email code, magic link, passkey) creates a session: a suspended account
           // gets none (spec §5.4). The session keeps no IP address (spec §9); Better Auth's own
           // `disableIpTracking` is not used because it also turns off its per-IP rate limits.
-          // Its lifetime: a `long` or `short` one asked for by our own server-side sign-ins is
-          // kept; otherwise (Better Auth's default, `standard`) `lifetimeFor` picks it from the
-          // user and the client. Better Auth's expiry stays for `standard`.
+          // Its lifetime: a session from our own server-side sign-ins (`createServerSession`,
+          // auth-sessions.ts) keeps exactly the one its route gave, `standard` included, so no
+          // client header can turn it into another; for a session Better Auth creates itself
+          // (its default is `standard`), `lifetimeFor` picks it from the user and the client.
+          // Better Auth's expiry stays for `standard`.
           before: async (data, ctx) => {
             const [found] = await deps.db
               .select({
@@ -543,7 +545,7 @@ export function createAuth(deps: AppDeps) {
             if (found?.suspendedAt != null) throw accountSuspended();
             const given = data.lifetime as SessionLifetime | undefined;
             const lifetime =
-              given === "long" || given === "short"
+              ctx?.path === SERVER_SESSION_PATH && given
                 ? given
                 : lifetimeFor(
                     {
