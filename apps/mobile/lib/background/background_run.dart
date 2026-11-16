@@ -46,6 +46,7 @@ class BackgroundDeps {
     required this.now,
     this.refreshKeys,
     this.dropKeyVersion,
+    this.deadline,
   });
 
   /// The session's token, or null when signed out.
@@ -69,6 +70,36 @@ class BackgroundDeps {
   /// the run keeps the keys it loaded.
   final Future<Keyring> Function(String userId, Dio network)? refreshKeys;
   final Future<void> Function(String userId, int keyV)? dropKeyVersion;
+
+  /// When the run must stop, well before native code's budget ends the engine (which would leave the
+  /// lease for its whole ttl): past it the engine stops at its next fence, the effects are skipped,
+  /// and the run acks what it saved and releases the lease. Null: no deadline.
+  final DateTime? deadline;
+}
+
+/// Cancels every request of [dio] still running at [deadline] and refuses any made after it, so a
+/// slow network cannot keep a run past its deadline (the sync reads it as `offline` and stops).
+void cutAtDeadline(Dio dio, DateTime deadline) {
+  final cancel = CancelToken();
+  final left = deadline.difference(DateTime.now());
+  if (left <= Duration.zero) {
+    cancel.cancel('deadline');
+  } else {
+    Timer(left, () => cancel.cancel('deadline'));
+  }
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) {
+        options.cancelToken = cancel;
+        if (cancel.isCancelled) {
+          return handler.reject(
+            DioException.requestCancelled(requestOptions: options, reason: 'deadline'),
+          );
+        }
+        handler.next(options);
+      },
+    ),
+  );
 }
 
 /// What a run writes outside the vault once it has synced, for the account it ran for: the home
@@ -91,14 +122,15 @@ class BackgroundReport {
 
 /// A lease the run already holds, lent to the engine: renewing is the real lease's, releasing is the
 /// run's alone (the engine releases after its pass, and the run still needs the lease for its
-/// effects).
+/// effects). Past the run's deadline it no longer renews, so the engine stops at its next fence.
 class _Borrowed implements VaultLease {
-  _Borrowed(this._lease);
+  _Borrowed(this._lease, this._past);
 
   final VaultLease _lease;
+  final bool Function() _past;
 
   @override
-  Future<bool> renew() => _lease.renew();
+  Future<bool> renew() async => !_past() && await _lease.renew();
 
   @override
   Future<void> release() async {}
@@ -120,8 +152,11 @@ const _ended = {
 ///   goes to `captured`. Any other status leaves it unacked, in the queue.
 /// - A confirm is `POST /v1/transactions/review` for its id; 200 and 404 (unknown: dropped) are acked.
 /// - [ack] runs last: a crash anywhere before it leaves everything queued, and the next run merges
-///   what was already saved (Review Focus 1). Never called on `busy`, `locked`, `signedOut`,
-///   `notPreview`, or when anything threw.
+///   what was already saved (Review Focus 1). Never called when the lease was not taken (`busy`),
+///   on `locked`, `signedOut`, `notPreview`, or when saving or the sync threw. The effects are best
+///   effort: one that throws is skipped, never the ack.
+/// - Past [BackgroundDeps.deadline] the sync stops at its next fence and the effects are skipped;
+///   what was saved is still acked, and the lease released.
 Future<BackgroundReport> runBackground(
   BackgroundDeps deps,
   BackgroundEffects effects, {
@@ -192,6 +227,8 @@ Future<BackgroundReport> runBackground(
       }
     }
 
+    final deadline = deps.deadline;
+    bool past() => deadline != null && !deps.now().isBefore(deadline);
     final network = deps.network(token);
     final engine = createSyncEngine(
       SyncEngineOptions(
@@ -205,7 +242,7 @@ Future<BackgroundReport> runBackground(
         },
         dropKeyVersion: deps.dropKeyVersion == null ? null : (v) => deps.dropKeyVersion!(userId, v),
         now: () => deps.now().millisecondsSinceEpoch,
-        lease: () async => _Borrowed(lease!),
+        lease: () async => _Borrowed(lease!, past),
       ),
     );
     final result = await engine.run();
@@ -221,17 +258,32 @@ Future<BackgroundReport> runBackground(
       outcome = BackgroundOutcome.changed;
     }
     if (problem == SyncProblemCode.unauthorized) outcome = BackgroundOutcome.signedOut;
-    if (problem == SyncProblemCode.busy) outcome = BackgroundOutcome.busy;
+    // Stopped by its own deadline, a run that saved something still reports it (the app refreshes,
+    // the captures are notified); one that saved nothing is retried like a busy one.
+    final cut = past();
+    if (problem == SyncProblemCode.busy && !(cut && outcome == BackgroundOutcome.changed)) {
+      outcome = BackgroundOutcome.busy;
+    }
     if (problem == SyncProblemCode.sessionChanged ||
         problem == SyncProblemCode.deviceRemoved ||
         problem == SyncProblemCode.keyUnverified) {
       outcome = BackgroundOutcome.failed;
     }
 
-    // The widget and the due list are this account's only while its session stands.
-    if (!_ended.contains(problem)) {
-      await effects.widget(userId, backend);
-      await effects.due(userId, backend);
+    // The widget and the due list are this account's only while its session stands, and are
+    // skipped past the deadline (the next run or the app draws them). Each is best effort: one that
+    // throws skips neither the other nor the ack of what was saved.
+    if (!_ended.contains(problem) && !cut) {
+      try {
+        await effects.widget(userId, backend);
+      } on Object {
+        // The widget keeps its last snapshot.
+      }
+      try {
+        await effects.due(userId, backend);
+      } on Object {
+        // The phone keeps its last due list.
+      }
     }
     if (ack != null && (savedKeys.isNotEmpty || doneConfirms.isNotEmpty)) {
       await ack(savedKeys, doneConfirms);

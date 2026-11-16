@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/local/keys_error.dart';
 import 'package:wambito/local/prf.dart';
+import 'package:wambito/local/sync.dart' show SyncProblemCode;
+import 'package:wambito/local/vault_session.dart' show VaultOpenError;
 import 'package:wambito/vault/vault_gate.dart';
 
 /// Keys and sessions are plain strings here: a session is the keys it was opened with.
@@ -231,6 +233,28 @@ void main() {
       await settle();
       expect(h.lastOpen, ('new', false));
       expect(h.opened, hasLength(2));
+      expect(h.gate.state, const Ready('again'));
+    });
+
+    test('a first open refused busy (a background engine holds the lease) locks like offline, and '
+        'the retry opens', () async {
+      String? keys;
+      final opening = inTurn<String>([
+        () => throw const VaultOpenError(SyncProblemCode.busy),
+        () => 'again',
+      ]);
+      final h = gateWith(
+        loadLocalKeys: () async => keys,
+        prepareAccount: () async =>
+            GatePrepared(recoveryKey: null, commit: () async => keys = 'new'),
+        open: (_, _) => opening(),
+      );
+      h.gate.start();
+      await settle();
+      expect(h.gate.state, const Locked(LockedKind.offline, false));
+
+      h.gate.retry();
+      await settle();
       expect(h.gate.state, const Ready('again'));
     });
 

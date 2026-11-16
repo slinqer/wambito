@@ -99,10 +99,19 @@ class OpenVaultOptions {
   /// `keys.dart`'s `refreshKeys`; tests pass their own to hold or fail a refresh.
   final Future<LocalKeys> Function(KeysOptions options)? refreshKeys;
 
-  /// The lease a sync run takes (vault_lock.dart). Default: the app's (`waitLease`, holder `app`)
+  /// The lease a sync run takes (vault_lock.dart). Default: the app's ([appLease], a short wait)
   /// on the real vault folder; none when a test passes its own `openStore`.
   final Future<VaultLease?> Function()? lease;
 }
+
+/// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
+/// lease before it reports `busy` and is retried like `offline`: a headless engine may hold it for
+/// minutes, and the person must never wait on it.
+const appLeaseWait = Duration(seconds: 2);
+
+/// The app's lease for one sync run; [directory] is for tests.
+Future<VaultLease?> appLease(String userId, {String? directory}) =>
+    waitLease(userId, holder: 'app', wait: appLeaseWait, directory: directory);
 
 /// The open vault of one account.
 class VaultSession {
@@ -421,9 +430,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           return local.keyring;
         },
         dropKeyVersion: (v) => dropKeyVersion(userId, v, storage),
-        lease:
-            options.lease ??
-            (options.openStore == null ? () => waitLease(userId, holder: 'app') : null),
+        lease: options.lease ?? (options.openStore == null ? () => appLease(userId) : null),
         debounce: options.syncDebounce,
         onError: (problem) {
           // A signed-out or closing session tells nobody anything (a late run of it ends here).
@@ -463,6 +470,9 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     final fatal =
         first.error == SyncProblemCode.unauthorized ||
         first.error == SyncProblemCode.sessionChanged;
+    // `busy` (a headless engine holds the lease) is reported within [appLeaseWait]: a known phone
+    // opens on its local data and the sync is retried; a fresh vault, which must not seed before its
+    // first download, fails like `offline` and the gate offers to try again.
     if (!first.ok && (options.fresh || fatal)) {
       throw VaultOpenError(first.error ?? SyncProblemCode.server);
     }

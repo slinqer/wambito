@@ -62,7 +62,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
   vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
   `res/xml/backup_rules.xml` + `data_extraction_rules.xml` (the `vault` folder and the secure storage
-  prefs, `FlutterSecureStorageConfiguration:FlutterSecureStorage` included; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
+  prefs, `FlutterSecureStorageConfiguration:FlutterSecureStorage` included, and the finance prefs: the widget's,
+  the due list and the capture queue `wambito.capture.queue`; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
   `lib/debug/prf_probe_screen.dart` is the PRF probe, `/debug/prf`, registered only when `kDebugMode`: it
   creates a passkey and evaluates its PRF on a real phone, to check that the platform gives one.
   `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`; `seedNamespace`), `captures.dart` (`merchantRecordId`, `createCaptureSchema`; the save and the merchant memory of `POST /v1/captures` live in `backend.dart`, twin of the API's `services/captures.ts`: 10-minute duplicate window, learned on review and on a PATCH that confirms a `capture` row), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
@@ -109,15 +110,20 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`background_channel.dart`). A run: token, account (`preview` only), keys, lease, background store, the queued
   captures (`POST /v1/captures`, `Idempotency-Key` = the queue's `key`; 201 and 200 are both acked) and confirms
   (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
-  widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
+  widget and due effects (each best effort: one that throws skips neither the other nor the ack), then `ack` last
+  (a crash leaves the queue; the next run merges). A run has a deadline (`BackgroundDeps.deadline`: 20 s on iOS,
+  8 min on Android, inside the native budgets): past it the sync stops at its next fence, the effects are skipped,
+  what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
   The vault lease (`lib/local/vault_lock.dart`, `tryLease` / `waitLease`) is what lets the app and a headless engine
   share one vault file: a lock file `wambito-vault-<userId>.db-lock` in the vault folder, holder `app` or `background`,
-  TTL 10 minutes (renewed by the sync), taken over atomically once expired; the app waits at most 30 s for it, a
-  headless run that cannot take it ends `busy` and touches nothing. Tests give each phone its own folder, so its own lock.
+  TTL 10 minutes (renewed by the sync), taken over atomically once expired; the app waits at most `appLeaseWait`
+  (2 s, `vault_session.dart`) for it and reports `busy` (retried like `offline`; a known phone opens, a fresh vault's
+  open fails `busy` and the gate shows it as offline), a headless run that cannot take it ends `busy` and touches nothing. Tests give each phone its own folder, so its own lock.
   Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`, KEEP: while an ask waits or runs, a second is dropped, so the widget's refresh jobs never chain engines;
   `AccountMode.write(mode, owner)` schedules for `preview` and cancels for `plain`/none), `SyncWorker` (runs
-  `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`), `HeadlessRunner` (a `FlutterEngine`
+  `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`; after `done`/`changed` a non-empty
+  capture queue gets `CaptureScheduler.enqueueSend`); the capture workers also send `vaultChanged` on `changed`, `HeadlessRunner` (a `FlutterEngine`
   with no activity, 9 min budget, destroyed in every case; `HeadlessHooks.runner` replaces it in tests) and
   `BackgroundChannel` (`finished` from the headless Dart; `vaultChanged` to the app's engine, D7, which
   `vaultChangedProvider` in `vault_providers.dart` turns into `VaultSession.externalChange()`).
@@ -125,8 +131,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   answers from the queue and removes acked keys, so a failed run keeps everything. iOS `Background/`: `SyncTask`
   (BGAppRefreshTask `wambito.sync`, registered in `didFinishLaunching`; reschedules first, 4 h, only for `preview`
   via `SyncPlan` in `WambitoNative`; a `plain` account has none waiting) runs `HeadlessRunner` (`syncMain` in a
-  headless engine, 25 s budget; destroyed once on `finished`, budget or `expirationHandler`, all on the main thread)
-  and ends with `setTaskCompleted` once; `BackgroundChannel` hands `finished`'s outcome to it and sends
+  headless engine, 25 s budget; destroyed once on `finished` (on the next main-queue turn, never inside its own
+  handler), budget or `expirationHandler`, all on the main thread) and ends with `setTaskCompleted` once (`TaskOnce`
+  in `WambitoNative`: an expiration before the start keeps the engine from starting); `BackgroundChannel` hands `finished`'s outcome to it and sends
   `vaultChanged` to the app's engine (`BackgroundChannel.app`). `setEncryptionMode {mode, owner}` schedules or
   cancels it (`AccountMode.owner`, `wambito.encryption.owner`). iOS has no capture queue and sends nothing natively.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected

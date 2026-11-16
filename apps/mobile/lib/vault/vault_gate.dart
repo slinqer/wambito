@@ -335,7 +335,8 @@ String? gateErrorCode(Object? error) => switch (error) {
 };
 
 LockedKind _lockedKind(Object? error) => switch (gateErrorCode(error)) {
-  'offline' => LockedKind.offline,
+  // `busy`: a headless engine holds the vault's lease for now; like offline, a retry opens.
+  'offline' || 'busy' => LockedKind.offline,
   'unsupported_browser' => LockedKind.unsupported,
   _ => LockedKind.error,
 };

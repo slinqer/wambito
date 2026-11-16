@@ -1,6 +1,10 @@
 // The background run (`runBackground`): queued captures saved into the encrypted vault, one sync,
 // the widget and due-list effects, then the acknowledgement (D1, D8, D9, D14, D23, R3).
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -81,6 +85,8 @@ class _Calls {
   bool noLease = false,
   Future<SqliteStore> Function(String userId)? openStore,
   Future<void> Function(String userId, LocalBackend backend)? widget,
+  Future<void> Function(String userId, LocalBackend backend)? due,
+  DateTime? deadline,
 }) {
   final calls = _Calls();
   final lease = Lease();
@@ -102,13 +108,17 @@ class _Calls {
       return lease.take(calls.released);
     },
     now: () => _now,
+    deadline: deadline,
   );
   final effects = BackgroundEffects(
     widget: (id, backend) async {
       calls.widget.add(id);
       await widget?.call(id, backend);
     },
-    due: (id, backend) async => calls.due.add(id),
+    due: (id, backend) async {
+      calls.due.add(id);
+      await due?.call(id, backend);
+    },
   );
   return (deps: deps, effects: effects, calls: calls, lease: lease);
 }
@@ -148,6 +158,32 @@ QueuedCapture _capture(
   capturedAt: at,
   source: 'revolut',
 );
+
+/// An adapter that answers after 30 s, unless the request is cancelled.
+class _Slow implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final done = Completer<ResponseBody>();
+    final timer = Timer(
+      const Duration(seconds: 30),
+      () => done.complete(ResponseBody.fromString('{}', 200)),
+    );
+    unawaited(
+      cancelFuture?.then((_) {
+        timer.cancel();
+        if (!done.isCompleted) done.completeError(StateError('cancelled'));
+      }),
+    );
+    return done.future;
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
 
 Future<int> _txCount() async {
   final store = await _openStore(_userId);
@@ -229,7 +265,7 @@ void main() {
     expect(m.calls.released, ['released']);
   });
 
-  test('a crash after the save acks nothing', () async {
+  test('a widget effect that throws skips neither the due effect nor the ack', () async {
     final m = _make(widget: (_, _) async => throw StateError('widget'));
     final report = await runBackground(
       m.deps,
@@ -237,9 +273,84 @@ void main() {
       captures: [_capture('k1')],
       ack: (keys, confirms) async => m.calls.acks.add((keys: keys, confirms: confirms)),
     );
+    expect(report.outcome, BackgroundOutcome.changed);
+    expect(m.calls.due, [_userId]);
+    expect(m.calls.acks.single.keys, ['k1']);
+    expect(await _txCount(), 1);
+  });
+
+  test('a due effect that throws still acks what was saved', () async {
+    final m = _make(due: (_, _) async => throw StateError('due'));
+    final report = await runBackground(
+      m.deps,
+      m.effects,
+      captures: [_capture('k1')],
+      ack: (keys, confirms) async => m.calls.acks.add((keys: keys, confirms: confirms)),
+    );
+    expect(report.outcome, BackgroundOutcome.changed);
+    expect(m.calls.widget, [_userId]);
+    expect(m.calls.acks.single.keys, ['k1']);
+  });
+
+  test('an ack that throws acks nothing: the run failed', () async {
+    final m = _make();
+    final report = await runBackground(
+      m.deps,
+      m.effects,
+      captures: [_capture('k1')],
+      ack: (keys, confirms) async => throw StateError('ack'),
+    );
     expect(report.outcome, BackgroundOutcome.failed);
-    expect(m.calls.acks, isEmpty);
     expect(await _txCount(), 1, reason: 'the save stands; the next run merges the duplicate');
+  });
+
+  test('a run past its deadline stops at the next fence, skips the effects, acks and releases '
+      'the lease', () async {
+    final m = _make(deadline: _now);
+    final report = await runBackground(
+      m.deps,
+      m.effects,
+      captures: [_capture('k1')],
+      ack: (keys, confirms) async => m.calls.acks.add((keys: keys, confirms: confirms)),
+    );
+    expect(_server.posts + _server.gets, 0, reason: 'stopped at the first fence');
+    expect(m.calls.widget, isEmpty);
+    expect(m.calls.due, isEmpty);
+    expect(m.calls.acks.single.keys, ['k1']);
+    expect(report.outcome, BackgroundOutcome.changed, reason: 'the capture was saved');
+    expect(m.calls.released, ['released']);
+  });
+
+  test('a run past its deadline with nothing saved is busy (retried)', () async {
+    final m = _make(deadline: _now.subtract(const Duration(seconds: 1)));
+    final report = await runBackground(m.deps, m.effects);
+    expect(report.outcome, BackgroundOutcome.busy);
+    expect(_server.posts + _server.gets, 0);
+    expect(m.calls.released, ['released']);
+  });
+
+  test('a run before its deadline syncs as usual', () async {
+    final m = _make(deadline: _now.add(const Duration(seconds: 20)));
+    await runBackground(m.deps, m.effects, captures: [_capture('k1')]);
+    expect(_server.gets, 1);
+    expect(m.calls.widget, [_userId]);
+  });
+
+  test('cutAtDeadline cancels a request still running at the deadline', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://wambito.test/api'))..httpClientAdapter = _Slow();
+    cutAtDeadline(dio, DateTime.now().add(const Duration(milliseconds: 50)));
+    final watch = Stopwatch()..start();
+    await expectLater(
+      dio.get<Object?>('/v2/sync'),
+      throwsA(isA<DioException>().having((e) => e.type, 'type', DioExceptionType.cancel)),
+    );
+    expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+  });
+
+  test('cutAtDeadline refuses a request made after the deadline', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://wambito.test/api'))..httpClientAdapter = _Slow();
+    cutAtDeadline(dio, DateTime.now().subtract(const Duration(seconds: 1)));
+    await expectLater(dio.get<Object?>('/v2/sync'), throwsA(isA<DioException>()));
   });
 
   test('not preview', () async {
