@@ -23,6 +23,14 @@ class _$AdminMetrics extends AdminMetrics {
   final int signupsPrev7d;
   @override
   final BuiltList<AdminMetricsWeeklyInner> weekly;
+  @override
+  final BuiltList<AdminMetricsDailyActiveInner> dailyActive;
+  @override
+  final BuiltList<AdminMetricsCohortsInner> cohorts;
+  @override
+  final BuiltList<AdminMetricsInstallsByPlatformInner> installsByPlatform;
+  @override
+  final BuiltList<AdminMetricsVersionsInner> versions;
 
   factory _$AdminMetrics([void Function(AdminMetricsBuilder)? updates]) =>
       (AdminMetricsBuilder()..update(updates))._build();
@@ -36,6 +44,10 @@ class _$AdminMetrics extends AdminMetrics {
     required this.signups7d,
     required this.signupsPrev7d,
     required this.weekly,
+    required this.dailyActive,
+    required this.cohorts,
+    required this.installsByPlatform,
+    required this.versions,
   }) : super._();
   @override
   AdminMetrics rebuild(void Function(AdminMetricsBuilder) updates) =>
@@ -55,7 +67,11 @@ class _$AdminMetrics extends AdminMetrics {
         suspended == other.suspended &&
         signups7d == other.signups7d &&
         signupsPrev7d == other.signupsPrev7d &&
-        weekly == other.weekly;
+        weekly == other.weekly &&
+        dailyActive == other.dailyActive &&
+        cohorts == other.cohorts &&
+        installsByPlatform == other.installsByPlatform &&
+        versions == other.versions;
   }
 
   @override
@@ -69,6 +85,10 @@ class _$AdminMetrics extends AdminMetrics {
     _$hash = $jc(_$hash, signups7d.hashCode);
     _$hash = $jc(_$hash, signupsPrev7d.hashCode);
     _$hash = $jc(_$hash, weekly.hashCode);
+    _$hash = $jc(_$hash, dailyActive.hashCode);
+    _$hash = $jc(_$hash, cohorts.hashCode);
+    _$hash = $jc(_$hash, installsByPlatform.hashCode);
+    _$hash = $jc(_$hash, versions.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -83,7 +103,11 @@ class _$AdminMetrics extends AdminMetrics {
           ..add('suspended', suspended)
           ..add('signups7d', signups7d)
           ..add('signupsPrev7d', signupsPrev7d)
-          ..add('weekly', weekly))
+          ..add('weekly', weekly)
+          ..add('dailyActive', dailyActive)
+          ..add('cohorts', cohorts)
+          ..add('installsByPlatform', installsByPlatform)
+          ..add('versions', versions))
         .toString();
   }
 }
@@ -124,6 +148,28 @@ class AdminMetricsBuilder implements Builder<AdminMetrics, AdminMetricsBuilder> 
       _$this._weekly ??= ListBuilder<AdminMetricsWeeklyInner>();
   set weekly(ListBuilder<AdminMetricsWeeklyInner>? weekly) => _$this._weekly = weekly;
 
+  ListBuilder<AdminMetricsDailyActiveInner>? _dailyActive;
+  ListBuilder<AdminMetricsDailyActiveInner> get dailyActive =>
+      _$this._dailyActive ??= ListBuilder<AdminMetricsDailyActiveInner>();
+  set dailyActive(ListBuilder<AdminMetricsDailyActiveInner>? dailyActive) =>
+      _$this._dailyActive = dailyActive;
+
+  ListBuilder<AdminMetricsCohortsInner>? _cohorts;
+  ListBuilder<AdminMetricsCohortsInner> get cohorts =>
+      _$this._cohorts ??= ListBuilder<AdminMetricsCohortsInner>();
+  set cohorts(ListBuilder<AdminMetricsCohortsInner>? cohorts) => _$this._cohorts = cohorts;
+
+  ListBuilder<AdminMetricsInstallsByPlatformInner>? _installsByPlatform;
+  ListBuilder<AdminMetricsInstallsByPlatformInner> get installsByPlatform =>
+      _$this._installsByPlatform ??= ListBuilder<AdminMetricsInstallsByPlatformInner>();
+  set installsByPlatform(ListBuilder<AdminMetricsInstallsByPlatformInner>? installsByPlatform) =>
+      _$this._installsByPlatform = installsByPlatform;
+
+  ListBuilder<AdminMetricsVersionsInner>? _versions;
+  ListBuilder<AdminMetricsVersionsInner> get versions =>
+      _$this._versions ??= ListBuilder<AdminMetricsVersionsInner>();
+  set versions(ListBuilder<AdminMetricsVersionsInner>? versions) => _$this._versions = versions;
+
   AdminMetricsBuilder() {
     AdminMetrics._defaults(this);
   }
@@ -139,6 +185,10 @@ class AdminMetricsBuilder implements Builder<AdminMetrics, AdminMetricsBuilder> 
       _signups7d = $v.signups7d;
       _signupsPrev7d = $v.signupsPrev7d;
       _weekly = $v.weekly.toBuilder();
+      _dailyActive = $v.dailyActive.toBuilder();
+      _cohorts = $v.cohorts.toBuilder();
+      _installsByPlatform = $v.installsByPlatform.toBuilder();
+      _versions = $v.versions.toBuilder();
       _$v = null;
     }
     return this;
@@ -191,12 +241,24 @@ class AdminMetricsBuilder implements Builder<AdminMetrics, AdminMetricsBuilder> 
               'signupsPrev7d',
             ),
             weekly: weekly.build(),
+            dailyActive: dailyActive.build(),
+            cohorts: cohorts.build(),
+            installsByPlatform: installsByPlatform.build(),
+            versions: versions.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'weekly';
         weekly.build();
+        _$failedField = 'dailyActive';
+        dailyActive.build();
+        _$failedField = 'cohorts';
+        cohorts.build();
+        _$failedField = 'installsByPlatform';
+        installsByPlatform.build();
+        _$failedField = 'versions';
+        versions.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'AdminMetrics', _$failedField, e.toString());
       }

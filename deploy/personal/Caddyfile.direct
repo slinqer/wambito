@@ -13,7 +13,7 @@
 }
 
 {$PUBLIC_HOSTNAME} {
-	# The client's address, which routes.caddy logs and sends to the API and the MCP as the only
+	# The client's address, which routes.caddy sends (never logs) to the API and the MCP as the only
 	# X-Forwarded-For entry (the API trusts just this hop). Here anyone can reach Caddy, so it is
 	# always the TCP peer: a Cf-Connecting-Ip or X-Forwarded-For the client sends changes nothing.
 	# (Caddy starts each request with client_ip set to the peer already, as no trusted_proxies is

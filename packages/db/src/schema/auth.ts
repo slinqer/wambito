@@ -29,7 +29,11 @@ export const user = pgTable("user", {
   timezone: text("timezone").default("UTC").notNull(),
   locale: text("locale").default("es").notNull(),
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  encryption: text("encryption").default("plain").notNull(),
+  platform: text("platform"),
   lastActiveAt: timestamp("last_active_at"),
+  appVersion: text("app_version"),
+  lastSeenDay: text("last_seen_day"),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
 });
 
@@ -48,6 +52,7 @@ export const session = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    lifetime: text("lifetime").default("standard").notNull(),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );

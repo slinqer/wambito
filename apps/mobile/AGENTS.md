@@ -27,7 +27,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
-  (`x-wambito-timezone`, `-locale`, `-client: android` on both phones, the API's word for the app); server defaults to `https://app.wambito.com`,
+  (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app); server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Storage: secure storage for session and settings; widget snapshot JSON under
   `wambito.widget.snapshot` in `HomeWidgetPreferences` (`lib/home/widget_snapshot.dart`).

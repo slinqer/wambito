@@ -7,7 +7,7 @@
 }
 
 :80 {
-	# The client's address, which routes.caddy logs and sends to the API and the MCP as the only
+	# The client's address, which routes.caddy sends (never logs) to the API and the MCP as the only
 	# X-Forwarded-For entry (the API trusts just this hop). Each line has a matcher, and the two
 	# exclude each other, so their order does not matter: Caddy sorts same-name directives and puts one
 	# without a matcher last, and a `route { }` block would run after routes.caddy's handle blocks.

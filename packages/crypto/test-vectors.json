@@ -131,6 +131,36 @@
       "text": "ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZW0"
     }
   ],
+  "recoveryVerifiers": [
+    {
+      "secret": "AAECAwQFBgcICQoLDA0ODw",
+      "lookup": "ZCs-lpMED2TRfYOjz3R77A",
+      "auth": "Ymr0yHT2bDEI3u7U2XWzvVJteCzJnroKrP1XwdhqvXc",
+      "lookupHash": "y82rnJhKySyvRdknj_PfcYi03MY90j2TtAl4lkIE6Vc",
+      "authHash": "kYrvWfDgm84s5ANVdVAb5gk5WMKTq2lKUt0YO0f0Aiw"
+    },
+    {
+      "secret": "8PHy8_T19vf4-fr7_P3-_w",
+      "lookup": "lM_YpUnMdBfeODWx9TL7Xw",
+      "auth": "BV1ohtvFbw2lsD74C8X0x37gEo1pvvUbCHphV_5fPjc",
+      "lookupHash": "10VqHySecsYw0bmbgSWYeW5A83gA3DieLk6csfOrOp0",
+      "authHash": "VP6mrt4H2nxx8dOCCzK66NAhbO9VYFvxTROGjW6ov6Y"
+    },
+    {
+      "secret": "AAAAAAAAAAAAAAAAAAAAAA",
+      "lookup": "9yCVD5GKzQSQAi6ixf9MTA",
+      "auth": "ub-d1TdbGbm2M_aUCtKgIQHb7JgUPZ8CLklrv1SN8WA",
+      "lookupHash": "GqGPBCLtoK-YiY6G-GhhcxmaD5jwZHzIVtVCAwqRNOo",
+      "authHash": "L23QV9MpHJVE0PXgBDyn1HV5iC1PEP3pBa55yI5hEMA"
+    },
+    {
+      "secret": "_____________________w",
+      "lookup": "t5S29ve4RmFQMmbAcuS-aQ",
+      "auth": "85i_-Lp5g-KmdQ1-rfgMtWM_md5fpU6rFVK34SitptY",
+      "lookupHash": "N3gEv9VWviXiSUSdLEmIYzB2zfFRimMVjreTUvwmF7s",
+      "authHash": "7w5c9uDtPlOU-63tkYlggZH8BT33a0TNsRVo3KJ63m4"
+    }
+  ],
   "devices": [
     {
       "privateKey": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8",
@@ -314,6 +344,12 @@
       },
       "nonce": "IiMkJSYnKCkqKywt",
       "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "code": "bad_input"
+    },
+    {
+      "name": "recovery verifier of a 15-byte secret",
+      "op": "recoveryVerifier",
+      "secret": "UFFSU1RVVldYWVpbXF1e",
       "code": "bad_input"
     },
     {

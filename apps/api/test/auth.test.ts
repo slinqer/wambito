@@ -236,11 +236,16 @@ describe("email code + magic link", () => {
     expect(new URL(app).searchParams.get("from")).toBe("app");
     expect(new URL(app).pathname).toBe("/auth/verify");
 
+    // The iOS app marks its sign-ins the same way.
+    await sendCode("from-ios@wambito.test", { "x-wambito-client": "ios" });
+    const ios = /http\S+/.exec(t.mailer.lastTo("from-ios@wambito.test")?.text ?? "")?.[0] ?? "";
+    expect(new URL(ios).searchParams.get("from")).toBe("app");
+
     // The web sends no marker, and anything but the app's own value is not the app.
     await sendCode("from-web@wambito.test");
     const web = /http\S+/.exec(t.mailer.lastTo("from-web@wambito.test")?.text ?? "")?.[0] ?? "";
     expect(new URL(web).searchParams.has("from")).toBe(false);
-    for (const value of ["ios", "web", "", "android evil"]) {
+    for (const value of ["web", "", "android evil", "ios evil"]) {
       await sendCode("from-other@wambito.test", { "x-wambito-client": value });
       const other =
         /http\S+/.exec(t.mailer.lastTo("from-other@wambito.test")?.text ?? "")?.[0] ?? "";

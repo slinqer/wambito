@@ -228,6 +228,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/recovery/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Signs in with the recovery key: `lookup` and `auth` are what it derives. On success the session travels in the `set-cookie` headers (the web) and the `set-auth-token` header (the app's bearer token); from the app (`x-wambito-client`), an encrypted account without an email gets a 25-month session. 401 `recovery_key_invalid` for a key that does not sign in, whatever the reason; 403 `account_suspended`; 429 after 10 tries per address in 10 minutes. */
+        post: operations["recoverySignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The phone finds a request by the typed `code` (case, dashes, spaces and look-alike letters are forgiven) and gets its `commitment` and `label`. 404 when expired or once an approver is set. */
+        get: operations["findSignin"];
+        put?: never;
+        /** @description The browser opens a sign-in request, signed out: a commitment to its X25519 public key (SHA-256 with a domain tag), `remember` (the "Keep me signed in" box) and a `label` for the phone to show. It shows the returned `code` and a QR of `id` and its public key, and keeps `pollSecret`. A request lives 2 minutes. 429 `too_many_requests` past 30 requests per address in 10 minutes, `too_many_signins` past 5 open ones. */
+        post: operations["startSignin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description With `x-wambito-poll`, the browser polls: `approverKey` (null until the phone approves), `ready` (sealed: pick it up) and `expiresAt`; 404 for a wrong secret. Without it, the phone reads the request with its session (a scanned QR): `commitment`, `label`, `expiresAt` and the browser's revealed `publicKey` (null until revealed); once approved, 404 for any other user. 404 when expired. */
+        get: operations["getSignin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin/{id}/approver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The phone approves: its ephemeral public key, once; the request is bound to the phone's user. 404 when expired, 409 `already_set` for any later call. */
+        post: operations["setSigninApprover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin/{id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The browser reveals its public key after it sees the approver key, with `x-wambito-poll`. 404 for a wrong or missing secret or when expired, 409 `not_ready` (no approver yet) or `already_set`, 422 `commitment_mismatch`. */
+        post: operations["revealSignin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin/{id}/seal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The approving phone posts the data key sealed to the browser's revealed key with the key version, as `POST /v2/pairing/{id}/seal`: 409 `not_ready`, `already_sealed`, `key_version_mismatch`, 422 `approver_mismatch`. 404 for any other user or when expired. */
+        post: operations["sealSignin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/signin/{id}/pickup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The browser takes the sealed data key, with `x-wambito-poll`, and is signed in as the phone's user: the session travels in the `set-cookie` headers. With `remember` it is a 60-day session renewed on use; without, a 12-hour one whose cookie has no Max-Age (Better Auth's "don't remember me") and is never renewed. The request is deleted, so a second pickup is 404. 409 `not_ready` while unsealed; 403 `account_suspended`; 404 for a wrong secret or when expired. */
+        post: operations["pickupSignin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -841,6 +961,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/recovery/verifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Stores what lets the recovery key sign in: the SHA-256 of its `lookup` and of its `auth`. Replaces the earlier verifier, so only the newest key signs in; a new recovery wrap with other bytes deletes it too (store the new key's verifier after it). Needs the account's recovery wrap (409 `recovery_required`); a `lookupHash` another account holds is 409 `verifier_taken`. */
+        put: operations["putRecoveryVerifier"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/me/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The app was opened by the person. The first call of their local day counts one in the daily activity numbers, which keep no per-person history; later calls the same day count nothing. `x-wambito-client` says the platform and `x-wambito-version` the app's version (up to 64 characters). A call with `x-wambito-background: 1` changes nothing: background work never calls this. Not for assistants. */
+        post: operations["markSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -926,6 +1080,27 @@ export interface components {
                 withEmail: number;
                 guests: number;
             }[];
+            dailyActive: {
+                day: string;
+                count: number;
+            }[];
+            cohorts: {
+                weekStart: string;
+                size: number;
+                week1: number | null;
+                week4: number | null;
+                week12: number | null;
+            }[];
+            installsByPlatform: {
+                /** @enum {string} */
+                platform: "android" | "ios" | "web" | "unknown";
+                count: number;
+            }[];
+            versions: {
+                platform: string;
+                appVersion: string;
+                users: number;
+            }[];
         };
         AdminAuditPage: {
             entries: components["schemas"]["AdminAuditEntry"][];
@@ -956,6 +1131,74 @@ export interface components {
         };
         EmailChangeConfirm: {
             token: string;
+        };
+        RecoverySignedIn: {
+            /** @description The account signed in to */
+            userId: string;
+        };
+        RecoverySignIn: {
+            /** @description HKDF-SHA256 of the recovery secret under `wambito/v1/recovery/lookup`, 16 bytes, base64url */
+            lookup: string;
+            /** @description HKDF-SHA256 of the recovery secret under `wambito/v1/recovery/auth`, 32 bytes, base64url */
+            auth: string;
+        };
+        SigninStarted: {
+            /** Format: uuid */
+            id: string;
+            /** @description 8 Crockford base32 characters, shown under the QR code */
+            code: string;
+            /** @description 32 random bytes, base64url; only the browser holds it and sends it as `x-wambito-poll` */
+            pollSecret: string;
+            expiresAt: string;
+        };
+        StartSignin: {
+            /** @description SHA-256("wambito/v1/pairing-commit" || the browser's X25519 public key), 32 bytes, base64url */
+            commitment: string;
+            /** @description Keep me signed in on this browser: true gives a 60-day session renewed on use, false a 12-hour session whose cookie has no Max-Age */
+            remember: boolean;
+            /** @description What the phone shows, made from the user agent ("Firefox on Mac") */
+            label: string;
+        };
+        SigninFound: {
+            /** Format: uuid */
+            id: string;
+            /** @description base64url without padding */
+            commitment: string;
+            label: string;
+            expiresAt: string;
+        };
+        SigninPoll: {
+            /** @description base64url; null until set */
+            approverKey: string | null;
+            /** @description The phone sealed the key: pick it up */
+            ready: boolean;
+            expiresAt: string;
+        };
+        SigninView: components["schemas"]["SigninFound"] & {
+            /** @description base64url; null until set */
+            publicKey: string | null;
+        };
+        PairingApprover: {
+            /** @description The approving device's ephemeral X25519 public key, 32 bytes, base64url */
+            publicKey: string;
+        };
+        PairingReveal: {
+            /** @description The new device's X25519 public key, 32 bytes, base64url; must match the commitment */
+            publicKey: string;
+        };
+        SealPairing: {
+            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded; its first 32 bytes are the approver key */
+            sealed: string;
+            /** @description The data key version the seal is bound to */
+            keyV: number;
+        };
+        SigninPickup: {
+            /** @description base64url */
+            sealed: string;
+            /** @description The data key version the seal is bound to */
+            keyV: number;
+            /** @description The account signed in to */
+            userId: string;
         };
         Profile: {
             id: string;
@@ -1453,20 +1696,6 @@ export interface components {
             commitment: string;
             expiresAt: string;
         };
-        PairingApprover: {
-            /** @description The approving device's ephemeral X25519 public key, 32 bytes, base64url */
-            publicKey: string;
-        };
-        PairingReveal: {
-            /** @description The new device's X25519 public key, 32 bytes, base64url; must match the commitment */
-            publicKey: string;
-        };
-        SealPairing: {
-            /** @description The data key sealed to the new device's public key, base64url, 1–1024 bytes decoded; its first 32 bytes are the approver key */
-            sealed: string;
-            /** @description The data key version the seal is bound to */
-            keyV: number;
-        };
         PairingState: {
             /** @description base64url */
             commitment: string;
@@ -1485,6 +1714,12 @@ export interface components {
             sealed: string;
             /** @description The data key version the seal is bound to */
             keyV: number;
+        };
+        PutRecoveryVerifier: {
+            /** @description SHA-256 of the recovery key's lookup bytes, 32 bytes, base64url */
+            lookupHash: string;
+            /** @description SHA-256 of the recovery key's auth bytes, 32 bytes, base64url */
+            authHash: string;
         };
     };
     responses: never;
@@ -2193,6 +2428,462 @@ export interface operations {
             };
             /** @description Problem */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    recoverySignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoverySignIn"];
+            };
+        };
+        responses: {
+            /** @description Signed in; the session is in the headers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoverySignedIn"];
+                };
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    findSignin: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigninFound"];
+                };
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startSignin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSignin"];
+            };
+        };
+        responses: {
+            /** @description The request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigninStarted"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getSignin: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The request's `pollSecret`; only the browser that opened it has it */
+                "x-wambito-poll"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigninPoll"] | components["schemas"]["SigninView"];
+                };
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setSigninApprover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingApprover"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    revealSignin: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The request's `pollSecret`; only the browser that opened it has it */
+                "x-wambito-poll"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingReveal"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    sealSignin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SealPairing"];
+            };
+        };
+        responses: {
+            /** @description Sealed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    pickupSignin: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The request's `pollSecret`; only the browser that opened it has it */
+                "x-wambito-poll"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sealed key; the session is in the headers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigninPickup"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3956,6 +4647,82 @@ export interface operations {
             };
             /** @description Problem */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    putRecoveryVerifier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutRecoveryVerifier"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    markSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Noted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

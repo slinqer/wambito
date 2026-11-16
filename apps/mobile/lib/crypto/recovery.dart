@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
+
 import 'errors.dart';
+import 'keys.dart';
 import 'validate.dart';
 
 /// Twin of packages/crypto/src/recovery.ts.
@@ -10,6 +13,34 @@ const crockford = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const _dataChars = 26;
 
 Uint8List newRecoverySecret() => randomBytes(16);
+
+const recoveryLookupInfo = 'wambito/v1/recovery/lookup';
+const recoveryAuthInfo = 'wambito/v1/recovery/auth';
+
+/// What the server stores (as SHA-256 hashes) to let a recovery key sign in without the data key.
+class RecoveryVerifier {
+  const RecoveryVerifier({required this.lookup, required this.auth});
+
+  /// 16 bytes: finds the verifier row.
+  final Uint8List lookup;
+
+  /// 32 bytes: proves the person holds the recovery key.
+  final Uint8List auth;
+}
+
+/// HKDF-SHA-256 (empty salt) of the 16-byte recovery secret under two infos, different from the
+/// wrap info, so what the server sees never opens the recovery wrap.
+Future<RecoveryVerifier> recoveryVerifier(Uint8List secret) async {
+  assertBytes(secret, 16, 'recovery secret');
+  return RecoveryVerifier(
+    lookup: await hkdfBytes(secret, recoveryLookupInfo, 16),
+    auth: await hkdfBytes(secret, recoveryAuthInfo, 32),
+  );
+}
+
+/// SHA-256 of verifier bytes: what the server stores as `lookup_hash` and `auth_hash`.
+Future<Uint8List> verifierHash(Uint8List bytes) async =>
+    Uint8List.fromList((await Sha256().hash(bytes)).bytes);
 
 /// Luhn mod N check character (N = 32, code points = index in the Crockford alphabet) over the 26
 /// data characters. It is always alphanumeric, catches every single-character error and almost

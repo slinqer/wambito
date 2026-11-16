@@ -4,6 +4,7 @@ import {
   formatRecoveryKey,
   newRecoverySecret,
   parseRecoveryKey,
+  recoveryVerifier,
 } from "../src/index.ts";
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -99,5 +100,45 @@ describe("recovery key", () => {
 
   it("rejects non-16-byte secrets when formatting", () => {
     expect(code(() => formatRecoveryKey(new Uint8Array(15)))).toBe("bad_input");
+  });
+});
+
+describe("recovery verifier", () => {
+  it("gives 16 and 32 bytes, deterministic, and neither equals the recovery wrap key", async () => {
+    const secret = newRecoverySecret();
+    const v = await recoveryVerifier(secret);
+    expect(v.lookup).toHaveLength(16);
+    expect(v.auth).toHaveLength(32);
+    expect(await recoveryVerifier(secret)).toEqual(v);
+    const base = await globalThis.crypto.subtle.importKey(
+      "raw",
+      secret as BufferSource,
+      "HKDF",
+      false,
+      ["deriveBits"],
+    );
+    const wrap = new Uint8Array(
+      await globalThis.crypto.subtle.deriveBits(
+        {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: new Uint8Array(0),
+          info: new TextEncoder().encode("wambito/v1/wrap/recovery"),
+        },
+        base,
+        256,
+      ),
+    );
+    expect(v.auth).not.toEqual(wrap);
+    expect(v.lookup).not.toEqual(v.auth.slice(0, 16));
+    expect(v.lookup).not.toEqual(wrap.slice(0, 16));
+  });
+
+  it("a secret that is not 16 bytes is bad_input", async () => {
+    for (const n of [0, 15, 17, 32]) {
+      await expect(recoveryVerifier(new Uint8Array(n))).rejects.toMatchObject({
+        code: "bad_input",
+      });
+    }
   });
 });

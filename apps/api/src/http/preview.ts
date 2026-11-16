@@ -1,6 +1,8 @@
 import { createMiddleware } from "hono/factory";
-import { type Config, isPreviewAccount } from "../config.ts";
+import { isPreviewAccount } from "../config.ts";
+import type { AppDeps } from "../deps.ts";
 import type { AppEnv } from "../env.ts";
+import { accountEncryption } from "../services/encryption.ts";
 import { ApiError } from "./problem.ts";
 
 /**
@@ -30,11 +32,13 @@ export const encryptedAccount = () =>
  * A preview account uses `/v2` only: its `/v1` finance routes answer 403 `encrypted_account`,
  * whether the request comes from a session or an assistant's token (after `requireUser`).
  */
-export function previewOnlyV2(config: Pick<Config, "E2E_PREVIEW_USER_IDS">) {
+export function previewOnlyV2(deps: Pick<AppDeps, "config" | "db">) {
   return createMiddleware<AppEnv>(async (c, next) => {
-    if (isPreviewAccount(config, c.get("userId"))) {
-      const path = c.req.path.replace(/^.*?(?=\/v1\/)/, "");
-      if (FINANCE_PATHS.some((p) => p.test(path))) throw encryptedAccount();
+    const path = c.req.path.replace(/^.*?(?=\/v1\/)/, "");
+    if (FINANCE_PATHS.some((p) => p.test(path))) {
+      const userId = c.get("userId");
+      const encryption = await accountEncryption(deps.db, userId);
+      if (isPreviewAccount(deps.config, { id: userId, encryption })) throw encryptedAccount();
     }
     await next();
   });

@@ -19,6 +19,7 @@ export const TEST_CONFIG = {
   NODE_ENV: "test" as const,
   CLIENT_IP_HEADER: "x-forwarded-for",
   GUEST_SIGNUP: true,
+  NEW_USERS_ENCRYPTED: false,
   TRUSTED_PROXIES: ["10.0.0.0/8"],
   ADMIN_USER_IDS: [],
   E2E_PREVIEW_USER_IDS: [] as string[],

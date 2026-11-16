@@ -1,6 +1,48 @@
 import { CryptoError } from "./errors.ts";
 import { assertBytes } from "./validate.ts";
 
+const subtle = globalThis.crypto.subtle;
+const encoder = new TextEncoder();
+
+export const RECOVERY_LOOKUP_INFO = "wambito/v1/recovery/lookup";
+export const RECOVERY_AUTH_INFO = "wambito/v1/recovery/auth";
+
+/** What the server stores (as SHA-256 hashes) to let a recovery key sign in without the data key. */
+export interface RecoveryVerifier {
+  /** 16 bytes: finds the verifier row. */
+  lookup: Uint8Array;
+  /** 32 bytes: proves the person holds the recovery key. */
+  auth: Uint8Array;
+}
+
+async function hkdfBits(secret: Uint8Array, info: string, bits: number): Promise<Uint8Array> {
+  const base = await subtle.importKey("raw", secret as BufferSource, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(
+    await subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: encoder.encode(info) },
+      base,
+      bits,
+    ),
+  );
+}
+
+/**
+ * HKDF-SHA256 (empty salt) of the 16-byte recovery secret under two infos, different from the wrap
+ * info, so what the server sees never opens the recovery wrap.
+ */
+export async function recoveryVerifier(secret: Uint8Array): Promise<RecoveryVerifier> {
+  assertBytes(secret, 16, "recovery secret");
+  return {
+    lookup: await hkdfBits(secret, RECOVERY_LOOKUP_INFO, 128),
+    auth: await hkdfBits(secret, RECOVERY_AUTH_INFO, 256),
+  };
+}
+
+/** SHA-256 of verifier bytes: what the server stores as `lookup_hash` and `auth_hash`. */
+export async function verifierHash(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await subtle.digest("SHA-256", bytes as BufferSource));
+}
+
 /** Crockford base32 (no I, L, O, U). */
 export const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const DATA_CHARS = 26;

@@ -10,6 +10,13 @@ export 'keys.dart' show RecordKeys, deriveRecordKeys, generateDataKey;
 export 'links.dart';
 export 'pairing.dart';
 export 'records.dart';
-export 'recovery.dart' show formatRecoveryKey, newRecoverySecret, parseRecoveryKey;
+export 'recovery.dart'
+    show
+        RecoveryVerifier,
+        formatRecoveryKey,
+        newRecoverySecret,
+        parseRecoveryKey,
+        recoveryVerifier,
+        verifierHash;
 export 'validate.dart' show assertKeyV, assertUserId, assertUuid;
 export 'wraps.dart' show WrapContext, WrapKind, prfSalt, unwrapDataKey, wrapDataKey;

@@ -186,6 +186,38 @@ describe("cleanupInactiveGuests", () => {
   });
 });
 
+describe("NEW_USERS_ENCRYPTED on", () => {
+  let on: TestApp;
+  beforeAll(async () => {
+    on = await createTestApp({ NEW_USERS_ENCRYPTED: true });
+  });
+  afterAll(() => on?.stop());
+
+  test("a plain guest is still deleted at 61 days with the flag on", async () => {
+    // A guest from before the switch: plain. A guest from after: encrypted, on the 12/24 months.
+    const old = daysAgo(61);
+    await on.admin.insert(user).values({
+      id: "plain-guest",
+      name: "Plain guest",
+      email: "plain-guest@guest.wambito.invalid",
+      isAnonymous: true,
+      encryption: "plain",
+      createdAt: old,
+      updatedAt: old,
+      lastActiveAt: old,
+    });
+    const res = await on.request("POST", "/auth/sign-in/anonymous", { body: {} });
+    const encryptedId = ((await res.json()) as { user: { id: string } }).user.id;
+    await on.admin.update(session).set({ updatedAt: old }).where(eq(session.userId, encryptedId));
+    await on.admin.update(user).set({ lastActiveAt: old }).where(eq(user.id, encryptedId));
+
+    expect(await cleanupInactiveGuests(on.db, NOW)).toBe(1);
+
+    const left = await on.admin.select({ id: user.id, encryption: user.encryption }).from(user);
+    expect(left).toEqual([{ id: encryptedId, encryption: "encrypted" }]);
+  });
+});
+
 describe("batches", () => {
   test("1200 inactive guests are all deleted across 3 batches, a user with an email untouched", async () => {
     expect(GUEST_CLEANUP_BATCH).toBe(500);
@@ -431,31 +463,70 @@ describe("a guest's last activity outlives its sessions", () => {
     expect(await cleanupInactiveGuests(t.db, NOW)).toBe(0);
   });
 
-  test("an email user is never stamped", async () => {
+  test("an email user is stamped too", async () => {
     const member = await t.signIn("stamp@wambito.test");
-    expect(await lastActiveAt(member.userId)).toBeNull();
+    recent(await lastActiveAt(member.userId));
   });
 });
 
 describe("scheduleGuestCleanup", () => {
+  /** The three daily steps, as mocks that record the order they ran in. */
+  function steps(counts: { plain: number; encrypted: number; ended: number }) {
+    const order: string[] = [];
+    const step = (name: keyof typeof counts) =>
+      vi.fn(async () => {
+        order.push(name);
+        return counts[name];
+      });
+    return {
+      order,
+      cleanup: step("plain"),
+      cleanupEncrypted: step("encrypted"),
+      purgeEnded: step("ended"),
+    };
+  }
+
   test("runs at start and then once a day, and stops when asked", async () => {
     vi.useFakeTimers();
     try {
-      const cleanup = vi.fn(async () => 2);
+      const s = steps({ plain: 2, encrypted: 0, ended: 0 });
       const log = vi.fn();
-      const stop = scheduleGuestCleanup({ db: t.db, cleanup, log });
+      const stop = scheduleGuestCleanup({ db: t.db, ...s, log });
       await vi.advanceTimersByTimeAsync(0);
-      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(s.cleanup).toHaveBeenCalledTimes(1);
       expect(log).toHaveBeenCalledWith(expect.stringContaining("2"));
 
       await vi.advanceTimersByTimeAsync(DAY - 1);
-      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(s.cleanup).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
-      expect(cleanup).toHaveBeenCalledTimes(2);
+      expect(s.cleanup).toHaveBeenCalledTimes(2);
 
       stop();
       await vi.advanceTimersByTimeAsync(3 * DAY);
-      expect(cleanup).toHaveBeenCalledTimes(2);
+      expect(s.cleanup).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("runs the plain cleanup, then the encrypted one, then purges ended sessions; one log line each", async () => {
+    vi.useFakeTimers();
+    try {
+      const s = steps({ plain: 2, encrypted: 3, ended: 4 });
+      const log = vi.fn();
+      const stop = scheduleGuestCleanup({ db: t.db, ...s, log });
+      await vi.advanceTimersByTimeAsync(0);
+      stop();
+
+      expect(s.order).toEqual(["plain", "encrypted", "ended"]);
+      for (const fn of [s.cleanup, s.cleanupEncrypted, s.purgeEnded]) {
+        expect(fn).toHaveBeenCalledWith(t.db, expect.any(Date));
+      }
+      expect(log.mock.calls.map(([m]) => m)).toEqual([
+        expect.stringMatching(/deleted 2 .*60 days/),
+        expect.stringMatching(/deleted 3 .*365 days.*730/),
+        expect.stringMatching(/4 .*90 days/),
+      ]);
     } finally {
       vi.useRealTimers();
     }
@@ -468,10 +539,14 @@ describe("scheduleGuestCleanup", () => {
         .fn<() => Promise<number>>()
         .mockRejectedValueOnce(new Error("db down"))
         .mockResolvedValue(0);
+      const s = steps({ plain: 0, encrypted: 0, ended: 0 });
       const logError = vi.fn();
-      const stop = scheduleGuestCleanup({ db: t.db, cleanup, logError });
+      const stop = scheduleGuestCleanup({ db: t.db, ...s, cleanup, logError });
       await vi.advanceTimersByTimeAsync(0);
       expect(logError).toHaveBeenCalledTimes(1);
+      // One step failing does not skip the others.
+      expect(s.cleanupEncrypted).toHaveBeenCalledTimes(1);
+      expect(s.purgeEnded).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(DAY);
       expect(cleanup).toHaveBeenCalledTimes(2);

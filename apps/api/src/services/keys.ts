@@ -5,13 +5,16 @@ import {
   keyWraps,
   oauthConsent,
   passkey,
+  recoveryVerifiers,
   session,
   type Tx,
+  user,
   withUser,
 } from "@wambito/db";
 import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
+import { recordEndedSessions } from "./ended.ts";
 
 type KeyWrapKind = (typeof KEY_WRAP_KINDS)[number];
 type KeyWrapRow = typeof keyWraps.$inferSelect;
@@ -64,7 +67,7 @@ export function toKeyWrap(row: KeyWrapRow): KeyWrapDto {
  * Takes the transaction-level lock on one person's wraps. Every write to `key_wraps` takes it
  * first, so the current keyV a write checks cannot change before it commits.
  */
-async function lockWraps(tx: Tx, userId: string): Promise<void> {
+export async function lockWraps(tx: Tx, userId: string): Promise<void> {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`key_wraps:${userId}`}, 0))`,
   );
@@ -120,7 +123,9 @@ export interface SessionOption {
  * Ends `sessionIds` (the removed devices'), in the caller's transaction, after the wraps were
  * deleted or replaced: never the caller's own, and never one a remaining device wrap of the person
  * still uses (a browser that enrolled again under the same session keeps its old wrap when the
- * delete of it failed; removing that stale wrap must not sign the good one out).
+ * delete of it failed; removing that stale wrap must not sign the good one out). For an encrypted
+ * account, the ended tokens' hashes go in `ended_sessions`, so their next call hears 401
+ * `device_removed`.
  */
 async function endSessions(
   tx: Tx,
@@ -137,7 +142,21 @@ async function endSessions(
   const used = new Set(inUse.map((row) => row.sessionId));
   const ended = ids.filter((id) => !used.has(id));
   if (ended.length === 0) return;
-  await tx.delete(session).where(and(eq(session.userId, userId), inArray(session.id, ended)));
+  const gone = await tx
+    .delete(session)
+    .where(and(eq(session.userId, userId), inArray(session.id, ended)))
+    .returning({ token: session.token });
+  // The 401 codes are for encrypted accounts only (spec 2026-11-15 §11).
+  const [owner] = await tx
+    .select({ encryption: user.encryption })
+    .from(user)
+    .where(eq(user.id, userId));
+  if (owner?.encryption === "encrypted") {
+    await recordEndedSessions(
+      tx,
+      gone.map((row) => row.token),
+    );
+  }
 }
 
 const values = (
@@ -259,6 +278,18 @@ export async function putKeyWrap(
       wrap.kind === "recovery"
         ? eq(keyWraps.kind, "recovery")
         : and(eq(keyWraps.kind, wrap.kind), eq(keyWraps.ref, row.ref ?? ""));
+    // A recovery wrap with other bytes is taken for a new recovery key (plan decision 10): the
+    // old key's verifier goes, so that key no longer signs in to an account it cannot open. A retry
+    // of the same PUT keeps it; so does a rotation (`rotateKeys`: same key, new data key).
+    if (wrap.kind === "recovery") {
+      const [old] = await tx
+        .select({ wrapped: keyWraps.wrapped })
+        .from(keyWraps)
+        .where(own(userId, eq(keyWraps.kind, "recovery")));
+      if (old && !Buffer.from(old.wrapped).equals(Buffer.from(row.wrapped))) {
+        await tx.delete(recoveryVerifiers).where(eq(recoveryVerifiers.userId, userId));
+      }
+    }
     await tx.delete(keyWraps).where(own(userId, ne(keyWraps.id, id), duplicate));
 
     const [existing] = await tx

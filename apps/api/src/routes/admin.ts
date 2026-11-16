@@ -102,6 +102,28 @@ const AdminMetrics = z
         guests: z.number().int(),
       }),
     ),
+    /** 90 days ending today (UTC), oldest first, zero-filled. */
+    dailyActive: z.array(z.object({ day: z.string(), count: z.number().int() })),
+    /** Last 12 sign-up weeks; `weekN` is null while that week has not ended. */
+    cohorts: z.array(
+      z.object({
+        weekStart: z.string(),
+        size: z.number().int(),
+        week1: z.number().int().nullable(),
+        week4: z.number().int().nullable(),
+        week12: z.number().int().nullable(),
+      }),
+    ),
+    installsByPlatform: z.array(
+      z.object({
+        platform: z.enum(["android", "ios", "web", "unknown"]),
+        count: z.number().int(),
+      }),
+    ),
+    /** Users seen in the last 30 days, by platform and app version. */
+    versions: z.array(
+      z.object({ platform: z.string(), appVersion: z.string(), users: z.number().int() }),
+    ),
   })
   .openapi("AdminMetrics");
 

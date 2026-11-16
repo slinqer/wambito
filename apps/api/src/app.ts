@@ -10,6 +10,7 @@ import { previewOnlyV2 } from "./http/preview.ts";
 import { notFound, onError, validationHook } from "./http/problem.ts";
 import { assistantScopes } from "./http/scopes.ts";
 import { requireUser } from "./http/session.ts";
+import { activityRoutes } from "./routes/activity.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { assistantRoutes } from "./routes/assistants.ts";
 import { captureRoutes } from "./routes/captures.ts";
@@ -19,8 +20,10 @@ import { importRoutes } from "./routes/imports.ts";
 import { keyRoutes } from "./routes/keys.ts";
 import { meRoutes } from "./routes/me.ts";
 import { pairingRoutes } from "./routes/pairing.ts";
+import { recoveryRoutes, recoverySignInRoutes } from "./routes/recovery.ts";
 import { recurrenceRoutes } from "./routes/recurrences.ts";
 import { reportRoutes } from "./routes/reports.ts";
+import { signinRoutes } from "./routes/signin.ts";
 import { summaryRoutes } from "./routes/summary.ts";
 import { syncRoutes } from "./routes/sync.ts";
 import { transactionRoutes } from "./routes/transactions.ts";
@@ -74,11 +77,16 @@ export function createApp(deps: AppDeps) {
   app.route("/", adminRoutes(deps, auth));
   // Public: the person confirming an admin's email change is usually signed out (rate-limited).
   app.route("/", emailChangeRoutes(deps));
-  app.use("/v1/*", requireUser(auth, deps.config));
+  // Public: signing in with the recovery key, before `/v2/*`'s `requireUser` (rate-limited).
+  app.route("/", recoverySignInRoutes(deps, auth));
+  // Signing in on the web through the phone: the browser is signed out; the phone's routes run
+  // `requireUser` themselves.
+  app.route("/", signinRoutes(deps, auth));
+  app.use("/v1/*", requireUser(auth, deps.config, deps.db));
   app.use("/v1/*", assistantScopes());
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
-  app.use("/v1/*", previewOnlyV2(deps.config));
-  app.use("/v2/*", requireUser(auth, deps.config));
+  app.use("/v1/*", previewOnlyV2(deps));
+  app.use("/v2/*", requireUser(auth, deps.config, deps.db));
   // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
   app.use("/v2/*", expectedUser());
   app.use("/v2/*", assistantScopes());
@@ -94,6 +102,8 @@ export function createApp(deps: AppDeps) {
   app.route("/", syncRoutes(deps));
   app.route("/", keyRoutes(deps));
   app.route("/", pairingRoutes(deps));
+  app.route("/", recoveryRoutes(deps));
+  app.route("/", activityRoutes(deps));
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

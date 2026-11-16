@@ -8,6 +8,7 @@ part of 'serializers.dart';
 
 Serializers _$serializers =
     (Serializers().toBuilder()
+          ..add($SigninFound.serializer)
           ..add(AdminActionReason.serializer)
           ..add(AdminAuditEntry.serializer)
           ..add(AdminAuditPage.serializer)
@@ -15,6 +16,11 @@ Serializers _$serializers =
           ..add(AdminEmailChange.serializer)
           ..add(AdminMe.serializer)
           ..add(AdminMetrics.serializer)
+          ..add(AdminMetricsCohortsInner.serializer)
+          ..add(AdminMetricsDailyActiveInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInnerPlatformEnum.serializer)
+          ..add(AdminMetricsVersionsInner.serializer)
           ..add(AdminMetricsWeeklyInner.serializer)
           ..add(AdminUser.serializer)
           ..add(AdminUserAssistantsInner.serializer)
@@ -55,6 +61,7 @@ Serializers _$serializers =
           ..add(EmailChangeConfirm.serializer)
           ..add(FileImport.serializer)
           ..add(FileImportStatusEnum.serializer)
+          ..add(GetSignin200Response.serializer)
           ..add(ImportStats.serializer)
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
@@ -92,6 +99,9 @@ Serializers _$serializers =
           ..add(PushResults.serializer)
           ..add(PutKeyWrap.serializer)
           ..add(PutKeyWrapKindEnum.serializer)
+          ..add(PutRecoveryVerifier.serializer)
+          ..add(RecoverySignIn.serializer)
+          ..add(RecoverySignedIn.serializer)
           ..add(Recurrence.serializer)
           ..add(RecurrenceFrequencyEnum.serializer)
           ..add(ReviewTransactions.serializer)
@@ -100,7 +110,12 @@ Serializers _$serializers =
           ..add(RotatedKeyWrapKindEnum.serializer)
           ..add(SealPairing.serializer)
           ..add(SetBudget.serializer)
+          ..add(SigninPickup.serializer)
+          ..add(SigninPoll.serializer)
+          ..add(SigninStarted.serializer)
+          ..add(SigninView.serializer)
           ..add(StartPairing.serializer)
+          ..add(StartSignin.serializer)
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
           ..add(SummaryCategoriesInnerStateEnum.serializer)
@@ -137,6 +152,22 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AdminMetricsWeeklyInner)]),
             () => ListBuilder<AdminMetricsWeeklyInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsDailyActiveInner)]),
+            () => ListBuilder<AdminMetricsDailyActiveInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsCohortsInner)]),
+            () => ListBuilder<AdminMetricsCohortsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsInstallsByPlatformInner)]),
+            () => ListBuilder<AdminMetricsInstallsByPlatformInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsVersionsInner)]),
+            () => ListBuilder<AdminMetricsVersionsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AdminUserPasskeysInner)]),
