@@ -24,8 +24,18 @@ import { apiPathPrefix, type Config, isPreviewAccount } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
 import { clientHeader } from "./http/client-headers.ts";
-import { stampGuestActivity } from "./services/guest-cleanup.ts";
+import { stampActivity } from "./services/guest-cleanup.ts";
 import { deletePasskeyWraps } from "./services/keys.ts";
+import {
+  LONG_SESSION_SECONDS,
+  lifetimeFor,
+  SESSION_SECONDS,
+  type SessionLifetime,
+  SHORT_SESSION_SECONDS,
+} from "./services/sessions.ts";
+
+/** The session lifetimes (services/sessions.ts), in seconds. */
+export { LONG_SESSION_SECONDS, SESSION_SECONDS, SHORT_SESSION_SECONDS };
 
 /**
  * The passkey a `/passkey/delete-passkey` request is deleting, from its before hook to its after
@@ -241,8 +251,8 @@ type Locale = "es" | "en" | "it" | "pt";
  * - `x-wambito-background: 1`: the request is made by a job the person did not start (the Android
  *   widget's refresh, the local notices). The session is read as usual but never refreshed, so
  *   such a request does not count as activity: `session.updatedAt` and `expiresAt` stay as they
- *   were, and the guest cleanup (spec §4.4, 60 days idle) is not postponed by a phone that only
- *   runs jobs.
+ *   were (`requireUser` does not slide a `long` session either), and the guest cleanup (spec
+ *   §4.4, 60 days idle) is not postponed by a phone that only runs jobs.
  */
 export const CLIENT_ANDROID = "android";
 export const CLIENT_IOS = "ios";
@@ -385,10 +395,19 @@ export function createAuth(deps: AppDeps) {
     trustedOrigins: [config.WEB_URL],
     database: drizzleAdapter(deps.db, { provider: "pg", schema }),
     emailAndPassword: { enabled: false },
-    // Every session slides while it is used: valid for 60 days after its last use, extended at most
-    // once a day. A guest has no email to sign in again with, so it must outlast the 60 days of
-    // idleness after which the account is deleted (services/guest-cleanup.ts).
-    session: { expiresIn: 60 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
+    // A `standard` session slides while it is used: valid for 60 days after its last use, extended
+    // at most once a day. A guest has no email to sign in again with, so it must outlast the 60 days
+    // of idleness after which the account is deleted (services/guest-cleanup.ts). The session
+    // create hook below makes the other two lifetimes (`session.lifetime`, services/sessions.ts):
+    // `long` (25 months, slid by `requireUser`, http/session.ts) and `short` (12 hours).
+    session: {
+      expiresIn: SESSION_SECONDS,
+      updateAge: 24 * 60 * 60,
+      additionalFields: {
+        // `standard`, `long` or `short` (services/sessions.ts), set by the session create hook.
+        lifetime: { type: "string", required: true, defaultValue: "standard", input: false },
+      },
+    },
     user: {
       additionalFields: {
         timezone: { type: "string", required: false, defaultValue: "UTC", input: false },
@@ -398,8 +417,8 @@ export function createAuth(deps: AppDeps) {
         encryption: { type: "string", required: true, defaultValue: "plain", input: false },
         // The client that created the user (`android`, `ios`, `web`); null for users made before.
         platform: { type: "string", required: false, input: false },
-        // A guest's latest activity, kept on the user so it outlives a signed-out session; the
-        // guest cleanup reads it (services/guest-cleanup.ts, `stampGuestActivity`).
+        // The user's latest activity, kept on the user so it outlives a signed-out session; the
+        // guest cleanup reads it (services/guest-cleanup.ts, `stampActivity`).
         lastActiveAt: { type: "date", required: false, input: false, returned: false },
         // Set by an admin's suspend (spec §5.4): no new session, no token works while it is set.
         suspendedAt: { type: "date", required: false, input: false, returned: false },
@@ -501,23 +520,58 @@ export function createAuth(deps: AppDeps) {
       }),
     },
     databaseHooks: {
-      // A guest's activity is stamped on the user, so it outlives the session (guest-cleanup.ts).
+      // Every user's activity is stamped on the user, so it outlives the session (guest-cleanup.ts).
       // A background request refreshes nothing, so it never stamps.
       session: {
         create: {
           // Every sign-in (email code, magic link, passkey) creates a session: a suspended account
           // gets none (spec §5.4). The session keeps no IP address (spec §9); Better Auth's own
           // `disableIpTracking` is not used because it also turns off its per-IP rate limits.
-          before: async (data) => {
-            if (await isSuspended(deps, data.userId)) throw accountSuspended();
-            return { data: { ...data, ipAddress: null } };
+          // Its lifetime: a `long` or `short` one asked for by our own server-side sign-ins is
+          // kept; otherwise (Better Auth's default, `standard`) `lifetimeFor` picks it from the
+          // user and the client. Better Auth's expiry stays for `standard`.
+          before: async (data, ctx) => {
+            const [found] = await deps.db
+              .select({
+                suspendedAt: userTable.suspendedAt,
+                encryption: userTable.encryption,
+                isAnonymous: userTable.isAnonymous,
+              })
+              .from(userTable)
+              .where(eq(userTable.id, data.userId));
+            if (found?.suspendedAt != null) throw accountSuspended();
+            const given = data.lifetime as SessionLifetime | undefined;
+            const lifetime =
+              given === "long" || given === "short"
+                ? given
+                : lifetimeFor(
+                    {
+                      encryption: found?.encryption === "encrypted" ? "encrypted" : "plain",
+                      isAnonymous: found?.isAnonymous === true,
+                    },
+                    platformOf(ctx?.headers ?? ctx?.request?.headers),
+                  );
+            const seconds =
+              lifetime === "long"
+                ? LONG_SESSION_SECONDS
+                : lifetime === "short"
+                  ? SHORT_SESSION_SECONDS
+                  : null;
+            return {
+              data: {
+                ...data,
+                ipAddress: null,
+                lifetime,
+                ...(seconds ? { expiresAt: new Date(Date.now() + seconds * 1000) } : {}),
+              },
+            };
           },
-          after: async (created) => stampGuestActivity(deps.db, created.userId, created.updatedAt),
+          after: async (created) => stampActivity(deps.db, created.userId, created.updatedAt),
         },
         update: {
           after: async (updated) => {
             if (updated.userId && updated.updatedAt)
-              await stampGuestActivity(deps.db, updated.userId, updated.updatedAt);
+              await stampActivity(deps.db, updated.userId, updated.updatedAt);
           },
         },
         delete: {
@@ -526,7 +580,7 @@ export function createAuth(deps: AppDeps) {
           after: async (ended) => {
             const now = new Date();
             const live = new Date(ended.expiresAt) > now;
-            await stampGuestActivity(deps.db, ended.userId, live ? now : new Date(ended.updatedAt));
+            await stampActivity(deps.db, ended.userId, live ? now : new Date(ended.updatedAt));
           },
         },
       },

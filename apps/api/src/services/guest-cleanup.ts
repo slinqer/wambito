@@ -12,17 +12,18 @@ export const GUEST_CLEANUP_LOCK = 0x6c756b61;
 export const GUEST_CLEANUP_BATCH = 500;
 
 /**
- * Records that a guest was active at `at` (`user.lastActiveAt`, which only moves forward), so the
+ * Records that the user was active at `at` (`user.lastActiveAt`, which only moves forward), so the
  * activity outlives the session: a guest who signs out keeps 60 days to come back with a passkey.
- * Better Auth's session hooks call it when a guest's session is created, refreshed or ended
- * (auth.ts); a background request refreshes nothing, so it never gets here. A user with an email is
- * left alone.
+ * Every user is stamped, with or without an email (spec 2026-11-15 §9). Better Auth's session
+ * hooks call it when a session is created, refreshed or ended (auth.ts), and `slideLongSession`
+ * when it slides a long one (services/sessions.ts); a background request refreshes nothing, so it
+ * never gets here.
  */
-export async function stampGuestActivity(db: Db, userId: string, at: Date): Promise<void> {
+export async function stampActivity(db: Db, userId: string, at: Date): Promise<void> {
   // Raw SQL: an ORM update would also move `user.updatedAt`.
   await db.execute(sql`update ${user}
     set last_active_at = greatest(last_active_at, ${at.toISOString()}::timestamp)
-    where ${user.id} = ${userId} and ${user.isAnonymous}`);
+    where ${user.id} = ${userId}`);
 }
 
 /**

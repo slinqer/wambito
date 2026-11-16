@@ -38,6 +38,7 @@ How to add to it:
 
 ### Changed
 
+- An encrypted user without an email gets a 25-month (760-day) session on the phone (`x-wambito-client: android` or `ios`), renewed at most once a day while it is used (never by a `x-wambito-background: 1` request); claiming an email brings it back to the standard 60 days. Every user's activity is stamped now, with an email or not (before, only guests').
 - Sessions store no IP address, and rate limits are kept in memory instead of the `rate_limit` table (a restart forgets the counts); a migration clears the old rows and addresses. Limits are unchanged, including `POST /v1/email-change/confirm` (10 per 10 minutes per address).
 - `x-wambito-client: ios` is accepted and marks the app like `android` (the sign-in link carries `from=app`).
 - `/v2/keys` (unreleased): a `device` wrap needs a 32-byte `attestation` next to its `publicKey` (`PUT /v2/keys/{id}` and `POST /v2/keys/rotate`; else 422 `attestation_required`), and `GET /v2/keys` returns it (`null` for other kinds). The server stores it and cannot verify it; devices check it before sealing the data key to a device.

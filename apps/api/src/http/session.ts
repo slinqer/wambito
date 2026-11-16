@@ -1,8 +1,10 @@
+import type { Db } from "@wambito/db";
 import { verifyJwsAccessToken } from "better-auth/oauth2";
 import { createMiddleware } from "hono/factory";
 import type { Auth } from "../auth.ts";
 import type { Config } from "../config.ts";
 import type { AppEnv, Grant, SessionUser } from "../env.ts";
+import { slideLongSession } from "../services/sessions.ts";
 import { clientHeader } from "./client-headers.ts";
 import { ApiError } from "./problem.ts";
 
@@ -47,8 +49,12 @@ export const authIssuer = (config: Pick<Config, "API_URL">) =>
  *
  * A request with `x-wambito-background: 1` reads the session without refreshing it (Better Auth's
  * `disableRefresh`), so background jobs never count as activity for the guest cleanup.
+ *
+ * Better Auth never refreshes a `long` session (25 months; it refreshes only in the last 59 days),
+ * so this slides it, at most once a day and never for a background request, and stamps the user's
+ * activity (`slideLongSession`): a person using the app daily is never cleaned up as idle.
  */
-export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_URL">) {
+export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_URL">, db: Db) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const background = clientHeader(c.req.raw.headers, "background") === "1";
     const result = await auth.api.getSession({
@@ -62,6 +68,8 @@ export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_UR
       if (await isSuspendedUser(auth, result.user.id)) throw suspended();
       user = toSessionUser(result.user as AuthUser);
       grant = { kind: "session", sessionId: result.session.id };
+      if (!background && result.session.lifetime === "long")
+        await slideLongSession(db, result.session.id, result.user.id, new Date());
     } else {
       const oauth = await oauthUser(auth, config, c.req.header("authorization"));
       if (!oauth) throw new ApiError(401, "unauthenticated", "Sign in to continue");

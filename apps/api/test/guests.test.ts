@@ -259,6 +259,36 @@ describe("guests", () => {
   });
 });
 
+describe("encrypted guests (NEW_USERS_ENCRYPTED on)", () => {
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await createTestApp({ NEW_USERS_ENCRYPTED: true });
+  });
+  afterAll(() => t?.stop());
+
+  test("an encrypted guest that signs in with an existing email keeps its own user", async () => {
+    const existing = await t.signIn("existing@wambito.test");
+    const g = await guest(t, { "x-wambito-client": "android" });
+
+    // Better Auth's anonymous plugin would delete the guest here (disableDeleteAnonymousUser).
+    const sent = await t.request("POST", "/auth/email-otp/send-verification-otp", {
+      headers: g.headers,
+      body: { email: "existing@wambito.test", type: "sign-in" },
+    });
+    expect(sent.status).toBe(200);
+    const code = /(\d{6})$/.exec(t.mailer.lastTo("existing@wambito.test")?.subject ?? "")?.[1];
+    const signedIn = await t.request("POST", "/auth/sign-in/email-otp", {
+      headers: g.headers,
+      body: { email: "existing@wambito.test", otp: code },
+    });
+    expect(signedIn.status).toBe(200);
+    expect(((await signedIn.json()) as { user: { id: string } }).user.id).toBe(existing.userId);
+
+    const [still] = await t.admin.select().from(user).where(eq(user.id, g.userId));
+    expect(still).toMatchObject({ isAnonymous: true, encryption: "encrypted" });
+  });
+});
+
 describe("app sign-ups by email (x-wambito-timezone on the creating request)", () => {
   let t: TestApp;
   beforeAll(async () => {

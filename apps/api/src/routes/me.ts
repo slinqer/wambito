@@ -30,6 +30,7 @@ import { router } from "../http/router.ts";
 import { UpdateProfile } from "../http/schemas.ts";
 import { deleteAccount } from "../services/account.ts";
 import { accountEncryption } from "../services/encryption.ts";
+import { endLongSessions } from "../services/sessions.ts";
 import { userToday } from "../services/time.ts";
 import { defaultAccount, toTransactionDto } from "../services/transactions.ts";
 
@@ -308,6 +309,8 @@ export function meRoutes(deps: AppDeps) {
         throw error;
       }
       if (claimed.length === 0) throw notAGuest();
+      // With an email the person can sign in again: a 25-month phone session goes back to 60 days.
+      await endLongSessions(deps.db, userId, new Date());
       await dropClaimCodes(deps, userId);
       return c.json(await profile(deps, userId), 200);
     },

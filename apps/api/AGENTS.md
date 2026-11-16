@@ -8,7 +8,14 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - `src/server.ts` starts it; `src/app.ts` builds the app (routes, OpenAPI).
 - `src/config.ts`: zod env schema (`WAMBITO_VERSION` included); `.env.example` at the repo root.
 - `src/auth.ts`: Better Auth: email OTP + magic link, anonymous guests, passkeys (`rpName`
-  "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP.
+  "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP. Sessions carry a `lifetime`
+  (`src/services/sessions.ts`): `standard` (60 days, slid by Better Auth at most once a day),
+  `long` (760 days: an encrypted user without an email on the phone, `lifetimeFor`), `short`
+  (12 hours); the session create hook keeps a given `long`/`short`, else picks it and sets
+  `expiresAt` (constants `SESSION_SECONDS`, `LONG_SESSION_SECONDS`, `SHORT_SESSION_SECONDS`).
+  Better Auth never refreshes a `long` session, so `requireUser` slides it (`slideLongSession`, at
+  most once a day, stamping activity); claiming an email ends it (`endLongSessions`). Every
+  user's activity is stamped on `user.lastActiveAt` (`stampActivity`, services/guest-cleanup.ts).
 - `src/http/session.ts`: `requireUser` (cookie or bearer session, or an OAuth JWT with `aud` =
   MCP_URL). `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
@@ -122,7 +129,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
 - Client headers `x-wambito-{locale,next,timezone,client,background,user}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
-  session with `disableRefresh` (not counted as activity); `user` on `/v2/*` is the account the
+  session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` is the account the
   client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
   `src/http/expected-user.ts`, after `requireUser`, before the scopes; sessions and tokens alike).
 - DB: connects as the runtime role (RLS); migrations run as admin (`packages/db`).

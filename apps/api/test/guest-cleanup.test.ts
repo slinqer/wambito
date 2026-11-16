@@ -431,9 +431,9 @@ describe("a guest's last activity outlives its sessions", () => {
     expect(await cleanupInactiveGuests(t.db, NOW)).toBe(0);
   });
 
-  test("an email user is never stamped", async () => {
+  test("an email user is stamped too", async () => {
     const member = await t.signIn("stamp@wambito.test");
-    expect(await lastActiveAt(member.userId)).toBeNull();
+    recent(await lastActiveAt(member.userId));
   });
 });
 

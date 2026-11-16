@@ -30,9 +30,10 @@ describe("admin look-up, metrics and audit list", () => {
     headers = await verifiedAdmin(t, key);
 
     // Fixture, on the pinned clock: 3 people with an email (the admin, u1, u2 suspended), 2 guests.
+    // The admin's sign-in stamped its activity on the real clock; its session is the only one.
     await t.admin
       .update(user)
-      .set({ createdAt: day("2026-09-01") })
+      .set({ createdAt: day("2026-09-01"), lastActiveAt: null })
       .where(eq(user.id, ADMIN_ID));
     await t.admin.update(session).set({ updatedAt: day("2026-11-03") });
     await t.admin.insert(user).values([

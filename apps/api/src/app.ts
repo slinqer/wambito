@@ -74,11 +74,11 @@ export function createApp(deps: AppDeps) {
   app.route("/", adminRoutes(deps, auth));
   // Public: the person confirming an admin's email change is usually signed out (rate-limited).
   app.route("/", emailChangeRoutes(deps));
-  app.use("/v1/*", requireUser(auth, deps.config));
+  app.use("/v1/*", requireUser(auth, deps.config, deps.db));
   app.use("/v1/*", assistantScopes());
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
   app.use("/v1/*", previewOnlyV2(deps));
-  app.use("/v2/*", requireUser(auth, deps.config));
+  app.use("/v2/*", requireUser(auth, deps.config, deps.db));
   // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
   app.use("/v2/*", expectedUser());
   app.use("/v2/*", assistantScopes());
