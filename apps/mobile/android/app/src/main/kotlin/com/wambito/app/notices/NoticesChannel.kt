@@ -31,6 +31,14 @@ class NoticesChannel(private val context: Context, private val activity: Activit
                 NoticeScheduler.scheduleDue(context, call.argument<String>("zone"), call.argument<String>("language"))
                 result.success(null)
             }
+            // A `preview` account's due list, read from the vault by Dart: the owner it was read for
+            // and the days and names, replacing the whole list; the notice is scheduled as ever.
+            "scheduleDueList" -> {
+                DueList.replace(context, call.argument<String>("owner"), daysOf(call.argument<List<Map<String, Any?>>>("days")))
+                NoticeChannels.ensure(context)
+                NoticeScheduler.scheduleDue(context, call.argument<String>("zone"), call.argument<String>("language"))
+                result.success(null)
+            }
             "cancelDue" -> {
                 NoticeScheduler.cancelDue(context)
                 result.success(null)
@@ -56,6 +64,12 @@ class NoticesChannel(private val context: Context, private val activity: Activit
             else -> result.notImplemented()
         }
     }
+
+    private fun daysOf(days: List<Map<String, Any?>>?): List<Pair<String, List<String>>> =
+        days.orEmpty().mapNotNull { day ->
+            val date = day["date"] as? String ?: return@mapNotNull null
+            date to (day["names"] as? List<*>).orEmpty().filterIsInstance<String>()
+        }
 
     /**
      * `granted` when notices can be posted; `askable` when they cannot because the Android 13+

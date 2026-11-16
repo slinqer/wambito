@@ -12,6 +12,9 @@ import WambitoNative
 ///  * `scheduleGuest({language})` / `cancelGuest` -> nil: the guest warning, 44 days from now.
 ///  * `scheduleDue({zone, language})` / `cancelDue` -> nil: "Hoy vence…", the daily background run
 ///    at 9:00 in the profile's zone (DueTask.swift); its settings are kept in `DueSettings`.
+///  * `scheduleDueList({zone, language, owner, days})` -> nil: a `preview` account's "Hoy vence…",
+///    one local notification per day at 9:00 in the profile's zone, from the days and names Dart read
+///    from the vault (DueSchedule.swift); replaces the whole list. `cancelDue` removes them too.
 ///  * `setEncryptionMode({mode, owner})` -> nil: the account's mode and user id for the background
 ///    runs; schedules or cancels the background sync (SyncTask.swift).
 final class NoticesChannel {
@@ -29,14 +32,34 @@ final class NoticesChannel {
           zone: arguments?["zone"] as? String, language: arguments?["language"] as? String)
         DueTask.schedule(zone: zone)
         result(nil)
+      case "scheduleDueList":
+        // A `preview` account's payments, read from the vault by Dart: days and names, replacing
+        // every pending `wambito.due.` request. The owner is not kept: a sign-out and an account
+        // change both go through `cancelDue`, which removes them.
+        let zone = NoticeTimes.zone(arguments?["zone"] as? String, fallback: .current)
+        let days: [(date: String, names: [String])] = (arguments?["days"] as? [[String: Any]] ?? [])
+          .compactMap { day in
+            guard let date = day["date"] as? String else { return nil }
+            return (date, (day["names"] as? [String]) ?? [])
+          }
+        let language = arguments?["language"] as? String
+        Task {
+          await NoticePoster.scheduleDueList(
+            zone: zone, language: language, days: days, center: self.center)
+          result(nil)
+        }
       case "cancelDue":
         DueSettings.clear()
         DueTask.cancel()
         // One already in the notification centre goes too: after a sign-out it names the previous
-        // person's payments.
+        // person's payments. The answer waits for the due list's requests to go, so a list handed
+        // over right after is never removed by this.
         self.center.removePendingNotificationRequests(withIdentifiers: [NoticePoster.dueId])
         self.center.removeDeliveredNotifications(withIdentifiers: [NoticePoster.dueId])
-        result(nil)
+        Task {
+          await NoticePoster.cancelDueList(center: self.center)
+          result(nil)
+        }
       case "scheduleGuest":
         NoticePoster.scheduleGuest(language: arguments?["language"] as? String, center: self.center)
         result(nil)

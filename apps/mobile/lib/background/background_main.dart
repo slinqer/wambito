@@ -15,11 +15,13 @@ import '../home/widget_sync.dart' show widgetTheme;
 import '../local/keys.dart';
 import '../local/sqlite_store.dart';
 import '../local/vault_lock.dart';
+import '../notices/notice_platform.dart' show ChannelNoticePlatform;
 import '../settings/initial_settings.dart';
 import '../settings/settings_store.dart';
 import '../vault/encryption_mode.dart' show EncryptionMode, EncryptionStore, VaultAccount;
 import 'background_channel.dart';
 import 'background_run.dart';
+import 'due_effect.dart';
 import 'queued_capture.dart';
 import 'widget_effect.dart';
 
@@ -32,8 +34,8 @@ const _leaseWait = Duration(seconds: 5);
 /// [runBackground] and tells native code how it ended with `wambito/background` `finished`; an
 /// error anywhere is the outcome `failed`, never an uncaught one.
 ///
-/// The widget effect draws the home widget from the vault ([widgetEffect]); the due-list effect is a
-/// no-op until its task (10) fills it.
+/// The widget effect draws the home widget from the vault ([widgetEffect]); the due-list effect hands
+/// the next days' payments to the phone ([dueEffect]).
 Future<void> backgroundMain(String kind) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
@@ -71,6 +73,15 @@ Future<BackgroundReport> _run(String kind) async {
         (await refreshKeys(KeysOptions(userId: userId, dio: network, storage: keyStorage))).keyring,
     dropKeyVersion: (userId, v) => dropKeyVersion(userId, v, keyStorage),
   );
+  Future<bool> owns(String userId) async {
+    final token = (await sessions.read())?.token;
+    if (token == null) return false;
+    final account = await encryption.recall(token);
+    return account != null &&
+        account.mode == EncryptionMode.preview &&
+        account.profile.id == userId;
+  }
+
   final effects = BackgroundEffects(
     widget: widgetEffect(
       store: const HomeWidgetStore(),
@@ -78,16 +89,15 @@ Future<BackgroundReport> _run(String kind) async {
       theme: widgetTheme(settings.themeMode),
       locale: settings.locale?.languageCode ?? languageOfTag(hints.locale),
       now: DateTime.now,
-      owns: (userId) async {
-        final token = (await sessions.read())?.token;
-        if (token == null) return false;
-        final account = await encryption.recall(token);
-        return account != null &&
-            account.mode == EncryptionMode.preview &&
-            account.profile.id == userId;
-      },
+      owns: owns,
     ),
-    due: (userId, backend) async {},
+    due: dueEffect(
+      platform: const ChannelNoticePlatform(),
+      enabled: _dueEnabled,
+      language: settings.locale?.languageCode ?? languageOfTag(hints.locale),
+      now: DateTime.now,
+      owns: owns,
+    ),
   );
 
   var captures = const <QueuedCapture>[];
@@ -109,6 +119,16 @@ Future<BackgroundReport> _run(String kind) async {
     confirms: confirms,
     ack: platform.ackQueued,
   );
+}
+
+/// The "Hoy vence…" switch (Settings): on until chosen; one that cannot be read counts as on, so the
+/// list is kept for the phone, which also checks its owner.
+Future<bool> _dueEnabled() async {
+  try {
+    return await const SecureFlagStore('setting.notice.due').read() ?? true;
+  } on Object {
+    return true;
+  }
 }
 
 /// The "hide the amount in the widget" choice (Settings): never made reads as shown, one that

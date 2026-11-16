@@ -137,8 +137,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
-  What stage 3a leaves out for a `preview` account (automatic capture, due notices,
-  export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
+  What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
   `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
   `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
   reads it (`wambito/notices` `setEncryptionMode {mode, owner}`, keys `wambito.encryption.mode`: `plain`, `preview`,
@@ -173,7 +172,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - `MainActivity.kt`: takes the launch link. Channels:
   `wambito/*`, registered in `MainActivity.kt`; names match the Dart constants (rename both at once).
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
-  local notices only; `capture/`: the queue of captures parsed from bank notifications
+  local notices only. A `preview` account's "Hoy vence…" is computed in Dart from the vault
+  (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)
+  and handed over as `scheduleDueList {zone, language, owner, days}` (14 days, replaced whole);
+  `DueList` keeps it in prefs `wambito.notice.duelist` (excluded from backups) with its owner, and `DueWorker`
+  posts today's entry at 9:00 without asking the API, but nothing (and clears the list) when that owner is not
+  `AccountMode.owner` or either is null; iOS schedules one `UNCalendarNotificationTrigger` per day
+  (`DueSchedule`, ids `wambito.due.<date>`) and `cancelDue` removes them; `capture/`: the queue of captures parsed from bank notifications
   (`CaptureQueue`: each item tagged with the account id it was captured for, the prefs' `owner`
   then; `adopt(userId)` drops the items of another account or of none, old untagged items included;
   only the owner's items are sent, and only while the session mark matches `ownerMark`, which
@@ -222,7 +227,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
     `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
-    AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `cancelDue`,
+    AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `scheduleDueList`, `cancelDue`,
     `scheduleGuest`, `cancelGuest`, `permission`, `requestPermission`), local notices only
     (`UNUserNotificationCenter`; `KeychainSession` reads the session `flutter_secure_storage` keeps).
   - Words of the notices: `{es,en,it,pt}.lproj/Notices.strings`, generated from the Android
@@ -233,7 +238,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `registerChannels`. The Runner target is not a synchronized folder group: add every new file by
     hand to `ios/Runner.xcodeproj/project.pbxproj` (file reference, group per area, build file, the
     Sources or Resources phase), IDs unique (grep first).
-- `ios/WambitoNative/`: Swift package with the logic that needs no UIKit (`NoticeTimes`, `DueToday`,
+- `ios/WambitoNative/`: Swift package with the logic that needs no UIKit (`NoticeTimes`, `DueToday`, `DueSchedule`,
   `LaunchLinks`, `ExternalLinks`, `FileTransfer`, `HapticSpec`, `WebAuthnJSON`); the Runner imports
   it. Put new pure logic here with a test in `Tests/WambitoNativeTests/` (`swift test`); a channel
   file stays a thin wrapper. Dart twins (`launch_links.dart`, notice times) are pinned by the same

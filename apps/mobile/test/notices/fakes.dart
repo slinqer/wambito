@@ -1,3 +1,4 @@
+import 'package:wambito/notices/due_list.dart';
 import 'package:wambito/notices/notice_backend.dart';
 import 'package:wambito/notices/notice_platform.dart';
 
@@ -21,6 +22,20 @@ class FakeNoticePlatform implements NoticePlatform {
   @override
   Future<void> scheduleDue({required String zone, required String language}) async =>
       calls.add('scheduleDue $zone $language');
+
+  /// The days of every `scheduleDueList`, in order.
+  final dueLists = <List<DueDay>>[];
+
+  @override
+  Future<void> scheduleDueList({
+    required String zone,
+    required String language,
+    required String owner,
+    required List<DueDay> days,
+  }) async {
+    dueLists.add(days);
+    calls.add('scheduleDueList $zone $language $owner');
+  }
 
   @override
   Future<void> cancelDue() async => calls.add('cancelDue');
