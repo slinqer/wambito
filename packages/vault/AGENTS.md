@@ -25,10 +25,14 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
 - `src/sync.ts`: `createSyncEngine` over an `EncryptedStore`; option `upgrade: false` skips the
   re-seal pass (the MCP). Its tests stay in `apps/web/app/local/sync.test.ts` (over IndexedDB);
   `src/sync.test.ts` is a smoke test over the memory store.
-- `src/ids.ts`: `uuidv7`, `uuidv5`.
+- `src/ids.ts`: `uuidv7`, `uuidv5`, `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`).
 - `src/backend.ts`: `createLocalBackend` (the `/v1` routes over a store, one store transaction per
   request), `DEMO_UNAVAILABLE`. Its round-trip tests need the web's typed API client, so they stay in
   `apps/web/app/local/backend.test.ts`.
+  Options for the MCP: `source: "mcp"` (forced on every created movement) and
+  `idsFromIdempotencyKey: { userId }` (batch ids stable across retries); it also answers the batch
+  create and batch-delete routes and `Idempotent-Replayed`. Their tests: `src/backend-mcp.test.ts`,
+  and through `apiWambito` in `apps/mcp/test/local-backend.test.ts`.
 
 ## Test
 

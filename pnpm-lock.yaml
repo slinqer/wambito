@@ -259,6 +259,9 @@ importers:
       '@wambito/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@wambito/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
       hono:
         specifier: ^4.13.13
         version: 4.13.13

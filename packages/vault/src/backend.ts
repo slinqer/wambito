@@ -7,6 +7,8 @@ import {
   createCategorySchema,
   createRecurrenceSchema,
   createTransactionSchema,
+  createTransactionsBatchSchema,
+  deleteTransactionsBatchSchema,
   effectiveBudget,
   firstDay,
   isMonth,
@@ -32,7 +34,7 @@ import {
   updateRecurrenceSchema,
   updateTransactionSchema,
 } from "@wambito/core";
-import { uuidv5, uuidv7 } from "./ids.ts";
+import { IDEMPOTENCY_NAMESPACE, uuidv5, uuidv7 } from "./ids.ts";
 import type { FinanceStore, ReadOptions, RecordType, StoreOps } from "./store.ts";
 
 /**
@@ -83,6 +85,16 @@ export interface LocalBackendOptions {
   unavailable?: readonly UnavailableRoute[];
   /** Ids of new records. Default: UUID v7 from `now()`. The demo passes a counter. */
   newId?: () => string;
+  /** When set, every movement this backend creates has this `source`, whatever the body says. */
+  source?: "mcp";
+  /**
+   * When set, a batch create with an `Idempotency-Key` gives item `i` the id
+   * `uuidv5(`${userId}/${key}/${i}`)`: a retry (even after this backend was rebuilt) finds what
+   * the first try wrote. Every id already there (live or deleted) answers 201 with those
+   * movements and `Idempotent-Replayed: true`, writing nothing; only some there, the missing are
+   * created and there is no replay header.
+   */
+  idsFromIdempotencyKey?: { userId: string };
 }
 
 /** Field errors, as the API lists them in a 422. */
@@ -299,9 +311,11 @@ function rangeParams(params: URLSearchParams): Month[] {
 interface Answer {
   status: number;
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 const ok = (body: unknown, status = 200): Answer => ({ status, body });
+const REPLAYED = { "idempotent-replayed": "true" };
 
 /** The settings of an account that has not saved any yet. */
 const FRESH_SETTINGS: SettingsRecord = {
@@ -635,27 +649,26 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
     return ok({ items: found.map((f) => ({ name: f.latest.name, categoryId: f.usual })) });
   }
 
-  async function createTransaction(
-    e: Env,
-    raw: string,
-    body: unknown,
-    key: string | null,
-  ): Promise<Answer> {
-    if (key) {
-      const seen = idempotency.get(key);
-      if (seen) {
-        if (seen.body !== raw) {
-          throw new Problem(
-            422,
-            "idempotency_key_reused",
-            "This Idempotency-Key was used with a different request",
-          );
-        }
-        return ok(seen.payload, seen.status);
-      }
+  /** A retry with a known key: the first answer (422 when the body differs), flagged. */
+  function replayOf(key: string | null, raw: string): Answer | null {
+    const seen = key ? idempotency.get(key) : undefined;
+    if (!seen) return null;
+    if (seen.body !== raw) {
+      throw new Problem(
+        422,
+        "idempotency_key_reused",
+        "This Idempotency-Key was used with a different request",
+      );
     }
-    const input = valid(createTransactionSchema, body);
-    await requireActiveCategory(e.s, input.categoryId);
+    return { status: seen.status, body: seen.payload, headers: REPLAYED };
+  }
+
+  /** The insert path of single and batch create: its recurrence (if it repeats), then the row. */
+  async function insertTransaction(
+    e: Env,
+    input: ReturnType<typeof createTransactionSchema.parse>,
+    id: string,
+  ): Promise<TransactionDto> {
     const at = stamp();
     // "Repetir": its recurrence first, and this row is that rule's occurrence for its month.
     let ruleId: string | null = null;
@@ -675,7 +688,6 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
         createdAt: at,
       });
     }
-    const id = newId();
     const record: TxBody = {
       s: 1,
       name: input.name,
@@ -688,7 +700,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       accountId: null,
       recurrenceId: ruleId,
       occurrenceMonth: ruleId ? monthOf(input.date) : null,
-      source: input.source,
+      source: options.source ?? input.source,
       needsReview: false,
       captureSource: null,
       capturedAt: null,
@@ -697,9 +709,78 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       updatedAt: at,
     };
     await e.s.put("transaction", id, record);
-    const payload = toTransactionDto(toTxRow(id, record));
+    return toTransactionDto(toTxRow(id, record));
+  }
+
+  async function createTransaction(
+    e: Env,
+    raw: string,
+    body: unknown,
+    key: string | null,
+  ): Promise<Answer> {
+    const replay = replayOf(key, raw);
+    if (replay) return replay;
+    const input = valid(createTransactionSchema, body);
+    await requireActiveCategory(e.s, input.categoryId);
+    const payload = await insertTransaction(e, input, newId());
     if (key) idempotency.set(key, { body: raw, status: 201, payload });
     return ok(payload, 201);
+  }
+
+  /** `POST /v1/transactions/batch`, as the API: up to 20, all or nothing, a key is required. */
+  async function createTransactionsBatch(
+    e: Env,
+    raw: string,
+    body: unknown,
+    key: string | null,
+  ): Promise<Answer> {
+    if (!key) {
+      throw new Problem(
+        400,
+        "idempotency_key_required",
+        "Send an Idempotency-Key header with this request",
+      );
+    }
+    const replay = replayOf(key, raw);
+    if (replay) return replay;
+    const { items } = valid(createTransactionsBatchSchema, body);
+    for (const categoryId of new Set(items.map((i) => i.categoryId))) {
+      await requireActiveCategory(e.s, categoryId);
+    }
+    const derived = options.idsFromIdempotencyKey;
+    const ids = await Promise.all(
+      items.map((_, i) =>
+        derived
+          ? uuidv5(IDEMPOTENCY_NAMESPACE, `${derived.userId}/${key}/${i}`)
+          : Promise.resolve(newId()),
+      ),
+    );
+    const payloadItems: TransactionDto[] = [];
+    let written = 0;
+    for (const [i, input] of items.entries()) {
+      const id = ids[i] as string;
+      const there = derived ? await e.s.get("transaction", id, { includeDeleted: true }) : null;
+      if (there) {
+        payloadItems.push(toTransactionDto(toTxRow(id, there.body, there.deleted)));
+        continue;
+      }
+      payloadItems.push(await insertTransaction(e, input, id));
+      written += 1;
+    }
+    const payload = { items: payloadItems };
+    idempotency.set(key, { body: raw, status: 201, payload });
+    return written === 0 && derived
+      ? { status: 201, body: payload, headers: REPLAYED }
+      : ok(payload, 201);
+  }
+
+  /** `POST /v1/transactions/batch-delete`: soft-deletes the live ones; any other id is ignored. */
+  async function deleteTransactionsBatch(e: Env, body: unknown): Promise<Answer> {
+    const { ids } = valid(deleteTransactionsBatchSchema, body);
+    for (const id of new Set(ids)) {
+      if (await e.s.get("transaction", id)) await e.s.delete("transaction", id);
+    }
+    return { status: 204 };
   }
 
   async function updateTransaction(e: Env, id: string, body: unknown): Promise<Answer> {
@@ -959,6 +1040,12 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
         return createTransaction(e, raw, body, headers.get("idempotency-key"));
       }
     }
+    if (path === "/v1/transactions/batch" && method === "POST") {
+      return createTransactionsBatch(e, raw, body, headers.get("idempotency-key"));
+    }
+    if (path === "/v1/transactions/batch-delete" && method === "POST") {
+      return deleteTransactionsBatch(e, body);
+    }
     if (path === "/v1/transactions/suggestions" && method === "GET") return suggestions(e, params);
     if (path === "/v1/transactions/review" && method === "POST") {
       return reviewTransactions(e, body);
@@ -1054,10 +1141,12 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
         headers: { "content-type": "application/problem+json" },
       });
     }
-    if (answer.body === undefined) return new Response(null, { status: answer.status });
+    if (answer.body === undefined) {
+      return new Response(null, { status: answer.status, headers: answer.headers });
+    }
     return new Response(JSON.stringify(answer.body), {
       status: answer.status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...answer.headers },
     });
   }
 
