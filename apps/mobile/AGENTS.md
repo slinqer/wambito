@@ -60,7 +60,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   prefs, `FlutterSecureStorageConfiguration:FlutterSecureStorage` included; tested by `BackupRulesTest`). Move the vault folder and the XML paths change together.
   `lib/debug/prf_probe_screen.dart` is the PRF probe, `/debug/prf`, registered only when `kDebugMode`: it
   creates a passkey and evaluates its PRF on a real phone, to check that the platform gives one.
-  `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
+  `ids.dart` = `ids.ts` (`uuidv7`, `uuidv5`; `seedNamespace`), `captures.dart` (`merchantRecordId`, `createCaptureSchema`; the save and the merchant memory of `POST /v1/captures` live in `backend.dart`, twin of the API's `services/captures.ts`: 10-minute duplicate window, learned on review and on a PATCH that confirms a `capture` row), `backend.dart` = `backend.ts` (`createLocalBackend`: the `/v1`
   finance routes over a `FinanceStore`, one store transaction per request, 422 `validation_failed`,
   403 `demo_unavailable` for `localUnavailable`; `handle` returns null for a path it does not serve) and
   `backend_interceptor.dart` (the Dio interceptor that answers those routes, `GET`/`PATCH /v1/me` and the

@@ -258,9 +258,6 @@ Future<void> _forgetRefreshed(
   }
 }
 
-/// The namespace of the seeded records' ids; the account's own namespace is made from it.
-const _seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
-
 /// Creates the account's first records when it has none after the first sync: the settings (from
 /// the server's profile, the web's default currency EUR) and the suggested categories in the
 /// person's language. The ids are UUID v5 of the account and the record's name, and the content
@@ -269,7 +266,7 @@ Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
   if ((await store.list(RecordType.settings)).isNotEmpty) return;
   final locale = supportedLocales.contains(profile.locale) ? profile.locale : 'es';
   final names = SuggestionLocale.values.byName(locale);
-  final namespace = uuidv5(_seedNamespace, profile.id);
+  final namespace = uuidv5(seedNamespace, profile.id);
   final settingsId = uuidv5(namespace, 'settings');
   final categories = [
     for (final (i, s) in suggestedCategories.indexed)
