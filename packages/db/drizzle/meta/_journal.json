@@ -92,6 +92,13 @@
       "when": 1794341286216,
       "tag": "0012_lying_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794819833931,
+      "tag": "0013_user_encryption",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,13 +35,14 @@ class DeviceHints {
   final String timezone;
   final String locale;
 
-  /// The request headers, as the API names them. `x-wambito-client: android` marks the magic link of
-  /// a sign-in started here `from=app`, so the web page it opens offers to open this app
-  /// (apps/api/src/auth.ts, `CLIENT_HEADER`).
+  /// The request headers, as the API names them. `x-wambito-client` is `ios` on an iPhone and
+  /// `android` elsewhere; either marks the magic link of a sign-in started here `from=app`, so the
+  /// web page it opens offers to open this app, and names the user's platform
+  /// (apps/api/src/auth.ts, `platformOf`).
   Map<String, String> get headers => {
     'x-wambito-timezone': timezone,
     'x-wambito-locale': locale,
-    'x-wambito-client': 'android',
+    'x-wambito-client': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
   };
 }
 

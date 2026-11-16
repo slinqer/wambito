@@ -29,6 +29,7 @@ import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
 import { UpdateProfile } from "../http/schemas.ts";
 import { deleteAccount } from "../services/account.ts";
+import { accountEncryption } from "../services/encryption.ts";
 import { userToday } from "../services/time.ts";
 import { defaultAccount, toTransactionDto } from "../services/transactions.ts";
 
@@ -44,7 +45,8 @@ const profileDto = z
     isAnonymous: z.boolean(),
     /**
      * `preview`: the account keeps its finances only as end-to-end encrypted records (`/v2`), and
-     * its `/v1` finance routes stay empty; `plain`: every other account.
+     * its `/v1` finance routes stay empty (listed in `E2E_PREVIEW_USER_IDS`, or created while
+     * `NEW_USERS_ENCRYPTED` was on); `plain`: every other account.
      */
     encryption: z.enum(["plain", "preview"]),
   })
@@ -113,7 +115,12 @@ async function profile(deps: AppDeps, userId: string) {
     ...row,
     onboardingCompletedAt: row.onboardingCompletedAt?.toISOString() ?? null,
     currency: account?.currency ?? "EUR",
-    encryption: isPreviewAccount(deps.config, userId) ? ("preview" as const) : ("plain" as const),
+    encryption: isPreviewAccount(deps.config, {
+      id: userId,
+      encryption: await accountEncryption(deps.db, userId),
+    })
+      ? ("preview" as const)
+      : ("plain" as const),
   };
 }
 
@@ -210,7 +217,15 @@ export function meRoutes(deps: AppDeps) {
       const { onboardingCompleted, currency, ...fields } = c.req.valid("json");
       const userId = c.get("userId");
       // A preview account's currency lives in its settings record.
-      if (currency && isPreviewAccount(deps.config, userId)) throw encryptedAccount();
+      if (
+        currency &&
+        isPreviewAccount(deps.config, {
+          id: userId,
+          encryption: await accountEncryption(deps.db, userId),
+        })
+      ) {
+        throw encryptedAccount();
+      }
       const set = {
         ...fields,
         // Stamp completion once; later calls keep the first timestamp.

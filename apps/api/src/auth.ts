@@ -245,6 +245,13 @@ type Locale = "es" | "en" | "it" | "pt";
  *   runs jobs.
  */
 export const CLIENT_ANDROID = "android";
+export const CLIENT_IOS = "ios";
+
+/** The client a request comes from: the app's `x-wambito-client` (`android`, `ios`), else the web. */
+export function platformOf(headers: Headers | undefined): "android" | "ios" | "web" {
+  const value = clientHeader(headers, "client")?.trim().toLowerCase();
+  return value === CLIENT_ANDROID || value === CLIENT_IOS ? value : "web";
+}
 
 const asLocale = (value: string | null | undefined): Locale | null =>
   value === "es" || value === "en" || value === "it" || value === "pt" ? value : null;
@@ -387,6 +394,10 @@ export function createAuth(deps: AppDeps) {
         timezone: { type: "string", required: false, defaultValue: "UTC", input: false },
         locale: { type: "string", required: false, defaultValue: "es", input: false },
         onboardingCompletedAt: { type: "date", required: false, input: false },
+        // `plain` or `encrypted`, fixed at sign-up by NEW_USERS_ENCRYPTED (services/encryption.ts).
+        encryption: { type: "string", required: true, defaultValue: "plain", input: false },
+        // The client that created the user (`android`, `ios`, `web`); null for users made before.
+        platform: { type: "string", required: false, input: false },
         // A guest's latest activity, kept on the user so it outlives a signed-out session; the
         // guest cleanup reads it (services/guest-cleanup.ts, `stampGuestActivity`).
         lastActiveAt: { type: "date", required: false, input: false, returned: false },
@@ -523,9 +534,13 @@ export function createAuth(deps: AppDeps) {
           // from the web (no such header) stays at the defaults until the web's onboarding.
           before: async (data, ctx) => {
             const headers = ctx?.headers ?? ctx?.request?.headers;
-            if (!data.isAnonymous && !fromDevice(headers)) return;
+            const born = {
+              encryption: config.NEW_USERS_ENCRYPTED ? "encrypted" : "plain",
+              platform: platformOf(headers),
+            };
+            if (!data.isAnonymous && !fromDevice(headers)) return { data: { ...data, ...born } };
             const { timezone, locale } = guestDefaults(headers);
-            return { data: { ...data, timezone, locale } };
+            return { data: { ...data, ...born, timezone, locale } };
           },
           after: async (created, ctx) => {
             // A guest or an app user skips the web's currency step, so the device picks it (the
@@ -542,7 +557,13 @@ export function createAuth(deps: AppDeps) {
             // (`x-wambito-locale`, else the browser's), so a person who leaves the welcome halfway
             // still has them. The welcome then shows them as the person's own. A preview account
             // keeps its finances only as encrypted records: the web creates them there instead.
-            if (isPreviewAccount(config, created.id)) return;
+            if (
+              isPreviewAccount(config, {
+                id: created.id,
+                encryption: created.encryption === "encrypted" ? "encrypted" : "plain",
+              })
+            )
+              return;
             const { locale } = guestDefaults(headers);
             await withUser(deps.db, created.id, async (tx) => {
               await tx.insert(accounts).values({
@@ -583,9 +604,7 @@ export function createAuth(deps: AppDeps) {
           const params = new URLSearchParams({ email, code: otp, lang: locale });
           const next = linkNext(clientHeader(headers, "next"));
           if (next) params.set("next", next);
-          if (clientHeader(headers, "client")?.trim().toLowerCase() === CLIENT_ANDROID) {
-            params.set("from", "app");
-          }
+          if (platformOf(headers) !== "web") params.set("from", "app");
           // Signing in for an assistant: a path the Android app does not claim (its App Link is
           // /auth/verify), so the link never takes the code away from the assistant's window.
           const forAssistant = next?.startsWith(ASSISTANT_CONSENT_PREFIX) ?? false;

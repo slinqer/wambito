@@ -176,6 +176,20 @@ describe("GUEST_SIGNUP", () => {
   });
 });
 
+describe("NEW_USERS_ENCRYPTED", () => {
+  const prod = { ...base, CLIENT_IP_HEADER: "fly-client-ip" };
+
+  test('NEW_USERS_ENCRYPTED defaults to false, reads "true", refuses "yes"', () => {
+    expect(loadConfig(prod).NEW_USERS_ENCRYPTED).toBe(false);
+    expect(loadConfig({ ...prod, NEW_USERS_ENCRYPTED: "" }).NEW_USERS_ENCRYPTED).toBe(false);
+    expect(loadConfig({ ...prod, NEW_USERS_ENCRYPTED: "false" }).NEW_USERS_ENCRYPTED).toBe(false);
+    expect(loadConfig({ ...prod, NEW_USERS_ENCRYPTED: "true" }).NEW_USERS_ENCRYPTED).toBe(true);
+    expect(() => loadConfig({ ...prod, NEW_USERS_ENCRYPTED: "yes" })).toThrow(
+      /NEW_USERS_ENCRYPTED/,
+    );
+  });
+});
+
 describe("WAMBITO_VERSION", () => {
   test("is the version the build was given, and unset (or blank) when it was given none", () => {
     expect(

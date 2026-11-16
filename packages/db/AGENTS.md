@@ -31,6 +31,7 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
   device wraps without an attestation: run `delete from key_wraps where kind='device'` before
   migrating.
 - `0012` adds `key_links` (`user_id`, `key_v` >= 2 primary key, `link` 60 bytes: the previous data key sealed under the new one, one per rotation; RLS like `records`) and `key_wraps.session_id` (the Better Auth session that registered a device wrap, `on delete set null`, device wraps only).
+- `0013` adds `user.encryption` (text not null default `plain`, CHECK `plain`/`encrypted`) and `user.platform` (text null, CHECK `android`/`ios`/`web`). The CHECKs are in the SQL only (`auth.ts` is generated).
 - In production `docker compose run --rm migrate` (`deploy/personal/up.sh`) runs bootstrap +
   migrations.
 

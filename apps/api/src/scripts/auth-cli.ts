@@ -14,6 +14,7 @@ export const auth = createAuth({
     NODE_ENV: "test",
     CLIENT_IP_HEADER: "x-forwarded-for",
     GUEST_SIGNUP: true,
+    NEW_USERS_ENCRYPTED: false,
     TRUSTED_PROXIES: [],
     ADMIN_USER_IDS: [],
     E2E_PREVIEW_USER_IDS: [],

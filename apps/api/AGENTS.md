@@ -97,8 +97,12 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
-- End-to-end encryption preview (stage 2a): `E2E_PREVIEW_USER_IDS` (comma-separated user ids,
-  unset by default; `isPreviewAccount` in `config.ts`). `GET /v1/me` (every profile answer) says
+- End-to-end encryption preview (stage 2a): an account is a preview account when its `user.encryption`
+  is `encrypted` (born while `NEW_USERS_ENCRYPTED` is `true`, default off; set by the user-create
+  hook, which also records `user.platform` through `platformOf`: `x-wambito-client` `android` or
+  `ios`, else `web`) or its id is in `E2E_PREVIEW_USER_IDS` (comma-separated, unset by default).
+  `isPreviewAccount(config, { id, encryption })` in `config.ts`; `accountEncryption(db, userId)` in
+  `services/encryption.ts`. `GET /v1/me` (every profile answer) says
   `encryption: "preview" | "plain"`. A preview account's finances live only as records under
   `/v2`; the user-create hook in `auth.ts` seeds no default account or categories for it (the web
   creates them as records), so its `/v1` finance tables stay empty.

@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { z } from "zod";
+import type { Encryption } from "./services/encryption.ts";
 
 const isCidr = (entry: string) => {
   const [ip, prefix] = entry.split("/");
@@ -92,6 +93,17 @@ const configSchema = z
         z.enum(["true", "false"]).transform((v) => v === "true"),
       )
       .default(true),
+    /**
+     * The switch (spec 2026-11-15, section 11): while `true`, every user created from now on is
+     * `encrypted` (its finances live only as end-to-end encrypted records under `/v2`); users that
+     * exist keep what they have. Off by default, `"true"` or `"false"`, blank = default.
+     */
+    NEW_USERS_ENCRYPTED: z
+      .preprocess(
+        (v) => (v === "" || v === undefined ? "false" : v),
+        z.enum(["true", "false"]).transform((v) => v === "true"),
+      )
+      .default(false),
     /**
      * The SHA-256 fingerprints of the certificates the Android app is signed with, comma-separated,
      * as release.sh prints them (AA:BB:…, 32 pairs) — the value the web container writes into
@@ -231,12 +243,15 @@ export function apiPathPrefix(config: Pick<Config, "API_URL">): string {
   return new URL(config.API_URL).pathname.replace(/\/+$/, "");
 }
 
-/** Whether the account keeps its finances only as encrypted records (`E2E_PREVIEW_USER_IDS`). */
+/**
+ * Whether the account keeps its finances only as encrypted records: listed in
+ * `E2E_PREVIEW_USER_IDS`, or `encrypted` (born while `NEW_USERS_ENCRYPTED` was on).
+ */
 export function isPreviewAccount(
   config: Pick<Config, "E2E_PREVIEW_USER_IDS">,
-  userId: string,
+  user: { id: string; encryption: Encryption },
 ): boolean {
-  return config.E2E_PREVIEW_USER_IDS.includes(userId);
+  return user.encryption === "encrypted" || config.E2E_PREVIEW_USER_IDS.includes(user.id);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {

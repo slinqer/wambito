@@ -23,6 +23,7 @@ How to add to it:
 
 ### Added
 
+- `NEW_USERS_ENCRYPTED` (env, `true` or `false`, default `false`): while on, every user created from then on (guest or email) is `encrypted`: no default account or categories are seeded, its `/v1` finance routes answer 403 `encrypted_account`, and `GET /v1/me` says `encryption: "preview"` (as for `E2E_PREVIEW_USER_IDS`). Users that exist keep what they have. The user row records `encryption` (`plain` or `encrypted`) and `platform` (`android`, `ios` or `web`, from `x-wambito-client`; null for users made before).
 - Removing a device (deleting its wrap, or a rotation that leaves it out) ends the session that registered it, unless another device wrap still uses it.
 - `POST /v2/keys/rotate` requires `link`, the previous data key sealed under the new one (422 `link_required`, `link_unexpected`, `invalid_link`).
 - `GET /v2/keys` and the rotate answer return `links`.
@@ -37,6 +38,7 @@ How to add to it:
 
 ### Changed
 
+- `x-wambito-client: ios` is accepted and marks the app like `android` (the sign-in link carries `from=app`).
 - `/v2/keys` (unreleased): a `device` wrap needs a 32-byte `attestation` next to its `publicKey` (`PUT /v2/keys/{id}` and `POST /v2/keys/rotate`; else 422 `attestation_required`), and `GET /v2/keys` returns it (`null` for other kinds). The server stores it and cannot verify it; devices check it before sealing the data key to a device.
 - `GET /v2/sync` (unreleased): optional `base` (the `latest` the pull cycle started from; 0 for a full download; defaults to `since`). 410 `resync_required` when `0 < base` and `base` is below the newest version of a tombstone the daily purge deleted; the device downloads everything again from `since=0&base=0`, which paging never trips.
 - Pairing relay (`/v2/pairing`, unreleased): the new device commits first. `POST /v2/pairing` takes `{ commitment }` (SHA-256 of a domain tag and its public key) instead of a public key; `GET /v2/pairing?code=` returns `{ id, commitment, expiresAt }` and is 404 once an approver key is set; new `POST /v2/pairing/{id}/approver` (the approving device's ephemeral key, once: 409 `already_set`) and `POST /v2/pairing/{id}/reveal` (the new device's key, checked against the commitment: 409 `not_ready` or `already_set`, 422 `commitment_mismatch`); `POST /v2/pairing/{id}/seal` takes `{ sealed, keyV }`, needs the revealed key (409 `not_ready`) and a blob that starts with the approver key (422 `approver_mismatch`); `GET /v2/pairing/{id}` returns `{ commitment, approverKey, publicKey, sealed, keyV, expiresAt }` (null until set) and never deletes; new `POST /v2/pairing/{id}/pickup` returns `{ sealed, keyV }` and deletes the row in the same transaction (409 `not_ready` while unsealed, 404 when unknown, expired or foreign); `seal` needs `keyV` to be the account's current key version (409 `key_version_mismatch`).

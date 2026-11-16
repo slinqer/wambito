@@ -77,7 +77,7 @@ export function createApp(deps: AppDeps) {
   app.use("/v1/*", requireUser(auth, deps.config));
   app.use("/v1/*", assistantScopes());
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
-  app.use("/v1/*", previewOnlyV2(deps.config));
+  app.use("/v1/*", previewOnlyV2(deps));
   app.use("/v2/*", requireUser(auth, deps.config));
   // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
   app.use("/v2/*", expectedUser());
