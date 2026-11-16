@@ -426,6 +426,64 @@ export const PairingPickup = z
   })
   .openapi("PairingPickup");
 
+export const StartSignin = z
+  .object({
+    commitment: pairingKey(
+      'SHA-256("wambito/v1/pairing-commit" || the browser\'s X25519 public key), 32 bytes, base64url',
+    ),
+    remember: z.boolean().openapi({
+      description:
+        "Keep me signed in on this browser: true gives a 60-day session renewed on use, false a 12-hour session whose cookie has no Max-Age",
+    }),
+    label: z.string().min(1).max(64).openapi({
+      description: 'What the phone shows, made from the user agent ("Firefox on Mac")',
+    }),
+  })
+  .openapi("StartSignin");
+
+export const SigninStarted = z
+  .object({
+    id: z.uuid(),
+    code: z
+      .string()
+      .openapi({ description: "8 Crockford base32 characters, shown under the QR code" }),
+    pollSecret: z.string().openapi({
+      description:
+        "32 random bytes, base64url; only the browser holds it and sends it as `x-wambito-poll`",
+    }),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninStarted");
+
+export const SigninFound = z
+  .object({
+    id: z.uuid(),
+    commitment: z.string().openapi({ description: "base64url without padding" }),
+    label: z.string(),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninFound");
+
+export const SigninView = SigninFound.extend({
+  publicKey: nullableB64,
+}).openapi("SigninView");
+
+export const SigninPoll = z
+  .object({
+    approverKey: nullableB64,
+    ready: z.boolean().openapi({ description: "The phone sealed the key: pick it up" }),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninPoll");
+
+export const SigninPickup = z
+  .object({
+    sealed: z.string().openapi({ description: "base64url" }),
+    keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
+    userId: z.string().openapi({ description: "The account signed in to" }),
+  })
+  .openapi("SigninPickup");
+
 /** The recovery key's lookup bytes (HKDF, `wambito/v1/recovery/lookup`). */
 export const RECOVERY_LOOKUP_BYTES = 16;
 /** The recovery key's auth bytes (HKDF, `wambito/v1/recovery/auth`), and every SHA-256. */

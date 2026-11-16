@@ -22,6 +22,7 @@ import { pairingRoutes } from "./routes/pairing.ts";
 import { recoveryRoutes, recoverySignInRoutes } from "./routes/recovery.ts";
 import { recurrenceRoutes } from "./routes/recurrences.ts";
 import { reportRoutes } from "./routes/reports.ts";
+import { signinRoutes } from "./routes/signin.ts";
 import { summaryRoutes } from "./routes/summary.ts";
 import { syncRoutes } from "./routes/sync.ts";
 import { transactionRoutes } from "./routes/transactions.ts";
@@ -77,6 +78,9 @@ export function createApp(deps: AppDeps) {
   app.route("/", emailChangeRoutes(deps));
   // Public: signing in with the recovery key, before `/v2/*`'s `requireUser` (rate-limited).
   app.route("/", recoverySignInRoutes(deps, auth));
+  // Signing in on the web through the phone: the browser is signed out; the phone's routes run
+  // `requireUser` themselves.
+  app.route("/", signinRoutes(deps, auth));
   app.use("/v1/*", requireUser(auth, deps.config, deps.db));
   app.use("/v1/*", assistantScopes());
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).

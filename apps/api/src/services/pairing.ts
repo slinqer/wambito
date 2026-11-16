@@ -3,6 +3,12 @@ import { type Db, pairingRequests, user, withUser } from "@wambito/db";
 import { and, asc, eq, gt, isNull, lte, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import { currentKeyV } from "./keys.ts";
+import {
+  assertCanReveal,
+  assertCanSeal,
+  assertCanSetApprover,
+  normalizeRelayCode,
+} from "./relay.ts";
 
 /** A pairing request lives this long (spec 2026-11-08 section 7.3). */
 export const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -14,13 +20,8 @@ const CODE_TRIES = 5;
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
 const bytes = (text: string) => new Uint8Array(Buffer.from(text, "base64url"));
 
-/**
- * What the person typed, as the stored code: upper case, `I`/`L` read as 1, `O` as 0, dashes and
- * spaces dropped (the same reading as the recovery key's parser).
- */
-export function normalizePairingCode(input: string): string {
-  return input.toUpperCase().replace(/[-\s]/g, "").replace(/[IL]/g, "1").replace(/O/g, "0");
-}
+/** What the person typed, as the stored code (`normalizeRelayCode`). */
+export const normalizePairingCode = normalizeRelayCode;
 
 export interface PairingStartedDto {
   id: string;
@@ -157,7 +158,7 @@ export async function setApprover(
 ): Promise<void> {
   await withUser(db, userId, async (tx) => {
     const row = await loadLocked(tx, userId, id, now);
-    if (row.approverKey) throw new ApiError(409, "already_set", "The approver key is already set");
+    assertCanSetApprover(row);
     await updateRow(tx, userId, row.id, { approverKey: Buffer.from(bytes(publicKey)) });
   });
 }
@@ -178,11 +179,7 @@ export async function revealPairing(
   const hash = Buffer.from(await pairingCommitment(key));
   await withUser(db, userId, async (tx) => {
     const row = await loadLocked(tx, userId, id, now);
-    if (!row.approverKey) throw new ApiError(409, "not_ready", "The approver key is not set yet");
-    if (row.publicKey) throw new ApiError(409, "already_set", "The key was already revealed");
-    if (!hash.equals(row.commitment)) {
-      throw new ApiError(422, "commitment_mismatch", "The key does not match the commitment");
-    }
+    assertCanReveal(row, hash);
     await updateRow(tx, userId, row.id, { publicKey: Buffer.from(key) });
   });
 }
@@ -203,21 +200,7 @@ export async function sealPairing(
   const blob = Buffer.from(bytes(sealed));
   await withUser(db, userId, async (tx) => {
     const row = await loadLocked(tx, userId, id, now);
-    if (row.sealed) throw new ApiError(409, "already_sealed", "Already sealed");
-    if (!row.approverKey || !row.publicKey) {
-      throw new ApiError(409, "not_ready", "The new device has not revealed its key yet");
-    }
-    if (!blob.subarray(0, row.approverKey.length).equals(row.approverKey)) {
-      throw new ApiError(422, "approver_mismatch", "The sealed key is not from the approver key");
-    }
-    const current = await currentKeyV(tx, userId);
-    if (current !== keyV) {
-      throw new ApiError(
-        409,
-        "key_version_mismatch",
-        `The account's key version is ${current ?? "unset"}; the seal is for ${keyV}`,
-      );
-    }
+    assertCanSeal(row, blob, keyV, await currentKeyV(tx, userId));
     await updateRow(tx, userId, row.id, { sealed: blob, keyV });
   });
 }

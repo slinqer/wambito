@@ -120,6 +120,13 @@
       "when": 1794821416399,
       "tag": "0016_recovery_verifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794822545240,
+      "tag": "0017_signin_requests",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ part of 'serializers.dart';
 
 Serializers _$serializers =
     (Serializers().toBuilder()
+          ..add($SigninFound.serializer)
           ..add(AdminActionReason.serializer)
           ..add(AdminAuditEntry.serializer)
           ..add(AdminAuditPage.serializer)
@@ -55,6 +56,7 @@ Serializers _$serializers =
           ..add(EmailChangeConfirm.serializer)
           ..add(FileImport.serializer)
           ..add(FileImportStatusEnum.serializer)
+          ..add(GetSignin200Response.serializer)
           ..add(ImportStats.serializer)
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
@@ -103,7 +105,12 @@ Serializers _$serializers =
           ..add(RotatedKeyWrapKindEnum.serializer)
           ..add(SealPairing.serializer)
           ..add(SetBudget.serializer)
+          ..add(SigninPickup.serializer)
+          ..add(SigninPoll.serializer)
+          ..add(SigninStarted.serializer)
+          ..add(SigninView.serializer)
           ..add(StartPairing.serializer)
+          ..add(StartSignin.serializer)
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
           ..add(SummaryCategoriesInnerStateEnum.serializer)

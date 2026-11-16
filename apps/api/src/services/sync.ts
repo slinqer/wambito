@@ -5,6 +5,7 @@ import { ApiError } from "../http/problem.ts";
 import type { RECORD_TYPES } from "../http/schemas.ts";
 import { currentKeyV } from "./keys.ts";
 import { purgeExpiredPairings } from "./pairing.ts";
+import { purgeExpiredSignins } from "./signin.ts";
 
 type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -355,6 +356,8 @@ export interface TombstonePurgeDeps {
   purge?: (db: Db, now: Date) => Promise<number>;
   /** Replaces `purgeExpiredPairings`; for tests. */
   purgePairings?: (db: Db, now: Date) => Promise<number>;
+  /** Replaces `purgeExpiredSignins`; for tests. */
+  purgeSignins?: (db: Db, now: Date) => Promise<number>;
   log?: (message: string) => void;
   logError?: (message: string, error: unknown) => void;
 }
@@ -366,16 +369,22 @@ export interface TombstonePurgeDeps {
 export function scheduleTombstonePurge(deps: TombstonePurgeDeps): () => void {
   const purge = deps.purge ?? purgeTombstones;
   const purgePairings = deps.purgePairings ?? purgeExpiredPairings;
+  const purgeSignins = deps.purgeSignins ?? purgeExpiredSignins;
   const log = deps.log ?? ((message) => console.log(message));
   const logError = deps.logError ?? ((message, error) => console.error(message, error));
 
   const run = async () => {
-    // Expired pairing requests go with the daily purge (spec 2026-11-08 section 7.3); each purge
-    // has its own try so a failure of one does not skip the other.
+    // Expired pairing and sign-in requests go with the daily purge (spec 2026-11-08 section 7.3,
+    // spec 2026-11-15 section 8); each purge has its own try so a failure of one skips no other.
     try {
       await purgePairings(deps.db, new Date());
     } catch (error) {
       logError("Pairing purge failed", error);
+    }
+    try {
+      await purgeSignins(deps.db, new Date());
+    } catch (error) {
+      logError("Sign-in request purge failed", error);
     }
     try {
       const count = await purge(deps.db, new Date());

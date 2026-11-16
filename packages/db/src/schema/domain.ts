@@ -372,6 +372,43 @@ export const pairingRequests = pgTable(
   ],
 );
 
+/**
+ * A browser waiting to be signed in by the phone (spec 2026-11-15 section 8): the same relay as
+ * `pairing_requests`, opened with no session. `poll_hash` is the SHA-256 of the poll secret only
+ * the browser holds; `user_id` is bound by the phone's approval. No row-level security: it is read
+ * before the user is known, by `code` or by `id` and `poll_hash`.
+ */
+export const signinRequests = pgTable(
+  "signin_requests",
+  {
+    id: id(),
+    code: text("code").notNull().unique(),
+    commitment: bytea("commitment").notNull(),
+    pollHash: bytea("poll_hash").notNull(),
+    label: text("label").notNull(),
+    remember: boolean("remember").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    approverKey: bytea("approver_key"),
+    publicKey: bytea("public_key"),
+    keyV: smallint("key_v"),
+    sealed: bytea("sealed"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check("signin_requests_commitment_len", sql`octet_length(${t.commitment}) = 32`),
+    check("signin_requests_poll_hash_len", sql`octet_length(${t.pollHash}) = 32`),
+    check("signin_requests_label_len", sql`char_length(${t.label}) between 1 and 64`),
+    check(
+      "signin_requests_approver_key_len",
+      sql`${t.approverKey} is null or octet_length(${t.approverKey}) = 32`,
+    ),
+    check(
+      "signin_requests_public_key_len",
+      sql`${t.publicKey} is null or octet_length(${t.publicKey}) = 32`,
+    ),
+  ],
+);
+
 /** Highest record version whose tombstones were purged, per person: older clients must resync. */
 export const recordPurges = pgTable("record_purges", {
   userId: text("user_id")

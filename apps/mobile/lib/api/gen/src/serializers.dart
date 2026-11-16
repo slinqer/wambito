@@ -47,6 +47,7 @@ import 'package:wambito/api/gen/src/model/create_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/delete_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/email_change_confirm.dart';
 import 'package:wambito/api/gen/src/model/file_import.dart';
+import 'package:wambito/api/gen/src/model/get_signin200_response.dart';
 import 'package:wambito/api/gen/src/model/import_stats.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
@@ -85,7 +86,13 @@ import 'package:wambito/api/gen/src/model/rotate_keys.dart';
 import 'package:wambito/api/gen/src/model/rotated_key_wrap.dart';
 import 'package:wambito/api/gen/src/model/seal_pairing.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
+import 'package:wambito/api/gen/src/model/signin_found.dart';
+import 'package:wambito/api/gen/src/model/signin_pickup.dart';
+import 'package:wambito/api/gen/src/model/signin_poll.dart';
+import 'package:wambito/api/gen/src/model/signin_started.dart';
+import 'package:wambito/api/gen/src/model/signin_view.dart';
 import 'package:wambito/api/gen/src/model/start_pairing.dart';
+import 'package:wambito/api/gen/src/model/start_signin.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
 import 'package:wambito/api/gen/src/model/sync_change.dart';
@@ -139,6 +146,7 @@ part 'serializers.g.dart';
   DeleteTransactionsBatch,
   EmailChangeConfirm,
   FileImport,
+  GetSignin200Response,
   ImportStats,
   ImportStatsAverageMonthlySpendingInner,
   ImportStatsAverageWindow,
@@ -177,7 +185,14 @@ part 'serializers.g.dart';
   RotatedKeyWrap,
   SealPairing,
   SetBudget,
+  SigninFound,
+  $SigninFound,
+  SigninPickup,
+  SigninPoll,
+  SigninStarted,
+  SigninView,
   StartPairing,
+  StartSignin,
   Summary,
   SummaryCategoriesInner,
   SyncChange,
@@ -305,6 +320,7 @@ Serializers serializers =
             const FullType(BuiltList, [FullType(ImportStatsAverageMonthlySpendingInner)]),
             () => ListBuilder<ImportStatsAverageMonthlySpendingInner>(),
           )
+          ..add(SigninFound.serializer)
           ..add(const OneOfSerializer())
           ..add(const AnyOfSerializer())
           ..add(const DateSerializer())

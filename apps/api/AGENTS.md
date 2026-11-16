@@ -83,7 +83,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   the server): stored in `key_links` in the rotation's transaction; 422 `link_required` (account
   has a version), `link_unexpected` (first version), `invalid_link` (not 60 bytes). `GET /v2/keys`
   and the rotate answer are `{ wraps, links }` (`listKeys`), links ordered by `keyV`.
-- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
+- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`, its checks in
+  `src/services/relay.ts`; stage 1b spec §1): relay for
   approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
   `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is
   set) -> `POST /{id}/approver` (once, 409 `already_set`) -> `POST /{id}/reveal` (new device's key;
@@ -99,6 +100,23 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id, 0))`.
   `purgeExpiredPairings` runs with the daily tombstone purge (`scheduleTombstonePurge`). Assistant
   tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2/signin` (`src/routes/signin.ts`, `src/services/signin.ts`; spec 2026-11-15 §8): the web
+  signs in through the phone, the same relay as `/v2/pairing` (checks shared in
+  `src/services/relay.ts`), in `signin_requests` (no RLS). Mounted before `/v2/*`'s `requireUser`:
+  the browser is signed out and proves itself with the poll secret (`x-wambito-poll`, read with
+  `clientHeader`; the row keeps its SHA-256; missing or wrong is 404); the phone's routes (find,
+  view, approver, seal) run `requireUser` themselves. `POST` opens (2-minute TTL by `deps.now`;
+  per IP, `SIGNIN_OPEN_LIMIT` 30 per 10 min by real time, then `IpOpenCount` 5 open, both in
+  memory) -> `GET ?code=` (404 once approved) -> `POST /{id}/approver` (binds `user_id`, once) ->
+  `GET /{id}` with the poll secret (`{ approverKey, ready }`) -> `POST /{id}/reveal` -> `POST
+  /{id}/seal` (the bound user only) -> `POST /{id}/pickup` (`takeSignin`: one `delete … returning`
+  of a sealed row, so of two pickups one wins and the other is 404; closes the IP slot; then
+  `signInAs` with `remember ? "standard" : "short"`). A bearer JWT (an assistant) is 403
+  `insufficient_scope` on every route. `purgeExpiredSignins` runs with the daily tombstone purge.
+  A `short` session is never refreshed on any path: the `wambitoSessions` plugin's before hook
+  looks up the presented token (bearer or cookie) and sets Better Auth's
+  `setShouldSkipSessionRefresh` for a `short` one, since the `dont_remember` cookie alone does
+  not cover a bearer token or a cookie header without it.
 - `/v2/recovery` (`src/routes/recovery.ts`, `src/services/recovery.ts`; spec 2026-11-15): the
   recovery key's verifier, `recovery_verifiers` (SHA-256 of the key's 16-byte lookup and 32-byte
   auth, `recoveryVerifier` in `@wambito/crypto`; one per person, no RLS). `PUT /v2/recovery/verifier`
@@ -133,7 +151,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   routes (transactions, categories, recurrences, summary, reports, captures, imports,
   `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
   403 too (the currency lives in the settings record). `DELETE /v1/me` still works:
-  `records`, `key_wraps`, `record_purges`, `pairing_requests` and `recovery_verifiers` cascade from `user`.
+  `records`, `key_wraps`, `record_purges`, `pairing_requests`, `recovery_verifiers` and bound
+  `signin_requests` cascade from `user`.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
@@ -143,7 +162,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
-- Client headers `x-wambito-{locale,next,timezone,client,background,user}`, always read via
+- Client headers `x-wambito-{locale,next,timezone,client,background,user,poll}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
   session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` is the account the
   client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
