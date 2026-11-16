@@ -11,7 +11,7 @@ import 'sqlite_store.dart';
 import 'store.dart' show WriteOptions;
 import 'vault_lock.dart' show VaultLease;
 
-/// The sync engine: the Dart twin of `apps/web/app/local/sync.ts`. It pushes the outbox to
+/// The sync engine: the Dart twin of `packages/vault/src/sync.ts`. It pushes the outbox to
 /// `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the vault equal to the server (spec
 /// 2026-11-08 end-to-end-encryption section 6, stage 1b addendum section 3, stage 3 section 4.3).
 /// It never logs or reports plaintext, only ids, types and counts.

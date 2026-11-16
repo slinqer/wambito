@@ -1,9 +1,14 @@
 import { SUGGESTED_CATEGORIES } from "@wambito/core";
-import { createLocalBackend, type UnavailableRoute, uuidv5 } from "@wambito/vault";
+import {
+  createLocalBackend,
+  createSyncEngine,
+  type SyncProblemCode,
+  type UnavailableRoute,
+  uuidv5,
+} from "@wambito/vault";
 import { isLocale, type Locale } from "../i18n/format.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
-import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
 
 /**
  * A preview account's open vault in this tab (stage 2a): the encrypted store, the local backend the

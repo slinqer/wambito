@@ -6,14 +6,14 @@ import {
   sealRecord,
   toBase64Url,
 } from "@wambito/crypto";
-import type { OutboxEntry } from "./db.ts";
 import {
   changedKeys,
   type EncryptedStore,
+  type OutboxEntry,
   type SetAsideOutcome,
   VaultClosedError,
-} from "./encrypted-store.ts";
-import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keys.ts";
+} from "./encrypted.ts";
+import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keyring.ts";
 
 /**
  * The sync engine: pushes the outbox to `POST /v2/sync`, pulls `GET /v2/sync`, and keeps the
@@ -184,6 +184,12 @@ export interface SyncEngineOptions {
   /** `start()` only. Defaults: 1000, 60000. */
   debounceMs?: number;
   intervalMs?: number;
+  /**
+   * The upgrade pass (records under an older key version are sealed again under the current one,
+   * and an old version nothing uses any more is forgotten). Default `true`; `false` skips it
+   * entirely: a client that holds no old keys to re-seal with (the MCP) never queues a reseal.
+   */
+  upgrade?: boolean;
 }
 
 export interface SyncEngine {
@@ -742,6 +748,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
    * any more is forgotten.
    */
   async function upgrade(result: SyncResult): Promise<void> {
+    if (options.upgrade === false) return;
     const current = keyring.current;
     if (![...keyring.byVersion.keys()].some((v) => v < current)) return;
     if ((await store.queueReseal(current, RESEAL_LIMIT)) > 0) await push(result);

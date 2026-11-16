@@ -12,7 +12,7 @@ import type { DemoSeed } from "./demo-data.ts";
 
 /**
  * The demo's backend: the seed laid over the calendar, in a memory store, behind the local backend
- * (`../local/backend.ts`), which is the `fetch` that `ApiProvider` hands to the screens
+ * (`packages/vault/src/backend.ts`), which is the `fetch` that `ApiProvider` hands to the screens
  * (`<ApiProvider mode="demo" fetch={demo.fetch}>`). It answers the `/api/v1/*` routes the screens
  * use with the same shapes, applies the same `@wambito/core` rules, validates bodies with the same
  * zod schemas and fails with the same problem+json codes. Nothing leaves the page: no network, no

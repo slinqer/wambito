@@ -32,7 +32,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (code `vault_closed`); `isClosed()`, `onClosed(cb)` → unsubscribe. `wipeRecords` keeps the outbox
   and sets pending entries aside (`restoreSetAside` puts them back after the full download,
   merging the touched fields); remote writes take `skipIfPending` / `ifSeq`.
-  `sync.ts` (`createSyncEngine({ store, fetch, userId, keyring, refreshKeys, onError })` → `run()` /
+  `sync.ts` (now `packages/vault/src/sync.ts`, imported from `@wambito/vault`; `createSyncEngine({ store, fetch, userId, keyring, refreshKeys, onError })` → `run()` /
   `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
   `410` resync that keeps pending edits (set aside, then re-applied); the design notes are at the
   top of the file; tests run against a fake `/v2` in `sync.test.ts`). A run holds a Web Lock

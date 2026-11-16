@@ -1,4 +1,4 @@
-// Port of apps/web/app/local/backend.ts: the `/v1/*` finance routes answered from a
+// Port of packages/vault/src/backend.ts: the `/v1/*` finance routes answered from a
 // `FinanceStore` with the API's shapes, the `lib/core` rules, the same validation and the same
 // problem+json codes. Nothing leaves the phone.
 //

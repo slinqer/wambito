@@ -1,4 +1,4 @@
-// Ports apps/web/app/local/ids.test.ts.
+// Ports packages/vault/src/ids.test.ts.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/local/ids.dart';
 

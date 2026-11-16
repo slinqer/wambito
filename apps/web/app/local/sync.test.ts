@@ -8,11 +8,10 @@ import {
   sealRecord,
   toBase64Url,
 } from "@wambito/crypto";
-import type { RecordBodies } from "@wambito/vault";
+import { createSyncEngine, type RecordBodies } from "@wambito/vault";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { type Keyring, KeysError } from "./keys.ts";
-import { createSyncEngine } from "./sync.ts";
 
 const USER = "user_sync";
 const A = "01930000-0000-7000-8000-00000000000a";
@@ -151,7 +150,7 @@ function refresher(server: Server, start: Keyring) {
 async function device(
   server: Server,
   k?: RecordKeys,
-  options: { keyring?: Keyring; store?: EncryptedStore } = {},
+  options: { keyring?: Keyring; store?: EncryptedStore; upgrade?: boolean } = {},
 ) {
   const store = options.store ?? (await createEncryptedStore(`device-${++counter}`));
   const problems: Array<{ code: string }> = [];
@@ -166,6 +165,7 @@ async function device(
     userId: USER,
     keyring,
     refreshKeys,
+    upgrade: options.upgrade,
     onError: (p) => problems.push(p),
     debounceMs: 20,
     intervalMs: 100000,
@@ -1208,6 +1208,32 @@ describe("key versions", () => {
     expect(at(2)).toBe(501);
     expect(await store.keyNames()).not.toContain("record:1");
   }, 30_000);
+
+  it("upgrade: false never queues a reseal", async () => {
+    const server = fakeServer();
+    const k1 = await fresh();
+    const k2 = await fresh();
+    const store = await createEncryptedStore(`device-${++counter}`);
+    const before = await device(server, k1, { store });
+    await store.put("category", A, category("old"));
+    await before.engine.run();
+    server.wraps.set(1, k1).set(2, k2);
+    await store.putKey("record:1", k1.record);
+    const after = await device(server, undefined, {
+      store,
+      keyring: ring([
+        [1, k1],
+        [2, k2],
+      ]),
+      upgrade: false,
+    });
+    const posts = server.posts;
+    expect((await after.engine.run()).ok).toBe(true);
+    expect(await store.readOutbox(10)).toEqual([]);
+    expect(server.posts).toBe(posts);
+    expect(server.rows.get(A)?.keyV).toBe(1);
+    expect(await store.keyNames()).toContain("record:1");
+  });
 
   it("a conflict on a re-seal takes the server's copy", async () => {
     const server = fakeServer();

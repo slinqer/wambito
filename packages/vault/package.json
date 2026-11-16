@@ -6,7 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./contract": "./src/store-contract.ts"
+    "./contract": "./src/contract.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
