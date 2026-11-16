@@ -134,6 +134,13 @@
       "when": 1794823454081,
       "tag": "0018_activity_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794823928440,
+      "tag": "0019_ended_sessions",
+      "breakpoints": true
     }
   ]
 }

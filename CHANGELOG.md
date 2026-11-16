@@ -43,6 +43,7 @@ How to add to it:
 
 ### Changed
 
+- Encrypted users without an email are deleted after 12 idle months (365 days) when only their phone can open the account (no recovery verifier and no passkey wrap), else after 24 idle months (730 days); the deletion keeps only the SHA-256 of the user id (`deleted_users`). The 60-day cleanup is for plain guests only. Users with an email are never deleted for inactivity.
 - `PUT /v2/keys/{id}`: a recovery wrap that replaces the stored one with other `wrapped` bytes (a new recovery key) deletes the recovery verifier, so the old key no longer signs in; a retry of the same PUT and `POST /v2/keys/rotate` keep it.
 - An encrypted user without an email gets a 25-month (760-day) session on the phone (`x-wambito-client: android` or `ios`), renewed at most once a day while it is used (never by a `x-wambito-background: 1` request); claiming an email brings it back to the standard 60 days. Every user's activity is stamped now, with an email or not (before, only guests').
 - Sessions store no IP address, and rate limits are kept in memory instead of the `rate_limit` table (a restart forgets the counts); a migration clears the old rows and addresses. Limits are unchanged, including `POST /v1/email-change/confirm` (10 per 10 minutes per address).

@@ -16,6 +16,16 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   Better Auth never refreshes a `long` session, so `requireUser` slides it (`slideLongSession`, at
   most once a day, stamping activity); claiming an email ends it (`endLongSessions`). Every
   user's activity is stamped on `user.lastActiveAt` (`stampActivity`, services/guest-cleanup.ts).
+- `src/services/guest-cleanup.ts` (`scheduleGuestCleanup`, daily from `server.ts`, real clock):
+  `cleanupInactiveGuests` deletes `plain` guests idle over 60 days; `cleanupInactiveEncrypted`
+  deletes `encrypted` users without an email idle over 365 days (`UNPROTECTED_IDLE_DAYS`), or 730
+  (`PROTECTED_IDLE_DAYS`) when they have a `recovery_verifiers` row or a `passkey` key wrap (read
+  through `withUser`: `key_wraps` has forced RLS); a recovery wrap alone or a passkey without a
+  wrap does not protect. Idle = the later of `lastActiveAt` and the latest `session.updatedAt`.
+  Batches of 500 under one advisory lock, the encrypted tier walked by id; its delete and
+  `recordDeletedUsers` (`src/services/ended.ts`, SHA-256 of the id in `deleted_users`) share a
+  transaction. Then `purgeEndedSessions` drops `ended_sessions` rows older than 90 days. Users
+  with an email are never deleted for inactivity.
 - `src/http/session.ts`: `requireUser` (cookie or bearer session, or an OAuth JWT with `aud` =
   MCP_URL). `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.

@@ -17,7 +17,8 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
 
 - Migrations run as the admin/owner role, never as the runtime role (`APP_ROLE`,
   `NOSUPERUSER NOBYPASSRLS`): every user table needs RLS, except the ones read before the user is
-  known (`session`, `passkey`, `recovery_verifiers`, `signin_requests`, `activity_daily`). Its grants are not in migrations: they
+  known (`session`, `passkey`, `recovery_verifiers`, `signin_requests`, `activity_daily`,
+  `ended_sessions`, `deleted_users`). Its grants are not in migrations: they
   live in `grantAppRole` (bootstrap), which `prepareDatabase` runs after the migrations.
 - Add migrations with drizzle-kit; never edit an applied one (the one exception: `0001`'s grants
   moved to the bootstrap in part 2b).
@@ -38,6 +39,7 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
 - `0016` adds `recovery_verifiers` (`user_id` primary key → `user` on delete cascade, `lookup_hash` unique and `auth_hash`, both `bytea` CHECK 32 bytes: SHA-256 of the recovery key's lookup and auth). No row-level security (plan decision 4): it is read by `lookup_hash` before the user is known, like `session` and `passkey`; every statement filters on the user id or the lookup hash.
 - `0017` adds `signin_requests` (the web's sign-in through the phone, `apps/api/src/services/signin.ts`): `id` uuid, `code` unique, `commitment` and `poll_hash` (SHA-256 of the poll secret) `bytea` CHECK 32 bytes, `label` (CHECK 1–64 characters), `remember`, `user_id` null until the phone approves (→ `user` on delete cascade), `approver_key`/`public_key` (CHECK 32 bytes), `key_v`, `sealed`, `expires_at`. No row-level security (plan decision 4): it is read before the user is known, by `code` or by `id` and `poll_hash`; every statement filters on the request id or the code.
 - `0018` adds `activity_daily` (`apps/api/src/services/activity.ts`): `day` date, `platform`, `app_version` (`''` when none), `cohort_week` date (the Monday of the user's `created_at`), `has_email`, `count`; primary key over the first five. No user id column and no row-level security (plan decision 4): it counts people per day and keeps no per-person history. Also `user.app_version` and `user.last_seen_day` (text `YYYY-MM-DD`), Better Auth fields.
+- `0019` adds `ended_sessions` (`session_hash` primary key, SHA-256 of the session token; `reason` CHECK `device_removed`; `ended_at`, purged after 90 days) and `deleted_users` (`user_hash` primary key, SHA-256 of a user id the inactivity cleanup deleted; `deleted_at`; kept), both `bytea` CHECK 32 bytes (`apps/api/src/services/ended.ts`). No user id column and no row-level security (plan decision 4): both are read before the user is known.
 - In production `docker compose run --rm migrate` (`deploy/personal/up.sh`) runs bootstrap +
   migrations.
 

@@ -457,6 +457,39 @@ export const activityDaily = pgTable(
   (t) => [primaryKey({ columns: [t.day, t.platform, t.appVersion, t.cohortWeek, t.hasEmail] })],
 );
 
+/**
+ * Sessions the server ended on purpose (spec 2026-11-15 §10): the SHA-256 of the session token
+ * (a 401 has only the token), so the phone hears why (`device_removed`) instead of a bare 401.
+ * Purged after 90 days (`purgeEndedSessions`). No row-level security (plan decision 4): it is read
+ * before the user is known, and holds no user id.
+ */
+export const endedSessions = pgTable(
+  "ended_sessions",
+  {
+    sessionHash: bytea("session_hash").primaryKey(),
+    reason: text("reason").notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("ended_sessions_session_hash_len", sql`octet_length(${t.sessionHash}) = 32`),
+    check("ended_sessions_reason", sql`${t.reason} = 'device_removed'`),
+  ],
+);
+
+/**
+ * Users the inactivity cleanup deleted: the SHA-256 of the user id, nothing else, kept for good
+ * (plan decision 2), so a phone that comes back hears `user_deleted`. No row-level security (plan
+ * decision 4): it is read before the user is known.
+ */
+export const deletedUsers = pgTable(
+  "deleted_users",
+  {
+    userHash: bytea("user_hash").primaryKey(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("deleted_users_user_hash_len", sql`octet_length(${t.userHash}) = 32`)],
+);
+
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [
   "accounts",
