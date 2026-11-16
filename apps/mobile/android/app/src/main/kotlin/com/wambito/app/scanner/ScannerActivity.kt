@@ -87,6 +87,7 @@ class ScannerActivity : ComponentActivity() {
                     },
             )
         }
+        watchTexture(preview)
         setContentView(root)
         // The bars' insets: the hint and the button stay clear of the status and navigation bars.
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -128,45 +129,103 @@ class ScannerActivity : ComponentActivity() {
         )
     }
 
+    /** The last request's buffer and orientation, kept to apply again when the view's size changes. */
+    private var bufferSize: android.util.Size? = null
+    private var transformInfo: SurfaceRequest.TransformationInfo? = null
+
+    /** What the person's screen is turned by, as 0, 90, 180 or 270. */
+    @Suppress("DEPRECATION")
+    private fun displayRotationDegrees(): Int = when (windowManager.defaultDisplay.rotation) {
+        Surface.ROTATION_90 -> 90
+        Surface.ROTATION_180 -> 180
+        Surface.ROTATION_270 -> 270
+        else -> 0
+    }
+
+    /** Sets the preview's matrix from the last request, when the view has a size. */
+    private fun applyTransform(view: TextureView) {
+        val size = bufferSize ?: return
+        val info = transformInfo ?: return
+        if (view.width == 0 || view.height == 0) return
+        val transform = previewTransform(
+            view.width.toFloat(),
+            view.height.toFloat(),
+            size.width,
+            size.height,
+            info.rotationDegrees,
+            info.hasCameraTransform(),
+            displayRotationDegrees(),
+        )
+        view.setTransform(Matrix().apply { setValues(transform.values()) })
+    }
+
+    /** The surface CameraX is drawing on, and a texture the view let go while it still was. */
+    private var surfaceInUse: Surface? = null
+    private var textureLost: SurfaceTexture? = null
+
+    /** A request waiting for the view's texture to exist. */
+    private var waiting: ((SurfaceTexture) -> Unit)? = null
+
+    /** The view's texture callbacks, set once: it is ours to release (see [onTextureDestroyed]). */
+    private fun watchTexture(view: TextureView) {
+        view.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+                waiting?.invoke(texture)
+                waiting = null
+            }
+
+            override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
+
+            // False: the view does not release the texture, we do, once CameraX is done with its Surface.
+            override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                if (surfaceInUse == null) texture.release() else textureLost = texture
+                return false
+            }
+
+            override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+        }
+        // The first layout comes after the first request: the matrix is applied again then.
+        view.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyTransform(view) }
+    }
+
     /**
      * CameraX's preview on [view], with no preview library: the surface comes from the texture, and the
-     * picture is turned upright ([SurfaceRequest.setTransformationInfoListener]) and scaled to fill
-     * the screen, cropping the overflow. The analysis does not depend on it.
+     * picture is turned upright and scaled to fill the screen, cropping the overflow
+     * ([previewTransform]). The analysis does not depend on it. A second request (CameraX asks again
+     * after a rebind) lets go of the first one's Surface before the new one is given.
      */
     private fun show(view: TextureView, request: SurfaceRequest) {
-        val size = request.resolution
         val executor = ContextCompat.getMainExecutor(this)
+        bufferSize = request.resolution
         fun provide(texture: SurfaceTexture) {
-            texture.setDefaultBufferSize(size.width, size.height)
+            texture.setDefaultBufferSize(request.resolution.width, request.resolution.height)
+            surfaceInUse?.release()
             val surface = Surface(texture)
-            request.provideSurface(surface, executor) { surface.release() }
+            surfaceInUse = surface
+            request.provideSurface(surface, executor) {
+                // The texture goes only after CameraX is done with this Surface.
+                surface.release()
+                if (surfaceInUse === surface) surfaceInUse = null
+                textureLost?.let {
+                    if (surfaceInUse == null) {
+                        it.release()
+                        textureLost = null
+                    }
+                }
+            }
         }
         request.setTransformationInfoListener(executor) { info ->
-            val width = view.width.toFloat()
-            val height = view.height.toFloat()
-            if (width == 0f || height == 0f) return@setTransformationInfoListener
-            val turned = info.rotationDegrees % 180 != 0
-            val shownWidth = if (turned) size.height else size.width
-            val shownHeight = if (turned) size.width else size.height
-            val matrix = Matrix()
-            // The texture fills the view stretched: undo that, turn it upright, then cover the view.
-            matrix.postScale(size.width / width, size.height / height, width / 2, height / 2)
-            matrix.postRotate(info.rotationDegrees.toFloat(), width / 2, height / 2)
-            val cover = maxOf(width / shownWidth, height / shownHeight)
-            matrix.postScale(cover, cover, width / 2, height / 2)
-            view.setTransform(matrix)
+            transformInfo = info
+            applyTransform(view)
         }
         val ready = view.surfaceTexture
         if (ready != null) {
             provide(ready)
         } else {
-            view.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) = provide(texture)
-                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
-                // CameraX releases the Surface it was given; the texture is let go with the view.
-                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture) = true
-                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
-            }
+            val pending: (SurfaceTexture) -> Unit = ::provide
+            waiting = pending
+            // A request CameraX withdraws before the texture exists is dropped, not answered later.
+            request.addRequestCancellationListener(executor) { if (waiting === pending) waiting = null }
         }
     }
 
