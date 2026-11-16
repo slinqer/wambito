@@ -27,7 +27,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   transaction. Then `purgeEndedSessions` drops `ended_sessions` rows older than 90 days. Users
   with an email are never deleted for inactivity.
 - `src/http/session.ts`: `requireUser` (cookie or bearer session, or an OAuth JWT with `aud` =
-  MCP_URL). `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+  MCP_URL). Without one, its 401 code comes from `missingSessionCode`: `device_removed` when the
+  presented token (`presentedSessionToken`: a non-JWT bearer, else the session cookie, without its
+  signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when `x-wambito-user`'s
+  SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
   `src/services/`: domain services. `src/emails/sign-in.ts`: sign-in mail copy (es/en/it/pt);
   `src/emails/layout.ts`: the frame every email shares (Wambi, wordmark image, card, footer; day
@@ -85,7 +88,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   for OAuth grants): deleting it, or a rotation that leaves its `ref` out, deletes that session in
   the same transaction, never the caller's own nor one a remaining device wrap still references
   (a browser that enrolled again under the same session); a kept device's new row copies the old
-  `session_id`.
+  `session_id`. For an encrypted account, the ended sessions' token hashes go in `ended_sessions`
+  in that transaction (`recordEndedSessions`), so the removed device hears 401 `device_removed`.
   `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
   the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
   recovery wrap with it, so two setups at once cannot make two data keys.

@@ -1,9 +1,12 @@
-import type { Db } from "@wambito/db";
+import { type Db, deletedUsers, endedSessions } from "@wambito/db";
+import { eq } from "@wambito/db/orm";
+import { parseCookies } from "better-auth/cookies";
 import { verifyJwsAccessToken } from "better-auth/oauth2";
 import { createMiddleware } from "hono/factory";
 import type { Auth } from "../auth.ts";
 import type { Config } from "../config.ts";
 import type { AppEnv, Grant, SessionUser } from "../env.ts";
+import { sha256 } from "../services/ended.ts";
 import { slideLongSession } from "../services/sessions.ts";
 import { clientHeader } from "./client-headers.ts";
 import { ApiError } from "./problem.ts";
@@ -53,6 +56,9 @@ export const authIssuer = (config: Pick<Config, "API_URL">) =>
  * Better Auth never refreshes a `long` session (25 months; it refreshes only in the last 59 days),
  * so this slides it, at most once a day and never for a background request, and stamps the user's
  * activity (`slideLongSession`): a person using the app daily is never cleaned up as idle.
+ *
+ * Without a session, the 401 says why when it can (`missingSessionCode`): `device_removed`,
+ * `user_deleted`, else `unauthenticated`.
  */
 export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_URL">, db: Db) {
   return createMiddleware<AppEnv>(async (c, next) => {
@@ -72,7 +78,11 @@ export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_UR
         await slideLongSession(db, result.session.id, result.user.id, new Date());
     } else {
       const oauth = await oauthUser(auth, config, c.req.header("authorization"));
-      if (!oauth) throw new ApiError(401, "unauthenticated", "Sign in to continue");
+      if (!oauth) {
+        const cookieName = (await auth.$context).authCookies.sessionToken.name;
+        const code = await missingSessionCode(db, c.req.raw.headers, cookieName);
+        throw new ApiError(401, code, UNAUTHENTICATED_DETAIL[code]);
+      }
       ({ user, grant } = oauth);
     }
     c.set("userId", user.id);
@@ -80,6 +90,66 @@ export function requireUser(auth: Auth, config: Pick<Config, "API_URL" | "MCP_UR
     c.set("grant", grant);
     await next();
   });
+}
+
+/**
+ * The session token a request presents, without its signature: the bearer when it is not a JWT
+ * (an assistant's access token), else the session cookie; URL-decoded (Better Auth's signed
+ * token may be), cut at the first `.`; null without one. Only
+ * hashed and looked up for a 401's code; Better Auth alone decides whether it signs in.
+ */
+export function presentedSessionToken(headers: Headers, cookieName: string): string | null {
+  const bearer = /^Bearer\s+(\S+)$/i.exec(headers.get("authorization") ?? "")?.[1];
+  const signed =
+    bearer !== undefined && bearer.split(".").length !== 3
+      ? bearer
+      : parseCookies(headers.get("cookie") ?? "").get(cookieName);
+  if (signed === undefined) return null;
+  let value = signed;
+  try {
+    value = decodeURIComponent(signed);
+  } catch {}
+  return value.split(".")[0] || null;
+}
+
+export type MissingSessionCode = "device_removed" | "user_deleted" | "unauthenticated";
+
+const UNAUTHENTICATED_DETAIL: Record<MissingSessionCode, string> = {
+  device_removed: "This device was removed from the account",
+  user_deleted: "This account was deleted",
+  unauthenticated: "Sign in to continue",
+};
+
+/**
+ * Why a request has no session (spec 2026-11-15 §10): `device_removed` when its token's hash is in
+ * `ended_sessions` (a removed device), else `user_deleted` when its `x-wambito-user`'s hash is in
+ * `deleted_users` (the cleanup deleted that account), else `unauthenticated`. It tells nothing
+ * beyond what the token or the id the client sent already names.
+ */
+export async function missingSessionCode(
+  db: Db,
+  headers: Headers,
+  cookieName: string,
+): Promise<MissingSessionCode> {
+  const token = presentedSessionToken(headers, cookieName);
+  if (token !== null) {
+    const [ended] = await db
+      .select({ reason: endedSessions.reason })
+      .from(endedSessions)
+      .where(eq(endedSessions.sessionHash, sha256(token)))
+      .limit(1);
+    if (ended) return "device_removed";
+  }
+  const userId = clientHeader(headers, "user");
+  if (userId) {
+    const [deleted] = await db
+      .select({ at: deletedUsers.deletedAt })
+      .from(deletedUsers)
+      .where(eq(deletedUsers.userHash, sha256(userId)))
+      .limit(1);
+    if (deleted) return "user_deleted";
+  }
+  return "unauthenticated";
 }
 
 async function oauthUser(

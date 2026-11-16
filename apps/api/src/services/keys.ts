@@ -8,11 +8,13 @@ import {
   recoveryVerifiers,
   session,
   type Tx,
+  user,
   withUser,
 } from "@wambito/db";
 import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
+import { recordEndedSessions } from "./ended.ts";
 
 type KeyWrapKind = (typeof KEY_WRAP_KINDS)[number];
 type KeyWrapRow = typeof keyWraps.$inferSelect;
@@ -121,7 +123,9 @@ export interface SessionOption {
  * Ends `sessionIds` (the removed devices'), in the caller's transaction, after the wraps were
  * deleted or replaced: never the caller's own, and never one a remaining device wrap of the person
  * still uses (a browser that enrolled again under the same session keeps its old wrap when the
- * delete of it failed; removing that stale wrap must not sign the good one out).
+ * delete of it failed; removing that stale wrap must not sign the good one out). For an encrypted
+ * account, the ended tokens' hashes go in `ended_sessions`, so their next call hears 401
+ * `device_removed`.
  */
 async function endSessions(
   tx: Tx,
@@ -138,7 +142,21 @@ async function endSessions(
   const used = new Set(inUse.map((row) => row.sessionId));
   const ended = ids.filter((id) => !used.has(id));
   if (ended.length === 0) return;
-  await tx.delete(session).where(and(eq(session.userId, userId), inArray(session.id, ended)));
+  const gone = await tx
+    .delete(session)
+    .where(and(eq(session.userId, userId), inArray(session.id, ended)))
+    .returning({ token: session.token });
+  // The 401 codes are for encrypted accounts only (spec 2026-11-15 §11).
+  const [owner] = await tx
+    .select({ encryption: user.encryption })
+    .from(user)
+    .where(eq(user.id, userId));
+  if (owner?.encryption === "encrypted") {
+    await recordEndedSessions(
+      tx,
+      gone.map((row) => row.token),
+    );
+  }
 }
 
 const values = (
