@@ -1080,6 +1080,27 @@ export interface components {
                 withEmail: number;
                 guests: number;
             }[];
+            dailyActive: {
+                day: string;
+                count: number;
+            }[];
+            cohorts: {
+                weekStart: string;
+                size: number;
+                week1: number | null;
+                week4: number | null;
+                week12: number | null;
+            }[];
+            installsByPlatform: {
+                /** @enum {string} */
+                platform: "android" | "ios" | "web" | "unknown";
+                count: number;
+            }[];
+            versions: {
+                platform: string;
+                appVersion: string;
+                users: number;
+            }[];
         };
         AdminAuditPage: {
             entries: components["schemas"]["AdminAuditEntry"][];

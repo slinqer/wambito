@@ -21,6 +21,10 @@ import 'package:wambito/api/gen/src/model/admin_delete_user.dart';
 import 'package:wambito/api/gen/src/model/admin_email_change.dart';
 import 'package:wambito/api/gen/src/model/admin_me.dart';
 import 'package:wambito/api/gen/src/model/admin_metrics.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_cohorts_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_daily_active_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_installs_by_platform_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_versions_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_metrics_weekly_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_user.dart';
 import 'package:wambito/api/gen/src/model/admin_user_assistants_inner.dart';
@@ -120,6 +124,10 @@ part 'serializers.g.dart';
   AdminEmailChange,
   AdminMe,
   AdminMetrics,
+  AdminMetricsCohortsInner,
+  AdminMetricsDailyActiveInner,
+  AdminMetricsInstallsByPlatformInner,
+  AdminMetricsVersionsInner,
   AdminMetricsWeeklyInner,
   AdminUser,
   AdminUserAssistantsInner,
@@ -257,6 +265,10 @@ Serializers serializers =
             () => ListBuilder<SyncRecord>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsDailyActiveInner)]),
+            () => ListBuilder<AdminMetricsDailyActiveInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(PasskeyRequestOptionsAllowCredentialsInner)]),
             () => ListBuilder<PasskeyRequestOptionsAllowCredentialsInner>(),
           )
@@ -277,8 +289,20 @@ Serializers serializers =
             () => ListBuilder<Recurrence>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsCohortsInner)]),
+            () => ListBuilder<AdminMetricsCohortsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsVersionsInner)]),
+            () => ListBuilder<AdminMetricsVersionsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AdminMetricsWeeklyInner)]),
             () => ListBuilder<AdminMetricsWeeklyInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsInstallsByPlatformInner)]),
+            () => ListBuilder<AdminMetricsInstallsByPlatformInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Category)]),

@@ -16,6 +16,11 @@ Serializers _$serializers =
           ..add(AdminEmailChange.serializer)
           ..add(AdminMe.serializer)
           ..add(AdminMetrics.serializer)
+          ..add(AdminMetricsCohortsInner.serializer)
+          ..add(AdminMetricsDailyActiveInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInnerPlatformEnum.serializer)
+          ..add(AdminMetricsVersionsInner.serializer)
           ..add(AdminMetricsWeeklyInner.serializer)
           ..add(AdminUser.serializer)
           ..add(AdminUserAssistantsInner.serializer)
@@ -147,6 +152,22 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AdminMetricsWeeklyInner)]),
             () => ListBuilder<AdminMetricsWeeklyInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsDailyActiveInner)]),
+            () => ListBuilder<AdminMetricsDailyActiveInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsCohortsInner)]),
+            () => ListBuilder<AdminMetricsCohortsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsInstallsByPlatformInner)]),
+            () => ListBuilder<AdminMetricsInstallsByPlatformInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsVersionsInner)]),
+            () => ListBuilder<AdminMetricsVersionsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AdminUserPasskeysInner)]),
