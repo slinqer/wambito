@@ -17,7 +17,7 @@ class _Native implements NativeEncryptionMode {
   final writes = <String?>[];
 
   @override
-  Future<void> write(String? mode) async => writes.add(mode);
+  Future<void> write(String? mode, String? owner) async => writes.add(mode);
 }
 
 void main() {

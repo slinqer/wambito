@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import com.wambito.app.files.FilesChannel
 import com.wambito.app.haptics.HapticsChannel
 import com.wambito.app.launch.LaunchLinks
+import com.wambito.app.background.BackgroundChannel
 import com.wambito.app.capture.CaptureChannel
 import com.wambito.app.notices.DueWorker
 import com.wambito.app.notices.GuestWorker
@@ -40,6 +41,7 @@ class MainActivity : FlutterActivity() {
     private var sounds: SoundChannel? = null
     private var notices: NoticesChannel? = null
     private var capture: CaptureChannel? = null
+    private var background: BackgroundChannel? = null
     private var files: FilesChannel? = null
     private var launch: MethodChannel? = null
 
@@ -122,7 +124,10 @@ class MainActivity : FlutterActivity() {
         sounds = SoundChannel(this, messenger)
 
         // The two local notices (lib/notices): scheduling them, and the notification permission.
-        notices = NoticesChannel(this, messenger)
+        notices = NoticesChannel(this, this, messenger)
+
+        // A headless run changed the vault (wambito/background `vaultChanged`, D7).
+        background = BackgroundChannel(messenger).also { BackgroundChannel.app = it }
 
         // Automatic capture (lib/capture): access, enabled sources, the settings screens.
         capture = CaptureChannel(this, messenger)
@@ -329,6 +334,9 @@ class MainActivity : FlutterActivity() {
         notices = null
         capture?.dispose()
         capture = null
+        background?.let { if (BackgroundChannel.app === it) BackgroundChannel.app = null }
+        background?.dispose()
+        background = null
         files?.dispose()
         files = null
         super.cleanUpFlutterEngine(flutterEngine)

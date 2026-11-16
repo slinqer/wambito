@@ -25,3 +25,24 @@ class BackgroundChannel {
     }
   }
 }
+
+/// The app's side of `wambito/background` (D7): native code says a headless run changed the vault
+/// file (`vaultChanged`). One listener at a time; [listen] returns what removes it.
+class BackgroundListener {
+  const BackgroundListener();
+
+  static const _channel = MethodChannel('wambito/background');
+
+  void Function() listen(void Function() onVaultChanged) {
+    Future<Object?> handle(MethodCall call) async {
+      if (call.method == 'vaultChanged') {
+        onVaultChanged();
+        return null;
+      }
+      throw MissingPluginException(call.method);
+    }
+
+    _channel.setMethodCallHandler(handle);
+    return () => _channel.setMethodCallHandler(null);
+  }
+}

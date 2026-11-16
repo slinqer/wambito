@@ -93,6 +93,15 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
   widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
+  Native, Android `background/`: `SyncScheduler` (`wambito.sync.periodic` every 6 h with network, `wambito.sync.now`;
+  `AccountMode.write(mode, owner)` schedules for `preview` and cancels for `plain`/none), `SyncWorker` (runs
+  `syncMain`; `busy`/`failed`/`timeout` retry up to 3 times, then `gave up`), `HeadlessRunner` (a `FlutterEngine`
+  with no activity, 9 min budget, destroyed in every case; `HeadlessHooks.runner` replaces it in tests) and
+  `BackgroundChannel` (`finished` from the headless Dart; `vaultChanged` to the app's engine, D7, which
+  `vaultChangedProvider` in `vault_providers.dart` turns into `VaultSession.externalChange()`).
+  `capture/CaptureQueueChannel.kt` is the headless engine's `wambito/capture` (`takeQueued`, `ackQueued`): it only
+  answers from the queue and removes acked keys, so a failed run keeps everything. iOS `Background/BackgroundChannel.swift`
+  answers `finished` and nothing more yet.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
   `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`
@@ -122,8 +131,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
   `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
   `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
-  reads it (`wambito/notices` `setEncryptionMode`, key `wambito.encryption.mode`: `plain`, `preview`,
-  `unknown` while the account is not known, cleared on sign-out; untouched while the session loads),
+  reads it (`wambito/notices` `setEncryptionMode {mode, owner}`, keys `wambito.encryption.mode`: `plain`, `preview`,
+  `unknown` while the account is not known, and `wambito.encryption.owner`: the user id; both cleared on sign-out; untouched while the session loads),
   tells `WidgetSync.modeChanged` (the widget snapshot gets no figures and a `line`) and calls the capture
   channel's `clearQueue()` once. Native: Android `account/AccountMode.kt` (prefs `wambito.encryption`),
   asked first by `SendCapturesWorker`, `ConfirmCaptureWorker`, `CaptureListener`, `RefreshWorker` and

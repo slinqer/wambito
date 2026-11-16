@@ -14,8 +14,9 @@ import 'encryption_mode.dart';
 /// `preview` account. Stored under `wambito.encryption.mode` (`plain`, `preview`, `unknown`;
 /// absent when signed out), over the `wambito/notices` channel, which both phones have.
 abstract interface class NativeEncryptionMode {
-  /// Writes [mode], or clears it when null.
-  Future<void> write(String? mode);
+  /// Writes [mode] and [owner] (the signed-in account's user id, which the headless background
+  /// run checks against the vault it opens), or clears them when null.
+  Future<void> write(String? mode, String? owner);
 }
 
 /// [NativeEncryptionMode] over `wambito/notices` `setEncryptionMode`. Where the channel does not
@@ -27,9 +28,9 @@ class ChannelNativeEncryptionMode implements NativeEncryptionMode {
   static const _channel = MethodChannel('wambito/notices');
 
   @override
-  Future<void> write(String? mode) async {
+  Future<void> write(String? mode, String? owner) async {
     try {
-      await _channel.invokeMethod<void>('setEncryptionMode', {'mode': mode});
+      await _channel.invokeMethod<void>('setEncryptionMode', {'mode': mode, 'owner': owner});
     } on MissingPluginException {
       // No native side.
     } on PlatformException {
@@ -55,30 +56,35 @@ String? nativeModeOf(String? owner, EncryptionMode? mode) =>
 ///    (`clearQueue`): nothing queued may go out, and the server would refuse it anyway (403).
 final previewSyncProvider = Provider<void>((ref) {
   final native = ref.read(nativeEncryptionModeProvider);
-  ({bool loading, String? owner, EncryptionMode? mode}) standing() => (
+  ({bool loading, String? owner, String? userId, EncryptionMode? mode}) standing() => (
     loading: ref.read(sessionProvider).status == SessionStatus.loading,
     owner: ref.read(vaultOwnerProvider),
+    // The user id, null without a session or while the account is not known.
+    userId: ref.read(vaultOwnerProvider) == null
+        ? null
+        : ref.read(currentVaultAccountProvider)?.profile.id,
     // An account only inferred `plain` (its cache) is not known yet: the jobs wait.
     mode: switch (ref.read(currentVaultAccountProvider)) {
       final a? when !a.inferred => a.mode,
       _ => null,
     },
   );
-  void apply(EncryptionMode? before, ({bool loading, String? owner, EncryptionMode? mode}) now) {
+  void apply(
+    EncryptionMode? before,
+    ({bool loading, String? owner, String? userId, EncryptionMode? mode}) now,
+  ) {
     // While the stored session is being read nobody is known to be signed in or out: what the jobs
     // were told last stands (a `preview` account is never turned loose by a cold start).
     final written = now.loading
         ? Future<void>.value()
-        : native.write(nativeModeOf(now.owner, now.mode)).catchError((Object _) {});
+        : native.write(nativeModeOf(now.owner, now.mode), now.userId).catchError((Object _) {});
     ref.read(widgetSyncProvider).modeChanged(preview: now.mode == EncryptionMode.preview);
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
       // Read now, not after the native write: the container may be gone by then.
       final capture = ref.read(autoCapturePlatformProvider);
       // After the mode is written: the jobs already refuse before the queue is cleared.
       unawaited(
-        written.then<void>(
-          (_) => capture.clearQueue().then<void>((_) {}, onError: (Object _) {}),
-        ),
+        written.then<void>((_) => capture.clearQueue().then<void>((_) {}, onError: (Object _) {})),
       );
     } else {
       unawaited(written);

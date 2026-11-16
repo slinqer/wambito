@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
@@ -56,6 +57,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundChannel.swift; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
@@ -108,6 +110,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B7C8D9E0F1A2B3C4000000B2 /* Background */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */,
+			);
+			path = Background;
+			sourceTree = "<group>";
+		};
 		B7C8D9E0F1A2B3C400000084 /* Notices */ = {
 			isa = PBXGroup;
 			children = (
@@ -224,6 +234,7 @@
 				B7C8D9E0F1A2B3C400000042 /* Launch */,
 				B7C8D9E0F1A2B3C400000062 /* Files */,
 				B7C8D9E0F1A2B3C400000084 /* Notices */,
+				B7C8D9E0F1A2B3C4000000B2 /* Background */,
 				B7C8D9E0F1A2B3C400000072 /* Passkeys */,
 				B7C8D9E0F1A2B3C400000022 /* Haptics */,
 				B7C8D9E0F1A2B3C400000032 /* Sounds */,
@@ -402,6 +413,7 @@
 				B7C8D9E0F1A2B3C400000061 /* FilesChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000071 /* PasskeyChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000081 /* NoticesChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000083 /* NoticePoster.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A1 /* DueTask.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A3 /* KeychainSession.swift in Sources */,

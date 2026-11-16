@@ -26,9 +26,13 @@ import '../settings/fakes.dart';
 
 class _Native implements NativeEncryptionMode {
   final writes = <String?>[];
+  final owners = <String?>[];
 
   @override
-  Future<void> write(String? mode) async => writes.add(mode);
+  Future<void> write(String? mode, String? owner) async {
+    writes.add(mode);
+    owners.add(owner);
+  }
 }
 
 /// A native write that waits for [release], to dispose the container while it is in flight.
@@ -36,7 +40,7 @@ class _SlowNative implements NativeEncryptionMode {
   final release = Completer<void>();
 
   @override
-  Future<void> write(String? mode) => release.future;
+  Future<void> write(String? mode, String? owner) => release.future;
 }
 
 class _Session extends SessionController {
@@ -139,6 +143,15 @@ void main() {
     expect(capture.callsNamed('clearQueue'), ['clearQueue']);
   });
 
+  test('the native write carries the owner: the account\'s user id', () async {
+    final c = make(account: () => SynchronousFuture(_account(EncryptionMode.preview)));
+    c.listen(previewSyncProvider, (_, _) {});
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(native.writes.last, 'preview');
+    expect(native.owners.last, 'user-1');
+  });
+
   test('plain: the jobs are told, and nothing is cleared or written to the widget', () async {
     final c = make(account: () => SynchronousFuture(_account(EncryptionMode.plain)));
     c.listen(previewSyncProvider, (_, _) {});
@@ -175,6 +188,7 @@ void main() {
       out.listen(previewSyncProvider, (_, _) {});
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(native.writes, [null]);
+      expect(native.owners, [null], reason: 'signed out writes (null, null)');
     },
   );
 

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
+import '../background/background_channel.dart';
 import '../local/db.dart' show pendingChangesInVault;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
@@ -28,6 +29,20 @@ typedef AppVaultGate = VaultGate<LocalKeys, VaultSession>;
 
 /// Where the vault's keys live: the Keystore / Keychain (lib/local/key_storage.dart).
 final keyStorageProvider = Provider<KeyStorage>((ref) => KeyStorage());
+
+/// Replaced in tests: where `vaultChanged` comes from.
+final backgroundListenerProvider = Provider<BackgroundListener>(
+  (ref) => const BackgroundListener(),
+);
+
+/// A headless run changed the vault file (D7): the open [VaultSession] re-notifies its listeners
+/// and schedules a sync. The app watches it for as long as it runs (app.dart).
+final vaultChangedProvider = Provider<void>((ref) {
+  final remove = ref.read(backgroundListenerProvider).listen(() {
+    ref.read(vaultSessionProvider)?.externalChange();
+  });
+  ref.onDispose(remove);
+});
 
 /// Opens a vault session: [openVaultSession]; tests put their own store folder in.
 final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaultOptions)>(
