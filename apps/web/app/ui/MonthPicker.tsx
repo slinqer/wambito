@@ -2,6 +2,7 @@ import { addMonths, type Month } from "@wambito/core";
 import { useTranslations } from "use-intl";
 import { formatMonth } from "../i18n/format.ts";
 import { useLocale } from "../i18n/IntlProvider.tsx";
+import { Icon } from "./Icon.tsx";
 
 export interface MonthPickerProps {
   month: Month;
@@ -24,31 +25,35 @@ export function MonthPicker({ month, onChange, max }: MonthPickerProps) {
   const atMax = month >= max;
 
   return (
-    <div role="group" aria-label={t("label")} className="inline-flex items-center gap-(--space-2)">
+    <div
+      role="group"
+      aria-label={t("label")}
+      className="inline-flex min-w-0 items-center gap-(--space-1) min-[400px]:gap-(--space-2)"
+    >
       <button
         type="button"
-        className="lk-step"
+        className="lk-step flex-none"
         aria-label={t("previous")}
         onClick={() => onChange(addMonths(month, -1))}
       >
-        <span aria-hidden="true">‹</span>
+        <Icon name="chevron-left" size={16} />
       </button>
       <span
         aria-live="polite"
-        className="min-w-[7.5em] text-center font-display text-lg font-semibold text-ink"
+        className="min-w-0 truncate text-center font-display text-lg font-semibold text-ink min-[400px]:min-w-[7.5em]"
       >
         {label}
       </span>
       <button
         type="button"
-        className="lk-step"
+        className="lk-step flex-none"
         aria-label={t("next")}
         disabled={atMax}
         onClick={() => {
           if (!atMax) onChange(addMonths(month, 1));
         }}
       >
-        <span aria-hidden="true">›</span>
+        <Icon name="chevron-right" size={16} />
       </button>
     </div>
   );

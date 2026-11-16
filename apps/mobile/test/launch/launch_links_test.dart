@@ -23,6 +23,10 @@ import '../home/fixtures.dart';
 import '../review/fakes.dart' show detected;
 import '../settings/harness.dart';
 
+import 'package:wambito/ui/lk_icons.dart';
+
+import '../support/icons.dart';
+
 /// The links Android hands the app: one it was started with, and later ones.
 class FakeLaunchLinks implements LaunchLinkSource {
   FakeLaunchLinks([this.initial]);
@@ -252,7 +256,7 @@ void main() {
           clockProvider.overrideWithValue(() => DateTime.utc(2026, 10, 22, 15)),
         ],
       );
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.text('Septiembre'), findsOneWidget);
       expect(find.text('Zapatos'), findsOneWidget);

@@ -14,6 +14,7 @@ import '../ui/lk_theme.dart';
 import '../ui/pressable.dart';
 import '../ui/segmented_control.dart';
 import 'add_form.dart';
+import '../ui/lk_icons.dart';
 
 /// `.lk-more-row`: a 44px button with a 2px `control-edge` border on the row colour, holding
 /// "Más opciones", the date and status in muted text, and ▴ or ▾ at the end.
@@ -214,12 +215,10 @@ class ClearableDate extends StatelessWidget {
                 width: 44,
                 height: 44,
                 child: Center(
-                  child: ExcludeSemantics(
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: state.focusVisible ? colors.focus : colors.inkMuted,
-                    ),
+                  child: LkIcon(
+                    LkIconName.close,
+                    size: 18,
+                    color: state.focusVisible ? colors.focus : colors.inkMuted,
                   ),
                 ),
               ),

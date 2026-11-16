@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/ui/bottom_bar.dart';
+import 'package:wambito/ui/lk_icons.dart';
 
 import '../support/fonts.dart';
 import '../support/ui_app.dart';
@@ -28,8 +29,21 @@ Widget _bar({
   width: width,
 );
 
+/// The icon [name] in the bar (the ＋, the 🎤, a tab's).
+Finder _icon(LkIconName name) => find.byWidgetPredicate((w) => w is LkIcon && w.name == name);
+
 void main() {
   setUpAll(loadAppFonts);
+
+  testWidgets('the current tab\'s icon is filled, the other\'s outlined', (t) async {
+    await t.pumpWidget(_bar(current: 'insights'));
+    LkIconVariant variant(LkIconName name) => t.widget<LkIcon>(_icon(name)).variant;
+    expect(variant(LkIconName.chart), LkIconVariant.filled);
+    expect(variant(LkIconName.home), LkIconVariant.outline);
+    await t.pumpWidget(_bar(current: 'categories'));
+    expect(variant(LkIconName.chart), LkIconVariant.outline);
+    expect(variant(LkIconName.home), LkIconVariant.outline);
+  });
 
   testWidgets('Inicio and Análisis navigate; the ＋ adds; the 🎤 listens', (t) async {
     final taps = <String>[];
@@ -37,8 +51,8 @@ void main() {
     await t.pumpWidget(_bar(taps: taps, onAdd: () => added++, onMic: () => mic++));
     await t.tap(find.text('Inicio'));
     await t.tap(find.text('Análisis'));
-    await t.tap(find.text('＋'));
-    await t.tap(find.text('🎤'));
+    await t.tap(_icon(LkIconName.plus));
+    await t.tap(_icon(LkIconName.mic));
     expect(taps, ['home', 'insights']);
     expect(added, 1);
     expect(mic, 1);
@@ -75,10 +89,10 @@ void main() {
     (t) async {
       await t.pumpWidget(_bar());
       final plus = t.getRect(
-        find.ancestor(of: find.text('＋'), matching: find.byType(SizedBox)).first,
+        find.ancestor(of: _icon(LkIconName.plus), matching: find.byType(SizedBox)).first,
       );
       final mic = t.getRect(
-        find.ancestor(of: find.text('🎤'), matching: find.byType(SizedBox)).first,
+        find.ancestor(of: _icon(LkIconName.mic), matching: find.byType(SizedBox)).first,
       );
       final home = t.getRect(
         find.ancestor(of: find.text('Inicio'), matching: find.byType(AnimatedContainer)).first,
@@ -108,12 +122,12 @@ void main() {
       t,
     ) async {
       await t.pumpWidget(_bar(width: width));
-      Rect box(String text, Type type) =>
-          t.getRect(find.ancestor(of: find.text(text), matching: find.byType(type)).first);
-      final plus = box('＋', SizedBox);
-      final mic = box('🎤', SizedBox);
-      final insights = box('Análisis', AnimatedContainer);
-      final home = box('Inicio', AnimatedContainer);
+      Rect box(Finder of, Type type) =>
+          t.getRect(find.ancestor(of: of, matching: find.byType(type)).first);
+      final plus = box(_icon(LkIconName.plus), SizedBox);
+      final mic = box(_icon(LkIconName.mic), SizedBox);
+      final insights = box(find.text('Análisis'), AnimatedContainer);
+      final home = box(find.text('Inicio'), AnimatedContainer);
       expect(
         mic.left,
         greaterThanOrEqualTo(plus.right + (width >= 360 ? 4 : 0)),
@@ -139,14 +153,14 @@ void main() {
 
   testWidgets('without the 🎤 (the parity pair) it is not there', (t) async {
     await t.pumpWidget(_bar(showMic: false));
-    expect(find.text('🎤'), findsNothing);
+    expect(_icon(LkIconName.mic), findsNothing);
   });
 
   testWidgets('a touch on the top of the ＋, above the bar\'s drawn box, still adds', (t) async {
     var added = 0;
     await t.pumpWidget(_bar(onAdd: () => added++));
     final plus = t.getRect(
-      find.ancestor(of: find.text('＋'), matching: find.byType(SizedBox)).first,
+      find.ancestor(of: _icon(LkIconName.plus), matching: find.byType(SizedBox)).first,
     );
     await t.tapAt(Offset(plus.center.dx, plus.top + 2));
     expect(added, 1);

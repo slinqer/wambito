@@ -16,6 +16,10 @@ import 'package:wambito/ui/segmented_control.dart';
 import '../support/parity.dart';
 import '../support/parity_home.dart';
 
+import 'package:wambito/ui/lk_icons.dart';
+
+import '../support/icons.dart';
+
 /// Análisis against the stories that show it, `insights-insights--*`
 /// (apps/web/app/features/insights/Insights.stories.tsx), each as Storybook shows it after its
 /// `play` function.
@@ -174,7 +178,7 @@ void main() {
           await t.pumpAndSettle();
           await t.tap(find.bySemanticsLabel('Mes anterior'));
           await t.pumpAndSettle();
-          _focus(t, find.text('‹').first);
+          _focus(t, findIcon(LkIconName.chevronLeft).first);
         },
       );
     });
@@ -226,7 +230,7 @@ void main() {
             await t.tap(find.bySemanticsLabel('Ver el mes anterior en el gráfico'));
             await t.pumpAndSettle();
           }
-          _focus(t, find.text('‹').last);
+          _focus(t, findIcon(LkIconName.chevronLeft).last);
         },
       );
     });

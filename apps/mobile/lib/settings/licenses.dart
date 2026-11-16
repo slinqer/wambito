@@ -192,6 +192,10 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
     }
   }
+  // The two tab icons from Plump Free (docs/design/system/project/icons/icons.json).
+  yield LicenseEntryWithLineBreaks([
+    'Plump Free, Streamline',
+  ], '${l10n.licenseNoticePlump}\n\n${await load(_ccBy)}');
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};
   final groups = <String, List<AndroidLibrary>>{};

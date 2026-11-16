@@ -334,13 +334,6 @@ void main() {
       },
     );
 
-    test('avatarGlyph: the face on the avatar button, 20px', () {
-      // app.css:1048-1063 .lk-avatar
-      final css = _rule('.lk-avatar');
-      expect(css['font-size'], '20px');
-      expect(LkText.avatarGlyph.fontSize, 20);
-    });
-
     test('the CSS sizes are read in px: sanity of the parser', () {
       expect(_px('36px'), 36);
     });

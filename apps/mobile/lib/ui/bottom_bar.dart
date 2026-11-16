@@ -10,6 +10,7 @@ import '../feedback/feedback.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
+import 'lk_icons.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
 
@@ -59,12 +60,9 @@ class BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    // The tabs are 44px tall, or as tall as their icon and label are at the phone's font size.
+    // The tabs are 44px tall, or as tall as their 24px icon and label are at the phone's font size.
     final scaler = MediaQuery.textScalerOf(context);
-    final tabs = math.max(
-      44.0,
-      scaler.scale(18 * 1.5).ceilToDouble() + 2 + scaler.scale(10 * 1.5).ceilToDouble(),
-    );
+    final tabs = math.max(44.0, 24 + 2 + scaler.scale(10 * 1.5).ceilToDouble());
     // Where the tabs end (the ＋ and the 🎤 stand on that line).
     final floor = _rise + 2 + 8 + tabs;
     return Semantics(
@@ -110,7 +108,7 @@ class BottomBar extends StatelessWidget {
                           children: [
                             _Tab(
                               width: tabWidth,
-                              glyph: '🏠',
+                              icon: LkIconName.home,
                               label: l10n.navHome,
                               current: current == 'home',
                               onPressed: () => onNavigate('home'),
@@ -119,7 +117,7 @@ class BottomBar extends StatelessWidget {
                             const SizedBox(width: 58, height: 44),
                             _Tab(
                               width: tabWidth,
-                              glyph: '📊',
+                              icon: LkIconName.chart,
                               label: l10n.navInsights,
                               current: current == 'insights',
                               onPressed: () => onNavigate('insights'),
@@ -144,8 +142,8 @@ class BottomBar extends StatelessWidget {
                       child: _RaisedButton(
                         key: addKey,
                         size: 58,
-                        glyph: '＋',
-                        style: LkText.plus,
+                        icon: LkIconName.plus,
+                        iconSize: 26,
                         label: l10n.navAdd,
                         onPressed: onAdd,
                         pressedFeel: FeedbackEvent.addPressed,
@@ -167,8 +165,8 @@ class BottomBar extends StatelessWidget {
                         child: _RaisedButton(
                           key: micKey,
                           size: 44,
-                          glyph: '🎤',
-                          style: LkText.tabIcon,
+                          icon: LkIconName.mic,
+                          iconSize: 22,
                           label: l10n.captureFabLabel,
                           onPressed: onMic,
                           pressedFeel: FeedbackEvent.micPressed,
@@ -187,18 +185,19 @@ class BottomBar extends StatelessWidget {
 }
 
 /// `.lk-tab`: an icon over a label, [width] wide (76px) and at least 44px tall. It has no edge: it dips 2px
-/// while pressed. The current one is in `ink`, the others `ink-muted`.
+/// while pressed. The current one is in `ink` with its icon filled, the others `ink-muted` and
+/// outlined.
 class _Tab extends StatelessWidget {
   const _Tab({
     required this.width,
-    required this.glyph,
+    required this.icon,
     required this.label,
     required this.current,
     required this.onPressed,
   });
 
   final double width;
-  final String glyph;
+  final LkIconName icon;
   final String label;
   final bool current;
   final VoidCallback onPressed;
@@ -227,9 +226,11 @@ class _Tab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             spacing: 2,
             children: [
-              BlinkLine(
-                style: LkText.tabIcon,
-                child: Text(glyph, style: LkText.tabIcon.copyWith(color: colors.ink)),
+              LkIcon(
+                icon,
+                size: 24,
+                variant: current ? LkIconVariant.filled : LkIconVariant.outline,
+                color: current ? colors.ink : colors.inkMuted,
               ),
               BlinkLine(
                 style: LkText.tab,
@@ -255,8 +256,8 @@ class _RaisedButton extends StatelessWidget {
   const _RaisedButton({
     super.key,
     required this.size,
-    required this.glyph,
-    required this.style,
+    required this.icon,
+    required this.iconSize,
     required this.label,
     required this.onPressed,
     required this.pressedFeel,
@@ -264,8 +265,8 @@ class _RaisedButton extends StatelessWidget {
   });
 
   final double size;
-  final String glyph;
-  final TextStyle style;
+  final LkIconName icon;
+  final double iconSize;
   final String label;
   final VoidCallback onPressed;
   final FeedbackEvent pressedFeel;
@@ -297,10 +298,7 @@ class _RaisedButton extends StatelessWidget {
             width: size,
             height: size,
             child: Center(
-              child: BlinkLine(
-                style: style,
-                child: Text(glyph, style: style.copyWith(color: colors.onBrand)),
-              ),
+              child: LkIcon(icon, size: iconSize, color: colors.onBrand),
             ),
           ),
         );
