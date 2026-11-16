@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { effectiveBudget } from "./budget.ts";
+import { merchantKey, merchantKeyPrefixes } from "./capture.ts";
 import { costOfLiving } from "./cost-of-living.ts";
 import { addMonths, firstDay, isMonth, lastDay, monthOf, monthsBetween, todayIn } from "./dates.ts";
 import { matchesMovementSearch, movementTotals } from "./movement-search.ts";
@@ -60,4 +61,17 @@ describe("dates.json", () =>
     addMonths,
     monthsBetween,
     isMonth,
+  }));
+
+describe("merchant-memory.json", () =>
+  run("merchant-memory.json", {
+    // The fixture writes a rejected input as {"throws": true}.
+    merchantKey: (merchant: string) => {
+      try {
+        return merchantKey(merchant);
+      } catch {
+        return { throws: true };
+      }
+    },
+    merchantKeyPrefixes,
   }));

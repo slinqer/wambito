@@ -58,6 +58,7 @@ dependencies:
   # Time zone rules for the profile's "today" (lib/capture/parser/dates.dart), from the bundled
   # database, with no network. BSD-2-Clause.
   timezone: 0.11.1
+  unorm_dart: 0.3.3
 
 dev_dependencies:
   flutter_test:
