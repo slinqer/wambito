@@ -31,6 +31,7 @@ import WambitoNative
     noticeTaps = taps
     UNUserNotificationCenter.current().delegate = taps
     DueTask.register()
+    SyncTask.register()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -55,6 +56,7 @@ import WambitoNative
     passkeyChannel = PasskeyChannel(messenger: messenger)
     noticesChannel = NoticesChannel(messenger: messenger)
     backgroundChannel = BackgroundChannel(messenger: messenger)
+    BackgroundChannel.app = backgroundChannel
     if let url = tappedBeforeChannel, let launchChannel {
       tappedBeforeChannel = nil
       _ = launchChannel.handles(url)

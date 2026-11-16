@@ -12,7 +12,8 @@ import WambitoNative
 ///  * `scheduleGuest({language})` / `cancelGuest` -> nil: the guest warning, 44 days from now.
 ///  * `scheduleDue({zone, language})` / `cancelDue` -> nil: "Hoy vence…", the daily background run
 ///    at 9:00 in the profile's zone (DueTask.swift); its settings are kept in `DueSettings`.
-///  * `setEncryptionMode({mode})` -> nil: the account's mode for the background runs.
+///  * `setEncryptionMode({mode, owner})` -> nil: the account's mode and user id for the background
+///    runs; schedules or cancels the background sync (SyncTask.swift).
 final class NoticesChannel {
   private let channel: FlutterMethodChannel
   private let center = UNUserNotificationCenter.current()
@@ -44,8 +45,17 @@ final class NoticesChannel {
         result(nil)
       case "setEncryptionMode":
         // The account's mode for the background runs (DueTask): `plain`, `preview`, `unknown`, or
-        // nil when signed out. See AccountMode.swift in WambitoNative.
-        AccountMode.write(arguments?["mode"] as? String)
+        // nil when signed out. See AccountMode.swift in WambitoNative. `owner` is the account's user
+        // id; the background sync (SyncTask) follows both: scheduled for a `preview` account with
+        // an owner, cancelled for `plain` or none, left as it was for `unknown`.
+        let mode = arguments?["mode"] as? String
+        let owner = arguments?["owner"] as? String
+        AccountMode.write(mode, owner: owner)
+        if mode == "preview" && owner != nil {
+          SyncTask.schedule()
+        } else if mode == nil || mode == "plain" {
+          SyncTask.cancel()
+        }
         result(nil)
       case "permission":
         self.center.getNotificationSettings { settings in

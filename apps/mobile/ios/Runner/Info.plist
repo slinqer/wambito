@@ -5,6 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>wambito.notice.due</string>
+		<string>wambito.sync</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>

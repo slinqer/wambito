@@ -11,12 +11,29 @@ public enum AccountMode {
   /// The key the app and the background runs share, as on Android. Nothing secret.
   public static let key = "wambito.encryption.mode"
 
+  /// The id of the account the mode is for, kept beside it (persistent name: never renamed).
+  public static let ownerKey = "wambito.encryption.owner"
+
   public static func read(_ defaults: UserDefaults = .standard) -> String? {
     defaults.string(forKey: key)
   }
 
-  public static func write(_ mode: String?, defaults: UserDefaults = .standard) {
+  /// The account the mode is for (the headless run checks it against the vault it opens), or nil:
+  /// signed out, or the app has not told it.
+  public static func owner(_ defaults: UserDefaults = .standard) -> String? {
+    defaults.string(forKey: ownerKey)
+  }
+
+  /// The [mode] and its [owner] are written together; no mode or no owner leaves no owner.
+  public static func write(
+    _ mode: String?, owner: String? = nil, defaults: UserDefaults = .standard
+  ) {
     if let mode { defaults.set(mode, forKey: key) } else { defaults.removeObject(forKey: key) }
+    if mode != nil, let owner {
+      defaults.set(owner, forKey: ownerKey)
+    } else {
+      defaults.removeObject(forKey: ownerKey)
+    }
   }
 
   /// Only a `plain` account (or one from before the vault, which never wrote a mode) lets a

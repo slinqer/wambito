@@ -105,8 +105,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `BackgroundChannel` (`finished` from the headless Dart; `vaultChanged` to the app's engine, D7, which
   `vaultChangedProvider` in `vault_providers.dart` turns into `VaultSession.externalChange()`).
   `capture/CaptureQueueChannel.kt` is the headless engine's `wambito/capture` (`takeQueued`, `ackQueued`): it only
-  answers from the queue and removes acked keys, so a failed run keeps everything. iOS `Background/BackgroundChannel.swift`
-  answers `finished` and nothing more yet.
+  answers from the queue and removes acked keys, so a failed run keeps everything. iOS `Background/`: `SyncTask`
+  (BGAppRefreshTask `wambito.sync`, registered in `didFinishLaunching`; reschedules first, 4 h, only for `preview`
+  via `SyncPlan` in `WambitoNative`; a `plain` account has none waiting) runs `HeadlessRunner` (`syncMain` in a
+  headless engine, 25 s budget; destroyed once on `finished`, budget or `expirationHandler`, all on the main thread)
+  and ends with `setTaskCompleted` once; `BackgroundChannel` hands `finished`'s outcome to it and sends
+  `vaultChanged` to the app's engine (`BackgroundChannel.app`). `setEncryptionMode {mode, owner}` schedules or
+  cancels it (`AccountMode.owner`, `wambito.encryption.owner`). iOS has no capture queue and sends nothing natively.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
   `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`

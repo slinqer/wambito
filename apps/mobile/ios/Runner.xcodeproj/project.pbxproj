@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B7C8D9E0F1A2B3C4000000C1 /* SyncTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000C0 /* SyncTask.swift */; };
+		B7C8D9E0F1A2B3C4000000C3 /* HeadlessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000C2 /* HeadlessRunner.swift */; };
 		B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
@@ -57,6 +59,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B7C8D9E0F1A2B3C4000000C0 /* SyncTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTask.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4000000C2 /* HeadlessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadlessRunner.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundChannel.swift; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -114,6 +118,8 @@
 			isa = PBXGroup;
 			children = (
 				B7C8D9E0F1A2B3C4000000B0 /* BackgroundChannel.swift */,
+				B7C8D9E0F1A2B3C4000000C2 /* HeadlessRunner.swift */,
+				B7C8D9E0F1A2B3C4000000C0 /* SyncTask.swift */,
 			);
 			path = Background;
 			sourceTree = "<group>";
@@ -414,6 +420,8 @@
 				B7C8D9E0F1A2B3C400000071 /* PasskeyChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C400000081 /* NoticesChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C4000000C3 /* HeadlessRunner.swift in Sources */,
+				B7C8D9E0F1A2B3C4000000C1 /* SyncTask.swift in Sources */,
 				B7C8D9E0F1A2B3C400000083 /* NoticePoster.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A1 /* DueTask.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A3 /* KeychainSession.swift in Sources */,
