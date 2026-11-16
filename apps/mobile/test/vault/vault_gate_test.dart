@@ -1,5 +1,5 @@
-// Port of apps/web/app/features/vault/vault-gate.test.ts, without the pairing cases (stage 3b),
-// plus a guest that crashed half-way through its setup.
+// Port of apps/web/app/features/vault/vault-gate.test.ts, plus a guest that crashed half-way
+// through its setup.
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -51,6 +51,7 @@ Harness gateWith({
   Future<void> Function(PasskeyPrf passkey)? addPasskeyWrap,
   Future<PasskeyPrf?> Function(List<String>? credentialIds)? evaluatePrf,
   Future<List<String>> Function()? accountPasskeyIds,
+  Future<GatePairing<String>> Function()? startPairing,
 }) {
   final h = Harness();
   h.gate = Gate(
@@ -81,10 +82,34 @@ Harness gateWith({
       addPasskeyWrap: addPasskeyWrap,
       evaluatePrf: evaluatePrf,
       accountPasskeyIds: accountPasskeyIds,
+      startPairing: startPairing,
     ),
   );
   h.gate.subscribe(() => h.seen.add(h.gate.state.status));
   return h;
+}
+
+/// A new-device pairing whose `finish()` the test settles ([done], [fail]).
+class FakePairing implements GatePairing<String> {
+  FakePairing([this.id = 'p-1']);
+
+  @override
+  final String id;
+  final finishing = Completer<String>();
+  var cancels = 0;
+
+  @override
+  String get code => 'ABCDEFGH';
+  @override
+  String get qr => 'wambito://pair?id=$id&key=k';
+  @override
+  String get expiresAt => '2026-11-10T12:10:00Z';
+  @override
+  Future<String> number() async => '123456';
+  @override
+  Future<String> finish() => finishing.future;
+  @override
+  void cancel() => cancels += 1;
 }
 
 Future<GatePrepared<String>> alreadySetUp() async => throw fail('already_set_up');
@@ -724,6 +749,201 @@ void main() {
           expect(asked, [null]);
         },
       );
+    });
+
+    group('pairing', () {
+      test('pairing -> open after finish(), as a fresh unlock (the pending passkey gets its '
+          'wrap)', () async {
+        final pairing = FakePairing();
+        var wraps = 0;
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInPrf: () =>
+              PasskeyPrf(credentialId: 'cred-1', prf: Uint8List(32)..fillRange(0, 32, 7)),
+          unlockWithPasskey: (_) async => throw fail('no_passkey_wrap'),
+          addPasskeyWrap: (_) async => wraps += 1,
+          startPairing: () async => pairing,
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Unlock());
+
+        await h.gate.pair();
+        expect(h.gate.state, const Pairing(PairingFrom.unlock));
+        expect(await h.gate.startPairing(), same(pairing));
+        await settle();
+        expect(h.opened, isEmpty);
+
+        pairing.finishing.complete('paired');
+        await settle();
+        expect(wraps, 1);
+        expect(h.lastOpen, ('paired', true));
+        expect(h.gate.state, const Ready('paired'));
+        // a finished pairing is not cancelled behind its own back
+        expect(pairing.cancels, 0);
+      });
+
+      test('back cancels the pairing and shows Unlock; starting again cancels the previous '
+          'one', () async {
+        final first = FakePairing('p-1');
+        final second = FakePairing('p-2');
+        final queue = [first, second];
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          startPairing: () async => queue.removeAt(0),
+        );
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        await h.gate.startPairing();
+        await h.gate.startPairing();
+        expect(first.cancels, 1);
+        expect(second.cancels, 0);
+
+        h.gate.leavePairing();
+        expect(second.cancels, 1);
+        expect(h.gate.state, const Unlock());
+      });
+
+      test('the latest startPairing wins: an older call resolving last cancels its own '
+          'request', () async {
+        final first = FakePairing('p-1');
+        final second = FakePairing('p-2');
+        final firstReady = Completer<GatePairing<String>>();
+        final secondReady = Completer<GatePairing<String>>();
+        final queue = [firstReady, secondReady];
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          startPairing: () => queue.removeAt(0).future,
+        );
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        // A quick "Start again": two calls in flight.
+        final a = h.gate.startPairing();
+        final b = h.gate.startPairing();
+        unawaited(a.then((_) {}, onError: (_) {}));
+        secondReady.complete(second);
+        expect(await b, same(second));
+        firstReady.complete(first);
+        await expectLater(a, throwsA(isA<GateError>().having((e) => e.code, 'code', 'cancelled')));
+        expect(first.cancels, greaterThan(0));
+        expect(second.cancels, 0);
+
+        second.finishing.complete('second');
+        await settle();
+        expect(h.lastOpen, ('second', true));
+        expect(h.gate.state, const Ready('second'));
+      });
+
+      test('a guest locked out pairs from Locked, and back returns to Locked', () async {
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          guest: true,
+          startPairing: () async => FakePairing(),
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Locked(LockedKind.guest, false));
+        await h.gate.pair();
+        expect(h.gate.state, const Pairing(PairingFrom.guest));
+        h.gate.leavePairing();
+        expect(h.gate.state, const Locked(LockedKind.guest, false));
+      });
+
+      test('a pairing that fails stays on the pairing screen, which shows why', () async {
+        final pairing = FakePairing();
+        final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => pairing);
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        await h.gate.startPairing();
+        pairing.finishing.completeError(fail('tampered'));
+        await settle();
+        expect(h.opened, isEmpty);
+        expect(h.gate.state, const Pairing(PairingFrom.unlock));
+      });
+
+      test('a finish refused with session_changed reloads for the account signed in now', () async {
+        var reloads = 0;
+        var who = 'me';
+        final pairing = FakePairing();
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          userId: 'me',
+          sessionUserId: () async => who,
+          reload: () => reloads += 1,
+          startPairing: () async => pairing,
+        );
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        await h.gate.startPairing();
+        who = 'someone-else';
+        pairing.finishing.completeError(fail('session_changed'));
+        await settle();
+        expect(reloads, 1);
+      });
+
+      test('a cancelled pairing is not opened when its finish resolves late', () async {
+        final pairing = FakePairing();
+        final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => pairing);
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        await h.gate.startPairing();
+        h.gate.leavePairing();
+        pairing.finishing.complete('late');
+        await settle();
+        expect(h.opened, isEmpty);
+        expect(h.gate.state, const Unlock());
+      });
+
+      test('disposing the gate cancels the pairing in progress', () async {
+        final pairing = FakePairing();
+        final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => pairing);
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        await h.gate.startPairing();
+        h.gate.dispose();
+        expect(pairing.cancels, 1);
+      });
+
+      test("pair() does nothing outside Unlock and a guest's Locked", () async {
+        final h = gateWith(
+          loadLocalKeys: () async => 'kept',
+          startPairing: () async => FakePairing(),
+        );
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        expect(h.gate.state, const Ready('kept'));
+      });
+
+      test('without a startPairing dependency pair() does nothing', () async {
+        final h = gateWith(prepareAccount: alreadySetUp);
+        h.gate.start();
+        await settle();
+        await h.gate.pair();
+        expect(h.gate.state, const Unlock());
+      });
+
+      test('the notice stays through a failed unlock and goes with a new screen', () async {
+        final h = gateWith(
+          loadLocalKeys: () async => 'kept',
+          unlockWithRecovery: (_) async => throw fail('wrong_recovery_key'),
+          startPairing: () async => FakePairing(),
+        );
+        h.gate.start();
+        await settle();
+        h.gate.removed();
+        expect(await h.gate.unlock('nope'), 'wrong_recovery_key');
+        expect(h.gate.state, const Unlock(notice: Unlock.removed));
+        await h.gate.pair();
+        h.gate.leavePairing();
+        expect(h.gate.state, const Unlock());
+      });
     });
 
     group('a removed browser', () {

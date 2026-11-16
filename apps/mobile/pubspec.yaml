@@ -55,6 +55,9 @@ dependencies:
   # The app's private files directory, where the vault file lives (getApplicationSupportDirectory).
   # BSD-3-Clause, from the Flutter team; already in the app through flutter_secure_storage.
   path_provider: 2.1.6
+  # The pairing QR the new phone shows (lib/vault/pair_new_device_view.dart). BSD-3-Clause, pure Dart
+  # and Flutter (it brings `qr`, BSD-3-Clause); no native code, no Play Services.
+  qr_flutter: 4.1.0
   # Time zone rules for the profile's "today" (lib/capture/parser/dates.dart), from the bundled
   # database, with no network. BSD-2-Clause.
   timezone: 0.11.1

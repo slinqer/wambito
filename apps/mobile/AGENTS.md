@@ -89,6 +89,14 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`); `rotate.dart` imports `keys.dart`,
   not the other way;
   `recovery_verifier.dart` holds the verifier hashes (pure crypto) and `keys.dart` `putRecoveryVerifier` sends them.
+  `pairing.dart` = `pairing.ts` (the `/v2/pairing` relay, D21: both devices show the same 6-digit number): the new
+  phone's `startPairing` (`NewDevicePairing`: id, 8-character code, QR `wambito://pair?id=…&key=…`, `number()`,
+  `finish()` which enrolls the phone, `cancel()`) and the approver's `findPairing` by code or QR (`ApproverPairing`:
+  `number()`, `approve()` refuses with a plain `StateError` until the number was shown). Polls every 1.5 s, stops at the
+  relay's `expiresAt` capped at 10 minutes from its own start, and on `cancel()`; the ephemeral private keys and the
+  opened DK are zeroed; nothing secret is logged. `PairingClock` is the test seam; `pairingOpenFromPairing` and
+  `pairingSealToDevice` record what the crypto handed out. `test/local/pairing_test.dart` ports `pairing.test.ts` over
+  a fake relay.
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
   Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
@@ -128,8 +136,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   stays false, so its finance calls wait for the server's answer). The router reads
   `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
-  `unlock_view.dart`, `locked_view.dart` (guest: delete the account); Checking, Opening and Committing
-  show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (guest: the same button, and
+  delete the account), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
+  groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
+  a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
+  stops polling); Checking, Opening and Committing show a loading line. `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
   gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
   while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault

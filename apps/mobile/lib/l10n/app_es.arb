@@ -3935,6 +3935,84 @@
   "@vaultUnlockPasskey": {
     "description": "Unlock: opens the data with a passkey."
   },
+  "vaultUnlockPair": "Añadir este teléfono desde otro dispositivo",
+  "@vaultUnlockPair": {
+    "description": "Unlock and a guest's Locked: opens the pairing screen, where another device approves this phone."
+  },
+  "vaultPairTitle": "Abre tus datos desde otro dispositivo",
+  "@vaultPairTitle": {
+    "description": "Pairing: the title."
+  },
+  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Aprobar un dispositivo nuevo, y escanea este código o escríbelo.",
+  "@vaultPairLead": {
+    "description": "Pairing: what to do on the other device."
+  },
+  "vaultPairStarting": "Preparando un código…",
+  "@vaultPairStarting": {
+    "description": "Pairing: while the code is made."
+  },
+  "vaultPairCodeLabel": "Código",
+  "@vaultPairCodeLabel": {
+    "description": "Pairing: the caption of the 8-character code."
+  },
+  "vaultPairExpires": "Este código sirve hasta las {time}.",
+  "@vaultPairExpires": {
+    "description": "Pairing: when the code stops working.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "14:05"
+      }
+    }
+  },
+  "vaultPairWaiting": "Esperando a tu otro dispositivo…",
+  "@vaultPairWaiting": {
+    "description": "Pairing: waiting for the other device."
+  },
+  "vaultPairNumberTitle": "Comprueba que las dos pantallas muestran el mismo número",
+  "@vaultPairNumberTitle": {
+    "description": "Pairing: the title over the 6-digit number both screens show."
+  },
+  "vaultPairNumberLead": "Si coinciden, confírmalo en tu otro dispositivo.",
+  "@vaultPairNumberLead": {
+    "description": "Pairing: what to do when the numbers match."
+  },
+  "vaultPairDone": "Listo. Abriendo tus datos…",
+  "@vaultPairDone": {
+    "description": "Pairing: the data key arrived."
+  },
+  "vaultPairExpiredTitle": "Este código caducó",
+  "@vaultPairExpiredTitle": {
+    "description": "Pairing: the code expired."
+  },
+  "vaultPairExpiredLead": "Un código dura 10 minutos. Empieza de nuevo para tener otro.",
+  "@vaultPairExpiredLead": {
+    "description": "Pairing: why, and what to do."
+  },
+  "vaultPairFailedTitle": "No se pudo terminar",
+  "@vaultPairFailedTitle": {
+    "description": "Pairing: the title when it failed."
+  },
+  "vaultPairTampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+  "@vaultPairTampered": {
+    "description": "Pairing: the server relayed something that does not match."
+  },
+  "vaultPairOffline": "No hay conexión. Empieza de nuevo cuando vuelvas a tenerla.",
+  "@vaultPairOffline": {
+    "description": "Pairing: no connection."
+  },
+  "vaultPairServer": "Algo falló de nuestro lado. Empieza de nuevo.",
+  "@vaultPairServer": {
+    "description": "Pairing: the server failed."
+  },
+  "vaultPairRestart": "Empezar de nuevo",
+  "@vaultPairRestart": {
+    "description": "Pairing: asks for a new code."
+  },
+  "vaultPairBack": "Volver",
+  "@vaultPairBack": {
+    "description": "Pairing: goes back to where the person came from."
+  },
   "vaultLockedTitle": "No pudimos abrir tus datos",
   "@vaultLockedTitle": {
     "description": "Locked: the title when the vault could not open."
