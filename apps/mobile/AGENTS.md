@@ -85,6 +85,14 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito.installed` (Application Support) is missing, since the iOS Keychain outlives a reinstall;
   it then marks the session that survived (`wambito.reinstalledSession`), whose home cache and saves
   no longer prove the account `plain`.
+- `lib/background/`: the headless engine's Dart side. `syncMain` / `captureMain` (in `lib/main.dart`, D22) call
+  `backgroundMain(kind)` (`background_main.dart`: real deps, D14 headers `x-wambito-background: 1`), which runs
+  `runBackground` (`background_run.dart`) and ends with `wambito/background` `finished {outcome, captured}`
+  (`background_channel.dart`). A run: token, account (`preview` only), keys, lease, background store, the queued
+  captures (`POST /v1/captures`, `Idempotency-Key` = the queue's `key`; 201 and 200 are both acked) and confirms
+  (`POST /v1/transactions/review`; 404 acked) through the local backend, one sync on the lease the run holds, the
+  widget and due effects, then `ack` last (a crash leaves the queue; the next run merges). `queued_capture.dart`
+  reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
   `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`

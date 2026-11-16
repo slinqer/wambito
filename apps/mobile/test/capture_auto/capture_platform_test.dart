@@ -76,4 +76,47 @@ void main() {
     expect(await platform.openAccessSettings(), isFalse);
     await platform.clearQueue();
   });
+
+  test('the queue is taken for the account and acknowledged by key and id', () async {
+    const platform = ChannelAutoCapturePlatform();
+    answer = (call) => call.method == 'takeQueued'
+        ? {
+            'captures': [
+              {
+                'key': 'k1',
+                'kind': 'expense',
+                'amount': 1250,
+                'currency': 'EUR',
+                'merchant': 'Mercadona',
+                'capturedAt': '2026-11-04T15:00:00.000Z',
+                'source': 'revolut',
+              },
+              {'key': 'bad'},
+            ],
+            'confirms': ['tx-1'],
+          }
+        : null;
+    final taken = await platform.takeQueued('user_1');
+    expect(calls.last.method, 'takeQueued');
+    expect(calls.last.arguments, {'userId': 'user_1'});
+    expect(taken.captures.map((c) => c.key), ['k1'], reason: 'a malformed item is skipped');
+    expect(taken.confirms, ['tx-1']);
+
+    await platform.ackQueued(['k1'], ['tx-1']);
+    expect(calls.last.method, 'ackQueued');
+    expect(calls.last.arguments, {
+      'keys': ['k1'],
+      'confirms': ['tx-1'],
+    });
+  });
+
+  test('without a native side the queue is empty', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      null,
+    );
+    final taken = await const ChannelAutoCapturePlatform().takeQueued('user_1');
+    expect(taken.captures, isEmpty);
+    expect(taken.confirms, isEmpty);
+  });
 }
