@@ -192,7 +192,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Android (`android/app/src/main/kotlin/com/wambito/app/`)
 
-- `MainActivity.kt`: takes the launch link. Channels:
+- `MainActivity.kt`: a `FlutterFragmentActivity` (`local_auth`'s prompt needs a `FragmentActivity`, so request codes
+  must fit 16 bits: all do) that takes the launch link. The themes (`styles.xml`, `values-v31`) inherit
+  `Theme.AppCompat.NoActionBar`, as `local_auth_android` asks for Android 8 and below. The screen lock is Dart only:
+  `lib/security/screen_lock.dart` (`ScreenLock`, `LocalAuthScreenLock`, `screenLockProvider`, `confirmSensitive`:
+  lock passed → true, closed → false, no lock → a sheet asking the current recovery key through `checkRecoveryKey`);
+  `USE_BIOMETRIC` comes from `local_auth_android` and is required by `check-permissions.sh`, `USE_FINGERPRINT` stays
+  removed; iOS has `NSFaceIDUsageDescription`. Channels:
   `wambito/*`, registered in `MainActivity.kt`; names match the Dart constants (rename both at once).
 - `scanner/`: `wambito/scanner` (`isAvailable`, `scan`): `ScannerChannel` asks the `CAMERA` permission at scan time
   only (a refusal answers null) and starts `ScannerActivity` (not exported): CameraX `Preview` + `ImageAnalysis`

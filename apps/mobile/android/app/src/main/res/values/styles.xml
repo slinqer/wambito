@@ -2,11 +2,11 @@
 <resources>
     <!-- The window while the app starts, until Flutter draws its first frame: night, the app's
          default theme, whatever the phone's mode (values-v31 sets Android 12's splash too). -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <style name="LaunchTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
     <!-- The window behind Flutter's UI once it runs (Flutter's Android embedding V2). -->
-    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <style name="NormalTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/wambito_night_bg</item>
     </style>
 </resources>

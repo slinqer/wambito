@@ -1,2 +1,3 @@
 "NSCameraUsageDescription" = "Wambito uses the camera only while you scan the QR code of a new device to approve it. Nothing the camera sees is kept or leaves the phone.";
+"NSFaceIDUsageDescription" = "Wambito uses Face ID only to confirm it is you before a sensitive operation, such as removing a device. Your face never leaves the phone and Wambito never sees it.";
 "NSMicrophoneUsageDescription" = "Wambito uses the microphone only while you hold the button, to understand what you say on the phone. The audio never leaves the phone.";

@@ -905,5 +905,9 @@
   "vaultUnsyncedChanges": "{count, plural, =0{Tens 0 alterações por sincronizar} =1{Tens 1 alteração por sincronizar} other{Tens {count} alterações por sincronizar}}",
   "vaultSyncAndSignOut": "Sincronizar e terminar sessão",
   "vaultSignOutAnyway": "Terminar sessão mesmo assim",
-  "comingSoonWithEncryption": "Em breve com encriptação"
+  "comingSoonWithEncryption": "Em breve com encriptação",
+  "screenLockTitle": "Confirma que és tu",
+  "screenLockLead": "Este telemóvel não tem bloqueio de ecrã. Escreve a tua chave de recuperação atual para continuar.",
+  "screenLockSubmit": "Confirmar",
+  "screenLockBusy": "A verificar…"
 }

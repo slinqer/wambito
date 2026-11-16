@@ -30,13 +30,13 @@ import com.wambito.app.voice.VoiceModels
 import com.wambito.app.widget.RefreshScheduler
 import com.wambito.app.widget.RefreshWorker
 import com.wambito.app.widget.SecureStorageSession
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.time.ZoneId
 import kotlin.concurrent.thread
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private var voice: VoiceChannel? = null
     private var haptics: HapticsChannel? = null
     private var sounds: SoundChannel? = null
@@ -355,7 +355,7 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
-    @Deprecated("The platform's result callback; FlutterActivity has no ActivityResult API to use instead")
+    @Deprecated("The platform's result callback; the channels still use the request-code API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         // The document picker's answer (files/FilesChannel.kt); anything else is Flutter's or a plugin's.
         if (files?.onActivityResult(requestCode, resultCode, data) == true) return

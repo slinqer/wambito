@@ -29,7 +29,9 @@ const _vibrate =
     "uses-permission: name='android.permission.RECEIVE_BOOT_COMPLETED'\n"
     "uses-permission: name='android.permission.POST_NOTIFICATIONS'\n"
     // The QR scanner's camera (Task 14), asked at scan time.
-    "uses-permission: name='android.permission.CAMERA'\n";
+    "uses-permission: name='android.permission.CAMERA'\n"
+    // The screen lock before a sensitive operation (Task 15, local_auth's androidx.biometric).
+    "uses-permission: name='android.permission.USE_BIOMETRIC'\n";
 
 void main() {
   test('release permissions: INTERNET, RECORD_AUDIO, VIBRATE and the AndroidX receiver permission pass', () async {
@@ -102,6 +104,22 @@ void main() {
       );
       expect(result.exitCode, 1);
       expect(result.stdout, contains('Missing permission: android.permission.CAMERA'));
+    },
+  );
+
+  test(
+    'release permissions: no USE_BIOMETRIC fails (the screen lock prompt could never be shown)',
+    () async {
+      final without = _vibrate
+          .split('\n')
+          .where((line) => !line.contains('USE_BIOMETRIC'))
+          .join('\n');
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$without\n$_receiver",
+      );
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('Missing permission: android.permission.USE_BIOMETRIC'));
     },
   );
 

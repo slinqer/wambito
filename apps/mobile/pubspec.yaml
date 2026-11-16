@@ -44,6 +44,10 @@ dependencies:
   home_widget: 0.10.0
   # The version flutter_localizations pins.
   intl: 0.20.3
+  # The screen lock before a sensitive operation (lib/security/screen_lock.dart): the phone's
+  # biometrics or PIN. BSD-3-Clause, from the Flutter team; on Android it uses androidx.biometric
+  # (no Play Services), on iOS LocalAuthentication. Needs FlutterFragmentActivity.
+  local_auth: 3.0.2
   one_of: 1.5.0
   one_of_serializer: 1.5.0
   # The encrypted vault's local database (lib/local/sqlite_store.dart): the opened records, the

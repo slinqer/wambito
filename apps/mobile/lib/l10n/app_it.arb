@@ -905,5 +905,9 @@
   "vaultUnsyncedChanges": "{count, plural, =1{Hai 1 modifica non ancora sincronizzata} other{Hai {count} modifiche non ancora sincronizzate}}",
   "vaultSyncAndSignOut": "Sincronizza ed esci",
   "vaultSignOutAnyway": "Esci comunque",
-  "comingSoonWithEncryption": "Presto con la crittografia"
+  "comingSoonWithEncryption": "Presto con la crittografia",
+  "screenLockTitle": "Conferma che sei tu",
+  "screenLockLead": "Questo telefono non ha il blocco schermo. Scrivi la tua chiave di recupero attuale per continuare.",
+  "screenLockSubmit": "Conferma",
+  "screenLockBusy": "Verifica…"
 }

@@ -4222,5 +4222,21 @@
   "comingSoonWithEncryption": "Próximamente con cifrado",
   "@comingSoonWithEncryption": {
     "description": "What an encrypted (preview) account sees in place of what is not ported to it yet: automatic capture, the widget, due notices, export, import and assistants."
+  },
+  "screenLockTitle": "Confirma que eres tú",
+  "@screenLockTitle": {
+    "description": "Sensitive operation without a screen lock: the sheet's title."
+  },
+  "screenLockLead": "Este teléfono no tiene bloqueo de pantalla. Escribe tu clave de recuperación actual para continuar.",
+  "@screenLockLead": {
+    "description": "Sensitive operation without a screen lock: asks the current recovery key instead."
+  },
+  "screenLockSubmit": "Confirmar",
+  "@screenLockSubmit": {
+    "description": "Sensitive operation without a screen lock: tries the typed key."
+  },
+  "screenLockBusy": "Comprobando…",
+  "@screenLockBusy": {
+    "description": "Sensitive operation without a screen lock: while the key is tried."
   }
 }

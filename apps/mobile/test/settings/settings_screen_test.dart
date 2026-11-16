@@ -791,7 +791,7 @@ void main() {
           .first;
       for (final name in [
         'Wambito feedback sounds',
-        'androidx.core:core 1.15.0',
+        'androidx.core:core 1.18.0',
         'vosk-android 0.3.75',
         'vosk-model-small-en-us-0.15',
         'vosk-model-small-es-0.42',
