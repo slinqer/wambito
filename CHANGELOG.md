@@ -38,6 +38,7 @@ How to add to it:
 
 ### Changed
 
+- Sessions store no IP address, and rate limits are kept in memory instead of the `rate_limit` table (a restart forgets the counts); a migration clears the old rows and addresses. Limits are unchanged, including `POST /v1/email-change/confirm` (10 per 10 minutes per address).
 - `x-wambito-client: ios` is accepted and marks the app like `android` (the sign-in link carries `from=app`).
 - `/v2/keys` (unreleased): a `device` wrap needs a 32-byte `attestation` next to its `publicKey` (`PUT /v2/keys/{id}` and `POST /v2/keys/rotate`; else 422 `attestation_required`), and `GET /v2/keys` returns it (`null` for other kinds). The server stores it and cannot verify it; devices check it before sealing the data key to a device.
 - `GET /v2/sync` (unreleased): optional `base` (the `latest` the pull cycle started from; 0 for a full download; defaults to `since`). 410 `resync_required` when `0 < base` and `base` is below the newest version of a tombstone the daily purge deleted; the device downloads everything again from `since=0&base=0`, which paging never trips.

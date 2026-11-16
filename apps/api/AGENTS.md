@@ -38,7 +38,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   suspended account, or a reactivate of an active one, is a 204 no-op: no audit row, no mail.
 - `src/routes/email-change.ts`: public `POST /v1/email-change/confirm` (mounted before
   `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP in the
-  `rate_limit` table (key `email-change-confirm|<ip>`).
+  in memory (`src/http/ip-limit.ts`: `IpWindowLimit`, and `IpOpenCount` for open-request counts).
 - `GET`/`POST /v2/sync` (`src/routes/sync.ts`, `src/services/sync.ts`; spec
   `docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md` §5–6): opaque encrypted
   records, never read or logged. A push holds `pg_advisory_xact_lock(hashtextextended('records:'
@@ -142,4 +142,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - See root `AGENTS.md`: secrets.
 - Better Auth tables: `pnpm --filter @wambito/api auth:generate` writes
   `packages/db/src/schema/auth.ts`; then add a migration in `packages/db`.
-- Rate limits trust one X-Forwarded-For hop set by Caddy: `docs/deploy/api.md`.
+- Rate limits trust one X-Forwarded-For hop set by Caddy: `docs/deploy/api.md`. No IP address is
+  stored: Better Auth's `rateLimit.storage` is `memory`, sessions drop `ipAddress` in the create hook
+  (never `disableIpTracking`: it also turns off Better Auth's per-IP limits), and our own per-IP
+  limits use `ip-limit.ts`.

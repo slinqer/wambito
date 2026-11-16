@@ -413,7 +413,8 @@ export function createAuth(deps: AppDeps) {
     },
     rateLimit: {
       enabled: true,
-      storage: "database",
+      // In memory: no IP address reaches the database (spec §9).
+      storage: "memory",
       window: 60,
       max: 30,
       customRules: {
@@ -505,9 +506,11 @@ export function createAuth(deps: AppDeps) {
       session: {
         create: {
           // Every sign-in (email code, magic link, passkey) creates a session: a suspended account
-          // gets none (spec §5.4).
+          // gets none (spec §5.4). The session keeps no IP address (spec §9); Better Auth's own
+          // `disableIpTracking` is not used because it also turns off its per-IP rate limits.
           before: async (data) => {
             if (await isSuspended(deps, data.userId)) throw accountSuspended();
+            return { data: { ...data, ipAddress: null } };
           },
           after: async (created) => stampGuestActivity(deps.db, created.userId, created.updatedAt),
         },

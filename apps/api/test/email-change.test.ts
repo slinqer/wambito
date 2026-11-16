@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { adminAudit, emailChange, rateLimit, session, user } from "@wambito/db";
+import { adminAudit, emailChange, session, user } from "@wambito/db";
 import { count, eq } from "@wambito/db/orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { adminMail } from "../src/emails/admin.ts";
@@ -345,7 +345,6 @@ describe("confirm an email change", () => {
   });
 
   test("is rate limited: 10 per 10 minutes per IP", async () => {
-    await t.admin.delete(rateLimit);
     const ip = "203.0.113.77";
     for (let i = 0; i < 10; i++) {
       expect((await confirm(`unknown-token-${i}`, ip)).status).toBe(410);
