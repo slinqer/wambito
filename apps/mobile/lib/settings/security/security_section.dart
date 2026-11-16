@@ -61,21 +61,28 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
   }
 
   Future<void> _remove(SecurityApi security, DeviceRow row, bool hasPasskeys) async {
-    final l10n = AppLocalizations.of(context);
-    final ok = await confirmSensitive(
-      context,
-      ref,
-      reason: l10n.settingsSecurityLockRemove,
-      checkRecoveryKey: security.checkRecoveryKey,
-    );
-    if (!ok || !mounted) return;
-    await RemoveDeviceSheet.show(
-      context,
-      device: row,
-      security: security,
-      hasPasskeys: hasPasskeys,
-      onChanged: _changed,
-    );
+    // Set before the lock is asked: a double tap opens neither two prompts nor two sheets.
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final l10n = AppLocalizations.of(context);
+      final ok = await confirmSensitive(
+        context,
+        ref,
+        reason: l10n.settingsSecurityLockRemove,
+        checkRecoveryKey: security.checkRecoveryKey,
+      );
+      if (!ok || !mounted) return;
+      await RemoveDeviceSheet.show(
+        context,
+        device: row,
+        security: security,
+        hasPasskeys: hasPasskeys,
+        onChanged: _changed,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// "New recovery key" (spec 7.4's "ask again"): the screen lock confirms, then the new key is
@@ -84,15 +91,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (_busy) return;
     final l10n = AppLocalizations.of(context);
     final toasts = ToastHost.of(context);
-    final ok = await confirmSensitive(
-      context,
-      ref,
-      reason: l10n.settingsSecurityLockNewKey,
-      checkRecoveryKey: security.checkRecoveryKey,
-    );
-    if (!ok || !mounted) return;
     setState(() => _busy = true);
     try {
+      final ok = await confirmSensitive(
+        context,
+        ref,
+        reason: l10n.settingsSecurityLockNewKey,
+        checkRecoveryKey: security.checkRecoveryKey,
+      );
+      if (!ok || !mounted) return;
       final NewRecoveryKey prepared;
       try {
         prepared = await security.newRecoveryKey();

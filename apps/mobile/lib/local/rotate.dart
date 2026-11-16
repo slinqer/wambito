@@ -88,8 +88,9 @@ class PreparedRotation {
   final Future<RotateResult> Function() commit;
 
   /// The person gave up before committing: zeroes the new DK held for `commit()`, which then
-  /// throws `abandoned` (nothing is posted). Nothing happens once the commit is done, or while one
-  /// is in flight (its own end zeroes the key).
+  /// throws `abandoned` (nothing is posted). Only for a rotation that never left the phone: nothing
+  /// happens once a POST was attempted (the server may hold it, and only `commit()` keeps it here and
+  /// writes `revokedDevices`; retry it), once the commit is done, or while one is in flight.
   final void Function() forget;
 }
 
@@ -342,6 +343,9 @@ Future<PreparedRotation> rotateKeys(
     }
 
     var posted = false;
+
+    /// A POST was tried: the server may hold the rotation, so it is never given up (R17).
+    var attempted = false;
     var kept = false;
     var verifierSent = false;
     KeysError? refused;
@@ -360,6 +364,7 @@ Future<PreparedRotation> rotateKeys(
       final failure = refused;
       if (failure != null) throw failure;
       if (!posted) {
+        attempted = true;
         try {
           await call(
             '/v2/keys/rotate',
@@ -403,7 +408,7 @@ Future<PreparedRotation> rotateKeys(
       recoveryKey: recoveryKey,
       commit: () => running ??= run().whenComplete(() => running = null),
       forget: () {
-        if (done == null && running == null && refused == null) {
+        if (done == null && running == null && refused == null && !attempted) {
           drop(const KeysError('abandoned'));
           _zero(verifier?.lookupHash);
           _zero(verifier?.authHash);
@@ -466,7 +471,8 @@ class NewRecoveryKey {
 
   /// The person gave up before committing: zeroes the verifier hashes held for `commit()`, which
   /// then throws `abandoned` (nothing is sent). The wrap's bytes are no secret and just go. Nothing
-  /// happens once the commit is done, or while one is in flight.
+  /// happens once a PUT was attempted (the server may hold it: retry `commit()`), once the commit
+  /// is done, or while one is in flight.
   final void Function() forget;
 }
 
@@ -511,8 +517,10 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
     }
 
     var wrapSent = false;
+    var attempted = false;
     Future<void> send() async {
       if (!wrapSent) {
+        attempted = true;
         try {
           await call('/v2/keys/$id', method: 'PUT', data: body);
         } on KeysError catch (error) {
@@ -541,7 +549,7 @@ Future<NewRecoveryKey> newRecoveryKey(KeysOptions options) async {
             });
       },
       forget: () {
-        if (done || sent != null || abandoned) return;
+        if (done || attempted || sent != null || abandoned) return;
         abandoned = true;
         _zero(hashes.lookupHash);
         _zero(hashes.authHash);

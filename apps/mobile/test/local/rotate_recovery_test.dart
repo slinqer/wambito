@@ -143,6 +143,20 @@ void main() {
       },
     );
 
+    test(
+      'forget() after a PUT was attempted changes nothing: the retry sends the verifier',
+      () async {
+        final a = await account();
+        final prepared = await newRecoveryKey(a.options);
+        a.api.failVerifier = true;
+        expect(await caught(prepared.commit), isKeysError('server', 503));
+        a.api.failVerifier = false;
+        prepared.forget();
+        await prepared.commit();
+        expect(a.api.verifier, await verifierOf(prepared.recoveryKey));
+      },
+    );
+
     test('the verifier follows the wrap', () async {
       final a = await account();
       final prepared = await newRecoveryKey(a.options);

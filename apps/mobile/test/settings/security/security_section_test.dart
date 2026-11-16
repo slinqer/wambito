@@ -107,6 +107,18 @@ void main() {
     },
   );
 
+  testWidgets('a double tap on Remove or New recovery key asks the lock once', (t) async {
+    final lock = _SlowLock();
+    await pumpSection(t, FakeSecurity(), lock);
+    for (final key in ['security.newKey', 'security.remove.$laptopId']) {
+      await t.ensureVisible(find.byKey(Key(key)));
+      await t.tap(find.byKey(Key(key)));
+      await t.tap(find.byKey(Key(key)));
+      await t.pump();
+    }
+    expect(lock.asked, 1);
+  });
+
   testWidgets('"Approve a new device" opens the approver screen', (t) async {
     await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
     await tapKey(t, 'security.approve');
@@ -167,7 +179,7 @@ void main() {
       expect(security.calls, ['newRecoveryKey']);
       await typeCheck(t);
       await tapKey(t, 'vault.continue');
-      expect(security.calls, ['newRecoveryKey', 'commit', 'forget']);
+      expect(security.calls, ['newRecoveryKey', 'commit']);
       expect(
         find.text('Your new recovery key is saved. The old one no longer works.'),
         findsOneWidget,
@@ -192,7 +204,7 @@ void main() {
         find.text('Your keys changed on another device meanwhile. Make the new key again.'),
         findsOneWidget,
       );
-      expect(security.calls, ['newRecoveryKey', 'commit', 'forget', 'reloadKeys']);
+      expect(security.calls, ['newRecoveryKey', 'commit', 'reloadKeys']);
       expect(security.loads, 2);
     });
   });
@@ -200,7 +212,11 @@ void main() {
 
 class _SlowLock implements ScreenLock {
   final answer = Completer<LockCheck>();
+  int asked = 0;
 
   @override
-  Future<LockCheck> confirm(String reason) => answer.future;
+  Future<LockCheck> confirm(String reason) {
+    asked += 1;
+    return answer.future;
+  }
 }

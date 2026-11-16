@@ -89,9 +89,12 @@ class FakeSecurity implements SecurityApi {
     calls.add('rotate remove=${remove.join(',')} $kind');
     final failure = rotateFailure;
     if (failure != null) throw failure;
+    // as the library: once a commit was attempted, forget() is a no-op (R17)
+    var attempted = false;
     return PreparedRotation(
       recoveryKey: recovery is FreshRecovery ? recoveryKeyText : null,
       commit: () async {
+        attempted = true;
         calls.add('commit');
         if (commitFailures.isNotEmpty) {
           final failure = commitFailures.removeAt(0);
@@ -100,6 +103,7 @@ class FakeSecurity implements SecurityApi {
         return RotateResult(keyV: 3, dropped: dropped);
       },
       forget: () {
+        if (attempted) return;
         forgets += 1;
         calls.add('forget');
       },
@@ -116,9 +120,11 @@ class FakeSecurity implements SecurityApi {
     calls.add('newRecoveryKey');
     final failure = newKeyFailure;
     if (failure != null) throw failure;
+    var attempted = false;
     return NewRecoveryKey(
       recoveryKey: recoveryKeyText,
       commit: () async {
+        attempted = true;
         calls.add('commit');
         if (commitFailures.isNotEmpty) {
           final failure = commitFailures.removeAt(0);
@@ -126,6 +132,7 @@ class FakeSecurity implements SecurityApi {
         }
       },
       forget: () {
+        if (attempted) return;
         forgets += 1;
         calls.add('forget');
       },

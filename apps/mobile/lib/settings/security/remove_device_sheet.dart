@@ -131,7 +131,9 @@ class _RemoveBodyState extends State<_RemoveBody> {
   }
 
   void _asking({String? keyError, _Problem? problem}) {
-    widget.locked.value = false;
+    // A commit was tried and failed: the server may hold the rotation, so the sheet stays until
+    // "Try again" succeeds or the server refuses it for good (R17).
+    widget.locked.value = _pending != null;
     if (!mounted) return;
     setState(() {
       _busy = false;

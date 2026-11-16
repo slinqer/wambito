@@ -91,7 +91,6 @@ void main() {
       expect(security.calls, [
         'rotate remove=$laptopId typed:$recoveryKeyText',
         'commit',
-        'forget', // the held rotation is let go once it is done
         'reloadKeys',
       ]);
       expect(find.text('Removed'), findsOneWidget);
@@ -156,7 +155,6 @@ void main() {
     expect(security.calls, [
       'rotate remove=$laptopId typed:$recoveryKeyText',
       'commit',
-      'forget',
       'reloadKeys',
     ]);
     expect(changed, 1);
@@ -170,7 +168,6 @@ void main() {
     await tapKey(t, 'vault.continue');
     expect(find.textContaining('Another device changed your keys'), findsOneWidget);
     expect(security.calls, contains('reloadKeys'));
-    expect(security.calls, contains('forget'));
     expect(changed, 1);
   });
 
@@ -188,7 +185,6 @@ void main() {
       'rotate remove=$laptopId typed:$recoveryKeyText',
       'commit',
       'commit',
-      'forget',
       'reloadKeys',
     ]);
     expect(find.text('Removed'), findsOneWidget);
@@ -235,13 +231,31 @@ void main() {
     },
   );
 
-  testWidgets('closing the sheet after a failed commit forgets the held rotation', (t) async {
+  testWidgets('after a failed commit the sheet stays: no way out but "Try again" (R17)', (t) async {
     final security = FakeSecurity()..commitFailures.add(keysError('offline'));
+    await pumpSheet(t, security);
+    await typeKey(t);
+    await tapKey(t, 'security.remove.confirm');
+    expect(find.text('TRY AGAIN'), findsOneWidget);
+    // the backdrop does not close it, nor does the system's back button
+    await t.tapAt(const Offset(10, 10));
+    await t.pumpAndSettle();
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('security.remove.key')), findsOneWidget);
+    expect(security.forgets, 0);
+    await tapKey(t, 'security.remove.confirm');
+    expect(find.text('Removed'), findsOneWidget);
+    expect(security.calls.where((c) => c == 'commit'), hasLength(2));
+  });
+
+  testWidgets('a refused-for-good commit frees the sheet again', (t) async {
+    final security = FakeSecurity()..commitFailures.add(keysError('rotated_elsewhere'));
     await pumpSheet(t, security);
     await typeKey(t);
     await tapKey(t, 'security.remove.confirm');
     await t.tapAt(const Offset(10, 10));
     await t.pumpAndSettle();
-    expect(security.forgets, 1);
+    expect(find.byKey(const Key('security.remove.key')), findsNothing);
   });
 }

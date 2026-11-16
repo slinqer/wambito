@@ -652,6 +652,31 @@ void main() {
       expect(a.api.posts, isEmpty);
     });
 
+    test('forget() after a commit failed past the POST changes nothing: the retry finishes and writes revokedDevices', () async {
+      final a = await account();
+      final gone = await addDevice(a, 'Chrome on Android');
+      final prepared = await a.rotate(remove: [gone.id]);
+      a.storage.failSetCurrent = true;
+      expect(await caught(prepared.commit), isA<StateError>());
+      expect(a.api.rotations, hasLength(1));
+      prepared.forget();
+      expect(zeroed(dataKeys.single), isFalse);
+      expect((await prepared.commit()).keyV, 2);
+      expect(a.api.posts, hasLength(1));
+      expect(await a.revoked(), [gone.id]);
+    });
+
+    test('forget() after a lost answer (offline) changes nothing: a retry still lands', () async {
+      final a = await account();
+      final prepared = await a.rotate(recovery: const FreshRecovery());
+      a.api.loseNextAnswer = true;
+      expect(await caught(prepared.commit), isKeysError('offline'));
+      a.api.offline = false;
+      prepared.forget();
+      expect(zeroed(dataKeys.single), isFalse);
+      expect((await prepared.commit()).keyV, 2);
+    });
+
     test('forget() after the commit is done changes nothing', () async {
       final a = await account();
       final prepared = await a.rotate();
