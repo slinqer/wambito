@@ -53,7 +53,7 @@ const LOCALES = [
     how: "Cómo funciona",
     questions: "Preguntas",
     other: { name: "English", path: "/en", lang: "en" },
-    titlePart: "Tus lukas, por fin claras",
+    titlePart: "La app que lleva tus gastos por ti",
   },
   {
     locale: "en",
@@ -91,7 +91,7 @@ const LOCALES = [
     how: "How it works",
     questions: "Questions",
     other: { name: "Español", path: "/", lang: "es" },
-    titlePart: "Your money, finally clear",
+    titlePart: "The app that tracks your expenses for you",
   },
   {
     locale: "it",
@@ -129,7 +129,7 @@ const LOCALES = [
     how: "Come funziona",
     questions: "Domande",
     other: { name: "Português", path: "/pt", lang: "pt" },
-    titlePart: "I tuoi soldi, finalmente chiari",
+    titlePart: "L'app che tiene i conti delle tue spese per te",
   },
   {
     locale: "pt",
@@ -167,7 +167,7 @@ const LOCALES = [
     how: "Como funciona",
     questions: "Perguntas",
     other: { name: "Italiano", path: "/it", lang: "it" },
-    titlePart: "O teu dinheiro, finalmente claro",
+    titlePart: "A app que gere as tuas despesas por ti",
   },
 ] as const;
 
@@ -1286,7 +1286,7 @@ test.describe("landing with JavaScript", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Your money, finally clear.",
     );
-    await expect(page).toHaveTitle(/Your money, finally clear/);
+    await expect(page).toHaveTitle(/The app that tracks your expenses for you/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${ORIGIN}/en`);
     expect(errors).toEqual([]);
