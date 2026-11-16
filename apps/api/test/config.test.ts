@@ -238,4 +238,19 @@ describe("admin settings", () => {
   test("ADMIN_ALLOWED_IPS rejects anything else", () => {
     expect(() => loadConfig({ ...dev, ADMIN_ALLOWED_IPS: "nope" })).toThrow(/ADMIN_ALLOWED_IPS/);
   });
+
+  test("MCP_WK_PUBLIC_KEY takes a public JWK; blank means none", () => {
+    const jwk = '{"crv":"X25519","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","kty":"OKP"}';
+    expect(loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: jwk }).MCP_WK_PUBLIC_KEY).toBe(jwk);
+    expect(loadConfig(dev).MCP_WK_PUBLIC_KEY).toBeUndefined();
+    expect(loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: " " }).MCP_WK_PUBLIC_KEY).toBeUndefined();
+  });
+
+  test("MCP_WK_PUBLIC_KEY refuses a private key or anything not a JWK", () => {
+    const priv =
+      '{"crv":"X25519","d":"EEE_hOXo4OQuqVq9GdvY3uGfzM-vGm1FeX4GD9p2xlc","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","kty":"OKP"}';
+    for (const value of [priv, "not json", "[]", '{"x":"y"}']) {
+      expect(() => loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: value })).toThrow(/MCP_WK_PUBLIC_KEY/);
+    }
+  });
 });

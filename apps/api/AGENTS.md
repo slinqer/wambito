@@ -33,6 +33,20 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   presented token (`presentedSessionToken`: a non-JWT bearer, else the session cookie, without its
   signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when a token was presented
   and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+- `src/http/assistant-secret.ts` (`assistantSecret`, spec 2026-11-16 §4): a wrapper on
+  `/auth/oauth2/*`, mounted before `/auth/*`, that carries the assistant secret `S` (32 bytes,
+  base64url) of an encrypted account (`isPreviewAccount`) in its tokens. Authorize: adds
+  `prompt=consent` for such an account. Consent: takes `wk` out of the JSON (400 `invalid_request`
+  if not 32 bytes; 503 `assistant_keys_missing` without `MCP_WK_PUBLIC_KEY`), keeps `code → S` in
+  process memory (10 min; a restart loses it). Token: runs Better Auth inside an AsyncLocalStorage
+  with `S` (`assistantSecretClaims`, the oauthProvider's `customAccessTokenClaims`, adds `wk`: a
+  compact JWE `ECDH-ES` + `A256GCM` to `MCP_WK_PUBLIC_KEY`, plaintext `S` as text), appends `.S`
+  to the refresh token and strips it from a presented one (split on the last `.`; Better Auth's
+  own tokens have none); tokens issued without `S` for an encrypted account are refused (400
+  `invalid_grant`) and `revokeAssistant` runs for that client. Revoke and introspect: strip the
+  suffix. Better Auth and `auth.ts`'s refresh hook only ever see the plain token. `S` is never
+  stored, logged or put in an error; a new Better Auth endpoint that takes a refresh token needs
+  the same strip. Tests: `forgetPendingSecrets()` empties the map.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
   `src/services/`: domain services. `src/emails/sign-in.ts`: sign-in mail copy (es/en/it/pt);
   `src/emails/layout.ts`: the frame every email shares (Wambi, wordmark image, card, footer; day
@@ -202,6 +216,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - Services: `docker compose up -d postgres mailpit`; then `pnpm --filter @wambito/api dev`,
   seed with `pnpm --filter @wambito/api seed`. Mail lands in Mailpit (http://localhost:8025).
 - Tests: `pnpm vitest run apps/api`, one file `pnpm vitest run apps/api/test/auth.test.ts`.
+  Assistants: `t.connectAssistant(email, { wk })` (`wk`: `newAssistantSecret()`) connects with the
+  secret, as the web does for an encrypted account; `t.authorize` connects without it;
+  `consentCode` + `exchangeCode` split the flow. Each test app has its own MCP key pair
+  (`t.wkPrivateKey` opens the `wk` claim).
   Each file starts a Postgres testcontainer via `test/harness.ts` (`createTestApp`): Docker must
   run, or set `WAMBITO_TEST_DB=local`.
 - After changing a route or schema, regenerate the clients' types (root `AGENTS.md`); CI diffs them.

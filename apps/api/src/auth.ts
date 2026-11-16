@@ -24,6 +24,7 @@ import { SERVER_SESSION_PATH, wambitoSessions } from "./auth-sessions.ts";
 import { apiPathPrefix, type Config, isPreviewAccount } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
+import { assistantSecretClaims } from "./http/assistant-secret.ts";
 import { clientHeader } from "./http/client-headers.ts";
 import { stampActivity } from "./services/guest-cleanup.ts";
 import { deletePasskeyWraps } from "./services/keys.ts";
@@ -712,6 +713,9 @@ export function createAuth(deps: AppDeps) {
         accessTokenExpiresIn: ACCESS_TOKEN_TTL_SECONDS,
         // Refresh tokens last until the person revokes the assistant (~10 years).
         refreshTokenExpiresIn: 10 * 365 * 24 * 60 * 60,
+        // The `wk` claim: the assistant secret encrypted to the MCP, when the token request carries
+        // it (http/assistant-secret.ts, which wraps the oauth2 routes).
+        customAccessTokenClaims: assistantSecretClaims(config),
         ...(config.MCP_URL
           ? {
               resources: [{ identifier: config.MCP_URL, name: "Wambito MCP" }],

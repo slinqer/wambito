@@ -4,7 +4,7 @@ import { recoveryVerifiers, session, user } from "@wambito/db";
 import { desc, eq } from "@wambito/db/orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { RECOVERY_SIGNIN_LIMIT } from "../src/routes/recovery.ts";
-import { createTestApp, type TestApp } from "./harness.ts";
+import { createTestApp, newAssistantSecret, type TestApp } from "./harness.ts";
 
 // Recovery-key sign-in (spec 2026-11-15): the phone derives a lookup (16 bytes) and an auth (32
 // bytes) from the recovery secret; the server keeps only their SHA-256 hashes (`recovery_verifiers`)
@@ -274,7 +274,10 @@ describe("PUT /v2/recovery/verifier", () => {
   });
 
   test("an assistant token gets 403 on PUT /v2/recovery/verifier", async () => {
-    const tokens = await t.authorize("recovery-assistant@wambito.test");
+    // An encrypted account's assistant connects with its secret (http/assistant-secret.ts).
+    const tokens = await t.connectAssistant("recovery-assistant@wambito.test", {
+      wk: newAssistantSecret(),
+    });
     const res = await t.request("PUT", "/v2/recovery/verifier", {
       headers: { authorization: `Bearer ${tokens.accessToken}` },
       body: (await newKey()).put,
