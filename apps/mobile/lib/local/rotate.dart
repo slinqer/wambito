@@ -319,15 +319,19 @@ Future<PreparedRotation> rotateKeys(
       }
     });
 
-    /// The server's current wraps include this phone's prepared wrap: the rotation is ours.
+    /// The server's current wraps include this phone's prepared wrap: the rotation is ours. A
+    /// listing that could not be had is `offline`, never `false` (R13): only a server that answered
+    /// with someone else's wraps refuses this rotation for good.
     Future<bool> landed() async {
       final own = prepared.wraps.where((w) => w['id'] == prepared.ownId).firstOrNull;
+      final List<WrapDto> wraps;
       try {
-        final wrap = (await listWraps(call)).where((w) => w.id == prepared.ownId).firstOrNull;
-        return own != null && wrap?.keyV == prepared.keyV && wrap?.wrapped == own['wrapped'];
+        wraps = await listWraps(call);
       } on Object {
-        return false;
+        throw const KeysError('offline');
       }
+      final wrap = wraps.where((w) => w.id == prepared.ownId).firstOrNull;
+      return own != null && wrap?.keyV == prepared.keyV && wrap?.wrapped == own['wrapped'];
     }
 
     var posted = false;
@@ -359,6 +363,7 @@ Future<PreparedRotation> rotateKeys(
           // The rotate is not idempotent: a post whose answer was lost (`offline`), retried, gets
           // 409 (`rotated_elsewhere`). Ours if the server holds this phone's prepared wrap.
           final lost = error.code == 'offline' || error.code == 'rotated_elsewhere';
+          // `landed()` throws `offline` when it cannot ask: nothing is latched, a retry asks again.
           if (!lost || !await landed()) {
             // Another device's rotation won: this one is never posted again.
             if (error.code == 'rotated_elsewhere') drop(error);

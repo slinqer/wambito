@@ -551,10 +551,41 @@ void main() {
         expect(a.api.rotations, hasLength(1));
         expect(await a.storage.current(a.userId), 2);
         expect(await a.revoked(), [gone.id]);
-        // the shown key is the account's recovery key
+        // the shown key is the account's recovery key, and its verifier followed the retry
         expect(await openRecovery(a.api, a.userId, prepared.recoveryKey!, 2), hasLength(32));
+        expect(a.api.verifierPuts, hasLength(1));
+        expect(a.api.verifier, await verifierOf(prepared.recoveryKey!));
       },
     );
+
+    test('a lost answer, a 409 on retry and a landed() check that cannot reach the server is offline, not rotated_elsewhere: a later commit keeps the rotation', () async {
+      final a = await account();
+      final gone = await addDevice(a, 'Chrome on Android');
+      final prepared = await a.rotate(remove: [gone.id], recovery: const FreshRecovery());
+      a.api.loseNextAnswer = true;
+      expect(await caught(prepared.commit), isKeysError('offline'));
+      expect(a.api.rotations, hasLength(1)); // the server did commit
+      a.api.offline = false;
+      // the retried post gets its 409, then the network drops before landed() can ask
+      var posted = false;
+      a.api.intercept = (call) {
+        if (call.method == 'POST') posted = true;
+        if (posted && call.method == 'GET') throw StateError('network down');
+        return null;
+      };
+      expect(await caught(prepared.commit), isKeysError('offline'));
+      expect(dataKeys.any(zeroed), isFalse); // kept for the retry
+      expect(await a.storage.current(a.userId), 1);
+
+      a.api.intercept = null;
+      final result = await prepared.commit();
+      expect(result.keyV, 2);
+      expect(a.api.rotations, hasLength(1));
+      expect(await a.storage.current(a.userId), 2);
+      expect(await a.revoked(), [gone.id]);
+      expect(a.api.verifier, await verifierOf(prepared.recoveryKey!));
+      expect(dataKeys.every(zeroed), isTrue);
+    });
 
     test('a 409 after another device\'s rotation (its wraps, not ours) is rotated_elsewhere, local keys untouched', () async {
       final a = await account();
