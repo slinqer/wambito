@@ -50,7 +50,8 @@ enum NoticePoster {
     zone: TimeZone, language: String?, days: [(date: String, names: [String])],
     now: Date = Date(), center: UNUserNotificationCenter = .current()
   ) async {
-    await cancelDueList(center: center)
+    // Pending only: today's notice, already delivered, stays in the notification centre.
+    await removeDueList(delivered: false, center: center)
     for request in DueSchedule.requests(days: days, zone: zone, now: now) {
       let body = DueToday.text(
         request.names,
@@ -71,15 +72,18 @@ enum NoticePoster {
     }
   }
 
-  /// Removes every `wambito.due.` request, pending or already delivered: after a sign-out or an
+  /// Removes every `wambito.due.` request, pending and already delivered: after a sign-out or an
   /// account change they name the previous person's payments.
   static func cancelDueList(center: UNUserNotificationCenter = .current()) async {
-    let pending = await center.pendingNotificationRequests().map(\.identifier)
-      .filter { $0.hasPrefix(DueSchedule.idPrefix) }
+    await removeDueList(delivered: true, center: center)
+  }
+
+  private static func removeDueList(delivered: Bool, center: UNUserNotificationCenter) async {
+    let pending = DueSchedule.dueIds(await center.pendingNotificationRequests().map(\.identifier))
     center.removePendingNotificationRequests(withIdentifiers: pending)
-    let delivered = await center.deliveredNotifications().map(\.request.identifier)
-      .filter { $0.hasPrefix(DueSchedule.idPrefix) }
-    center.removeDeliveredNotifications(withIdentifiers: delivered)
+    guard delivered else { return }
+    let shown = DueSchedule.dueIds(await center.deliveredNotifications().map(\.request.identifier))
+    center.removeDeliveredNotifications(withIdentifiers: shown)
   }
 
   static func cancelGuest(center: UNUserNotificationCenter = .current()) {

@@ -29,4 +29,15 @@ public enum DueSchedule {
       return (id: idPrefix + day.date, fire: fire, names: names)
     }
   }
+
+  /// The identifiers among [ids] that are due requests (`wambito.due.` prefix), and no other notice.
+  public static func dueIds(_ ids: [String]) -> [String] { ids.filter { $0.hasPrefix(idPrefix) } }
+
+  /// Whether a list read for [owner] may be scheduled while [current] is the account the app last
+  /// told the phone about (`AccountMode.owner`): both must be known and equal. Closes the race where
+  /// a headless run hands a list over after a sign-out or an account change.
+  public static func accepts(owner: String?, current: String?) -> Bool {
+    guard let owner, let current else { return false }
+    return owner == current
+  }
 }

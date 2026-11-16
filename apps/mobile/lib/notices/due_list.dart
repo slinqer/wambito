@@ -13,6 +13,11 @@ class DueDay {
   Map<String, Object?> toJson() => {'date': date, 'names': names};
 }
 
+/// The vault did not answer a page of the pending payments: no list is better than a partial one.
+class DueListUnavailable implements Exception {
+  const DueListUnavailable();
+}
+
 /// The recurring payments still pending in the [days] days from [today] (inclusive), read from the
 /// vault in [backend]: what "Hoy vence…" says on each of them. Nothing is asked of the server
 /// (a `preview` account's payments live only on the phone).
@@ -20,6 +25,7 @@ class DueDay {
 /// Asks `GET /v1/transactions?status=pending&month=<m>` for each month the window touches (which
 /// also makes the month's occurrences), keeps the rows with a `recurrenceId` and a date inside the
 /// window, and groups their names by date, oldest creation first. Days with nothing are absent.
+/// Throws [DueListUnavailable] when a page is not answered with 200.
 Future<List<DueDay>> dueDays(LocalBackend backend, {required String today, int days = 14}) async {
   final start = DateTime.parse('${today}T00:00:00Z');
   final last = _date(start.add(Duration(days: days - 1)));
@@ -39,7 +45,7 @@ Future<List<DueDay>> dueDays(LocalBackend backend, {required String today, int d
         'cursor': ?cursor,
       }, null);
       final body = answer?.body;
-      if (answer == null || answer.status != 200 || body is! Map) break;
+      if (answer == null || answer.status != 200 || body is! Map) throw const DueListUnavailable();
       for (final item in (body['items'] as List? ?? const [])) {
         if (item is! Map || item['recurrenceId'] == null) continue;
         final date = item['date'];
@@ -76,5 +82,9 @@ Future<({String zone, List<DueDay> days})?> dueListOf(
   if (me == null || me.status != 200 || body is! Map) return null;
   final zone = body['timezone'];
   if (zone is! String) return null;
-  return (zone: zone, days: await dueDays(backend, today: todayIn(zone, now.toUtc())));
+  try {
+    return (zone: zone, days: await dueDays(backend, today: todayIn(zone, now.toUtc())));
+  } on DueListUnavailable {
+    return null;
+  }
 }

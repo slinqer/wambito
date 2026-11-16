@@ -34,8 +34,13 @@ final class NoticesChannel {
         result(nil)
       case "scheduleDueList":
         // A `preview` account's payments, read from the vault by Dart: days and names, replacing
-        // every pending `wambito.due.` request. The owner is not kept: a sign-out and an account
-        // change both go through `cancelDue`, which removes them.
+        // every pending `wambito.due.` request. A list read for an account that is not the one the
+        // app last told the phone about is dropped (a headless run landing after a sign-out).
+        guard DueSchedule.accepts(owner: arguments?["owner"] as? String, current: AccountMode.owner())
+        else {
+          result(nil)
+          return
+        }
         let zone = NoticeTimes.zone(arguments?["zone"] as? String, fallback: .current)
         let days: [(date: String, names: [String])] = (arguments?["days"] as? [[String: Any]] ?? [])
           .compactMap { day in

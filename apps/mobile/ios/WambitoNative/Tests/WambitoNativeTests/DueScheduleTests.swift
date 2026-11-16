@@ -47,4 +47,20 @@ final class DueScheduleTests: XCTestCase {
       zone: bogota, now: date("2026-11-16T13:00:00Z"))
     XCTAssertEqual(requests.map(\.id), ["wambito.due.2026-11-19"])
   }
+
+  func testOnlyTheDueRequestsAreReplaced() {
+    let ids = ["wambito.due.2026-11-17", "wambito.notice.due", "wambito.notice.guest", "other"]
+    XCTAssertEqual(DueSchedule.dueIds(ids), ["wambito.due.2026-11-17"])
+  }
+
+  func testAListOfTheSignedInAccountIsAccepted() {
+    XCTAssertTrue(DueSchedule.accepts(owner: "u1", current: "u1"))
+  }
+
+  func testAListOfAnotherAccountOrWithNoOwnerIsDropped() {
+    XCTAssertFalse(DueSchedule.accepts(owner: "u1", current: "u2"))
+    XCTAssertFalse(DueSchedule.accepts(owner: nil, current: "u1"))
+    XCTAssertFalse(DueSchedule.accepts(owner: "u1", current: nil))
+    XCTAssertFalse(DueSchedule.accepts(owner: nil, current: nil))
+  }
 }

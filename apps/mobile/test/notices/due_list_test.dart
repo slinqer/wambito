@@ -4,6 +4,27 @@ import 'package:wambito/local/backend.dart';
 import 'package:wambito/local/memory_store.dart';
 import 'package:wambito/notices/due_list.dart';
 
+/// A backend that answers the second month's page with [status].
+class _Failing implements LocalBackend {
+  _Failing(this.inner, this.status);
+
+  final LocalBackend inner;
+  final int status;
+  var _transactions = 0;
+
+  @override
+  Future<LocalResponse?> handle(
+    String method,
+    String path,
+    Map<String, Object> query,
+    Object? body, {
+    Map<String, String> headers = const {},
+  }) async {
+    if (path == '/v1/transactions' && ++_transactions == 2) return LocalResponse(status);
+    return inner.handle(method, path, query, body);
+  }
+}
+
 void main() {
   late LocalBackend backend;
   late String food;
@@ -97,6 +118,14 @@ void main() {
     ]);
     await call('DELETE', '/v1/recurrences/$id');
     expect((await dueDays(backend, today: '2026-10-28')).expand((d) => d.names), ['Gym']);
+  });
+
+  test('a page the vault does not answer gives no list at all, never a partial one', () async {
+    await rule('Arriendo', 3);
+    final failing = _Failing(backend, 500);
+    // The window crosses the month end: the second month's page fails.
+    expect(dueDays(failing, today: '2026-10-28'), throwsA(isA<DueListUnavailable>()));
+    expect(await dueListOf(_Failing(backend, 500), now: DateTime.utc(2026, 10, 28, 15)), isNull);
   });
 
   test('toJson is the channel shape', () {
