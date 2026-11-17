@@ -541,8 +541,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           ))
                             const ReviewHomeRow(),
                           // After the first movement, until a widget exists or it is put away.
-                          if (data.items.isNotEmpty &&
-                              ref.watch(widgetCardProvider.select((s) => s.value ?? false)))
+                          // The account's first movement, in any month; asked only when the card could show.
+                          if (ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
+                              (data.items.isNotEmpty ||
+                                  ref.watch(hasTransactionsProvider).value == true))
                             const WidgetCard(key: Key('home.widgetCard')),
                           ?_nudges(shown, l10n),
                         ] else

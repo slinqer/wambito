@@ -21,11 +21,8 @@ const widgetCardClosedKey = 'wambito.widgetCard.closed';
 bool get _android => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 /// Whether a Wambito widget is on a home screen. Android only: elsewhere there is nothing to ask,
-/// so it reads true (nothing to offer). After the launcher's dialog the answer is asked again on
-/// the next return to the app ([pinned]), since the person may have declined.
+/// so it reads true (nothing to offer). Asked again at every return to the app.
 class WidgetOnHome extends AsyncNotifier<bool> with WidgetsBindingObserver {
-  var _awaiting = false;
-
   @override
   Future<bool> build() async {
     final binding = WidgetsBinding.instance..addObserver(this);
@@ -34,14 +31,10 @@ class WidgetOnHome extends AsyncNotifier<bool> with WidgetsBindingObserver {
     return ref.read(widgetPinProvider).installed();
   }
 
-  /// The launcher's dialog was shown: look again when the person is back.
-  void pinned() => _awaiting = true;
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed || !_awaiting) return;
-    _awaiting = false;
-    ref.invalidateSelf();
+    // Any way of adding a widget (the dialog, the steps, the launcher) ends in a return to the app.
+    if (state == AppLifecycleState.resumed) ref.invalidateSelf();
   }
 }
 
@@ -50,10 +43,7 @@ final widgetOnHomeProvider = AsyncNotifierProvider<WidgetOnHome, bool>(WidgetOnH
 /// Asks the launcher to add the widget when it can; otherwise explains the three steps.
 Future<void> addWidget(BuildContext context, WidgetRef ref) async {
   final pin = ref.read(widgetPinProvider);
-  if (await pin.supported() && await pin.pin()) {
-    ref.read(widgetOnHomeProvider.notifier).pinned();
-    return;
-  }
+  if (await pin.supported() && await pin.pin()) return;
   if (context.mounted) await showWidgetSteps(context);
 }
 
@@ -105,7 +95,6 @@ class WidgetCard extends ConsumerWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: l10n.widgetCardTitle,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.surfaceRow,

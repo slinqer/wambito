@@ -85,23 +85,44 @@ void main() {
     expect(find.text('Así añades el widget'), findsNothing);
   });
 
-  androidTest('the card goes once the widget is on the home screen, on the next resume', (
+  Future<void> resume(WidgetTester tester) async {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+  }
+
+  androidTest('the card stays while no widget was added, and goes once one is, on a resume', (
     tester,
   ) async {
     final pin = FakeWidgetPin(isInstalled: false);
     await pumpHome(tester, withMovement(), overrides: [widgetPinProvider.overrideWithValue(pin)]);
     await tester.tap(find.byKey(const Key('widgetCard.add')));
     await tester.pumpAndSettle();
+    await resume(tester); // the person declined the launcher's dialog
     expect(find.byKey(card), findsOneWidget);
-    pin.isInstalled = true;
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
+    pin.isInstalled = true; // added any way, steps included
+    await resume(tester);
     expect(find.byKey(card), findsNothing);
+  });
+
+  androidTest('the card shows for an account whose movements are all in older months', (
+    tester,
+  ) async {
+    final repo = FakeHomeRepository(items: [tx('t0', '2026-08-20', -500000, name: 'Pan')]);
+    await pumpHome(
+      tester,
+      repo,
+      overrides: [widgetPinProvider.overrideWithValue(FakeWidgetPin(isInstalled: false))],
+    );
+    expect(find.byKey(card), findsOneWidget);
   });
 
   androidTest('Añadir widget shows the steps when the launcher cannot', (tester) async {
@@ -140,6 +161,23 @@ void main() {
     await tester.tap(find.byKey(const Key('settings.addWidget')));
     await tester.pumpAndSettle();
     expect(pin.pins, 1);
+  });
+
+  androidTest('the Settings row goes once a widget is added, on a resume', (tester) async {
+    final pin = FakeWidgetPin(isInstalled: false);
+    await pumpSettingsApp(
+      tester,
+      location: '/settings',
+      overrides: [widgetPinProvider.overrideWithValue(pin)],
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings.addWidget')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    pin.isInstalled = true;
+    await resume(tester);
+    expect(find.byKey(const Key('settings.addWidget')), findsNothing);
   });
 
   androidTest('Settings has no Añadir widget once one is added', (tester) async {
