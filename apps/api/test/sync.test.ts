@@ -472,6 +472,26 @@ describe("/v2/sync", () => {
       expect((await push(a, [{ ...fresh, body: b64("different") }]))[0]?.conflict).toBeDefined();
     });
 
+    test("a tombstone's reseal keeps its delete time, and the purge still counts from the delete", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const [gone] = await push(a, [
+        { ...change, baseVersion: created?.version as number, deleted: true, body: b64("old key") },
+      ]);
+      const now = new Date();
+      const deletedAt = new Date(now.getTime() - 181 * 86_400_000);
+      await t.admin.update(records).set({ updatedAt: deletedAt }).where(eq(records.id, change.id));
+      const [resealed] = await push(a, [
+        { ...change, baseVersion: gone?.version as number, deleted: true, body: b64("new key") },
+      ]);
+      expect(resealed?.version).toBeGreaterThan(gone?.version as number);
+      const [row] = await t.admin.select().from(records).where(eq(records.id, change.id));
+      expect(Buffer.from(row?.body ?? []).toString("base64url")).toBe(b64("new key"));
+      expect(row?.updatedAt.getTime()).toBe(deletedAt.getTime());
+      await purgeTombstones(t.db, now);
+      expect((await pullAll(a)).map((r) => r.id)).not.toContain(change.id);
+    });
+
     test("the purge removes a tombstone that has a body", async () => {
       const now = new Date("2026-11-08T12:00:00Z");
       const old = randomUUID();

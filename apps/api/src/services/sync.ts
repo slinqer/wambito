@@ -265,9 +265,11 @@ async function applyChange(
     return { id, conflict: toSyncRecord(current) };
   }
 
+  // A tombstone written over a tombstone (a reseal, a conflict's re-delete) keeps its delete time:
+  // the 180-day purge counts from the delete, not from the last write.
   const [updated] = await tx
     .update(records)
-    .set(fields)
+    .set(current.deleted && change.deleted ? { ...fields, updatedAt: current.updatedAt } : fields)
     .where(and(eq(records.userId, userId), eq(records.id, id)))
     .returning({ version: records.version });
   if (current.deleted !== change.deleted) addLive(change.deleted ? -1 : 1);
@@ -298,7 +300,7 @@ async function existsHidden(tx: Tx, id: string, userId: string): Promise<boolean
 }
 
 /**
- * Deletes every tombstone (deleted record) last written more than 180 days before `now`, and
+ * Deletes every tombstone (deleted record) deleted more than 180 days before `now`, and
  * returns how many it deleted. Live records are never touched.
  *
  * `records` is under forced row-level security and the API's role has no way around it, so the
