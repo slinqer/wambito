@@ -1866,6 +1866,40 @@ for (const l of LOCALES) {
       ).toHaveAttribute("href", CAPTURE[l.other.lang].path);
     });
 
+    test("the how-it-works page on a computer: each step's text beside its picture, sides taking turns", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(c.path);
+      await expectFitsTheViewport(page);
+      const steps = page.locator(".lk-capture-steps > li");
+      await expect(steps).toHaveCount(5);
+      const sides: string[] = [];
+      for (const i of [0, 1, 2, 3]) {
+        const step = steps.nth(i);
+        const [title, demo] = [
+          await step.locator("h2").boundingBox(),
+          await step.locator(".lk-capture-demo").boundingBox(),
+        ];
+        if (!title || !demo) throw new Error(`no step ${i}`);
+        // Side by side: they overlap in height, not in width.
+        expect(demo.y).toBeLessThan(title.y + title.height);
+        const textLeft = title.x < demo.x;
+        expect(textLeft ? title.x + title.width <= demo.x : demo.x + demo.width <= title.x).toBe(
+          true,
+        );
+        sides.push(textLeft ? "text-left" : "text-right");
+      }
+      expect(sides).toEqual(["text-left", "text-right", "text-left", "text-right"]);
+      // The last step has no picture of its own: its text sits in the middle.
+      const last = steps.nth(4);
+      const [card, lastTitle] = [await last.boundingBox(), await last.locator("h2").boundingBox()];
+      if (!card || !lastTitle) throw new Error("no last step");
+      expect(Math.abs(lastTitle.x + lastTitle.width / 2 - (card.x + card.width / 2))).toBeLessThan(
+        4,
+      );
+    });
+
     test.describe("at 320px", () => {
       test.use({ viewport: { width: 320, height: 700 } });
 
