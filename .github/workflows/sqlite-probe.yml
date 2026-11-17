@@ -1,0 +1,36 @@
+# TEMPORARY (branch fix/sqlite-lock-ci only, never merged): measures SQLite lock waits on CI.
+name: sqlite-probe
+on:
+  push:
+    branches: [fix/sqlite-lock-ci]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [alone, suite-1, suite-2, suite-3]
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the pinned Flutter version
+        id: flutter-version
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: probe alone
+        if: matrix.mode == 'alone'
+        run: PROBE_ROUNDS=80 flutter test test/probe/lock_probe_test.dart --reporter expanded 2>&1 | grep -E "PROBE|round|FAIL|All tests|Some tests" || true
+      - name: probe inside the full suite (as CI runs it)
+        if: matrix.mode != 'alone'
+        run: |
+          nproc
+          PROBE_ROUNDS=40 flutter test --exclude-tags golden,stack --reporter expanded > out.txt 2>&1 || true
+          grep -E "PROBE|^round|sqlite_two_connections|Some tests failed|All tests passed" out.txt || true
