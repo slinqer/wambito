@@ -104,6 +104,22 @@ export function liveSecurity(session: VaultSession): SecurityApi {
   };
 }
 
+/**
+ * "Change keys": a rotation that removes no device, confirmed with the typed recovery key. Like
+ * removing a device it commits and then has the sync take the new keys (a failed reload is kept:
+ * the sync tries again on its own). It disconnects every connected assistant (the server's rule).
+ */
+export async function changeKeys(security: SecurityApi, text: string): Promise<RotateResult> {
+  const prepared = await security.rotate({ remove: [], recovery: { text } });
+  const result = await prepared.commit();
+  try {
+    await security.reloadKeys();
+  } catch {
+    // The sync tries again on its own; the rotation is kept.
+  }
+  return result;
+}
+
 export const codeOf = (error: unknown): string | undefined =>
   error && typeof error === "object" && "code" in error && typeof error.code === "string"
     ? error.code

@@ -12,6 +12,7 @@ import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/store.dart';
 import 'package:wambito/local/sync.dart';
+import 'package:wambito/local/vault_lock.dart';
 
 import 'fake_sync.dart';
 
@@ -85,6 +86,7 @@ Future<Device> device(
   int Function()? now,
   Duration debounce = const Duration(milliseconds: 20),
   Duration interval = const Duration(seconds: 100),
+  Future<VaultLease?> Function()? lease,
 }) async {
   final s = store ?? await openStore();
   final problems = <SyncProblem>[];
@@ -104,6 +106,7 @@ Future<Device> device(
       debounce: debounce,
       interval: interval,
       watchResume: (_) => () {},
+      lease: lease,
     ),
   );
   return Device(s, engine, problems, refresher, dropped);
@@ -1377,4 +1380,78 @@ void main() {
       expect(await store.readOutbox(_all), isEmpty);
     });
   });
+
+  group('the vault lease', () {
+    test('a run while another holder has the lease is busy', () async {
+      final server = FakeSync();
+      final d = await device(server, lease: () async => null);
+      await d.store.transaction((tx) async {
+        await tx.put(_cat, a, category('Food'));
+      });
+      Future<List<String>> outbox() async => [
+        for (final e in await d.store.readOutbox(1000)) '${e.id}:${e.seq}:${e.baseVersion}',
+      ];
+      final before = await outbox();
+      final cursor = await d.store.getMeta('cursor');
+      final result = await d.engine.run();
+      expect(result.ok, isFalse);
+      expect(result.error, SyncProblemCode.busy);
+      expect(SyncProblemCode.busy.wire, 'busy');
+      expect(before, hasLength(1));
+      expect(await outbox(), before);
+      expect(await d.store.getMeta('cursor'), cursor);
+      expect(server.requests, isEmpty);
+    });
+
+    test('a lease lost mid-run stops the run as busy and writes nothing more', () async {
+      final server = FakeSync();
+      final other = await device(server);
+      await serverWrite(server, await getKeys(), a, 'Remote', 1);
+      var renews = 0;
+      final d = await device(
+        server,
+        // Held for the first check (before the pass), taken over by the time the pull commits.
+        lease: () async => _Lease(() {}, onRenew: () => ++renews < 2),
+      );
+      final result = await d.engine.run();
+      expect(result.ok, isFalse);
+      expect(result.error, SyncProblemCode.busy);
+      expect(renews, 2);
+      expect(await d.store.getMeta('latest'), isNull);
+      expect(await d.store.getMeta('lastSync'), isNull);
+      expect(await names(d.store), isEmpty);
+      expect(other.problems, isEmpty);
+    });
+
+    test('a run takes the lease and releases it at its end', () async {
+      final server = FakeSync();
+      var taken = 0;
+      var released = 0;
+      final d = await device(
+        server,
+        lease: () async {
+          taken += 1;
+          return _Lease(() => released += 1);
+        },
+      );
+      expect((await d.engine.run()).ok, isTrue);
+      expect((taken, released), (1, 1));
+      server.offline = true;
+      expect((await d.engine.run()).ok, isFalse);
+      expect((taken, released), (2, 2));
+    });
+  });
+}
+
+class _Lease implements VaultLease {
+  _Lease(this.onRelease, {this.onRenew});
+
+  final void Function() onRelease;
+  final bool Function()? onRenew;
+
+  @override
+  Future<bool> renew() async => onRenew?.call() ?? true;
+
+  @override
+  Future<void> release() async => onRelease();
 }

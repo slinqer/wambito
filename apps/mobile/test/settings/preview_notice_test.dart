@@ -80,12 +80,11 @@ void main() {
   });
 
   group('due notice', () {
-    testWidgets('Settings shows the notice in place of the "Hoy vence…" switch', (t) async {
+    testWidgets('Settings shows the "Hoy vence…" switch, computed on the phone', (t) async {
       final handle = t.ensureSemantics();
       await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
-      await _show(t, 'settings.dueNotice.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
-      expect(find.byKey(const Key('settings.dueNotice')), findsNothing);
+      await _show(t, 'settings.dueNotice');
+      expect(find.byKey(const Key('settings.dueNotice.comingSoon')), findsNothing);
       handle.dispose();
     });
   });

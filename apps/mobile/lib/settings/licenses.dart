@@ -26,6 +26,7 @@ import 'android_libraries.dart';
 const _apache = 'assets/licenses/apache-2.0.txt';
 const _agpl = 'assets/licenses/agpl-3.0.txt';
 const _bsdGlance = 'assets/licenses/glance-protobuf-bsd-3-clause.txt';
+const _libyuv = 'assets/licenses/libyuv-bsd-3-clause.txt';
 const _libraries = 'assets/licenses/android-libraries.json';
 
 // Inside the native libraries of vosk-android 0.3.75 (vosk-api's android/lib/build-vosk.sh) and of
@@ -75,8 +76,15 @@ const _jna = 'net.java.dev.jna:jna';
 const _sherpa = 'com.k2fsa.sherpa.onnx:sherpa-onnx';
 
 /// The text of a library whose licence is not the plain Apache one: the BSD-3-Clause that
-/// `androidx.glance:glance-appwidget-external-protobuf` publishes inside its jar.
-const _ownText = {'androidx.glance:glance-appwidget-external-protobuf': _bsdGlance};
+/// `androidx.glance:glance-appwidget-external-protobuf` publishes inside its jar, and camera-core,
+/// whose POM lists Apache-2.0 and BSD-3-Clause: the code is Apache and the BSD-3 part is the libyuv
+/// its native library carries, listed apart ([_camera], below), so the library sits with the Apache
+/// ones.
+const _camera = 'androidx.camera:camera-core';
+const _ownText = {
+  'androidx.glance:glance-appwidget-external-protobuf': _bsdGlance,
+  _camera: _apache,
+};
 
 String _textAssetFor(AndroidLibrary library) {
   final own = _ownText[library.id];
@@ -116,6 +124,15 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
     yield LicenseEntryWithLineBreaks([
       'CLAPACK 3.2.1',
     ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
+  }
+  // CameraX's core (the QR scanner's camera) ships libimage_processing_util_jni.so, which converts and
+  // rotates camera frames with libyuv, statically linked (no libyuv import, only the JNI entry points
+  // and the CPU-feature probe; androidx camera-core 1.6.2's AAR): its BSD-3-Clause text and notice.
+  final camera = find(_camera);
+  if (camera != null) {
+    yield LicenseEntryWithLineBreaks([
+      'libyuv',
+    ], '${l10n.licenseNoticeLibyuv(camera.version)}\n\n${await load(_libyuv)}');
   }
   final jna = find(_jna);
   if (jna != null) {
@@ -175,6 +192,10 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
     }
   }
+  // The two tab icons from Plump Free (docs/design/system/project/icons/icons.json).
+  yield LicenseEntryWithLineBreaks([
+    'Plump Free, Streamline',
+  ], '${l10n.licenseNoticePlump}\n\n${await load(_ccBy)}');
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};
   final groups = <String, List<AndroidLibrary>>{};

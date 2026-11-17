@@ -25,6 +25,23 @@ function smtpHostIsLocal(smtpUrl: string | undefined): boolean {
   }
 }
 
+/**
+ * A public key `ECDH-ES` can encrypt to: X25519 (`OKP`) with `x`, or P-256 (`EC`) with `x` and `y`,
+ * and no private or symmetric part (`d`, `k`). Anything else would fail only at a token exchange.
+ */
+function isPublicJwk(value: string): boolean {
+  try {
+    const jwk = JSON.parse(value) as Record<string, unknown> | null;
+    if (typeof jwk !== "object" || jwk === null || Array.isArray(jwk)) return false;
+    if ("d" in jwk || "k" in jwk || typeof jwk.x !== "string") return false;
+    if (jwk.kty === "OKP") return jwk.crv === "X25519";
+    if (jwk.kty === "EC") return jwk.crv === "P-256" && typeof jwk.y === "string";
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 /** A certificate's SHA-256 fingerprint as keytool and release.sh print it: 32 hex pairs. */
 const SHA256_FINGERPRINT = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
 
@@ -43,6 +60,24 @@ const configSchema = z
      */
     MCP_URL: z
       .preprocess((v) => (v === "" ? undefined : v), z.string().url().optional())
+      .optional(),
+    /**
+     * The MCP's public key, a JWK as a JSON string (X25519 or P-256, for `ECDH-ES`): the API
+     * encrypts the assistant secret to it in the access token's `wk` claim (spec 2026-11-16 §4).
+     * Blank or unset: a consent that carries `wk` is refused (503 `assistant_keys_missing`). A
+     * private key (`d`) is refused: only the MCP holds that half.
+     */
+    MCP_WK_PUBLIC_KEY: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+        z
+          .string()
+          .refine(
+            isPublicJwk,
+            "MCP_WK_PUBLIC_KEY must be a public X25519 or P-256 JWK (JSON, no `d`)",
+          )
+          .optional(),
+      )
       .optional(),
     MAIL_FROM: z.string().min(3),
     RESEND_API_KEY: z.string().optional(),

@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { ClientMetadataResourceFetch } from "@better-auth/oauth-provider";
 import { categories, createDb, type Db, user } from "@wambito/db";
-import { eq } from "@wambito/db/orm";
+import { eq, sql } from "@wambito/db/orm";
 import { startTestDatabase } from "@wambito/db/testing";
+import { exportJWK, generateKeyPair } from "jose";
 import { createApp } from "../src/app.ts";
 import type { Config } from "../src/config.ts";
 import type { SyncHooks } from "../src/deps.ts";
@@ -35,6 +36,31 @@ export interface AssistantTokens {
   clientId: string;
 }
 
+export interface ConnectOptions {
+  scope?: string;
+  resource?: string;
+  clientId?: string;
+  /** A confidential client's secret, sent with the code exchange. */
+  clientSecret?: string;
+  headers?: { authorization: string };
+  /** The assistant secret `S` (base64url), posted in the consent body. */
+  wk?: string;
+}
+
+/** A consented connect waiting for its code exchange. */
+export interface PendingConnect {
+  code: string;
+  verifier: string;
+  clientId: string;
+  clientSecret?: string;
+  resource?: string;
+}
+
+/** A fresh assistant secret `S`: 32 random bytes, base64url, as the web's consent page makes it. */
+export function newAssistantSecret(): string {
+  return randomBytes(32).toString("base64url");
+}
+
 export function codeFrom(subject: string): string {
   const match = /(\d{6})$/.exec(subject);
   if (!match?.[1]) throw new Error(`No code in subject: ${subject}`);
@@ -58,8 +84,11 @@ export async function createTestApp(
   const app$ = createDb(database.appUrl);
   const admin = createDb(database.adminUrl);
   const mailer = new MemoryMailer();
+  // The MCP's key pair for the `wk` claim, made per test app (a test may override the public half).
+  const wkPair = await generateKeyPair("ECDH-ES", { crv: "X25519", extractable: true });
   const config: Config = {
     ...TEST_CONFIG,
+    MCP_WK_PUBLIC_KEY: JSON.stringify(await exportJWK(wkPair.publicKey)),
     DATABASE_URL: database.appUrl,
     DATABASE_ADMIN_URL: database.adminUrl,
     ...overrides,
@@ -181,29 +210,18 @@ export async function createTestApp(
   }
 
   /**
-   * Runs the whole authorization code flow with PKCE for `email`, as Claude would: authorize
-   * (signed in), consent, then the code for tokens, for `resource` (the MCP by default).
+   * `GET /auth/oauth2/authorize` for `clientId` as the signed-in `session`, with PKCE; returns the
+   * answer (a redirect to the consent page, or straight back to the assistant with a code).
    */
-  async function authorize(
-    email: string,
-    {
-      scope = "finance:read finance:write offline_access",
-      resource = config.MCP_URL,
-      clientId,
-      headers,
-    }: {
-      scope?: string;
-      resource?: string;
-      clientId?: string;
-      headers?: { authorization: string };
-    } = {},
-  ): Promise<AssistantTokens> {
-    const client = clientId ?? (await registerAssistant());
-    const session = headers ?? (await signIn(email)).headers;
+  async function authorizeRequest(
+    clientId: string,
+    session: Record<string, string>,
+    { scope = "finance:read finance:write offline_access", resource = config.MCP_URL } = {},
+  ): Promise<{ res: Response; verifier: string }> {
     const verifier = randomBytes(32).toString("base64url");
     const query = new URLSearchParams({
       response_type: "code",
-      client_id: client,
+      client_id: clientId,
       redirect_uri: ASSISTANT_REDIRECT,
       scope,
       state: "state",
@@ -211,42 +229,130 @@ export async function createTestApp(
       code_challenge_method: "S256",
       ...(resource ? { resource } : {}),
     });
-    const auth = await request("GET", `/auth/oauth2/authorize?${query}`, { headers: session });
+    const res = await request("GET", `/auth/oauth2/authorize?${query}`, { headers: session });
+    return { res, verifier };
+  }
+
+  /**
+   * The first half of connecting an assistant: authorize (signed in) and consent, posting `wk`
+   * (the assistant secret) in the consent body when given. Returns what the code exchange needs.
+   */
+  async function consentCode(
+    email: string,
+    { scope, resource = config.MCP_URL, clientId, clientSecret, headers, wk }: ConnectOptions = {},
+  ): Promise<PendingConnect> {
+    const client = clientId ?? (await registerAssistant());
+    const session = headers ?? (await signIn(email)).headers;
+    const { res: auth, verifier } = await authorizeRequest(client, session, { scope, resource });
     const consentUrl = auth.headers.get("location") ?? "";
     if (!consentUrl.startsWith(`${config.WEB_URL}/oauth/consent`)) {
       throw new Error(`authorize did not ask for consent: ${auth.status} ${consentUrl}`);
     }
     const consent = await request("POST", "/auth/oauth2/consent", {
       headers: session,
-      body: { accept: true, oauth_query: new URL(consentUrl).search.slice(1) },
+      body: {
+        accept: true,
+        oauth_query: new URL(consentUrl).search.slice(1),
+        ...(wk !== undefined ? { wk } : {}),
+      },
     });
     if (consent.status !== 200) {
       throw new Error(`consent failed: ${consent.status} ${await consent.text()}`);
     }
     const back = new URL(((await consent.json()) as { url: string }).url);
-    const res = await tokenRequest({
-      grant_type: "authorization_code",
+    return {
       code: back.searchParams.get("code") ?? "",
+      verifier,
+      clientId: client,
+      clientSecret,
+      resource,
+    };
+  }
+
+  /** The second half: the code for tokens, as the assistant posts it. */
+  function exchangeCode(pending: PendingConnect): Promise<Response> {
+    return tokenRequest({
+      grant_type: "authorization_code",
+      code: pending.code,
       redirect_uri: ASSISTANT_REDIRECT,
-      client_id: client,
-      code_verifier: verifier,
-      ...(resource ? { resource } : {}),
+      client_id: pending.clientId,
+      code_verifier: pending.verifier,
+      ...(pending.clientSecret ? { client_secret: pending.clientSecret } : {}),
+      ...(pending.resource ? { resource: pending.resource } : {}),
     });
+  }
+
+  /**
+   * Runs the whole authorization code flow with PKCE for `email`, as Claude would: authorize
+   * (signed in), consent (with `wk` when given, as the web does for an encrypted account), then
+   * the code for tokens, for `resource` (the MCP by default).
+   */
+  async function connectAssistant(
+    email: string,
+    options: ConnectOptions = {},
+  ): Promise<AssistantTokens> {
+    const pending = await consentCode(email, options);
+    const res = await exchangeCode(pending);
     if (res.status !== 200) throw new Error(`token failed: ${res.status} ${await res.text()}`);
     const tokens = (await res.json()) as { access_token: string; refresh_token: string };
     return {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
-      clientId: client,
+      clientId: pending.clientId,
     };
+  }
+
+  /** The flow without `wk`: what a plain account's connect looks like. */
+  function authorize(
+    email: string,
+    options: Omit<ConnectOptions, "wk" | "clientSecret"> = {},
+  ): Promise<AssistantTokens> {
+    return connectAssistant(email, options);
+  }
+
+  /**
+   * The public tables with a row that holds any of `needles` anywhere in its text (what a `psql`
+   * scan for plain text finds), as `table: needle`. A string is looked for as text and as its UTF-8
+   * bytes in hex (how a `bytea` column reads as text); bytes are looked for as hex only.
+   */
+  async function tablesHolding(needles: (string | Uint8Array)[]): Promise<string[]> {
+    const tables = (await admin.db.execute(sql`
+      select table_name from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE'
+    `)) as unknown as { table_name: string }[];
+    const found: string[] = [];
+    for (const { table_name } of tables) {
+      for (const needle of needles) {
+        const hex = Buffer.from(needle).toString("hex");
+        const text = typeof needle === "string" ? needle : null;
+        const rows = (await admin.db.execute(sql`
+          select 1 from ${sql.identifier(table_name)} r
+          where position(${hex} in lower(r::text)) > 0
+            or (${text}::text is not null and position(${text}::text in r::text) > 0) limit 1
+        `)) as unknown as unknown[];
+        if (rows.length > 0) {
+          found.push(
+            `${table_name}: ${typeof needle === "string" ? needle : `${hex.slice(0, 8)}…`}`,
+          );
+        }
+      }
+    }
+    return found;
   }
 
   return {
     app,
     config,
+    tablesHolding,
     registerAssistant,
     tokenRequest,
+    authorizeRequest,
+    consentCode,
+    exchangeCode,
+    connectAssistant,
     authorize,
+    /** The MCP's private key matching the default `MCP_WK_PUBLIC_KEY`: it opens `wk` claims. */
+    wkPrivateKey: wkPair.privateKey,
     db: app$.db as Db,
     admin: admin.db as Db,
     mailer,

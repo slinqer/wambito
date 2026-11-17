@@ -1,4 +1,4 @@
-// Port of apps/web/app/local/backend.ts: the `/v1/*` finance routes answered from a
+// Port of packages/vault/src/backend.ts: the `/v1/*` finance routes answered from a
 // `FinanceStore` with the API's shapes, the `lib/core` rules, the same validation and the same
 // problem+json codes. Nothing leaves the phone.
 //
@@ -8,6 +8,7 @@
 import 'dart:convert';
 
 import '../core/budget.dart';
+import '../core/capture.dart';
 import '../core/cost_of_living.dart';
 import '../core/dates.dart';
 import '../core/js_math.dart' show stableSorted;
@@ -17,6 +18,7 @@ import '../core/reports.dart';
 import '../core/schemas.dart';
 import '../core/summary.dart';
 import '../crypto/records.dart' show RecordType;
+import 'captures.dart';
 import 'ids.dart';
 import 'store.dart';
 
@@ -380,6 +382,7 @@ bool _serves(String path) =>
       '/v1/me',
       '/v1/summary',
       '/v1/transactions',
+      '/v1/captures',
       '/v1/categories',
       '/v1/recurrences',
       '/v1/reports/by-category',
@@ -893,12 +896,17 @@ class _Backend implements LocalBackend {
     if (categoryId != null) await _requireActiveCategory(e.s, categoryId as String);
     final next = {...found.body, ...input, 'updatedAt': stamp()};
     await e.s.put(RecordType.transaction, id, next);
+    final before = _Tx(id, found.body);
+    if (before.source == 'capture' && before.needsReview && input['needsReview'] == false) {
+      await _learn(e, _Tx(id, next));
+    }
     return _ok(_Tx(id, next).toDto());
   }
 
   /// `POST /v1/transactions/review`, as the API: confirms detected transactions at once, all or
   /// nothing (an unknown or deleted id is 404 and nothing changes), in request order; ids already
-  /// confirmed stay as they are. The merchant memory the API learns has no record yet.
+  /// confirmed stay as they are. A `capture` row that goes from review to confirmed teaches its
+  /// merchant (`_learn`).
   Future<_Answer> _reviewTransactions(_Env e, Object? body) async {
     final ids = ((_valid(reviewTransactionsSchema, body)['ids']!) as List).cast<String>();
     final found = <String, Json>{};
@@ -911,11 +919,188 @@ class _Backend implements LocalBackend {
       final next = {...before, 'needsReview': false, 'updatedAt': stamp()};
       await e.s.put(RecordType.transaction, id, next);
       found[id] = next;
+      if (_Tx(id, before).source == 'capture') await _learn(e, _Tx(id, next));
     }
     return _ok({
       'items': [for (final id in ids) _Tx(id, found[id]!).toDto()],
     });
   }
+
+  // -- /v1/captures -------------------------------------------------------------------------
+
+  /// The API's `keyOf`/`learn` reads the key stored with the row, else the name's.
+  String? _keyOfRow(_Tx row) =>
+      (row.body['captureMerchantKey'] as String?) ?? merchantKeyOrNull(row.name);
+
+  /// The API's `learn`: remembers the category a person confirmed for a capture's merchant. Only a
+  /// category that is active, of the row's kind and not a fallback (`systemKey` set) is remembered;
+  /// a merchant with nothing alphanumeric is skipped. The record's id is made from the account and
+  /// the key (`merchantRecordId`), so the devices converge on one per merchant.
+  Future<void> _learn(_Env e, _Tx row) async {
+    final key = _keyOfRow(row);
+    if (key == null) return;
+    final category = await e.s.get(RecordType.category, row.categoryId);
+    if (category == null) return;
+    final body = category.body;
+    if (body['kind'] != (row.amount < 0 ? 'expense' : 'income') ||
+        body['archivedAt'] != null ||
+        body['systemKey'] != null) {
+      return;
+    }
+    await e.s.put(RecordType.merchant, merchantRecordId(profile.id, key), {
+      's': 1,
+      'merchantKey': key,
+      'categoryId': row.categoryId,
+    });
+  }
+
+  /// The API's `rememberedCategory`: the category learned for this merchant key when still active
+  /// and of this kind. The key itself wins; otherwise the longest learned key made of its leading
+  /// words (`merchantKeyPrefixes`).
+  Future<String?> _rememberedCategory(_Env e, String? key, String kind) async {
+    if (key == null) return null;
+    final candidates = [key, ...merchantKeyPrefixes(key)];
+    final learned =
+        [
+          for (final r in await e.s.list(RecordType.merchant))
+            if (candidates.contains(r.body['merchantKey'])) r,
+        ]..sort(
+          (a, b) => (b.body['merchantKey']! as String).length.compareTo(
+            (a.body['merchantKey']! as String).length,
+          ),
+        );
+    for (final r in learned) {
+      final id = r.body['categoryId']! as String;
+      final category = await e.s.get(RecordType.category, id);
+      if (category != null &&
+          category.body['kind'] == kind &&
+          category.body['archivedAt'] == null) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  /// The API's `fallbackCategory`: the person's `other` category of this kind, marked by
+  /// `systemKey`, else an active one with the localized name (which gets the key), else a new one.
+  Future<String> _fallbackCategory(_Env e, String kind) async {
+    final categories = [
+      for (final c in await _rows(e.s, RecordType.category))
+        if (c['kind'] == kind && c['archivedAt'] == null) c,
+    ];
+    for (final c in categories) {
+      if (c['systemKey'] == 'other') return c['id']! as String;
+    }
+    final locale = e.settings['locale'] as String?;
+    final names = fallbackCategoryNames[fallbackCategoryNames.containsKey(locale) ? locale : 'es']!;
+    final name = kind == 'expense' ? names.expense : names.income;
+    for (final c in categories) {
+      if ((c['name']! as String).toLowerCase() == name.toLowerCase()) {
+        await e.s.put(RecordType.category, c['id']! as String, {
+          ..._bodyOf(c),
+          'systemKey': 'other',
+        });
+        return c['id']! as String;
+      }
+    }
+    final id = newId();
+    await e.s.put(RecordType.category, id, {
+      's': 1,
+      'name': name,
+      'kind': kind,
+      'icon': '📦',
+      'color': '#8e8e9a',
+      'sortOrder': 0,
+      'archivedAt': null,
+      'systemKey': 'other',
+      'createdAt': stamp(),
+    });
+    return id;
+  }
+
+  /// The notified amount and currency, kept in the note when the account's currency differs.
+  String? _captureNote(Json input, String accountCurrency) => input['currency'] == accountCurrency
+      ? null
+      : '${((input['amount']! as int) / 100).toStringAsFixed(2)} ${input['currency']}';
+
+  /// `POST /v1/captures`, as the API's `saveCapture`: saves a purchase parsed from a notification,
+  /// to review, or answers `merged` for the same purchase seen again (same kind's sign, amount and
+  /// currency, same note, within [captureDuplicateWindow] of `capturedAt`). The key is mandatory.
+  Future<_Answer> _createCapture(_Env e, String raw, Object? body, String? key) =>
+      _idempotent(key, raw, required: true, () async {
+        final input = _valid(createCaptureSchema, body);
+        final kind = input['kind']! as String;
+        final amount = input['amount']! as int;
+        final signed = kind == 'expense' ? -amount : amount;
+        final currency = e.settings['currency']! as String;
+        final note = _captureNote(input, currency);
+        final capturedAt = DateTime.parse(input['capturedAt']! as String).toUtc();
+        final from = capturedAt.subtract(captureDuplicateWindow);
+        final to = capturedAt.add(captureDuplicateWindow);
+
+        ({_Tx row, Json category})? existing;
+        Duration? gap;
+        for (final r in await _txRows(e.s)) {
+          if (r.source != 'capture' ||
+              r.amount != signed ||
+              r.body['currency'] != currency ||
+              r.note != note) {
+            continue;
+          }
+          final at = DateTime.tryParse((r.body['capturedAt'] as String?) ?? '')?.toUtc();
+          if (at == null || at.isBefore(from) || at.isAfter(to)) continue;
+          final category = await e.s.get(RecordType.category, r.categoryId);
+          if (category == null) continue;
+          final distance = at.difference(capturedAt).abs();
+          if (gap == null || distance < gap) {
+            gap = distance;
+            existing = (row: r, category: category.body);
+          }
+        }
+        if (existing != null) {
+          return _ok({
+            'result': 'merged',
+            'transaction': existing.row.toDto(),
+            'category': {
+              'name': existing.category['name'],
+              'fallback': existing.category['systemKey'] == 'other',
+            },
+          });
+        }
+
+        final merchantKey = merchantKeyOrNull(input['merchant']! as String);
+        final categoryId =
+            await _rememberedCategory(e, merchantKey, kind) ?? await _fallbackCategory(e, kind);
+        final category = (await e.s.get(RecordType.category, categoryId))!.body;
+        final id = newId();
+        final at = stamp();
+        final record = <String, Object?>{
+          's': 1,
+          'name': input['merchant'],
+          'amount': signed,
+          'currency': currency,
+          'date': todayIn(e.settings['timezone']! as String, capturedAt),
+          'status': 'paid',
+          'note': note,
+          'categoryId': categoryId,
+          'accountId': null,
+          'recurrenceId': null,
+          'occurrenceMonth': null,
+          'source': 'capture',
+          'needsReview': true,
+          'captureSource': input['source'],
+          'capturedAt': capturedAt.toIso8601String(),
+          'captureMerchantKey': merchantKey,
+          'createdAt': at,
+          'updatedAt': at,
+        };
+        await e.s.put(RecordType.transaction, id, record);
+        return _ok({
+          'result': 'created',
+          'transaction': _Tx(id, record).toDto(),
+          'category': {'name': category['name'], 'fallback': category['systemKey'] == 'other'},
+        }, 201);
+      });
 
   // -- /v1/categories -----------------------------------------------------------------------
 
@@ -965,7 +1150,13 @@ class _Backend implements LocalBackend {
       await _requireUniqueName(e.s, (fields['name'] as String?) ?? existing['name']! as String, id);
     }
     final archiving = archived == true && existing['archivedAt'] == null;
-    final next = {...existing, ...fields, 'archivedAt': archivedAt};
+    // As the API: an archived category stops being the fallback (the next capture makes a new one).
+    final next = {
+      ...existing,
+      ...fields,
+      'archivedAt': archivedAt,
+      if (archived == true) 'systemKey': null,
+    };
     await e.s.put(RecordType.category, id, _bodyOf(next));
     if (archiving) {
       // Its active recurrences end today, and their unpaid pending rows from today on go.
@@ -1184,6 +1375,9 @@ class _Backend implements LocalBackend {
       if (method == 'POST') {
         return _createTransaction(e, raw, body, headers['idempotency-key']);
       }
+    }
+    if (path == '/v1/captures' && method == 'POST') {
+      return _createCapture(e, raw, body, headers['idempotency-key']);
     }
     if (path == '/v1/transactions/suggestions' && method == 'GET') return _suggestions(e, params);
     if (path == '/v1/transactions/review' && method == 'POST') return _reviewTransactions(e, body);

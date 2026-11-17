@@ -27,7 +27,11 @@ const _vibrate =
     "uses-permission: name='android.permission.VIBRATE'\n"
     "uses-permission: name='android.permission.ACCESS_NETWORK_STATE'\n"
     "uses-permission: name='android.permission.RECEIVE_BOOT_COMPLETED'\n"
-    "uses-permission: name='android.permission.POST_NOTIFICATIONS'\n";
+    "uses-permission: name='android.permission.POST_NOTIFICATIONS'\n"
+    // The QR scanner's camera (Task 14), asked at scan time.
+    "uses-permission: name='android.permission.CAMERA'\n"
+    // The screen lock before a sensitive operation (Task 15, local_auth's androidx.biometric).
+    "uses-permission: name='android.permission.USE_BIOMETRIC'\n";
 
 void main() {
   test('release permissions: INTERNET, RECORD_AUDIO, VIBRATE and the AndroidX receiver permission pass', () async {
@@ -74,18 +78,63 @@ void main() {
     });
   }
 
-  test('release permissions: no POST_NOTIFICATIONS fails (the two local notices could never post)', () async {
-    final without = _vibrate
-        .split('\n')
-        .where((line) => !line.contains('POST_NOTIFICATIONS'))
-        .join('\n');
-    final result = await _check(
-      'package: com.wambito.app\n'
-      "uses-permission: name='android.permission.INTERNET'\n$_mic$without\n$_receiver",
-    );
-    expect(result.exitCode, 1);
-    expect(result.stdout, contains('Missing permission: android.permission.POST_NOTIFICATIONS'));
-  });
+  test(
+    'release permissions: no POST_NOTIFICATIONS fails (the two local notices could never post)',
+    () async {
+      final without = _vibrate
+          .split('\n')
+          .where((line) => !line.contains('POST_NOTIFICATIONS'))
+          .join('\n');
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$without\n$_receiver",
+      );
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('Missing permission: android.permission.POST_NOTIFICATIONS'));
+    },
+  );
+
+  test(
+    'release permissions: no CAMERA fails (the QR of a new device could never be scanned)',
+    () async {
+      final without = _vibrate.split('\n').where((line) => !line.contains('CAMERA')).join('\n');
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$without\n$_receiver",
+      );
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('Missing permission: android.permission.CAMERA'));
+    },
+  );
+
+  test(
+    'release permissions: no USE_BIOMETRIC fails (the screen lock prompt could never be shown)',
+    () async {
+      final without = _vibrate
+          .split('\n')
+          .where((line) => !line.contains('USE_BIOMETRIC'))
+          .join('\n');
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$without\n$_receiver",
+      );
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('Missing permission: android.permission.USE_BIOMETRIC'));
+    },
+  );
+
+  test(
+    'release permissions: USE_FINGERPRINT (API 28 and below, for the lock prompt) passes',
+    () async {
+      final result = await _check(
+        'package: com.wambito.app\n'
+        "uses-permission: name='android.permission.INTERNET'\n$_mic$_vibrate"
+        "uses-permission-sdk-23: name='android.permission.USE_FINGERPRINT'\n"
+        "uses-permission: name='android.permission.USE_FINGERPRINT' maxSdkVersion='28'\n$_receiver",
+      );
+      expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    },
+  );
 
   for (final unwanted in ['WAKE_LOCK', 'FOREGROUND_SERVICE']) {
     test("release permissions: WorkManager's $unwanted stays out", () async {

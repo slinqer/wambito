@@ -5,6 +5,7 @@ import { useTranslations } from "use-intl";
 import { useApiMode } from "../../api/ApiProvider.tsx";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { LANDING_PATH } from "../../site/paths.ts";
+import { Icon } from "../../ui/Icon.tsx";
 import { MonthPicker } from "../../ui/MonthPicker.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { PressLink } from "../../ui/PressLink.tsx";
@@ -31,7 +32,8 @@ const SECTIONS = [
 ] as const;
 
 /**
- * Home's header: the wordmark, the month (previous months browsable), and the avatar menu with
+ * Home's header, one row: the month (previous months browsable) on the left; the magnifier and the
+ * account button on the right, which opens the avatar menu with
  * the day/night switch, Recurrentes, Categorías and Ajustes, and sign-out (in the demo, "Salir del
  * demo", back to the landing: there is no session to end). The menu is a disclosure: its
  * button says whether it is open, Escape or a tap outside closes it and gives focus back.
@@ -67,19 +69,13 @@ export function HomeHeader({ month, onMonth, max, signOut: request }: HomeHeader
   }, [open]);
 
   return (
-    // The logo, the month and the two buttons need about 470px on one row, so under 480px (every
-    // phone, 412px included) the month gets its own centred row under the logo and the buttons,
-    // which never wrap to a row of their own.
-    <header className="relative flex flex-wrap items-center justify-between gap-x-(--space-2)">
-      <span className="lk-logo inline-flex min-h-11 items-center lg:invisible">
-        {t("app.name")}
-      </span>
-      <div className="order-last flex w-full justify-center min-[480px]:order-none min-[480px]:w-auto">
-        <MonthPicker month={month} onChange={onMonth} max={max} />
-      </div>
-      <div className="flex items-center gap-(--space-2)">
+    // No wordmark: the app's icon already says where you are, and without it the month and the two
+    // buttons fit one row down to 320px.
+    <header className="relative flex items-center justify-between gap-x-(--space-2)">
+      <MonthPicker month={month} onChange={onMonth} max={max} />
+      <div className="flex flex-none items-center gap-(--space-2)">
         <Link to={appPath("/search")} className="lk-avatar" aria-label={t("nav.search")}>
-          <span aria-hidden="true">🔍</span>
+          <Icon name="search" size={22} />
         </Link>
         <button
           ref={button}
@@ -90,7 +86,7 @@ export function HomeHeader({ month, onMonth, max, signOut: request }: HomeHeader
           aria-controls={menuId}
           onClick={() => setOpen((current) => !current)}
         >
-          <span aria-hidden="true">🙂</span>
+          <Icon name="user" size={22} />
         </button>
       </div>
       {/* Above home's sticky tabs (z-20, later in the page), which once hid its lower half. */}

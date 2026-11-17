@@ -7,9 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/files/files_channel.dart';
+import 'package:wambito/local/keys.dart' show LocalKeys;
+import 'package:wambito/local/pairing.dart' show PairingError;
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/settings/account_deletion.dart';
 import 'package:wambito/ui/press_button.dart';
+import 'package:wambito/vault/pair_new_device_view.dart' show PairingQr;
 import 'package:wambito/vault/vault_gate.dart';
 import 'package:wambito/vault/vault_providers.dart';
 import 'package:wambito/vault/vault_screen.dart';
@@ -52,6 +55,49 @@ class FakeGate extends Fake implements AppVaultGate {
 
   @override
   void retry() => retries += 1;
+
+  int pairs = 0;
+  int leaves = 0;
+  final started = <FakePairing>[];
+  Future<GatePairing<LocalKeys>> Function()? onStart;
+
+  @override
+  Future<void> pair() async => pairs += 1;
+
+  @override
+  Future<GatePairing<LocalKeys>> startPairing() async {
+    if (onStart != null) return onStart!();
+    final next = FakePairing('p-${started.length + 1}');
+    started.add(next);
+    return next;
+  }
+
+  @override
+  void leavePairing() => leaves += 1;
+}
+
+/// A new-device request the test settles: its number, its end.
+class FakePairing implements GatePairing<LocalKeys> {
+  FakePairing(this.id);
+
+  @override
+  final String id;
+  final numbered = Completer<String>();
+  final finished = Completer<LocalKeys>();
+  int cancels = 0;
+
+  @override
+  String get code => 'AB3DEFGH';
+  @override
+  String get qr => 'wambito://pair?id=$id&key=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
+  @override
+  String get expiresAt => '2026-11-10T14:10:00Z';
+  @override
+  Future<String> number() => numbered.future;
+  @override
+  Future<LocalKeys> finish() => finished.future;
+  @override
+  void cancel() => cancels += 1;
 }
 
 class FakeFiles implements FilesChannel {
@@ -103,8 +149,10 @@ void main() {
     List<int>? positions,
     Locale locale = const Locale('es'),
     int unsent = 0,
+    void Function(FakeGate gate)? prepare,
   }) async {
     final gate = FakeGate(state);
+    prepare?.call(gate);
     session = FixedSession(signedIn('t'));
     tester.view
       ..physicalSize = const Size(412, 915)
@@ -120,6 +168,7 @@ void main() {
           accountDeletionProvider.overrideWithValue(deletion),
           sessionProvider.overrideWith(() => session),
           unsentChangesProvider.overrideWithValue(() async => unsent),
+          pairingTimeZoneProvider.overrideWithValue('America/Bogota'),
         ],
         child: uiApp(
           locale: locale,
@@ -338,6 +387,106 @@ void main() {
       expect(find.textContaining('Este teléfono se eliminó de tu cuenta'), findsOneWidget);
       await pumpScreen(tester, const Unlock(notice: Unlock.unverified));
       expect(find.textContaining('Este teléfono no pudo verificar la clave nueva'), findsOneWidget);
+    });
+  });
+
+  group('pairing', () {
+    testWidgets('Unlock offers "Añadir este teléfono desde otro dispositivo" and asks the gate', (
+      tester,
+    ) async {
+      final gate = await pumpScreen(tester, const Unlock());
+      expect(find.text('AÑADIR ESTE TELÉFONO DESDE OTRO DISPOSITIVO'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.pair')));
+      await tester.pump();
+      expect(gate.pairs, 1);
+    });
+
+    testWidgets('in English it reads "Add this phone from another device"', (tester) async {
+      await pumpScreen(tester, const Unlock(), locale: const Locale('en'));
+      expect(find.text('ADD THIS PHONE FROM ANOTHER DEVICE'), findsOneWidget);
+    });
+
+    testWidgets("a guest's Locked offers it too; a plain Locked does not", (tester) async {
+      final gate = await pumpScreen(tester, const Locked(LockedKind.guest, false));
+      await tester.tap(find.byKey(const Key('vault.pair')));
+      await tester.pump();
+      expect(gate.pairs, 1);
+      await pumpScreen(tester, const Locked(LockedKind.error, false));
+      expect(find.byKey(const Key('vault.pair')), findsNothing);
+    });
+
+    testWidgets('shows the QR, the 8-character code under it and when it expires', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      expect(find.text('Abre tus datos desde otro dispositivo'), findsOneWidget);
+      final qr = tester.widget<PairingQr>(find.byType(PairingQr));
+      expect(qr.data, gate.started.single.qr);
+      expect(find.text('AB3D EFGH'), findsOneWidget);
+      // 14:10 UTC is 09:10 in Bogota
+      expect(find.textContaining('09:10'), findsOneWidget);
+      expect(find.text('Esperando a tu otro dispositivo…'), findsOneWidget);
+    });
+
+    testWidgets('the number appears once known, and the code goes', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      gate.started.single.numbered.complete('042917');
+      await tester.pumpAndSettle();
+      expect(find.text('042 917'), findsOneWidget);
+      expect(find.text('Comprueba que las dos pantallas muestran el mismo número'), findsOneWidget);
+      expect(find.byType(PairingQr), findsNothing);
+      expect(find.text('AB3D EFGH'), findsNothing);
+    });
+
+    testWidgets('Back asks the gate to leave, and leaving cancels the request', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      await tester.tap(find.byKey(const Key('vault.pairBack')));
+      await tester.pump();
+      expect(gate.leaves, 1);
+      // the gate moves on: the screen goes with the request
+      await tester.pumpWidget(const SizedBox());
+      expect(gate.started.single.cancels, 1);
+    });
+
+    testWidgets('an expired code says so and starts again with a new request', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      gate.started.single.numbered.completeError(const PairingError('expired'));
+      await tester.pumpAndSettle();
+      expect(find.text('Este código caducó'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.pairRestart')));
+      await tester.pumpAndSettle();
+      expect(gate.started, hasLength(2));
+      expect(find.byType(PairingQr), findsOneWidget);
+    });
+
+    testWidgets('a tampered pairing stops with a warning and no restart', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      gate.started.single.finished.completeError(const PairingError('tampered'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Detente: puede que alguien esté interfiriendo. No se compartió nada.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('vault.pairRestart')), findsNothing);
+      expect(find.byKey(const Key('vault.pairBack')), findsOneWidget);
+    });
+
+    testWidgets('a cancelled request shows nothing', (tester) async {
+      final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
+      gate.started.single.numbered.completeError(const PairingError('cancelled'));
+      await tester.pumpAndSettle();
+      expect(find.text('No se pudo terminar'), findsNothing);
+      expect(find.byType(PairingQr), findsOneWidget);
+    });
+
+    testWidgets('a request that cannot start says why', (tester) async {
+      await pumpScreen(
+        tester,
+        const Pairing(PairingFrom.unlock),
+        prepare: (g) => g.onStart = () async => throw const PairingError('offline'),
+      );
+      expect(
+        find.text('No hay conexión. Empieza de nuevo cuando vuelvas a tenerla.'),
+        findsOneWidget,
+      );
     });
   });
 

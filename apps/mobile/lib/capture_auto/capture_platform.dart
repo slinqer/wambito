@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../background/queued_capture.dart';
+
 /// The sources automatic capture reads, by the wire name the Android side uses.
 enum CaptureSource {
   revolut('revolut', 'Revolut'),
@@ -65,6 +67,14 @@ abstract interface class AutoCapturePlatform {
   /// other detected transaction (confirmed on the web, through an assistant, in the editor) go.
   /// One posted from [before] on may be newer than the list, so it stays.
   Future<void> keepOnlyNotifications(List<String> ids, DateTime before);
+
+  /// What waits in the queue for [userId]'s vault, for the headless engine (`captureMain`): the
+  /// parsed captures (each with its stable `key`) and the notification ids confirmed with "Bien".
+  /// Nothing is removed until [ackQueued].
+  Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId);
+
+  /// The engine saved these captures (by `key`) and applied these confirms: they leave the queue.
+  Future<void> ackQueued(List<String> keys, List<String> confirms);
 }
 
 /// [AutoCapturePlatform] over the `wambito/capture` channel. Where that channel does not exist the
@@ -117,6 +127,25 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
   @override
   Future<void> keepOnlyNotifications(List<String> ids, DateTime before) =>
       _call<void>('keepOnly', {'ids': ids, 'before': before.millisecondsSinceEpoch});
+
+  @override
+  Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId) async {
+    final raw = await _call<Map<Object?, Object?>>('takeQueued', {'userId': userId});
+    final captures = <QueuedCapture>[];
+    for (final item in (raw?['captures'] as List?) ?? const []) {
+      try {
+        if (item is Map) captures.add(QueuedCapture.fromJson(item));
+      } on FormatException {
+        // Kept in the queue by native code; never saved.
+      }
+    }
+    final confirms = [...((raw?['confirms'] as List?) ?? const []).whereType<String>()];
+    return (captures: captures, confirms: confirms);
+  }
+
+  @override
+  Future<void> ackQueued(List<String> keys, List<String> confirms) =>
+      _call<void>('ackQueued', {'keys': keys, 'confirms': confirms});
 }
 
 /// The platform side of automatic capture (replaced in tests).

@@ -85,7 +85,9 @@ Future<void> deleteStaleVaults(
 const _accountKey = 'wambito.account';
 const _modePrefix = 'wambito.encryption.';
 
-final _vaultFile = RegExp(r'^wambito-vault-([A-Za-z0-9_-]{1,128})\.db(?:-journal|-wal|-shm)?$');
+final _vaultFile = RegExp(
+  r'^wambito-vault-([A-Za-z0-9_-]{1,128})\.db(?:-journal|-wal|-shm|-lock(?:\.claim-[0-9a-f]+)?)?$',
+);
 final _vaultKey = RegExp(r'^wambito\.vault\.([A-Za-z0-9_-]{1,128})\.');
 final _modeKey = RegExp(r'^wambito\.encryption\.([A-Za-z0-9_-]{1,128})$');
 

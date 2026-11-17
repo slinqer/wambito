@@ -237,16 +237,100 @@ class NoticeWorkersTest {
     }
 
     @Test
-    fun `a preview account asks the server nothing, posts nothing and is not scheduled again`() {
-        AccountMode(context).value = "preview"
+    fun `a preview account never asks the server, whatever it holds there`() {
+        AccountMode(context).write("preview", "u1")
         pages[""] = page(item("Arriendo", "2026-10-22"))
+
+        runDue()
+
+        assertTrue("nothing is asked of the server", requests.isEmpty())
+        assertTrue(posted().isEmpty())
+    }
+
+    // --- "Hoy vence…" from the vault (a preview account) ---------------------------------------
+
+    private fun previewOf(owner: String?, listOwner: String?, vararg names: String) {
+        AccountMode(context).write("preview", owner)
+        DueList.replace(context, listOwner, listOf("2026-10-22" to names.toList()))
+    }
+
+    @Test
+    fun `a preview account posts today's entry of the list, asks the server nothing and goes on`() {
+        previewOf("u1", "u1", "Arriendo")
 
         val result = runDue()
 
-        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "encrypted account")), result)
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "posted")), result)
+        assertEquals("Hoy vence Arriendo", text(posted().single()))
         assertTrue("nothing is asked of the server", requests.isEmpty())
+        assertEquals(1, enqueued(NoticeScheduler.DUE).size)
+    }
+
+    @Test
+    fun `a preview account with nothing due today posts nothing and goes on`() {
+        AccountMode(context).write("preview", "u1")
+        DueList.replace(context, "u1", listOf("2026-10-23" to listOf("Gimnasio")))
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "nothing due today")), result)
         assertTrue(posted().isEmpty())
-        assertTrue(work(NoticeScheduler.DUE).none { !it.state.isFinished })
+        assertTrue(requests.isEmpty())
+        assertEquals(1, enqueued(NoticeScheduler.DUE).size)
+    }
+
+    @Test
+    fun `a preview account posts once a day`() {
+        previewOf("u1", "u1", "Arriendo")
+        runDue()
+        notifications().cancelAll()
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "already today")), result)
+        assertTrue(posted().isEmpty())
+    }
+
+    @Test
+    fun `a list read for another account posts nothing and is cleared`() {
+        previewOf("u2", "u1", "Arriendo")
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "owner mismatch")), result)
+        assertTrue(posted().isEmpty())
+        assertTrue(requests.isEmpty())
+        assertNull(DueList.owner(context))
+        assertEquals(emptyList<String>(), DueList.namesOn(context, java.time.LocalDate.parse("2026-10-22")))
+    }
+
+    @Test
+    fun `a preview account with no known owner, or a list with none, posts nothing and is cleared`() {
+        for ((owner, listOwner) in listOf(null to "u1", "u1" to null, null to null)) {
+            notifications().cancelAll()
+            previewOf(owner, listOwner, "Arriendo")
+
+            val result = runDue()
+
+            assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "owner mismatch")), result)
+            assertTrue("$owner/$listOwner", posted().isEmpty())
+            assertNull(DueList.owner(context))
+            assertEquals(emptyList<String>(), DueList.namesOn(context, java.time.LocalDate.parse("2026-10-22")))
+        }
+    }
+
+    @Test
+    fun `a preview account before 9 posts nothing and aims at 9`() {
+        // 08:00 in Bogota.
+        now = Instant.parse("2026-10-22T13:00:00Z")
+        settings.zone = "America/Bogota"
+        previewOf("u1", "u1", "Arriendo")
+
+        val result = runDue()
+
+        assertEquals(ListenableWorker.Result.success(androidx.work.workDataOf(NOTICE_OUTCOME to "before 9")), result)
+        assertTrue(posted().isEmpty())
+        assertEquals(Duration.ofHours(1).toMillis(), enqueued(NoticeScheduler.DUE).single().initialDelayMillis)
     }
 
     @Test

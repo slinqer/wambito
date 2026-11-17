@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../capture/parser/dates.dart';
 import '../l10n/app_localizations.dart';
+import '../local/keys_error.dart';
+import '../local/prf.dart' show PasskeyPrf;
 import '../recurring/recurring_row.dart' show formatRecurringDate;
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
@@ -22,6 +24,8 @@ import '../ui/pressable.dart' show PressSurface;
 import '../ui/press_button.dart';
 import '../ui/toast.dart';
 import 'passkeys_settings.dart';
+import 'security/security_api.dart';
+import 'security/security_model.dart';
 import 'settings_parts.dart';
 
 /// The account's passkeys, read when Settings opens and again after an add or a delete.
@@ -56,17 +60,75 @@ class PasskeysSection extends ConsumerStatefulWidget {
 class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
   var _adding = false;
 
+  /// The passkey being turned on for the data, and one whose provider gives no PRF (said under it).
+  String? _turningOn;
+  String? _noPrf;
+
+  /// The open vault's keys: which passkeys open the data, "Turn on" for the others. Null for an
+  /// account with no vault on the phone.
+  SecurityApi? get _security => ref.read(securityApiProvider);
+
+  Future<void> _turnOn(PasskeyItem item) async {
+    final security = _security;
+    final credentialId = item.credentialId;
+    if (security == null || credentialId == null || _turningOn != null) return;
+    final l10n = AppLocalizations.of(context);
+    final toasts = ToastHost.of(context);
+    setState(() {
+      _turningOn = item.id;
+      _noPrf = null;
+    });
+    try {
+      final PasskeyPrf? touched;
+      try {
+        touched = await security.evaluatePrf([credentialId]);
+      } on Object catch (problem) {
+        if (problem is KeysError && problem.code == 'no_prf') {
+          if (mounted) setState(() => _noPrf = item.id);
+        } else {
+          toasts.say(l10n.settingsPasskeysTurnOnFailed, error: true);
+        }
+        return;
+      }
+      if (touched == null) return;
+      try {
+        await security.addPasskeyWrap(touched);
+      } on Object {
+        toasts.say(l10n.settingsPasskeysTurnOnFailed, error: true);
+        return;
+      } finally {
+        touched.prf.fillRange(0, touched.prf.length, 0);
+      }
+      toasts.say(l10n.settingsPasskeysTurnedOn);
+      ref.invalidate(securitySnapshotProvider);
+    } finally {
+      if (mounted) setState(() => _turningOn = null);
+    }
+  }
+
   Future<void> _add() async {
     if (_adding) return;
     final l10n = AppLocalizations.of(context);
     final toasts = ToastHost.of(context);
     setState(() => _adding = true);
     try {
-      final outcome = await ref.read(settingsPasskeysProvider).add();
+      final security = widget.guest ? null : _security;
+      final outcome = await ref
+          .read(settingsPasskeysProvider)
+          .add(
+            // An encrypted account's new passkey opens the data too (its PRF wraps the data key).
+            prf: security == null
+                ? null
+                : PasskeyPrfUse(
+                    explainSecondTouch: () => toasts.say(l10n.settingsPasskeysSecondTouch),
+                    keep: security.addPasskeyWrap,
+                  ),
+          );
       switch (outcome) {
         case PasskeyOutcome.added:
           toasts.say(l10n.settingsPasskeysAdded);
           ref.invalidate(settingsPasskeyListProvider);
+          if (security != null) ref.invalidate(securitySnapshotProvider);
         case PasskeyOutcome.failed:
           toasts.say(l10n.settingsPasskeysAddFailed, error: true);
         case PasskeyOutcome.cancelled:
@@ -108,6 +170,12 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
     final canMake = ref.watch(_passkeysCanBeMadeProvider).value ?? true;
     final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
     final items = list.value;
+    // Only an encrypted account (an open vault) says which passkeys open its data.
+    final security = ref.watch(securityApiProvider);
+    final wraps = security == null || widget.guest
+        ? null
+        : ref.watch(securitySnapshotProvider).value?.wraps;
+    final rows = items == null ? null : passkeyRows(items, wraps);
     final addLabel = _adding ? l10n.settingsPasskeysAdding : l10n.settingsPasskeysAdd;
     final guest = widget.guest;
 
@@ -127,16 +195,20 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
                 l10n.settingsPasskeysEmpty,
                 style: LkText.bodySm.copyWith(color: colors.ink),
               ),
-            if (items != null && items.isNotEmpty)
+            if (rows != null && rows.isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: WambitoTokens.space2,
                 children: [
-                  for (final item in items)
+                  for (final row in rows)
                     _PasskeyRow(
-                      item: item,
-                      day: passkeyDay(item.createdAt, l10n.localeName, widget.timeZone),
-                      onRemove: () => unawaited(_remove(item)),
+                      item: row.item,
+                      unlocks: row.unlocks,
+                      day: passkeyDay(row.item.createdAt, l10n.localeName, widget.timeZone),
+                      busy: _turningOn != null,
+                      noPrf: _noPrf == row.item.id,
+                      onRemove: () => unawaited(_remove(row.item)),
+                      onTurnOn: () => unawaited(_turnOn(row.item)),
                     ),
                 ],
               ),
@@ -171,11 +243,29 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
 /// One passkey: `lk-rowcard justify-between`, the fingerprint in `brand-glow`, its name (or
 /// "Huella") over "Creada el…" and "Sincronizada", and its "Eliminar".
 class _PasskeyRow extends StatelessWidget {
-  const _PasskeyRow({required this.item, required this.day, required this.onRemove});
+  const _PasskeyRow({
+    required this.item,
+    required this.unlocks,
+    required this.day,
+    required this.busy,
+    required this.noPrf,
+    required this.onRemove,
+    required this.onTurnOn,
+  });
 
   final PasskeyItem item;
+
+  /// Whether a passkey wrap opens the data with it; null for a plain account (nothing is said).
+  final bool? unlocks;
   final String day;
+
+  /// A "Turn on" is running: the others wait.
+  final bool busy;
+
+  /// This passkey's provider gives no PRF: it cannot open the data.
+  final bool noPrf;
   final VoidCallback onRemove;
+  final VoidCallback onTurnOn;
 
   @override
   Widget build(BuildContext context) {
@@ -193,59 +283,97 @@ class _PasskeyRow extends StatelessWidget {
       decoration: LkSurface.rowCard(lk),
       child: SizedBox(
         width: double.infinity,
-        child: Row(
-          spacing: 10,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: WambitoTokens.space2,
           children: [
-            Expanded(
-              child: Row(
-                spacing: WambitoTokens.space3,
-                children: [
-                  DefaultTextStyle.merge(
-                    style: TextStyle(color: colors.brandGlow),
-                    child: const FingerprintIcon(),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CssBlinkLines(
-                          style: LkText.body,
-                          child: Text(
-                            name ?? l10n.settingsPasskeysDefaultName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: LkText.body.copyWith(color: colors.ink),
-                          ),
-                        ),
-                        Wrap(
-                          spacing: WambitoTokens.space2,
+            Row(
+              spacing: 10,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    spacing: WambitoTokens.space3,
+                    children: [
+                      DefaultTextStyle.merge(
+                        style: TextStyle(color: colors.brandGlow),
+                        child: const FingerprintIcon(),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CssBlinkLines(
-                              style: LkText.fieldLabel,
-                              child: Text(l10n.settingsPasskeysCreated(day), style: muted),
-                            ),
-                            if (item.synced)
-                              CssBlinkLines(
-                                style: LkText.fieldLabel,
-                                child: Text(l10n.settingsPasskeysSynced, style: muted),
+                              style: LkText.body,
+                              child: Text(
+                                name ?? l10n.settingsPasskeysDefaultName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: LkText.body.copyWith(color: colors.ink),
                               ),
+                            ),
+                            Wrap(
+                              spacing: WambitoTokens.space2,
+                              children: [
+                                CssBlinkLines(
+                                  style: LkText.fieldLabel,
+                                  child: Text(l10n.settingsPasskeysCreated(day), style: muted),
+                                ),
+                                if (item.synced)
+                                  CssBlinkLines(
+                                    style: LkText.fieldLabel,
+                                    child: Text(l10n.settingsPasskeysSynced, style: muted),
+                                  ),
+                                if (unlocks == true)
+                                  CssBlinkLines(
+                                    style: LkText.fieldLabel,
+                                    child: Text(l10n.settingsPasskeysUnlocks, style: muted),
+                                  ),
+                                if (unlocks == false)
+                                  CssBlinkLines(
+                                    style: LkText.fieldLabel,
+                                    child: Text(
+                                      l10n.settingsPasskeysLocked,
+                                      style: muted.copyWith(
+                                        color: colors.ink,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+                if (unlocks == false && item.credentialId != null)
+                  PressButton.text(
+                    l10n.settingsPasskeysTurnOn,
+                    key: Key('settings.passkeys.turnOn.${item.id}'),
+                    tone: PressTone.secondary,
+                    size: PressSize.sm,
+                    semanticLabel: name == null
+                        ? l10n.settingsPasskeysTurnOnLabel(day)
+                        : l10n.settingsPasskeysTurnOnNamedLabel(name),
+                    onPressed: busy ? null : onTurnOn,
+                  ),
+                PressButton(
+                  key: Key('settings.passkeys.remove.${item.id}'),
+                  tone: PressTone.ghost,
+                  size: PressSize.sm,
+                  semanticLabel: removeLabel,
+                  onPressed: onRemove,
+                  child: OffsetUnderline(LkText.upperCase(l10n.settingsPasskeysRemove)),
+                ),
+              ],
+            ),
+            if (noPrf)
+              CssParagraph(
+                l10n.settingsPasskeysTurnOnNoPrf,
+                style: LkText.bodySm.copyWith(color: colors.over),
               ),
-            ),
-            PressButton(
-              key: Key('settings.passkeys.remove.${item.id}'),
-              tone: PressTone.ghost,
-              size: PressSize.sm,
-              semanticLabel: removeLabel,
-              onPressed: onRemove,
-              child: OffsetUnderline(LkText.upperCase(l10n.settingsPasskeysRemove)),
-            ),
           ],
         ),
       ),

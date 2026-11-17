@@ -18,9 +18,9 @@ import {
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
 
 /** Every secret and data key the crypto hands out, to check that rotation zeroes them. */
 const handed = vi.hoisted(() => ({

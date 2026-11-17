@@ -43,9 +43,9 @@ export interface SettingsProps {
  * email to the founder); and deleting the account. Reached from the avatar menu (phones) and the sidebar (wide screens). In the demo
  * (`/demo/settings`, spec §2.6b) passkeys, import, export and deleting the account are off, each
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
- * steps there, and lists nothing. A preview account (`local` mode) has import, export and the
- * assistants' list off with a "not available yet" note; passkeys and deleting the account work,
- * and Security lists the devices that open the data (not for a guest, who has no recovery key).
+ * steps there, and lists nothing. A preview account (`local` mode) has import and export off
+ * with a "not available yet" note; passkeys, the assistants and deleting the account work, and
+ * Security lists the devices that open the data (not for a guest, who has no recovery key).
  */
 export function Settings({
   passkeys = livePasskeys,
@@ -62,8 +62,8 @@ export function Settings({
   const appPath = useAppPath();
   const mode = useApiMode();
   const demo = mode === "demo";
-  // A preview account's vault: no export, import or assistants yet (passkeys and deleting the
-  // account work: they are the account's, not its finances).
+  // A preview account's vault: no export or import yet (passkeys, the assistants and deleting
+  // the account work: they are the account's, not its finances).
   const local = mode === "local";
   const session = useVaultSession();
   const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
@@ -72,7 +72,6 @@ export function Settings({
   const vaultKeys = local ? (securityProp ?? vaultSecurity) : null;
   const security = me.isAnonymous ? null : vaultKeys;
   const dataOffId = useId();
-  const assistantsOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
 
   return (
@@ -140,12 +139,7 @@ export function Settings({
           </div>
           {(demo || local) && <DemoOffNote id={dataOffId} local={local} />}
         </SettingsSection>
-        <AssistantsSection
-          timeZone={me.timezone}
-          off={demo || local}
-          offNote={local ? <DemoOffNote id={assistantsOffId} local /> : undefined}
-          {...(copy ? { copy } : {})}
-        />
+        <AssistantsSection timeZone={me.timezone} {...(copy ? { copy } : {})} />
         <FeedbackSection />
         <DeleteAccount
           email={me.email}

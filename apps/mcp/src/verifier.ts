@@ -6,6 +6,11 @@ import { type Config, jwksUrl } from "./config.ts";
 /** The person behind a token, which the tools act for. */
 export interface TokenUser {
   userId: string;
+  /**
+   * An encrypted account's `wk` claim, still encrypted (a JWE to the MCP's key, holding the
+   * assistant secret `S`): the vault path opens it per request. Absent for plain accounts.
+   */
+  wk?: string;
 }
 
 /**
@@ -34,7 +39,10 @@ export function jwtVerifier(
           scopes: typeof payload.scope === "string" ? payload.scope.split(" ").filter(Boolean) : [],
           expiresAt: payload.exp,
           resource: new URL(config.MCP_URL),
-          extra: { userId: payload.sub } satisfies TokenUser,
+          extra: {
+            userId: payload.sub,
+            ...(typeof payload.wk === "string" ? { wk: payload.wk } : {}),
+          } satisfies TokenUser,
         };
       } catch {
         throw new OAuthError(OAuthErrorCode.InvalidToken, "Invalid or expired access token");

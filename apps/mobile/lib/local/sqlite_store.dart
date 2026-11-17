@@ -198,17 +198,22 @@ class SqliteStore implements FinanceStore {
   /// Opens the vault of [userId] and asks [excludeFromBackup] (once, with the vault's folder) to
   /// keep it out of backups. [directory], [factory] and [excludeFromBackup] are for tests; the app
   /// leaves them out (a test directory is not excluded unless the test passes a callback).
+  /// [background] is for a headless engine: it gets its own connection (`singleInstance: false`),
+  /// so closing it never closes the app's.
   static Future<SqliteStore> open(
     String userId, {
     String? directory,
     DatabaseFactory? factory,
     Future<void> Function(String path)? excludeFromBackup,
+    bool background = false,
   }) async {
     final dir = directory ?? await defaultVaultDirectory();
     final exclude = excludeFromBackup ?? (directory == null ? excludeVaultFromBackup : null);
     // Before the file exists, so even its first bytes are never in a backup.
     await exclude?.call(dir);
-    return SqliteStore._(await openVault(userId, directory: dir, factory: factory));
+    return SqliteStore._(
+      await openVault(userId, directory: dir, factory: factory, singleInstance: !background),
+    );
   }
 
   final Database _db;
@@ -246,6 +251,9 @@ class SqliteStore implements FinanceStore {
       listener();
     }
   }
+
+  /// Another engine wrote the file (a headless run): tells the subscribers, as after a commit.
+  void notifyExternalChange() => _fire();
 
   /// A read-write unit: the SQLite transaction commits when [fn] completes, rolls back if it
   /// throws, and subscribers hear of it after the commit when it wrote.

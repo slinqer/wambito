@@ -11,7 +11,9 @@ import 'backend_interceptor.dart';
 import 'ids.dart';
 import 'keys.dart';
 import 'sqlite_store.dart';
+import 'store.dart' show FinanceStore;
 import 'sync.dart';
+import 'vault_lock.dart';
 
 /// A preview account's open vault on this phone: the Dart twin of
 /// `apps/web/app/local/vault-session.ts`. It ties the store, the keys, the local backend the
@@ -65,6 +67,7 @@ class OpenVaultOptions {
     this.deleteStore,
     this.syncDebounce = const Duration(seconds: 1),
     this.refreshKeys,
+    this.lease,
   });
 
   final VaultProfile profile;
@@ -95,11 +98,31 @@ class OpenVaultOptions {
 
   /// `keys.dart`'s `refreshKeys`; tests pass their own to hold or fail a refresh.
   final Future<LocalKeys> Function(KeysOptions options)? refreshKeys;
+
+  /// The lease a sync run takes (vault_lock.dart). Default: the app's ([appLease], a short wait)
+  /// on the real vault folder; none when a test passes its own `openStore`.
+  final Future<VaultLease?> Function()? lease;
 }
+
+/// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
+/// lease before it reports `busy` and is retried like `offline`: a headless engine may hold it for
+/// minutes, and the person must never wait on it.
+const appLeaseWait = Duration(seconds: 2);
+
+/// The app's lease for one sync run; [directory] is for tests.
+Future<VaultLease?> appLease(String userId, {String? directory}) =>
+    waitLease(userId, holder: 'app', wait: appLeaseWait, directory: directory);
 
 /// The open vault of one account.
 class VaultSession {
-  VaultSession._(this.userId, this.interceptor, this._store, this._engine, this._storage);
+  VaultSession._(
+    this.userId,
+    this.interceptor,
+    this.backend,
+    this._store,
+    this._engine,
+    this._storage,
+  );
 
   final String userId;
 
@@ -107,6 +130,10 @@ class VaultSession {
   /// included); deleting the account and everything outside `/v1` go on to the network. Its
   /// local writes start a sync.
   final Interceptor interceptor;
+
+  /// The local backend behind [interceptor], for what reads the vault without a request: the home
+  /// widget ([writeVaultWidget]).
+  final LocalBackend backend;
   final SqliteStore _store;
   final SyncEngine _engine;
   final KeyStorage _storage;
@@ -115,6 +142,13 @@ class VaultSession {
   final Set<void Function()> _unverifiedListeners = {};
   bool _closing = false;
   late final void Function() _drop;
+
+  /// The vault's store, for what changes the keys on this phone ([rotateKeys] writes
+  /// `settings.revokedDevices` through it) and Settings → Security's reads.
+  FinanceStore get store => _store;
+
+  /// How many records the sync could not open (the quarantine), for Settings → Security.
+  Future<int> unreadableCount() => _store.quarantineCount();
 
   /// Called after every commit to the store (the screens refetch). Returns the unsubscribe.
   void Function() subscribe(void Function() listener) => _store.subscribe(listener);
@@ -139,6 +173,12 @@ class VaultSession {
   void Function() onUnverified(void Function() listener) {
     _unverifiedListeners.add(listener);
     return () => _unverifiedListeners.remove(listener);
+  }
+
+  /// A headless engine changed the vault file: the subscribers refetch, then a sync is scheduled.
+  void externalChange() {
+    _store.notifyExternalChange();
+    _engine.afterLocalWrite();
   }
 
   /// A sync now (pull-to-refresh). Shares a run in flight.
@@ -258,9 +298,6 @@ Future<void> _forgetRefreshed(
   }
 }
 
-/// The namespace of the seeded records' ids; the account's own namespace is made from it.
-const _seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
-
 /// Creates the account's first records when it has none after the first sync: the settings (from
 /// the server's profile, the web's default currency EUR) and the suggested categories in the
 /// person's language. The ids are UUID v5 of the account and the record's name, and the content
@@ -269,7 +306,7 @@ Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
   if ((await store.list(RecordType.settings)).isNotEmpty) return;
   final locale = supportedLocales.contains(profile.locale) ? profile.locale : 'es';
   final names = SuggestionLocale.values.byName(locale);
-  final namespace = uuidv5(_seedNamespace, profile.id);
+  final namespace = uuidv5(seedNamespace, profile.id);
   final settingsId = uuidv5(namespace, 'settings');
   final categories = [
     for (final (i, s) in suggestedCategories.indexed)
@@ -393,6 +430,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           return local.keyring;
         },
         dropKeyVersion: (v) => dropKeyVersion(userId, v, storage),
+        lease: options.lease ?? (options.openStore == null ? () => appLease(userId) : null),
         debounce: options.syncDebounce,
         onError: (problem) {
           // A signed-out or closing session tells nobody anything (a late run of it ends here).
@@ -432,6 +470,9 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     final fatal =
         first.error == SyncProblemCode.unauthorized ||
         first.error == SyncProblemCode.sessionChanged;
+    // `busy` (a headless engine holds the lease) is reported within [appLeaseWait]: a known phone
+    // opens on its local data and the sync is retried; a fresh vault, which must not seed before its
+    // first download, fails like `offline` and the gate offers to try again.
     if (!first.ok && (options.fresh || fatal)) {
       throw VaultOpenError(first.error ?? SyncProblemCode.server);
     }
@@ -444,6 +485,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     final session = VaultSession._(
       userId,
       LocalBackendInterceptor(backend, afterWrite: engine.afterLocalWrite),
+      backend,
       store,
       engine,
       storage,

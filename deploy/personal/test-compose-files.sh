@@ -75,6 +75,13 @@ check "the API's database" wambito "${api_url##*/}"
 with_env admin ADMIN_USER_IDS=some-id ADMIN_ALLOWED_IPS=203.0.113.0/24
 check "the API gets ADMIN_USER_IDS" some-id "$(compose config --format json | jq -r .services.api.environment.ADMIN_USER_IDS)"
 check "the API gets ADMIN_ALLOWED_IPS" 203.0.113.0/24 "$(compose config --format json | jq -r .services.api.environment.ADMIN_ALLOWED_IPS)"
+# The MCP's key pair: the public half reaches the API, the private half the MCP (and no other).
+with_env keys "MCP_WK_PUBLIC_KEY={\"kty\":\"OKP\",\"crv\":\"X25519\",\"x\":\"pub\"}" \
+  "MCP_WK_PRIVATE_KEY={\"kty\":\"OKP\",\"crv\":\"X25519\",\"d\":\"priv\",\"x\":\"pub\"}"
+check "the API gets the MCP's public key only" '{"kty":"OKP","crv":"X25519","x":"pub"} ' \
+  "$(compose config --format json | jq -r '[.services.api.environment.MCP_WK_PUBLIC_KEY, .services.api.environment.MCP_WK_PRIVATE_KEY] | join(" ")')"
+check "the MCP gets the private key only" ' {"kty":"OKP","crv":"X25519","d":"priv","x":"pub"}' \
+  "$(compose config --format json | jq -r '[.services.mcp.environment.MCP_WK_PUBLIC_KEY, .services.mcp.environment.MCP_WK_PRIVATE_KEY] | join(" ")')"
 with_env unset
 check "the images" "wambito-api:personal wambito-mcp:personal wambito-web:personal" \
   "$(compose config --format json | jq -r '[.services.api.image, .services.mcp.image, .services.web.image] | join(" ")')"

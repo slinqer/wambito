@@ -38,7 +38,7 @@ const LOCALES = [
     freeQuestion: "¿Es gratis?",
     freeAnswer: "Sí, y lo será siempre.",
     openQuestion: "¿Es de código abierto?",
-    metaDescription: [/Gratis para siempre/, /código abierto/],
+    metaDescription: [/notificaciones de tus pagos/, /código abierto/],
     banned: [/mejor amigo/i, /\bjueg(o|a)\b/i, /Empieza gratis/i],
     // Privacy copy claims only what Wambito does: no "can't leak", no encryption at rest. End-to-end
     // encryption is a feature (Wambito launches with it: the feature grid's card says so), so the
@@ -54,7 +54,7 @@ const LOCALES = [
     how: "Cómo funciona",
     questions: "Preguntas",
     other: { name: "English", path: "/en", lang: "en" },
-    titlePart: "Tus lukas, por fin claras",
+    titlePart: "La app que lleva tus gastos por ti",
   },
   {
     locale: "en",
@@ -79,7 +79,7 @@ const LOCALES = [
     freeQuestion: "Is it free?",
     freeAnswer: "Yes, and it always will be.",
     openQuestion: "Is it open source?",
-    metaDescription: [/Free forever/, /open source/],
+    metaDescription: [/payment notifications/, /open source/],
     banned: [/best friend/i, /\bgames?\b/i, /Start free/i],
     overclaims: [/nothing to leak/i, /at rest/i],
     privacyAnswer:
@@ -92,7 +92,7 @@ const LOCALES = [
     how: "How it works",
     questions: "Questions",
     other: { name: "Español", path: "/", lang: "es" },
-    titlePart: "Your money, finally clear",
+    titlePart: "The app that tracks your expenses for you",
   },
   {
     locale: "it",
@@ -117,7 +117,7 @@ const LOCALES = [
     freeQuestion: "È gratis?",
     freeAnswer: "Sì, e lo sarà sempre.",
     openQuestion: "È open source?",
-    metaDescription: [/Gratis per sempre/, /open source/],
+    metaDescription: [/notifiche dei tuoi pagamenti/, /open source/],
     banned: [/migliore amico/i, /\bgioc(o|hi)\b/i, /Inizia gratis/i],
     overclaims: [/non possa trapelare/i, /a riposo/i],
     privacyAnswer:
@@ -130,7 +130,7 @@ const LOCALES = [
     how: "Come funziona",
     questions: "Domande",
     other: { name: "Português", path: "/pt", lang: "pt" },
-    titlePart: "I tuoi soldi, finalmente chiari",
+    titlePart: "L'app che tiene i conti delle tue spese per te",
   },
   {
     locale: "pt",
@@ -155,7 +155,7 @@ const LOCALES = [
     freeQuestion: "É grátis?",
     freeAnswer: "Sim, e vai ser sempre.",
     openQuestion: "É de código aberto?",
-    metaDescription: [/Grátis para sempre/, /código aberto/],
+    metaDescription: [/notificações dos teus pagamentos/, /código aberto/],
     banned: [/melhor amigo/i, /\bjogos?\b/i, /Começa grátis/i],
     overclaims: [/não possa vazar/i, /em repouso/i],
     privacyAnswer:
@@ -168,7 +168,7 @@ const LOCALES = [
     how: "Como funciona",
     questions: "Perguntas",
     other: { name: "Italiano", path: "/it", lang: "it" },
-    titlePart: "O teu dinheiro, finalmente claro",
+    titlePart: "A app que gere as tuas despesas por ti",
   },
 ] as const;
 
@@ -1387,7 +1387,7 @@ test.describe("landing with JavaScript", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Your money, finally clear.",
     );
-    await expect(page).toHaveTitle(/Your money, finally clear/);
+    await expect(page).toHaveTitle(/The app that tracks your expenses for you/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${ORIGIN}/en`);
     expect(errors).toEqual([]);

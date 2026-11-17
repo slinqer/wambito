@@ -38,7 +38,11 @@ class RecoveryKeySetupView extends StatefulWidget {
     super.key,
     required this.recoveryKey,
     required this.onContinue,
-    required this.onSignOut,
+    this.onSignOut,
+    this.onCancel,
+    this.busy = false,
+    this.problem,
+    this.continueLabel,
     this.onShare,
     this.onCopy,
     this.now,
@@ -51,8 +55,22 @@ class RecoveryKeySetupView extends StatefulWidget {
   /// The person confirmed they kept it: the app goes on.
   final VoidCallback onContinue;
 
-  /// Signs out (and wipes this phone's vault): nothing was sent yet, so nothing is kept.
-  final VoidCallback onSignOut;
+  /// Signs out (and wipes this phone's vault): nothing was sent yet, so nothing is kept. The
+  /// first-run setup's way out; Settings gives [onCancel] instead.
+  final VoidCallback? onSignOut;
+
+  /// Gives up on this key (Settings' new recovery key): nothing was sent yet. Replaces the sign-out
+  /// button; null with no [onSignOut] leaves no way out (a failed save: the key may be kept).
+  final VoidCallback? onCancel;
+
+  /// The key is being saved: Continue waits, and the key cannot be hidden again.
+  final bool busy;
+
+  /// Why the last save failed, shown above Continue.
+  final String? problem;
+
+  /// Continue's label when it is not the usual one ("Try again" after a failed save).
+  final String? continueLabel;
 
   /// Hands the file's name and text to the share sheet; null shares nothing.
   final Future<void> Function(String name, String text)? onShare;
@@ -195,15 +213,27 @@ class _RecoveryKeySetupViewState extends State<RecoveryKeySetupView> {
             onPressed: () => setState(() => _confirming = true),
           ),
         ),
-        SizedBox(
-          width: double.infinity,
-          child: PressButton.text(
-            l10n.settingsSignOut,
-            key: const Key('vault.signOut'),
-            tone: PressTone.ghost,
-            onPressed: widget.onSignOut,
+        if (widget.problem != null) FieldError(widget.problem!, textAlign: TextAlign.center),
+        if (widget.onCancel != null)
+          SizedBox(
+            width: double.infinity,
+            child: PressButton.text(
+              l10n.cancel,
+              key: const Key('vault.cancel'),
+              tone: PressTone.ghost,
+              onPressed: widget.busy ? null : widget.onCancel,
+            ),
+          )
+        else if (widget.onSignOut != null)
+          SizedBox(
+            width: double.infinity,
+            child: PressButton.text(
+              l10n.settingsSignOut,
+              key: const Key('vault.signOut'),
+              tone: PressTone.ghost,
+              onPressed: widget.onSignOut,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -231,12 +261,13 @@ class _RecoveryKeySetupViewState extends State<RecoveryKeySetupView> {
           ),
         ),
         if (mismatch) FieldError(l10n.vaultSetupMismatch, textAlign: TextAlign.center),
+        if (widget.problem != null) FieldError(widget.problem!, textAlign: TextAlign.center),
         SizedBox(
           width: double.infinity,
           child: PressButton.text(
-            l10n.vaultSetupContinue,
+            widget.continueLabel ?? l10n.vaultSetupContinue,
             key: const Key('vault.continue'),
-            onPressed: matches ? widget.onContinue : null,
+            onPressed: matches && !widget.busy ? widget.onContinue : null,
           ),
         ),
         SizedBox(
@@ -245,7 +276,7 @@ class _RecoveryKeySetupViewState extends State<RecoveryKeySetupView> {
             l10n.vaultSetupShowAgain,
             key: const Key('vault.showAgain'),
             tone: PressTone.ghost,
-            onPressed: () => setState(() => _confirming = false),
+            onPressed: widget.busy ? null : () => setState(() => _confirming = false),
           ),
         ),
       ],

@@ -34,6 +34,12 @@ export interface UnlockProps {
   onPair?(): void;
   /** Signs out (and wipes this browser's vault): the way out. */
   onSignOut(): void;
+  /** Another screen's title (the consent page's); "Open your data here" by default. */
+  title?: string;
+  /** Another lead, or null for none; the recovery key's "…in this browser" by default. */
+  lead?: string | null;
+  /** The way out's label when it is not signing out (the consent page goes back). */
+  exitLabel?: string;
 }
 
 /**
@@ -47,6 +53,9 @@ export function Unlock({
   passkeysSupported = browserPasskeys,
   onPair,
   onSignOut,
+  title,
+  lead,
+  exitLabel,
 }: UnlockProps) {
   const t = useTranslations("vault.unlock");
   const tVault = useTranslations("vault");
@@ -86,13 +95,13 @@ export function Unlock({
 
   return (
     <SignInScreen>
-      <ScreenTitle>{t("title")}</ScreenTitle>
+      <ScreenTitle>{title ?? t("title")}</ScreenTitle>
       {notice && (
         <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
           {tVault(notice)}
         </p>
       )}
-      <p className="text-center text-ink-muted">{t("lead")}</p>
+      {lead !== null && <p className="text-center text-ink-muted">{lead ?? t("lead")}</p>}
       <form noValidate className="flex w-full flex-col gap-(--space-3)" onSubmit={submit}>
         <label htmlFor={inputId} className="text-sm text-ink-muted">
           {t("label")}
@@ -146,7 +155,7 @@ export function Unlock({
         </PressButton>
       )}
       <PressButton variant="ghost" className="w-full" disabled={busy} onClick={onSignOut}>
-        {tVault("sign_out")}
+        {exitLabel ?? tVault("sign_out")}
       </PressButton>
     </SignInScreen>
   );

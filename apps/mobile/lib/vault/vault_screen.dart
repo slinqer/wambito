@@ -1,6 +1,6 @@
 // `/unlock`: the vault gate on screen (the web's VaultGate.tsx switch over its state). A `preview`
 // account is kept here until its vault is open (lib/router.dart): the recovery key to set up,
-// Unlock, Locked, or a loading line while the gate checks, commits or opens.
+// Unlock, Locked, the pairing screen, or a loading line while the gate checks, commits or opens.
 import 'dart:async';
 import 'dart:convert';
 
@@ -14,6 +14,7 @@ import '../l10n/app_localizations.dart';
 import '../settings/account_deletion.dart';
 import 'encryption_mode.dart';
 import 'locked_view.dart';
+import 'pair_new_device_view.dart';
 import 'recovery_key_setup_view.dart';
 import 'unlock_view.dart';
 import 'unsynced_sheet.dart';
@@ -104,7 +105,14 @@ class VaultScreen extends ConsumerWidget {
         onPasskey: (ref.watch(unlockPasskeyOfferedProvider).value ?? false)
             ? gate.unlockWithPasskey
             : null,
+        onPair: () => unawaited(gate.pair()),
         onSignOut: signOut,
+      ),
+      Pairing() => PairNewDeviceView(
+        // The gate owns the request: it cancels one when a new one starts and when this is left.
+        start: gate.startPairing,
+        onBack: gate.leavePairing,
+        timeZone: ref.watch(pairingTimeZoneProvider),
       ),
       Locked(:final kind, :final retrying) => LockedView(
         kind: kind,
@@ -112,6 +120,7 @@ class VaultScreen extends ConsumerWidget {
         onRetry: gate.retry,
         onSignOut: signOut,
         onDeleteAccount: kind == LockedKind.guest ? () => _deleteAccount(ref) : null,
+        onPair: kind == LockedKind.guest ? () => unawaited(gate.pair()) : null,
       ),
       _ => const VaultLoading(),
     };

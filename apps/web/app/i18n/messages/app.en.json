@@ -228,7 +228,9 @@
     "insufficient_scope": "This assistant isn't allowed to do that.",
     "encrypted_account": "This account keeps its finances end-to-end encrypted; this part of Wambito doesn't work with it yet.",
     "already_set_up": "This account already has its keys. Open it with your recovery key.",
-    "session_changed": "Another account signed in on this browser. Reload the page."
+    "session_changed": "Another account signed in on this browser. Reload the page.",
+    "assistant_keys_missing": "Assistants can't be connected right now. Try again later.",
+    "assistant_wrap_in_rotation": "Changing your keys disconnects your assistants. Connect them again afterwards."
   },
   "sign_in": {
     "meta_title": "Sign in · Wambito",
@@ -684,13 +686,18 @@
       "recovery_title": "Recovery key",
       "recovery_lead": "Make a new one if you lost it or someone else may have seen it. The old one stops working.",
       "new_recovery": "New recovery key",
+      "change_keys": "Change keys",
+      "change_keys_body": "Makes new encryption keys for your data. Your devices keep working; connected assistants are disconnected. Type your recovery key to confirm.",
+      "changing": "Changing…",
+      "change_keys_done": "Your keys changed.",
+      "change_keys_failed": "We couldn't change your keys. Try again.",
       "unreadable": "{count, plural, one {Could not read # item} other {Could not read # items}}",
       "unreadable_lead": "They were saved with a key this browser does not have. They are kept safe as they are.",
       "passkeys_failed": "We couldn't load your fingerprints, so a new key can't be offered yet.",
       "maybe_saved": "It may have been saved: keep this new key until it says it is done.",
       "remove_sheet": {
         "title": "Remove {name}?",
-        "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm.",
+        "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm. Connected assistants are disconnected and need connecting again.",
         "key_label": "Recovery key",
         "confirm": "Remove it",
         "removing": "Removing…",
@@ -797,11 +804,15 @@
       "offline": "Stay connected until you disconnect it"
     },
     "revoke_hint": "You can disconnect it any time in Settings.",
+    "encrypted_note": "While it's connected, Wambito opens your data on its server only to answer your assistant, and the assistant's company reads what it is given. Revoke it any time in Settings and it stops at once.",
     "allow": "Allow",
     "allowing": "Connecting…",
     "cancel": "Cancel",
     "loading": "Loading the assistant…",
     "failed": "We couldn't finish connecting. Try again.",
+    "unlock_title": "Open your data to connect it",
+    "wrap_failed": "It was allowed but its key wasn't saved, so it can't read anything yet.",
+    "try_again": "Try again",
     "guest": {
       "title": "Save your progress",
       "body": "To connect an assistant, first save your progress with your email: in the Wambito app, tap “Save your progress”. Then connect it again from your assistant."

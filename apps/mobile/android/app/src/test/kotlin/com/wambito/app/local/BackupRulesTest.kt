@@ -1,5 +1,6 @@
 package com.wambito.app.local
 
+import com.wambito.app.capture.CaptureQueue
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -34,6 +35,9 @@ class BackupRulesTest {
     private val vault = "file" to "vault"
     private val keys = "sharedpref" to "FlutterSecureStorage.xml"
     private val wrappedKey = "sharedpref" to "FlutterSecureKeyStorage.xml"
+    private val widgetFigures = "sharedpref" to "HomeWidgetPreferences.xml"
+    private val dueList = "sharedpref" to "wambito.notice.duelist.xml"
+    private val captureQueue = "sharedpref" to "${CaptureQueue.FILE}.xml"
     private val config = "sharedpref" to "FlutterSecureStorageConfiguration:FlutterSecureStorage.xml"
 
     @Test
@@ -48,6 +52,28 @@ class BackupRulesTest {
     fun `the older full backup rules exclude the same files`() {
         val found = excludes("backup_rules.xml", null)
         assertTrue(found.toString(), found.containsAll(listOf(vault, keys, wrappedKey, config)))
+    }
+
+    @Test
+    fun `the widget figures and the due list, which hold a preview account's data, are excluded`() {
+        val own = listOf(widgetFigures, dueList)
+        for (scope in listOf("cloud-backup", "device-transfer")) {
+            val found = excludes("data_extraction_rules.xml", scope)
+            assertTrue("$scope: $found", found.containsAll(own))
+        }
+        val found = excludes("backup_rules.xml", null)
+        assertTrue(found.toString(), found.containsAll(own))
+    }
+
+    @Test
+    fun `the capture queue, which holds amounts and merchants, is excluded`() {
+        assertEquals("wambito.capture.queue.xml", captureQueue.second)
+        for (scope in listOf("cloud-backup", "device-transfer")) {
+            val found = excludes("data_extraction_rules.xml", scope)
+            assertTrue("$scope: $found", found.contains(captureQueue))
+        }
+        val found = excludes("backup_rules.xml", null)
+        assertTrue(found.toString(), found.contains(captureQueue))
     }
 
     @Test

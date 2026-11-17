@@ -1,8 +1,6 @@
+import { createLocalBackend, createMemoryStore, DEMO_UNAVAILABLE, uuidv5 } from "@wambito/vault";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "../api/client.ts";
-import { createLocalBackend, DEMO_UNAVAILABLE } from "./backend.ts";
-import { uuidv5 } from "./ids.ts";
-import { createMemoryStore } from "./memory-store.ts";
 
 const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const NOW = new Date("2026-10-21T18:00:00Z");

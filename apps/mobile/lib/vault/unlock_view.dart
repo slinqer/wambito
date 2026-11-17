@@ -1,6 +1,6 @@
 // The web's Unlock (apps/web/app/features/vault/Unlock.tsx): a phone on an account that has keys
 // types the recovery key, or touches a passkey whose PRF opens its wrap, to open the data here.
-// "From another device" (pairing) is stage 3b.
+// "Add this phone from another device" opens the pairing screen (pair_new_device_view.dart).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -31,6 +31,7 @@ class UnlockView extends StatefulWidget {
     this.notice,
     required this.onUnlock,
     this.onPasskey,
+    this.onPair,
     required this.onSignOut,
   });
 
@@ -43,6 +44,10 @@ class UnlockView extends StatefulWidget {
   /// "Use a passkey": resolves to the error code, or null (it worked, or the prompt was closed).
   /// Without it there is no button.
   final Future<String?> Function()? onPasskey;
+
+  /// "Add this phone from another device": the pairing screen, where a device that has the data
+  /// approves this one. Without it there is no button.
+  final VoidCallback? onPair;
 
   /// Signs out (and wipes this phone's vault): the way out.
   final VoidCallback onSignOut;
@@ -113,6 +118,7 @@ class _UnlockViewState extends State<UnlockView> {
       _ => null,
     };
     final onPasskey = widget.onPasskey;
+    final onPair = widget.onPair;
     return SignInFrame(
       children: [
         EntryTitle(l10n.vaultUnlockTitle),
@@ -148,6 +154,7 @@ class _UnlockViewState extends State<UnlockView> {
                 invalid: _error != null,
                 readOnly: _busy,
                 autofocus: true,
+                enableIMEPersonalizedLearning: false,
                 textInputAction: TextInputAction.done,
                 onChanged: (_) {
                   if (_error != null) setState(() => _error = null);
@@ -178,6 +185,16 @@ class _UnlockViewState extends State<UnlockView> {
                 ),
                 if (_passkeyError != null) FieldError(unlockErrorText(l10n, _passkeyError!)),
               ],
+            ),
+          ),
+        if (onPair != null)
+          SizedBox(
+            width: double.infinity,
+            child: PressButton.text(
+              l10n.vaultUnlockPair,
+              key: const Key('vault.pair'),
+              tone: PressTone.secondary,
+              onPressed: _busy ? null : onPair,
             ),
           ),
         SizedBox(

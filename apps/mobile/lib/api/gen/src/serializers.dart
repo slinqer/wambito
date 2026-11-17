@@ -31,6 +31,7 @@ import 'package:wambito/api/gen/src/model/admin_user_assistants_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_user_passkeys_inner.dart';
 import 'package:wambito/api/gen/src/model/assistant.dart';
 import 'package:wambito/api/gen/src/model/assistant_list.dart';
+import 'package:wambito/api/gen/src/model/assistant_wrap.dart';
 import 'package:wambito/api/gen/src/model/capture_result.dart';
 import 'package:wambito/api/gen/src/model/capture_result_category.dart';
 import 'package:wambito/api/gen/src/model/capture_result_transaction.dart';
@@ -134,6 +135,7 @@ part 'serializers.g.dart';
   AdminUserPasskeysInner,
   Assistant,
   AssistantList,
+  AssistantWrap,
   CaptureResult,
   CaptureResultCategory,
   CaptureResultTransaction,

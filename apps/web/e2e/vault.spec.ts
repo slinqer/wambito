@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
 import {
   type Browser,
   type BrowserContext,
@@ -7,7 +7,7 @@ import {
   type Page,
   test,
 } from "@playwright/test";
-import { clientIp, pinClock, signInExisting } from "./helpers.ts";
+import { clientIp, pinClock, reseed, setUpRecoveryKey, signInExisting } from "./helpers.ts";
 
 /**
  * An encrypted preview account (stage 2a) against the dev stack, signed in as the seeded
@@ -39,37 +39,6 @@ const vaultDatabases = (page: Page) =>
       .map((d) => d.name ?? "")
       .filter((n) => n.startsWith("wambito-vault-")),
   );
-
-/** The recovery key from the setup screen, then the four characters it asks back. */
-async function setUpRecoveryKey(page: Page): Promise<string> {
-  await expect(
-    page.getByRole("heading", { name: "Guarda tu clave de recuperación" }),
-  ).toBeVisible();
-  const key = (
-    await page.getByRole("group", { name: "Tu clave de recuperación" }).innerText()
-  ).replace(/\s+/g, "-");
-  expect(key).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{3,4})+$/);
-  await page.getByRole("button", { name: "Ya la guardé" }).click();
-  const plain = key.replaceAll("-", "");
-  const boxes = page.getByRole("textbox", { name: /^Grupo \d+, carácter \d+$/ });
-  for (const box of await boxes.all()) {
-    const [, group, char] = /^Grupo (\d+), carácter (\d+)$/.exec(
-      (await box.getAttribute("aria-label")) ?? "",
-    ) ?? ["", "0", "0"];
-    await box.fill(plain[(Number(group) - 1) * 4 + Number(char) - 1] ?? "");
-  }
-  await page.getByRole("button", { name: "Continuar" }).click();
-  return key;
-}
-
-/** Makes the preview account again: no records, key wraps, passkeys or finance rows. */
-function reseed() {
-  execFileSync(
-    "docker",
-    ["compose", "exec", "-T", "api", "pnpm", "--filter", "@wambito/api", "seed:e2e-preview"],
-    { stdio: "inherit" },
-  );
-}
 
 test.beforeAll(async ({ browser: _ }, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
@@ -359,7 +328,14 @@ test("a passkey unlocks with PRF", async ({ browser }) => {
     authenticatorId: authenticator.authenticatorId,
     enabled: true,
   });
-  await first.page.getByRole("button", { name: "Entrar con huella" }).click();
+  // With presence back on, the page's pending autofill request may answer first and sign in by
+  // itself (the button is then disabled and gone). Either way the same passkey and its PRF must
+  // land on the movements with the vault open.
+  const click = first.page
+    .getByRole("button", { name: "Entrar con huella" })
+    .click({ timeout: 20_000 });
+  click.catch(() => {});
+  await Promise.race([first.page.waitForURL(/\/app$/, { timeout: 20_000 }), click]);
   await expect(first.page).toHaveURL(/\/app$/, { timeout: 20_000 });
   await expect(first.page.getByText(NAME, { exact: true })).toBeVisible();
   await expect(first.page.getByRole("heading", { name: "Abre tus datos aquí" })).toHaveCount(0);
@@ -635,4 +611,160 @@ test("a browser closed through two rotations opens and shows the data", async ({
   await first.context.close();
   await closed.context.close();
   for (const other of others) await other.context.close();
+});
+
+// An AI assistant connects to the same account through the real consent page (stage 4): in this
+// file so it runs inside the serial run above, never beside another reseed of `preview-e2e`.
+const ASSISTANT_REDIRECT = "https://claude.ai/api/mcp/auth_callback";
+const MCP_URL = "http://localhost:3001/mcp";
+const API = process.env.E2E_API_URL ?? "http://localhost:3000";
+
+test.describe("connecting an assistant", () => {
+  interface Pending {
+    authorize: string;
+    verifier: string;
+    clientId: string;
+  }
+
+  /**
+   * What an assistant does before it sends the person to the browser: registers itself (dynamic
+   * client registration) and builds the authorize URL (PKCE S256, `resource` = the MCP).
+   */
+  async function startConnecting(): Promise<Pending> {
+    const registered = await fetch(`${API}/api/auth/oauth2/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": clientIp() },
+      body: JSON.stringify({
+        client_name: "Claude",
+        client_uri: "https://claude.ai",
+        redirect_uris: [ASSISTANT_REDIRECT],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+      }),
+    });
+    expect(registered.status, await registered.clone().text()).toBe(201);
+    const { client_id: clientId } = (await registered.json()) as { client_id: string };
+    const verifier = randomBytes(32).toString("base64url");
+    const query = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: ASSISTANT_REDIRECT,
+      scope: "finance:read finance:write offline_access",
+      resource: MCP_URL,
+      state: "e2e",
+      code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+      code_challenge_method: "S256",
+      prompt: "consent",
+    });
+    return { authorize: `/api/auth/oauth2/authorize?${query}`, verifier, clientId };
+  }
+
+  /**
+   * Opens the authorize URL in the person's browser and holds the redirect back to the assistant
+   * (an external site, answered empty here); returns the code it carries.
+   */
+  async function openConsent(page: Page, pending: Pending) {
+    await page.route("https://claude.ai/**", (route) => route.fulfill({ status: 200, body: "" }));
+    await page.goto(pending.authorize);
+    await expect(page).toHaveURL(/\/oauth\/consent\?/);
+    await expect(
+      page.getByRole("heading", { name: "Claude quiere acceder a tus finanzas" }),
+    ).toBeVisible();
+    await expect(page.getByText("Mientras esté conectado, Wambito abre tus datos")).toBeVisible();
+  }
+
+  async function codeAfterRedirect(page: Page): Promise<string> {
+    await page.waitForURL((url) => url.origin === "https://claude.ai");
+    const back = new URL(page.url());
+    expect(back.searchParams.get("state")).toBe("e2e");
+    const code = back.searchParams.get("code");
+    expect(code).toBeTruthy();
+    return code ?? "";
+  }
+
+  /** The assistant's second half: the code for tokens. Returns the refresh token. */
+  async function refreshTokenFor(pending: Pending, code: string): Promise<string> {
+    const response = await fetch(`${API}/api/auth/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-forwarded-for": clientIp(),
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: ASSISTANT_REDIRECT,
+        client_id: pending.clientId,
+        code_verifier: pending.verifier,
+        resource: MCP_URL,
+      }),
+    });
+    expect(response.status, await response.clone().text()).toBe(200);
+    const tokens = (await response.json()) as { refresh_token?: string };
+    expect(tokens.refresh_token).toBeTruthy();
+    return tokens.refresh_token ?? "";
+  }
+
+  /** An encrypted account's refresh token: the usual token, then `.` and `S` (43 base64url chars). */
+  const CARRIES_SECRET = /\.[A-Za-z0-9_-]{43}$/;
+
+  async function expectListed(page: Page) {
+    const list = await page.request.get("/api/v1/me/assistants");
+    expect(list.status()).toBe(200);
+    const body = (await list.json()) as { items: { name: string }[] };
+    expect(body.items.map((a) => a.name)).toContain("Claude");
+  }
+
+  test("with the vault open, Allow connects without asking for a key", async ({ browser }) => {
+    test.setTimeout(90_000);
+    reseed();
+    const opened = await openBrowser(browser);
+    await firstBrowser(opened);
+    const { page } = opened;
+
+    const pending = await startConnecting();
+    await openConsent(page, pending);
+    await page.getByRole("button", { name: "Permitir" }).click();
+
+    const code = await codeAfterRedirect(page);
+    await expectListed(page);
+    expect(await refreshTokenFor(pending, code)).toMatch(CARRIES_SECRET);
+
+    await opened.context.close();
+  });
+
+  test("in a browser without the vault, the recovery key connects it", async ({ browser }) => {
+    test.setTimeout(120_000);
+    reseed();
+    const first = await openBrowser(browser);
+    const key = await firstBrowser(first);
+
+    // A second browser signs in and is at the unlock screen, with no vault of its own.
+    const second = await openBrowser(browser);
+    await signInExisting(second.page, EMAIL);
+    await expect(second.page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
+
+    const pending = await startConnecting();
+    await openConsent(second.page, pending);
+    await second.page.getByRole("button", { name: "Permitir" }).click();
+    await expect(
+      second.page.getByRole("heading", { name: "Abre tus datos para conectarlo" }),
+    ).toBeVisible();
+    await second.page.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
+    await second.page.getByRole("button", { name: "Abrir mis datos" }).click();
+
+    const code = await codeAfterRedirect(second.page);
+    await expectListed(second.page);
+    expect(await refreshTokenFor(pending, code)).toMatch(CARRIES_SECRET);
+    // Nothing was kept: this browser still has no vault.
+    expect(
+      await second.page.evaluate(async () =>
+        (await indexedDB.databases()).map((d) => d.name ?? ""),
+      ),
+    ).not.toContain("wambito-vault-preview-e2e");
+
+    await first.context.close();
+    await second.context.close();
+  });
 });

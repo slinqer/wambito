@@ -228,7 +228,9 @@
     "insufficient_scope": "Este assistente não tem permissão para fazer isso.",
     "encrypted_account": "Esta conta guarda as finanças cifradas de ponta a ponta; esta parte do Wambito ainda não funciona com ela.",
     "already_set_up": "Esta conta já tem as suas chaves. Abre-a com a tua chave de recuperação.",
-    "session_changed": "Outra conta iniciou sessão neste navegador. Recarrega a página."
+    "session_changed": "Outra conta iniciou sessão neste navegador. Recarrega a página.",
+    "assistant_keys_missing": "Neste momento não é possível ligar assistentes. Tenta mais tarde.",
+    "assistant_wrap_in_rotation": "Mudar as tuas chaves desliga os teus assistentes. Volta a ligá-los depois."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -684,13 +686,18 @@
       "recovery_title": "Chave de recuperação",
       "recovery_lead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto. A anterior deixa de funcionar.",
       "new_recovery": "Nova chave de recuperação",
+      "change_keys": "Mudar chaves",
+      "change_keys_body": "Cria novas chaves de cifra para os teus dados. Os teus dispositivos continuam a funcionar; os assistentes ligados são desligados. Escreve a tua chave de recuperação para confirmar.",
+      "changing": "A mudar…",
+      "change_keys_done": "As tuas chaves mudaram.",
+      "change_keys_failed": "Não conseguimos mudar as tuas chaves. Tenta outra vez.",
       "unreadable": "{count, plural, one {Não foi possível ler # elemento} other {Não foi possível ler # elementos}}",
       "unreadable_lead": "Foram guardados com uma chave que este browser não tem. Continuam seguros tal como estão.",
       "passkeys_failed": "Não conseguimos carregar as tuas impressões digitais, por isso ainda não podemos oferecer uma chave nova.",
       "maybe_saved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",
       "remove_sheet": {
         "title": "Remover {name}?",
-        "body": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar.",
+        "body": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar. Os assistentes ligados são desligados e é preciso ligá-los outra vez.",
         "key_label": "Chave de recuperação",
         "confirm": "Sim, remover",
         "removing": "A remover…",
@@ -797,11 +804,15 @@
       "offline": "Continuar ligado até o desligares"
     },
     "revoke_hint": "Podes desligá-lo quando quiseres nas Definições.",
+    "encrypted_note": "Enquanto estiver ligado, o Wambito abre os teus dados no servidor só para responder ao teu assistente, e a empresa do assistente lê o que lhe é dado. Revoga-o quando quiseres nas Definições e para de imediato.",
     "allow": "Permitir",
     "allowing": "A ligar…",
     "cancel": "Cancelar",
     "loading": "A carregar o assistente…",
     "failed": "Não conseguimos concluir a ligação. Tenta de novo.",
+    "unlock_title": "Abre os teus dados para o ligar",
+    "wrap_failed": "Foi permitido, mas a chave dele não foi guardada, por isso ainda não consegue ler nada.",
+    "try_again": "Tentar de novo",
     "guest": {
       "title": "Guarda o teu progresso",
       "body": "Para ligar um assistente, guarda primeiro o teu progresso com o teu email: na app do Wambito, toca em «Guarda o teu progresso». Depois volta a ligá-lo a partir do teu assistente."

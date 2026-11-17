@@ -13,7 +13,7 @@ import { eq, sql } from "@wambito/db/orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { purgeExpiredSignins, SIGNIN_OPEN_LIMIT } from "../src/services/signin.ts";
 import { scheduleTombstonePurge } from "../src/services/sync.ts";
-import { createTestApp, type TestApp } from "./harness.ts";
+import { createTestApp, newAssistantSecret, type TestApp } from "./harness.ts";
 
 // The web sign-in through the phone (spec 2026-11-15 §8): the web opens a request with a
 // commitment to its key and a poll secret only it holds, the phone approves it with its session,
@@ -360,7 +360,11 @@ describe("/v2/signin", () => {
     const email = `signin-assistant-${++people}@wambito.test`;
     const signedIn = await t.signIn(email);
     const { started, web } = await open();
-    const token = await t.authorize(email, { headers: signedIn.headers });
+    // An encrypted account's assistant connects with its secret (http/assistant-secret.ts).
+    const token = await t.connectAssistant(email, {
+      headers: signedIn.headers,
+      wk: newAssistantSecret(),
+    });
     const h = { authorization: `Bearer ${token.accessToken}` };
     const key = toBase64Url(web.publicKey);
     for (const res of [

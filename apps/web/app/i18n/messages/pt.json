@@ -125,8 +125,8 @@
   "landing": {
     "new_tab": "(abre num novo separador)",
     "meta": {
-      "title": "Wambito · O teu dinheiro, finalmente claro",
-      "description": "Wambito é o teu orçamento, e vais gostar de cuidar dele: regista uma despesa em segundos e vê para onde vai o teu dinheiro. Grátis para sempre, de código aberto e sem palavras-passe.",
+      "title": "Wambito · A app que gere as tuas despesas por ti",
+      "description": "Lê as notificações dos teus pagamentos e regista cada despesa automaticamente. Grátis e de código aberto.",
       "image_alt": "Wambi, uma moeda de ouro sorridente, acena junto ao título: O teu dinheiro, finalmente claro."
     },
     "nav": {

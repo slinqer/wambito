@@ -1,10 +1,14 @@
-// Port of apps/web/app/local/ids.ts: ids of the local backend. Lower-case UUID v7 for new
+// Port of packages/vault/src/ids.ts: ids of the local backend. Lower-case UUID v7 for new
 // records, v5 for recurrence occurrences.
 import 'dart:convert' show utf8;
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' show sha1;
+
+/// The namespace of the seeded records' ids and of the merchant memory's: an account's own
+/// namespace is `uuidv5(seedNamespace, userId)`.
+const seedNamespace = '6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10';
 
 final Random _random = Random.secure();
 

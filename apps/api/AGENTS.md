@@ -7,6 +7,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - `src/server.ts` starts it; `src/app.ts` builds the app (routes, OpenAPI).
 - `src/config.ts`: zod env schema (`WAMBITO_VERSION` included); `.env.example` at the repo root.
+  `MCP_WK_PUBLIC_KEY` (a public JWK as JSON; the VPS pair comes from `deploy/personal/gen-mcp-keys.sh`).
 - `src/auth.ts`: Better Auth: email OTP + magic link, anonymous guests, passkeys (`rpName`
   "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP. Sessions carry a `lifetime`
   (`src/services/sessions.ts`): `standard` (60 days, slid by Better Auth at most once a day),
@@ -33,6 +34,20 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   presented token (`presentedSessionToken`: a non-JWT bearer, else the session cookie, without its
   signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when a token was presented
   and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+- `src/http/assistant-secret.ts` (`assistantSecret`, spec 2026-11-16 §4): a wrapper on
+  `/auth/oauth2/*`, mounted before `/auth/*`, that carries the assistant secret `S` (32 bytes,
+  base64url) of an encrypted account (`isPreviewAccount`) in its tokens. Authorize: adds
+  `prompt=consent` for such an account. Consent: takes `wk` out of the JSON (400 `invalid_request`
+  if not 32 bytes; 503 `assistant_keys_missing` without `MCP_WK_PUBLIC_KEY`), keeps `code → S` in
+  process memory (10 min; a restart loses it). Token: runs Better Auth inside an AsyncLocalStorage
+  with `S` (`assistantSecretClaims`, the oauthProvider's `customAccessTokenClaims`, adds `wk`: a
+  compact JWE `ECDH-ES` + `A256GCM` to `MCP_WK_PUBLIC_KEY`, plaintext `S` as text), appends `.S`
+  to the refresh token and strips it from a presented one (split on the last `.`; Better Auth's
+  own tokens have none); tokens issued without `S` for an encrypted account are refused (400
+  `invalid_grant`) and `revokeAssistant` runs for that client. Revoke and introspect: strip the
+  suffix. Better Auth and `auth.ts`'s refresh hook only ever see the plain token. `S` is never
+  stored, logged or put in an error; a new Better Auth endpoint that takes a refresh token needs
+  the same strip. Tests: `forgetPendingSecrets()` empties the map.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
   `src/services/`: domain services. `src/emails/sign-in.ts`: sign-in mail copy (es/en/it/pt);
   `src/emails/layout.ts`: the frame every email shares (Wambi, wordmark image, card, footer; day
@@ -83,8 +98,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   Passkey wraps' `ref` is the passkey's `credentialID`; `auth.ts` hooks on
   `/passkey/delete-passkey` (before: read the credential id; after, on success: delete the wrap; two
   statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
-  `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
-  4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
+  `oauth_consent` row). Revoking an assistant (`revokeAssistant`, `revokeAllAssistants` in
+  `services/account.ts`) deletes its wrap; a rotation refuses `assistant` wraps (422
+  `assistant_wrap_in_rotation`) and revokes every assistant. Tokens reach only
+  `GET /v2/keys/assistant` (`http/scopes.ts`), which answers `{ wrap, links }` and sets
   `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
@@ -192,8 +209,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
 - Client headers `x-wambito-{locale,next,timezone,client,background,user,poll,version}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
-  session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` is the account the
-  client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
+  session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` and `/v1/me/assistants/*` (revoke) is the
+  account the client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
   `src/http/expected-user.ts`, after `requireUser`, before the scopes; sessions and tokens alike).
 - DB: connects as the runtime role (RLS); migrations run as admin (`packages/db`).
 
@@ -202,6 +219,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - Services: `docker compose up -d postgres mailpit`; then `pnpm --filter @wambito/api dev`,
   seed with `pnpm --filter @wambito/api seed`. Mail lands in Mailpit (http://localhost:8025).
 - Tests: `pnpm vitest run apps/api`, one file `pnpm vitest run apps/api/test/auth.test.ts`.
+  Assistants: `t.connectAssistant(email, { wk })` (`wk`: `newAssistantSecret()`) connects with the
+  secret, as the web does for an encrypted account; `t.authorize` connects without it;
+  `consentCode` + `exchangeCode` split the flow. Each test app has its own MCP key pair
+  (`t.wkPrivateKey` opens the `wk` claim). `t.tablesHolding(needles)` scans every public table's
+  rows as text (the "no plain text in the database" check; used by `apps/mcp/test/vault-end-to-end.test.ts`).
   Each file starts a Postgres testcontainer via `test/harness.ts` (`createTestApp`): Docker must
   run, or set `WAMBITO_TEST_DB=local`.
 - After changing a route or schema, regenerate the clients' types (root `AGENTS.md`); CI diffs them.

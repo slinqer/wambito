@@ -11,9 +11,9 @@ import 'encryption_mode.dart';
 /// phone. False when signed out, for `plain`, and while the mode is loading or failed (read from
 /// [currentVaultAccountProvider], never the previous session's value).
 ///
-/// What stage 3a leaves out (automatic capture, the home widget, due notices, export, import and
-/// the assistants) is not offered to such an account: each shows [ComingSoonNotice], and nothing of
-/// it sends or fetches finance data.
+/// Automatic capture, the home widget and due notices run on the vault (stage 3b, in a headless
+/// engine). What is still left out (export, import and the assistants) is not offered to such an
+/// account: each shows [ComingSoonNotice], and nothing of it sends or fetches finance data.
 final isPreviewProvider = Provider<bool>(
   (ref) => ref.watch(currentVaultAccountProvider)?.mode == EncryptionMode.preview,
 );

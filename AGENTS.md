@@ -10,11 +10,12 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 |---|---|---|
 | `apps/api` | Hono + Better Auth HTTP API, OpenAPI | `apps/api/AGENTS.md` |
 | `apps/web` | React Router app: landing, signed-in app, demo, OAuth consent | `apps/web/AGENTS.md` |
-| `apps/mcp` | MCP server for AI assistants, calls the API | `apps/mcp/AGENTS.md` |
+| `apps/mcp` | MCP server for AI assistants, calls the API; opens encrypted accounts in memory | `apps/mcp/AGENTS.md` |
 | `apps/mobile` | Flutter Android app + Kotlin side | `apps/mobile/AGENTS.md` |
 | `packages/ai-assistant-tools` | MCP tools, prompts, instructions | `packages/ai-assistant-tools/AGENTS.md` |
 | `packages/core` | shared domain: money, dates, budgets, quick-capture cases | `packages/core/AGENTS.md` |
 | `packages/crypto` | end-to-end encryption: data key, record sealing, dedupe tags | `packages/crypto/AGENTS.md` |
+| `packages/vault` | browser-free vault (web and MCP): store contract, memory stores, sync engine, local `/v1` backend, ids | `packages/vault/AGENTS.md` |
 | `packages/db` | Drizzle schema, migrations, RLS | `packages/db/AGENTS.md` |
 | `packages/importers` | CSV importers | `packages/importers/AGENTS.md` |
 | `deploy/personal` | the VPS / home install: compose, Caddy, backups, auto-deploy | `deploy/personal/AGENTS.md` |
@@ -40,11 +41,11 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 ## What CI runs (`.github/workflows/ci.yml`)
 
 - `check`: install, Playwright chromium (`scripts/ci-install-chromium.sh`, browser only when
-  apt cannot reach Ubuntu; tested by `scripts/test-ci-install-chromium.sh`), the two guards and the
+  apt cannot reach Ubuntu; tested by `scripts/test-ci-install-chromium.sh`), the guards (channels, Dockerfiles) and the
   old-name guard's test, `pnpm lint`,
   generated-file checks (web `tokens`, web and mcp `api:types` + `git diff --exit-code`),
   `pnpm typecheck`, `pnpm test`, then `deploy/personal/test-*.sh` (retention, r2, auto-deploy,
-  caddy, compose-files, version).
+  caddy, compose-files, version, mcp-keys).
 - `e2e`: root stack with `E2E_NOW=2026-10-21T15:00:00Z`, then web `e2e`, `e2e:landing`,
   `e2e:landing-only`, `e2e:landing-only-app`.
 - `deploy-landing`: push to `main` after `check` + `e2e`; `wrangler deploy` from `deploy/landing`.
@@ -55,7 +56,9 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   lock check, Gradle unit tests, native-switch test (`test-native-switch.sh`), release build.
 - `mobile-e2e` (filter: the `mobile` paths plus `apps/api/**` and `packages/{crypto,core,db}/**`): Flutter,
   the root stack on the real clock, then `apps/mobile/scripts/run-vault-e2e.sh`: the phone's vault
-  (`test_stack/`, tag `stack`) against the real API, and `psql` finds no plain text in `records`.
+  (`test_stack/`, tag `stack`: `vault_e2e_test.dart` and `vault_3b_e2e_test.dart`, pairing, background
+  capture and sync, device removal, a new recovery key) against the real API, and `psql` finds no plain
+  text in `records`.
 - `ios` (same filter; macOS runner): pub get, the signing guard and its test
   (`apps/mobile/scripts/check-ios-signing.sh`), `swift test` on `ios/WambitoNative`,
   `flutter build ios --release --no-codesign`.
@@ -73,6 +76,10 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   method Dart calls is missing from `apps/mobile` Kotlin or Swift, unless `.github/channel-allowlist.txt`
   has `<channel>  # <reason>` (`ios-impossible`, `ios-part-two`, `android-only`); tested by
   `scripts/test-check-channels.sh`. Fix the missing native side, never widen the allowlist.
+- Dockerfile guard (`ci.yml` `check`): `scripts/check-dockerfile-workspaces.sh` fails when a
+  `workspace:` dependency (transitive) of `apps/api` or `apps/mcp` is not copied in its
+  `Dockerfile.prod` (its `package.json` before the install, its sources before the build); tested by
+  `scripts/test-check-dockerfile-workspaces.sh`. CI never builds those images, the VPS does.
 - Personal-name guard (`ci.yml`): a `git grep` for the founder's name outside `docs/superpowers`.
   Never write personal names, emails or paths into the repo.
 
@@ -88,7 +95,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 - Persistent names on phones (prefs files, WorkManager unique names, widget receivers, snapshot
   key) need a migration to change.
 - Never read `deploy/personal/.env`, the root `.env`, `~/.cloudflared/*.json`, the signing keystore
-  or any other secret. Use the `.env.example` files.
+  (or `MCP_WK_PRIVATE_KEY`, in any env) or any other secret. Use the `.env.example` files.
 - Money is an integer number of cents, never a float. Fixtures are invented, never real data.
 - Generated files are regenerated, never hand-edited:
   - `apps/web/app/styles/tokens.css`: `pnpm --filter @wambito/web tokens`;
@@ -116,6 +123,10 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 - The VPS serves `app.wambito.com` directly (no tunnel), `direct` mode via `COMPOSE_FILE` in its
   `.env`. It deploys `main` by itself once CI passes (`deploy/personal/auto-deploy.sh`).
   Merging to `main` is deploying.
+- Assistants on encrypted accounts need the MCP's key pair in the VPS `.env` (`MCP_WK_PUBLIC_KEY` for
+  the API, `MCP_WK_PRIVATE_KEY` for the MCP), made once with `deploy/personal/gen-mcp-keys.sh`.
+  Losing the private key disconnects every encrypted account's assistants; plain accounts are
+  unaffected. Design: `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
 - The landing `wambito.com` is the Cloudflare Worker (`deploy/landing`), deployed by CI.
 
 ## History: `docs/superpowers/**` (read only when needed, never edit)

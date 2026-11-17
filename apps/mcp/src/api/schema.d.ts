@@ -439,7 +439,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. */
+        /** @description Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. With `x-wambito-user` naming another account than the signed-in one, 409 `session_changed` and nothing is removed. */
         delete: operations["revokeAssistant"];
         options?: never;
         head?: never;
@@ -796,7 +796,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an assistant's token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session. */
+        /** @description For an assistant's token: the wrap of that assistant (its OAuth client), marks it used, and `links` (as `GET /v2/keys`) to open records under older key versions. 404 when the person made none for it (revoking the assistant or rotating the keys deletes it), and for every session. */
         get: operations["getAssistantWrap"];
         put?: never;
         post?: never;
@@ -1606,6 +1606,11 @@ export interface components {
             /** @description The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted */
             body: string | null;
         };
+        AssistantWrap: {
+            wrap: components["schemas"]["KeyWrap"];
+            /** @description Ordered by `keyV` */
+            links: components["schemas"]["KeyLink"][];
+        };
         KeyWrap: {
             /** Format: uuid */
             id: string;
@@ -1623,16 +1628,16 @@ export interface components {
             createdAt: string;
             lastUsedAt: string | null;
         };
-        KeyWraps: {
-            wraps: components["schemas"]["KeyWrap"][];
-            /** @description Ordered by `keyV` */
-            links: components["schemas"]["KeyLink"][];
-        };
         KeyLink: {
             /** @description The data key version this link leads to (>= 2) */
             keyV: number;
             /** @description The previous data key sealed under this version's key, base64url without padding, 60 bytes decoded */
             link: string;
+        };
+        KeyWraps: {
+            wraps: components["schemas"]["KeyWrap"][];
+            /** @description Ordered by `keyV` */
+            links: components["schemas"]["KeyLink"][];
         };
         PutKeyWrap: {
             /** @enum {string} */
@@ -3170,6 +3175,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listCategories: {
@@ -4208,13 +4222,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The assistant's wrap */
+            /** @description The assistant's wrap and the links */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KeyWrap"];
+                    "application/json": components["schemas"]["AssistantWrap"];
                 };
             };
             /** @description Problem */

@@ -226,11 +226,14 @@ void main() {
     final server = FakeServer({'tok': _preview})..holdPut = Completer();
     final c = containerFor(server);
     await until(() => c.read(vaultGateStateProvider)?.status == 'setup');
-    unawaited(c.read(vaultGateProvider)!.confirmSetup());
+    final commit = c.read(vaultGateProvider)!.confirmSetup();
     await until(() => c.read(vaultGateStateProvider)?.status == 'committing');
     await expectHeld(c);
     expect(c.read(vaultGateStateProvider)?.status, 'committing');
+    // Let the commit finish inside this test: left running, it writes the data key into the shared
+    // (static) secure storage mock during the next test, which then finds a ready vault.
     server.holdPut!.complete();
+    await commit;
   });
 
   test('a preview account on Unlock: finance calls are refused, the rest goes on', () async {

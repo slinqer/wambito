@@ -1,6 +1,7 @@
 package com.wambito.app.capture
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
@@ -12,6 +13,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.account.AccountMode
+import com.wambito.app.background.BackgroundChannel
+import com.wambito.app.background.HeadlessHooks
 import com.wambito.app.notices.ApiResult
 import com.wambito.app.notices.serverOf
 import com.wambito.app.widget.SecureStorageSession
@@ -75,12 +78,22 @@ object CaptureScheduler {
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     /**
-     * Sends what is queued once there is a network. APPEND_OR_REPLACE: a capture queued while a
-     * send runs gets its own run after it, and a failed send never blocks the ones behind it.
+     * A `preview` account's capture is saved on the phone, in the vault: it waits for no network
+     * (the engine's own sync tries the network afterwards and survives not having one).
+     */
+    private fun constraintsFor(context: Context): Constraints =
+        if (AccountMode(context).isPreview()) Constraints.NONE else network
+
+    /**
+     * Sends what is queued: to the server once there is a network (`plain`), or into the vault
+     * through the headless engine at once (`preview`). APPEND_OR_REPLACE: a capture queued while a
+     * send runs gets its own run after it, and a failed send never blocks the ones behind it. A
+     * run that finds the queue empty (the engine before it saved what the next one waits for)
+     * returns at once without starting an engine, so a burst of captures never chains engines.
      */
     fun enqueueSend(context: Context) {
         val request = OneTimeWorkRequestBuilder<SendCapturesWorker>()
-            .setConstraints(network)
+            .setConstraints(constraintsFor(context))
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(SEND, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
@@ -103,7 +116,7 @@ object CaptureScheduler {
      */
     fun enqueueConfirm(context: Context, id: String) {
         val request = OneTimeWorkRequestBuilder<ConfirmCaptureWorker>()
-            .setConstraints(network)
+            .setConstraints(constraintsFor(context))
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setInputData(workDataOf(ConfirmCaptureWorker.ID to id))
             .build()
@@ -128,9 +141,9 @@ class ConfirmCaptureWorker(context: Context, params: WorkerParameters) : Corouti
     override suspend fun doWork(): Result {
         val context = applicationContext
         val id = inputData.getString(ID)?.takeIf { it.isNotEmpty() } ?: return done("no id")
-        // A `preview` account's finances never leave the phone: nothing is confirmed with the server.
+        // A `preview` account's finances never leave the phone: its "Bien" goes to the vault.
         val mode = AccountMode(context)
-        if (mode.isPreview()) return done("encrypted account")
+        if (mode.isPreview()) return confirmInVault(context, id)
         if (!mode.allowsApi()) return if (runAttemptCount + 1 >= MAX_ATTEMPTS) done("gave up") else Result.retry()
         val dependencies = CaptureHooks.of(context)
         val token = dependencies.session.token()
@@ -148,6 +161,30 @@ class ConfirmCaptureWorker(context: Context, params: WorkerParameters) : Corouti
             ApiResult.Unauthorized -> done("session refused")
             ApiResult.Failed -> if (runAttemptCount + 1 >= MAX_ATTEMPTS) done("gave up") else Result.retry()
         }
+    }
+
+    /**
+     * D9: the id joins the queue's confirms and `captureMain` posts it to the local
+     * `/v1/transactions/review`; a `changed` run tells the app's engine (D7). Only a run that finished (`done`, `changed`) can say it was
+     * taken; any other outcome keeps the id (retried up to [MAX_ATTEMPTS], then it waits for the
+     * next engine run, which reads it again). An id a finished run never acknowledged is dropped
+     * at the last attempt.
+     */
+    private suspend fun confirmInVault(context: Context, id: String): Result {
+        val queue = CaptureQueue(context)
+        queue.addConfirm(id)
+        val result = HeadlessHooks.run(context, CAPTURE_ENTRYPOINT)
+        if (result.outcome == "changed") BackgroundChannel.notifyVaultChanged()
+        announceCaptured(context, result.captured)
+        val last = runAttemptCount + 1 >= MAX_ATTEMPTS
+        if (!finished(result.outcome)) return if (last) done("kept") else Result.retry()
+        if (id !in queue.confirms()) {
+            CapturePoster.dismiss(context, id)
+            return done("confirmed")
+        }
+        if (!last) return Result.retry()
+        queue.ack(emptyList(), listOf(id))
+        return done("gave up")
     }
 
     private fun done(outcome: String): Result = Result.success(workDataOf(CAPTURE_OUTCOME to outcome))
@@ -186,13 +223,13 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
         val dependencies = CaptureHooks.of(context)
         val queue = CaptureQueue(context)
         if (mine(queue).isEmpty()) return done("empty")
-        // A `preview` account's finances live only on the phone: nothing queued goes to the server
-        // (the app clears the queue; until it does, it just stays). A mode the app has not learned
-        // yet waits: the job runs again, and nothing is sent meanwhile.
+        // A `preview` account's finances live only on the phone: the headless engine saves what is
+        // queued in the vault and nothing goes to the server. A mode the app has not learned yet
+        // waits: the job runs again, and nothing is sent meanwhile.
         val mode = AccountMode(context)
-        if (mode.isPreview()) return done("encrypted account")
+        if (mode.isPreview()) return saveInVault(context, queue)
         if (!mode.allowsApi()) {
-            return if (runAttemptCount + 1 >= ConfirmCaptureWorker.MAX_ATTEMPTS) done("mode unknown") else Result.retry()
+            return if (runAttemptCount + 1 >= MAX_ATTEMPTS) done("mode unknown") else Result.retry()
         }
         val mark = dependencies.session.mark()
         val token = dependencies.session.token()
@@ -245,6 +282,34 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
         return done("sent")
     }
 
+    /**
+     * D1, D8, D23: `captureMain` reads the queue (`takeQueued`), saves each capture in the vault
+     * through the local `POST /v1/captures`, and acknowledges the ones it saved (`ackQueued`).
+     * This worker never calls [CaptureApi] and never touches the queue itself, except to count.
+     *
+     *  * `changed` tells the app's engine, if it is alive, with `vaultChanged` (D7).
+     *  * `done` or `changed`: the answers become notifications, once per transaction. A capture
+     *    the run did not acknowledge is one the vault refuses: its count goes up and at
+     *    [CaptureQueue.MAX_REFUSALS] it is dropped, logged with no finance field (R8). While some
+     *    are left the job runs again, up to [MAX_ATTEMPTS].
+     *  * Any other outcome, or `timeout`: the queue is as it was, nothing counts, and the job is
+     *    retried up to [MAX_ATTEMPTS] runs, then `kept` (the next capture, app start or sync
+     *    enqueues it again). Never dropped, never sent.
+     */
+    private suspend fun saveInVault(context: Context, queue: CaptureQueue): Result {
+        val before = mine(queue).map { it.key }
+        val result = HeadlessHooks.run(context, CAPTURE_ENTRYPOINT)
+        if (result.outcome == "changed") BackgroundChannel.notifyVaultChanged()
+        announceCaptured(context, result.captured)
+        val last = runAttemptCount + 1 >= MAX_ATTEMPTS
+        if (!finished(result.outcome)) return if (last) done("kept") else Result.retry()
+        val left = queue.all().map { it.key }.toSet()
+        val dropped = queue.refuse(before.filter { it in left }, CaptureQueue.MAX_REFUSALS)
+        dropped.forEach { _ -> log("dropped a capture the vault refused") }
+        if (mine(queue).isEmpty()) return done("saved")
+        return if (last) done("kept") else Result.retry()
+    }
+
     /** The queued captures of the account the queue belongs to. */
     private fun mine(queue: CaptureQueue): List<QueuedCapture> {
         val owner = queue.owner() ?: return emptyList()
@@ -252,4 +317,38 @@ class SendCapturesWorker(context: Context, params: WorkerParameters) : Coroutine
     }
 
     private fun done(outcome: String): Result = Result.success(workDataOf(CAPTURE_OUTCOME to outcome))
+
+    companion object {
+        /** Runs of one send before it gives up and leaves the queue for the next one (D23). */
+        const val MAX_ATTEMPTS = ConfirmCaptureWorker.MAX_ATTEMPTS
+
+        /** Where a dropped capture is reported; no capture field ever goes in it. Replaced in tests. */
+        @VisibleForTesting
+        var log: (String) -> Unit = { Log.w("WambitoCapture", it) }
+    }
+}
+
+/** The headless entry point (lib/main.dart) that saves captures and confirms in the vault. */
+private const val CAPTURE_ENTRYPOINT = "captureMain"
+
+/** Whether a headless run ended with the vault worked on (`done`, `changed`): else the queue stays. */
+private fun finished(outcome: String): Boolean = outcome == "done" || outcome == "changed"
+
+/**
+ * Tells the person what a headless run saved: one notification per transaction, even if the
+ * answer comes twice (a re-run after a failure returns the same ones; the notification id is the
+ * transaction's, so it replaces itself). The other bank app's notice of a purchase already
+ * confirmed asks nothing.
+ */
+private fun announceCaptured(context: Context, captured: List<String>) {
+    val seen = mutableSetOf<String>()
+    for (json in captured) {
+        val answer = parseCaptureAnswer(json) ?: continue
+        if (!seen.add(answer.id)) continue
+        if (answer.merged && !answer.needsReview) {
+            CaptureHooks.notifier.dismiss(context, answer.id)
+        } else {
+            CaptureHooks.notifier.show(context, answer)
+        }
+    }
 }

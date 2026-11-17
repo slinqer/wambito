@@ -62,4 +62,8 @@
     <string name="capture_change">Cambiar</string>
     <string name="capture_channel">Gastos detectados</string>
     <string name="capture_channel_description">Un aviso por cada gasto o ingreso que Wambito detecta en tus apps del banco.</string>
+    <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt, ScannerViewController.swift on iOS):
+         the words of the web's approve-a-device scan. -->
+    <string name="scanner_hint">Apunta la cámara al QR del dispositivo nuevo.</string>
+    <string name="scanner_close">Apagar la cámara</string>
 </resources>

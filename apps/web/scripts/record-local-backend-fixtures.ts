@@ -11,9 +11,8 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createLocalBackend } from "../app/local/backend.ts";
-import { createMemoryStore } from "../app/local/memory-store.ts";
-import type { RecordType } from "../app/local/store.ts";
+import type { RecordType } from "@wambito/vault";
+import { createLocalBackend, createMemoryStore } from "@wambito/vault";
 import { LOCAL_UNAVAILABLE } from "../app/local/vault-session.ts";
 
 const DIR = join(import.meta.dirname, "../../mobile/test/fixtures/local_backend");

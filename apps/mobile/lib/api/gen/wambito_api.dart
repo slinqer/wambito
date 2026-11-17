@@ -30,6 +30,7 @@ export 'package:wambito/api/gen/src/model/admin_user_assistants_inner.dart';
 export 'package:wambito/api/gen/src/model/admin_user_passkeys_inner.dart';
 export 'package:wambito/api/gen/src/model/assistant.dart';
 export 'package:wambito/api/gen/src/model/assistant_list.dart';
+export 'package:wambito/api/gen/src/model/assistant_wrap.dart';
 export 'package:wambito/api/gen/src/model/capture_result.dart';
 export 'package:wambito/api/gen/src/model/capture_result_category.dart';
 export 'package:wambito/api/gen/src/model/capture_result_transaction.dart';

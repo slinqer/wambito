@@ -16,6 +16,7 @@ import 'package:wambito/local/install_marker.dart';
 import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/sync.dart';
+import 'package:wambito/local/vault_lock.dart';
 import 'package:wambito/local/vault_session.dart';
 
 import 'fake_keys.dart';
@@ -208,6 +209,7 @@ Future<VaultSession> open(
   void Function()? onSessionChanged,
   Future<SqliteStore> Function(String userId)? store,
   Future<LocalKeys> Function(KeysOptions options)? refresh,
+  Future<VaultLease?> Function()? lease,
 }) {
   _opened.add(profile.id);
   return openVaultSession(
@@ -223,6 +225,7 @@ Future<VaultSession> open(
       deleteStore: deleteStore,
       syncDebounce: const Duration(milliseconds: 20),
       refreshKeys: refresh,
+      lease: lease,
     ),
   );
 }
@@ -333,6 +336,52 @@ void main() {
         expect((await send(appDio(session, net), 'GET', '/v1/me')).statusCode, 200);
       },
     );
+
+    test('a known phone opens promptly while a background engine holds the lease: the sync is '
+        'busy and retried later, never a 30 s wait', () async {
+      final profile = profileOf();
+      final held = await tryLease(profile.id, holder: 'background', directory: _dir.path);
+      expect(held, isNotNull);
+      final net = FakeNetwork();
+      final watch = Stopwatch()..start();
+      final session = await open(
+        profile,
+        net: net,
+        keys: await keys(),
+        fresh: false,
+        lease: () => appLease(profile.id, directory: _dir.path),
+      ).timeout(const Duration(seconds: 10));
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      expect(
+        net.users,
+        isEmpty,
+        reason: 'busy: the open touched neither the outbox nor the cursor',
+      );
+      final busy = await session.sync().timeout(const Duration(seconds: 10));
+      expect(busy.error, SyncProblemCode.busy);
+      await held!.release();
+      final synced = await session.sync();
+      expect(synced.ok, isTrue);
+      expect(net.users, isNotEmpty);
+    });
+
+    test('a fresh vault whose lease a background engine holds fails promptly with busy (the gate '
+        'treats it as offline), never after a 30 s wait', () async {
+      final profile = profileOf();
+      final held = await tryLease(profile.id, holder: 'background', directory: _dir.path);
+      final watch = Stopwatch()..start();
+      final error = await failure(
+        open(
+          profile,
+          net: FakeNetwork(),
+          keys: await keys(),
+          lease: () => appLease(profile.id, directory: _dir.path),
+        ).timeout(const Duration(seconds: 10)),
+      );
+      expect(error, isOpenError(SyncProblemCode.busy));
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      await held!.release();
+    });
 
     test('a 401 from the sync stops the opening and reports it', () async {
       final net = FakeNetwork()..mode = Mode.unauthorized;

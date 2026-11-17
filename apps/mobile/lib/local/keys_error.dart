@@ -1,4 +1,4 @@
-/// A failure of the encryption keys, by a code (twin of `KeysError` in apps/web/app/local/keys.ts).
+/// A failure of the encryption keys, by a code (twin of `KeysError` in packages/vault/src/keyring.ts).
 class KeysError implements Exception {
   const KeysError(this.code, {this.status});
 

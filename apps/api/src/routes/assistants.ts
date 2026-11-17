@@ -104,9 +104,9 @@ export function assistantRoutes(deps: AppDeps) {
       path: "/v1/me/assistants/{clientId}",
       operationId: "revokeAssistant",
       description:
-        "Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most.",
+        "Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. With `x-wambito-user` naming another account than the signed-in one, 409 `session_changed` and nothing is removed.",
       request: { params: z.object({ clientId: z.string().min(1) }) },
-      responses: { 204: { description: "Revoked" }, ...problems(404) },
+      responses: { 204: { description: "Revoked" }, ...problems(404, 409) },
     }),
     async (c) => {
       const userId = c.get("userId");

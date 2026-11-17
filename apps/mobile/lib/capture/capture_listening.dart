@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 
 import '../home/home_widgets.dart' show QuietSpinner;
@@ -11,6 +10,7 @@ import '../ui/wambi_bubble.dart';
 import '../ui/press_button.dart';
 import 'capture_session.dart';
 import 'mic_level.dart';
+import '../ui/lk_icons.dart';
 
 /// While the microphone is open: Wambi asks "¿En qué gastaste?" in his bubble (once the engine is
 /// ready, so no start of a sentence is lost; before, he says he is getting the microphone ready),
@@ -104,7 +104,7 @@ class CaptureWaves extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   spacing: WambitoTokens.space3,
                   children: [
-                    ExcludeSemantics(child: Icon(Icons.mic, size: 28, color: colors.brand)),
+                    LkIcon(LkIconName.mic, size: 28, color: colors.brand),
                     MicLevel(levels: levels),
                   ],
                 )

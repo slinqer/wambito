@@ -29,4 +29,20 @@ final class AccountModeTests: XCTestCase {
     AccountMode.write(nil, defaults: defaults)
     XCTAssertNil(AccountMode.read(defaults))
   }
+
+  func testTheOwnerIsKeptUnderWambitoDotEncryptionDotOwnerAndClearedWithTheMode() throws {
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: "AccountModeOwnerTests"))
+    defaults.removePersistentDomain(forName: "AccountModeOwnerTests")
+    XCTAssertNil(AccountMode.owner(defaults))
+    AccountMode.write("preview", owner: "user-1", defaults: defaults)
+    XCTAssertEqual(AccountMode.owner(defaults), "user-1")
+    XCTAssertEqual(defaults.string(forKey: "wambito.encryption.owner"), "user-1")
+    // A mode without an owner (signed in, no session read yet) keeps no owner.
+    AccountMode.write("unknown", owner: nil, defaults: defaults)
+    XCTAssertNil(AccountMode.owner(defaults))
+    AccountMode.write("preview", owner: "user-2", defaults: defaults)
+    AccountMode.write(nil, owner: "user-2", defaults: defaults)
+    XCTAssertNil(AccountMode.read(defaults))
+    XCTAssertNil(AccountMode.owner(defaults))
+  }
 }

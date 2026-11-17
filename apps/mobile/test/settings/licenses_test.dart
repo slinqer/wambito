@@ -34,6 +34,15 @@ void main() {
       }
     });
 
+    test('the Plump icons are credited to Streamline, with the CC BY 4.0 text', () async {
+      for (final language in ['es', 'en', 'it', 'pt']) {
+        final entries = await _extras(language);
+        final plump = entries.singleWhere((e) => e.packages.contains('Plump Free, Streamline'));
+        expect(_text(plump), contains('streamlinehq.com'), reason: language);
+        expect(_text(plump), contains('Attribution 4.0 International'), reason: language);
+      }
+    });
+
     test('the sounds say they are original work under the app\'s own licence, AGPL-3.0', () async {
       final entries = await _extras('en');
       final sounds = entries.singleWhere((e) => e.packages.contains('Wambito feedback sounds'));
@@ -96,6 +105,48 @@ void main() {
         );
         expect(entry.packages, hasLength(1));
         expect(_text(entry), contains('BSD'));
+      },
+    );
+
+    test('libyuv, bundled in camera-core 1.6.2, is listed with its BSD-3-Clause text', () async {
+      for (final language in ['es', 'en']) {
+        final entry = (await _extras(language)).singleWhere((e) => e.packages.contains('libyuv'));
+        expect(entry.packages, ['libyuv']);
+        expect(
+          _text(entry),
+          contains('Copyright 2011 The LibYuv Project Authors'),
+          reason: language,
+        );
+        expect(_text(entry), contains('Redistribution and use in source and binary forms'));
+        expect(_text(entry), isNot(contains('Apache License')), reason: language);
+      }
+      // camera-core stays with the Apache libraries. Its bundled libyuv is what was checked at this
+      // version: upgrading it means looking at the AAR's native library again.
+      final libraries = await _libraries();
+      expect(libraries.singleWhere((l) => l.id == 'androidx.camera:camera-core').version, '1.6.2');
+    });
+
+    test(
+      'CameraX and ZXing core, which scan the QR, are listed with the Apache libraries',
+      () async {
+        final entry = (await _extras(
+          'en',
+        )).singleWhere((e) => e.packages.any((p) => p.startsWith('androidx.camera:camera-core ')));
+        expect(_text(entry), contains('Version 2.0, January 2004'));
+        // No preview library, so none of what it brings: Guava, media3, the Checker Framework.
+        final libraries = await _libraries();
+        for (final gone in [
+          'androidx.camera:camera-view',
+          'androidx.camera:camera-video',
+          'org.checkerframework:checker-qual',
+        ]) {
+          expect(libraries.any((l) => l.id == gone), isFalse, reason: gone);
+        }
+        expect(libraries.any((l) => l.id.startsWith('androidx.media3:')), isFalse);
+        expect(libraries.any((l) => l.id == 'com.google.guava:guava'), isFalse);
+        for (final id in ['androidx.camera:camera-camera2', 'com.google.zxing:core']) {
+          expect(entry.packages.any((p) => p.startsWith('$id ')), isTrue, reason: id);
+        }
       },
     );
 
@@ -410,6 +461,7 @@ void main() {
           'boost-1.0.txt',
           'eigen-mpl-2.0.txt',
           'kissfft-bsd-3-clause.txt',
+          'libyuv-bsd-3-clause.txt',
         ]),
       );
       final shown = [for (final e in await _extras()) _text(e)].join('\n');

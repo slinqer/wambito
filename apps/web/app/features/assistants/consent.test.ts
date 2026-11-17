@@ -83,6 +83,10 @@ describe("consentProblemFrom", () => {
     expect(consentProblemFrom(404, undefined)).toBe("expired");
   });
 
+  it("tells that the cookie now belongs to another account", () => {
+    expect(consentProblemFrom(409, { code: "session_changed" })).toBe("session_changed");
+  });
+
   it("tells a lost connection from anything else", () => {
     expect(consentProblemFrom(0, undefined)).toBe("network");
     expect(consentProblemFrom(500, "<html>")).toBe("generic");
@@ -125,6 +129,72 @@ describe("createConsentApi", () => {
       throw new TypeError("Failed to fetch");
     });
     await expect(offline.decide(true, "q")).rejects.toMatchObject({ problem: "network" });
+  });
+
+  it("an encrypted account's Permitir carries wk, the assistant secret", async () => {
+    const fetchImpl = answer(200, { redirect: true, url: "https://claude.ai/cb?code=1" });
+    await createConsentApi(fetchImpl).decide(true, "client_id=c1&sig=x", "c2VjcmV0");
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      accept: true,
+      oauth_query: "client_id=c1&sig=x",
+      wk: "c2VjcmV0",
+    });
+  });
+
+  it("an encrypted account's Permitir names the account; a 409 means the cookie changed", async () => {
+    const fetchImpl = answer(200, { redirect: true, url: "https://claude.ai/cb?code=1" });
+    const api = createConsentApi(fetchImpl, { userId: "u1" });
+    await api.decide(true, "client_id=c1&sig=x", "c2VjcmV0");
+    expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("x-wambito-user")).toBe("u1");
+    // Without wk (a plain account) the consent is as before.
+    await api.decide(true, "client_id=c1&sig=x");
+    expect(new Headers(fetchImpl.mock.calls[1]?.[1]?.headers).get("x-wambito-user")).toBeNull();
+    const switched = createConsentApi(answer(409, { code: "session_changed" }), { userId: "u1" });
+    await expect(switched.decide(true, "q", "c2VjcmV0")).rejects.toEqual(
+      new ConsentError("session_changed"),
+    );
+  });
+
+  it("puts the assistant wrap under /v2/keys, naming the account", async () => {
+    const fetchImpl = answer(200, {});
+    const id = "01930000-0000-7000-8000-0000000000a1";
+    await createConsentApi(fetchImpl, { userId: "u1" }).putAssistantWrap({
+      id,
+      keyV: 2,
+      ref: "https://claude.ai/meta",
+      wrap: "d3JhcA",
+    });
+    const [input, init] = fetchImpl.mock.calls[0] ?? [];
+    expect(input).toBe(`/api/v2/keys/${id}`);
+    expect(init?.method).toBe("PUT");
+    expect(init?.credentials).toBe("include");
+    expect(new Headers(init?.headers).get("x-wambito-user")).toBe("u1");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      kind: "assistant",
+      ref: "https://claude.ai/meta",
+      keyV: 2,
+      wrapped: "d3JhcA",
+    });
+    const refused = createConsentApi(answer(422, { code: "unknown_assistant" }));
+    await expect(
+      refused.putAssistantWrap({ id, keyV: 1, ref: "c1", wrap: "x" }),
+    ).rejects.toBeInstanceOf(ConsentError);
+  });
+
+  it("revokes through the assistants route; one already gone counts as done", async () => {
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 204 }),
+    );
+    await createConsentApi(fetchImpl, { userId: "u1" }).revoke("https://claude.ai/meta");
+    const [input, init] = fetchImpl.mock.calls[0] ?? [];
+    expect(input).toBe("/api/v1/me/assistants/https%3A%2F%2Fclaude.ai%2Fmeta");
+    expect(init?.method).toBe("DELETE");
+    // names the account: a cookie switched to someone else gets 409, never revokes theirs
+    expect(new Headers(init?.headers).get("x-wambito-user")).toBe("u1");
+    await createConsentApi(answer(404, { code: "not_found" })).revoke("c1");
+    await expect(createConsentApi(answer(500, {})).revoke("c1")).rejects.toBeInstanceOf(
+      ConsentError,
+    );
   });
 
   it("asks for the public client by its client_id", async () => {

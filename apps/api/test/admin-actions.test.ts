@@ -1,6 +1,7 @@
 import {
   adminAudit,
   emailThrottle,
+  keyWraps,
   oauthAccessToken,
   oauthConsent,
   oauthRefreshToken,
@@ -354,6 +355,17 @@ describe("suspend", () => {
       detail: null,
     });
     expectMail(email, "account_suspended", "es");
+  });
+
+  test("suspending deletes the assistants' key wraps", async () => {
+    const { userId, email } = await person();
+    const { clientId } = await t.authorize(email);
+    await t.admin
+      .insert(keyWraps)
+      .values({ userId, kind: "assistant", ref: clientId, keyV: 1, wrapped: Buffer.alloc(60, 1) });
+    const res = await call("POST", `/v1/admin/users/${userId}/suspend`, { reason: REASON });
+    expect(res.status).toBe(204);
+    expect(await t.admin.select().from(keyWraps).where(eq(keyWraps.userId, userId))).toEqual([]);
   });
 
   test("their own account → 409 cannot_target_self", async () => {

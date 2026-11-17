@@ -14,6 +14,7 @@ import 'outset_box.dart';
 import 'pending_badge.dart';
 import 'pressable.dart';
 import 'swipe_row.dart';
+import 'lk_icons.dart';
 
 /// Whether a transaction is paid or still to be.
 enum TransactionRowStatus { paid, pending }
@@ -240,8 +241,8 @@ class _TransactionRowState extends State<TransactionRow> {
                                   ),
                                 ?badge,
                                 if (unsent)
-                                  Icon(
-                                    Icons.cloud_off_rounded,
+                                  LkIcon(
+                                    LkIconName.cloudOff,
                                     key: const Key('row.unsent'),
                                     size: 14,
                                     color: colors.inkMuted,
