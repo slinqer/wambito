@@ -7,13 +7,17 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs ./
 COPY packages/core/package.json packages/core/
+COPY packages/crypto/package.json packages/crypto/
 COPY packages/ai-assistant-tools/package.json packages/ai-assistant-tools/
+COPY packages/vault/package.json packages/vault/
 COPY apps/mcp/package.json apps/mcp/
 RUN pnpm install --frozen-lockfile --filter "@wambito/mcp..."
 
 COPY tsconfig.base.json ./
 COPY packages/core packages/core
+COPY packages/crypto packages/crypto
 COPY packages/ai-assistant-tools packages/ai-assistant-tools
+COPY packages/vault packages/vault
 COPY apps/mcp apps/mcp
 # One bundle with every dependency inside: no node_modules in the final image.
 RUN pnpm --filter @wambito/mcp build

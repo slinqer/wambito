@@ -523,7 +523,7 @@
   "settingsSecurityUnreadableLead": "Foram guardados com uma chave que este telemóvel não tem. Continuam seguros tal como estão.",
   "settingsSecurityMaybeSaved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",
   "settingsSecurityRemoveTitle": "Remover {name}?",
-  "settingsSecurityRemoveBody": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar.",
+  "settingsSecurityRemoveBody": "Deixará de conseguir abrir os teus dados. Para isso, as tuas chaves de cifra mudam: escreve a tua chave de recuperação para confirmar. Os assistentes ligados são desligados e é preciso ligá-los outra vez.",
   "settingsSecurityKeyLabel": "Chave de recuperação",
   "settingsSecurityRemoveConfirm": "Sim, remover",
   "settingsSecurityRemoving": "A remover…",

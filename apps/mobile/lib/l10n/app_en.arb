@@ -1464,7 +1464,7 @@
   "settingsSecurityUnreadableLead": "They were saved with a key this phone does not have. They are kept safe as they are.",
   "settingsSecurityMaybeSaved": "It may have been saved: keep this new key until it says it is done.",
   "settingsSecurityRemoveTitle": "Remove {name}?",
-  "settingsSecurityRemoveBody": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm.",
+  "settingsSecurityRemoveBody": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm. Connected assistants are disconnected and need connecting again.",
   "settingsSecurityKeyLabel": "Recovery key",
   "settingsSecurityRemoveConfirm": "Remove it",
   "settingsSecurityRemoving": "Removing…",

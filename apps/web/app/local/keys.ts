@@ -18,10 +18,19 @@ import {
   unwrapDataKey,
   wrapDataKey,
 } from "@wambito/crypto";
+import {
+  dedupeKeyName,
+  type Keyring,
+  KeysError,
+  type KeysErrorCode,
+  recordKeyName,
+  uuidv7,
+} from "@wambito/vault";
 import { deleteVault } from "./db.ts";
 import { deviceLabel } from "./device-label.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
+
+export { dedupeKeyName, type Keyring, KeysError, type KeysErrorCode, recordKeyName };
 
 /**
  * Keys on the web (spec 2026-11-08 sections 4.1, 5.2, 7.1, 7.2, 7.4, 7.5). This browser keeps only
@@ -32,46 +41,6 @@ import { uuidv7 } from "./ids.ts";
  * All network goes through an injected `fetch` against `baseUrl` (`/api`).
  */
 
-export type KeysErrorCode =
-  | "already_set_up"
-  | "bad_recovery_key"
-  | "wrong_recovery_key"
-  | "offline"
-  | "server"
-  /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
-  | "unsupported_browser"
-  /** The signed-in account is not this vault's (409): the app reloads for the new one. */
-  | "session_changed"
-  /** The server lists no device wrap for this browser (or one sealed to another key): removed. */
-  | "device_removed"
-  /** Another device rotated the data key first (409 `key_version_mismatch`): nothing was kept. */
-  | "rotated_elsewhere"
-  /** The touched passkey gave no PRF output (some password managers): it cannot open a wrap. */
-  | "no_prf"
-  /** No passkey wrap has the touched credential as `ref`, or its PRF does not open it. */
-  | "no_passkey_wrap"
-  /** 422: the credential is not one of the signed-in account's passkeys; no wrap was stored. */
-  | "unknown_passkey"
-  /**
-   * This browser's device wrap holds a data key that is not the one this browser already keeps
-   * for that key version (anyone with its public key can seal one to it), or a newer version
-   * whose links do not lead back to the key this browser holds: refused, every key zeroed.
-   */
-  | "tampered";
-
-export class KeysError extends Error {
-  constructor(
-    readonly code: KeysErrorCode,
-    readonly status?: number,
-  ) {
-    super(code);
-    this.name = "KeysError";
-  }
-}
-
-/** The names under which the vault's `keys` store keeps them: `record:<v>`, `dedupe:<v>`. */
-export const recordKeyName = (keyV: number) => `record:${keyV}`;
-export const dedupeKeyName = (keyV: number) => `dedupe:${keyV}`;
 export const DEVICE_KEY = "device";
 /** Stage 2a's single-version names, read as version `meta.keyV` and renamed on first load. */
 const LEGACY_RECORD_KEY = "record";
@@ -86,12 +55,6 @@ export interface KeysOptions {
   baseUrl?: string;
   /** Makes the device key pair; tests pass the noble fallback's shape. */
   deviceKeyPair?: typeof generateDeviceKeyPair;
-}
-
-/** The record keys this browser holds, by key version; `current` is the account's newest. */
-export interface Keyring {
-  current: number;
-  byVersion: Map<number, RecordKeys>;
 }
 
 export interface LocalKeys {
@@ -569,35 +532,68 @@ export async function unlockWithRecovery(
   options: KeysOptions & { text: string },
 ): Promise<LocalKeys> {
   const { userId, text } = options;
-  let secret: Uint8Array;
-  try {
-    secret = parseRecoveryKey(text);
-  } catch {
-    throw new KeysError("bad_recovery_key");
-  }
+  const secret = parseRecoverySecret(text);
   try {
     const pair = await safeDeviceKeyPair(options);
     const call = api(options);
     const { wraps, links } = await listKeys(call);
-    const wrap = wraps.find((w) => w.kind === "recovery");
-    if (!wrap) throw new KeysError("wrong_recovery_key");
-    let dataKey: Uint8Array;
+    const { dataKey, keyV } = await openRecoveryWrap(wraps, userId, secret);
     try {
-      dataKey = await unwrapDataKey(
-        secret,
-        { kind: "recovery", userId, keyV: wrap.keyV },
-        fromBase64Url(wrap.wrapped),
-      );
-    } catch {
-      throw new KeysError("wrong_recovery_key");
-    }
-    try {
-      return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
+      return await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
     } finally {
       dataKey.fill(0);
     }
   } finally {
     secret.fill(0);
+  }
+}
+
+/** The recovery key typed as text, as a secret; `bad_recovery_key` when it does not parse. */
+function parseRecoverySecret(text: string): Uint8Array {
+  try {
+    return parseRecoveryKey(text);
+  } catch {
+    throw new KeysError("bad_recovery_key");
+  }
+}
+
+/** DK and its `keyV` from the account's recovery wrap; `wrong_recovery_key` when it opens nothing. */
+async function openRecoveryWrap(
+  wraps: WrapDto[],
+  userId: string,
+  secret: Uint8Array,
+): Promise<{ dataKey: Uint8Array; keyV: number }> {
+  const wrap = wraps.find((w) => w.kind === "recovery");
+  if (!wrap) throw new KeysError("wrong_recovery_key");
+  try {
+    const dataKey = await unwrapDataKey(
+      secret,
+      { kind: "recovery", userId, keyV: wrap.keyV },
+      fromBase64Url(wrap.wrapped),
+    );
+    return { dataKey, keyV: wrap.keyV };
+  } catch {
+    throw new KeysError("wrong_recovery_key");
+  }
+}
+
+/** DK and its `keyV` from the passkey wrap whose `ref` is the credential; else `no_passkey_wrap`. */
+async function openPasskeyWrap(
+  wraps: WrapDto[],
+  userId: string,
+  { credentialId, prf }: PasskeySecret,
+): Promise<{ dataKey: Uint8Array; keyV: number }> {
+  const wrap = wraps.find((w) => w.kind === "passkey" && w.ref === credentialId);
+  if (!wrap) throw new KeysError("no_passkey_wrap");
+  try {
+    const dataKey = await unwrapDataKey(
+      prf,
+      { kind: "passkey", userId, keyV: wrap.keyV },
+      fromBase64Url(wrap.wrapped),
+    );
+    return { dataKey, keyV: wrap.keyV };
+  } catch {
+    throw new KeysError("no_passkey_wrap");
   }
 }
 
@@ -615,24 +611,13 @@ export interface PasskeySecret {
  * open it (nothing is sent).
  */
 export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): Promise<LocalKeys> {
-  const { userId, credentialId, prf } = options;
+  const { userId } = options;
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   const { wraps, links } = await listKeys(call);
-  const wrap = wraps.find((w) => w.kind === "passkey" && w.ref === credentialId);
-  if (!wrap) throw new KeysError("no_passkey_wrap");
-  let dataKey: Uint8Array;
+  const { dataKey, keyV } = await openPasskeyWrap(wraps, userId, options);
   try {
-    dataKey = await unwrapDataKey(
-      prf,
-      { kind: "passkey", userId, keyV: wrap.keyV },
-      fromBase64Url(wrap.wrapped),
-    );
-  } catch {
-    throw new KeysError("no_passkey_wrap");
-  }
-  try {
-    return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
+    return await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
   } finally {
     dataKey.fill(0);
   }
@@ -813,6 +798,42 @@ export async function withDataKey<T>(
   fn: (dk: Uint8Array, keyV: number) => Promise<T>,
 ): Promise<T> {
   return withOwnDeviceKey(options, (dk, keyV) => fn(dk, keyV));
+}
+
+/** Where `withDataKeyFrom` opens DK: this browser's device wrap, a passkey's PRF, or the recovery key. */
+export type DataKeySource = { device: true } | PasskeySecret | { recovery: string };
+
+/**
+ * Opens DK for one operation from `source` (spec 2026-11-16 section 5, the consent page):
+ * `device` is `withDataKey`; a passkey (its PRF) or the recovery key (as typed) opens the matching
+ * wrap without enrolling a device, storing or sending anything (a browser that holds nothing for
+ * the account gives its assistant the key this way). `fn` gets DK and the wrap's `keyV`; DK is
+ * zeroed once `fn` settles, and the parsed recovery secret at once. The caller owns the PRF and
+ * zeroes it. Errors as the unlocks: `no_passkey_wrap`, `bad_recovery_key` (nothing sent),
+ * `wrong_recovery_key`; `fn` never runs then.
+ */
+export async function withDataKeyFrom<T>(
+  options: KeysOptions,
+  source: DataKeySource,
+  fn: (dk: Uint8Array, keyV: number) => Promise<T>,
+): Promise<T> {
+  if ("device" in source) return withDataKey(options, fn);
+  let opened: { dataKey: Uint8Array; keyV: number };
+  if ("recovery" in source) {
+    const secret = parseRecoverySecret(source.recovery);
+    try {
+      opened = await openRecoveryWrap(await listWraps(api(options)), options.userId, secret);
+    } finally {
+      secret.fill(0);
+    }
+  } else {
+    opened = await openPasskeyWrap(await listWraps(api(options)), options.userId, source);
+  }
+  try {
+    return await fn(opened.dataKey, opened.keyV);
+  } finally {
+    opened.dataKey.fill(0);
+  }
 }
 
 /**

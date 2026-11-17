@@ -14,6 +14,7 @@ import {
 import { and, asc, eq, inArray, ne, type SQL, sql } from "@wambito/db/orm";
 import { ApiError } from "../http/problem.ts";
 import type { KEY_WRAP_KINDS } from "../http/schemas.ts";
+import { revokeAllAssistants } from "./account.ts";
 import { recordEndedSessions } from "./ended.ts";
 
 type KeyWrapKind = (typeof KEY_WRAP_KINDS)[number];
@@ -350,6 +351,8 @@ export async function deleteKeyWrap(
  * `invalid_link`). It is stored in the same transaction, and the answer lists every link. A device
  * wrap is the same device across the rotation when its `ref` is: it keeps the old row's session;
  * the sessions of devices left out end (never the caller's own, nor one a kept wrap still uses).
+ * An `assistant` wrap is refused (422 `assistant_wrap_in_rotation`): the rotation disconnects every
+ * assistant of the account (consent, tokens, wraps), and each connects again.
  */
 export async function rotateKeys(
   db: Db,
@@ -361,6 +364,13 @@ export async function rotateKeys(
 ): Promise<{ wraps: KeyWrapDto[]; links: KeyLinkDto[] }> {
   if (wraps.filter((wrap) => wrap.kind === "recovery").length !== 1) {
     throw new ApiError(422, "recovery_required", "A rotation carries exactly one recovery wrap");
+  }
+  if (wraps.some((wrap) => wrap.kind === "assistant")) {
+    throw new ApiError(
+      422,
+      "assistant_wrap_in_rotation",
+      "A rotation carries no assistant wrap: assistants are disconnected and connect again",
+    );
   }
   for (const wrap of wraps) checkAttestation(wrap);
   return withUser(db, userId, async (tx) => {
@@ -399,26 +409,28 @@ export async function rotateKeys(
     if (inserted.length !== rows.length) throw new ApiError(409, "id_taken", "An id is taken");
     if (link !== null) await tx.insert(keyLinks).values({ userId, keyV, link });
     await endSessions(tx, userId, removed, sessionId);
+    // Their wraps went with `delete(keyWraps)`; revoking also drops consent and tokens.
+    await revokeAllAssistants(tx, userId);
     return { wraps: inserted.map(toKeyWrap), links: await listLinks(tx, userId) };
   });
 }
 
 /**
- * The wrap of the assistant `clientId`, with `last_used_at` set to now; null when the person has
- * none for it.
+ * The wrap of the assistant `clientId`, with `last_used_at` set to now, and the account's key links
+ * (to open records under older key versions); null when the person has none for it.
  */
 export async function useAssistantWrap(
   db: Db,
   userId: string,
   clientId: string,
-): Promise<KeyWrapDto | null> {
+): Promise<{ wrap: KeyWrapDto; links: KeyLinkDto[] } | null> {
   return withUser(db, userId, async (tx) => {
     const [row] = await tx
       .update(keyWraps)
       .set({ lastUsedAt: sql`now()` })
       .where(own(userId, eq(keyWraps.kind, "assistant"), eq(keyWraps.ref, clientId)))
       .returning();
-    return row ? toKeyWrap(row) : null;
+    return row ? { wrap: toKeyWrap(row), links: await listLinks(tx, userId) } : null;
   });
 }
 

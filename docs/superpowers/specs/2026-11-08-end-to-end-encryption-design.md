@@ -232,6 +232,8 @@ two ways keep working. Stage 0 checks this with real passkeys before anything is
 
 ### 7.4 Daily use
 
+*Stage 4 (the MCP on encrypted accounts, consent, revoke, rotation): `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.*
+
 - **Android:** DK and the device private key live in `flutter_secure_storage` (Keystore). The app
   opens without asking for anything, as today.
 - **Web:** after unlocking, the device private key and the derived record and dedupe keys are kept
@@ -241,6 +243,8 @@ two ways keep working. Stage 0 checks this with real passkeys before anything is
 - Signing out deletes the local keys and the local database on that device.
 
 ### 7.5 Removing access and rotating
+
+*Stage 4 (the MCP on encrypted accounts, consent, revoke, rotation): `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.*
 
 - Removing a passkey or the recovery key deletes its wrap. DK never left the device in clear, so no
   rotation is needed.
@@ -301,6 +305,8 @@ two ways keep working. Stage 0 checks this with real passkeys before anything is
 - The same new screens as the web, plus scanning the QR shown by the web.
 
 ## 9. Remote MCP
+
+*Stage 4 (the MCP on encrypted accounts, consent, revoke, rotation): `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.*
 
 - **Connecting** (the consent page on the web, which asks for a passkey touch to get DK): the web
   makes `S` (32 random bytes), posts the `assistant` wrap, and sends `S` with the approval. The

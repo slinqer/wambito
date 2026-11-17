@@ -72,6 +72,9 @@ services:
       WEB_URL: https://${PUBLIC_HOSTNAME:-app.wambito.com}
       # The MCP's public URL: the audience of assistants' access tokens.
       MCP_URL: https://${PUBLIC_HOSTNAME:-app.wambito.com}/mcp
+      # The public half of the MCP's key pair (gen-mcp-keys.sh): the API seals an assistant's secret
+      # to it for encrypted accounts. Empty: connecting an assistant to one is refused (503).
+      MCP_WK_PUBLIC_KEY: ${MCP_WK_PUBLIC_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-Wambito <hola@wambito.com>}
       # Exactly one of these two (the API refuses to start otherwise): Proton Bridge on this Mac,
       # or Resend on a server.
@@ -110,7 +113,8 @@ services:
       start_period: 15s
 
   # The MCP server: assistants' tools over the API, with each assistant's own access token. It
-  # holds no state and no secret; the API checks every token again.
+  # holds no state, only the private half of its key pair (MCP_WK_PRIVATE_KEY) that opens the
+  # assistant secret of encrypted accounts; the API checks every token again.
   mcp:
     build:
       context: ../..
@@ -125,6 +129,9 @@ services:
       AUTH_ISSUER: https://${PUBLIC_HOSTNAME:-app.wambito.com}/api/auth
       MCP_API_URL: http://api:3000/api
       MCP_PORT: "3001"
+      # The private half (gen-mcp-keys.sh), a JWK as a JSON string. Empty: assistants on encrypted
+      # accounts are asked to connect again; plain accounts work.
+      MCP_WK_PRIVATE_KEY: ${MCP_WK_PRIVATE_KEY:-}
     depends_on:
       api:
         condition: service_healthy

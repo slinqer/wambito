@@ -22,7 +22,7 @@ import {
   RemoveDeviceSheet,
   Takeover,
 } from "./RemoveDeviceSheet.tsx";
-import { codeOf, SECURITY_KEY, type SecurityApi } from "./security.ts";
+import { changeKeys, codeOf, SECURITY_KEY, type SecurityApi } from "./security.ts";
 import { type DeviceRow, deviceRows } from "./security-model.ts";
 
 /**
@@ -31,7 +31,8 @@ import { type DeviceRow, deviceRows } from "./security-model.ts";
  * this browser and the other devices that open the data (label, added date; "Not verified" when
  * an attestation fails), each other one with "Remove" (a key rotation, `RemoveDeviceSheet`);
  * "Approve a new device" (`ApproveDevice`); "New recovery key" (confirmed by the current key or a
- * passkey touch, then `RecoveryKeySetup`); and how many records could not be read, when any.
+ * passkey touch, then `RecoveryKeySetup`); "Change keys" (a rotation that removes no device,
+ * typed recovery key; it disconnects assistants); and how many records could not be read, when any.
  */
 export function SecuritySection({
   security,
@@ -62,6 +63,7 @@ export function SecuritySection({
   const [removing, setRemoving] = useState<DeviceRow | null>(null);
   const [approving, setApproving] = useState(false);
   const [newKey, setNewKey] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   const known: PasskeyList = passkeyList.isSuccess
     ? { status: "ready", ids: passkeyList.data.map((p) => p.credentialId) }
@@ -151,6 +153,12 @@ export function SecuritySection({
           {t("new_recovery")}
         </PressButton>
       </div>
+      <div className="flex flex-col gap-(--space-2)">
+        <SettingLabel label={t("change_keys")} hint={t("change_keys_body")} />
+        <PressButton variant="secondary" className="self-start" onClick={() => setChanging(true)}>
+          {t("change_keys")}
+        </PressButton>
+      </div>
       {unreadable > 0 && (
         <SettingLabel label={t("unreadable", { count: unreadable })} hint={t("unreadable_lead")} />
       )}
@@ -160,6 +168,12 @@ export function SecuritySection({
         passkeyList={known}
         canTouch={canTouch}
         onClose={() => setRemoving(null)}
+        onChanged={changed}
+      />
+      <ChangeKeysSheet
+        open={changing}
+        security={security}
+        onClose={() => setChanging(false)}
         onChanged={changed}
       />
       <NewRecoveryKeySheet
@@ -373,6 +387,107 @@ function NewRecoveryKeySheet({
             {asking.problem === "offline"
               ? tUnlock("error_offline")
               : t(asking.problem === "rotated_elsewhere" ? "rotated_elsewhere" : "failed")}
+          </FieldError>
+        )}
+      </form>
+    </Sheet>
+  );
+}
+
+/**
+ * "Change keys": a rotation that removes no device. The typed recovery key confirms it (nothing
+ * new to write down); the person's devices keep working and every connected assistant is
+ * disconnected. A key the sheet cannot trust, or another device rotating first, is said on the
+ * sheet, as when removing a device.
+ */
+function ChangeKeysSheet({
+  open,
+  security,
+  onClose,
+  onChanged,
+}: {
+  open: boolean;
+  security: SecurityApi;
+  onClose(): void;
+  /** The account's keys changed (or may have): read them again. */
+  onChanged(): void;
+}) {
+  const t = useTranslations("settings.security");
+  const tSheet = useTranslations("settings.security.remove_sheet");
+  const tUnlock = useTranslations("vault.unlock");
+  const toast = useToast();
+  const problemId = useId();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [keyError, setKeyError] = useState<KeyError | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
+
+  const close = () => {
+    setText("");
+    setBusy(false);
+    setKeyError(null);
+    setProblem(null);
+    onClose();
+  };
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy || text.trim() === "") return;
+    setBusy(true);
+    setKeyError(null);
+    setProblem(null);
+    try {
+      await changeKeys(security, text);
+    } catch (error) {
+      setBusy(false);
+      const typed = keyErrorOf(error);
+      if (typed) {
+        setKeyError(typed);
+        return;
+      }
+      const found = problemOf(error);
+      if (found === "rotated_elsewhere") {
+        // The sync picks up the other device's keys; the list follows.
+        void security.reloadKeys().catch(() => {});
+        onChanged();
+      }
+      setProblem(found);
+      return;
+    }
+    onChanged();
+    toast.show({ message: t("change_keys_done") });
+    close();
+  }
+
+  return (
+    <Sheet open={open} onClose={close} title={t("change_keys")}>
+      <form noValidate className="flex flex-col gap-(--space-4) pt-(--space-3)" onSubmit={submit}>
+        <p className="m-0 text-[15px] text-ink">{t("change_keys_body")}</p>
+        <RecoveryKeyField
+          label={tSheet("key_label")}
+          value={text}
+          onChange={(value) => {
+            setText(value);
+            if (keyError) setKeyError(null);
+          }}
+          error={keyError}
+        />
+        <PressButton
+          type="submit"
+          className="w-full"
+          disabled={busy || text.trim() === ""}
+          aria-busy={busy || undefined}
+          aria-describedby={problem ? problemId : undefined}
+        >
+          {busy ? t("changing") : t("change_keys")}
+        </PressButton>
+        {problem && (
+          <FieldError id={problemId}>
+            {problem === "offline"
+              ? tUnlock("error_offline")
+              : problem === "rotated_elsewhere"
+                ? tSheet("rotated_elsewhere")
+                : t("change_keys_failed")}
           </FieldError>
         )}
       </form>

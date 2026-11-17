@@ -1,4 +1,4 @@
-// Port of apps/web/app/local/ids.ts: ids of the local backend. Lower-case UUID v7 for new
+// Port of packages/vault/src/ids.ts: ids of the local backend. Lower-case UUID v7 for new
 // records, v5 for recurrence occurrences.
 import 'dart:convert' show utf8;
 import 'dart:math';

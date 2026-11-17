@@ -5,6 +5,7 @@ import { createAuth } from "./auth.ts";
 import { apiPathPrefix } from "./config.ts";
 import type { AppDeps } from "./deps.ts";
 import type { AppEnv } from "./env.ts";
+import { assistantSecret } from "./http/assistant-secret.ts";
 import { expectedUser } from "./http/expected-user.ts";
 import { previewOnlyV2 } from "./http/preview.ts";
 import { notFound, onError, validationHook } from "./http/problem.ts";
@@ -64,6 +65,9 @@ export function createApp(deps: AppDeps) {
       ...(deps.now ? { now: deps.now().toISOString() } : {}),
     }),
   );
+  // The assistant secret rides the OAuth tokens of encrypted accounts: this wrapper takes it from
+  // the consent and puts it in the tokens, before Better Auth's own handler below.
+  app.on(["GET", "POST"], "/auth/oauth2/*", assistantSecret(deps, auth));
   app.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
   // RFC 8414 puts an issuer's metadata at the well-known path followed by the issuer's path
   // (`/auth`, under API_URL), which is where MCP clients look for it; the bare path stays too.
@@ -86,6 +90,9 @@ export function createApp(deps: AppDeps) {
   app.use("/v1/*", assistantScopes());
   // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
   app.use("/v1/*", previewOnlyV2(deps));
+  // Revoking an assistant names the account it means too (the consent page's "Try again"): a
+  // cookie that now belongs to someone else gets 409 `session_changed`, not their assistant gone.
+  app.use("/v1/me/assistants/*", expectedUser());
   app.use("/v2/*", requireUser(auth, deps.config, deps.db));
   // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
   app.use("/v2/*", expectedUser());

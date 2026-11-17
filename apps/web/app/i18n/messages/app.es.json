@@ -228,7 +228,9 @@
     "insufficient_scope": "Este asistente no tiene permiso para hacer eso.",
     "encrypted_account": "Esta cuenta guarda sus finanzas cifradas de extremo a extremo; esta parte de Wambito todavía no funciona con ella.",
     "already_set_up": "Esta cuenta ya tiene sus claves. Ábrela con tu clave de recuperación.",
-    "session_changed": "Se inició sesión con otra cuenta en este navegador. Recarga la página."
+    "session_changed": "Se inició sesión con otra cuenta en este navegador. Recarga la página.",
+    "assistant_keys_missing": "Ahora mismo no se pueden conectar asistentes. Inténtalo más tarde.",
+    "assistant_wrap_in_rotation": "Cambiar tus claves desconecta tus asistentes. Vuelve a conectarlos después."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -684,13 +686,18 @@
       "recovery_title": "Clave de recuperación",
       "recovery_lead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
       "new_recovery": "Nueva clave de recuperación",
+      "change_keys": "Cambiar claves",
+      "change_keys_body": "Crea claves de cifrado nuevas para tus datos. Tus dispositivos siguen funcionando; los asistentes conectados se desconectan. Escribe tu clave de recuperación para confirmar.",
+      "changing": "Cambiando…",
+      "change_keys_done": "Tus claves cambiaron.",
+      "change_keys_failed": "No pudimos cambiar tus claves. Inténtalo otra vez.",
       "unreadable": "{count, plural, one {No pudimos leer # elemento} other {No pudimos leer # elementos}}",
       "unreadable_lead": "Se guardaron con una clave que este navegador no tiene. Siguen a salvo tal como están.",
       "passkeys_failed": "No pudimos cargar tus huellas, así que todavía no podemos ofrecerte una clave nueva.",
       "maybe_saved": "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.",
       "remove_sheet": {
         "title": "¿Quitar {name}?",
-        "body": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar.",
+        "body": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar. Los asistentes conectados se desconectan y hay que conectarlos otra vez.",
         "key_label": "Clave de recuperación",
         "confirm": "Sí, quitarlo",
         "removing": "Quitando…",
@@ -797,11 +804,15 @@
       "offline": "Seguir conectado hasta que lo desconectes"
     },
     "revoke_hint": "Puedes desconectarlo cuando quieras en Ajustes.",
+    "encrypted_note": "Mientras esté conectado, Wambito abre tus datos en su servidor solo para responder a tu asistente, y la empresa del asistente lee lo que se le da. Revócalo cuando quieras en Ajustes y se detiene al instante.",
     "allow": "Permitir",
     "allowing": "Conectando…",
     "cancel": "Cancelar",
     "loading": "Cargando el asistente…",
     "failed": "No pudimos completar la conexión. Inténtalo de nuevo.",
+    "unlock_title": "Abre tus datos para conectarlo",
+    "wrap_failed": "Se permitió, pero su clave no se guardó, así que todavía no puede leer nada.",
+    "try_again": "Reintentar",
     "guest": {
       "title": "Guarda tu progreso",
       "body": "Para conectar un asistente, primero guarda tu progreso con tu correo: en la app de Wambito, toca «Guarda tu progreso». Luego vuelve a conectarlo desde tu asistente."

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
@@ -296,4 +297,35 @@ export async function expectNoAxeViolations(page: Page, screen = page.url(), tag
     results.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(" ")) })),
     `axe on ${screen}`,
   ).toEqual([]);
+}
+
+/** The recovery key from the setup screen, then the four characters it asks back. */
+export async function setUpRecoveryKey(page: Page): Promise<string> {
+  await expect(
+    page.getByRole("heading", { name: "Guarda tu clave de recuperación" }),
+  ).toBeVisible();
+  const key = (
+    await page.getByRole("group", { name: "Tu clave de recuperación" }).innerText()
+  ).replace(/\s+/g, "-");
+  expect(key).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{3,4})+$/);
+  await page.getByRole("button", { name: "Ya la guardé" }).click();
+  const plain = key.replaceAll("-", "");
+  const boxes = page.getByRole("textbox", { name: /^Grupo \d+, carácter \d+$/ });
+  for (const box of await boxes.all()) {
+    const [, group, char] = /^Grupo (\d+), carácter (\d+)$/.exec(
+      (await box.getAttribute("aria-label")) ?? "",
+    ) ?? ["", "0", "0"];
+    await box.fill(plain[(Number(group) - 1) * 4 + Number(char) - 1] ?? "");
+  }
+  await page.getByRole("button", { name: "Continuar" }).click();
+  return key;
+}
+
+/** Makes the preview account again: no records, key wraps, passkeys or finance rows. */
+export function reseed() {
+  execFileSync(
+    "docker",
+    ["compose", "exec", "-T", "api", "pnpm", "--filter", "@wambito/api", "seed:e2e-preview"],
+    { stdio: "inherit" },
+  );
 }

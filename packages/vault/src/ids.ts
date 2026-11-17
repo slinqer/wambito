@@ -53,3 +53,9 @@ export async function uuidv5(namespace: string, name: string): Promise<string> {
   digest[8] = 0x80 | ((digest[8] ?? 0) & 0x3f);
   return hex(digest);
 }
+
+/**
+ * The UUID v5 namespace of ids derived from an `Idempotency-Key` (`<userId>/<key>/<index>`): a
+ * retried batch gets the ids of the first try. Fixed forever; changing it breaks retries in flight.
+ */
+export const IDEMPOTENCY_NAMESPACE = "6f1d2c3e-8a47-4b59-9c0e-5d7a1b2f4e68";

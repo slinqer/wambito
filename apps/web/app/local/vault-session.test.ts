@@ -11,9 +11,9 @@ import {
   unwrapDataKey,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv5 } from "@wambito/vault";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv5 } from "./ids.ts";
 import { type LocalKeys, loadLocalKeys, prepareAccount, unlockWithRecovery } from "./keys.ts";
 import {
   forgetVault,
@@ -152,7 +152,7 @@ describe("openVaultSession", () => {
     }
   });
 
-  it("refuses what a preview account cannot do yet, and sends deleting the account to the API", async () => {
+  it("refuses what a preview account cannot do yet, and sends the account's routes to the API", async () => {
     const net = fakeNetwork();
     const session = await openVaultSession({
       profile: profileOf(),
@@ -163,10 +163,18 @@ describe("openVaultSession", () => {
     const exported = await session.fetch("http://app/api/v1/me/export?format=json");
     expect(exported.status).toBe(403);
     expect((await session.fetch("http://app/api/v1/imports", { method: "POST" })).status).toBe(403);
-    expect((await session.fetch("http://app/api/v1/me/assistants")).status).toBe(403);
+    // the connected assistants are the account's, not its finances: listed and revoked live
+    await session.fetch("http://app/api/v1/me/assistants");
+    await session.fetch("http://app/api/v1/me/assistants/https%3A%2F%2Fclaude.ai%2Fmeta", {
+      method: "DELETE",
+    });
     const deleted = await session.fetch(new Request("http://app/api/v1/me", { method: "DELETE" }));
     expect(deleted.status).toBe(204);
-    expect(net.live).toEqual(["DELETE /api/v1/me"]);
+    expect(net.live).toEqual([
+      "GET /api/v1/me/assistants",
+      "DELETE /api/v1/me/assistants/https%3A%2F%2Fclaude.ai%2Fmeta",
+      "DELETE /api/v1/me",
+    ]);
   });
 
   it("a fresh vault needs its first sync; a known one opens offline on its local data", async () => {

@@ -238,4 +238,41 @@ describe("admin settings", () => {
   test("ADMIN_ALLOWED_IPS rejects anything else", () => {
     expect(() => loadConfig({ ...dev, ADMIN_ALLOWED_IPS: "nope" })).toThrow(/ADMIN_ALLOWED_IPS/);
   });
+
+  test("MCP_WK_PUBLIC_KEY takes a public JWK; blank means none", () => {
+    const jwk = '{"crv":"X25519","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","kty":"OKP"}';
+    expect(loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: jwk }).MCP_WK_PUBLIC_KEY).toBe(jwk);
+    expect(loadConfig(dev).MCP_WK_PUBLIC_KEY).toBeUndefined();
+    expect(loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: " " }).MCP_WK_PUBLIC_KEY).toBeUndefined();
+  });
+
+  test("MCP_WK_PUBLIC_KEY refuses a private key or anything not a JWK", () => {
+    const priv =
+      '{"crv":"X25519","d":"EEE_hOXo4OQuqVq9GdvY3uGfzM-vGm1FeX4GD9p2xlc","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","kty":"OKP"}';
+    for (const value of [priv, "not json", "[]", '{"x":"y"}']) {
+      expect(() => loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: value })).toThrow(/MCP_WK_PUBLIC_KEY/);
+    }
+  });
+
+  test("MCP_WK_PUBLIC_KEY takes an X25519 or a P-256 key, nothing else", () => {
+    const p256 =
+      '{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"}';
+    expect(loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: p256 }).MCP_WK_PUBLIC_KEY).toBe(p256);
+    for (const value of [
+      // A symmetric key: CompactEncrypt would throw only at the token exchange.
+      '{"kty":"oct","k":"GawgguFyGrWKav7AX4VKUg"}',
+      // An X25519 key with a symmetric part.
+      '{"kty":"OKP","crv":"X25519","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","k":"GawgguFyGrWKav7AX4VKUg"}',
+      // Signing curves, not ECDH-ES ones.
+      '{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}',
+      '{"kty":"EC","crv":"secp256k1","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"}',
+      // A kty and crv that do not go together.
+      '{"kty":"EC","crv":"X25519","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek"}',
+      // No public point.
+      '{"kty":"OKP","crv":"X25519"}',
+      '{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU"}',
+    ]) {
+      expect(() => loadConfig({ ...dev, MCP_WK_PUBLIC_KEY: value })).toThrow(/MCP_WK_PUBLIC_KEY/);
+    }
+  });
 });

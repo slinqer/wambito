@@ -228,6 +228,9 @@ importers:
       hono:
         specifier: ^4.13.13
         version: 4.13.13
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
       nodemailer:
         specifier: ^7.0.13
         version: 7.0.13
@@ -259,6 +262,12 @@ importers:
       '@wambito/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@wambito/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@wambito/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
       hono:
         specifier: ^4.13.13
         version: 4.13.13
@@ -311,6 +320,9 @@ importers:
       '@wambito/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@wambito/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
       better-auth:
         specifier: ^1.7.11
         version: 1.7.11(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(kysely@0.29.7)(postgres@3.4.9))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)
@@ -454,6 +466,15 @@ importers:
       csv-parse:
         specifier: ^6.2.1
         version: 6.2.1
+
+  packages/vault:
+    dependencies:
+      '@wambito/core':
+        specifier: workspace:*
+        version: link:../core
+      '@wambito/crypto':
+        specifier: workspace:*
+        version: link:../crypto
 
 packages:
 

@@ -2377,7 +2377,7 @@
       }
     }
   },
-  "settingsSecurityRemoveBody": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar.",
+  "settingsSecurityRemoveBody": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar. Los asistentes conectados se desconectan y hay que conectarlos otra vez.",
   "settingsSecurityKeyLabel": "Clave de recuperación",
   "settingsSecurityRemoveConfirm": "Sí, quitarlo",
   "settingsSecurityRemoving": "Quitando…",

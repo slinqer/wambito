@@ -523,7 +523,7 @@
   "settingsSecurityUnreadableLead": "Sono stati salvati con una chiave che questo telefono non ha. Restano al sicuro così come sono.",
   "settingsSecurityMaybeSaved": "Potrebbe essere già stata salvata: conserva questa nuova chiave finché non dice che è pronta.",
   "settingsSecurityRemoveTitle": "Rimuovere {name}?",
-  "settingsSecurityRemoveBody": "Non potrà più aprire i tuoi dati. Per questo cambiano le tue chiavi di cifratura: scrivi la tua chiave di recupero per confermare.",
+  "settingsSecurityRemoveBody": "Non potrà più aprire i tuoi dati. Per questo cambiano le tue chiavi di cifratura: scrivi la tua chiave di recupero per confermare. Gli assistenti collegati vengono scollegati e vanno collegati di nuovo.",
   "settingsSecurityKeyLabel": "Chiave di recupero",
   "settingsSecurityRemoveConfirm": "Sì, rimuovilo",
   "settingsSecurityRemoving": "Rimozione…",
