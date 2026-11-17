@@ -7,7 +7,12 @@ import { CATALOGS } from "../../i18n/catalog.ts";
 import { ThemeProvider } from "../../theme/ThemeProvider.tsx";
 import { ConsentUnlock, ConsentWrapFailed } from "./Consent.tsx";
 import { createConsentApi } from "./consent-api.ts";
-import { AssistantWrapError, allowAssistant, firstKeySource } from "./consent-model.ts";
+import {
+  type AllowOptions,
+  AssistantWrapError,
+  allowAssistant,
+  firstKeySource,
+} from "./consent-model.ts";
 
 const CLIENT = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const QUERY = `client_id=${encodeURIComponent(CLIENT)}&scope=finance%3Aread&exp=1793450000&sig=s1g`;
@@ -144,7 +149,10 @@ describe("Consent for an encrypted account", () => {
   it("a failed wrap PUT says so; Try again revokes and consents again with a new S", async () => {
     const server = fakeServer({ failPut: true });
     const vault = vaultWith(generateDataKey(), 1);
-    const key = { userId: USER, open: vault.keys.open.bind(null, { device: true }) };
+    const key: NonNullable<AllowOptions["key"]> = {
+      userId: USER,
+      open: (fn) => vault.keys.open({ device: true }, fn),
+    };
     const first = await allowAssistant({
       api: server.api,
       clientId: CLIENT,
@@ -184,7 +192,10 @@ describe("Consent for an encrypted account", () => {
     const server = fakeServer();
     server.state.sessionChanged = true;
     const vault = vaultWith(generateDataKey(), 1);
-    const key = { userId: USER, open: vault.keys.open.bind(null, { device: true }) };
+    const key: NonNullable<AllowOptions["key"]> = {
+      userId: USER,
+      open: (fn) => vault.keys.open({ device: true }, fn),
+    };
     const first = await allowAssistant({
       api: server.api,
       clientId: CLIENT,
