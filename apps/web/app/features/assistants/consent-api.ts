@@ -1,5 +1,5 @@
 import {
-  type ConsentProblem,
+  ConsentError,
   consentProblemFrom,
   type PublicClient,
   publicClientFrom,
@@ -9,15 +9,7 @@ import {
 const AUTH_BASE = "/api/auth";
 const API_BASE = "/api";
 
-/** A refusal, already read into what the consent screen says about it. */
-export class ConsentError extends Error {
-  readonly problem: ConsentProblem;
-  constructor(problem: ConsentProblem) {
-    super(problem);
-    this.name = "ConsentError";
-    this.problem = problem;
-  }
-}
+export { ConsentError };
 
 /** What the consent screen asks of Better Auth, as a prop so stories can stand in for it. */
 export interface ConsentApi {
@@ -102,6 +94,9 @@ export function createConsentApi(
     revoke: async (clientId) => {
       const response = await send(`${API_BASE}/v1/me/assistants/${encodeURIComponent(clientId)}`, {
         method: "DELETE",
+        // Names the account: a cookie that now belongs to someone else gets 409, and theirs is
+        // never revoked.
+        ...(userId ? { headers: { "x-wambito-user": userId } } : {}),
       });
       if (response.ok || response.status === 404) return;
       throw new ConsentError(consentProblemFrom(response.status, await bodyOf(response)));

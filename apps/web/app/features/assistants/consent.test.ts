@@ -83,6 +83,10 @@ describe("consentProblemFrom", () => {
     expect(consentProblemFrom(404, undefined)).toBe("expired");
   });
 
+  it("tells that the cookie now belongs to another account", () => {
+    expect(consentProblemFrom(409, { code: "session_changed" })).toBe("session_changed");
+  });
+
   it("tells a lost connection from anything else", () => {
     expect(consentProblemFrom(0, undefined)).toBe("network");
     expect(consentProblemFrom(500, "<html>")).toBe("generic");
@@ -167,10 +171,12 @@ describe("createConsentApi", () => {
     const fetchImpl = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 204 }),
     );
-    await createConsentApi(fetchImpl).revoke("https://claude.ai/meta");
+    await createConsentApi(fetchImpl, { userId: "u1" }).revoke("https://claude.ai/meta");
     const [input, init] = fetchImpl.mock.calls[0] ?? [];
     expect(input).toBe("/api/v1/me/assistants/https%3A%2F%2Fclaude.ai%2Fmeta");
     expect(init?.method).toBe("DELETE");
+    // names the account: a cookie switched to someone else gets 409, never revokes theirs
+    expect(new Headers(init?.headers).get("x-wambito-user")).toBe("u1");
     await createConsentApi(answer(404, { code: "not_found" })).revoke("c1");
     await expect(createConsentApi(answer(500, {})).revoke("c1")).rejects.toBeInstanceOf(
       ConsentError,

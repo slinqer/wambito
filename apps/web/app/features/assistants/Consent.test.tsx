@@ -17,11 +17,15 @@ const REDIRECT = "https://claude.ai/api/mcp/auth_callback?code=c0de&state=st";
 /** Better Auth's consent, `/v2/keys` and the assistants route, recording every request. */
 function fakeServer(options: { failPut?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body: Record<string, unknown> | null }> = [];
-  const state = { failPut: options.failPut ?? false };
+  /** `sessionChanged`: the cookie is another account's, so calls naming USER get 409. */
+  const state = { failPut: options.failPut ?? false, sessionChanged: false };
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const path = String(input);
     calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (state.sessionChanged && new Headers(init?.headers).get("x-wambito-user") === USER) {
+      return Response.json({ code: "session_changed" }, { status: 409 });
+    }
     if (path === "/api/auth/oauth2/consent")
       return Response.json({ redirect: true, url: REDIRECT });
     if (path.startsWith("/api/v2/keys/")) {
@@ -174,5 +178,34 @@ describe("Consent for an encrypted account", () => {
     const secondWk = server.calls[1]?.body?.wk as string;
     expect(secondWk).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(secondWk).not.toBe(firstWk);
+  });
+
+  it("a cookie that now belongs to another account is no failed wrap: nothing is revoked", async () => {
+    const server = fakeServer();
+    server.state.sessionChanged = true;
+    const vault = vaultWith(generateDataKey(), 1);
+    const key = { userId: USER, open: vault.keys.open.bind(null, { device: true }) };
+    const first = await allowAssistant({
+      api: server.api,
+      clientId: CLIENT,
+      oauthQuery: QUERY,
+      key,
+    }).catch((e) => e);
+    expect(first).not.toBeInstanceOf(AssistantWrapError);
+    expect(first).toMatchObject({ problem: "session_changed" });
+    expect(server.calls.map((c) => c.method)).toEqual(["POST", "PUT"]);
+
+    // a retry after a real wrap failure, with the cookie switched since: the revoke names the
+    // account, gets 409, and nothing else is sent
+    server.calls.length = 0;
+    const again = await allowAssistant({
+      api: server.api,
+      clientId: CLIENT,
+      oauthQuery: QUERY,
+      key,
+      again: true,
+    }).catch((e) => e);
+    expect(again).toMatchObject({ problem: "session_changed" });
+    expect(server.calls.map((c) => c.method)).toEqual(["DELETE"]);
   });
 });

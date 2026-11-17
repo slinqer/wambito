@@ -84,9 +84,20 @@ export function publicClientFrom(clientId: string, body: unknown): PublicClient 
 /**
  * Why consent can't go on, as the screen says it: `expired` (the signed link ran out or was
  * tampered with, or the assistant is unknown: start again from the assistant), `guest` (save
- * the progress first), `network` (no connection), or `generic`.
+ * the progress first), `network` (no connection), `session_changed` (a call naming the account
+ * got 409: the cookie now belongs to another one; reload the page), or `generic`.
  */
-export type ConsentProblem = "expired" | "guest" | "network" | "generic";
+export type ConsentProblem = "expired" | "guest" | "network" | "session_changed" | "generic";
+
+/** A refusal, already read into what the consent screen says about it. */
+export class ConsentError extends Error {
+  readonly problem: ConsentProblem;
+  constructor(problem: ConsentProblem) {
+    super(problem);
+    this.name = "ConsentError";
+    this.problem = problem;
+  }
+}
 
 const START_AGAIN = new Set([
   "invalid_signature",
@@ -105,6 +116,7 @@ export function consentProblemFrom(status: number, body: unknown): ConsentProble
   const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
   const code = [fields.code, fields.error].find((v): v is string => typeof v === "string");
   if (code === "guest_cannot_authorize") return "guest";
+  if (status === 409 && code === "session_changed") return "session_changed";
   if (code && START_AGAIN.has(code.toLowerCase())) return "expired";
   if (status === 404) return "expired";
   return "generic";
@@ -134,9 +146,12 @@ export const firstKeySource = (keys: Pick<ConsentKeys, "device">): DataKeySource
  * to open. The screen says so and offers "Try again" (`allowAssistant` with `again`).
  */
 export class AssistantWrapError extends Error {
-  constructor() {
+  /** Why the PUT failed: no connection, or anything else. */
+  readonly problem: "network" | "generic";
+  constructor(problem: "network" | "generic") {
     super("assistant_wrap_not_saved");
     this.name = "AssistantWrapError";
+    this.problem = problem;
   }
 }
 
@@ -165,7 +180,8 @@ export interface AllowOptions {
  * `assistant` wrap of DK under `S` (ref: the client, the wrap's `keyV`), revokes the earlier
  * consent when `again`, posts the consent with `wk` = `S`, then PUTs the wrap; `S` is zeroed and
  * DK forgotten whatever happens. A refused consent throws its `ConsentError`; a refused wrap after
- * the consent, `AssistantWrapError`.
+ * the consent, `AssistantWrapError`, except a 409 `session_changed` (the cookie is another
+ * account's now), thrown as its `ConsentError`: nothing to retry, the page must reload.
  */
 export async function allowAssistant(options: AllowOptions): Promise<string> {
   const { api, clientId, oauthQuery, key, again = false, newId = uuidv7 } = options;
@@ -187,8 +203,12 @@ export async function allowAssistant(options: AllowOptions): Promise<string> {
           ref: clientId,
           wrap: toBase64Url(wrapped),
         });
-      } catch {
-        throw new AssistantWrapError();
+      } catch (error) {
+        // The cookie is another account's now (409): no failed wrap to retry, and a retry's
+        // revoke would hit that account. The screen asks to reload instead.
+        if (error instanceof ConsentError && error.problem === "session_changed") throw error;
+        const network = error instanceof ConsentError && error.problem === "network";
+        throw new AssistantWrapError(network ? "network" : "generic");
       }
       return url;
     } finally {

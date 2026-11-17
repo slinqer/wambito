@@ -197,7 +197,12 @@ export function Consent({
     setBusy(accept ? "allow" : "cancel");
     setProblem(null);
     try {
-      go(await api.decide(accept, oauthQueryOf(search)));
+      const oauthQuery = oauthQueryOf(search);
+      go(
+        accept && request
+          ? await allowAssistant({ api, clientId: request.clientId, oauthQuery })
+          : await api.decide(accept, oauthQuery),
+      );
       // Busy until the page is gone: the assistant's address is loading.
     } catch (error) {
       inFlight.current = false;
@@ -232,6 +237,7 @@ export function Consent({
       setBusy(null);
       if (error instanceof AssistantWrapError) {
         again.current = true;
+        setProblem(error.problem === "network" ? "network" : null);
         setStep("wrap_failed");
         return null;
       }
@@ -243,7 +249,11 @@ export function Consent({
         return null;
       }
       const consentProblem = error instanceof ConsentError ? error.problem : null;
-      if (consentProblem === "expired" || consentProblem === "guest") {
+      if (
+        consentProblem === "expired" ||
+        consentProblem === "guest" ||
+        consentProblem === "session_changed"
+      ) {
         setProblem(consentProblem);
         setStep("ask");
         return null;
@@ -284,6 +294,17 @@ export function Consent({
       <SignInScreen>
         <p role="status" className="m-0 text-ink-muted">
           {t("allowing")}
+        </p>
+      </SignInScreen>
+    );
+  }
+
+  // The cookie now belongs to another account: nothing here may go on for this one.
+  if (problem === "session_changed") {
+    return (
+      <SignInScreen mood="worried">
+        <p role="alert" className="m-0 text-center text-[17px] font-bold text-ink">
+          {tErrors("session_changed")}
         </p>
       </SignInScreen>
     );

@@ -376,3 +376,27 @@ export const WrapFailed: Story = {
     await expect(args.go).not.toHaveBeenCalled();
   },
 };
+
+/**
+ * Another account signed in on this browser meanwhile (the wrap PUT names this one: 409): it says
+ * to reload, offers no retry, and revokes nothing (the cookie's account is someone else's).
+ */
+export const SessionChanged: Story = {
+  args: {
+    encrypted: { device: true },
+    putAssistantWrap: fn<StageProps["putAssistantWrap"]>(refuse("session_changed")),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await expect(
+      await canvas.findByText(
+        "Se inició sesión con otra cuenta en este navegador. Recarga la página.",
+      ),
+    ).toHaveAttribute("role", "alert");
+    await expect(canvas.queryByRole("button", { name: "Reintentar" })).toBeNull();
+    await expect(args.revoke).not.toHaveBeenCalled();
+    await expect(args.go).not.toHaveBeenCalled();
+  },
+};
