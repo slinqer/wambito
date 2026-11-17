@@ -20,19 +20,28 @@ const configSchema = z.object({
   MCP_WK_PRIVATE_KEY: z
     .preprocess((v) => (v === "" ? undefined : v), z.string().trim().optional())
     .optional()
-    .refine((v) => v === undefined || isPrivateJwk(v), "MCP_WK_PRIVATE_KEY must be a JWK with `d`"),
+    .refine(
+      (v) => v === undefined || isPrivateJwk(v),
+      "MCP_WK_PRIVATE_KEY must be a private X25519 or P-256 JWK (with `d`)",
+    ),
   /** As the API's /health, the build's version. */
   WAMBITO_VERSION: z
     .preprocess((v) => (v === "" ? undefined : v), z.string().trim().optional())
     .optional(),
 });
 
+/**
+ * A private key that opens `ECDH-ES`: X25519 (`OKP`) with `x` and `d`, or P-256 (`EC`) with `x`, `y`
+ * and `d`, and no symmetric part (`k`).
+ */
 function isPrivateJwk(value: string): boolean {
   try {
-    const jwk = JSON.parse(value) as unknown;
-    return (
-      typeof jwk === "object" && jwk !== null && typeof (jwk as { d?: unknown }).d === "string"
-    );
+    const jwk = JSON.parse(value) as Record<string, unknown> | null;
+    if (typeof jwk !== "object" || jwk === null || Array.isArray(jwk)) return false;
+    if ("k" in jwk || typeof jwk.d !== "string" || typeof jwk.x !== "string") return false;
+    if (jwk.kty === "OKP") return jwk.crv === "X25519";
+    if (jwk.kty === "EC") return jwk.crv === "P-256" && typeof jwk.y === "string";
+    return false;
   } catch {
     return false;
   }

@@ -25,16 +25,18 @@ function smtpHostIsLocal(smtpUrl: string | undefined): boolean {
   }
 }
 
-/** A JSON object with a key type and no private part. */
+/**
+ * A public key `ECDH-ES` can encrypt to: X25519 (`OKP`) with `x`, or P-256 (`EC`) with `x` and `y`,
+ * and no private or symmetric part (`d`, `k`). Anything else would fail only at a token exchange.
+ */
 function isPublicJwk(value: string): boolean {
   try {
-    const jwk = JSON.parse(value) as unknown;
-    return (
-      typeof jwk === "object" &&
-      jwk !== null &&
-      typeof (jwk as { kty?: unknown }).kty === "string" &&
-      !("d" in jwk)
-    );
+    const jwk = JSON.parse(value) as Record<string, unknown> | null;
+    if (typeof jwk !== "object" || jwk === null || Array.isArray(jwk)) return false;
+    if ("d" in jwk || "k" in jwk || typeof jwk.x !== "string") return false;
+    if (jwk.kty === "OKP") return jwk.crv === "X25519";
+    if (jwk.kty === "EC") return jwk.crv === "P-256" && typeof jwk.y === "string";
+    return false;
   } catch {
     return false;
   }
@@ -70,7 +72,10 @@ const configSchema = z
         (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
         z
           .string()
-          .refine(isPublicJwk, "MCP_WK_PUBLIC_KEY must be a public JWK (JSON, no `d`)")
+          .refine(
+            isPublicJwk,
+            "MCP_WK_PUBLIC_KEY must be a public X25519 or P-256 JWK (JSON, no `d`)",
+          )
           .optional(),
       )
       .optional(),
