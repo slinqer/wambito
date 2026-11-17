@@ -262,6 +262,9 @@ importers:
       '@wambito/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@wambito/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@wambito/vault':
         specifier: workspace:*
         version: link:../../packages/vault

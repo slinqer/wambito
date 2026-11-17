@@ -12,11 +12,31 @@ const configSchema = z.object({
   /** Requests one assistant may make per minute; a looping assistant gets 429 past it. */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
   MCP_PORT: z.coerce.number().int().default(3001),
+  /**
+   * The private half of the key the API seals the assistant secret to (the access token's `wk`
+   * claim), a JWK as a JSON string. Without it, a token with `wk` (an encrypted account) gets the
+   * reconnect error.
+   */
+  MCP_WK_PRIVATE_KEY: z
+    .preprocess((v) => (v === "" ? undefined : v), z.string().trim().optional())
+    .optional()
+    .refine((v) => v === undefined || isPrivateJwk(v), "MCP_WK_PRIVATE_KEY must be a JWK with `d`"),
   /** As the API's /health, the build's version. */
   WAMBITO_VERSION: z
     .preprocess((v) => (v === "" ? undefined : v), z.string().trim().optional())
     .optional(),
 });
+
+function isPrivateJwk(value: string): boolean {
+  try {
+    const jwk = JSON.parse(value) as unknown;
+    return (
+      typeof jwk === "object" && jwk !== null && typeof (jwk as { d?: unknown }).d === "string"
+    );
+  } catch {
+    return false;
+  }
+}
 
 export type Config = z.infer<typeof configSchema>;
 

@@ -24,14 +24,19 @@ import { rateLimiter } from "./rate-limit.ts";
 /** Who the token is for, and (for prompt requests) the language to answer in. */
 interface Caller {
   userId: string;
+  /** An encrypted account's `wk` claim (still encrypted): the vault path opens it. */
+  wk?: string;
   locale?: Profile["locale"];
 }
 
 export interface McpDeps {
   config: Pick<Config, "MCP_URL" | "AUTH_ISSUER" | "RATE_LIMIT_PER_MINUTE" | "WAMBITO_VERSION">;
   verifier: OAuthTokenVerifier;
-  /** The person's Wambito, acting with their assistant's token. */
-  wambitoFor(token: string): Wambito;
+  /**
+   * The person's Wambito, acting with their assistant's token: over the vault when the token
+   * carries `wk` (an encrypted account), else over the API's `/v1`.
+   */
+  wambitoFor(token: string, wk: string | undefined): Wambito;
   now?: () => Date;
 }
 
@@ -105,7 +110,7 @@ export function createMcpApp(deps: McpDeps) {
       const token = authInfo?.token ?? "";
       let wambito: Wambito | undefined;
       const wambitoNow = () => {
-        wambito ??= deps.wambitoFor(token);
+        wambito ??= deps.wambitoFor(token, caller.wk);
         return wambito;
       };
       for (const tool of TOOLS as AssistantTool<z.ZodObject, z.ZodObject>[]) {
@@ -190,9 +195,12 @@ export function createMcpApp(deps: McpDeps) {
     const wantsLocale = messagesOf(parsedBody).some(
       (m) => typeof m.method === "string" && m.method.startsWith("prompts/"),
     );
+    const extra = auth.extra as unknown as Caller;
     const caller: Caller = {
-      ...(auth.extra as unknown as Caller),
-      ...(wantsLocale ? { locale: (await deps.wambitoFor(auth.token).profile()).locale } : {}),
+      ...extra,
+      ...(wantsLocale
+        ? { locale: (await deps.wambitoFor(auth.token, extra.wk).profile()).locale }
+        : {}),
     };
     return handler.fetch(c.req.raw, {
       authInfo: { ...auth, extra: caller as unknown as Record<string, unknown> },
