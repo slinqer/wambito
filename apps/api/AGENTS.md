@@ -97,8 +97,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   Passkey wraps' `ref` is the passkey's `credentialID`; `auth.ts` hooks on
   `/passkey/delete-passkey` (before: read the credential id; after, on success: delete the wrap; two
   statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
-  `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
-  4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
+  `oauth_consent` row). Revoking an assistant (`revokeAssistant`, `revokeAllAssistants` in
+  `services/account.ts`) deletes its wrap; a rotation refuses `assistant` wraps (422
+  `assistant_wrap_in_rotation`) and revokes every assistant. Tokens reach only
+  `GET /v2/keys/assistant` (`http/scopes.ts`), which answers `{ wrap, links }` and sets
   `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;

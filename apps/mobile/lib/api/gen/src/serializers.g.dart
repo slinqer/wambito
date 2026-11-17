@@ -27,6 +27,7 @@ Serializers _$serializers =
           ..add(AdminUserPasskeysInner.serializer)
           ..add(Assistant.serializer)
           ..add(AssistantList.serializer)
+          ..add(AssistantWrap.serializer)
           ..add(CaptureResult.serializer)
           ..add(CaptureResultCategory.serializer)
           ..add(CaptureResultResultEnum.serializer)
@@ -192,6 +193,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(CreateTransaction)]),
             () => ListBuilder<CreateTransaction>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(KeyLink)]),
+            () => ListBuilder<KeyLink>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyWrap)]),

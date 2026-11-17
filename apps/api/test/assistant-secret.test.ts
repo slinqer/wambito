@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { oauthConsent } from "@wambito/db";
+import { keyWraps, oauthConsent } from "@wambito/db";
 import { and, eq, sql } from "@wambito/db/orm";
 import { compactDecrypt, decodeProtectedHeader } from "jose";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
@@ -198,9 +198,17 @@ describe("an encrypted account's connect carries S", () => {
     const pending = await t.consentCode(email, { headers, wk: newSecret() });
     // The API restarted between consent and exchange: the map is empty.
     forgetPendingSecrets();
+    await t.admin.insert(keyWraps).values({
+      userId,
+      kind: "assistant",
+      ref: pending.clientId,
+      keyV: 1,
+      wrapped: Buffer.alloc(60, 1),
+    });
     const res = await t.exchangeCode(pending);
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe("invalid_grant");
+    expect(await t.admin.select().from(keyWraps).where(eq(keyWraps.userId, userId))).toEqual([]);
     const consents = await t.admin
       .select()
       .from(oauthConsent)

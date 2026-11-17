@@ -47,6 +47,9 @@ How to add to it:
 
 ### Changed
 
+- Revoking an assistant (`DELETE /v1/me/assistants/{clientId}`, the admin disconnect and suspend, and the `invalid_grant` refusal) also deletes its `assistant` key wrap, so a disconnected assistant keeps no copy of the data key.
+- `POST /v2/keys/rotate` refuses a wrap of kind `assistant` (422 `assistant_wrap_in_rotation`) and revokes every assistant of the account in the same transaction (consent, tokens and wraps); each connects again and wraps afresh.
+- `GET /v2/keys/assistant` (`getAssistantWrap`) answers `{ wrap, links }` instead of the bare wrap: `links` is the same list `GET /v2/keys` returns, so an assistant can open records still under an older key version.
 - An encrypted account's `GET /auth/oauth2/authorize` always shows the consent page (`prompt=consent` is added), even when a consent already covers the scopes.
 - `POST /auth/oauth2/token` refuses to issue tokens without `S` for an encrypted account (400 `invalid_grant`: the server restarted between consent and exchange, a refresh token without its `.S`, a consent without `wk`) and revokes that assistant for the account (consent and tokens), so the next connect starts over through the consent page.
 - Encrypted users without an email are deleted after 12 idle months (365 days) when only their phone can open the account (no recovery verifier and no passkey wrap), else after 24 idle months (730 days); the deletion keeps only the SHA-256 of the user id (`deleted_users`). The 60-day cleanup is for plain guests only. Users with an email are never deleted for inactivity.

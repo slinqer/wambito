@@ -12,6 +12,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:built_value/json_object.dart';
 import 'package:wambito/api/gen/src/api_util.dart';
 import 'package:wambito/api/gen/src/model/assistant_list.dart';
+import 'package:wambito/api/gen/src/model/assistant_wrap.dart';
 import 'package:wambito/api/gen/src/model/capture_result.dart';
 import 'package:wambito/api/gen/src/model/category.dart';
 import 'package:wambito/api/gen/src/model/category_report.dart';
@@ -1354,7 +1355,7 @@ class DefaultApi {
   }
 
   /// getAssistantWrap
-  /// For an assistant&#39;s token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session.
+  /// For an assistant&#39;s token: the wrap of that assistant (its OAuth client), marks it used, and &#x60;links&#x60; (as &#x60;GET /v2/keys&#x60;) to open records under older key versions. 404 when the person made none for it (revoking the assistant or rotating the keys deletes it), and for every session.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1364,9 +1365,9 @@ class DefaultApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [KeyWrap] as data
+  /// Returns a [Future] containing a [Response] with a [AssistantWrap] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<KeyWrap>> getAssistantWrap({
+  Future<Response<AssistantWrap>> getAssistantWrap({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1390,14 +1391,14 @@ class DefaultApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    KeyWrap? _responseData;
+    AssistantWrap? _responseData;
 
     try {
       final rawResponse = _response.data;
       _responseData = rawResponse == null
           ? null
-          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWrap))
-                as KeyWrap;
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(AssistantWrap))
+                as AssistantWrap;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1408,7 +1409,7 @@ class DefaultApi {
       );
     }
 
-    return Response<KeyWrap>(
+    return Response<AssistantWrap>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
