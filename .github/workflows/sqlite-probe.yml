@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [alone, suite-1, suite-2, suite-3]
+        mode: [pragma, alone]
     defaults:
       run:
         working-directory: apps/mobile
@@ -25,6 +25,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
+      - name: pragma probe
+        if: matrix.mode == 'pragma'
+        run: flutter test test/probe/pragma_probe_test.dart --reporter expanded 2>&1 | sed -n '/PRAGMA/,/All tests\|Some tests/p'
       - name: probe alone
         if: matrix.mode == 'alone'
         run: PROBE_ROUNDS=80 flutter test test/probe/lock_probe_test.dart --reporter expanded 2>&1 | grep -E "PROBE|round|FAIL|All tests|Some tests" || true
