@@ -5,8 +5,8 @@ import { HomeStage } from "../home/story-harness.tsx";
 import { VaultLoading } from "./VaultGate.tsx";
 
 /**
- * A preview account's app (`<ApiProvider mode="local">`, stage 2a): settings turns off import,
- * export and the assistants' list with a "not available yet" note; passkeys and deleting the
+ * A preview account's app (`<ApiProvider mode="local">`, stage 2a): settings turns off import
+ * and export with a "not available yet" note (the assistants' list works); passkeys and deleting the
  * account stay. Web-only, not in parity.json.
  */
 interface Spies {
@@ -33,7 +33,8 @@ export const Settings: Story = {
     await expect(data.getByRole("button", { name: "Descargar JSON" })).toBeDisabled();
     await expect(data.getByText(NOTE)).toBeVisible();
     const assistants = within(await canvas.findByRole("region", { name: "Conecta tu asistente" }));
-    await expect(assistants.getByText(NOTE)).toBeVisible();
+    // an assistant on an encrypted account is listed and revoked here (stage 4); the note is the demo's
+    await expect(assistants.queryByText(NOTE)).toBeNull();
     // deleting the account is the account's, not its finances: it stays on, without the export
     const remove = canvas.getByRole("button", { name: "Eliminar mi cuenta" });
     await expect(remove).toBeEnabled();
