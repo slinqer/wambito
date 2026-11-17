@@ -74,7 +74,12 @@ export function createConsentApi(
     decide: async (accept, oauthQuery, wk) => {
       const body = await call(`${AUTH_BASE}/oauth2/consent`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          // With `wk`, names the account the page was loaded for: a cookie that now belongs to
+          // someone else gets 409 `session_changed`, not a consent of theirs.
+          ...(wk && userId ? { "x-wambito-user": userId } : {}),
+        },
         body: JSON.stringify({ accept, oauth_query: oauthQuery, ...(wk ? { wk } : {}) }),
       });
       const url = (body as { url?: unknown } | undefined)?.url;

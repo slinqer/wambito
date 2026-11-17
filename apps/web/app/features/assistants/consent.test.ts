@@ -141,6 +141,20 @@ describe("createConsentApi", () => {
     });
   });
 
+  it("an encrypted account's Permitir names the account; a 409 means the cookie changed", async () => {
+    const fetchImpl = answer(200, { redirect: true, url: "https://claude.ai/cb?code=1" });
+    const api = createConsentApi(fetchImpl, { userId: "u1" });
+    await api.decide(true, "client_id=c1&sig=x", "c2VjcmV0");
+    expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("x-wambito-user")).toBe("u1");
+    // Without wk (a plain account) the consent is as before.
+    await api.decide(true, "client_id=c1&sig=x");
+    expect(new Headers(fetchImpl.mock.calls[1]?.[1]?.headers).get("x-wambito-user")).toBeNull();
+    const switched = createConsentApi(answer(409, { code: "session_changed" }), { userId: "u1" });
+    await expect(switched.decide(true, "q", "c2VjcmV0")).rejects.toEqual(
+      new ConsentError("session_changed"),
+    );
+  });
+
   it("puts the assistant wrap under /v2/keys, naming the account", async () => {
     const fetchImpl = answer(200, {});
     const id = "01930000-0000-7000-8000-0000000000a1";

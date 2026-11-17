@@ -193,7 +193,8 @@ describe("Consent for an encrypted account", () => {
     }).catch((e) => e);
     expect(first).not.toBeInstanceOf(AssistantWrapError);
     expect(first).toMatchObject({ problem: "session_changed" });
-    expect(server.calls.map((c) => c.method)).toEqual(["POST", "PUT"]);
+    // The consent names the account too: refused, so no consent and no wrap for the other one.
+    expect(server.calls.map((c) => c.method)).toEqual(["POST"]);
 
     // a retry after a real wrap failure, with the cookie switched since: the revoke names the
     // account, gets 409, and nothing else is sent
