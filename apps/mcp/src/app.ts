@@ -20,6 +20,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Config } from "./config.ts";
 import { rateLimiter } from "./rate-limit.ts";
+import { inRequest } from "./vault-wambito.ts";
 
 /** Who the token is for, and (for prompt requests) the language to answer in. */
 interface Caller {
@@ -56,7 +57,11 @@ function toolResult(tool: AssistantTool<z.ZodObject, z.ZodObject>) {
     now: () => Date,
   ): Promise<CallToolResult> => {
     try {
-      const result = await tool.handler(input, { wambito, userId: caller.userId, now });
+      // One tool call is one request on an encrypted account: the vault holds the account's lock
+      // for all of it, so two calls never decide on a store the other is changing.
+      const result = await inRequest(wambito, () =>
+        tool.handler(input, { wambito, userId: caller.userId, now }),
+      );
       return {
         content: [{ type: "text", text: result.text }],
         structuredContent: result.structured as Record<string, unknown>,
@@ -161,6 +166,19 @@ export function createMcpApp(deps: McpDeps) {
     { legacy: "stateless" },
   );
 
+  /**
+   * The person's language for prompts. A Wambito that cannot answer (an encrypted account whose
+   * assistant was disconnected) leaves the default: a prompt is text, not data.
+   */
+  async function localeOf(token: string, extra: Caller): Promise<Pick<Caller, "locale">> {
+    try {
+      return { locale: (await deps.wambitoFor(token, extra.wk).profile()).locale };
+    } catch (error) {
+      if (error instanceof ToolError) return {};
+      throw error;
+    }
+  }
+
   const app = new Hono();
 
   app.get("/health", (c) =>
@@ -196,12 +214,7 @@ export function createMcpApp(deps: McpDeps) {
       (m) => typeof m.method === "string" && m.method.startsWith("prompts/"),
     );
     const extra = auth.extra as unknown as Caller;
-    const caller: Caller = {
-      ...extra,
-      ...(wantsLocale
-        ? { locale: (await deps.wambitoFor(auth.token, extra.wk).profile()).locale }
-        : {}),
-    };
+    const caller: Caller = { ...extra, ...(wantsLocale ? await localeOf(auth.token, extra) : {}) };
     return handler.fetch(c.req.raw, {
       authInfo: { ...auth, extra: caller as unknown as Record<string, unknown> },
       ...(parsedBody === undefined ? {} : { parsedBody }),

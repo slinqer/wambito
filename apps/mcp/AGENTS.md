@@ -18,7 +18,9 @@ memory for the request (below) and keeps only their ciphertext.
   (`S` and data keys zeroed once derived), a memory store rebuilt from the cache, one `/v2/sync`
   run, then `apiWambito(apiUrl, token, backend.fetch)` over `@wambito/vault`'s local backend
   (`source: "mcp"`, ids from the `Idempotency-Key`). A write runs the sync once more and is the
-  `not_saved` tool error unless every change was acknowledged; a read never pushes.
+  `not_saved` tool error unless every change was acknowledged; a read never pushes. `app.ts` runs
+  each tool inside `inRequest` (the lock for the whole tool call, the vault dropped at its end); a
+  method called outside one is a request of its own.
 - `src/vault-cache.ts`: per account, only what `/v2/sync` sent (ciphertext, tombstones) and the
   cursor; LRU by accounts and bytes, 30 minutes idle (`VAULT_CACHE_DEFAULTS`), dropped on `410
   resync_required` or a new key version; `lock(userId, fn)` runs one request per account.

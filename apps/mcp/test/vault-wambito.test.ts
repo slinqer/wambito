@@ -374,22 +374,29 @@ test("a read tool never posts /v2/sync", async () => {
   const conn = await connect(account);
   const calls: Call[] = [];
   const mcp = vault(conn, network(calls));
-  await mcp.profile();
-  await mcp.monthSummary("2026-10");
-  await mcp.listTransactions({ month: "2026-10", limit: 100 });
-  await mcp.categoryReport({ from: "2026-10", to: "2026-10", kind: "expense" });
-  await mcp.trend({ from: "2026-09", to: "2026-10" });
-  await mcp.listCategories();
-  await mcp.listRecurrences();
+  // One MCP request (one tool) may read many times.
+  await mcp.inRequest(async () => {
+    await mcp.profile();
+    await mcp.monthSummary("2026-10");
+    await mcp.listTransactions({ month: "2026-10", limit: 100 });
+    await mcp.categoryReport({ from: "2026-10", to: "2026-10", kind: "expense" });
+    await mcp.trend({ from: "2026-09", to: "2026-10" });
+    await mcp.listCategories();
+    await mcp.listRecurrences();
+  });
   expect(calls.filter((c) => c.method !== "GET")).toEqual([]);
   // One sync pass for the whole request, whatever the number of reads.
   expect(calls.filter((c) => c.path === "/v2/keys/assistant")).toHaveLength(1);
+  // Outside a request bracket, each call is its own request.
+  await mcp.listCategories();
+  expect(calls.filter((c) => c.path === "/v2/keys/assistant")).toHaveLength(2);
 });
 
-test("a retried add_transactions writes once and says alreadySaved", async () => {
-  const account = await encryptedAccount();
-  await withFixture(account);
-  const conn = await connect(account);
+/** The MCP app over the real verifier: `callTool` runs one tool as one MCP request. */
+async function mcpApp(
+  conn: { token: string },
+  wambitoFor: (token: string, wk: string | undefined) => Wambito,
+) {
   const jwks = (await (await t.app.request("/auth/jwks")).json()) as JSONWebKeySet;
   const config = {
     MCP_URL: t.config.MCP_URL ?? "",
@@ -400,28 +407,46 @@ test("a retried add_transactions writes once and says alreadySaved", async () =>
   const mcp = createMcpApp({
     config,
     verifier: jwtVerifier(config, createLocalJWKSet(jwks)),
-    wambitoFor: createWambitoFor({ apiUrl: API, privateKey, cache, fetch: network() }),
+    wambitoFor,
     now: () => new Date(NOW),
   });
-  const call = async () => {
-    const client = new Client(
+  async function client() {
+    const c = new Client(
       { name: "vault", version: "1.0.0" },
       { versionNegotiation: { mode: { pin: "2026-07-28" } } },
     );
-    await client.connect(
+    await c.connect(
       new StreamableHTTPClientTransport(new URL(config.MCP_URL), {
         fetch: (async (url: string | URL, init?: RequestInit) =>
           mcp.request(String(url), init)) as typeof fetch,
         requestInit: { headers: { authorization: `Bearer ${conn.token}` } },
       }),
     );
-    const result = await client.callTool({
-      name: "add_transactions",
-      arguments: { items: [{ name: "Lunch", amount: 18000, kind: "expense", category: "food" }] },
-    });
-    await client.close();
-    return result;
+    return c;
+  }
+  return {
+    client,
+    async callTool(name: string, args: Record<string, unknown>) {
+      const c = await client();
+      const result = await c.callTool({ name, arguments: args });
+      await c.close();
+      return result;
+    },
   };
+}
+
+test("a retried add_transactions writes once and says alreadySaved", async () => {
+  const account = await encryptedAccount();
+  await withFixture(account);
+  const conn = await connect(account);
+  const mcp = await mcpApp(
+    conn,
+    createWambitoFor({ apiUrl: API, privateKey, cache, fetch: network() }),
+  );
+  const call = () =>
+    mcp.callTool("add_transactions", {
+      items: [{ name: "Lunch", amount: 18000, kind: "expense", category: "food" }],
+    });
   const first = await call();
   expect(first.isError, JSON.stringify(first.content)).toBeFalsy();
   expect(first.structuredContent).toMatchObject({ alreadySaved: false });
@@ -472,27 +497,98 @@ describe("an unacknowledged push is a not_saved tool error", () => {
   });
 });
 
-test("two calls on one account run one after the other and both writes land", async () => {
-  const account = await encryptedAccount();
-  const { items } = await withFixture(account);
-  const conn = await connect(account);
-  const id = items[0]?.id ?? "";
-  const calls: Call[] = [];
-  const a = vault(conn, network(calls, "a"));
-  const b = vault(conn, network(calls, "b"));
-  await Promise.all([
-    a.updateTransaction(id, { name: "Market" }),
-    b.updateTransaction(id, { amount: -4200 }),
-  ]);
-  // Every call of one request comes before every call of the other.
-  const tags = calls.map((c) => c.tag);
-  const switches = tags.filter((tag, i) => i > 0 && tag !== tags[i - 1]).length;
-  expect(switches).toBe(1);
-  expect(calls.filter((c) => c.method === "POST" && c.path === "/v2/sync")).toHaveLength(2);
+describe("two calls on one account run one after the other", () => {
+  /** A `wambitoFor` whose every MCP request gets its own tag on the recorded calls. */
+  function tagged(calls: Call[]) {
+    let requests = 0;
+    return (token: string, wk: string | undefined) =>
+      createWambitoFor({
+        apiUrl: API,
+        privateKey,
+        cache,
+        fetch: network(calls, String(++requests)),
+      })(token, wk);
+  }
+  /** How often the recorded calls switch from one request to another. */
+  const switches = (calls: Call[]) =>
+    calls.map((c) => c.tag).filter((tag, i, tags) => i > 0 && tag !== tags[i - 1]).length;
 
-  await account.web.sync();
-  const row = await account.web.store.get("transaction", id);
-  expect(row?.body).toMatchObject({ name: "Market", amount: -4200 });
+  test("two create_category of one name: one category, one name-taken answer", async () => {
+    const account = await encryptedAccount();
+    await withFixture(account);
+    const conn = await connect(account);
+    const calls: Call[] = [];
+    const mcp = await mcpApp(conn, tagged(calls));
+    const results = await Promise.all([
+      mcp.callTool("create_category", { name: "Pets", kind: "expense" }),
+      mcp.callTool("create_category", { name: "Pets", kind: "expense" }),
+    ]);
+    // Every API call of one tool call comes before every call of the other.
+    expect(switches(calls)).toBe(1);
+    expect(results.filter((r) => !r.isError)).toHaveLength(1);
+    const refused = results.find((r) => r.isError);
+    expect(JSON.stringify(refused?.content)).toContain("category_name_taken");
+
+    await account.web.sync();
+    const pets = (await account.web.store.list("category")).filter(
+      (r) => (r.body as { name: string }).name === "Pets",
+    );
+    expect(pets).toHaveLength(1);
+  });
+
+  test("two update_transaction on one movement: both writes land", async () => {
+    const account = await encryptedAccount();
+    const { items } = await withFixture(account);
+    const conn = await connect(account);
+    const id = items[0]?.id ?? "";
+    const calls: Call[] = [];
+    const mcp = await mcpApp(conn, tagged(calls));
+    const results = await Promise.all([
+      mcp.callTool("update_transaction", { id, name: "Market" }),
+      mcp.callTool("update_transaction", { id, amount: 42 }),
+    ]);
+    for (const r of results) expect(r.isError, JSON.stringify(r.content)).toBeFalsy();
+    expect(switches(calls)).toBe(1);
+    expect(calls.filter((c) => c.method === "POST" && c.path === "/v2/sync")).toHaveLength(2);
+
+    await account.web.sync();
+    const row = await account.web.store.get("transaction", id);
+    expect(row?.body).toMatchObject({ name: "Market", amount: -4200 });
+  });
+});
+
+test("a failed cache write never replaces the tool's answer", async () => {
+  const account = await encryptedAccount();
+  await withFixture(account);
+  const conn = await connect(account);
+  const broken: VaultCache = {
+    ...cache,
+    get: (userId) => cache.get(userId),
+    drop: (userId) => cache.drop(userId),
+    lock: (userId, fn) => cache.lock(userId, fn),
+    set: () => {
+      throw new Error("cache full");
+    },
+  };
+  const mcp = vaultWambito(
+    { apiUrl: API, privateKey, cache: broken, fetch: network(), now: () => new Date(NOW) },
+    conn.token,
+    conn.wk,
+  );
+  expect((await mcp.listCategories()).map((c) => c.name)).toContain("Food");
+});
+
+test("a prompt request whose vault cannot open falls back to the default language", async () => {
+  const account = await encryptedAccount();
+  const conn = await connect(account, { wrap: false });
+  const mcp = await mcpApp(
+    conn,
+    createWambitoFor({ apiUrl: API, privateKey, cache, fetch: network() }),
+  );
+  const c = await mcp.client();
+  const { prompts } = await c.listPrompts();
+  expect(prompts.length).toBeGreaterThan(0);
+  await c.close();
 });
 
 test("a record under an older key version opens through the links", async () => {

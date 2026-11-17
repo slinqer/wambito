@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { ToolError, type Wambito } from "@wambito/ai-assistant-tools";
 import {
   deriveRecordKeys,
@@ -106,6 +107,17 @@ export async function importWkPrivateKey(json: string | undefined): Promise<Cryp
   const key = await importJWK(JSON.parse(json) as Record<string, unknown>, "ECDH-ES");
   if (key instanceof Uint8Array) throw new Error("MCP_WK_PRIVATE_KEY must be an asymmetric JWK");
   return key;
+}
+
+/** A `Wambito` whose calls can be bracketed as one MCP request (`app.ts` wraps each tool). */
+export interface VaultWambito extends Wambito {
+  inRequest<T>(fn: () => Promise<T>): Promise<T>;
+}
+
+/** Runs `fn` as one request of `wambito` when it is a vault's, else as is. */
+export function inRequest<T>(wambito: Wambito, fn: () => Promise<T>): Promise<T> {
+  const scoped = wambito as Partial<VaultWambito>;
+  return typeof scoped.inRequest === "function" ? scoped.inRequest(fn) : fn();
 }
 
 export interface VaultDeps {
@@ -258,7 +270,7 @@ async function replay(
  * The person's Wambito for an encrypted account, for one MCP request (see the file's comment).
  * `token` is the assistant's access token, `wk` its claim.
  */
-export function vaultWambito(deps: VaultDeps, token: string, wk: string): Wambito {
+export function vaultWambito(deps: VaultDeps, token: string, wk: string): VaultWambito {
   const apiUrl = deps.apiUrl.replace(/\/+$/, "");
   const network = deps.fetch ?? fetch;
   const now = deps.now ?? (() => new Date());
@@ -415,42 +427,83 @@ export function vaultWambito(deps: VaultDeps, token: string, wk: string): Wambit
   }
 
   let opened: Promise<Session> | undefined;
+  /**
+   * Set inside `inRequest`, for the async calls it makes: a method called there is part of the
+   * request; one called anywhere else (another tool of the same MCP request) waits for the lock.
+   */
+  const bracket = new AsyncLocalStorage<true>();
 
-  async function call(name: Method, args: unknown[], write: boolean): Promise<unknown> {
+  /**
+   * One MCP request (one tool call, all its methods): under the account's lock, so two requests
+   * never interleave (a check-then-act tool decides on the store it then writes to). The vault
+   * opens on the first method and is dropped (store closed, keys released) when `fn` ends.
+   */
+  async function inRequest<T>(fn: () => Promise<T>): Promise<T> {
+    if (bracket.getStore()) return fn();
     const user = userId;
     if (!user) throw reconnectError();
     return cache.lock(user, async () => {
-      opened ??= prepare(user);
-      let session: Session;
       try {
-        session = await opened;
-      } catch (error) {
-        opened = undefined;
-        throw error;
-      }
-      try {
-        const method = session.api[name] as (...a: unknown[]) => Promise<unknown>;
-        const answer = await method(...args);
-        if (write) {
-          const pushed = await session.engine.run();
-          const pending = await session.store.readOutbox(Number.MAX_SAFE_INTEGER);
-          if (
-            !pushed.ok ||
-            pushed.parked.length > 0 ||
-            pushed.dropped.length > 0 ||
-            pending.length > 0
-          ) {
-            // Nothing is kept to retry later: the next call starts from the server's copy.
-            opened = undefined;
-            throw notSaved();
-          }
-        }
-        return answer;
+        return await bracket.run(true, fn);
       } finally {
-        await writeBack(user, session);
+        const session = opened;
+        opened = undefined;
+        await session?.then(
+          (s) => s.store.close(),
+          () => undefined,
+        );
       }
     });
   }
 
-  return wambitoOf((name, args) => call(name, args, (WRITES as readonly string[]).includes(name)));
+  /** Stores what was pulled, but a failed cache write is never what the tool reports. */
+  async function keepPulled(user: string, session: Session) {
+    try {
+      await writeBack(user, session);
+    } catch {
+      log("the cache could not be written");
+    }
+  }
+
+  async function call(name: Method, args: unknown[], write: boolean): Promise<unknown> {
+    // A method called outside a request bracket is a request of its own.
+    if (!bracket.getStore()) return inRequest(() => call(name, args, write));
+    const user = userId;
+    if (!user) throw reconnectError();
+    opened ??= prepare(user);
+    let session: Session;
+    try {
+      session = await opened;
+    } catch (error) {
+      opened = undefined;
+      throw error;
+    }
+    try {
+      const method = session.api[name] as (...a: unknown[]) => Promise<unknown>;
+      const answer = await method(...args);
+      if (write) {
+        const pushed = await session.engine.run();
+        const pending = await session.store.readOutbox(Number.MAX_SAFE_INTEGER);
+        if (
+          !pushed.ok ||
+          pushed.parked.length > 0 ||
+          pushed.dropped.length > 0 ||
+          pending.length > 0
+        ) {
+          // Nothing is kept to retry later: the next call starts from the server's copy.
+          opened = undefined;
+          session.store.close();
+          throw notSaved();
+        }
+      }
+      return answer;
+    } finally {
+      await keepPulled(user, session);
+    }
+  }
+
+  return {
+    ...wambitoOf((name, args) => call(name, args, (WRITES as readonly string[]).includes(name))),
+    inRequest,
+  };
 }
