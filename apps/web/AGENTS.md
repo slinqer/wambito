@@ -324,6 +324,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
 - Unit + Storybook tests: `pnpm vitest run apps/web`; one project
   `--project "@wambito/web (unit)"` or `"@wambito/web (storybook)"` (Chromium).
 - Storybook: `pnpm --filter @wambito/web storybook` (:6006). OG images: `pnpm --filter @wambito/web og`.
+- The landing's phone screen ("See where it goes" in `#how`): `pnpm --filter @wambito/web
+  landing-screens` (`scripts/landing-screens.ts`, needs the dev server; `--url` for another origin)
+  shoots `/demo/insights` per language and theme into `public/landing/insights-*.webp` (the screen
+  without the donut's ring) and `donut-*.webp` (the ring alone, which CSS sweeps in over it), and
+  writes the ring's place to `app/features/landing/app-screen.gen.ts`. Generated: never edit them.
 - e2e: `E2E_NOW=2026-10-21T15:00:00Z docker compose up -d --build` (value from
   `e2e/helpers.ts`), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
   `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).

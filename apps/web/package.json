@@ -10,6 +10,7 @@
     "tokens": "tsx scripts/gen-tokens.ts",
     "sounds": "tsx scripts/gen-feedback-sounds.ts",
     "og": "tsx scripts/og/render.ts",
+    "landing-screens": "tsx scripts/landing-screens.ts",
     "api:types": "tsx scripts/gen-api.ts",
     "storybook": "storybook dev --port 6006",
     "record:local-backend": "tsx scripts/record-local-backend-fixtures.ts",

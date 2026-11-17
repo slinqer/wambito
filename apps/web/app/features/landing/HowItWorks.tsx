@@ -1,44 +1,47 @@
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslations } from "use-intl";
-import { LANDING_ART, Wambi } from "../../wambi/Wambi.tsx";
+import { useLocale } from "../../i18n/IntlProvider.tsx";
+import { DONUT_ON_SCREEN } from "./app-screen.gen.ts";
 import { useDemoMoney } from "./demo-money.ts";
 import { useReplayOnView } from "./play-on-view.ts";
 
 /** Sample figures for the illustrations, in euro cents (`useDemoMoney` shows them in the language's demo currency). */
 const DEMO = {
-  groceries: { remaining: 4633, filled: "62%" },
-  goingOut: { remaining: 800, filled: "91%" },
   importedRows: 1248,
-  recurring: [
-    { key: "rent", emoji: "🏠", cents: -65000, days: 3 },
-    { key: "streaming", emoji: "🎬", cents: -1299, days: 9 },
-    { key: "gym", emoji: "🏋️", cents: -3500, days: 16 },
+  // Subscriptions: name (a brand, the same in every language), its mark in public/landing/logos/.
+  subscriptions: [
+    { name: "Netflix", logo: "netflix.svg", cents: -1299, days: 3 },
+    { name: "Spotify", logo: "spotify.svg", cents: -1199, days: 9 },
+    { name: "YouTube Premium", logo: "youtube.svg", cents: -1399, days: 16 },
   ],
   // An expense as the phone shows it, and the same record as the server keeps it: noise.
   coffee: { emoji: "☕", cents: -450, sealed: "x9Fq·2LmK·v0Zt·R7cA" },
-  code: "482 913",
 } as const;
 
 /** How long the imported count takes to run from 0 to its total, in ms. */
 const COUNT_MS = 1600;
 
+/** How long the count waits, hidden, while the file is pushed and the arrow points, in ms. */
+const COUNT_WAIT_MS = 1100;
+
 /** How often a card on screen plays its illustration again, in ms. */
 const REPLAY_MS = 6000;
 
 /**
- * "1248 transactions ready". With `play` (each time its card plays, a fresh one) it counts up from
- * 0, then a check pops to confirm. Without it (before the card plays, without JavaScript, under
+ * "1248 transactions ready". With `play` (each time its card plays, a fresh one) it waits, hidden,
+ * while the file is pushed and the arrow points (`waiting`), pops in and counts up from 0, then a
+ * check pops to confirm. Without it (before the card plays, without JavaScript, under
  * reduced motion) it shows the final count, confirmed. No motion library: this is the landing.
  */
 function ImportedCount({ total, play, pace }: { total: number; play: boolean; pace: number }) {
   const t = useTranslations("landing.how");
   const [shown, setShown] = useState(play ? 0 : total);
-  const [counting, setCounting] = useState(play);
+  const [state, setState] = useState<"waiting" | "counting" | "done">(play ? "waiting" : "done");
 
   useEffect(() => {
     if (!play) return;
     let frame = 0;
-    const start = performance.now();
+    let start = 0;
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / (COUNT_MS * pace));
       // Ease out: fast at first, settling on the total.
@@ -47,18 +50,21 @@ function ImportedCount({ total, play, pace }: { total: number; play: boolean; pa
         frame = requestAnimationFrame(tick);
         return;
       }
-      setCounting(false);
+      setState("done");
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    const wait = window.setTimeout(() => {
+      setState("counting");
+      start = performance.now();
+      frame = requestAnimationFrame(tick);
+    }, COUNT_WAIT_MS * pace);
+    return () => {
+      window.clearTimeout(wait);
+      cancelAnimationFrame(frame);
+    };
   }, [play, pace, total]);
 
   return (
-    <span
-      className="lk-landing-imported"
-      data-state={counting ? "counting" : "done"}
-      data-counted={play ? "" : undefined}
-    >
+    <span className="lk-landing-imported" data-state={state} data-counted={play ? "" : undefined}>
       {t("import.demo_rows", { count: shown })}
       <span className="lk-landing-imported-check">
         <svg viewBox="0 0 24 24">
@@ -69,8 +75,84 @@ function ImportedCount({ total, play, pace }: { total: number; play: boolean; pa
   );
 }
 
-/** His celebration, held on frame 4 (jumping, fists up): on the landing he reacts to nothing. */
-const STILL_CELEBRATE = { ...LANDING_ART.celebrate, play: false };
+/** Where else a history will come from; `logo` is the source's mark in public/landing/logos/. */
+const COMING_SOURCES = [
+  { name: "Buddy", logo: "buddy.png" },
+  { name: "Excel", logo: "microsoft-excel.svg" },
+  { name: "Google Sheets", logo: "google-sheets.svg" },
+] as const;
+
+/**
+ * Where else a history will come from, marked as coming soon (only Budge imports today). Brand
+ * names stay as they are in every language; the marks stay their owners' trademarks and only say
+ * where a history can come from.
+ */
+function ComingSources({ soon }: { soon: string }) {
+  return (
+    <div className="lk-landing-sources">
+      <span className="lk-landing-soon">{soon}</span>
+      <ul>
+        {COMING_SOURCES.map((source) => (
+          <li key={source.name}>
+            <img src={`/landing/logos/${source.logo}`} alt="" width={16} height={16} />
+            {source.name}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * A real app screen in a phone (the demo, made-up data, rendered by
+ * `pnpm --filter @wambito/web landing-screens`), in the page's language: the screen without what
+ * moves, and what moves laid over it, which CSS animates as the app does each time the card plays.
+ * - `insights`: the "By category" card; the donut's ring (at `DONUT_ON_SCREEN`) sweeps in.
+ * - `budgets`: home's Categories tab; the bars' fills (over the whole screen) grow from the left.
+ * Both themes are here and CSS shows the one in use; lazy, so the hidden ones are never fetched.
+ * Decorative: the card's text says what it shows.
+ */
+function AppScreen({ screen, locale }: { screen: "insights" | "budgets"; locale: string }) {
+  return (
+    <div className="lk-landing-phone">
+      {(["night", "day"] as const).map((theme) => (
+        <div key={theme} className={`lk-landing-screen is-${theme}`}>
+          <img
+            className="lk-landing-screen-shot"
+            src={`/landing/${screen}-${locale}-${theme}.webp`}
+            alt=""
+            width={390}
+            height={844}
+            loading="lazy"
+            decoding="async"
+          />
+          {screen === "insights" ? (
+            <img
+              className="lk-landing-screen-ring"
+              src={`/landing/donut-${locale}-${theme}.webp`}
+              alt=""
+              width={200}
+              height={200}
+              loading="lazy"
+              decoding="async"
+              style={DONUT_ON_SCREEN}
+            />
+          ) : (
+            <img
+              className="lk-landing-screen-bars"
+              src={`/landing/budget-bars-${locale}-${theme}.webp`}
+              alt=""
+              width={390}
+              height={844}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * A card: its name, one line and the illustration, which plays by itself
@@ -103,103 +185,85 @@ function Feature({
 }
 
 /**
- * What Wambito does, as a grid of six cards (three across on desktop, two on tablets, one on
- * phones), each with its name, one line and a small illustration built from the app's own pieces
- * that fills the card's foot: where the money goes, budgets that warn you, fixed payments with
- * their due dates, end-to-end encryption (an expense on the phone, noise on the server), importing your history (Budge today) and signing in without a password, under a big title with Wambi jumping for joy at its end. Automatic capture has
+ * What Wambito does, as a grid of five cards (three then two, centred, on desktop; two on tablets,
+ * the last centred; one on phones), each with its name, one line and a small illustration that fills the card's foot:
+ * importing your history first (Budge today; where people start), then where the money goes and
+ * budgets that warn you (the app's real screens, in phones), subscriptions with their due dates and what they cost a month,
+ * end-to-end encryption (an expense on the phone, noise on the server), under a big title (signing in without a password is in the FAQ). Automatic capture has
  * its own section above (`AutomaticCapture.tsx`). `pace` scales the timing (stories only).
  */
 export function HowItWorks({ pace = 1 }: { pace?: number }) {
   const t = useTranslations("landing.how");
+  const { locale } = useLocale();
   const money = useDemoMoney();
-  const dot = (color: string) => ({ "--dot": color }) as CSSProperties;
 
   return (
     <section id="how" className="lk-landing-section" aria-labelledby="how-title">
       <div className="lk-landing-section-head is-center">
-        <h2 id="how-title">
-          {t("title")}
-          {/* Wambi jumping for joy after the title: a still frame, decorative. */}
-          <span
-            className="lk-landing-title-wambi"
-            data-wambi-spot="how"
-            data-wambi-pose="celebrate"
-            aria-hidden="true"
-          >
-            <Wambi mood="celebrating" size="100%" decorative art={STILL_CELEBRATE} />
-          </span>
-        </h2>
+        <h2 id="how-title">{t("title")}</h2>
       </div>
       <ul className="lk-landing-cards is-how">
         <Feature
           pace={pace}
-          title={t("spend.title")}
-          body={t("spend.body")}
-          demo={() => (
-            <div className="lk-landing-demo-row">
-              <span className="lk-landing-donut" />
-              <div className="grid gap-(--space-2)">
-                <span className="lk-overline">{t("spend.demo_label")}</span>
-                <ul className="lk-landing-legend">
-                  <li style={dot("var(--candy)")}>{t("demo_categories.groceries")}</li>
-                  <li style={dot("var(--brand-glow)")}>{t("demo_categories.home")}</li>
-                  <li style={dot("var(--near)")}>{t("demo_categories.going_out")}</li>
-                  <li style={dot("var(--good)")}>{t("demo_categories.transport")}</li>
-                </ul>
-              </div>
+          title={t("import.title")}
+          body={t("import.body")}
+          demo={(play) => (
+            <div className="lk-landing-demo-row lk-landing-import flex-wrap">
+              <span className="lk-landing-file">
+                <img src="/landing/logos/budge.png" alt="" width={20} height={20} />
+                {t("import.demo_file")}
+              </span>
+              <svg className="lk-landing-arrow" viewBox="0 0 24 24">
+                <path d="M4 12h15M13 6l6 6-6 6" />
+              </svg>
+              <ImportedCount total={DEMO.importedRows} play={play} pace={pace} />
+              <ComingSources soon={t("import.soon")} />
             </div>
           )}
         />
         <Feature
           pace={pace}
-          title={t("budgets.title")}
-          body={t("budgets.body")}
-          demo={() => (
-            <>
-              <div className="lk-landing-budget">
-                <div className="lk-rowtop">
-                  <span>{t("demo_categories.groceries")}</span>
-                  <span className="lk-status">
-                    {t("budgets.demo_remaining", { amount: money(DEMO.groceries.remaining) })}
-                  </span>
-                </div>
-                <div className="lk-bar">
-                  <span style={{ width: DEMO.groceries.filled }} />
-                </div>
-              </div>
-              <div className="lk-landing-budget">
-                <div className="lk-rowtop">
-                  <span>{t("demo_categories.going_out")}</span>
-                  <span className="lk-status is-near">
-                    {t("budgets.demo_remaining", { amount: money(DEMO.goingOut.remaining) })}
-                  </span>
-                </div>
-                <div className="lk-bar is-near">
-                  <span style={{ width: DEMO.goingOut.filled }} />
-                </div>
-              </div>
-            </>
-          )}
+          title={t("spend.title")}
+          body={t("spend.body")}
+          demo={() => <AppScreen screen="insights" locale={locale} />}
         />
         <Feature
           pace={pace}
-          title={t("recurring.title")}
-          body={t("recurring.body")}
+          title={t("budgets.title")}
+          body={t("budgets.body")}
+          demo={() => <AppScreen screen="budgets" locale={locale} />}
+        />
+        <Feature
+          pace={pace}
+          title={t("subscriptions.title")}
+          body={t("subscriptions.body")}
           demo={() => (
-            <ul className="lk-landing-bills">
-              {DEMO.recurring.map((bill) => (
-                <li key={bill.key} className="lk-landing-demo-row">
-                  <span className="lk-tile">{bill.emoji}</span>
-                  <span className="lk-landing-bill-name">
-                    {t(`recurring.demo.${bill.key}`)}
-                    <span className="lk-landing-bill-due">
-                      {t("recurring.demo_due", { days: bill.days })}
+            <div className="lk-landing-subs">
+              <div className="lk-landing-subs-total">
+                <span>{t("subscriptions.demo_label")}</span>
+                <strong>
+                  {t("subscriptions.demo_total", {
+                    amount: money(-DEMO.subscriptions.reduce((total, sub) => total + sub.cents, 0)),
+                  })}
+                </strong>
+              </div>
+              <ul className="lk-landing-bills">
+                {DEMO.subscriptions.map((sub) => (
+                  <li key={sub.name} className="lk-landing-demo-row">
+                    <span className="lk-tile lk-landing-sub-logo">
+                      <img src={`/landing/logos/${sub.logo}`} alt="" width={20} height={20} />
                     </span>
-                  </span>
-                  <span className="lk-amount">{money(bill.cents)}</span>
-                </li>
-              ))}
-            </ul>
+                    <span className="lk-landing-bill-name">
+                      {sub.name}
+                      <span className="lk-landing-bill-due">
+                        {t("subscriptions.demo_due", { days: sub.days })}
+                      </span>
+                    </span>
+                    <span className="lk-amount">{money(sub.cents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         />
         <Feature
@@ -226,38 +290,6 @@ export function HowItWorks({ pace = 1 }: { pace?: number }) {
                 <span className="lk-landing-sealed-text">{DEMO.coffee.sealed}</span>
                 <span className="lk-landing-vault-where">{t("encryption.demo_server")}</span>
               </div>
-            </div>
-          )}
-        />
-        <Feature
-          pace={pace}
-          title={t("import.title")}
-          body={t("import.body")}
-          demo={(play) => (
-            <div className="lk-landing-demo-row flex-wrap">
-              <span className="lk-landing-file">{t("import.demo_file")}</span>
-              <svg className="lk-landing-arrow" viewBox="0 0 24 24">
-                <path d="M4 12h15M13 6l6 6-6 6" />
-              </svg>
-              <ImportedCount total={DEMO.importedRows} play={play} pace={pace} />
-            </div>
-          )}
-        />
-        <Feature
-          pace={pace}
-          title={t("passwords.title")}
-          body={t("passwords.body")}
-          demo={() => (
-            <div className="lk-landing-demo-row lk-landing-signin">
-              <span className="lk-landing-fingerprint">
-                <svg viewBox="0 0 24 24">
-                  <path d="M6.5 18.5c1-1.6 1.5-3.6 1.5-6.5a4 4 0 0 1 8 0c0 2 0 4-.6 6" />
-                  <path d="M12 12c0 3.5-.6 6.4-2 8.5M4.6 15.5c.3-1.1.4-2.3.4-3.5a7 7 0 0 1 12.2-4.7" />
-                  <path d="M19 11c.2 2.6 0 5.2-.8 7.5" />
-                </svg>
-              </span>
-              <span className="lk-landing-or">{t("passwords.demo_or")}</span>
-              <span className="lk-landing-code">{DEMO.code}</span>
             </div>
           )}
         />

@@ -160,30 +160,19 @@
     },
     "how": {
       "title": "Tutto il tuo mese, in un'unica app.",
-      "demo_categories": {
-        "groceries": "Supermercato",
-        "going_out": "Uscite",
-        "home": "Casa",
-        "transport": "Trasporti"
-      },
       "spend": {
         "title": "Guarda dove vanno i tuoi soldi",
-        "body": "Ogni spesa finisce nella sua categoria, e con un'occhiata sai quanto ti costa vivere.",
-        "demo_label": "Questo mese"
+        "body": "Ogni spesa finisce nella sua categoria, e con un'occhiata sai quanto ti costa vivere."
       },
       "budgets": {
         "title": "Budget che ti avvisano",
-        "body": "Le barre cambiano colore prima che tu sfori, non dopo.",
-        "demo_remaining": "Restano {amount}"
+        "body": "Le barre cambiano colore prima che tu sfori, non dopo."
       },
-      "recurring": {
-        "title": "Spese fisse senza sorprese",
-        "body": "L'affitto, gli abbonamenti e la palestra, con un avviso il giorno della scadenza.",
-        "demo": {
-          "rent": "Affitto",
-          "streaming": "Netflix",
-          "gym": "Palestra"
-        },
+      "subscriptions": {
+        "title": "I tuoi abbonamenti, sotto controllo",
+        "body": "Netflix, Spotify, la palestra: vedi quanto paghi ogni mese e ti avvisiamo il giorno della scadenza.",
+        "demo_label": "Abbonamenti",
+        "demo_total": "{amount} al mese",
         "demo_due": "{days, plural, one {Scade domani} other {Scade tra # giorni}}"
       },
       "encryption": {
@@ -197,12 +186,8 @@
         "title": "Porta il tuo storico",
         "body": "Importa i tuoi movimenti da altre app: oggi da Budge, e presto da Buddy e altre.",
         "demo_file": "budge.csv",
-        "demo_rows": "{count, plural, one {# movimento pronto} other {# movimenti pronti}}"
-      },
-      "passwords": {
-        "title": "Entra senza password",
-        "body": "Con un codice che ti arriva via email, o con la tua impronta.",
-        "demo_or": "o"
+        "demo_rows": "{count, plural, one {# movimento pronto} other {# movimenti pronti}}",
+        "soon": "Presto"
       }
     },
     "agent": {
@@ -286,16 +271,11 @@
         "other_income": "Altre entrate"
       }
     },
-    "open_source": {
-      "title": "Open source",
-      "body": "Chiunque può leggere il codice di Wambito: non c'è niente di nascosto. È software libero, con licenza AGPL-3.0.",
-      "cta": "Vedi il codice su GitHub"
-    },
     "faq": {
       "title": "Domande frequenti",
       "what": {
         "q": "Cos'è Wambito?",
-        "a": "Un'app per seguire il tuo budget del mese senza che sembri un compito. Annoti quello che spendi, vedi quanto ti resta in ogni categoria e Wambi, una moneta d'oro con tanta personalità, ti fa compagnia: festeggia quando annoti e ti avvisa quando qualcosa si sta riempiendo."
+        "a": "Un'app per tenere traccia delle tue spese senza che sembri un compito. Annoti quello che spendi, o lo annota Wambi per te, e vedi dove vanno i tuoi soldi ogni mese. Se vuoi, metti un tetto per categoria. Wambi, una moneta d'oro con tanta personalità, ti fa compagnia: festeggia quando annoti e ti avvisa quando qualcosa si sta riempiendo."
       },
       "import": {
         "q": "Posso portare il mio storico da altre app?",
@@ -303,19 +283,19 @@
       },
       "passwords": {
         "q": "Perché non mi chiede la password?",
-        "a": "Perché non ti serve. Entri con un codice di 6 cifre o con un link che ti arriva via email e, se vuoi, con una passkey: la tua impronta, il tuo viso o il blocco del telefono. Nessuna password da ricordare."
+        "a": "Perché una password in più non ti protegge meglio: si dimentica, si ripete tra le app e si può rubare. Entri con un codice di 6 cifre o con un link che ti arriva via email, oppure con una passkey: la tua impronta, il tuo viso o il blocco del telefono. Una passkey è più sicura di una password: non si può indovinare, non arriva mai ai nostri server e non funziona su una pagina falsa."
       },
       "privacy": {
         "q": "Cosa fate con i miei dati?",
-        "a": "I tuoi dati sono cifrati end-to-end sul tuo dispositivo: nessun altro può leggerli, nemmeno Wambito. Non li vendiamo né li condividiamo mai con gli inserzionisti. Puoi esportarli o cancellare il tuo account quando vuoi. Il codice è open source: chiunque può verificare come vengono cifrati. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
+        "a": "I tuoi dati sono cifrati end-to-end: vengono cifrati sul tuo dispositivo, con una chiave che hai solo tu, prima di uscirne. Ai nostri server arriva solo testo cifrato, che non possiamo leggere. Per questo non potremmo vendere i tuoi dati nemmeno se volessimo: per come è progettato Wambito, non possiamo vederli. Puoi esportarli o cancellare il tuo account quando vuoi. Il codice è open source: chiunque può verificare come vengono cifrati. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
       },
       "free": {
         "q": "È gratis?",
-        "a": "Sì, e lo sarà sempre. Wambito è gratis e open source: tutto il codice è su <github>GitHub</github> e chiunque può controllarlo. Non ti chiediamo la carta."
+        "a": "Sì, e lo sarà sempre. Non ti chiediamo la carta."
       },
-      "languages": {
-        "q": "In che lingue è disponibile?",
-        "a": "In spagnolo, inglese, italiano e portoghese. Cambi lingua quando vuoi in Impostazioni, e importi e date seguono il formato della tua lingua."
+      "open": {
+        "q": "È open source?",
+        "a": "Sì. Chiunque può leggere il codice di Wambito su <github>GitHub</github>: non c'è niente di nascosto. È software libero, con licenza AGPL-3.0."
       }
     },
     "closing": {

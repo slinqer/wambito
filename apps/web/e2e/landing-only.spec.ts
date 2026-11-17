@@ -345,7 +345,7 @@ for (const l of LOCALES) {
       await page.goto(l.path);
       const text = await page.locator("body").evaluate((body) => body.textContent ?? "");
       for (const pattern of l.banned) expect(text).not.toMatch(pattern);
-      await expect(page.locator("#open-source").getByRole("link")).toHaveAttribute("href", GITHUB);
+      await expect(page.locator("#faq a", { hasText: "GitHub" })).toHaveAttribute("href", GITHUB);
     });
 
     test("canonical, hreflang and Open Graph use the configured origin", async ({ page }) => {
@@ -607,6 +607,8 @@ test.describe("landing-only build output", () => {
         "favicon.svg",
         "index.html",
         "it",
+        // The app's real insights screen in the "See where it goes" phone (pnpm landing-screens).
+        "landing",
         "wambi",
         "og-en.png",
         "og-es.png",

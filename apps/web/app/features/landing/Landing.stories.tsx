@@ -10,7 +10,6 @@ import { Hero } from "./Hero.tsx";
 import { HowItWorks } from "./HowItWorks.tsx";
 import { Landing } from "./Landing.tsx";
 import { ANDROID_APK_HREF } from "./links.ts";
-import { OpenSource } from "./OpenSource.tsx";
 import { SiteHeader } from "./SiteHeader.tsx";
 import { UseItYourWay } from "./UseItYourWay.tsx";
 
@@ -302,29 +301,105 @@ export const HowItWorksSection: Story = {
     const canvas = within(canvasElement);
     const title = canvas.getByRole("heading", { level: 2 });
     await expect(title).toHaveAccessibleName("Your whole month, in one app.");
-    // Wambi jumps for joy after the title: one still frame, decorative.
-    const wambi = title.querySelector("[data-wambi-spot='how']");
-    await expect(wambi).toHaveAttribute("aria-hidden", "true");
-    const sprite = wambi?.querySelector<HTMLElement>(".lk-wambi-sprite");
-    await expect(sprite).not.toHaveClass("is-playing");
-    await expect(sprite?.getAnimations() ?? []).toHaveLength(0);
+    // No Wambi by the title: the section is busy enough with its six cards.
+    await expect(canvasElement.querySelector(".lk-wambi, [data-wambi-spot]")).toBeNull();
     // Each card's name (the badge aside).
     const names = canvas
       .getAllByRole("heading", { level: 3 })
       .map((h) => h.firstChild?.textContent);
     await expect(names).toEqual([
+      // Bringing your history first: that is where people start.
+      "Bring your history",
       "See where it goes",
       "Budgets that give you a heads-up",
-      "Fixed payments, no surprises",
+      "Your subscriptions, under control",
       "Only you can read your data",
-      "Bring your history",
-      "Sign in without passwords",
     ]);
     const demos = canvasElement.querySelectorAll(".lk-landing-demo");
-    await expect(demos).toHaveLength(6);
+    await expect(demos).toHaveLength(5);
     for (const demo of demos) {
       await expect(demo).toHaveAttribute("aria-hidden", "true");
     }
+    // "Bring your history": Budge today; Buddy, Excel and Google Sheets (with their marks) marked as
+    // coming soon.
+    const history = canvas.getByRole("heading", { name: "Bring your history" }).closest("li");
+    const soon = history?.querySelector<HTMLElement>(".lk-landing-sources");
+    await expect(soon?.querySelector(".lk-landing-soon")).toHaveTextContent("Soon");
+    await expect([...(soon?.querySelectorAll("li") ?? [])].map((li) => li.textContent)).toEqual([
+      "Buddy",
+      "Excel",
+      "Google Sheets",
+    ]);
+    await expect(
+      [...(soon?.querySelectorAll("li img") ?? [])].map((img) => img.getAttribute("src")),
+    ).toEqual([
+      "/landing/logos/buddy.png",
+      "/landing/logos/microsoft-excel.svg",
+      "/landing/logos/google-sheets.svg",
+    ]);
+    // The file comes from Budge, with Budge's icon.
+    await expect(history?.querySelector(".lk-landing-file img")).toHaveAttribute(
+      "src",
+      "/landing/logos/budge.png",
+    );
+    // Subscriptions: each with its brand's mark, what it costs and when it is due; the total a month.
+    const subs = canvas
+      .getByRole("heading", { name: "Your subscriptions, under control" })
+      .closest("li");
+    const rows = [...(subs?.querySelectorAll<HTMLElement>(".lk-landing-subs li") ?? [])];
+    await expect(
+      rows.map((row) => row.querySelector(".lk-landing-bill-name")?.firstChild?.textContent),
+    ).toEqual(["Netflix", "Spotify", "YouTube Premium"]);
+    for (const row of rows) {
+      await expect(row.querySelector(".lk-landing-sub-logo img")).toHaveAttribute(
+        "src",
+        expect.stringMatching(/^\/landing\/logos\/(netflix|spotify|youtube)\.svg$/),
+      );
+    }
+    await expect(subs?.querySelector(".lk-landing-subs-total")).toHaveTextContent(
+      "Subscriptions$38.97 a month",
+    );
+    // "See where it goes" shows the app's real insights screen in a phone, in the page's language
+    // and both themes (only the one in use shows), not a drawn donut: the screen, and over it the
+    // donut's ring, which sweeps in as the app draws it.
+    const spend = canvas.getByRole("heading", { name: "See where it goes" }).closest("li");
+    await expect(spend?.querySelector(".lk-landing-donut")).toBeNull();
+    const srcs = (selector: string) =>
+      [...(spend?.querySelectorAll<HTMLImageElement>(selector) ?? [])].map((img) =>
+        img.getAttribute("src"),
+      );
+    await expect(srcs(".lk-landing-phone img.lk-landing-screen-shot")).toEqual([
+      "/landing/insights-en-night.webp",
+      "/landing/insights-en-day.webp",
+    ]);
+    await expect(srcs(".lk-landing-phone img.lk-landing-screen-ring")).toEqual([
+      "/landing/donut-en-night.webp",
+      "/landing/donut-en-day.webp",
+    ]);
+    const shots = [...(spend?.querySelectorAll<HTMLImageElement>(".lk-landing-phone img") ?? [])];
+    for (const img of shots) {
+      await expect(img).toHaveAttribute("alt", "");
+      await expect(img).toHaveAttribute("loading", "lazy");
+    }
+    const screens = [...(spend?.querySelectorAll<HTMLElement>(".lk-landing-screen") ?? [])];
+    await expect(screens.filter((el) => getComputedStyle(el).display !== "none")).toHaveLength(1);
+    // "Budgets that give you a heads-up" shows the app's real budgets (home's Categories tab), its
+    // bars' fills laid over the screen so they grow as in the app.
+    const budgets = canvas
+      .getByRole("heading", { name: "Budgets that give you a heads-up" })
+      .closest("li");
+    const budgetSrcs = (selector: string) =>
+      [...(budgets?.querySelectorAll<HTMLImageElement>(selector) ?? [])].map((img) =>
+        img.getAttribute("src"),
+      );
+    await expect(budgetSrcs(".lk-landing-phone img.lk-landing-screen-shot")).toEqual([
+      "/landing/budgets-en-night.webp",
+      "/landing/budgets-en-day.webp",
+    ]);
+    await expect(budgetSrcs(".lk-landing-phone img.lk-landing-screen-bars")).toEqual([
+      "/landing/budget-bars-en-night.webp",
+      "/landing/budget-bars-en-day.webp",
+    ]);
     // Automatic capture has its own section now, and the voice and month cards are gone.
     await expect(canvasElement).not.toHaveTextContent("Wambi logs your expenses for you!");
     await expect(canvasElement).not.toHaveTextContent("I spent 3 euros on coffee");
@@ -342,8 +417,8 @@ export const HowItWorksSection: Story = {
     await expect(vault).toHaveTextContent("What the server sees");
     // Dollars in English (the demo currency per language).
     await expect(vault).toHaveTextContent("−$4.50");
-    await expect(canvasElement).toHaveTextContent("482 913");
-    await expect(canvasElement).toHaveTextContent("$46.33 left");
+    // Signing in without a password is told in the FAQ, not in a card.
+    await expect(canvasElement).not.toHaveTextContent("482 913");
     await expect(canvasElement).toHaveTextContent("1,248 transactions ready");
     await expect(canvasElement).toHaveTextContent("Budge today, Buddy and others soon.");
   },
@@ -351,8 +426,8 @@ export const HowItWorksSection: Story = {
 
 /**
  * The cards play by themselves once on screen, no pointer needed, and again every few seconds
- * while they stay there: the donut sweeps in clockwise from the top as in the app's insights; the
- * budget bars fill up; the file pushes the arrow; the expense is locked and leaves scrambled.
+ * while they stay there: the app's donut sweeps in clockwise from the top, as on the insights
+ * screen; the app's budget bars grow from the left; the file pushes the arrow; the expense is locked and leaves scrambled.
  * Nothing waits for a hover any more. `pace` runs it fast here.
  */
 export const HowItWorksPlays: Story = {
@@ -385,9 +460,8 @@ export const HowItWorksPlays: Story = {
     const animated = (part: string) =>
       [...playing].some(([selector, name]) => selector.includes(part) && /lk-landing-/.test(name));
     for (const part of [
-      ".lk-landing-donut",
-      ".lk-landing-legend",
-      ".lk-bar",
+      ".lk-landing-screen-ring",
+      ".lk-landing-screen-bars",
       ".lk-landing-arrow",
       ".lk-landing-lock",
       ".lk-landing-sealed",
@@ -398,7 +472,7 @@ export const HowItWorksPlays: Story = {
 
     // Each card on screen plays, then plays again while it stays there.
     const cards = [...canvasElement.querySelectorAll<HTMLElement>(".lk-landing-cards.is-how > li")];
-    await expect(cards).toHaveLength(6);
+    await expect(cards).toHaveLength(5);
     for (const card of cards) {
       card.scrollIntoView({ block: "center" });
       await waitFor(() => expect(card).toHaveAttribute("data-play"));
@@ -412,8 +486,7 @@ export const HowItWorksPlays: Story = {
 
 /**
  * "Bring your history": once on screen the count runs from 0 up to 1248 transactions, then a check
- * pops to confirm. Without JavaScript it shows the final count, confirmed. The budget card's near
- * bar turns from green to yellow as it fills.
+ * pops to confirm. Without JavaScript it shows the final count, confirmed.
  */
 export const HowItWorksImportCount: Story = {
   render: () => <HowItWorks pace={0.5} />,
@@ -433,37 +506,6 @@ export const HowItWorksImportCount: Story = {
       { timeout: 4000 },
     );
     await expect(imported()?.querySelector(".lk-landing-imported-check")).not.toBeNull();
-
-    // The near bar's fill changes color on the way: green first, yellow at the end.
-    const fillNear = [...document.styleSheets]
-      .flatMap((sheet) => {
-        try {
-          return [...sheet.cssRules];
-        } catch {
-          return [];
-        }
-      })
-      .find((rule) => rule instanceof CSSKeyframesRule && rule.name === "lk-landing-fill-near") as
-      | CSSKeyframesRule
-      | undefined;
-    await expect(fillNear?.cssText).toMatch(/var\(--good\)[\s\S]*var\(--near\)/);
-  },
-};
-
-/** Open source: the code icon, one short paragraph and the repository, in a new tab. */
-export const OpenSourceSection: Story = {
-  render: () => <OpenSource />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { level: 2 })).toHaveTextContent("Código abierto");
-    await expect(canvasElement).toHaveTextContent("AGPL-3.0");
-    const code = canvas.getByRole("link", {
-      name: "Ver el código en GitHub (se abre en una pestaña nueva)",
-    });
-    await expect(code).toHaveAttribute("href", "https://github.com/slinqer/wambito");
-    await expect(code).toHaveAttribute("target", "_blank");
-    await expectEdge(code, 3);
-    await expectTarget(code);
   },
 };
 
@@ -475,12 +517,33 @@ export const FaqSection: Story = {
     await expect(summaries).toHaveLength(6);
     const first = summaries[0] as HTMLElement;
     await expectTarget(first);
+    // The plus is two bars centred in the circle, not a font glyph (which sat off centre).
+    const plus = getComputedStyle(first, "::after");
+    await expect(plus.content).toBe('""');
+    await expect(plus.backgroundPosition).toBe("50% 50%, 50% 50%, 0% 0%");
     await userEvent.click(first);
     await expect(first.parentElement).toHaveAttribute("open");
+    // What it is: an app for your expenses, not a budget app (most people never set a budget).
+    await expect(first.parentElement).toHaveTextContent("llevar tus gastos");
+    await expect(first.parentElement).not.toHaveTextContent("presupuesto");
     await expect(summaries[3]?.parentElement?.querySelector("a")).toHaveAttribute(
       "href",
       "/privacy",
     );
+    // No password: a passkey is the safer way in. Privacy: end-to-end, so the data can't be sold.
+    await expect(summaries[2]?.parentElement).toHaveTextContent(
+      "Una passkey es más segura que una contraseña",
+    );
+    await expect(summaries[3]?.parentElement).toHaveTextContent(
+      "no podríamos vender tus datos aunque quisiéramos",
+    );
+    // Open source lives in the FAQ (no section of its own): the licence and the code, in a new tab.
+    const open = summaries[5]?.parentElement as HTMLElement;
+    await expect(summaries[5]).toHaveTextContent("¿Es de código abierto?");
+    await expect(open).toHaveTextContent("AGPL-3.0");
+    const code = within(open).getByRole("link", { name: "GitHub (se abre en una pestaña nueva)" });
+    await expect(code).toHaveAttribute("href", "https://github.com/slinqer/wambito");
+    await expect(code).toHaveAttribute("target", "_blank");
     await userEvent.tab();
     await expectFocusRing(summaries[1] as HTMLElement);
   },

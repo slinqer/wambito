@@ -334,12 +334,13 @@
   /*
    * The closing's big button with Wambi sitting in its middle: his picture is a square whose coin
    * rests at 74% of its height, so the spot rises that far above the button's top edge; his legs
-   * (centred at 66% of the picture's width) hang over the gap between the label's two halves, the
-   * gap exactly in the button's centre (three columns, the outer two equal). He lets the pointer
+   * (at 66% of the picture's width) hang a little right of the button's centre (12% of his width),
+   * still over the gap between the label's two halves, the gap exactly in the button's centre
+   * (three columns, the outer two equal). He lets the pointer
    * through.
    */
   .lk-landing-seat {
-    --lk-seat: 120px;
+    --lk-seat: 160px;
     position: relative;
     max-width: 100%;
     margin-top: calc(var(--lk-seat) * 0.74 - var(--space-3));
@@ -368,7 +369,7 @@
   }
   .lk-landing-spot.is-closing {
     position: absolute;
-    left: calc(50% - var(--lk-seat) * 0.66);
+    left: calc(50% - var(--lk-seat) * 0.54);
     bottom: calc(100% - var(--lk-seat) * 0.26);
     width: var(--lk-seat);
     height: var(--lk-seat);
@@ -522,15 +523,6 @@
     display: grid;
     justify-items: center;
     gap: var(--space-3);
-  }
-  /* Wambi after the feature grid's title: a still frame, taller than the words, jumping off the line. */
-  .lk-landing-title-wambi {
-    display: inline-block;
-    position: relative;
-    width: 1.6em;
-    height: 1.6em;
-    margin: -0.45em 0 -0.25em 0.06em;
-    vertical-align: -0.45em;
   }
   .lk-landing-headline {
     font-family: var(--font-display);
@@ -869,14 +861,12 @@
   .lk-landing-cards.is-how > .lk-landing-card h3 {
     font-size: 22px;
   }
+  /* The illustration fills the card under its text, so a row of cards has no empty bands. */
   .lk-landing-cards.is-how .lk-landing-demo {
-    margin: auto 0 0;
+    flex: 1;
+    margin: var(--space-2) 0 0;
     min-height: 168px;
     text-align: start;
-  }
-  .lk-landing-cards.is-how .lk-landing-demo-row:has(.lk-landing-donut),
-  .lk-landing-cards.is-how .lk-landing-signin {
-    justify-content: center;
   }
   /* Fixed payments: name and due date stacked, the amount at the end. */
   .lk-landing-bills {
@@ -885,6 +875,32 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+  /* Subscriptions: what they cost a month on top, then each with its brand's mark. */
+  .lk-landing-subs {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .lk-landing-subs-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    border-bottom: 2px solid var(--stroke);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .lk-landing-subs-total strong {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .lk-landing-sub-logo img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
   }
   .lk-landing-bill-name {
     display: grid;
@@ -950,41 +966,6 @@
     letter-spacing: 0.04em;
     overflow-wrap: anywhere;
   }
-  /* Signing in: a fingerprint, "or", and the emailed six-digit code. */
-  .lk-landing-fingerprint {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    flex: none;
-    border-radius: 50%;
-    background: var(--brand);
-    color: var(--on-brand);
-  }
-  .lk-landing-fingerprint svg {
-    width: 30px;
-    height: 30px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
-  .lk-landing-or {
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--ink-muted);
-  }
-  .lk-landing-code {
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    background: var(--surface-row);
-    border: 2px solid var(--stroke);
-    font-family: var(--font-display);
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    font-variant-numeric: tabular-nums;
-  }
 
   /* "How it works" illustrations: decorative, drawn with the app's own pieces. */
   .lk-landing-demo {
@@ -1004,46 +985,69 @@
     align-items: center;
     gap: var(--space-3);
   }
-  .lk-landing-donut {
+  /*
+   * "See where it goes": the app's real insights screen (public/landing/, made by
+   * `pnpm --filter @wambito/web landing-screens`) in a phone rising from the card's foot: its top
+   * and sides framed, the screen fading out below, so it reads as a phone without a full-height
+   * picture. Both themes are in the page; only the one in use shows (and, lazy, loads).
+   */
+  .lk-landing-phone {
     position: relative;
-    width: 96px;
-    height: 96px;
-    flex: none;
-    border-radius: 50%;
-    background: conic-gradient(
-      var(--candy) 0 38%,
-      var(--brand-glow) 0 62%,
-      var(--near) 0 80%,
-      var(--good) 0 100%
-    );
+    width: min(230px, 80%);
+    aspect-ratio: 390 / 560;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 7px solid var(--stroke);
+    border-bottom: 0;
+    border-radius: 34px 34px 0 0;
+    background: var(--bg);
+    box-shadow: var(--edge-sm);
+    mask-image: linear-gradient(#000 80%, transparent);
   }
-  .lk-landing-donut::after {
+  /* The camera's notch. */
+  .lk-landing-phone::before {
     content: "";
     position: absolute;
-    inset: 22px;
-    border-radius: 50%;
-    background: var(--bg);
+    top: 6px;
+    left: 50%;
+    z-index: 1;
+    width: 30%;
+    height: 14px;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: var(--stroke);
   }
-  .lk-landing-legend {
-    display: grid;
-    gap: var(--space-1);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    font-size: 13px;
-    font-weight: 800;
+  /* The phone rises from the bottom edge of the illustration's box. */
+  .lk-landing-cards.is-how .lk-landing-demo:has(.lk-landing-phone) {
+    justify-content: flex-end;
+    padding-bottom: 0;
+    overflow: hidden;
   }
-  .lk-landing-legend li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+  /* The screen, and the donut's ring over it where the app draws it (inline left, top, width). */
+  .lk-landing-screen {
+    position: relative;
   }
-  .lk-landing-legend li::before {
-    content: "";
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--dot);
+  .lk-landing-screen-shot {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .lk-landing-screen-ring {
+    position: absolute;
+    height: auto;
+  }
+  .lk-landing-screen-bars {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: auto;
+  }
+  .lk-landing-screen.is-day,
+  [data-theme="day"] .lk-landing-screen.is-night {
+    display: none;
+  }
+  [data-theme="day"] .lk-landing-screen.is-day {
+    display: block;
   }
   .lk-landing-budget {
     display: grid;
@@ -1072,6 +1076,56 @@
     stroke-width: 2.5;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  /* Import: the file on top, the arrow pointing down, then the count, one under the other. */
+  .lk-landing-cards.is-how .lk-landing-import {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .lk-landing-import .lk-landing-arrow {
+    rotate: 90deg;
+  }
+  /* Under the import: where else a history will come from, marked as coming soon. */
+  .lk-landing-sources {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+  .lk-landing-sources ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .lk-landing-sources li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    border: 2px dashed var(--control-edge);
+    color: var(--ink-muted);
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .lk-landing-sources img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+  /* App icons (Budge, Buddy) keep their rounded-square look at this size. */
+  .lk-landing-sources img[src$=".png"],
+  .lk-landing-file img {
+    border-radius: 4px;
+  }
+  .lk-landing-file img {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
   }
   .lk-landing-imported {
     font-family: var(--font-display);
@@ -1119,20 +1173,23 @@
   .lk-landing-faq summary::-webkit-details-marker {
     display: none;
   }
-  /* A plus that turns into a cross when the answer is open. */
+  /*
+   * A plus that turns into a cross when the answer is open. Drawn with two bars, not a "+"
+   * glyph: the display font sits its plus off the circle's centre. Even sizes keep both bars
+   * on whole pixels, exactly centred.
+   */
   .lk-landing-faq summary::after {
-    content: "+";
+    content: "";
     flex: none;
-    display: grid;
-    place-items: center;
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--surface-sunken);
     /* Gold at night, deep purple by day (gold has no contrast on lavender). */
     color: var(--focus);
-    font-size: 22px;
-    line-height: 1;
+    background:
+      linear-gradient(currentColor, currentColor) center / 14px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) center / 2px 14px no-repeat,
+      var(--surface-sunken);
     transition: transform var(--sheet) ease;
   }
   .lk-landing-faq details[open] > summary::after {
@@ -1156,21 +1213,6 @@
     font-size: 15px;
     line-height: 1.55;
     color: var(--ink-muted);
-  }
-
-  /* Open source: one card with the code icon, a short paragraph and the link to the repository. */
-  .lk-landing-open {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-3);
-  }
-  .lk-landing-open h2 {
-    margin: 0 0 var(--space-2);
-  }
-  .lk-landing-open p {
-    max-width: 40rem;
-    font-size: 16px;
-    line-height: 1.5;
   }
 
   /* Closing call to action */
@@ -1273,17 +1315,118 @@
     font-weight: 800;
   }
 
+  /*
+   * Phones and small tablets: the base values above are the tightest the layout allows (320px);
+   * here the page breathes, with more room around the edges, between sections and inside cards.
+   * The desktop block below sets its own values from 900px.
+   */
+  @media (max-width: 899px) {
+    .lk-landing-wrap {
+      padding-inline: 20px;
+    }
+    .lk-landing-header {
+      padding-block: var(--space-4);
+    }
+    /* Each section takes most of a screen, not all of it, its content centred in it. */
+    .lk-landing-section {
+      min-height: 80svh;
+      display: grid;
+      align-content: center;
+      padding-block: calc(var(--space-6) * 1.5);
+    }
+    .lk-landing h2 {
+      margin-bottom: var(--space-5);
+    }
+    .lk-landing-section-head {
+      --lk-head-gap: var(--space-5);
+    }
+    /* The first screen: the hero takes most of the phone's screen below the header, its content
+       centred, leaving the capture's heading in view so it is clear the page goes on. */
+    .lk-landing-hero {
+      min-height: 70svh;
+      align-content: center;
+      gap: var(--space-5);
+      padding-block: var(--space-6) calc(var(--space-6) * 1.5);
+    }
+    .lk-landing-hero-text {
+      gap: var(--space-6);
+    }
+    .lk-landing-cta {
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+    .lk-landing-cta-actions {
+      gap: var(--space-4);
+    }
+    .lk-landing-split {
+      gap: var(--space-6);
+    }
+    .lk-landing-split-text {
+      gap: var(--space-4);
+    }
+    /* Automatic capture shows the notification first, then says what it is (the picture is
+       decorative, aria-hidden, so the reading order still starts with the title). */
+    #capture .lk-landing-capture-play {
+      order: -1;
+    }
+    /* More room above it, so it sits clearly apart from the hero. */
+    #capture.lk-landing-section {
+      padding-top: calc(var(--space-6) * 3);
+    }
+    .lk-landing-agent-logos {
+      padding-top: var(--space-4);
+    }
+    .lk-landing-cards {
+      gap: var(--space-5);
+    }
+    .lk-landing-card {
+      gap: var(--space-3);
+      padding: var(--space-5);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      padding: var(--space-6) var(--space-5) var(--space-5);
+    }
+    .lk-landing-closing {
+      gap: var(--space-5);
+    }
+  }
+  /* The narrowest phones (320px) keep the base edges, so the header still fits one row. */
+  @media (max-width: 359px) {
+    .lk-landing-wrap {
+      padding-inline: var(--space-4);
+    }
+    .lk-landing-card {
+      padding: var(--space-4);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      padding: var(--space-5) var(--space-4) var(--space-4);
+    }
+  }
   @media (min-width: 640px) {
     .lk-landing-cards.is-ways {
       grid-template-columns: repeat(2, 1fr);
     }
+    /* Two across (each card spans two of four columns); the fifth, alone, sits in the middle. */
     .lk-landing-cards.is-how {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      grid-column: span 2;
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(5) {
+      grid-column: 2 / span 2;
     }
   }
   @media (min-width: 900px) {
+    /* Three then two (each card spans two of six columns), the two centred under the three. */
     .lk-landing-cards.is-how {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(6, 1fr);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(4) {
+      grid-column: 2 / span 2;
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(5) {
+      grid-column: span 2;
     }
     .lk-landing-wrap {
       padding-inline: var(--space-6);
@@ -1296,7 +1439,7 @@
       --lk-head-gap: var(--space-5);
     }
     .lk-landing-seat {
-      --lk-seat: 170px;
+      --lk-seat: 220px;
     }
     .lk-landing .lk-landing-seat-cta {
       padding: 24px 36px;
@@ -1359,11 +1502,6 @@
       min-height: 520px;
       padding: var(--space-6);
     }
-    .lk-landing-open {
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: var(--space-5);
-    }
     .lk-landing-section {
       padding-block: var(--space-6) calc(var(--space-6) * 1.5);
     }
@@ -1390,21 +1528,16 @@
   @media (prefers-reduced-motion: no-preference) {
     .lk-landing-section-head,
     .lk-landing-cards > .lk-landing-card,
-    .lk-landing-open,
     .lk-landing-faq > li {
       animation: lk-landing-rise linear both;
       animation-timeline: view();
       animation-range: entry 5% cover 30%;
     }
-    /* Cards side by side enter one after the other, not as one block. */
-    .lk-landing-cards > .lk-landing-card:nth-child(2),
+    /*
+     * FAQ questions enter one after the other. Cards side by side rise together: driven by the
+     * scroll, a staggered row stays out of line wherever the scroll stops.
+     */
     .lk-landing-faq > li:nth-child(even) {
-      animation-range: entry 15% cover 35%;
-    }
-    .lk-landing-cards > .lk-landing-card:nth-child(3n) {
-      animation-range: entry 25% cover 40%;
-    }
-    .lk-landing-cards > .lk-landing-card:nth-child(3n + 2) {
       animation-range: entry 15% cover 35%;
     }
   }
@@ -1509,10 +1642,9 @@
  * stay (`data-play`, HowItWorks.tsx; the illustration is remounted each round, so it starts over):
  * no pointer needed. Before the first round, without JavaScript and under reduced motion they are
  * the still, final picture.
- * - Where it goes: the donut sweeps in clockwise from the top, as the insights donut does in the
- *   app, and the legend lights up in the order the donut draws it.
- * - Budgets: the bars fill from empty; the one near its limit turns from green to yellow on the
- *   way, and its "left" amount with it.
+ * - Where it goes: the phone with the app's real screen rises into the card's foot, and its
+ *   donut sweeps in clockwise from the top, as the insights donut does in the app.
+ * - Budgets: the phone with the app's real budgets rises in, and its bars grow from the left.
  * - Encryption: the lock snaps shut, then the record slides down scrambled.
  * - Import: the file pushes the arrow while the count runs from 0 (HowItWorks.tsx), then a check
  *   pops to confirm.
@@ -1523,8 +1655,17 @@
   inherits: false;
   initial-value: 360deg;
 }
-.lk-landing-donut {
+.lk-landing-screen-ring {
   mask: conic-gradient(#000 var(--lk-sweep), transparent 0);
+}
+/* The budgets' fills show up to --lk-wipe from the left: every bar grows from its start. */
+@property --lk-wipe {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+.lk-landing-screen-bars {
+  mask: linear-gradient(to right, #000 var(--lk-wipe), transparent 0);
 }
 .lk-landing-cards.is-how .lk-bar > span {
   transform-origin: left center;
@@ -1552,41 +1693,62 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* While counting, the check waits. */
-.lk-landing-imported[data-state="counting"] .lk-landing-imported-check {
+/* While counting, the check waits; before that, the whole count waits for the file and the arrow. */
+.lk-landing-imported[data-state="counting"] .lk-landing-imported-check,
+.lk-landing-imported[data-state="waiting"] .lk-landing-imported-check {
+  scale: 0;
+}
+.lk-landing-imported[data-state="waiting"] {
   scale: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  /* Once the file and the arrow are done, the count pops in, then runs. */
+  .lk-landing-imported[data-counted][data-state="counting"] {
+    animation: lk-landing-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
   /* After the count the check pops in. */
   .lk-landing-imported[data-counted][data-state="done"] .lk-landing-imported-check {
     animation: lk-landing-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
   .lk-landing-cards.is-how
     > .lk-landing-card[data-play]
-    .lk-landing-demo-row:not(.lk-landing-vault-plain) {
+    .lk-landing-demo-row:not(.lk-landing-vault-plain, .lk-landing-import) {
     animation: lk-landing-slide-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms both;
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-donut {
-    animation: lk-landing-sweep 1400ms ease-out;
+  /* The phone rises a little into the card's foot each time the card plays. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-phone {
+    animation: lk-landing-phone-rise 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-legend li::before {
-    animation: lk-landing-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--lk-delay, 0ms) both;
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-screen-ring {
+    animation: lk-landing-sweep 1400ms cubic-bezier(0.3, 0.7, 0.3, 1) 300ms both;
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-bar > span {
-    animation: lk-landing-fill 1600ms cubic-bezier(0.25, 0.7, 0.3, 1) var(--lk-delay, 0ms) both;
+  /* Subscriptions slide in one after the other, the total first. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-subs .lk-landing-demo-row {
+    animation: lk-landing-slide-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(200ms + var(--lk-i, 0) * 180ms);
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-bar.is-near > span {
-    animation-name: lk-landing-fill-near;
+  .lk-landing-subs li:nth-child(2) {
+    --lk-i: 1;
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-status.is-near {
-    animation: lk-landing-warn 1600ms linear var(--lk-delay, 0ms) both;
+  .lk-landing-subs li:nth-child(3) {
+    --lk-i: 2;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-screen-bars {
+    animation: lk-landing-wipe 1400ms cubic-bezier(0.25, 0.7, 0.3, 1) 300ms both;
   }
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-file {
     animation: lk-landing-push 900ms ease-in-out;
   }
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-arrow {
     animation: lk-landing-nudge 900ms ease-in-out 120ms;
+  }
+  /* The import is stacked (file, arrow down, count): the file and the arrow move down. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-file {
+    animation-name: lk-landing-push-down;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-arrow {
+    animation-name: lk-landing-nudge-down;
   }
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-lock {
     animation: lk-landing-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 500ms both;
@@ -1609,26 +1771,20 @@
   }
 }
 
-/* The legend lights up in the order the donut draws it; the second budget fills a beat later. */
-.lk-landing-legend li:nth-child(2)::before {
-  --lk-delay: 450ms;
-}
-.lk-landing-legend li:nth-child(3)::before {
-  --lk-delay: 750ms;
-}
-.lk-landing-legend li:nth-child(4)::before {
-  --lk-delay: 1000ms;
-}
-.lk-landing-budget + .lk-landing-budget {
-  --lk-delay: 300ms;
-}
-
 @keyframes lk-landing-sweep {
   from {
     --lk-sweep: 0deg;
   }
   to {
     --lk-sweep: 360deg;
+  }
+}
+@keyframes lk-landing-phone-rise {
+  from {
+    translate: 0 28px;
+  }
+  to {
+    translate: none;
   }
 }
 @keyframes lk-landing-pop {
@@ -1660,31 +1816,12 @@
     scale: 1 1;
   }
 }
-/* Green while there is room, yellow once it nears its limit. */
-@keyframes lk-landing-fill-near {
-  0% {
-    scale: 0 1;
-    background-color: var(--good);
+@keyframes lk-landing-wipe {
+  from {
+    --lk-wipe: 0%;
   }
-  55% {
-    background-color: var(--good);
-  }
-  75% {
-    background-color: var(--near);
-  }
-  100% {
-    scale: 1 1;
-    background-color: var(--near);
-  }
-}
-@keyframes lk-landing-warn {
-  0%,
-  55% {
-    color: var(--good);
-  }
-  75%,
-  100% {
-    color: var(--near);
+  to {
+    --lk-wipe: 100%;
   }
 }
 @keyframes lk-landing-push {
@@ -1695,6 +1832,16 @@
 @keyframes lk-landing-nudge {
   50% {
     translate: 12px 0;
+  }
+}
+@keyframes lk-landing-push-down {
+  50% {
+    translate: 0 6px;
+  }
+}
+@keyframes lk-landing-nudge-down {
+  50% {
+    translate: 0 10px;
   }
 }
 @keyframes lk-landing-chat-in {

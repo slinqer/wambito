@@ -4,8 +4,8 @@ import { gzipSync } from "node:zlib";
 import { expect, type Page, test } from "@playwright/test";
 
 /**
- * Wambi on the built landing page, with JavaScript on: he stands still on his two spots, the
- * feature grid's title and the closing, and nothing mounts over the page (no traveling Wambi rolling in, following the
+ * Wambi on the built landing page, with JavaScript on: he stands still on his one spot, the
+ * closing, and nothing mounts over the page (no traveling Wambi rolling in, following the
  * scroll or hopping when tapped). Also the JavaScript budget of `/`.
  */
 
@@ -29,7 +29,7 @@ function collectErrors(page: Page): string[] {
 }
 
 test.describe("still Wambi", () => {
-  test("stands still on both spots once the page is idle, and ignores the pointer", async ({
+  test("stands still on his spot once the page is idle, and ignores the pointer", async ({
     page,
   }) => {
     const errors = collectErrors(page);
@@ -38,17 +38,17 @@ test.describe("still Wambi", () => {
     await page.waitForTimeout(1500);
     await expect(page.locator("[data-wambi-traveler]")).toHaveCount(0);
     await expect(page.locator("html")).not.toHaveAttribute("data-wambi-live", /.+/);
-    for (const spot of ["how", "closing"]) {
+    for (const spot of ["closing"]) {
       const wambi = page.locator(`[data-wambi-spot='${spot}'] > *`);
       await wambi.scrollIntoViewIfNeeded();
       await expect(wambi).toBeVisible();
       expect(await wambi.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
     }
     // A click on him changes nothing: no animation starts, nothing navigates.
-    const jumping = page.locator("[data-wambi-spot='how']");
-    await jumping.scrollIntoViewIfNeeded();
-    await jumping.click();
-    expect(await jumping.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+    const resting = page.locator("[data-wambi-spot='closing']");
+    await resting.scrollIntoViewIfNeeded();
+    await resting.click({ force: true });
+    expect(await resting.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
     await expect(page).toHaveURL(/\/$/);
     expect(errors).toEqual([]);
   });
