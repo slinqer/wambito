@@ -131,3 +131,56 @@ test("a change the server leaves unanswered is parked and the run ends", async (
   expect(await engine.run()).toMatchObject({ ok: true, pushed: 0, parked: [C] });
   expect(posts).toBe(1);
 });
+
+test("a pulled tombstone that carries a body still deletes, and quarantines nothing", async () => {
+  const keys = await deriveRecordKeys(generateDataKey());
+  const keyring = { current: 1, byVersion: new Map([[1, keys]]) };
+  const seal = async (id: string, body: unknown) =>
+    toBase64Url(await sealRecord(keys, { userId: USER, type: "category", id, keyV: 1 }, body));
+  let tombstone = false;
+  const fakeFetch = (async (input: string) => {
+    const since = Number(new URL(input, "http://x").searchParams.get("since"));
+    const rec: Wire = tombstone
+      ? {
+          id: A,
+          type: "category",
+          version: 2,
+          deleted: true,
+          keyV: 1,
+          encV: 1,
+          body: await seal(A, category("Food")),
+        }
+      : {
+          id: A,
+          type: "category",
+          version: 1,
+          deleted: false,
+          keyV: 1,
+          encV: 1,
+          body: await seal(A, category("Food")),
+        };
+    const records = rec.version > since ? [rec] : [];
+    return new Response(JSON.stringify({ records, next: null, latest: rec.version }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  const store = createMemoryEncryptedStore(USER);
+  const engine = createSyncEngine({
+    store,
+    fetch: fakeFetch,
+    userId: USER,
+    keyring,
+    refreshKeys: async () => keyring,
+    upgrade: false,
+  });
+
+  expect(await engine.run()).toMatchObject({ ok: true });
+  expect(await store.get("category", A)).not.toBeNull();
+
+  tombstone = true;
+  expect(await engine.run()).toMatchObject({ ok: true, quarantined: 0 });
+  expect(await store.get("category", A)).toBeUndefined();
+  expect((await store.get("category", A, { includeDeleted: true }))?.deleted).toBe(true);
+  expect(await store.quarantined()).toEqual([]);
+});

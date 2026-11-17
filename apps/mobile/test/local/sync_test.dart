@@ -346,6 +346,29 @@ void main() {
       expect(await names(one.store), ['$a:a/#999']);
     });
 
+    test('a pulled tombstone that carries a body still deletes, and quarantines nothing', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      await serverWrite(server, await getKeys(), a, 'a', 1);
+      expect((await one.engine.run()).ok, isTrue);
+      expect(await one.store.get(_cat, a), isNotNull);
+      server.rows[a] = {
+        ...server.rows[a]!,
+        'version': ++server.counter,
+        'deleted': true,
+        'body': await sealedBy(await getKeys(), a, category('a')),
+      };
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.quarantined, 0);
+      expect(await one.store.get(_cat, a), isNull);
+      expect(
+        (await one.store.get(_cat, a, const ReadOptions(includeDeleted: true)))?.deleted,
+        isTrue,
+      );
+      expect(await one.store.quarantineCount(), 0);
+    });
+
     test('keeps a pending edit set aside across a resync that follows a failed push', () async {
       final server = FakeSync();
       final one = await device(server);
