@@ -97,7 +97,7 @@ Side? armedSide(double offset, double width, double threshold) {
   return offset < 0 ? Side.left : Side.right;
 }
 
-enum RowRelease { commitLeft, commitRight, openLeft, openRight, close }
+enum RowRelease { commitRight, openLeft, openRight, close }
 
 /// What a released row does. To the right (Editar / Pagado), past the threshold or flicked toward
 /// it, it runs the action. To the left it never deletes by itself: a long or fast swipe, like a

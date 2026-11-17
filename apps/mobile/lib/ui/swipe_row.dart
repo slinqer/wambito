@@ -528,8 +528,6 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     switch (outcome) {
       case RowRelease.commitRight:
         _runRight(velocity: vx);
-      case RowRelease.commitLeft:
-        unawaited(_remove(velocity: vx));
       case RowRelease.openLeft:
         _opened(Side.left, vx);
       case RowRelease.openRight:
