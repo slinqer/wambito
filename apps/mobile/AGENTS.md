@@ -60,7 +60,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
   run by every store), `db.dart` + `sqlite_store.dart` (`SqliteStore.open(userId)`: the vault, file
   `wambito-vault-<userId>.db` in the `vault` folder of the app support directory (Android `files/vault`), one table per record type plus `outbox`,
-  `meta`, `quarantine`; a local write updates record and outbox in one SQLite transaction, all
+  `meta`, `quarantine`; schema version 2 (`vaultSchemaVersion`; `_upgrade` in `db.dart` migrates a
+  real user's file in place, never by recreating it: v2 added `bodiless` to the records tables, set
+  on every v1 tombstone); a local write updates record and outbox in one SQLite transaction, all
   operations go through one queue; keys are not in it, they live in secure storage; tests use
   `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
   vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
