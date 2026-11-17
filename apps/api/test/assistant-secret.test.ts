@@ -298,6 +298,88 @@ describe("an encrypted account's connect carries S", () => {
   });
 });
 
+// Better Auth's body parser lowercases the content type and accepts any header that contains the
+// media type, so the wrapper must see every request Better Auth would parse.
+describe("content types Better Auth accepts", () => {
+  const MIXED_FORM = "Application/X-WWW-Form-Urlencoded; charset=UTF-8";
+  const post = (path: string, form: Record<string, string>, contentType = MIXED_FORM) =>
+    t.app.request(path, {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: new URLSearchParams(form).toString(),
+    });
+  const exchange = (pending: Awaited<ReturnType<TestApp["consentCode"]>>) =>
+    post("/auth/oauth2/token", {
+      grant_type: "authorization_code",
+      code: pending.code,
+      redirect_uri: ASSISTANT_REDIRECT,
+      client_id: pending.clientId,
+      code_verifier: pending.verifier,
+      resource: pending.resource ?? "",
+    });
+
+  test("a code exchange with a mixed-case content type carries S", async () => {
+    const S = newSecret();
+    const email = "mixed-exchange@wambito.test";
+    const { headers } = await encryptedUser(email);
+    const res = await exchange(await t.consentCode(email, { headers, wk: S }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; refresh_token: string };
+    expect(body.refresh_token.endsWith(`.${S}`)).toBe(true);
+    expect(await openWk(body.access_token)).toBe(S);
+  });
+
+  test("a code exchange with a mixed-case content type and no S is refused", async () => {
+    const email = "mixed-refused@wambito.test";
+    const { headers } = await encryptedUser(email);
+    const res = await exchange(await t.consentCode(email, { headers }));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("invalid_grant");
+  });
+
+  test("a revoke with a mixed-case content type and the suffixed token revokes", async () => {
+    const email = "mixed-revoke@wambito.test";
+    const { headers } = await encryptedUser(email);
+    const tokens = await t.connectAssistant(email, { headers, wk: newSecret() });
+    const res = await post("/auth/oauth2/revoke", {
+      token: tokens.refreshToken,
+      token_type_hint: "refresh_token",
+      client_id: tokens.clientId,
+    });
+    expect(res.status).toBe(200);
+    expect((await refresh(tokens.refreshToken, tokens.clientId)).status).toBe(400);
+  });
+
+  test("a consent with a mixed-case JSON content type carries wk", async () => {
+    const S = newSecret();
+    const email = "mixed-consent@wambito.test";
+    const { headers } = await encryptedUser(email);
+    const clientId = await t.registerAssistant();
+    const { res: auth, verifier } = await t.authorizeRequest(clientId, headers);
+    const consent = await t.app.request("/auth/oauth2/consent", {
+      method: "POST",
+      headers: { ...headers, "content-type": "Application/JSON; charset=UTF-8" },
+      body: JSON.stringify({
+        accept: true,
+        oauth_query: new URL(auth.headers.get("location") ?? "").search.slice(1),
+        wk: S,
+      }),
+    });
+    expect(consent.status).toBe(200);
+    const code = new URL(((await consent.json()) as { url: string }).url).searchParams.get("code");
+    const res = await exchange({
+      code: code ?? "",
+      verifier,
+      clientId,
+      resource: t.config.MCP_URL,
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { refresh_token: string }).refresh_token.endsWith(`.${S}`)).toBe(
+      true,
+    );
+  });
+});
+
 describe("a plain account", () => {
   test("a plain account's second authorize skips the consent page, as today", async () => {
     const email = "plain-skip@wambito.test";

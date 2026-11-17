@@ -229,7 +229,7 @@ importers:
         specifier: ^4.13.13
         version: 4.13.13
       jose:
-        specifier: ^6.2.12
+        specifier: 6.2.12
         version: 6.2.12
       nodemailer:
         specifier: ^7.0.13

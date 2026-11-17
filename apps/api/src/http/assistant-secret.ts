@@ -129,8 +129,17 @@ function withJson(res: Response, json: unknown): Response {
   return new Response(JSON.stringify(json), { status: res.status, headers });
 }
 
+/**
+ * Which bodies Better Auth parses, the way its body parser (better-call) decides: on the
+ * lower-cased content type, a form when it contains the media type anywhere, JSON when it starts
+ * with `application/json` or `application/…+json`. Any narrower test here would let a request
+ * Better Auth accepts past the wrapper (no refusal, no strip).
+ */
+const contentType = (request: Request) => (request.headers.get("content-type") ?? "").toLowerCase();
 const isForm = (request: Request) =>
-  (request.headers.get("content-type") ?? "").startsWith("application/x-www-form-urlencoded");
+  contentType(request).includes("application/x-www-form-urlencoded");
+const isJson = (request: Request) =>
+  /^application\/([a-z0-9.+-]*\+)?json/.test(contentType(request));
 
 /** Who the tokens Better Auth just issued belong to: its refresh token's row, else the JWT. */
 async function tokensHolder(
@@ -193,6 +202,7 @@ export function assistantSecret(deps: AppDeps, auth: Auth) {
   }
 
   async function consent(request: Request): Promise<Response | undefined> {
+    if (!isJson(request)) return undefined;
     let body: unknown;
     try {
       body = await request.clone().json();

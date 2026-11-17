@@ -27,7 +27,7 @@
     "@wambito/importers": "workspace:*",
     "better-auth": "^1.7.11",
     "hono": "^4.13.13",
-    "jose": "^6.2.12",
+    "jose": "6.2.12",
     "nodemailer": "^7.0.13",
     "resend": "^6.34.1",
     "zod": "^4.6.7"
