@@ -324,6 +324,30 @@ void main() {
       expect(t.widget<Text>(find.text('BORRAR')).style!.color, const Color(0xFF15122B));
     });
 
+    testWidgets('a long fast swipe left leaves Borrar open and deletes nothing', (t) async {
+      var deleted = 0;
+      await t.pumpWidget(
+        uiApp(
+          SizedBox(
+            width: 360,
+            child: SwipeRow(
+              deleteLabel: 'Borrar',
+              onDelete: () => deleted++,
+              right: SwipeRight(SwipeRightKind.edit, () {}, 'Editar'),
+              child: _tx(status: TransactionRowStatus.paid),
+            ),
+          ),
+        ),
+      );
+      await t.fling(find.byType(SwipeRow), const Offset(-300, 0), 2000);
+      await t.pumpAndSettle();
+      expect(find.text('BORRAR'), findsOneWidget);
+      expect(deleted, 0);
+      await t.tap(find.text('BORRAR'));
+      await t.pumpAndSettle();
+      expect(deleted, 1);
+    });
+
     testWidgets('at rest neither action is in the tree', (t) async {
       await t.pumpWidget(row());
       expect(find.text('BORRAR'), findsNothing);

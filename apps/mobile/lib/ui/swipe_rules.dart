@@ -97,9 +97,10 @@ Side? armedSide(double offset, double width, double threshold) {
 
 enum RowRelease { commitLeft, commitRight, openLeft, openRight, close }
 
-/// What a released row does: past the threshold, or flicked toward a side, it runs that side's
-/// action; a shorter swipe (past half the action's width) leaves the action open; anything less,
-/// or a flick back, closes it.
+/// What a released row does. To the right (Editar / Pagado), past the threshold or flicked toward
+/// it, it runs the action. To the left it never deletes by itself: a long or fast swipe, like a
+/// short one past half the action's width, leaves Borrar open and only a tap on it deletes.
+/// Anything less, or a flick back, closes the row.
 RowRelease rowRelease({
   required double offset,
   required double vx,
@@ -119,8 +120,11 @@ RowRelease rowRelease({
   if (!(side == Side.left ? left : right)) return RowRelease.close;
   final toward = side == Side.left ? vx <= -flick : vx >= flick;
   final back = side == Side.left ? vx >= flick : vx <= -flick;
-  final commit = side == Side.left ? RowRelease.commitLeft : RowRelease.commitRight;
-  if (toward || armedSide(offset, width, threshold) == side) return commit;
+  if (side == Side.left) {
+    if (toward || armedSide(offset, width, threshold) == side) return RowRelease.openLeft;
+  } else if (toward || armedSide(offset, width, threshold) == side) {
+    return RowRelease.commitRight;
+  }
   if (back) return RowRelease.close;
   if (offset.abs() >= openWidth / 2) {
     return side == Side.left ? RowRelease.openLeft : RowRelease.openRight;

@@ -74,14 +74,16 @@ void main() {
           right: right,
         );
 
-    test('commits past the threshold', () {
-      expect(release(-150, 0), RowRelease.commitLeft);
+    test('commits right past the threshold, or on a flick', () {
       expect(release(150, 0), RowRelease.commitRight);
+      expect(release(30, 700), RowRelease.commitRight);
     });
 
-    test('commits on a flick toward the action, even after a short distance', () {
-      expect(release(-30, -700), RowRelease.commitLeft);
-      expect(release(30, 700), RowRelease.commitRight);
+    test('a long or fast swipe left only opens Borrar', () {
+      expect(release(-150, 0), RowRelease.openLeft);
+      expect(release(-300, 0), RowRelease.openLeft);
+      expect(release(-30, -700), RowRelease.openLeft);
+      expect(release(-120, -2000), RowRelease.openLeft);
     });
 
     test('leaves a short swipe open', () {

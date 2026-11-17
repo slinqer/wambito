@@ -500,7 +500,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     _x.value = offset;
     final side = armedSide(offset, _width, SwipeFeel.rowThreshold);
     final next = switch (side) {
-      Side.left when !_hasLeft => null,
+      Side.left => null,
       Side.right when !_hasRight => null,
       _ => side,
     };
