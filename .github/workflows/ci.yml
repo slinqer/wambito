@@ -29,6 +29,10 @@ jobs:
       # unless .github/channel-allowlist.txt says why not.
       - run: scripts/check-channels.sh
       - run: scripts/test-check-channels.sh
+      # Every workspace package apps/api and apps/mcp depend on (transitively) is copied in their
+      # Dockerfile.prod: CI never builds those images, the server's auto-deploy does.
+      - run: scripts/check-dockerfile-workspaces.sh
+      - run: scripts/test-check-dockerfile-workspaces.sh
       # The Chromium install script's own test (stub install commands).
       - run: scripts/test-ci-install-chromium.sh
       - run: pnpm lint

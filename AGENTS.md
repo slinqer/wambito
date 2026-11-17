@@ -41,7 +41,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 ## What CI runs (`.github/workflows/ci.yml`)
 
 - `check`: install, Playwright chromium (`scripts/ci-install-chromium.sh`, browser only when
-  apt cannot reach Ubuntu; tested by `scripts/test-ci-install-chromium.sh`), the two guards and the
+  apt cannot reach Ubuntu; tested by `scripts/test-ci-install-chromium.sh`), the guards (channels, Dockerfiles) and the
   old-name guard's test, `pnpm lint`,
   generated-file checks (web `tokens`, web and mcp `api:types` + `git diff --exit-code`),
   `pnpm typecheck`, `pnpm test`, then `deploy/personal/test-*.sh` (retention, r2, auto-deploy,
@@ -76,6 +76,10 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   method Dart calls is missing from `apps/mobile` Kotlin or Swift, unless `.github/channel-allowlist.txt`
   has `<channel>  # <reason>` (`ios-impossible`, `ios-part-two`, `android-only`); tested by
   `scripts/test-check-channels.sh`. Fix the missing native side, never widen the allowlist.
+- Dockerfile guard (`ci.yml` `check`): `scripts/check-dockerfile-workspaces.sh` fails when a
+  `workspace:` dependency (transitive) of `apps/api` or `apps/mcp` is not copied in its
+  `Dockerfile.prod` (its `package.json` before the install, its sources before the build); tested by
+  `scripts/test-check-dockerfile-workspaces.sh`. CI never builds those images, the VPS does.
 - Personal-name guard (`ci.yml`): a `git grep` for the founder's name outside `docs/superpowers`.
   Never write personal names, emails or paths into the repo.
 
