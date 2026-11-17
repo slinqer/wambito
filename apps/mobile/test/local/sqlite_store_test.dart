@@ -910,5 +910,26 @@ void main() {
       expect((await again.rawRecord(RecordType.category, 'dead'))?.bodiless, isTrue);
       await again.close();
     });
+
+    test('marks the tombstones of a version 2 file a version 1 build reopened', () async {
+      final userId = freshUser();
+      final path = await version1File(userId);
+      await (await openFor(userId)).close();
+      // A version 1 build opened it again: the file says version 1, keeps `bodiless`, and that
+      // build wrote a tombstone without setting it.
+      final db = await factory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await db.setVersion(1);
+      await db.update('category', {'deleted': 1}, where: 'id = ?', whereArgs: ['kept']);
+      await db.close();
+      final store = await openFor(userId);
+      for (final id in ['dead', 'kept']) {
+        expect((await store.rawRecord(RecordType.category, id))?.bodiless, isTrue, reason: id);
+      }
+      expect((await store.rawRecord(RecordType.category, 'live'))?.bodiless, isFalse);
+      await store.close();
+    });
   });
 }

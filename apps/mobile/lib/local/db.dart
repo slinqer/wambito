@@ -220,15 +220,19 @@ CREATE TABLE $quarantineTable (
 
 /// From version 1: every records table gets `bodiless` (the server's copy of the tombstone has no
 /// body, as far as this device knows). No server tombstone held a body before, so every tombstone
-/// in the file is marked. Nothing else changes. Safe to run twice (two connections opening the
-/// file at once both read version 1): a table that has the column already is left as it is.
+/// in the file is marked. Nothing else changes. sqflite runs this under `BEGIN EXCLUSIVE` and reads
+/// the version again inside it, so two connections never both upgrade; the column check is only
+/// defensive: a file a version 1 build reopened (its version set back to 1) has the column already.
+/// The marking still runs then, as that build's tombstones were written without the flag; it is
+/// idempotent.
 Future<void> _upgrade(Database db, int from, int to) async {
   if (from >= 2) return;
   for (final type in RecordType.values) {
     final table = quoted(recordTable(type));
     final columns = await db.rawQuery('PRAGMA table_info($table)');
-    if (columns.any((c) => c['name'] == 'bodiless')) continue;
-    await db.execute('ALTER TABLE $table ADD COLUMN bodiless INTEGER NOT NULL DEFAULT 0');
+    if (!columns.any((c) => c['name'] == 'bodiless')) {
+      await db.execute('ALTER TABLE $table ADD COLUMN bodiless INTEGER NOT NULL DEFAULT 0');
+    }
     await db.rawUpdate('UPDATE $table SET bodiless = 1 WHERE deleted = 1');
   }
 }
