@@ -34,7 +34,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   and dropped at 8, never for an engine failure. Notifications are deduped by transaction id.
   Tests fake it with
   `test/capture_auto/fakes.dart`.
-- API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
+- API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`; the Android side of `wambito/device` (`timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`, `widgetInstalled`, `widgetPinSupported`, `pinWidget`) is in `MainActivity.kt`, the widget methods used by `lib/home/widget_pin.dart`
   (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app); server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Storage: secure storage for session and settings; widget snapshot JSON under
@@ -280,7 +280,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Dart constants, as on Android. The app uses a UIScene `SceneDelegate` (a `FlutterSceneDelegate`),
   so a link arriving on a scene reaches Dart through `LaunchSceneHandler` (in `Launch/`), not
   through `AppDelegate`.
-  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`); `Haptics/`: `wambito/haptics` (`vibrate`);
+  - `Device/`: `wambito/device` (`timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`, and `widgetInstalled`/`widgetPinSupported`/`pinWidget`, always false); `Haptics/`: `wambito/haptics` (`vibrate`);
     `Sounds/`: `wambito/sounds` (`preload`, `play`); `Launch/`: `wambito/launch` (`take`, the
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);

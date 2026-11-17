@@ -2,10 +2,13 @@ package com.wambito.app
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -30,6 +33,8 @@ import com.wambito.app.voice.VoiceModels
 import com.wambito.app.widget.RefreshScheduler
 import com.wambito.app.widget.RefreshWorker
 import com.wambito.app.widget.SecureStorageSession
+import com.wambito.app.widget.WambitoMediumWidget
+import com.wambito.app.widget.WambitoSmallWidget
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -159,6 +164,26 @@ class MainActivity : FlutterFragmentActivity() {
                     } catch (_: Exception) {
                         null
                     },
+                )
+                // The home card that adds the widget (lib/home/widget_pin.dart): is one on a home
+                // screen, can the launcher be asked, and the ask itself (Android 8+).
+                "widgetInstalled" -> {
+                    val manager = AppWidgetManager.getInstance(this)
+                    result.success(
+                        listOf(WambitoSmallWidget::class.java, WambitoMediumWidget::class.java).any {
+                            manager.getAppWidgetIds(ComponentName(this, it)).isNotEmpty()
+                        },
+                    )
+                }
+                "widgetPinSupported" -> result.success(
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                        AppWidgetManager.getInstance(this).isRequestPinAppWidgetSupported,
+                )
+                "pinWidget" -> result.success(
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                        AppWidgetManager.getInstance(this).requestPinAppWidget(
+                            ComponentName(this, WambitoMediumWidget::class.java), null, null,
+                        ),
                 )
                 else -> result.notImplemented()
             }

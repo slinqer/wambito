@@ -2,7 +2,7 @@ import Flutter
 import UIKit
 import WambitoNative
 
-/// The `wambito/device` channel: the phone's time zone, opening a web or mail link, the app's version, and keeping the vault out of backups.
+/// The `wambito/device` channel: the phone's time zone, opening a web or mail link, the app's version, keeping the vault out of backups, and the home-screen widget (iOS has none to pin: false).
 /// Same methods and answers as the Android side (MainActivity.kt).
 final class DeviceChannel {
   private let channel: FlutterMethodChannel
@@ -31,6 +31,9 @@ final class DeviceChannel {
         result(BackupExclusion.exclude(path: path))
       case "appVersion":
         result(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+      case "widgetInstalled", "widgetPinSupported", "pinWidget":
+        // The Android widget's home card (lib/home/widget_pin.dart); nothing to pin on iOS.
+        result(false)
       default:
         result(FlutterMethodNotImplemented)
       }
