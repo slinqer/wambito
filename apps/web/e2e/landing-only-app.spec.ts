@@ -72,7 +72,7 @@ async function expectAppLink(link: ReturnType<Page["locator"]>, locale: string) 
 
 for (const l of LOCALES) {
   test.describe(`landing-only with the app (${l.locale})`, () => {
-    test("the hero's \"try it without an account\" opens the demo on the app's origin", async ({
+    test("the hero's \"Demo\" opens the demo on the app's origin", async ({
       page,
     }) => {
       await page.goto(l.path);
