@@ -3,7 +3,12 @@ import { keyWraps, oauthConsent } from "@wambito/db";
 import { and, eq, sql } from "@wambito/db/orm";
 import { compactDecrypt, decodeProtectedHeader } from "jose";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { forgetPendingSecrets } from "../src/http/assistant-secret.ts";
+import {
+  forgetPendingSecrets,
+  PENDING_SECRET_LIMIT,
+  pendingSecretCodes,
+  rememberSecret,
+} from "../src/http/assistant-secret.ts";
 import { ASSISTANT_REDIRECT, createTestApp, newAssistantSecret, type TestApp } from "./harness.ts";
 
 // The assistant secret `S` (spec 2026-11-16 §4): posted as `wk` with the consent of an encrypted
@@ -254,6 +259,54 @@ describe("an encrypted account's connect carries S", () => {
     await expect(t.consentCode(email, { headers, wk: newSecret() })).rejects.toThrow(
       /consent failed: 503 .*assistant_keys_missing/,
     );
+  });
+
+  test("a consent naming another account than the signed-in one is 409 session_changed", async () => {
+    const email = "switched-consent@wambito.test";
+    const { headers, userId } = await encryptedUser(email);
+    const other = await t.signIn("switched-other@wambito.test");
+    const clientId = await t.registerAssistant();
+    const { res: auth } = await t.authorizeRequest(clientId, headers);
+    const consent = (user: string) =>
+      t.app.request("/auth/oauth2/consent", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json", "x-wambito-user": user },
+        body: JSON.stringify({
+          accept: true,
+          oauth_query: new URL(auth.headers.get("location") ?? "").search.slice(1),
+          wk: newSecret(),
+        }),
+      });
+    // The page was loaded for `other`; the cookie is this account's now.
+    const refused = await consent(other.userId);
+    expect(refused.status).toBe(409);
+    expect(refused.headers.get("content-type")).toMatch(/application\/problem\+json/);
+    expect(((await refused.json()) as { code: string }).code).toBe("session_changed");
+    const consents = await t.admin
+      .select()
+      .from(oauthConsent)
+      .where(and(eq(oauthConsent.userId, userId), eq(oauthConsent.clientId, clientId)));
+    expect(consents).toEqual([]);
+    // Naming the signed-in account goes on as before.
+    expect((await consent(userId)).status).toBe(200);
+  });
+
+  test("the code → S map keeps the newest 10,000 consents", async () => {
+    forgetPendingSecrets();
+    const S = newSecret();
+    for (let i = 0; i <= PENDING_SECRET_LIMIT; i++) rememberSecret(`code-${i}`, S);
+    const codes = pendingSecretCodes();
+    expect(PENDING_SECRET_LIMIT).toBe(10_000);
+    expect(codes).toHaveLength(PENDING_SECRET_LIMIT);
+    expect(codes[0]).toBe("code-1");
+    expect(codes.at(-1)).toBe(`code-${PENDING_SECRET_LIMIT}`);
+    // A consent made now still carries its S to the exchange.
+    const tokens = await t.connectAssistant("full-map@wambito.test", {
+      headers: (await encryptedUser("full-map@wambito.test")).headers,
+      wk: S,
+    });
+    expect(tokens.refreshToken.endsWith(`.${S}`)).toBe(true);
+    forgetPendingSecrets();
   });
 
   test("a wk that is not 32 bytes of base64url is refused", async () => {

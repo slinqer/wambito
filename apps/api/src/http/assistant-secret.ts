@@ -10,6 +10,7 @@ import type { AppDeps } from "../deps.ts";
 import type { AppEnv } from "../env.ts";
 import { revokeAssistant } from "../services/account.ts";
 import { accountEncryption } from "../services/encryption.ts";
+import { clientHeader } from "./client-headers.ts";
 import { ApiError } from "./problem.ts";
 
 /**
@@ -22,7 +23,9 @@ import { ApiError } from "./problem.ts";
  * This wrapper sits in front of Better Auth's `/auth/oauth2/*` (mounted before `/auth/*`):
  * - authorize: an encrypted account always gets the consent page (`prompt=consent`), since a code
  *   Better Auth hands out without it carries no `S`;
- * - consent: takes `wk` out of the body, and keeps `code → S` in process memory for 10 minutes;
+ * - consent: takes `wk` out of the body, and keeps `code → S` in process memory for 10 minutes
+ *   (the newest 10,000 codes); with `x-wambito-user` naming another account than the signed-in
+ *   one, 409 `session_changed` and no consent;
  * - token: runs Better Auth inside an AsyncLocalStorage holding `S` (`assistantSecretClaims` adds
  *   the claim), appends `.S` to the refresh token, and strips it from a presented one; an encrypted
  *   account without `S` is refused (400 `invalid_grant`) and that client is revoked for it;
@@ -56,10 +59,29 @@ function splitToken(token: string): { token: string; secret?: string } {
   return { token: head, secret: tail };
 }
 
+/** At most this many codes wait for their exchange; past it the oldest go (their connect fails). */
+export const PENDING_SECRET_LIMIT = 10_000;
+
+/** Oldest first: every entry lives `PENDING_SECRET_MS`, so this is also expiry order. */
 const pending = new Map<string, { secret: string; expiresAt: number }>();
 
 function sweep(now: number): void {
-  for (const [code, entry] of pending) if (entry.expiresAt <= now) pending.delete(code);
+  for (const [code, entry] of pending) {
+    if (entry.expiresAt > now) break;
+    pending.delete(code);
+  }
+}
+
+/** Keeps `S` for `code` until the exchange or `PENDING_SECRET_MS`, the newest `PENDING_SECRET_LIMIT`. */
+export function rememberSecret(code: string, secret: string): void {
+  const now = Date.now();
+  sweep(now);
+  pending.delete(code);
+  pending.set(code, { secret, expiresAt: now + PENDING_SECRET_MS });
+  for (const oldest of pending.keys()) {
+    if (pending.size <= PENDING_SECRET_LIMIT) break;
+    pending.delete(oldest);
+  }
 }
 
 /** Takes (and deletes, whatever happens next) the `S` a consent left for `code`. */
@@ -74,6 +96,11 @@ function takePending(code: string): string | undefined {
 /** Empties the code → `S` map, as an API restart does. Tests only. */
 export function forgetPendingSecrets(): void {
   pending.clear();
+}
+
+/** The codes waiting, oldest first. Tests only. */
+export function pendingSecretCodes(): string[] {
+  return [...pending.keys()];
 }
 
 /** The `S` of the token request being handled, for `assistantSecretClaims`. */
@@ -213,16 +240,24 @@ export function assistantSecret(deps: AppDeps, auth: Auth) {
     const { wk, ...rest } = body as Record<string, unknown>;
     if (!isSecret(wk)) return oauthError(400, "invalid_request", "wk must be 32 bytes, base64url");
     if (!config.MCP_WK_PUBLIC_KEY) throw keysMissing();
+    // The page names the account it was loaded for: a cookie that now belongs to another one
+    // (signed in as someone else in another tab) gets no consent row, as `expectedUser` answers.
+    const expected = clientHeader(request.headers, "user");
+    if (expected !== undefined) {
+      const session = await auth.api.getSession({
+        headers: request.headers,
+        query: { disableRefresh: true },
+      });
+      if (session?.user.id !== expected) {
+        throw new ApiError(409, "session_changed", "The signed-in account is not the one expected");
+      }
+    }
     const res = await auth.handler(withBody(request, JSON.stringify(rest)));
     if (res.status !== 200) return res;
     const answer = (await res.clone().json()) as { url?: unknown };
     const code =
       typeof answer.url === "string" ? new URL(answer.url).searchParams.get("code") : null;
-    if (code) {
-      const now = Date.now();
-      sweep(now);
-      pending.set(code, { secret: wk, expiresAt: now + PENDING_SECRET_MS });
-    }
+    if (code) rememberSecret(code, wk);
     return res;
   }
 
