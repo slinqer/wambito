@@ -26,7 +26,12 @@ import 'vault_lock.dart' show VaultLease;
 /// - A conflict on a create (deterministic ids only) takes the server's copy plus the fields the
 ///   person changed after the create.
 /// - A local delete beats a concurrent server edit; a server delete beats a local edit
-///   (`serverDeleted`). `not_found` and `id_taken` drop the entry (`dropped`).
+///   (`serverDeleted`), and the local tombstone keeps the person's edited body (with no local
+///   edit, the server's body). `not_found` and `id_taken` drop the entry (`dropped`).
+/// - A tombstone carries its body both ways, sealed like a live record (`null` only when the row
+///   holds none: a `bodiless` tombstone's local body is a stale copy, never sent), so a deleted
+///   record can be restored on any device. A pulled tombstone whose body does not open still
+///   deletes, without a body, and is never quarantined.
 /// - A change that keeps failing is parked (1 min back-off, doubling, at most 6 hours) and never
 ///   stops the pull; on its fifth failure it is abandoned (`dropped`). A whole batch refused with
 ///   413/422 is bisected; any other 4xx but 401 parks the batch. Offline, 401, 429 and 5xx stop.
@@ -43,7 +48,8 @@ import 'vault_lock.dart' show VaultLease;
 ///   grows, and on the engine's first pull. `key_version_mismatch` refreshes and seals again once,
 ///   else parks. `device_removed` and `tampered` (problem `key_unverified`) stop the run and the
 ///   triggers. The upgrade pass re-seals records under an older `keyV` through `reseal` outbox
-///   entries (at most 500 pending), and an old version's key is dropped once nothing uses it.
+///   entries (at most 500 pending; tombstones that hold a body too, pushed as a delete with the
+///   body), and an old version's key is dropped once nothing uses it.
 ///
 /// Phone differences: one run per account in the process (a Dart lock in place of the Web Lock);
 /// the triggers are app start, return to the foreground ([AppLifecycleListener]), a minute while in
@@ -498,6 +504,25 @@ class _Engine implements SyncEngine {
     return (body: parsed.value, reason: null);
   }
 
+  /// The body a server tombstone holds, opened; null when it has none or it does not open (the
+  /// delete still applies, without a body, and nothing is quarantined).
+  Future<Json?> tombstoneBodyOf(_Wire rec) async {
+    if (rec.body == null) return null;
+    return (await openWire(rec)).body;
+  }
+
+  /// [remote] with [tombstoneBody] (a remote delete that keeps it), or as it is when null.
+  WriteOptions _withBody(WriteOptions remote, Json? tombstoneBody) => tombstoneBody == null
+      ? remote
+      : WriteOptions(
+          origin: remote.origin,
+          version: remote.version,
+          keyV: remote.keyV,
+          skipIfPending: remote.skipIfPending,
+          ifSeq: remote.ifSeq,
+          tombstoneBody: tombstoneBody,
+        );
+
   Future<void> quarantine(_Wire rec, String reason, RecordType type) => store.quarantine(
     QuarantineEntry(id: rec.id, type: type, version: rec.version, reason: reason, keyV: rec.keyV),
   );
@@ -513,7 +538,9 @@ class _Engine implements SyncEngine {
     }
     final deleted = entry.deleted || row.deleted;
     final (:keyV, :keys) = sealingKeys();
-    final sealed = deleted
+    // A tombstone carries its body too (a restore on another device needs it); `null` only when
+    // the row holds none (a bodiless tombstone's body is a stale local copy, not the server's).
+    final sealed = row.bodiless
         ? null
         : toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body));
     return _Prepared(
@@ -543,7 +570,11 @@ class _Engine implements SyncEngine {
     final row = await store.rawRecord(type, entry.id);
     final remote = _remote(server, entry);
     if (server.deleted) {
-      await store.delete(type, entry.id, remote);
+      // The deletion wins. An unsent edit of the person's is what the tombstone keeps (a restore
+      // brings back what they last saw); otherwise the server's body, when it opens.
+      final edited = !entry.deleted && !entry.reseal && row != null;
+      final tombstoneBody = edited ? row.body : await tombstoneBodyOf(server);
+      await store.delete(type, entry.id, _withBody(remote, tombstoneBody));
       await store.ackOutbox(entry.id, server.version, entry.seq);
       if (!entry.deleted && !entry.reseal) {
         result.serverDeleted.add(entry.id);
@@ -551,11 +582,13 @@ class _Engine implements SyncEngine {
       }
       return;
     }
-    if (entry.deleted && !created) {
+    // A reseal is never the person's change: a tombstone's reseal meeting a live copy (restored on
+    // another device) takes that copy below, like any reseal.
+    if (entry.deleted && !entry.reseal && !created) {
       // The person's delete wins: keep the server's copy as the base and push the delete again.
       await store.transaction((tx) async {
         await tx.put(type, entry.id, row?.body ?? <String, Object?>{}, remote);
-        await tx.delete(type, entry.id, remote);
+        await tx.delete(type, entry.id, _withBody(remote, row?.body));
       });
       result.merged += 1;
       return;
@@ -630,7 +663,7 @@ class _Engine implements SyncEngine {
     if (server == null) return;
     final remote = _remote(server, entry);
     if (server.deleted) {
-      await store.delete(entry.type, entry.id, remote);
+      await store.delete(entry.type, entry.id, _withBody(remote, await tombstoneBodyOf(server)));
       return;
     }
     final opened = await openWire(server);
@@ -802,7 +835,9 @@ class _Engine implements SyncEngine {
         for (final e in await store.readOutbox(_all))
           if (e.setAside == null && !e.abandoned) e.id,
       };
-      final apply = <({_Wire rec, RecordType type, Json? body})>[];
+
+      /// `body: null` is a delete; its `tombstone` is the body it keeps (none: null).
+      final apply = <({_Wire rec, RecordType type, Json? body, Json? tombstone})>[];
       var quarantined = 0;
       for (final raw in page['records']! as List) {
         final rec = _Wire.fromJson(raw as Map);
@@ -813,11 +848,24 @@ class _Engine implements SyncEngine {
           // Kept with no known type: the quarantine table needs one, so it is counted only.
           quarantined += 1;
         } else if (rec.deleted) {
-          apply.add((rec: rec, type: type, body: null));
+          // Opened like a live record; a body that does not open never blocks the delete. A
+          // tombstone this device already holds at that version keeps its body (a conflict may
+          // have kept the person's own edit in it): the delete goes without one, and the store
+          // keeps an existing tombstone's body on a delete without one. A bodiless one takes the
+          // server's.
+          final local = await store.rawRecord(type, rec.id);
+          final known =
+              local != null && local.deleted && !local.bodiless && local.version >= rec.version;
+          apply.add((
+            rec: rec,
+            type: type,
+            body: null,
+            tombstone: known ? null : await tombstoneBodyOf(rec),
+          ));
         } else {
           final opened = await openWire(rec);
           if (opened.body != null) {
-            apply.add((rec: rec, type: type, body: opened.body));
+            apply.add((rec: rec, type: type, body: opened.body, tombstone: null));
           } else {
             await quarantine(rec, opened.reason!, type);
             quarantined += 1;
@@ -827,7 +875,7 @@ class _Engine implements SyncEngine {
       if (apply.isNotEmpty) {
         await fence();
         await store.transaction((tx) async {
-          for (final (:rec, :type, :body) in apply) {
+          for (final (:rec, :type, :body, :tombstone) in apply) {
             // Checked again here: the person may have written it since `pending` was read.
             final remote = WriteOptions(
               origin: 'remote',
@@ -836,7 +884,7 @@ class _Engine implements SyncEngine {
               skipIfPending: true,
             );
             if (body == null) {
-              await tx.delete(type, rec.id, remote);
+              await tx.delete(type, rec.id, _withBody(remote, tombstone));
             } else {
               await tx.put(type, rec.id, body, remote);
             }
@@ -892,6 +940,9 @@ class _Engine implements SyncEngine {
   /// Writes the set-aside changes again onto the fresh copies: only their touched fields.
   Future<void> restoreSetAside(SyncResult result) async {
     final serverDeleted = <String>[];
+
+    /// Server tombstones that keep the person's set-aside body instead of the server's.
+    final keep = <({OutboxEntry entry, RawRecord fresh, Json body})>[];
     await store.restoreSetAside((entry, fresh) {
       final live = fresh != null && !fresh.deleted ? fresh : null;
       if (entry.deleted) return live != null ? const SetAsideDelete() : const SetAsideDrop();
@@ -902,13 +953,35 @@ class _Engine implements SyncEngine {
         return fresh != null ? const SetAsideDrop() : SetAsidePut(aside);
       }
       if (live == null) {
-        // The server deleted it: the deletion wins, and the person is told.
+        // The server deleted it: the deletion wins, and the person is told. The tombstone keeps
+        // their body (a restore brings back what they last saw).
         serverDeleted.add(entry.id);
+        if (fresh != null) keep.add((entry: entry, fresh: fresh, body: aside));
         return const SetAsideDrop();
       }
       final parsed = parseRecord(entry.type, _mergeBodies(aside, live.body, entry.touched));
       return parsed.ok ? SetAsidePut(parsed.value!) : const SetAsideDrop();
     });
+    // A second commit: if it never lands, the tombstone keeps the server's body, which is still a
+    // body to restore from.
+    if (keep.isNotEmpty) {
+      await store.transaction((tx) async {
+        for (final (:entry, :fresh, :body) in keep) {
+          await tx.delete(
+            entry.type,
+            entry.id,
+            WriteOptions(
+              origin: 'remote',
+              version: fresh.version,
+              keyV: fresh.keyV,
+              // A write the person made since then is theirs to push.
+              skipIfPending: true,
+              tombstoneBody: body,
+            ),
+          );
+        }
+      });
+    }
     if (serverDeleted.isNotEmpty) {
       result.serverDeleted.addAll(serverDeleted);
       report(SyncProblem(SyncProblemCode.serverDeleted, ids: serverDeleted));
