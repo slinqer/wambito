@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { ClientMetadataResourceFetch } from "@better-auth/oauth-provider";
 import { categories, createDb, type Db, user } from "@wambito/db";
-import { eq } from "@wambito/db/orm";
+import { eq, sql } from "@wambito/db/orm";
 import { startTestDatabase } from "@wambito/db/testing";
 import { exportJWK, generateKeyPair } from "jose";
 import { createApp } from "../src/app.ts";
@@ -310,9 +310,32 @@ export async function createTestApp(
     return connectAssistant(email, options);
   }
 
+  /**
+   * The public tables with a row that holds any of `needles` anywhere in its text (what a
+   * `psql` scan for plain text finds), as `table: needle`.
+   */
+  async function tablesHolding(needles: string[]): Promise<string[]> {
+    const tables = (await admin.db.execute(sql`
+      select table_name from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE'
+    `)) as unknown as { table_name: string }[];
+    const found: string[] = [];
+    for (const { table_name } of tables) {
+      for (const needle of needles) {
+        const rows = (await admin.db.execute(sql`
+          select 1 from ${sql.identifier(table_name)} r
+          where position(${needle} in r::text) > 0 limit 1
+        `)) as unknown as unknown[];
+        if (rows.length > 0) found.push(`${table_name}: ${needle}`);
+      }
+    }
+    return found;
+  }
+
   return {
     app,
     config,
+    tablesHolding,
     registerAssistant,
     tokenRequest,
     authorizeRequest,
