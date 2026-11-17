@@ -99,9 +99,16 @@ export interface EncryptedStore extends FinanceStore {
   /**
    * The server accepted the change read as `seq` and gave it `version` (sealed under `keyV`, when
    * given). Records them, and clears the entry only if there was no newer local write since;
-   * otherwise the entry stays, now based on `version`.
+   * otherwise the entry stays, now based on `version`. `bodySent`: the accepted push carried a
+   * body, so a `bodiless` tombstone is no longer one; otherwise the flag stays.
    */
-  ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
+  ackOutbox(
+    id: string,
+    version: number,
+    seq: number,
+    keyV?: number,
+    bodySent?: boolean,
+  ): Promise<void>;
   /**
    * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
    * for records the server has (version above 0) sealed under a key version below `current` and

@@ -436,8 +436,57 @@ export function encryptedStoreContract(
       await store.put("category", "a", category("Mine"));
       await store.delete("category", "a");
       const [entry] = await store.readOutbox(10);
-      await store.ackOutbox("a", 3, entry?.seq ?? 0, 4);
+      await store.ackOutbox("a", 3, entry?.seq ?? 0, 4, true);
       expect(await store.keyVersionsInUse()).toEqual(new Set([4]));
+    });
+
+    it("an ack keeps a tombstone bodiless unless the push carried a body", async () => {
+      const store = await make();
+      for (const id of ["a", "b"]) {
+        await store.put("category", id, category("Old"), remote(1, 1));
+        // A pending edit, then the server's tombstone without a body over it.
+        await store.put("category", id, category("Mine"));
+        await store.delete("category", id, remote(2, 1));
+        expect((await store.getRaw("category", id))?.bodiless).toBe(true);
+      }
+      const entries = await store.readOutbox(10);
+      const seq = (id: string) => entries.find((e) => e.id === id)?.seq ?? 0;
+      await store.ackOutbox("a", 3, seq("a"), 2);
+      await store.ackOutbox("b", 3, seq("b"), 3, false);
+      for (const id of ["a", "b"]) {
+        expect(await store.getRaw("category", id)).toMatchObject({ version: 3, bodiless: true });
+      }
+      expect(await store.keyVersionsInUse()).toEqual(new Set());
+      expect(await store.queueReseal(5, 10)).toBe(0);
+      expect(await store.readOutbox(10)).toEqual([]);
+
+      // A push that carried the body: the server's tombstone holds it now.
+      await store.put("category", "c", category("Old"), remote(4, 1));
+      await store.put("category", "c", category("Mine"));
+      await store.delete("category", "c", remote(5, 1));
+      const [c] = await store.readOutbox(10);
+      await store.ackOutbox("c", 6, c?.seq ?? 0, 4, true);
+      expect((await store.getRaw("category", "c"))?.bodiless).toBeUndefined();
+      expect(await store.keyVersionsInUse()).toEqual(new Set([4]));
+    });
+
+    it("a remote delete with tombstoneBody and ifSeq does nothing after a newer local write", async () => {
+      const store = await make();
+      await store.put("category", "a", category("Old"), remote(1, 1));
+      await store.put("category", "a", category("Local"));
+      const [read] = await store.readOutbox(1);
+      await store.put("category", "a", category("Newer"));
+      await store.delete("category", "a", {
+        ...remote(2, 1),
+        ifSeq: read?.seq ?? 0,
+        tombstoneBody: category("Server"),
+      });
+      expect(await store.getRaw("category", "a")).toMatchObject({
+        deleted: false,
+        version: 1,
+        body: { name: "Newer" },
+      });
+      expect((await store.readOutbox(1))[0]?.seq).toBeGreaterThan(read?.seq ?? 0);
     });
 
     it("queueReseal shares its limit between records and tombstones", async () => {

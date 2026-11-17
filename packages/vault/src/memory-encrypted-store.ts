@@ -313,16 +313,16 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
           .slice(0, limit)
           .map(clone),
       ),
-    ackOutbox: (id, version, seq, keyV) =>
+    ackOutbox: (id, version, seq, keyV, bodySent) =>
       serial(async () => {
         const entry = state.outbox.get(id);
         if (!entry) return;
         const row = table(entry.type).get(id);
         if (row) {
-          // Every push from now on carries the body the tombstone has.
+          // A tombstone pushed with its body: the server's copy holds it now.
           const { bodiless: _, ...rest } = row;
           table(entry.type).set(id, {
-            ...(row.deleted ? rest : row),
+            ...(row.deleted && bodySent ? rest : row),
             version,
             keyV: keyV ?? row.keyV,
           });

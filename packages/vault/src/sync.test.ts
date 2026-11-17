@@ -281,9 +281,7 @@ test("a delete pushes its sealed body", async () => {
 });
 
 test("a delete of a record downloaded without a body pushes null", async () => {
-  const keys = await deriveRecordKeys(generateDataKey());
-  const keyring = { current: 1, byVersion: new Map([[1, keys]]) };
-  const server = fakeServer();
+  const { keys, server, store, engine } = await setup();
   server.serve({
     id: A,
     type: "category",
@@ -291,28 +289,17 @@ test("a delete of a record downloaded without a body pushes null", async () => {
     keyV: 1,
     body: await sealAs(keys, 1, A, category("Food")),
   });
-  const inner = createMemoryEncryptedStore(USER);
-  // A store that holds no body for this tombstone (a delete downloaded before tombstones had one).
-  const store = {
-    ...inner,
-    getRaw: (async (type, id) => {
-      const row = await inner.getRaw(type, id);
-      return row?.deleted ? { ...row, body: null as never } : row;
-    }) as typeof inner.getRaw,
-  };
-  const engine = createSyncEngine({
-    store,
-    fetch: server.fetch,
-    userId: USER,
-    keyring,
-    refreshKeys: async () => keyring,
-    upgrade: false,
-  });
   expect(await engine.run()).toMatchObject({ ok: true, pulled: 1 });
-
-  await store.delete("category", A);
+  // A tombstone the server holds without a body (an old client's delete), applied over a pending
+  // edit: the local body is only a stale copy, never sent as the tombstone's.
+  await store.put("category", A, category("Groceries"));
+  await store.delete("category", A, { origin: "remote", version: 1, keyV: 1 });
+  expect((await store.getRaw("category", A))?.bodiless).toBe(true);
   expect(await engine.run()).toMatchObject({ ok: true, pushed: 1 });
   expect(server.posted).toEqual([expect.objectContaining({ id: A, deleted: true, body: null })]);
+  // The server's tombstone still has no body: the local copy stays a stale one.
+  expect((await store.getRaw("category", A))?.bodiless).toBe(true);
+  expect(await store.keyVersionsInUse()).toEqual(new Set());
 });
 
 test("a pulled tombstone with a body is kept, even for an id this device never had", async () => {
@@ -593,4 +580,54 @@ test("a server tombstone with a body replaces a bodiless or older local tombston
   expect((await store.get("category", A, { includeDeleted: true }))?.body).toEqual(
     category("Groceries"),
   );
+});
+
+test("a reseal meeting a server tombstone without a body leaves the tombstone bodiless", async () => {
+  const keys1 = await deriveRecordKeys(generateDataKey());
+  const keys2 = await deriveRecordKeys(generateDataKey());
+  const keyring = {
+    current: 2,
+    byVersion: new Map([
+      [1, keys1],
+      [2, keys2],
+    ]),
+  };
+  let gone: Wire | undefined;
+  const server = fakeServer((c) => (gone ? { id: c.id, conflict: gone } : undefined));
+  server.serve({
+    id: A,
+    type: "category",
+    deleted: false,
+    keyV: 1,
+    body: await sealAs(keys1, 1, A, category("Food")),
+  });
+  const store = createMemoryEncryptedStore(USER);
+  // Pulled under key version 1, before the rotation.
+  const old = createSyncEngine({
+    store,
+    fetch: server.fetch,
+    userId: USER,
+    keyring: { current: 1, byVersion: new Map([[1, keys1]]) },
+    refreshKeys: async () => ({ current: 1, byVersion: new Map([[1, keys1]]) }),
+    upgrade: false,
+  });
+  expect(await old.run()).toMatchObject({ ok: true, pulled: 1 });
+
+  // An old client deleted it, without a body; the reseal meets that tombstone.
+  gone = server.serve({ id: A, type: "category", deleted: true, keyV: 1, body: null });
+  expect(await store.queueReseal(2, 500)).toBe(1);
+  const engine = createSyncEngine({
+    store,
+    fetch: server.fetch,
+    userId: USER,
+    keyring,
+    refreshKeys: async () => keyring,
+  });
+  expect(await engine.run()).toMatchObject({ ok: true, serverDeleted: [] });
+  expect(await store.get("category", A)).toBeUndefined();
+  expect(await store.getRaw("category", A)).toMatchObject({ deleted: true, bodiless: true });
+  expect(await store.keyVersionsInUse()).toEqual(new Set());
+  expect(await store.queueReseal(2, 500)).toBe(0);
+  expect(server.posted).toHaveLength(1);
+  expect(await store.readOutbox(10)).toEqual([]);
 });

@@ -418,9 +418,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     const deleted = entry.deleted || row.deleted;
     const { keyV, keys } = sealingKeys();
-    // A tombstone carries its body too (a restore on another device needs it); `null` only when
-    // the row holds none.
-    const hasBody = row.body !== null && row.body !== undefined;
+    // A tombstone carries its body too (a restore on another device needs it); `null` when the row
+    // holds none, or only a stale copy (a bodiless tombstone's body is not the server's).
+    const hasBody = row.body !== null && row.body !== undefined && !row.bodiless;
     const sealed = hasBody
       ? toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body))
       : null;
@@ -465,6 +465,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         entry.id,
         tombstoneBody === undefined ? remote : { ...remote, tombstoneBody },
       );
+      // Nothing was sent with a body: a tombstone stored without the server's stays bodiless.
       await store.ackOutbox(entry.id, server.version, entry.seq);
       if (!entry.deleted && !entry.reseal) {
         result.serverDeleted.push(entry.id);
@@ -587,7 +588,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       if (!r) {
         await park(entry, "no_result", result);
       } else if ("version" in r) {
-        await store.ackOutbox(entry.id, r.version, entry.seq, p.change.keyV as number);
+        await store.ackOutbox(
+          entry.id,
+          r.version,
+          entry.seq,
+          p.change.keyV as number,
+          p.change.body !== null,
+        );
         result.pushed += 1;
       } else if ("conflict" in r) {
         const count = (conflicts.get(entry.id) ?? 0) + 1;

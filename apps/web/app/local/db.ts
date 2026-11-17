@@ -21,8 +21,8 @@ export interface StoredRow {
   keyV: number;
   /**
    * The server's copy of this tombstone has no body, as far as this device knows. Set by a remote
-   * delete without a body, or by the version 2 upgrade; cleared by a remote delete with a body, an
-   * acked local delete, or any put.
+   * delete without a body, or by the version 2 upgrade; cleared by a remote delete with a body, the
+   * ack of a push that carried the body, or any put.
    */
   bodiless?: true;
   /** When it was first written: the order `list` returns. */

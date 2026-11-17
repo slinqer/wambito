@@ -358,7 +358,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       });
       return all.sort((x, y) => x.seq - y.seq).slice(0, limit);
     },
-    ackOutbox: (id, version, seq, keyV) =>
+    ackOutbox: (id, version, seq, keyV, bodySent) =>
       short([...RECORD_TYPES, OUTBOX], "readwrite", async (tx) => {
         const outbox = tx.objectStore(OUTBOX);
         const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
@@ -366,10 +366,14 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         const records = tx.objectStore(entry.type);
         const row = (await request(records.get(id))) as StoredRow | undefined;
         if (row) {
-          // Every push from now on carries the body the tombstone has.
+          // A tombstone pushed with its body: the server's copy holds it now.
           const { bodiless: _, ...rest } = row;
           await request(
-            records.put({ ...(row.deleted ? rest : row), version, keyV: keyV ?? row.keyV }),
+            records.put({
+              ...(row.deleted && bodySent ? rest : row),
+              version,
+              keyV: keyV ?? row.keyV,
+            }),
           );
         }
         if (entry.seq === seq) await request(outbox.delete(id));
