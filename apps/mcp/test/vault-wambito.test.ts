@@ -649,8 +649,9 @@ describe("a call the API never answers is the unavailable error, and frees the a
       }
       return real(input, init);
     }) as typeof fetch;
-    const deps = { apiUrl: API, privateKey, cache, now: () => new Date(NOW), timeoutMs: 50 };
-    const stuck = vaultWambito({ ...deps, fetch: hanging }, conn.token, conn.wk);
+    const deps = { apiUrl: API, privateKey, cache, now: () => new Date(NOW) };
+    // Long enough for the real calls before the hung one on a loaded machine.
+    const stuck = vaultWambito({ ...deps, fetch: hanging, timeoutMs: 1500 }, conn.token, conn.wk);
     const next = vaultWambito({ ...deps, fetch: real }, conn.token, conn.wk);
 
     // Both on the account's lock: the second waits for the first, which must give up.
