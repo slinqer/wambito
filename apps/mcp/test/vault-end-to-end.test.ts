@@ -306,10 +306,30 @@ test("a grant with only finance:write gets a clear tool error on an encrypted ac
   ).toBe(false);
 });
 
+// Relies on the tests above having filled `secrets` (it is asserted, so a lone run fails loudly).
 test("a scan of every table finds none of the run's words nor an assistant secret", async () => {
   expect(secrets.length).toBeGreaterThan(3);
-  const found = await t.tablesHolding([...WORDS, "Groceries", "Dinner", "Bakery", ...secrets]);
+  const found = await t.tablesHolding([
+    ...WORDS,
+    "Groceries",
+    "Dinner",
+    "Bakery",
+    ...secrets,
+    // S stored raw in a bytea column would read as hex.
+    ...secrets.map((S) => fromBase64Url(S)),
+  ]);
   expect(found).toEqual([]);
-  // The scan sees real rows: an email is there in plain text.
+});
+
+test("the scan reads text and bytea columns", async () => {
+  // text: an email is there in plain text
   expect((await t.tablesHolding(["@wambito.test"])).length).toBeGreaterThan(0);
+  // bytea: a wrap whose bytes are a known string (48 bytes, as the API takes them) is found
+  const { userId, headers } = await t.signIn("bytea-control@wambito.test");
+  t.config.E2E_PREVIEW_USER_IDS.push(userId);
+  const control = "bytea-control-e2e";
+  const bytes = new Uint8Array(48);
+  bytes.set(new TextEncoder().encode(control));
+  await putWrap(headers, { kind: "recovery", ref: null, keyV: 1, wrapped: toBase64Url(bytes) });
+  expect((await t.tablesHolding([control])).length).toBeGreaterThan(0);
 });

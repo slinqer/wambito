@@ -311,10 +311,11 @@ export async function createTestApp(
   }
 
   /**
-   * The public tables with a row that holds any of `needles` anywhere in its text (what a
-   * `psql` scan for plain text finds), as `table: needle`.
+   * The public tables with a row that holds any of `needles` anywhere in its text (what a `psql`
+   * scan for plain text finds), as `table: needle`. A string is looked for as text and as its UTF-8
+   * bytes in hex (how a `bytea` column reads as text); bytes are looked for as hex only.
    */
-  async function tablesHolding(needles: string[]): Promise<string[]> {
+  async function tablesHolding(needles: (string | Uint8Array)[]): Promise<string[]> {
     const tables = (await admin.db.execute(sql`
       select table_name from information_schema.tables
       where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -322,11 +323,18 @@ export async function createTestApp(
     const found: string[] = [];
     for (const { table_name } of tables) {
       for (const needle of needles) {
+        const hex = Buffer.from(needle).toString("hex");
+        const text = typeof needle === "string" ? needle : null;
         const rows = (await admin.db.execute(sql`
           select 1 from ${sql.identifier(table_name)} r
-          where position(${needle} in r::text) > 0 limit 1
+          where position(${hex} in lower(r::text)) > 0
+            or (${text}::text is not null and position(${text}::text in r::text) > 0) limit 1
         `)) as unknown as unknown[];
-        if (rows.length > 0) found.push(`${table_name}: ${needle}`);
+        if (rows.length > 0) {
+          found.push(
+            `${table_name}: ${typeof needle === "string" ? needle : `${hex.slice(0, 8)}…`}`,
+          );
+        }
       }
     }
     return found;
