@@ -90,7 +90,7 @@ export const HeroSection: Story = {
     // Two app-icon tiles inside the headline, decorative.
     const tiles = [...headline.querySelectorAll("[aria-hidden='true'] [data-tile]")];
     await expect(tiles.map((tile) => tile.getAttribute("data-tile"))).toEqual(["app", "notice"]);
-    await expect(canvas.getByRole("link", { name: "Pruébalo sin cuenta" })).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "Demo" })).toHaveAttribute(
       "href",
       "/demo?lang=es",
     );
@@ -110,7 +110,7 @@ export const HeroWithDemoDayEnglish: Story = {
   globals: { theme: "day", locale: "en" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const demo = canvas.getByRole("link", { name: "Try it without an account" });
+    const demo = canvas.getByRole("link", { name: "Demo" });
     await expect(demo).toHaveAttribute("href", "/demo?lang=en");
     await expect(demo).toHaveClass("lk-btn-secondary");
     await expectTarget(demo);
@@ -619,7 +619,7 @@ export const ButtonHalo: Story = {
     await expect(Number(cta.style.getPropertyValue("--lk-lean-x"))).toBeGreaterThan(0.9);
     await expect(Number(cta.style.getPropertyValue("--lk-lean-y"))).toBeLessThan(-0.8);
     // A finger has no hover: touch moves leave the button alone.
-    const [other] = canvas.getAllByRole("link", { name: "Pruébalo sin cuenta" });
+    const [other] = canvas.getAllByRole("link", { name: "Demo" });
     other?.dispatchEvent(
       new PointerEvent("pointermove", {
         bubbles: true,
