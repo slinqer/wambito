@@ -12,7 +12,8 @@ class WidgetPin {
   /// The launcher can be asked to add the widget.
   Future<bool> supported() => _ask('widgetPinSupported');
 
-  /// Asks the launcher to add the widget; true when the request was made.
+  /// Asks the launcher to add the widget. True means the launcher's dialog was shown, not that the
+  /// widget was added (the person may decline): check [installed] afterwards.
   Future<bool> pin() => _ask('pinWidget');
 
   Future<bool> _ask(String method) async {
