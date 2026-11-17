@@ -29,7 +29,7 @@ const LOCALES = [
     openSourcePerk: "Código abierto",
     removedQuestions: ["¿En qué se me va la plata?", "¿Cuánto me cuesta vivir?"],
     cta: "Empieza ahora",
-    demoCta: "Pruébalo sin cuenta",
+    demoCta: "Demo",
     soon: "Pronto",
     ways: ["App para Android", "App para iOS"],
     android: { cta: "Desde GitHub" },
@@ -37,14 +37,15 @@ const LOCALES = [
     importQuestion: "¿Puedo traer mi historial de otras apps?",
     freeQuestion: "¿Es gratis?",
     freeAnswer: "Sí, y lo será siempre.",
-    openSource: { title: "Código abierto", cta: "Ver el código en GitHub" },
+    openQuestion: "¿Es de código abierto?",
     metaDescription: [/notificaciones de tus pagos/, /código abierto/],
     banned: [/mejor amigo/i, /\bjueg(o|a)\b/i, /Empieza gratis/i],
     // Privacy copy claims only what Wambito does: no "can't leak", no encryption at rest. End-to-end
-    // encryption is a feature (Wambito launches with it: the feature grid's card says so).
-    overclaims: [/se pueda filtrar/i, /no podemos ver/i, /en reposo/i],
+    // encryption is a feature (Wambito launches with it: the feature grid's card says so), so the
+    // FAQ may say the data can't be seen by Wambito, by design.
+    overclaims: [/se pueda filtrar/i, /en reposo/i],
     privacyAnswer:
-      "Tus datos se cifran de punta a punta en tu dispositivo: nadie más puede leerlos, ni siquiera Wambito.",
+      "Por eso no podríamos vender tus datos aunque quisiéramos: por diseño, no podemos verlos.",
     faq: "Preguntas frecuentes",
     signIn: "Entrar",
     toggleToDay: "Cambiar a modo día",
@@ -69,7 +70,7 @@ const LOCALES = [
     openSourcePerk: "Open source",
     removedQuestions: ["Where does all my money go?", "How much does living cost me?"],
     cta: "Get started",
-    demoCta: "Try it without an account",
+    demoCta: "Demo",
     soon: "Soon",
     ways: ["Android app", "iOS app"],
     android: { cta: "From GitHub" },
@@ -77,12 +78,12 @@ const LOCALES = [
     importQuestion: "Can I bring my history from other apps?",
     freeQuestion: "Is it free?",
     freeAnswer: "Yes, and it always will be.",
-    openSource: { title: "Open source", cta: "View the code on GitHub" },
+    openQuestion: "Is it open source?",
     metaDescription: [/payment notifications/, /open source/],
     banned: [/best friend/i, /\bgames?\b/i, /Start free/i],
-    overclaims: [/nothing to leak/i, /can(no|')t see/i, /at rest/i],
+    overclaims: [/nothing to leak/i, /at rest/i],
     privacyAnswer:
-      "Your data is end-to-end encrypted on your device: no one else can read it, not even Wambito.",
+      "So we couldn't sell your data even if we wanted to: by design, we can't see it.",
     faq: "Frequently asked questions",
     signIn: "Sign in",
     toggleToDay: "Switch to day mode",
@@ -107,7 +108,7 @@ const LOCALES = [
     openSourcePerk: "Open source",
     removedQuestions: ["Dove se ne vanno tutti i miei soldi?", "Quanto mi costa vivere?"],
     cta: "Inizia ora",
-    demoCta: "Provala senza account",
+    demoCta: "Demo",
     soon: "Presto",
     ways: ["App per Android", "App per iOS"],
     android: { cta: "Da GitHub" },
@@ -115,12 +116,12 @@ const LOCALES = [
     importQuestion: "Posso portare il mio storico da altre app?",
     freeQuestion: "È gratis?",
     freeAnswer: "Sì, e lo sarà sempre.",
-    openSource: { title: "Open source", cta: "Vedi il codice su GitHub" },
+    openQuestion: "È open source?",
     metaDescription: [/notifiche dei tuoi pagamenti/, /open source/],
     banned: [/migliore amico/i, /\bgioc(o|hi)\b/i, /Inizia gratis/i],
-    overclaims: [/non possa trapelare/i, /non possiamo vedere/i, /a riposo/i],
+    overclaims: [/non possa trapelare/i, /a riposo/i],
     privacyAnswer:
-      "I tuoi dati sono cifrati end-to-end sul tuo dispositivo: nessun altro può leggerli, nemmeno Wambito.",
+      "Per questo non potremmo vendere i tuoi dati nemmeno se volessimo: per come è progettato Wambito, non possiamo vederli.",
     faq: "Domande frequenti",
     signIn: "Entra",
     toggleToDay: "Passa alla modalità giorno",
@@ -145,7 +146,7 @@ const LOCALES = [
     openSourcePerk: "Código aberto",
     removedQuestions: ["Para onde vai todo o meu dinheiro?", "Quanto me custa viver?"],
     cta: "Começa agora",
-    demoCta: "Experimenta sem conta",
+    demoCta: "Demo",
     soon: "Em breve",
     ways: ["App para Android", "App para iOS"],
     android: { cta: "Do GitHub" },
@@ -153,12 +154,12 @@ const LOCALES = [
     importQuestion: "Posso trazer o meu histórico de outras apps?",
     freeQuestion: "É grátis?",
     freeAnswer: "Sim, e vai ser sempre.",
-    openSource: { title: "Código aberto", cta: "Ver o código no GitHub" },
+    openQuestion: "É de código aberto?",
     metaDescription: [/notificações dos teus pagamentos/, /código aberto/],
     banned: [/melhor amigo/i, /\bjogos?\b/i, /Começa grátis/i],
-    overclaims: [/não possa vazar/i, /não podemos ver/i, /em repouso/i],
+    overclaims: [/não possa vazar/i, /em repouso/i],
     privacyAnswer:
-      "Os teus dados são encriptados de ponta a ponta no teu dispositivo: mais ninguém os consegue ler, nem mesmo o Wambito.",
+      "Por isso, não podíamos vender os teus dados nem que quiséssemos: pela forma como o Wambito é feito, não os conseguimos ver.",
     faq: "Perguntas frequentes",
     signIn: "Entrar",
     toggleToDay: "Mudar para o modo dia",
@@ -937,7 +938,7 @@ for (const l of LOCALES) {
       await expect(answer).toContainText("Buddy");
     });
 
-    test("free forever and open source: the FAQ and the section link to the code", async ({
+    test("free forever and open source: both in the FAQ, no section of its own", async ({
       page,
     }) => {
       await page.goto(l.path);
@@ -946,18 +947,19 @@ for (const l of LOCALES) {
         .filter({ has: page.getByText(l.freeQuestion, { exact: true }) });
       await free.locator("summary").click();
       await expect(free).toContainText(l.freeAnswer);
-      await expect(free.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", GITHUB);
 
-      const section = page.locator("#open-source");
-      await expect(section.getByRole("heading", { level: 2 })).toHaveText(l.openSource.title);
-      await expect(section).toContainText("AGPL-3.0");
-      const code = section.getByRole("link", { name: l.openSource.cta });
+      const open = page
+        .locator("#faq details")
+        .filter({ has: page.getByText(l.openQuestion, { exact: true }) });
+      await open.locator("summary").click();
+      await expect(open).toContainText("AGPL-3.0");
+      const code = open.getByRole("link", { name: "GitHub" });
       await expect(code).toHaveAttribute("href", GITHUB);
       await expect(code).toHaveAttribute("target", "_blank");
       await expect(code).toHaveAttribute("rel", "noopener");
       await expect(code.locator(".sr-only")).toHaveText(l.newTab);
-      // Then the FAQ: no "what's next" section between them.
-      expect(await section.evaluate((el) => el.nextElementSibling?.id)).toBe("faq");
+
+      await expect(page.locator("#open-source")).toHaveCount(0);
     });
 
     test("no what's next section: the header and the footer lead to the roadmap", async ({
@@ -1099,34 +1101,22 @@ for (const l of LOCALES) {
       await expectFitsTheViewport(page);
     });
 
-    test("shows Wambi jumping for joy, still, by the feature grid's title, not in the hero", async ({
-      page,
-    }) => {
+    test("shows no Wambi in the hero or by the feature grid's title", async ({ page }) => {
       await page.goto(l.path);
       await expect(page.locator("#hero .lk-wambi")).toHaveCount(0);
-      const wambi = page.locator("#how h2 [data-wambi-spot='how']");
-      await expect(wambi).toBeVisible();
-      await expect(wambi).toHaveAttribute("aria-hidden", "true");
-      const sprite = wambi.locator(".lk-wambi-sprite");
-      await expect(sprite).toHaveCSS("background-image", /\/wambi\/celebrate\.webp/);
-      // Frame 4 of the celebration (fists up), held: no sheet playing, nothing moving.
-      await expect(sprite).not.toHaveClass(/is-playing/);
-      expect(await sprite.evaluate((el) => el.getAnimations().length)).toBe(0);
-      await expect(sprite).toHaveCSS("background-position", "0% 100%");
+      await expect(page.locator("#how .lk-wambi, #how [data-wambi-spot]")).toHaveCount(0);
     });
 
-    test("keeps Wambi only by the grid's title and in the closing, both standing still", async ({
-      page,
-    }) => {
+    test("keeps Wambi only in the closing, standing still", async ({ page }) => {
       await page.goto(l.path);
-      // Two spots, and no other Wambi anywhere in the page (not even in the demo chips).
+      // One spot, and no other Wambi anywhere in the page (not even in the demo chips).
       expect(
         await page
           .locator("[data-wambi-spot]")
           .evaluateAll((spots) => spots.map((spot) => (spot as HTMLElement).dataset.wambiSpot)),
-      ).toEqual(["how", "closing"]);
-      // The grid title's sprite (still) and the closing's resting picture.
-      await expect(page.locator("main .lk-wambi")).toHaveCount(1);
+      ).toEqual(["closing"]);
+      // Only the closing's resting picture: no sprite anywhere.
+      await expect(page.locator("main .lk-wambi")).toHaveCount(0);
       await expect(page.locator("#capture .lk-capture-notif").first()).toBeVisible();
       // The closing shows him resting, eyes closed: one still picture.
       const closing = page.locator("[data-wambi-spot='closing'] img");
@@ -1143,10 +1133,13 @@ for (const l of LOCALES) {
       await expect(cta).toHaveAccessibleName(new RegExp(`^${l.cta}`));
       const [seat, wambi] = [await cta.boundingBox(), await closing.boundingBox()];
       if (!seat || !wambi) throw new Error("no closing seat");
+      // Big enough to read as the page's sign-off: at least 150px, even on a phone.
+      expect(wambi.width).toBeGreaterThanOrEqual(150);
       expect(wambi.y).toBeLessThan(seat.y);
       expect(wambi.y + wambi.height).toBeGreaterThan(seat.y);
+      // His legs sit a little right of the button's centre (12% of his width), still over the gap.
       const legs = wambi.x + wambi.width * 0.66;
-      expect(Math.abs(legs - (seat.x + seat.width / 2))).toBeLessThan(4);
+      expect(Math.abs(legs - (seat.x + seat.width / 2 + wambi.width * 0.12))).toBeLessThan(4);
       expect(
         await cta.evaluate((el) => {
           const box = el.getBoundingClientRect();
@@ -1160,6 +1153,114 @@ for (const l of LOCALES) {
 
 test.describe("landing with JavaScript", () => {
   test.use({ javaScriptEnabled: true });
+
+  for (const width of [375, 1280]) {
+    test(`bring your history at ${width}px: the file, an arrow down, then the count, one after the other`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/");
+      const card = page.locator("#how li", { has: page.locator(".lk-landing-file") });
+      const [file, arrow, count] = [
+        card.locator(".lk-landing-file"),
+        card.locator(".lk-landing-arrow"),
+        card.locator(".lk-landing-imported"),
+      ];
+      await card.scrollIntoViewIfNeeded();
+      // The count waits for the file and the arrow before it shows up and runs.
+      await expect(count).toHaveAttribute("data-state", "waiting");
+      await expect(count).toHaveAttribute("data-state", "done", { timeout: 6000 });
+      // Stacked and centred: the file on top, the arrow below it, pointing down, the count under it.
+      const [a, b, c] = [
+        await file.boundingBox(),
+        await arrow.boundingBox(),
+        await count.boundingBox(),
+      ];
+      if (!a || !b || !c) throw new Error("no import illustration");
+      expect(b.y).toBeGreaterThanOrEqual(a.y + a.height - 1);
+      expect(c.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+      expect(Math.abs(a.x + a.width / 2 - (c.x + c.width / 2))).toBeLessThan(4);
+      expect(await arrow.evaluate((el) => getComputedStyle(el).rotate)).toBe("90deg");
+    });
+  }
+
+  test("at 1280px every feature card's illustration fills the card under its text, so a row lines up", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/");
+    const cards = page.locator("#how .lk-landing-cards > li");
+    await expect(cards).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
+      const card = cards.nth(i);
+      const [box, text, demo] = [
+        await card.boundingBox(),
+        await card.locator("> p").boundingBox(),
+        await card.locator(".lk-landing-demo").boundingBox(),
+      ];
+      if (!box || !text || !demo) throw new Error(`no card ${i}`);
+      // No empty band: the illustration's box starts right under the text and ends at the foot.
+      expect(demo.y - (text.y + text.height)).toBeLessThan(40);
+      expect(box.y + box.height - (demo.y + demo.height)).toBeLessThan(40);
+    }
+    // Wherever the scroll stops, the cards of a row sit at the same height (they rise together).
+    for (const row of [
+      [0, 1, 2],
+      [3, 4],
+    ]) {
+      await cards.nth(row[0] ?? 0).evaluate((el) => el.scrollIntoView({ block: "end" }));
+      await page.waitForTimeout(100);
+      const tops = await Promise.all(
+        row.map(async (i) => (await cards.nth(i).boundingBox())?.y ?? 0),
+      );
+      expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
+    }
+    // Five cards: the second row's two sit in the middle, under the gaps of the first row.
+    const [a, c, d, e] = await Promise.all([0, 2, 3, 4].map((i) => cards.nth(i).boundingBox()));
+    if (!a || !c || !d || !e) throw new Error("no cards");
+    const middle = (a.x + c.x + c.width) / 2;
+    expect(Math.abs((d.x + e.x + e.width) / 2 - middle)).toBeLessThan(2);
+  });
+
+  for (const theme of ["night", "day"] as const) {
+    test(`two cards show real app screens in phones: insights and budgets (${theme})`, async ({
+      page,
+    }) => {
+      await page.addInitScript((value) => localStorage.setItem("wambito.theme", value), theme);
+      await page.goto("/");
+      const phones = page.locator("#how .lk-landing-phone");
+      await expect(phones).toHaveCount(2);
+      for (const [index, shot, layer] of [
+        [0, "insights", ".lk-landing-screen-ring"],
+        [1, "budgets", ".lk-landing-screen-bars"],
+      ] as const) {
+        const phone = phones.nth(index);
+        await phone.scrollIntoViewIfNeeded();
+        // Only the theme in use is shown, and it loads: the screen and what moves over it.
+        const screen = phone.locator(`.lk-landing-screen.is-${theme}`);
+        await expect(screen).toBeVisible();
+        await expect(phone.locator(".lk-landing-screen:visible")).toHaveCount(1);
+        for (const img of await screen.locator("img").all()) {
+          await expect
+            .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+            .toBeGreaterThan(0);
+        }
+        await expect(screen.locator(".lk-landing-screen-shot")).toHaveAttribute(
+          "src",
+          `/landing/${shot}-es-${theme}.webp`,
+        );
+        // The moving layer sits inside the screen.
+        const [base, over] = [
+          await screen.locator(".lk-landing-screen-shot").boundingBox(),
+          await screen.locator(layer).boundingBox(),
+        ];
+        if (!base || !over) throw new Error(`no ${shot} screen or layer`);
+        expect(over.x).toBeGreaterThanOrEqual(base.x);
+        expect(over.x + over.width).toBeLessThanOrEqual(base.x + base.width + 1);
+        expect(over.y).toBeGreaterThanOrEqual(base.y);
+      }
+    });
+  }
 
   test("the header's language switch opens the same page in another language", async ({ page }) => {
     await page.goto("/");
@@ -1744,8 +1845,8 @@ for (const l of LOCALES) {
       await expect(section.getByRole("heading", { level: 2, name: c.card })).toBeVisible();
       await expect(section.locator(".lk-landing-soon")).toHaveCount(0);
       await expect(section.getByRole("link", { name: c.link })).toHaveAttribute("href", c.path);
-      // The feature grid holds six cards, none of them the capture any more.
-      await expect(page.locator("#how ul.is-how > li")).toHaveCount(6);
+      // The feature grid holds five cards: none of them the capture, nor signing in (the FAQ's).
+      await expect(page.locator("#how ul.is-how > li")).toHaveCount(5);
     });
 
     test("the page works without JavaScript: five steps, five scenes, the soon line", async ({
@@ -1765,6 +1866,40 @@ for (const l of LOCALES) {
       ).toHaveAttribute("href", CAPTURE[l.other.lang].path);
     });
 
+    test("the how-it-works page on a computer: each step's text beside its picture, sides taking turns", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(c.path);
+      await expectFitsTheViewport(page);
+      const steps = page.locator(".lk-capture-steps > li");
+      await expect(steps).toHaveCount(5);
+      const sides: string[] = [];
+      for (const i of [0, 1, 2, 3]) {
+        const step = steps.nth(i);
+        const [title, demo] = [
+          await step.locator("h2").boundingBox(),
+          await step.locator(".lk-capture-demo").boundingBox(),
+        ];
+        if (!title || !demo) throw new Error(`no step ${i}`);
+        // Side by side: they overlap in height, not in width.
+        expect(demo.y).toBeLessThan(title.y + title.height);
+        const textLeft = title.x < demo.x;
+        expect(textLeft ? title.x + title.width <= demo.x : demo.x + demo.width <= title.x).toBe(
+          true,
+        );
+        sides.push(textLeft ? "text-left" : "text-right");
+      }
+      expect(sides).toEqual(["text-left", "text-right", "text-left", "text-right"]);
+      // The last step has no picture of its own: its text sits in the middle.
+      const last = steps.nth(4);
+      const [card, lastTitle] = [await last.boundingBox(), await last.locator("h2").boundingBox()];
+      if (!card || !lastTitle) throw new Error("no last step");
+      expect(Math.abs(lastTitle.x + lastTitle.width / 2 - (card.x + card.width / 2))).toBeLessThan(
+        4,
+      );
+    });
+
     test.describe("at 320px", () => {
       test.use({ viewport: { width: 320, height: 700 } });
 
@@ -1774,6 +1909,26 @@ for (const l of LOCALES) {
         await page.goto(l.path);
         await expectFitsTheViewport(page);
       });
+    });
+
+    test("on a phone the picture comes first, then the title; on a desktop, side by side", async ({
+      page,
+    }) => {
+      const top = async () => {
+        const [picture, title] = [
+          await page.locator("#capture .lk-landing-capture-play").boundingBox(),
+          await page.locator("#capture h2").boundingBox(),
+        ];
+        if (!picture || !title) throw new Error("no capture picture or title");
+        return { picture, title };
+      };
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto(l.path);
+      const phone = await top();
+      expect(phone.picture.y + phone.picture.height).toBeLessThanOrEqual(phone.title.y);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const desktop = await top();
+      expect(desktop.title.x).toBeLessThan(desktop.picture.x);
     });
   });
 }

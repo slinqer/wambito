@@ -143,7 +143,7 @@
       "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
       "cta": "Get started",
       "cta_soon": "Coming soon · Follow on GitHub",
-      "cta_demo": "Try it without an account"
+      "cta_demo": "Demo"
     },
     "ways": {
       "title": "Use it your way",
@@ -160,30 +160,19 @@
     },
     "how": {
       "title": "Your whole month, in one app.",
-      "demo_categories": {
-        "groceries": "Groceries",
-        "going_out": "Going out",
-        "home": "Home",
-        "transport": "Getting around"
-      },
       "spend": {
         "title": "See where it goes",
-        "body": "Every expense lands in its category, so at a glance you know what living costs you.",
-        "demo_label": "This month"
+        "body": "Every expense lands in its category, so at a glance you know what living costs you."
       },
       "budgets": {
         "title": "Budgets that give you a heads-up",
-        "body": "The bars change color before you go over, not after.",
-        "demo_remaining": "{amount} left"
+        "body": "The bars change color before you go over, not after."
       },
-      "recurring": {
-        "title": "Fixed payments, no surprises",
-        "body": "Rent, subscriptions and the gym, with a reminder on the day they're due.",
-        "demo": {
-          "rent": "Rent",
-          "streaming": "Netflix",
-          "gym": "Gym"
-        },
+      "subscriptions": {
+        "title": "Your subscriptions, under control",
+        "body": "Netflix, Spotify, the gym: see what you pay each month, with a reminder on the day they're due.",
+        "demo_label": "Subscriptions",
+        "demo_total": "{amount} a month",
         "demo_due": "{days, plural, one {Due tomorrow} other {Due in # days}}"
       },
       "encryption": {
@@ -197,12 +186,8 @@
         "title": "Bring your history",
         "body": "Import your transactions from other apps: Budge today, Buddy and others soon.",
         "demo_file": "budge.csv",
-        "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}"
-      },
-      "passwords": {
-        "title": "Sign in without passwords",
-        "body": "With a code sent to your email, or your fingerprint.",
-        "demo_or": "or"
+        "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}",
+        "soon": "Soon"
       }
     },
     "agent": {
@@ -286,16 +271,11 @@
         "other_income": "Other income"
       }
     },
-    "open_source": {
-      "title": "Open source",
-      "body": "Anyone can read Wambito's code: nothing in it is hidden. It's free software, licensed under the AGPL-3.0.",
-      "cta": "View the code on GitHub"
-    },
     "faq": {
       "title": "Frequently asked questions",
       "what": {
         "q": "What is Wambito?",
-        "a": "An app for your monthly budget that doesn't feel like homework. You log what you spend, see what's left in each category, and Wambi, a gold coin with plenty of personality, keeps you company: it cheers when you log something and gives you a heads-up when a category is filling up."
+        "a": "An app for keeping track of your spending that doesn't feel like homework. You log what you spend, or Wambi logs it for you, and you see where your money goes each month. If you like, you set a limit per category. Wambi, a gold coin with plenty of personality, keeps you company: it cheers when you log something and gives you a heads-up when a category is filling up."
       },
       "import": {
         "q": "Can I bring my history from other apps?",
@@ -303,19 +283,19 @@
       },
       "passwords": {
         "q": "Why doesn't it ask for a password?",
-        "a": "Because you don't need one. You sign in with a 6-digit code or a link sent to your email and, if you like, with a passkey: your fingerprint, your face or your phone's screen lock. No password to remember."
+        "a": "Because one more password wouldn't make you safer: passwords get forgotten, reused across apps and stolen. You sign in with a 6-digit code or a link sent to your email, or with a passkey: your fingerprint, your face or your phone's screen lock. A passkey is safer than a password: it can't be guessed, it never reaches our servers and it doesn't work on a fake page."
       },
       "privacy": {
         "q": "What do you do with my data?",
-        "a": "Your data is end-to-end encrypted on your device: no one else can read it, not even Wambito. We never sell it or share it with advertisers. You can export it or delete your account whenever you want. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
+        "a": "Your data is end-to-end encrypted: it is encrypted on your device, with a key only you hold, before it leaves it. Our servers only ever receive encrypted text they can't read. So we couldn't sell your data even if we wanted to: by design, we can't see it. You can export it or delete your account whenever you want. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
       },
       "free": {
         "q": "Is it free?",
-        "a": "Yes, and it always will be. Wambito is free and open source: all the code is on <github>GitHub</github> for anyone to read. We never ask for a card."
+        "a": "Yes, and it always will be. We never ask for a card."
       },
-      "languages": {
-        "q": "Which languages is it in?",
-        "a": "Spanish, English, Italian and Portuguese. Switch whenever you like in Settings, and amounts and dates follow your language's format."
+      "open": {
+        "q": "Is it open source?",
+        "a": "Yes. Anyone can read Wambito's code on <github>GitHub</github>: nothing in it is hidden. It's free software, licensed under the AGPL-3.0."
       }
     },
     "closing": {

@@ -3,7 +3,7 @@ import { expectNoAxeViolations } from "./helpers.ts";
 
 /**
  * The demo without an account (spec §2.6b), against `pnpm dev` alone: no API, no database. From
- * the landing's "Pruébalo sin cuenta" a visitor lands in Valentina's invented month, adds an
+ * the landing's "Demo" a visitor lands in Valentina's invented month, adds an
  * expense, sees what is left drop, and a reload puts everything back. Not one request leaves for
  * `/api/` on the way (no session check either): the demo's backend lives in the page.
  */
@@ -11,7 +11,7 @@ import { expectNoAxeViolations } from "./helpers.ts";
 const LANG = {
   es: {
     landing: "/",
-    cta: "Pruébalo sin cuenta",
+    cta: "Demo",
     banner: "Estás en el demo: los datos son inventados y se borran al recargar.",
     createAccount: "Crear mi cuenta",
     left: "Te quedan este mes",
@@ -42,7 +42,7 @@ const LANG = {
   },
   en: {
     landing: "/en",
-    cta: "Try it without an account",
+    cta: "Demo",
     banner: "You're in the demo: the data is made up and goes away when you reload.",
     createAccount: "Create my account",
     left: "Left this month",
@@ -101,7 +101,7 @@ async function expectLinksStayInDemo(page: Page) {
 
 async function enterFromLanding(page: Page, l: Lang) {
   await page.goto(l.landing);
-  await page.locator("#hero").getByRole("link", { name: l.cta }).click();
+  await page.locator("#hero").getByRole("link", { name: l.cta, exact: true }).click();
   await expect(page).toHaveURL(/\/demo\?lang=(es|en)$/);
   const banner = page.getByRole("complementary", { name: "Demo" });
   await expect(banner).toContainText(l.banner);

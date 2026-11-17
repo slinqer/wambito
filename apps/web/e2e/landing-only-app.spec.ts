@@ -23,7 +23,7 @@ const LOCALES = [
     locale: "es",
     path: "/",
     cta: "Empieza ahora",
-    demoCta: "Pruébalo sin cuenta",
+    demoCta: "Demo",
     navCta: "Entrar",
     soon: "Pronto",
     androidTitle: "App para Android",
@@ -38,7 +38,7 @@ const LOCALES = [
     locale: "en",
     path: "/en",
     cta: "Get started",
-    demoCta: "Try it without an account",
+    demoCta: "Demo",
     navCta: "Sign in",
     soon: "Soon",
     androidTitle: "Android app",
@@ -72,9 +72,7 @@ async function expectAppLink(link: ReturnType<Page["locator"]>, locale: string) 
 
 for (const l of LOCALES) {
   test.describe(`landing-only with the app (${l.locale})`, () => {
-    test("the hero's \"try it without an account\" opens the demo on the app's origin", async ({
-      page,
-    }) => {
+    test("the hero's \"Demo\" opens the demo on the app's origin", async ({ page }) => {
       await page.goto(l.path);
       const demo = page.locator("#hero").getByRole("link", { name: l.demoCta, exact: true });
       await expect(demo).toHaveAttribute("href", `${APP}/demo?lang=${l.locale}`);

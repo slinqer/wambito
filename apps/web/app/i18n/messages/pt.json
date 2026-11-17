@@ -143,7 +143,7 @@
       "description": "<lead>Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.</lead>",
       "cta": "Começa agora",
       "cta_soon": "Em breve · Segue no GitHub",
-      "cta_demo": "Experimenta sem conta"
+      "cta_demo": "Demo"
     },
     "ways": {
       "title": "Usa-o como preferires",
@@ -160,30 +160,19 @@
     },
     "how": {
       "title": "Todo o teu mês, numa só app.",
-      "demo_categories": {
-        "groceries": "Supermercado",
-        "going_out": "Saídas",
-        "home": "Casa",
-        "transport": "Transportes"
-      },
       "spend": {
         "title": "Vê para onde vai o teu dinheiro",
-        "body": "Cada despesa cai na sua categoria, e num relance sabes quanto te custa viver.",
-        "demo_label": "Este mês"
+        "body": "Cada despesa cai na sua categoria, e num relance sabes quanto te custa viver."
       },
       "budgets": {
         "title": "Orçamentos que te avisam",
-        "body": "As barras mudam de cor antes de te excederes, não depois.",
-        "demo_remaining": "Restam {amount}"
+        "body": "As barras mudam de cor antes de te excederes, não depois."
       },
-      "recurring": {
-        "title": "Pagamentos fixos sem surpresas",
-        "body": "A renda, as subscrições e o ginásio, com um aviso no dia em que vencem.",
-        "demo": {
-          "rent": "Renda",
-          "streaming": "Netflix",
-          "gym": "Ginásio"
-        },
+      "subscriptions": {
+        "title": "As tuas subscrições, sob controlo",
+        "body": "Netflix, Spotify, o ginásio: vês quanto pagas por mês e avisamos-te no dia em que vencem.",
+        "demo_label": "Subscrições",
+        "demo_total": "{amount} por mês",
         "demo_due": "{days, plural, one {Vence amanhã} other {Vence daqui a # dias}}"
       },
       "encryption": {
@@ -197,12 +186,8 @@
         "title": "Traz o teu histórico",
         "body": "Importa os teus movimentos de outras apps: hoje do Budge, e em breve do Buddy e de outras.",
         "demo_file": "budge.csv",
-        "demo_rows": "{count, plural, one {# movimento pronto} other {# movimentos prontos}}"
-      },
-      "passwords": {
-        "title": "Entra sem palavras-passe",
-        "body": "Com um código que te chega por email, ou com a tua impressão digital.",
-        "demo_or": "ou"
+        "demo_rows": "{count, plural, one {# movimento pronto} other {# movimentos prontos}}",
+        "soon": "Em breve"
       }
     },
     "agent": {
@@ -286,16 +271,11 @@
         "other_income": "Outras receitas"
       }
     },
-    "open_source": {
-      "title": "Código aberto",
-      "body": "Qualquer pessoa pode ler o código de Wambito: não há nada escondido nele. É software livre, com licença AGPL-3.0.",
-      "cta": "Ver o código no GitHub"
-    },
     "faq": {
       "title": "Perguntas frequentes",
       "what": {
         "q": "O que é Wambito?",
-        "a": "Uma app para levares o orçamento do mês sem que pareça um trabalho de casa. Registas o que gastas, vês quanto te resta em cada categoria e Wambi, uma moeda de ouro com muita personalidade, faz-te companhia: celebra quando registas e avisa-te quando algo está a encher."
+        "a": "Uma app para acompanhares os teus gastos sem que pareça um trabalho de casa. Registas o que gastas, ou o Wambi regista por ti, e vês para onde vai o teu dinheiro todos os meses. Se quiseres, pões um limite por categoria. Wambi, uma moeda de ouro com muita personalidade, faz-te companhia: celebra quando registas e avisa-te quando algo está a encher."
       },
       "import": {
         "q": "Posso trazer o meu histórico de outras apps?",
@@ -303,19 +283,19 @@
       },
       "passwords": {
         "q": "Porque é que não me pede palavra-passe?",
-        "a": "Porque não precisas dela. Entras com um código de 6 dígitos ou com uma ligação que te chega ao email e, se quiseres, com uma passkey: a tua impressão digital, a tua cara ou o bloqueio do telemóvel. Não há palavra-passe para decorar."
+        "a": "Porque mais uma palavra-passe não te protege melhor: esquece-se, repete-se entre apps e pode ser roubada. Entras com um código de 6 dígitos ou com uma ligação que te chega ao email, ou com uma passkey: a tua impressão digital, a tua cara ou o bloqueio do telemóvel. Uma passkey é mais segura do que uma palavra-passe: não se consegue adivinhar, nunca chega aos nossos servidores e não funciona numa página falsa."
       },
       "privacy": {
         "q": "O que fazem com os meus dados?",
-        "a": "Os teus dados são encriptados de ponta a ponta no teu dispositivo: mais ninguém os consegue ler, nem mesmo o Wambito. Nunca os vendemos nem os partilhamos com anunciantes. Podes exportá-los ou apagar a tua conta quando quiseres. O código é aberto: qualquer pessoa pode verificar como são encriptados. Os detalhes estão na <privacy>política de privacidade</privacy>."
+        "a": "Os teus dados são encriptados de ponta a ponta: são encriptados no teu dispositivo, com uma chave que só tu tens, antes de saírem dele. Aos nossos servidores só chega texto encriptado, que não conseguimos ler. Por isso, não podíamos vender os teus dados nem que quiséssemos: pela forma como o Wambito é feito, não os conseguimos ver. Podes exportá-los ou apagar a tua conta quando quiseres. O código é aberto: qualquer pessoa pode verificar como são encriptados. Os detalhes estão na <privacy>política de privacidade</privacy>."
       },
       "free": {
         "q": "É grátis?",
-        "a": "Sim, e vai ser sempre. Wambito é grátis e de código aberto: todo o código está no <github>GitHub</github> e qualquer pessoa o pode rever. Não te pedimos cartão."
+        "a": "Sim, e vai ser sempre. Não te pedimos cartão."
       },
-      "languages": {
-        "q": "Em que idiomas está?",
-        "a": "Em espanhol, inglês, italiano e português. Mudas de idioma quando quiseres nas Definições, e os valores e as datas seguem o formato do teu idioma."
+      "open": {
+        "q": "É de código aberto?",
+        "a": "Sim. Qualquer pessoa pode ler o código de Wambito no <github>GitHub</github>: não há nada escondido nele. É software livre, com licença AGPL-3.0."
       }
     },
     "closing": {

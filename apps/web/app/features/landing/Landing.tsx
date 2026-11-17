@@ -12,7 +12,6 @@ import { Hero } from "./Hero.tsx";
 import { HowItWorks } from "./HowItWorks.tsx";
 import { appLinkProps } from "./links.ts";
 import { NewTabHint } from "./NewTabHint.tsx";
-import { OpenSource } from "./OpenSource.tsx";
 import { useButtonGlow } from "./pointer-glow.ts";
 import { SiteHeader } from "./SiteHeader.tsx";
 import { UseItYourWay } from "./UseItYourWay.tsx";
@@ -95,7 +94,6 @@ export function Landing() {
         <HowItWorks />
         <AgentDemo />
         <UseItYourWay />
-        <OpenSource />
         <Faq />
         <Closing />
       </main>

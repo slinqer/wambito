@@ -29,7 +29,7 @@ const LOCALES = [
       "Wambito está en construcción, en abierto. Mira cómo avanza en GitHub y prueba la app en cuanto abra.",
     oldClosing: /Crea tu cuenta/,
     oldCtas: ["Empieza ahora", "Entrar", "Empezar"],
-    demoCta: "Pruébalo sin cuenta",
+    demoCta: "Demo",
     banned: [/\bjueg(o|a)\b/i],
     toggleToDay: "Cambiar a modo día",
   },
@@ -46,7 +46,7 @@ const LOCALES = [
       "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens.",
     oldClosing: /Create your account/,
     oldCtas: ["Get started", "Sign in", "Start"],
-    demoCta: "Try it without an account",
+    demoCta: "Demo",
     banned: [/\bgames?\b/i],
     toggleToDay: "Switch to day mode",
   },
@@ -345,7 +345,7 @@ for (const l of LOCALES) {
       await page.goto(l.path);
       const text = await page.locator("body").evaluate((body) => body.textContent ?? "");
       for (const pattern of l.banned) expect(text).not.toMatch(pattern);
-      await expect(page.locator("#open-source").getByRole("link")).toHaveAttribute("href", GITHUB);
+      await expect(page.locator("#faq a", { hasText: "GitHub" })).toHaveAttribute("href", GITHUB);
     });
 
     test("canonical, hreflang and Open Graph use the configured origin", async ({ page }) => {
@@ -607,6 +607,8 @@ test.describe("landing-only build output", () => {
         "favicon.svg",
         "index.html",
         "it",
+        // The app's real insights screen in the "See where it goes" phone (pnpm landing-screens).
+        "landing",
         "wambi",
         "og-en.png",
         "og-es.png",
