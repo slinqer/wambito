@@ -99,14 +99,15 @@ export interface EncryptedStore extends FinanceStore {
   ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
   /**
    * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
-   * for records the server has (version above 0, not deleted) sealed under a key version below
-   * `current` and with no outbox entry, until `limit` reseal entries are pending (those already
-   * pending count). Returns how many it added. Notifies nobody (the engine's own write).
+   * for records the server has (version above 0) sealed under a key version below `current` and
+   * with no outbox entry, until `limit` reseal entries are pending (those already
+   * pending count). Tombstones that hold a body (a remote delete with `tombstoneBody`, or a local
+   * delete) count as records; the push sends their entry as a delete. Returns how many it added. Notifies nobody (the engine's own write).
    */
   queueReseal(current: number, limit: number): Promise<number>;
   /**
-   * The key versions the server copies of the local records (not deleted, pushed) are under, and
-   * those of quarantined records (they may still be retried).
+   * The key versions the server copies of the local records (pushed; a tombstone only when it holds
+   * a body) are under, and those of quarantined records (they may still be retried).
    */
   keyVersionsInUse(): Promise<Set<number>>;
   /**

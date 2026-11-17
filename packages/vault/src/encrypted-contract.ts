@@ -326,6 +326,114 @@ export function encryptedStoreContract(
     });
   });
 
+  describe(`${name}: a remote tombstone with a body`, () => {
+    const remote = (version: number, keyV: number) =>
+      ({ origin: "remote", version, keyV }) as const;
+
+    it("a remote delete with tombstoneBody creates a tombstone for an unknown id", async () => {
+      const store = await make();
+      const listener = vi.fn();
+      store.subscribe(listener);
+      await store.delete("category", "z", { ...remote(6, 3), tombstoneBody: category("Gone") });
+      expect(await store.get("category", "z")).toBeUndefined();
+      expect(await store.get("category", "z", { includeDeleted: true })).toMatchObject({
+        deleted: true,
+        body: { name: "Gone" },
+      });
+      expect(await store.getRaw("category", "z")).toMatchObject({
+        deleted: true,
+        version: 6,
+        keyV: 3,
+      });
+      expect(await store.readOutbox(10)).toEqual([]);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("a remote delete without tombstoneBody still writes nothing for an unknown id", async () => {
+      const store = await make();
+      await store.delete("category", "z", remote(6, 3));
+      expect(await store.getRaw("category", "z")).toBeUndefined();
+    });
+
+    it("a remote delete with tombstoneBody replaces the local tombstone's body", async () => {
+      const store = await make();
+      await store.put("category", "a", category("Old"), remote(1, 1));
+      await store.delete("category", "a", { ...remote(2, 2), tombstoneBody: category("Server") });
+      expect(await store.getRaw("category", "a")).toMatchObject({
+        deleted: true,
+        version: 2,
+        keyV: 2,
+        body: { name: "Server" },
+      });
+      expect(await store.readOutbox(10)).toEqual([]);
+    });
+
+    it("a remote delete with tombstoneBody and skipIfPending leaves a pending local change alone", async () => {
+      const store = await make();
+      await store.put("category", "a", category("Local"));
+      await store.delete("category", "a", {
+        ...remote(4, 1),
+        skipIfPending: true,
+        tombstoneBody: category("Server"),
+      });
+      await store.delete("category", "b", {
+        ...remote(4, 1),
+        skipIfPending: true,
+        tombstoneBody: category("Server B"),
+      });
+      expect(await store.getRaw("category", "a")).toMatchObject({
+        version: 0,
+        deleted: false,
+        body: { name: "Local" },
+      });
+      expect(await store.getRaw("category", "b")).toMatchObject({ deleted: true, version: 4 });
+    });
+
+    it("a local delete ignores tombstoneBody", async () => {
+      const store = await make();
+      await store.put("category", "a", category("Mine"));
+      await store.delete("category", "a", { tombstoneBody: category("Other") });
+      expect(await store.getRaw("category", "a")).toMatchObject({ body: { name: "Mine" } });
+    });
+
+    it("keyVersionsInUse counts a pushed tombstone with a body", async () => {
+      const store = await make();
+      await store.delete("category", "z", { ...remote(3, 4), tombstoneBody: category("Gone") });
+      expect(await store.keyVersionsInUse()).toEqual(new Set([4]));
+    });
+
+    it("keyVersionsInUse does not count a pushed tombstone without a body", async () => {
+      const store = await make();
+      await store.put("category", "a", category("A"), remote(1, 1));
+      await store.delete("category", "a", remote(2, 7));
+      expect(await store.keyVersionsInUse()).toEqual(new Set());
+    });
+
+    it("queueReseal queues a pushed tombstone with a body under an older key, and its entry is a delete", async () => {
+      const store = await make();
+      await store.delete("category", "z", { ...remote(3, 1), tombstoneBody: category("Gone") });
+      await store.put("category", "y", category("Y"), remote(1, 1));
+      await store.delete("category", "y", remote(2, 1)); // no body: nothing to re-seal
+      expect(await store.queueReseal(2, 5)).toBe(1);
+      const entries = await store.readOutbox(10);
+      expect(entries.map((e) => [e.id, e.reseal, e.baseVersion])).toEqual([["z", true, 3]]);
+      expect(await store.get("category", "z", { includeDeleted: true })).toMatchObject({
+        deleted: true,
+      });
+      // Acked under the current key: it is no longer queued.
+      await store.ackOutbox("z", 4, entries[0]?.seq ?? 0, 2);
+      expect(await store.queueReseal(2, 5)).toBe(0);
+    });
+
+    it("queueReseal shares its limit between records and tombstones", async () => {
+      const store = await make();
+      await store.put("category", "a", category("A"), remote(1, 1));
+      await store.delete("category", "z", { ...remote(3, 1), tombstoneBody: category("Gone") });
+      expect(await store.queueReseal(2, 1)).toBe(1);
+      expect(await store.queueReseal(2, 1)).toBe(0);
+    });
+  });
+
   describe(`${name}: keys and closing`, () => {
     it("keeps keys by name, lists and deletes them", async () => {
       const store = await make();

@@ -15,6 +15,8 @@ interface Row {
   deleted: boolean;
   version: number;
   keyV: number;
+  /** A tombstone whose body is only a stale local copy: the server's holds none. */
+  bodiless?: true;
 }
 
 /** Everything a transaction may change; rows and entries are replaced, never edited in place. */
@@ -203,10 +205,22 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
       async delete(type: RecordType, id: string, opts?: WriteOptions) {
         const prev = table(type).get(id);
         const remote = opts?.origin === "remote";
+        const hasBody = remote && opts?.tombstoneBody !== undefined;
         if (!prev) {
-          // A tombstone of a record this store never opened: its quarantine rows go.
           if (remote) {
+            if (remoteBlocked(id, opts)) return;
             dirty();
+            if (hasBody) {
+              // A tombstone of a record this store never had, with its body: a tombstone row.
+              table(type).set(id, {
+                body: clone(opts?.tombstoneBody),
+                deleted: true,
+                version: opts?.version ?? 0,
+                keyV: opts?.keyV ?? 1,
+              });
+              wrote.value = true;
+            }
+            // Its quarantine rows go.
             clearAbandoned(type, id);
           }
           return;
@@ -214,11 +228,17 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
         if (!remote && prev.deleted) return;
         if (remote && remoteBlocked(id, opts)) return;
         dirty();
+        const { bodiless: _, ...rest } = prev;
         table(type).set(id, {
-          ...prev,
+          ...rest,
+          ...(hasBody ? { body: clone(opts?.tombstoneBody) } : {}),
           deleted: true,
           version: remote ? (opts?.version ?? prev.version) : prev.version,
           keyV: remote ? (opts?.keyV ?? prev.keyV) : prev.keyV,
+          // A remote delete without a body keeps the stale local copy, which is not the server's.
+          ...(remote && !hasBody && (!prev.deleted || prev.bodiless)
+            ? { bodiless: true as const }
+            : {}),
         });
         wrote.value = true;
         if (!remote) outboxFor(type, id, prev, true, [], prev.body);
@@ -310,14 +330,19 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
           if (room <= 0) break;
           for (const [id, row] of table(type)) {
             if (room <= 0) break;
-            if (row.deleted || row.version === 0 || row.keyV >= current || pending.has(id)) {
+            if (
+              (row.deleted && row.bodiless) ||
+              row.version === 0 ||
+              row.keyV >= current ||
+              pending.has(id)
+            ) {
               continue;
             }
             state.outbox.set(id, {
               id,
               type,
               baseVersion: row.version,
-              deleted: false,
+              deleted: row.deleted,
               touched: [],
               seq: nextSeq(),
               reseal: true,
@@ -333,7 +358,7 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
         const versions = new Set<number>();
         for (const type of RECORD_TYPES) {
           for (const row of table(type).values()) {
-            if (!row.deleted && row.version > 0) versions.add(row.keyV);
+            if (!(row.deleted && row.bodiless) && row.version > 0) versions.add(row.keyV);
           }
         }
         // A quarantined record may be retried under its version: keep that version's keys.

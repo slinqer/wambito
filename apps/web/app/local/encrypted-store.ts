@@ -185,19 +185,43 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       async delete(type: RecordType, id: string, opts?: WriteOptions) {
         const prev = await raw(type, id);
         const remote = opts?.origin === "remote";
+        const hasBody = remote && opts?.tombstoneBody !== undefined;
         if (!prev) {
-          // A tombstone of a record this browser never opened: its quarantine rows go.
-          if (remote) await clearAbandoned(type, id);
+          if (remote) {
+            if (await remoteBlocked(id, opts)) return;
+            if (hasBody) {
+              // A tombstone of a record this browser never had, with its body: a tombstone row.
+              await request(
+                store(type).put({
+                  id,
+                  body: opts?.tombstoneBody,
+                  deleted: true,
+                  version: opts?.version ?? 0,
+                  keyV: opts?.keyV ?? 1,
+                  n: await nextSeq(),
+                } satisfies StoredRow),
+              );
+              wrote.value = true;
+            }
+            // Its quarantine rows go.
+            await clearAbandoned(type, id);
+          }
           return;
         }
         if (!remote && prev.deleted) return;
         if (remote && (await remoteBlocked(id, opts))) return;
+        const { bodiless: _, ...rest } = prev;
         await request(
           store(type).put({
-            ...prev,
+            ...rest,
+            ...(hasBody ? { body: opts?.tombstoneBody } : {}),
             deleted: true,
             version: remote ? (opts?.version ?? prev.version) : prev.version,
             keyV: remote ? (opts?.keyV ?? prev.keyV) : prev.keyV,
+            // A remote delete without a body keeps the stale local copy, which is not the server's.
+            ...(remote && !hasBody && (!prev.deleted || prev.bodiless)
+              ? { bodiless: true as const }
+              : {}),
           } satisfies StoredRow),
         );
         wrote.value = true;
@@ -356,14 +380,19 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
           if (room <= 0) break;
           for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
             if (room <= 0) break;
-            if (row.deleted || row.version === 0 || row.keyV >= current || pending.has(row.id)) {
+            if (
+              (row.deleted && row.bodiless) ||
+              row.version === 0 ||
+              row.keyV >= current ||
+              pending.has(row.id)
+            ) {
               continue;
             }
             const entry: OutboxEntry = {
               id: row.id,
               type,
               baseVersion: row.version,
-              deleted: false,
+              deleted: row.deleted,
               touched: [],
               seq: ++seq,
               reseal: true,
@@ -381,7 +410,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         const versions = new Set<number>();
         for (const type of RECORD_TYPES) {
           for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
-            if (!row.deleted && row.version > 0) versions.add(row.keyV);
+            if (!(row.deleted && row.bodiless) && row.version > 0) versions.add(row.keyV);
           }
         }
         // A quarantined record may be retried under its version: keep that version's keys.

@@ -19,6 +19,8 @@ export interface StoredRow {
   version: number;
   /** The key version the server copy was sealed under. */
   keyV: number;
+  /** A tombstone whose body is only a stale local copy: the server's holds none. */
+  bodiless?: true;
   /** When it was first written: the order `list` returns. */
   n: number;
 }
