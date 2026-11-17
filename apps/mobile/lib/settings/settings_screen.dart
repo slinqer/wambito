@@ -25,6 +25,7 @@ import '../capture/capture_language.dart' show captureLanguage;
 import '../capture_auto/auto_capture_section.dart';
 import '../feedback/feedback.dart';
 import '../home/shell_navigation.dart';
+import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
 import '../theme/text_styles.dart';
@@ -35,6 +36,7 @@ import '../ui/manage_page.dart';
 import '../ui/page_header.dart';
 import '../ui/press_button.dart';
 import '../ui/press_link.dart';
+import '../ui/pressable.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import '../ui/web_text_field.dart';
@@ -451,6 +453,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
               ),
               // The widgets are Android's: iOS has none, so no setting about them.
+              if (defaultTargetPlatform == TargetPlatform.android &&
+                  ref.watch(widgetOnHomeProvider).value == false)
+                _AddWidgetRow(key: const Key('settings.addWidget')),
               if (defaultTargetPlatform == TargetPlatform.android)
                 SettingSwitch(
                   key: const Key('settings.hideAmount'),
@@ -567,6 +572,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const DeleteAccountCard(),
         ],
       ],
+    );
+  }
+}
+
+/// "Añadir widget": asks the launcher, or shows the steps; there only until a widget is on the home
+/// screen (Android).
+class _AddWidgetRow extends ConsumerWidget {
+  const _AddWidgetRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.lkColors;
+    return Pressable(
+      label: l10n.settingsAddWidget,
+      hint: l10n.settingsAddWidgetHint,
+      onPressed: () => unawaited(addWidget(context, ref)),
+      builder: (context, state) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          spacing: WambitoTokens.space3,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: WambitoTokens.space1,
+                children: [
+                  Text(l10n.settingsAddWidget, style: LkText.body.copyWith(color: colors.ink)),
+                  Text(
+                    l10n.settingsAddWidgetHint,
+                    style: LkText.fieldLabel.copyWith(
+                      color: colors.inkMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ExcludeSemantics(
+              child: Text('›', style: LkText.label.copyWith(color: colors.inkMuted)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

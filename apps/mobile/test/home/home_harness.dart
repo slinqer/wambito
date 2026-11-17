@@ -11,6 +11,7 @@ import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_header.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/home_screen.dart';
+import 'package:wambito/home/widget_pin.dart';
 import 'package:wambito/app.dart' show withAppHosts;
 import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/offline/pending_saves.dart';
@@ -82,6 +83,9 @@ Future<HomeHarness> pumpHome(
       // The phone does not qualify for the precise voice model, unless the test says so.
       if (!overrides.any((o) => o.origin == preciseEligibleProvider))
         preciseEligibleProvider.overrideWith((ref, locale) async => false),
+      // A widget is already on the home screen, so the card that offers one stays out of the way.
+      if (!overrides.any((o) => o.origin == widgetPinProvider))
+        widgetPinProvider.overrideWithValue(FakeWidgetPin()),
       homeRepositoryProvider.overrideWithValue(repo),
       if (!overrides.any((o) => '${o.origin}'.contains('reviewRepository')))
         reviewRepositoryProvider.overrideWithValue(FakeReviewRepository(repo)),

@@ -40,6 +40,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Android side of `wambito/device` (`MainActivity.kt`): `timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`, and the widget card's `widgetInstalled`, `widgetPinSupported`, `pinWidget` (`lib/home/widget_pin.dart`; they use the manifest's receivers, `widget/WidgetPinning.kt`, tested by `WidgetPinningTest`).
 - Storage: secure storage for session and settings; widget snapshot JSON under
   `wambito.widget.snapshot` in `HomeWidgetPreferences` (`lib/home/widget_snapshot.dart`).
+- `lib/home/widget_card.dart`: home's "Anota sin abrir la app" card (`WidgetCard`, key `home.widgetCard`, right after `ReviewHomeRow`). Shows on Android only, with at least one movement on screen, no Wambito widget on a home screen (`widgetOnHomeProvider`, asked again on the next app resume after a pin) and not put away ("Ahora no" keeps `wambito.widgetCard.closed` in secure storage). "Añadir widget" asks the launcher (`WidgetPin`), or opens the three-step sheet when it cannot; Settings has the same "Añadir widget" row (`settings.addWidget`) until a widget exists. Tests: `FakeWidgetPin` (`test/home/fakes.dart`, installed by default in `pumpHome` and `pumpSettingsApp`, so no card shows unless a test asks).
 - `lib/review/`: the inbox of transactions detected from notifications (`needsReview`). `reviewProvider`
   (`review_controller.dart`, read once, invalidated by home on refresh/resume) feeds home's
   "N gastos por revisar" row (`ReviewHomeRow`) and `/review` (`ReviewScreen`): Bien and Confirmar
@@ -421,7 +422,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
-  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; channel
+  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage key `wambito.widgetCard.closed`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
   Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;

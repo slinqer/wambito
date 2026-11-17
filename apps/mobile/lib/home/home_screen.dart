@@ -42,6 +42,7 @@ import 'home_widgets.dart';
 import 'wambi_line.dart';
 import 'wambi_face.dart';
 import 'nudges.dart';
+import 'widget_card.dart';
 import 'screen_error.dart';
 import 'shell_navigation.dart';
 
@@ -539,6 +540,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             reviewProvider.select((s) => (s.value ?? const []).isNotEmpty),
                           ))
                             const ReviewHomeRow(),
+                          // After the first movement, until a widget exists or it is put away.
+                          if (data.items.isNotEmpty &&
+                              ref.watch(widgetCardProvider.select((s) => s.value ?? false)))
+                            const WidgetCard(key: Key('home.widgetCard')),
                           ?_nudges(shown, l10n),
                         ] else
                           const HomeHeroPlaceholder(),
