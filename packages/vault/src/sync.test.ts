@@ -102,3 +102,32 @@ test("a sync engine pulls, opens and pushes over the memory store", async () => 
   );
   expect(opened).toMatchObject({ name: "Fun" });
 });
+
+test("a change the server leaves unanswered is parked and the run ends", async () => {
+  const keys = await deriveRecordKeys(generateDataKey());
+  const keyring = { current: 1, byVersion: new Map([[1, keys]]) };
+  let posts = 0;
+  const fakeFetch = (async (_input: string, init?: RequestInit) => {
+    if (init?.method === "POST") posts += 1;
+    const body = init?.method === "POST" ? { results: [] } : { records: [], next: null, latest: 0 };
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  const store = createMemoryEncryptedStore(USER);
+  const engine = createSyncEngine({
+    store,
+    fetch: fakeFetch,
+    userId: USER,
+    keyring,
+    refreshKeys: async () => keyring,
+    upgrade: false,
+  });
+  await store.put("category", C, category("Fun"));
+  // The memory store's write counter is the `seq` meta, as in IndexedDB: a change left pending
+  // (parked) is not taken for a write made during the run, so no further pass runs.
+  expect(await store.getMeta("seq")).toBe(1);
+  expect(await engine.run()).toMatchObject({ ok: true, pushed: 0, parked: [C] });
+  expect(posts).toBe(1);
+});

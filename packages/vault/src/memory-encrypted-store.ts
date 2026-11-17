@@ -376,7 +376,10 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
       });
       fire();
     },
-    getMeta: <T>(key: string) => serial(async () => clone(state.meta.get(key)) as T | undefined),
+    // `seq` is the write counter, as the IndexedDB store keeps it in its meta store: the sync
+    // engine reads it to tell writes made during a run from changes left pending.
+    getMeta: <T>(key: string) =>
+      serial(async () => (key === "seq" ? state.seq : clone(state.meta.get(key))) as T | undefined),
     setMeta: (key, value) =>
       serial(async () => {
         state.meta.set(key, clone(value));
