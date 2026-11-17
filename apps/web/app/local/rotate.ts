@@ -161,7 +161,8 @@ export async function checkRecoveryKey(options: KeysOptions & { text: string }):
  *    server lists (reported in `dropped`, with a forged attestation as `attestation`);
  * 3. a new DK at `keyV + 1`, and its wraps: one recovery, the kept devices (same id, ref and
  *    label, sealed to their public keys with fresh attestations; this browser's own with the
- *    public key it kept), the touched passkey. Assistants have no web wraps yet (stage 4).
+ *    public key it kept), the touched passkey. A rotation carries no assistant wraps: the server refuses them and revokes
+ *    every assistant of the account (stage 4), which then connects again.
  *
  * `commit()` then `POST /v2/keys/rotate`s them with the key link (the old DK sealed under the new one) (409 `key_version_mismatch` = `rotated_elsewhere`:
  * another device rotated first, nothing is kept), keeps the new version's record and dedupe keys

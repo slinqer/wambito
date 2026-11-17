@@ -107,6 +107,18 @@ void main() {
     },
   );
 
+  testWidgets('the body says that connected assistants are disconnected', (t) async {
+    final handle = t.ensureSemantics();
+    await pumpSheet(t, FakeSecurity(), hasPasskeys: true);
+    expect(
+      find.bySemanticsLabel(
+        RegExp('Connected assistants are disconnected and need connecting again'),
+      ),
+      findsOneWidget,
+    );
+    handle.dispose();
+  });
+
   testWidgets('without passkey wraps there is no note about fingerprints', (t) async {
     final security = FakeSecurity();
     await pumpSheet(t, security);
