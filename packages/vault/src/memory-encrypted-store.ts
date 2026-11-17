@@ -317,7 +317,15 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
         const entry = state.outbox.get(id);
         if (!entry) return;
         const row = table(entry.type).get(id);
-        if (row) table(entry.type).set(id, { ...row, version, keyV: keyV ?? row.keyV });
+        if (row) {
+          // Every push from now on carries the body the tombstone has.
+          const { bodiless: _, ...rest } = row;
+          table(entry.type).set(id, {
+            ...(row.deleted ? rest : row),
+            version,
+            keyV: keyV ?? row.keyV,
+          });
+        }
         if (entry.seq === seq) state.outbox.delete(id);
         else state.outbox.set(id, { ...entry, baseVersion: version });
       }),

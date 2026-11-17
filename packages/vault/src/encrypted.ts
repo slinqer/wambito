@@ -100,9 +100,10 @@ export interface EncryptedStore extends FinanceStore {
   /**
    * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
    * for records the server has (version above 0) sealed under a key version below `current` and
-   * with no outbox entry, until `limit` reseal entries are pending (those already
-   * pending count). Tombstones that hold a body (a remote delete with `tombstoneBody`, or a local
-   * delete) count as records; the push sends their entry as a delete. Returns how many it added. Notifies nobody (the engine's own write).
+   * with no outbox entry, until `limit` reseal entries are pending (those already pending count).
+   * Tombstones that hold a body (a remote delete with `tombstoneBody`, or a local delete) count as
+   * records; the push sends their entry as a delete. Returns how many it added. Notifies nobody
+   * (the engine's own write).
    */
   queueReseal(current: number, limit: number): Promise<number>;
   /**

@@ -416,13 +416,28 @@ export function encryptedStoreContract(
       await store.delete("category", "y", remote(2, 1)); // no body: nothing to re-seal
       expect(await store.queueReseal(2, 5)).toBe(1);
       const entries = await store.readOutbox(10);
-      expect(entries.map((e) => [e.id, e.reseal, e.baseVersion])).toEqual([["z", true, 3]]);
+      expect(entries.map((e) => [e.id, e.reseal, e.baseVersion, e.deleted])).toEqual([
+        ["z", true, 3, true],
+      ]);
       expect(await store.get("category", "z", { includeDeleted: true })).toMatchObject({
         deleted: true,
       });
       // Acked under the current key: it is no longer queued.
       await store.ackOutbox("z", 4, entries[0]?.seq ?? 0, 2);
       expect(await store.queueReseal(2, 5)).toBe(0);
+    });
+
+    it("an acked delete of a tombstone the server held without a body counts its key", async () => {
+      const store = await make();
+      await store.put("category", "a", category("A"), remote(1, 1));
+      await store.delete("category", "a", remote(2, 3)); // the server's tombstone has no body
+      expect(await store.keyVersionsInUse()).toEqual(new Set());
+      // The person's delete wins: put, then a local delete, pushed with the body.
+      await store.put("category", "a", category("Mine"));
+      await store.delete("category", "a");
+      const [entry] = await store.readOutbox(10);
+      await store.ackOutbox("a", 3, entry?.seq ?? 0, 4);
+      expect(await store.keyVersionsInUse()).toEqual(new Set([4]));
     });
 
     it("queueReseal shares its limit between records and tombstones", async () => {

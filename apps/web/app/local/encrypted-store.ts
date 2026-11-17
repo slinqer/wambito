@@ -364,7 +364,13 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         if (!entry) return;
         const records = tx.objectStore(entry.type);
         const row = (await request(records.get(id))) as StoredRow | undefined;
-        if (row) await request(records.put({ ...row, version, keyV: keyV ?? row.keyV }));
+        if (row) {
+          // Every push from now on carries the body the tombstone has.
+          const { bodiless: _, ...rest } = row;
+          await request(
+            records.put({ ...(row.deleted ? rest : row), version, keyV: keyV ?? row.keyV }),
+          );
+        }
         if (entry.seq === seq) await request(outbox.delete(id));
         else await request(outbox.put({ ...entry, baseVersion: version }));
       }),
