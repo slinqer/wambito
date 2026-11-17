@@ -581,6 +581,38 @@ void main() {
       expect(await again.readOutbox(10), isEmpty);
     });
 
+    test('deleteVault also removes the SQLite side files a crash can leave', () async {
+      // A stale `-wal` or `-journal` next to a new file of the same name would be replayed into it.
+      final userId = freshUser();
+      final store = await openFor(userId);
+      await store.put(RecordType.category, 'a', _category('A'));
+      await store.close();
+      final path = p.join(dir.path, vaultFileName(userId));
+      for (final side in ['-wal', '-shm', '-journal']) {
+        File('$path$side').writeAsStringSync('left by a crash');
+      }
+      await deleteVault(userId, directory: dir.path, factory: factory);
+      for (final side in ['', '-wal', '-shm', '-journal']) {
+        expect(File('$path$side').existsSync(), isFalse, reason: side);
+      }
+    });
+
+    test(
+      'the file is in WAL mode: a commit holds the write lock for one sync, not three',
+      () async {
+        final userId = freshUser();
+        final store = await openFor(userId);
+        await store.put(RecordType.category, 'a', _category('A'));
+        final raw = await factory.openDatabase(
+          p.join(dir.path, vaultFileName(userId)),
+          options: OpenDatabaseOptions(singleInstance: false),
+        );
+        expect((await raw.rawQuery('PRAGMA journal_mode')).first.values.first, 'wal');
+        await raw.close();
+        await store.close();
+      },
+    );
+
     test('names the file after the account', () {
       expect(vaultFileName('u1'), 'wambito-vault-u1.db');
     });
