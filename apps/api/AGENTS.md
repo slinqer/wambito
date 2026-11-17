@@ -7,6 +7,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - `src/server.ts` starts it; `src/app.ts` builds the app (routes, OpenAPI).
 - `src/config.ts`: zod env schema (`WAMBITO_VERSION` included); `.env.example` at the repo root.
+  `MCP_WK_PUBLIC_KEY` (a public JWK as JSON; the VPS pair comes from `deploy/personal/gen-mcp-keys.sh`).
 - `src/auth.ts`: Better Auth: email OTP + magic link, anonymous guests, passkeys (`rpName`
   "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP. Sessions carry a `lifetime`
   (`src/services/sessions.ts`): `standard` (60 days, slid by Better Auth at most once a day),
@@ -221,7 +222,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   Assistants: `t.connectAssistant(email, { wk })` (`wk`: `newAssistantSecret()`) connects with the
   secret, as the web does for an encrypted account; `t.authorize` connects without it;
   `consentCode` + `exchangeCode` split the flow. Each test app has its own MCP key pair
-  (`t.wkPrivateKey` opens the `wk` claim).
+  (`t.wkPrivateKey` opens the `wk` claim). `t.tablesHolding(needles)` scans every public table's
+  rows as text (the "no plain text in the database" check; used by `apps/mcp/test/vault-end-to-end.test.ts`).
   Each file starts a Postgres testcontainer via `test/harness.ts` (`createTestApp`): Docker must
   run, or set `WAMBITO_TEST_DB=local`.
 - After changing a route or schema, regenerate the clients' types (root `AGENTS.md`); CI diffs them.

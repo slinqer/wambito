@@ -312,7 +312,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   this browser's device wrap with no touch, else the unlock step (`ConsentUnlock`: a passkey's PRF
   or the recovery key, nothing kept); `allowAssistant` then makes `S` and the `assistant` wrap,
   posts the consent with `wk`, PUTs the wrap (`x-wambito-user` named), zeroes `S`. A refused PUT
-  shows `ConsentWrapFailed`; "Try again" revokes the consent first and gives a new `S`.
+  shows `ConsentWrapFailed`; "Try again" revokes the consent first and gives a new `S` (the API gives
+  a fresh code for the same signed query: `apps/mcp/test/vault-end-to-end.test.ts`). The whole
+  chain, API to tools, runs in that test; stage 4 design `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
 - `/confirm-email?token=…` (`routes/confirm-email.tsx`, `features/confirm-email/`, under the app
   layout, public): the page of an admin-started email change. It posts the token only when the
   person taps the button (a mail scanner opening the link spends nothing), then sends them to

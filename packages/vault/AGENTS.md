@@ -34,6 +34,17 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   create and batch-delete routes and `Idempotent-Replayed`. Their tests: `src/backend-mcp.test.ts`,
   and through `apiWambito` in `apps/mcp/test/local-backend.test.ts`.
 
+## Users
+
+- The web (IndexedDB store, browser hooks on) and the MCP (`apps/mcp/src/vault-wambito.ts`: the
+  memory store, a sync engine fed by a cache of ciphertext, `run()` only, `upgrade: false`, the local
+  backend with `source: "mcp"`). A change to the sync engine, the stores or the backend is a change
+  to both: run `apps/mcp/test/vault-wambito.test.ts` and `vault-end-to-end.test.ts` too. Design:
+  `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
+- Known limit: a deletion pushed to the server carries no body, so `restore_transactions` works
+  only inside the request that deleted (the web's store keeps the local copy); on the MCP's next
+  request it answers `not_found`.
+
 ## Test
 
 `pnpm vitest run --project @wambito/vault`; typecheck: `pnpm --filter @wambito/vault typecheck`.

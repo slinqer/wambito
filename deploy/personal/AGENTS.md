@@ -17,6 +17,7 @@ app and proxying), optional cloudflared. Full runbook: `README.md` here; short v
 
 ## Scripts
 
+- `gen-mcp-keys.sh`: the MCP key pair (below).
 - `up.sh` (build, migrate, start; `--no-tunnel`, `--skip-web`), `update.sh`, `smoke.sh`.
 - The server's version (`/health`, the app's Settings): the root `package.json` `"version"`, raised
   by hand (`chore: version X.Y.Z`), plus `+<commit>` and `-dirty` (`server_version` in `lib.sh`).
@@ -30,10 +31,24 @@ app and proxying), optional cloudflared. Full runbook: `README.md` here; short v
   before the rename, waiting (up to 30 min) for a running old backup or deploy instead of stopping
   it (`remove_old_units` in `lib.sh`, the only script that names them, split as `"luk""itas"`).
 
-## Test (CI runs all seven)
+## The MCP's key pair
+
+- `gen-mcp-keys.sh` prints two `.env` lines, `MCP_WK_PUBLIC_KEY` (compose passes it to `api`) and
+  `MCP_WK_PRIVATE_KEY` (to `mcp`), each a JWK as JSON (X25519). Make the pair once on the server, with
+  the repo checked out and `pnpm install` done (it runs `node` from `apps/api`, where `jose` lives:
+  it stops with a clear error when that is missing; on a VPS that only builds images, run it on any
+  machine with the repo and paste the lines). Never commit or log them.
+- Losing the private key, or making a new pair, disconnects every assistant on an encrypted
+  account (they must connect again; plain accounts are untouched). Without the public key the API
+  answers 503 `assistant_keys_missing` to such a consent; without the private key the MCP answers
+  those assistants with the `reconnect` tool error. The direct file passes nothing of its own: both
+  keys come from the base file.
+
+## Test (CI runs all eight)
 
 - `./test-retention.sh`, `./test-r2.sh`, `./test-auto-deploy.sh`, `./test-install-units.sh`,
-  `./test-caddy.sh`, `./test-compose-files.sh`, `./test-version.sh` (from this folder).
+  `./test-caddy.sh`, `./test-compose-files.sh`, `./test-version.sh`, `./test-mcp-keys.sh` (from this
+  folder; the last needs `node` and the repo's installed dependencies).
 
 ## Traps
 

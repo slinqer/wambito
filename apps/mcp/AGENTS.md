@@ -40,7 +40,15 @@ memory for the request (below) and keeps only their ciphertext.
 - `pnpm --filter @wambito/mcp dev` (API running).
 - `pnpm vitest run apps/mcp`. `test/end-to-end.test.ts`, `test/api-wambito.test.ts` and
   `test/vault-wambito.test.ts` start the API test app: Docker needed. The vault test plays the web
-  with a vault of its own (memory store, sync engine) to seal records, wrap `S` and rotate keys.
+  with a vault of its own (memory store, sync engine) to seal records, wrap `S` and rotate keys; its
+  helpers live in `test/support/encrypted-account.ts` (`encryptedSupport(() => t)`).
+  `test/vault-end-to-end.test.ts`: the SDK client through `createMcpApp` on a preview account, all 14
+  tools, revoke with a live token, rotation, a retried consent, a write-only grant, and a scan of
+  every table for plain text.
+- Scopes on the vault path: a read tool needs `finance:read` and a write tool `finance:write`
+  (the MCP's `scopeChallenge` asks for the missing one first); the vault pull (`GET /v2/sync`,
+  `GET /v1/me`) needs `finance:read`, so a token with only `finance:write` gets the tool error
+  `insufficient_scope` ("This assistant cannot do that") on every tool, and nothing is written.
 
 ## Traps
 
