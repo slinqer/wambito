@@ -41,9 +41,10 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   backend with `source: "mcp"`). A change to the sync engine, the stores or the backend is a change
   to both: run `apps/mcp/test/vault-wambito.test.ts` and `vault-end-to-end.test.ts` too. Design:
   `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
-- Known limit: a deletion pushed to the server carries no body, so `restore_transactions` works
-  only inside the request that deleted (the web's store keeps the local copy); on the MCP's next
-  request it answers `not_found`.
+- A delete carries its sealed body to the server, kept until the server's 180-day purge, so
+  `restore_transactions` works across requests and devices. The MCP's cache replay includes
+  tombstones, so a later request still sees (and can restore) a delete, and a deleted recurrence
+  occurrence is not made again.
 
 ## Test
 
