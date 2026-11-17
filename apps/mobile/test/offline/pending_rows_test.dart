@@ -177,13 +177,16 @@ void main() {
       await letTimersEnd(tester);
     });
 
-    testWidgets('a swipe left deletes it, and Deshacer brings it back', (tester) async {
+    testWidgets('a swipe left and Borrar delete it, and Deshacer brings it back', (tester) async {
       final env = await waiting(tester);
       await tester.timedDrag(
         find.text('Pan'),
         const Offset(-250, 0),
         const Duration(milliseconds: 300),
       );
+      await tester.pumpAndSettle();
+      expect(find.text('Pan'), findsOneWidget, reason: 'the swipe only opens Borrar');
+      await tester.tap(find.text('BORRAR'));
       await tester.pumpAndSettle();
       expect(find.text('Pan'), findsNothing);
       expect(find.text('Eliminado: Pan'), findsOneWidget);
@@ -208,6 +211,8 @@ void main() {
         const Offset(-250, 0),
         const Duration(milliseconds: 300),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('BORRAR'));
       await tester.pumpAndSettle();
       await letTimersEnd(tester);
 

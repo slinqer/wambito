@@ -128,8 +128,10 @@ void main() {
     ) async {
       final env = await _pump(tester);
       await swipe(tester, find.text('Café'), -250);
+      expect(env.waveforms, isEmpty, reason: 'a left swipe only opens Borrar: no tick, no delete');
+      await tester.tap(find.text('BORRAR'));
+      await tester.pumpAndSettle();
       expect(env.waveforms, [
-        [10],
         [14, 30, 8],
       ]);
       expect(env.platform.sounds, isEmpty, reason: 'gestures only vibrate');
@@ -148,6 +150,8 @@ void main() {
       repo.failures['delete'] = const HomeFailure(500);
       final env = await _pump(tester, server: repo);
       await swipe(tester, find.text('Café'), -250);
+      await tester.tap(find.text('BORRAR'));
+      await tester.pumpAndSettle();
       expect(env.waveforms, contains(equals([14, 30, 8])));
       expect(env.platform.sounds, isEmpty);
       await _endTimers(tester);
@@ -171,20 +175,29 @@ void main() {
       await _endTimers(tester);
     });
 
-    testWidgets('crossing the line and coming back ticks each way, and nothing else', (
+    testWidgets('the left side never ticks; the right one ticks each way it crosses the line', (
       tester,
     ) async {
-      final env = await _pump(tester);
-      final gesture = await tester.startGesture(tester.getCenter(find.text('Café')));
-      await gesture.moveBy(const Offset(-30, 0));
+      final env = await _pump(tester, size: tallPhone);
+      final left = await tester.startGesture(tester.getCenter(find.text('Café')));
+      await left.moveBy(const Offset(-230, 0));
+      await tester.pump();
+      expect(env.waveforms, isEmpty, reason: 'Borrar is never armed by a swipe');
+      await left.up();
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(tester.getCenter(find.text('Arriendo')));
+      await gesture.moveBy(const Offset(30, 0));
       await tester.pump();
       expect(env.waveforms, isEmpty, reason: 'not yet at the line');
-      await gesture.moveBy(const Offset(-200, 0));
+      await gesture.moveBy(const Offset(200, 0));
       await tester.pump();
       expect(env.waveforms, [
         [10],
       ]);
-      await gesture.moveBy(const Offset(200, 0));
+      await gesture.moveBy(const Offset(-200, 0));
       await tester.pump();
       expect(env.waveforms, [
         [10],
