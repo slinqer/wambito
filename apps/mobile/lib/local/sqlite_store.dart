@@ -323,28 +323,34 @@ class SqliteStore implements FinanceStore {
 
   /// The server accepted the change read as [seq] and gave it [version] (sealed under [keyV], when
   /// given). Records them, and clears the entry only if there was no newer local write since;
-  /// otherwise the entry stays, now based on [version].
-  Future<void> ackOutbox(String id, int version, int seq, [int? keyV]) => _enqueue(
-    () => _db.transaction((txn) async {
-      final entry = await _outboxEntry(txn, id);
-      if (entry == null) return;
-      final row = await _row(txn, entry.type, id);
-      if (row != null) {
-        await txn.update(
-          quoted(recordTable(entry.type)),
-          // Every push from now on carries the body the tombstone has.
-          {'version': version, 'key_v': keyV ?? row.keyV, 'bodiless': 0},
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      }
-      if (entry.seq == seq) {
-        await _deleteOutbox(txn, id);
-      } else {
-        await _putOutbox(txn, entry.copyWith(baseVersion: version));
-      }
-    }),
-  );
+  /// otherwise the entry stays, now based on [version]. [bodySent]: the accepted push carried a
+  /// body, so a `bodiless` tombstone is no longer one; otherwise the flag stays.
+  Future<void> ackOutbox(String id, int version, int seq, [int? keyV, bool bodySent = false]) =>
+      _enqueue(
+        () => _db.transaction((txn) async {
+          final entry = await _outboxEntry(txn, id);
+          if (entry == null) return;
+          final row = await _row(txn, entry.type, id);
+          if (row != null) {
+            await txn.update(
+              quoted(recordTable(entry.type)),
+              {
+                'version': version,
+                'key_v': keyV ?? row.keyV,
+                // A tombstone pushed with its body: the server's copy holds it now.
+                if (row.deleted && bodySent) 'bodiless': 0,
+              },
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+          }
+          if (entry.seq == seq) {
+            await _deleteOutbox(txn, id);
+          } else {
+            await _putOutbox(txn, entry.copyWith(baseVersion: version));
+          }
+        }),
+      );
 
   /// The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
   /// for pushed records sealed under a key version below [current] and with no outbox entry, until

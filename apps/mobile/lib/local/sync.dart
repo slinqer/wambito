@@ -575,6 +575,7 @@ class _Engine implements SyncEngine {
       final edited = !entry.deleted && !entry.reseal && row != null;
       final tombstoneBody = edited ? row.body : await tombstoneBodyOf(server);
       await store.delete(type, entry.id, _withBody(remote, tombstoneBody));
+      // Nothing was sent with a body: a tombstone stored without the server's stays bodiless.
       await store.ackOutbox(entry.id, server.version, entry.seq);
       if (!entry.deleted && !entry.reseal) {
         result.serverDeleted.add(entry.id);
@@ -688,7 +689,13 @@ class _Engine implements SyncEngine {
       if (r == null) {
         await park(entry, 'no_result', result);
       } else if (r['version'] is int) {
-        await store.ackOutbox(entry.id, r['version']! as int, entry.seq, p.keyV);
+        await store.ackOutbox(
+          entry.id,
+          r['version']! as int,
+          entry.seq,
+          p.keyV,
+          p.change['body'] != null,
+        );
         result.pushed += 1;
       } else if (r['conflict'] is Map) {
         final conflict = _Wire.fromJson(r['conflict']! as Map);

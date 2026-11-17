@@ -756,11 +756,67 @@ void main() {
       await store.put(RecordType.category, 'a', _category('Mine'));
       await store.delete(RecordType.category, 'a');
       final entry = (await store.readOutbox(10)).single;
-      await store.ackOutbox('a', 3, entry.seq, 4);
+      await store.ackOutbox('a', 3, entry.seq, 4, true);
       expect(await store.keyVersionsInUse(), {4});
     });
 
-    test('an acked outbox entry on a bodiless tombstone clears the flag', () async {
+    test('an ack keeps a tombstone bodiless unless the push carried a body', () async {
+      final store = await fresh();
+      for (final id in ['a', 'b']) {
+        await store.put(RecordType.category, id, _category('Old'), _remoteAt(1, 1));
+        // A pending edit, then the server's tombstone without a body over it.
+        await store.put(RecordType.category, id, _category('Mine'));
+        await store.delete(RecordType.category, id, remote(2, 1));
+        expect((await store.rawRecord(RecordType.category, id))?.bodiless, isTrue);
+      }
+      final entries = await store.readOutbox(10);
+      int seq(String id) => entries.firstWhere((e) => e.id == id).seq;
+      await store.ackOutbox('a', 3, seq('a'), 2);
+      await store.ackOutbox('b', 3, seq('b'), 3, false);
+      for (final id in ['a', 'b']) {
+        final raw = await store.rawRecord(RecordType.category, id);
+        expect([raw?.version, raw?.bodiless], [3, true], reason: id);
+      }
+      expect(await store.keyVersionsInUse(), <int>{});
+      expect(await store.queueReseal(5, 10), 0);
+      expect(await store.readOutbox(10), isEmpty);
+
+      // A push that carried the body: the server's tombstone holds it now.
+      await store.put(RecordType.category, 'c', _category('Old'), _remoteAt(4, 1));
+      await store.put(RecordType.category, 'c', _category('Mine'));
+      await store.delete(RecordType.category, 'c', remote(5, 1));
+      final c = (await store.readOutbox(10)).single;
+      await store.ackOutbox('c', 6, c.seq, 4, true);
+      expect((await store.rawRecord(RecordType.category, 'c'))?.bodiless, isFalse);
+      expect(await store.keyVersionsInUse(), {4});
+    });
+
+    test(
+      'a remote delete with tombstoneBody and ifSeq does nothing after a newer local write',
+      () async {
+        final store = await fresh();
+        await store.put(RecordType.category, 'a', _category('Old'), _remoteAt(1, 1));
+        await store.put(RecordType.category, 'a', _category('Local'));
+        final read = (await store.readOutbox(1)).single;
+        await store.put(RecordType.category, 'a', _category('Newer'));
+        await store.delete(
+          RecordType.category,
+          'a',
+          WriteOptions(
+            origin: 'remote',
+            version: 2,
+            keyV: 1,
+            ifSeq: read.seq,
+            tombstoneBody: _category('Server'),
+          ),
+        );
+        final raw = await store.rawRecord(RecordType.category, 'a');
+        expect([raw?.deleted, raw?.version, raw?.body['name']], [false, 1, 'Newer']);
+        expect((await store.readOutbox(1)).single.seq, greaterThan(read.seq));
+      },
+    );
+
+    test('an ack of a push that carried the body clears a bodiless tombstone\'s flag', () async {
       final store = await fresh();
       await store.put(RecordType.category, 'a', _category('A'), _remoteAt(1, 1));
       // The person's delete meets the server's tombstone: the engine stores the server's copy
@@ -772,7 +828,7 @@ void main() {
       });
       expect((await store.rawRecord(RecordType.category, 'a'))?.bodiless, isTrue);
       final entry = (await store.readOutbox(10)).single;
-      await store.ackOutbox('a', 4, entry.seq, 2);
+      await store.ackOutbox('a', 4, entry.seq, 2, true);
       expect((await store.rawRecord(RecordType.category, 'a'))?.bodiless, isFalse);
       expect(await store.keyVersionsInUse(), {2});
     });

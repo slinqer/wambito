@@ -1535,6 +1535,9 @@ void main() {
       expect(change, containsPair('id', a));
       expect(change, containsPair('deleted', true));
       expect(change, containsPair('body', null));
+      // The server's tombstone still has no body: the local copy stays a stale one.
+      expect((await one.store.rawRecord(_cat, a))!.bodiless, isTrue);
+      expect(await one.store.keyVersionsInUse(), <int>{});
     });
 
     test('a pulled tombstone with a body is kept, even for an id this device never had', () async {
@@ -1672,6 +1675,43 @@ void main() {
       expect(server.posts, 1);
       expect(await store.readOutbox(10), isEmpty);
     });
+
+    test(
+      'a reseal meeting a server tombstone without a body leaves the tombstone bodiless',
+      () async {
+        final server = FakeSync();
+        final k1 = await fresh();
+        final k2 = await fresh();
+        await serve(server, k1, a, 'Food');
+        final store = await openStore();
+        // Pulled under key version 1, before the rotation.
+        final old = await device(server, k: k1, store: store);
+        expect((await old.engine.run()).pulled, 1);
+
+        // An old client deleted it, without a body; the reseal meets that tombstone.
+        server.rows[a] = {
+          'id': a,
+          'type': 'category',
+          'version': ++server.counter,
+          'deleted': true,
+          'keyV': 1,
+          'encV': 1,
+          'body': null,
+        };
+        expect(await store.queueReseal(2, 500), 1);
+        final one = await device(server, store: store, keyring: ring({1: k1, 2: k2}));
+        final r = await one.engine.run();
+        expect(r.ok, isTrue);
+        expect(r.serverDeleted, isEmpty);
+        expect(await store.get(_cat, a), isNull);
+        final raw = await store.rawRecord(_cat, a);
+        expect([raw?.deleted, raw?.bodiless], [true, true]);
+        expect(await store.keyVersionsInUse(), <int>{});
+        expect(await store.queueReseal(2, 500), 0);
+        expect(server.posts, 1);
+        expect(await store.readOutbox(10), isEmpty);
+      },
+    );
 
     test(
       "a server tombstone with a body replaces a bodiless or older local tombstone's body",
