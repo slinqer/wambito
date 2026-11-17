@@ -71,6 +71,7 @@ How to add to it:
   letters or more.
 
 - MCP `list_transactions` category filter: it was sent as `categoryId` and the API ignored it.
+- `DELETE /v1/me/assistants/{clientId}` honours `x-wambito-user`: naming another account than the signed-in one is 409 `session_changed` and revokes nothing (a tab whose cookie now belongs to someone else no longer revokes their assistant).
 
 ## 1.0.0 - 2026-11-05
 

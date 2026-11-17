@@ -3387,7 +3387,7 @@ class DefaultApi {
   }
 
   /// revokeAssistant
-  /// Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most.
+  /// Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. With &#x60;x-wambito-user&#x60; naming another account than the signed-in one, 409 &#x60;session_changed&#x60; and nothing is removed.
   ///
   /// Parameters:
   /// * [clientId]

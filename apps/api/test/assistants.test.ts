@@ -60,6 +60,41 @@ describe("connected assistants", () => {
     expect(((await refresh.json()) as { error: string }).error).toBe("invalid_grant");
   });
 
+  test("revoking for another account than the signed-in one is 409 session_changed and removes nothing", async () => {
+    const email = "revoke-switched@wambito.test";
+    const { headers, userId } = await t.signIn(email);
+    const tokens = await t.authorize(email, { headers });
+    await t.admin.insert(keyWraps).values({
+      userId,
+      kind: "assistant",
+      ref: tokens.clientId,
+      keyV: 1,
+      wrapped: Buffer.alloc(60, 1),
+    });
+    // a tab whose vault is another account's, while the cookie is this one's
+    const switched = await t.request("DELETE", `/v1/me/assistants/${tokens.clientId}`, {
+      headers: { ...headers, "x-wambito-user": "someone-else" },
+    });
+    expect(switched.status).toBe(409);
+    expect(((await switched.json()) as { code: string }).code).toBe("session_changed");
+    expect((await list(headers)).map((a) => a.clientId)).toEqual([tokens.clientId]);
+    const wraps = await t.admin.select().from(keyWraps).where(eq(keyWraps.userId, userId));
+    expect(wraps.map((row) => row.ref)).toEqual([tokens.clientId]);
+    const refresh = await t.tokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: tokens.refreshToken,
+      client_id: tokens.clientId,
+    });
+    expect(refresh.status).toBe(200);
+
+    const named = await t.request("DELETE", `/v1/me/assistants/${tokens.clientId}`, {
+      headers: { ...headers, "x-wambito-user": userId },
+    });
+    expect(named.status).toBe(204);
+    expect(await list(headers)).toEqual([]);
+    expect(await t.admin.select().from(keyWraps).where(eq(keyWraps.userId, userId))).toEqual([]);
+  });
+
   test("revoking an assistant deletes its wraps and only its own", async () => {
     const email = "revoke-wraps@wambito.test";
     const { headers, userId } = await t.signIn(email);

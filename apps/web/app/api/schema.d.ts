@@ -439,7 +439,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. */
+        /** @description Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. With `x-wambito-user` naming another account than the signed-in one, 409 `session_changed` and nothing is removed. */
         delete: operations["revokeAssistant"];
         options?: never;
         head?: never;
@@ -3168,6 +3168,15 @@ export interface operations {
             };
             /** @description Problem */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
