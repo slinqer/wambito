@@ -714,6 +714,27 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('Listo is disabled while refining, Escribir is not', (tester) async {
+    final env = await _pump(tester);
+    env.engine.hold = true;
+    await _openMoving(tester);
+    env.engine.held!
+      ..add('')
+      ..add('gasté 15 mil');
+    await tester.pump();
+    PressButton button(String key) => tester.widget<PressButton>(find.byKey(Key(key)));
+    expect(button('capture.stop').onPressed, isNotNull);
+    env.engine.refiningController.add(true);
+    await tester.pump();
+    expect(button('capture.stop').onPressed, isNull);
+    expect(button('capture.type').onPressed, isNotNull);
+    env.engine.refiningController.add(false);
+    await tester.pump();
+    expect(button('capture.stop').onPressed, isNotNull);
+    await env.engine.held!.close();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('the preview follows the refined text', (tester) async {
     final env = await _pump(tester);
     env.engine.hold = true;

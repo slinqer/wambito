@@ -141,7 +141,7 @@ class CaptureListeningActions extends StatelessWidget {
             l10n.captureStop,
             key: const Key('capture.stop'),
             horizontalPadding: WambitoTokens.space4,
-            onPressed: enabled ? session.stopListening : null,
+            onPressed: enabled && !session.refining ? session.stopListening : null,
           ),
         ),
       ],
