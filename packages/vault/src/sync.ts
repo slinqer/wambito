@@ -10,6 +10,7 @@ import {
   changedKeys,
   type EncryptedStore,
   type OutboxEntry,
+  type RawRecord,
   type SetAsideOutcome,
   VaultClosedError,
 } from "./encrypted.ts";
@@ -35,7 +36,11 @@ import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keyring
  *   A conflict merge stores the merged body at the server's version without touching the outbox
  *   entry, so the entry stays pending and its next push is based on that version.
  * - A local delete beats a concurrent server edit (the delete is pushed again on the new
- *   version). A server delete beats a local edit; the id is reported in `serverDeleted`.
+ *   version). A server delete beats a local edit; the id is reported in `serverDeleted`, and the
+ *   local tombstone keeps the person's edited body (with no local edit, the server's body).
+ * - A tombstone carries its body both ways, sealed like a live record (`null` only when the row
+ *   holds none), so a deleted record can be restored on any device. A pulled tombstone whose body
+ *   does not open still deletes, without a body, and is never quarantined.
  * - `not_found` and `id_taken` drop the entry (reported in `dropped`).
  * - A change that keeps failing is parked (persisted on its outbox entry, with attempts and a
  *   short error code) and not pushed again until its back-off ends or the person edits it:
@@ -90,8 +95,10 @@ import { dedupeKeyName, type Keyring, KeysError, recordKeyName } from "./keyring
  * - The upgrade pass, after each pull while the keyring holds a version below the current one:
  *   records the server has under an older `keyV` get a `reseal` outbox entry (the unchanged body,
  *   `baseVersion` = the record's version), at most 500 pending per pass, and are pushed in the
- *   same pass. Through the outbox, so a closed tab never leaves a rotation half done. A conflict
- *   on a reseal takes the server's copy (no merge); a local write turns it into an ordinary edit.
+ *   same pass. Tombstones that hold a body are re-sealed too (pushed as a delete with the body),
+ *   so no deleted record stays restorable only under a dropped key. Through the outbox, so a
+ *   closed tab never leaves a rotation half done. A conflict on a reseal takes the server's copy
+ *   (no merge); a local write turns it into an ordinary edit.
  *   Reseal entries do not trigger a follow-up pass, so a run does at most 500.
  * - An acked push records its `keyV` on the local row. An old version's keys are dropped (from the
  *   keyring and the vault's `keys` store) once no local record the server has is under it.
@@ -372,6 +379,16 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     return { ok: true, body: parsed.value };
   }
 
+  /**
+   * The body a server tombstone holds, opened; `undefined` when it has none or it does not open
+   * (the delete still applies, without a body, and nothing is quarantined).
+   */
+  async function tombstoneBodyOf(rec: WireRecord): Promise<unknown> {
+    if (rec.body === null) return undefined;
+    const opened = await openWire(rec);
+    return opened.ok ? opened.body : undefined;
+  }
+
   async function quarantine(rec: WireRecord, reason: string) {
     await store.quarantine({
       id: rec.id,
@@ -401,9 +418,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     const deleted = entry.deleted || row.deleted;
     const { keyV, keys } = sealingKeys();
-    const sealed = deleted
-      ? null
-      : toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body));
+    // A tombstone carries its body too (a restore on another device needs it); `null` only when
+    // the row holds none.
+    const hasBody = row.body !== null && row.body !== undefined;
+    const sealed = hasBody
+      ? toBase64Url(await sealRecord(keys, ctx(entry.type, entry.id, keyV), row.body))
+      : null;
     return {
       entry,
       body: row.body,
@@ -436,7 +456,15 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       ifSeq: entry.seq,
     } as const;
     if (server.deleted) {
-      await store.delete(type, entry.id, remote);
+      // The deletion wins. An unsent edit of the person's is what the tombstone keeps (a restore
+      // brings back what they last saw); otherwise the server's body, when it opens.
+      const edited = !entry.deleted && !entry.reseal && row !== undefined;
+      const tombstoneBody = edited ? row.body : await tombstoneBodyOf(server);
+      await store.delete(
+        type,
+        entry.id,
+        tombstoneBody === undefined ? remote : { ...remote, tombstoneBody },
+      );
       await store.ackOutbox(entry.id, server.version, entry.seq);
       if (!entry.deleted && !entry.reseal) {
         result.serverDeleted.push(entry.id);
@@ -448,7 +476,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // The person's delete wins: keep the server's copy as the base and push the delete again.
       await store.transaction(async (tx) => {
         await tx.put(type, entry.id, row?.body as never, remote);
-        await tx.delete(type, entry.id, remote);
+        await tx.delete(type, entry.id, { ...remote, tombstoneBody: row?.body });
       });
       result.merged += 1;
       return;
@@ -528,7 +556,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       ifSeq: entry.seq,
     } as const;
     if (server.deleted) {
-      await store.delete(entry.type, entry.id, remote);
+      const tombstoneBody = await tombstoneBodyOf(server);
+      await store.delete(
+        entry.type,
+        entry.id,
+        tombstoneBody === undefined ? remote : { ...remote, tombstoneBody },
+      );
       return;
     }
     const opened = await openWire(server);
@@ -695,7 +728,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           .filter((e) => !e.setAside && !e.abandoned)
           .map((e) => e.id),
       );
-      type Apply = { rec: WireRecord; body: unknown } | { rec: WireRecord; body: null };
+      /** `body: null` is a delete; its `tombstone` is the body it keeps (none: undefined). */
+      type Apply = { rec: WireRecord; body: unknown; tombstone?: unknown };
       const apply: Apply[] = [];
       let quarantined = 0;
       for (const rec of page.records) {
@@ -705,7 +739,16 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           await quarantine(rec, "unknown_type");
           quarantined += 1;
         } else if (rec.deleted) {
-          apply.push({ rec, body: null });
+          // Opened like a live record; a body that does not open never blocks the delete. A
+          // tombstone this device already holds at that version keeps its body (a conflict may have
+          // kept the person's own edit in it).
+          const local = await store.getRaw(rec.type, rec.id);
+          const known = local?.deleted === true && local.version >= rec.version;
+          apply.push({
+            rec,
+            body: null,
+            tombstone: known ? undefined : await tombstoneBodyOf(rec),
+          });
         } else {
           const opened = await openWire(rec);
           if (opened.ok) apply.push({ rec, body: opened.body });
@@ -717,7 +760,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
       if (apply.length > 0) {
         await store.transaction(async (tx) => {
-          for (const { rec, body } of apply) {
+          for (const { rec, body, tombstone } of apply) {
             // Checked again here: the person may have written it since `pending` was read.
             const remote = {
               origin: "remote",
@@ -726,8 +769,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
               skipIfPending: true,
             } as const;
             const type = rec.type as RecordType;
-            if (body === null) await tx.delete(type, rec.id, remote);
-            else await tx.put(type, rec.id, body as never, remote);
+            if (body === null) {
+              await tx.delete(
+                type,
+                rec.id,
+                tombstone === undefined ? remote : { ...remote, tombstoneBody: tombstone },
+              );
+            } else await tx.put(type, rec.id, body as never, remote);
           }
         });
       }
@@ -777,6 +825,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   /** Writes the set-aside changes again onto the fresh copies: only their touched fields. */
   async function restoreSetAside(result: SyncResult): Promise<void> {
     const serverDeleted: string[] = [];
+    /** Server tombstones that keep the person's set-aside body instead of the server's. */
+    const keep: Array<{ entry: OutboxEntry; fresh: RawRecord; body: unknown }> = [];
     await store.restoreSetAside((entry, fresh): SetAsideOutcome => {
       const live = fresh && !fresh.deleted ? fresh : undefined;
       if (entry.deleted) return live ? { delete: true } : { drop: true };
@@ -787,14 +837,30 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         return fresh ? { drop: true } : { put: aside };
       }
       if (!live) {
-        // The server deleted it: the deletion wins, and the person is told.
+        // The server deleted it: the deletion wins, and the person is told. The tombstone keeps
+        // their body (a restore brings back what they last saw).
         serverDeleted.push(entry.id);
+        if (fresh) keep.push({ entry, fresh, body: aside });
         return { drop: true };
       }
       const merged = mergeBodies(aside, live.body, entry.touched);
       const parsed = parseRecord(entry.type, merged);
       return parsed.ok ? { put: parsed.value } : { drop: true };
     });
+    if (keep.length > 0) {
+      await store.transaction(async (tx) => {
+        for (const { entry, fresh, body } of keep) {
+          await tx.delete(entry.type, entry.id, {
+            origin: "remote",
+            version: fresh.version,
+            keyV: fresh.keyV,
+            // A write the person made since then is theirs to push.
+            skipIfPending: true,
+            tombstoneBody: body,
+          });
+        }
+      });
+    }
     if (serverDeleted.length > 0) {
       result.serverDeleted.push(...serverDeleted);
       report({ code: "server_deleted", ids: serverDeleted });
