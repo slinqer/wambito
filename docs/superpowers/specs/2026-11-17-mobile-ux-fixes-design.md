@@ -46,7 +46,8 @@ Each point had one sensible way; the alternatives and why they lost are in each 
   MEDIUM.
 - **Fix:** a third Glance size, ROW, for wide and short (width ≥ 220dp, height < 100dp): amount,
   then 🎤 and ＋ on one line. SMALL (2x1) drops the label and keeps the amount, 🎤 and ＋ (smaller
-  buttons, 36dp). MEDIUM starts at a height where its button column fits (≥ 120dp) so the mic is
+  buttons, 36dp). MEDIUM keeps its 220×100dp threshold (a 4x2 is about 110dp tall), and its
+  button column shrinks (40dp buttons, 4dp apart, 8dp padding) so it fits in 100dp and the mic is
   never clipped.
 - Rule: every size shows both buttons.
 
