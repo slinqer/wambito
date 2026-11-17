@@ -1550,7 +1550,7 @@ export interface components {
             /** @description The record format version */
             encV: number;
             version: number;
-            /** @description The encrypted record, base64url without padding; null when deleted */
+            /** @description The encrypted record, base64url without padding. Always present on a live record; on a deleted one, null unless the client sent the sealed body so the record can be restored */
             body: string | null;
         };
         PushResults: {
@@ -1603,7 +1603,7 @@ export interface components {
             encV: number;
             /** @description The version this change was made on; null creates the record */
             baseVersion: number | null;
-            /** @description The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag); null exactly when deleted */
+            /** @description The encrypted record, base64url without padding, 28–65536 bytes decoded (at least a nonce and a tag). Always present on a live record; on a deleted one, null unless the client sends the sealed body so the record can be restored */
             body: string | null;
         };
         AssistantWrap: {

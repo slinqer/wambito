@@ -294,7 +294,7 @@ export const records = pgTable(
   },
   (t) => [
     index("records_user_version").on(t.userId, t.version),
-    check("records_deleted_body", sql`${t.deleted} = (${t.body} is null)`),
+    check("records_live_body", sql`${t.deleted} or ${t.body} is not null`),
   ],
 );
 

@@ -19,7 +19,7 @@ const PURGE_PAGE = 500;
 
 type RecordRow = typeof records.$inferSelect;
 
-/** A record as it travels: `body` is base64url, null once deleted. */
+/** A record as it travels: `body` is base64url; null on a tombstone that carries none. */
 export interface SyncRecordDto {
   id: string;
   type: RecordType;

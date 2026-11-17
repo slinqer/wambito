@@ -122,7 +122,8 @@ export const SyncRecord = z
     ...recordFields,
     version: z.int().min(1),
     body: z.string().nullable().openapi({
-      description: "The encrypted record, base64url without padding; null when deleted",
+      description:
+        "The encrypted record, base64url without padding. Always present on a live record; on a deleted one, null unless the client sent the sealed body so the record can be restored",
     }),
   })
   .openapi("SyncRecord");
@@ -145,11 +146,11 @@ export const SyncChange = z
       })
       .nullable()
       .openapi({
-        description: `The encrypted record, base64url without padding, ${MIN_RECORD_BODY}–${MAX_RECORD_BODY} bytes decoded (at least a nonce and a tag); null exactly when deleted`,
+        description: `The encrypted record, base64url without padding, ${MIN_RECORD_BODY}–${MAX_RECORD_BODY} bytes decoded (at least a nonce and a tag). Always present on a live record; on a deleted one, null unless the client sends the sealed body so the record can be restored`,
       }),
   })
-  .refine((change) => change.deleted === (change.body === null), {
-    message: "A deleted record has no body, and a live one has one",
+  .refine((change) => change.deleted || change.body !== null, {
+    message: "A live record has a body",
     path: ["body"],
   })
   .openapi("SyncChange");
