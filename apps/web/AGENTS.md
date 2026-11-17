@@ -353,6 +353,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `app/features/landing/money-words.ts` / `MoneyHeadline.tsx` hold money words per language: edit
   with care.
 - The landing header must fit one row at 320px in every language (e2e checks it).
+- The landing's copy is repeated outside the page: `landing.meta` (title and description, the
+  `<title>` and the share text, `features/landing/seo.ts`), and the share images
+  `public/og-{es,en,it,pt}.png`, drawn by `scripts/og/og.html` from `landing.hero.headline` and
+  `landing.hero.description`. When the hero or what the landing promises changes, rewrite
+  `landing.meta` in all four languages and run `pnpm --filter @wambito/web og` (it fails on a
+  key the template reads that is gone); look at the four images before committing.
 - Landing HTML must not link files named after the mascot module (hence `mascot-*`).
 - Storybook story titles are the parity ids in `apps/mobile/test/parity/parity.json`.
 - Built e2e suites run without JavaScript by default; the dev e2e fails in global-setup without
