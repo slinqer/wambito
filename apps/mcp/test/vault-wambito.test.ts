@@ -628,3 +628,55 @@ test("nothing logged carries a body, S or a key", async () => {
     expect(log).not.toContain(secret);
   }
 });
+
+describe("a call the API never answers is the unavailable error, and frees the account", () => {
+  test.each([
+    ["GET", "/v2/keys/assistant"],
+    ["GET", "/v1/me"],
+    ["GET", "/v2/sync"],
+  ])("%s %s", async (hungMethod, hungPath) => {
+    const account = await encryptedAccount();
+    await withFixture(account);
+    const conn = await connect(account);
+    const real = network();
+    let hung = 0;
+    // Answers nothing and ignores the abort signal: only the MCP's own deadline ends the wait.
+    const hanging = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input instanceof Request ? input : String(input), init);
+      if (request.method === hungMethod && new URL(request.url).pathname === hungPath) {
+        hung++;
+        return new Promise<Response>(() => {});
+      }
+      return real(input, init);
+    }) as typeof fetch;
+    const deps = { apiUrl: API, privateKey, cache, now: () => new Date(NOW), timeoutMs: 50 };
+    const stuck = vaultWambito({ ...deps, fetch: hanging }, conn.token, conn.wk);
+    const next = vaultWambito({ ...deps, fetch: real }, conn.token, conn.wk);
+
+    // Both on the account's lock: the second waits for the first, which must give up.
+    const first = toolError(stuck.listCategories());
+    const second = next.listCategories();
+    const error = await first;
+    expect(hung).toBe(1);
+    expect(error.code).toBe("unavailable");
+    expect((await second).map((c) => c.name)).toEqual(
+      expect.arrayContaining(["Food", "Salary"]),
+    );
+  });
+});
+
+test("a cache entry that cannot be replayed is dropped, so the next call starts over", async () => {
+  const account = await encryptedAccount();
+  await withFixture(account);
+  const conn = await connect(account);
+  await vault(conn).listCategories();
+  const before = cache.get(account.userId);
+  if (!before) throw new Error("no cache entry");
+  // A cursor no JSON holds: the replay's own page cannot be built, so the replay fails.
+  cache.set(account.userId, { ...before, latest: 1n as unknown as number });
+
+  const error = await toolError(vault(conn).listCategories());
+  expect(error.code).toBe("unavailable");
+  expect(cache.get(account.userId)).toBeUndefined();
+  expect((await vault(conn).listCategories()).length).toBeGreaterThan(0);
+});

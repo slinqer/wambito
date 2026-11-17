@@ -39,6 +39,9 @@ export const NOT_SAVED_MESSAGE =
   "Wambito could not confirm that this change was saved. Part of it may have been saved; trying again is safe and saves nothing twice.";
 const UNAVAILABLE_MESSAGE = "Wambito could not be reached right now. Try again in a moment.";
 
+/** How long one API call (keys, profile, a sync page) may take: it runs under the account's lock. */
+export const API_TIMEOUT_MS = 20_000;
+
 const unavailable = () => new ToolError("unavailable", UNAVAILABLE_MESSAGE);
 const notSaved = () => new ToolError("not_saved", NOT_SAVED_MESSAGE);
 
@@ -128,6 +131,30 @@ export interface VaultDeps {
   cache: VaultCache;
   fetch?: typeof fetch;
   now?: () => Date;
+  /** Each API call's deadline (default `API_TIMEOUT_MS`); past it the call fails as unavailable. */
+  timeoutMs?: number;
+}
+
+/** `promise`, or `signal`'s reason once it aborts (even when the fetch ignores the signal). */
+function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**
@@ -274,6 +301,7 @@ export function vaultWambito(deps: VaultDeps, token: string, wk: string): VaultW
   const apiUrl = deps.apiUrl.replace(/\/+$/, "");
   const network = deps.fetch ?? fetch;
   const now = deps.now ?? (() => new Date());
+  const timeoutMs = deps.timeoutMs ?? API_TIMEOUT_MS;
   const { cache } = deps;
   let userId: string | undefined;
   try {
@@ -283,12 +311,17 @@ export function vaultWambito(deps: VaultDeps, token: string, wk: string): VaultW
     // reconnect below
   }
 
-  /** A call to the API with the assistant's token, as the account it is for. */
+  /**
+   * A call to the API with the assistant's token, as the account it is for. It runs under the
+   * account's lock, so it has a deadline: past it the call rejects (the tool error is unavailable).
+   */
   function callApi(user: string, input: string, init?: RequestInit): Promise<Response> {
     const headers = new Headers(init?.headers);
     headers.set("authorization", `Bearer ${token}`);
     headers.set("x-wambito-user", user);
-    return network(input, { ...init, headers });
+    const deadline = AbortSignal.timeout(timeoutMs);
+    const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+    return until(network(input, { ...init, headers, signal }), signal);
   }
 
   async function getJson<T>(user: string, path: string): Promise<T> {
@@ -335,7 +368,16 @@ export function vaultWambito(deps: VaultDeps, token: string, wk: string): VaultW
       entry = undefined;
     }
     const store = createMemoryEncryptedStore(user);
-    if (entry) await replay(store, entry, user, keyring);
+    if (entry) {
+      try {
+        await replay(store, entry, user, keyring);
+      } catch (error) {
+        // A broken entry would fail every call until it expires: the next one starts over.
+        cache.drop(user);
+        store.close();
+        throw error;
+      }
+    }
 
     const session = {
       keyV: keyring.current,
