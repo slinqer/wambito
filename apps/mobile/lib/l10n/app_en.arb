@@ -8,8 +8,6 @@
   "entryGuestHint": "You can add your email later.",
   "entryGuestBusy": "Setting up your account…",
   "entryEmail": "Sign in with my email",
-  "entryPasskey": "Sign in with fingerprint",
-  "entryPasskeyBusy": "Waiting for your fingerprint…",
   "emailPasskey": "Use a passkey",
   "emailPasskeyBusy": "Waiting for your passkey…",
   "signInTitle": "Sign in to Wambito",

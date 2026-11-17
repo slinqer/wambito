@@ -8,8 +8,6 @@
   "entryGuestHint": "Potrai aggiungere la tua email più tardi.",
   "entryGuestBusy": "Preparo il tuo account…",
   "entryEmail": "Entra con la mia email",
-  "entryPasskey": "Entra con l'impronta",
-  "entryPasskeyBusy": "In attesa della tua impronta…",
   "emailPasskey": "Usa la passkey",
   "emailPasskeyBusy": "In attesa della tua passkey…",
   "signInTitle": "Entra in Wambito",

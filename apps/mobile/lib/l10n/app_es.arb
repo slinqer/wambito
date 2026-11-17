@@ -41,14 +41,6 @@
   "@entryEmail": {
     "description": "First run: sign in with an email code or magic link."
   },
-  "entryPasskey": "Entrar con huella",
-  "@entryPasskey": {
-    "description": "First run: sign in with a passkey. Shown only when the phone supports passkeys."
-  },
-  "entryPasskeyBusy": "Esperando tu huella…",
-  "@entryPasskeyBusy": {
-    "description": "While the phone's passkey prompt is open."
-  },
   "emailPasskey": "Usar passkey",
   "@emailPasskey": {
     "description": "Email screen: sign in with a passkey stored on the phone (made on the web too). Shown only when the phone supports passkeys."
