@@ -512,16 +512,8 @@ class _Engine implements SyncEngine {
   }
 
   /// [remote] with [tombstoneBody] (a remote delete that keeps it), or as it is when null.
-  WriteOptions _withBody(WriteOptions remote, Json? tombstoneBody) => tombstoneBody == null
-      ? remote
-      : WriteOptions(
-          origin: remote.origin,
-          version: remote.version,
-          keyV: remote.keyV,
-          skipIfPending: remote.skipIfPending,
-          ifSeq: remote.ifSeq,
-          tombstoneBody: tombstoneBody,
-        );
+  WriteOptions _withBody(WriteOptions remote, Json? tombstoneBody) =>
+      tombstoneBody == null ? remote : remote.copyWith(tombstoneBody: tombstoneBody);
 
   Future<void> quarantine(_Wire rec, String reason, RecordType type) => store.quarantine(
     QuarantineEntry(id: rec.id, type: type, version: rec.version, reason: reason, keyV: rec.keyV),
