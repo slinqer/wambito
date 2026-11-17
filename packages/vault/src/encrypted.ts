@@ -62,6 +62,11 @@ export interface RawRecord<T extends RecordType = RecordType> {
   deleted: boolean;
   version: number;
   keyV: number;
+  /**
+   * A tombstone whose server copy has no body as far as this device knows (the local body is a
+   * stale copy): a server body arriving for it replaces it.
+   */
+  bodiless?: true;
 }
 
 /**

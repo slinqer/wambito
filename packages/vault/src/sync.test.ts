@@ -501,3 +501,96 @@ test("the upgrade pass re-seals a tombstone's body under the new key", async () 
   expect((await store.keyNames()).sort()).toEqual(["record:2"]);
   expect(await store.keyVersionsInUse()).toEqual(new Set([2]));
 });
+
+test("a tombstone's reseal meeting a restore on another device takes the live copy", async () => {
+  const keys1 = await deriveRecordKeys(generateDataKey());
+  const keys2 = await deriveRecordKeys(generateDataKey());
+  const keyring = {
+    current: 2,
+    byVersion: new Map([
+      [1, keys1],
+      [2, keys2],
+    ]),
+  };
+  let restored: Wire | undefined;
+  const server = fakeServer((c) => (restored ? { id: c.id, conflict: restored } : undefined));
+  server.serve({
+    id: B,
+    type: "category",
+    deleted: true,
+    keyV: 1,
+    body: await sealAs(keys1, 1, B, category("Rent")),
+  });
+  const store = createMemoryEncryptedStore(USER);
+  // This device holds the tombstone under key version 1 (pulled before the rotation).
+  const old = createSyncEngine({
+    store,
+    fetch: server.fetch,
+    userId: USER,
+    keyring: { current: 1, byVersion: new Map([[1, keys1]]) },
+    refreshKeys: async () => ({ current: 1, byVersion: new Map([[1, keys1]]) }),
+    upgrade: false,
+  });
+  expect(await old.run()).toMatchObject({ ok: true, pulled: 1 });
+
+  // Another device restored it, under key version 2; the reseal meets that live copy.
+  restored = server.serve({
+    id: B,
+    type: "category",
+    deleted: false,
+    keyV: 2,
+    body: await sealAs(keys2, 2, B, category("Rent again")),
+  });
+  expect(await store.queueReseal(2, 500)).toBe(1);
+  const engine = createSyncEngine({
+    store,
+    fetch: server.fetch,
+    userId: USER,
+    keyring,
+    refreshKeys: async () => keyring,
+  });
+  expect(await engine.run()).toMatchObject({ ok: true });
+  expect(await store.get("category", B)).toEqual({
+    id: B,
+    deleted: false,
+    body: category("Rent again"),
+  });
+  expect(server.posted).toHaveLength(1);
+  expect(await store.readOutbox(10)).toEqual([]);
+});
+
+test("a server tombstone with a body replaces a bodiless or older local tombstone's body", async () => {
+  const { keys, server, store, engine } = await setup();
+  await store.put("category", C, category("Fun"));
+  await store.delete("category", C);
+  expect(await engine.run()).toMatchObject({ ok: true, pushed: 1 });
+  expect(server.rows.get(C)?.version).toBe(1);
+
+  // Another device restored and deleted it again, with another body.
+  server.serve({
+    id: C,
+    type: "category",
+    deleted: true,
+    keyV: 1,
+    body: await sealAs(keys, 1, C, category("Games")),
+  });
+  expect(await engine.run()).toMatchObject({ ok: true });
+  expect((await store.get("category", C, { includeDeleted: true }))?.body).toEqual(
+    category("Games"),
+  );
+
+  // A tombstone this device holds without the server's body takes it, even at the same version.
+  await store.put("category", A, category("Food"), { origin: "remote", version: 1, keyV: 1 });
+  const row = server.serve({
+    id: A,
+    type: "category",
+    deleted: true,
+    keyV: 1,
+    body: await sealAs(keys, 1, A, category("Groceries")),
+  });
+  await store.delete("category", A, { origin: "remote", version: row.version, keyV: 1 });
+  expect(await engine.run()).toMatchObject({ ok: true });
+  expect((await store.get("category", A, { includeDeleted: true }))?.body).toEqual(
+    category("Groceries"),
+  );
+});

@@ -349,6 +349,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         deleted: row.deleted,
         version: row.version,
         keyV: row.keyV,
+        ...(row.deleted && row.bodiless ? { bodiless: true as const } : {}),
       } as RawRecord<T>;
     },
     async readOutbox(limit) {

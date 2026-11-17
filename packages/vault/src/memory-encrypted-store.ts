@@ -165,6 +165,7 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
     deleted: row.deleted,
     version: row.version,
     keyV: row.keyV,
+    ...(row.deleted && row.bodiless ? { bodiless: true as const } : {}),
   });
 
   function ops(wrote: { value: boolean }): StoreOps & {

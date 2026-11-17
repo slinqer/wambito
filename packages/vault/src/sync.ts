@@ -472,7 +472,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
       return;
     }
-    if (entry.deleted && !created) {
+    // A reseal is never the person's change: a tombstone's reseal meeting a live copy (restored on
+    // another device) takes that copy below, like any reseal.
+    if (entry.deleted && !entry.reseal && !created) {
       // The person's delete wins: keep the server's copy as the base and push the delete again.
       await store.transaction(async (tx) => {
         await tx.put(type, entry.id, row?.body as never, remote);
@@ -741,9 +743,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         } else if (rec.deleted) {
           // Opened like a live record; a body that does not open never blocks the delete. A
           // tombstone this device already holds at that version keeps its body (a conflict may have
-          // kept the person's own edit in it).
+          // kept the person's own edit in it): the delete goes without one, and the store keeps an
+          // existing tombstone's body on a delete without one. A `bodiless` one takes the server's.
           const local = await store.getRaw(rec.type, rec.id);
-          const known = local?.deleted === true && local.version >= rec.version;
+          const known = local?.deleted === true && !local.bodiless && local.version >= rec.version;
           apply.push({
             rec,
             body: null,
@@ -847,6 +850,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       const parsed = parseRecord(entry.type, merged);
       return parsed.ok ? { put: parsed.value } : { drop: true };
     });
+    // A second commit: if it never lands, the tombstone keeps the server's body, which is still a
+    // body to restore from.
     if (keep.length > 0) {
       await store.transaction(async (tx) => {
         for (const { entry, fresh, body } of keep) {
