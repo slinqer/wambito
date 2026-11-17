@@ -228,7 +228,9 @@
     "insufficient_scope": "Questo assistente non ha il permesso di farlo.",
     "encrypted_account": "Questo account conserva le sue finanze con crittografia end-to-end; questa parte di Wambito non funziona ancora con esso.",
     "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero.",
-    "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina."
+    "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina.",
+    "assistant_keys_missing": "Al momento non è possibile collegare assistenti. Riprova più tardi.",
+    "assistant_wrap_in_rotation": "Cambiare le chiavi scollega i tuoi assistenti. Ricollegali dopo."
   },
   "sign_in": {
     "meta_title": "Accedi · Wambito",
@@ -797,11 +799,15 @@
       "offline": "Restare collegato finché non lo scolleghi"
     },
     "revoke_hint": "Puoi scollegarlo quando vuoi nelle Impostazioni.",
+    "encrypted_note": "Finché è collegato, Wambito apre i tuoi dati sul suo server solo per rispondere al tuo assistente, e l'azienda dell'assistente legge ciò che riceve. Revocalo quando vuoi nelle Impostazioni e si ferma subito.",
     "allow": "Consenti",
     "allowing": "Collegamento…",
     "cancel": "Annulla",
     "loading": "Caricamento dell'assistente…",
     "failed": "Non siamo riusciti a completare il collegamento. Riprova.",
+    "unlock_title": "Apri i tuoi dati per collegarlo",
+    "wrap_failed": "È stato consentito, ma la sua chiave non è stata salvata, quindi per ora non può leggere nulla.",
+    "try_again": "Riprova",
     "guest": {
       "title": "Salva i tuoi progressi",
       "body": "Per collegare un assistente, prima salva i tuoi progressi con la tua email: nell'app di Wambito, tocca «Salva i tuoi progressi». Poi collegalo di nuovo dal tuo assistente."

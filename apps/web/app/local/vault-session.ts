@@ -59,13 +59,14 @@ export interface VaultSession {
 export const LOCAL_UNAVAILABLE: readonly UnavailableRoute[] = [
   { method: "*", path: "/v1/me/export" },
   { method: "*", path: "/v1/imports", prefix: true },
-  { method: "*", path: "/v1/me/assistants", prefix: true },
 ];
 
 /** The account itself, not its finances: these go to the real API. */
-const LIVE_ROUTES: readonly { method: string; path: string }[] = [
+const LIVE_ROUTES: readonly { method: string; path: string; prefix?: boolean }[] = [
   // Deleting the account; its records and key wraps cascade from the user on the server.
   { method: "DELETE", path: "/v1/me" },
+  // The connected assistants: listed and revoked (with their key wraps) on the server.
+  { method: "*", path: "/v1/me/assistants", prefix: true },
 ];
 
 /** Opening failed; `code` says why (`offline` gets the offline copy). */
@@ -113,7 +114,13 @@ export function rememberPreviewAccount(userId: string): void {
 }
 
 const isLive = (method: string, pathname: string) =>
-  LIVE_ROUTES.some((r) => r.method === method && pathname.endsWith(`/api${r.path}`));
+  LIVE_ROUTES.some((r) => {
+    if (r.method !== "*" && r.method !== method) return false;
+    const at = pathname.indexOf(`/api${r.path}`);
+    if (at < 0) return false;
+    const rest = pathname.slice(at + `/api${r.path}`.length);
+    return rest === "" || (r.prefix === true && rest.startsWith("/"));
+  });
 
 /** The namespace of the seeded records' ids; the account's own namespace is made from it. */
 const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";

@@ -1,6 +1,12 @@
+import { toBase64Url, wrapDataKey } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
+import type { DataKeySource, PasskeySecret } from "../../local/keys.ts";
+import type { ConsentApi } from "./consent-api.ts";
+
 /**
  * The consent screen's rules (spec §6.1), apart from React: what the signed query asks for, where
- * the assistant comes from, and what a refusal from Better Auth means for the person.
+ * the assistant comes from, what a refusal from Better Auth means for the person, and how an
+ * encrypted account's "Allow" gives the assistant its key (spec 2026-11-16 section 5).
  */
 
 /** The scopes the API offers (apps/api/src/auth.ts, OAUTH_SCOPES). */
@@ -102,4 +108,91 @@ export function consentProblemFrom(status: number, body: unknown): ConsentProble
   if (code && START_AGAIN.has(code.toLowerCase())) return "expired";
   if (status === 404) return "expired";
   return "generic";
+}
+
+/** What the consent screen needs for an encrypted account (absent for a plain one). */
+export interface ConsentKeys {
+  /** The signed-in account. */
+  userId: string;
+  /** This browser holds the account's vault: DK from its own device wrap, no touch. */
+  device: boolean;
+  /** Opens DK from `source` for one operation (`withDataKeyFrom`); DK is zeroed after. */
+  open<T>(source: DataKeySource, fn: (dk: Uint8Array, keyV: number) => Promise<T>): Promise<T>;
+  /** A touch of one of the person's passkeys for its PRF (`evaluatePrf`); null when cancelled. */
+  touchPasskey(): Promise<PasskeySecret | null>;
+}
+
+/**
+ * Where "Allow" first takes DK from: this browser's open vault (its device wrap), else nothing
+ * yet (null: the screen asks for a passkey or the recovery key).
+ */
+export const firstKeySource = (keys: Pick<ConsentKeys, "device">): DataKeySource | null =>
+  keys.device ? { device: true } : null;
+
+/**
+ * The consent was given but its wrap was not saved: the assistant would have a code and nothing
+ * to open. The screen says so and offers "Try again" (`allowAssistant` with `again`).
+ */
+export class AssistantWrapError extends Error {
+  constructor() {
+    super("assistant_wrap_not_saved");
+    this.name = "AssistantWrapError";
+  }
+}
+
+export interface AllowOptions {
+  api: Pick<ConsentApi, "decide" | "putAssistantWrap" | "revoke">;
+  clientId: string;
+  /** The page's signed query (`oauthQueryOf`). */
+  oauthQuery: string;
+  /** An encrypted account: its id and DK for one operation from the chosen source. */
+  key?: {
+    userId: string;
+    open<T>(fn: (dk: Uint8Array, keyV: number) => Promise<T>): Promise<T>;
+  };
+  /**
+   * "Try again" after an `AssistantWrapError`: the code already issued carries the old `S`, so the
+   * consent is revoked first, then given again with a new one.
+   */
+  again?: boolean;
+  /** The wrap's id; UUID v7 by default (the server replaces the client's earlier wrap). */
+  newId?: () => string;
+}
+
+/**
+ * "Allow": resolves to where the browser goes next. A plain account only posts the consent. An
+ * encrypted account (spec 2026-11-16 section 5), with DK open: makes `S` (32 random bytes) and the
+ * `assistant` wrap of DK under `S` (ref: the client, the wrap's `keyV`), revokes the earlier
+ * consent when `again`, posts the consent with `wk` = `S`, then PUTs the wrap; `S` is zeroed and
+ * DK forgotten whatever happens. A refused consent throws its `ConsentError`; a refused wrap after
+ * the consent, `AssistantWrapError`.
+ */
+export async function allowAssistant(options: AllowOptions): Promise<string> {
+  const { api, clientId, oauthQuery, key, again = false, newId = uuidv7 } = options;
+  if (!key) return api.decide(true, oauthQuery);
+  return key.open(async (dk, keyV) => {
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    try {
+      const wrapped = await wrapDataKey(
+        secret,
+        { kind: "assistant", userId: key.userId, keyV },
+        dk,
+      );
+      if (again) await api.revoke(clientId);
+      const url = await api.decide(true, oauthQuery, toBase64Url(secret));
+      try {
+        await api.putAssistantWrap({
+          id: newId(),
+          keyV,
+          ref: clientId,
+          wrap: toBase64Url(wrapped),
+        });
+      } catch {
+        throw new AssistantWrapError();
+      }
+      return url;
+    } finally {
+      secret.fill(0);
+    }
+  });
 }

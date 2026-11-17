@@ -127,6 +127,56 @@ describe("createConsentApi", () => {
     await expect(offline.decide(true, "q")).rejects.toMatchObject({ problem: "network" });
   });
 
+  it("an encrypted account's Permitir carries wk, the assistant secret", async () => {
+    const fetchImpl = answer(200, { redirect: true, url: "https://claude.ai/cb?code=1" });
+    await createConsentApi(fetchImpl).decide(true, "client_id=c1&sig=x", "c2VjcmV0");
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      accept: true,
+      oauth_query: "client_id=c1&sig=x",
+      wk: "c2VjcmV0",
+    });
+  });
+
+  it("puts the assistant wrap under /v2/keys, naming the account", async () => {
+    const fetchImpl = answer(200, {});
+    const id = "01930000-0000-7000-8000-0000000000a1";
+    await createConsentApi(fetchImpl, { userId: "u1" }).putAssistantWrap({
+      id,
+      keyV: 2,
+      ref: "https://claude.ai/meta",
+      wrap: "d3JhcA",
+    });
+    const [input, init] = fetchImpl.mock.calls[0] ?? [];
+    expect(input).toBe(`/api/v2/keys/${id}`);
+    expect(init?.method).toBe("PUT");
+    expect(init?.credentials).toBe("include");
+    expect(new Headers(init?.headers).get("x-wambito-user")).toBe("u1");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      kind: "assistant",
+      ref: "https://claude.ai/meta",
+      keyV: 2,
+      wrapped: "d3JhcA",
+    });
+    const refused = createConsentApi(answer(422, { code: "unknown_assistant" }));
+    await expect(
+      refused.putAssistantWrap({ id, keyV: 1, ref: "c1", wrap: "x" }),
+    ).rejects.toBeInstanceOf(ConsentError);
+  });
+
+  it("revokes through the assistants route; one already gone counts as done", async () => {
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 204 }),
+    );
+    await createConsentApi(fetchImpl).revoke("https://claude.ai/meta");
+    const [input, init] = fetchImpl.mock.calls[0] ?? [];
+    expect(input).toBe("/api/v1/me/assistants/https%3A%2F%2Fclaude.ai%2Fmeta");
+    expect(init?.method).toBe("DELETE");
+    await createConsentApi(answer(404, { code: "not_found" })).revoke("c1");
+    await expect(createConsentApi(answer(500, {})).revoke("c1")).rejects.toBeInstanceOf(
+      ConsentError,
+    );
+  });
+
   it("asks for the public client by its client_id", async () => {
     const fetchImpl = answer(200, { client_name: "Claude", client_uri: "https://claude.ai" });
     const client = await createConsentApi(fetchImpl).client("https://claude.ai/meta");

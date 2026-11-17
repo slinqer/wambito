@@ -228,7 +228,9 @@
     "insufficient_scope": "This assistant isn't allowed to do that.",
     "encrypted_account": "This account keeps its finances end-to-end encrypted; this part of Wambito doesn't work with it yet.",
     "already_set_up": "This account already has its keys. Open it with your recovery key.",
-    "session_changed": "Another account signed in on this browser. Reload the page."
+    "session_changed": "Another account signed in on this browser. Reload the page.",
+    "assistant_keys_missing": "Assistants can't be connected right now. Try again later.",
+    "assistant_wrap_in_rotation": "Changing your keys disconnects your assistants. Connect them again afterwards."
   },
   "sign_in": {
     "meta_title": "Sign in · Wambito",
@@ -797,11 +799,15 @@
       "offline": "Stay connected until you disconnect it"
     },
     "revoke_hint": "You can disconnect it any time in Settings.",
+    "encrypted_note": "While it's connected, Wambito opens your data on its server only to answer your assistant, and the assistant's company reads what it is given. Revoke it any time in Settings and it stops at once.",
     "allow": "Allow",
     "allowing": "Connecting…",
     "cancel": "Cancel",
     "loading": "Loading the assistant…",
     "failed": "We couldn't finish connecting. Try again.",
+    "unlock_title": "Open your data to connect it",
+    "wrap_failed": "It was allowed but its key wasn't saved, so it can't read anything yet.",
+    "try_again": "Try again",
     "guest": {
       "title": "Save your progress",
       "body": "To connect an assistant, first save your progress with your email: in the Wambito app, tap “Save your progress”. Then connect it again from your assistant."

@@ -6,7 +6,7 @@ import { expectTarget } from "../../../.storybook/story-utils.ts";
 import { ApiProvider } from "../../api/ApiProvider.tsx";
 import { Consent } from "./Consent.tsx";
 import { type ConsentApi, ConsentError } from "./consent-api.ts";
-import type { ConsentProblem, PublicClient } from "./consent-model.ts";
+import type { ConsentKeys, ConsentProblem, PublicClient } from "./consent-model.ts";
 
 /** Ten minutes from the story's start, as Better Auth signs it. */
 const EXP = Math.floor(Date.now() / 1000) + 600;
@@ -24,18 +24,63 @@ interface StageProps {
   search: string;
   guest: boolean;
   client: () => Promise<PublicClient>;
-  decide: (accept: boolean, oauthQuery: string) => Promise<string>;
+  decide: ConsentApi["decide"];
+  putAssistantWrap: ConsentApi["putAssistantWrap"];
+  revoke: ConsentApi["revoke"];
   go: (url: string) => void;
+  /** An encrypted account; `device`: this browser holds its vault. */
+  encrypted?: { device: boolean };
 }
 
+/** A vault that opens one made-up data key, from whatever source it is asked. */
+const storyKeys = (device: boolean): ConsentKeys => ({
+  userId: "u_story",
+  device,
+  open: async (_source, fn) => {
+    const dk = crypto.getRandomValues(new Uint8Array(32));
+    try {
+      return await fn(dk, 1);
+    } finally {
+      dk.fill(0);
+    }
+  },
+  touchPasskey: async () => ({ credentialId: "Y3JlZA", prf: new Uint8Array(32).fill(1) }),
+});
+
 /** The consent screen at `/oauth/consent<search>`, with Better Auth and the page load stood in for. */
-function ConsentStage({ search, guest, client, decide, go }: StageProps) {
-  const [api] = useState<ConsentApi>(() => ({ client: () => client(), decide }));
+function ConsentStage({
+  search,
+  guest,
+  client,
+  decide,
+  putAssistantWrap,
+  revoke,
+  go,
+  encrypted,
+}: StageProps) {
+  const [api] = useState<ConsentApi>(() => ({
+    client: () => client(),
+    decide,
+    putAssistantWrap,
+    revoke,
+  }));
+  const [keys] = useState(() => (encrypted ? storyKeys(encrypted.device) : undefined));
   return (
     <MemoryRouter initialEntries={[`/oauth/consent${search}`]}>
       <ApiProvider fetch={async () => new Response(null, { status: 404 })}>
         <Routes>
-          <Route path="/oauth/consent" element={<Consent api={api} guest={guest} go={go} />} />
+          <Route
+            path="/oauth/consent"
+            element={
+              <Consent
+                api={api}
+                guest={guest}
+                go={go}
+                passkeysSupported={() => true}
+                {...(keys ? { keys } : {})}
+              />
+            }
+          />
         </Routes>
       </ApiProvider>
     </MemoryRouter>
@@ -58,6 +103,8 @@ const meta = {
         ? "https://claude.ai/api/mcp/auth_callback?code=c0de&state=st"
         : "https://claude.ai/api/mcp/auth_callback?error=access_denied&state=st",
     ),
+    putAssistantWrap: fn<StageProps["putAssistantWrap"]>(async () => undefined),
+    revoke: fn<StageProps["revoke"]>(async () => undefined),
     go: fn(),
   },
 } satisfies Meta<typeof ConsentStage>;
@@ -247,5 +294,85 @@ export const ClientFailed: Story = {
       await canvas.findByText("No pudimos completar la conexión. Inténtalo de nuevo."),
     ).toHaveAttribute("role", "alert");
     await expect(canvas.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  },
+};
+
+/**
+ * An encrypted account whose vault is open in this browser: it says what connecting means, and
+ * Permitir, with no touch, posts the consent with the assistant's secret, then saves its key.
+ */
+export const EncryptedVaultHere: Story = {
+  args: { encrypted: { device: true } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await expect(
+      canvas.getByText(/Wambito abre tus datos en su servidor solo para responder a tu asistente/),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await waitFor(() =>
+      expect(args.go).toHaveBeenCalledWith(
+        "https://claude.ai/api/mcp/auth_callback?code=c0de&state=st",
+      ),
+    );
+    await expect(args.decide).toHaveBeenCalledWith(
+      true,
+      FULL.slice(1),
+      expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+    );
+    await expect(args.putAssistantWrap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ref: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+        keyV: 1,
+      }),
+    );
+    await expect(args.revoke).not.toHaveBeenCalled();
+  },
+};
+
+/** An encrypted account with nothing in this browser: Permitir asks for a passkey or the recovery key. */
+export const EncryptedUnlock: Story = {
+  args: { encrypted: { device: false } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await title(canvas, "Abre tus datos para conectarlo");
+    await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Usar una llave de acceso" })).toBeVisible();
+    await expect(args.decide).not.toHaveBeenCalled();
+    await userEvent.click(canvas.getByRole("button", { name: "Usar una llave de acceso" }));
+    await waitFor(() => expect(args.go).toHaveBeenCalled());
+    await expect(args.putAssistantWrap).toHaveBeenCalledTimes(1);
+  },
+};
+
+/**
+ * Consented, but the key was not saved: it says so and does not go back to the assistant.
+ * Reintentar revokes that consent and consents again with a new secret.
+ */
+export const WrapFailed: Story = {
+  args: {
+    encrypted: { device: true },
+    putAssistantWrap: fn<StageProps["putAssistantWrap"]>(refuse("generic")),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await expect(
+      await canvas.findByText(
+        "Se permitió, pero su clave no se guardó, así que todavía no puede leer nada.",
+      ),
+    ).toHaveAttribute("role", "alert");
+    await expect(args.go).not.toHaveBeenCalled();
+    await userEvent.click(canvas.getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(args.putAssistantWrap).toHaveBeenCalledTimes(2));
+    await expect(args.revoke).toHaveBeenCalledWith(
+      "https://claude.ai/oauth/mcp-oauth-client-metadata",
+    );
+    const [first, second] = (args.decide as ReturnType<typeof fn>).mock.calls;
+    await expect(second?.[2]).not.toBe(first?.[2]);
+    await expect(args.go).not.toHaveBeenCalled();
   },
 };

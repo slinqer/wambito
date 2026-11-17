@@ -105,6 +105,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the held current version is accepted only when its links lead strictly down to it and reach the
   held key, else `tampered`, every opened key zeroed: every caller
   (rotation, pairing approve, attestation marks, passkey wraps, `refreshKeys`) gets the check),
+  `withDataKeyFrom(options, source, fn)` (`source`: `{ device: true }` is `withDataKey`; a
+  `PasskeySecret` or `{ recovery: text }` opens that wrap only, enrolling, storing and sending
+  nothing; DK zeroed after; `no_passkey_wrap`, `bad_recovery_key`, `wrong_recovery_key`; the
+  consent page's way to an assistant's key),
   `refreshKeys(options)` (a device wrap at a higher `keyV` n, verified as `withDataKey`, adds
   every version from the current c + 1 to n to the keyring and makes n current, old versions kept;
   `tampered` keeps nothing; one below the current version changes nothing only when it is a held
@@ -197,15 +201,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   opens a new session fresh, whose first sync pushes what waited; a recovery key or passkey
   unlocks it even when the links do not reach the held key (a version made before links). `session.reloadKeys()`
   gives the engine the keyring the vault now holds (`engine.useKeyring`, only a higher or equal
-  `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` sent to the
-  API; `LOCAL_UNAVAILABLE` (export, imports, assistants) answers 403. `forgetVault()` stops the
+  `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` and `/v1/me/assistants*`
+  (list, revoke) sent to the API; `LOCAL_UNAVAILABLE` (export, imports) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
   If the store closes under it (another tab), the session stops its sync, drops itself and calls
   `onClosed`; the gate then checks again (`gate.closed()`: reopen with kept keys, else Unlock).
   The local backend also serves `POST /v1/transactions/review` (all or nothing, 404 on an unknown
   or deleted id; no merchant memory). The server refuses a preview account's `/v1` finance routes
-  (403 `encrypted_account`): only `GET`/`PATCH /v1/me` (locale on sign-in) and `DELETE /v1/me` go
-  live.
+  (403 `encrypted_account`): only `GET`/`PATCH /v1/me` (locale on sign-in), `DELETE /v1/me` and the
+  assistants go live.
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
@@ -227,13 +231,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   recovery key to type, so pair from another device, sign out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
   the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is
   `live | demo | local`: demo-only behaviour checks `=== "demo"`, live-only `=== "live"`
-  (import); settings shows `settings.local_off` under import, export and the assistants in
-  `local`; the welcome skips its import step there. Screens in
+  (import); settings shows `settings.local_off` under import and export in `local` (the
+  assistants list and revoke there; only the demo leaves the list out); the welcome skips its import step there. Screens in
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings,
   `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
-  where `passkeysSupported()` is false; `onPair` "From another device"), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
+  where `passkeysSupported()` is false; `onPair` "From another device"; `title`, `lead` (null: none)
+  and `exitLabel` for the consent page's unlock step), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
   `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
   number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
@@ -300,6 +305,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   naming a language in it. `Capture/Step` and `Capture/MainPicture` (night) are parity stories in
   `apps/mobile/test/parity/parity.json`; `Capture/Steps` is web-only (the Flutter twin is
   `apps/mobile/lib/capture_auto/`).
+- `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
+  `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
+  consent. An encrypted one (`previewProfile()` in the loader; `device` when `loadLocalKeys` finds
+  its vault here) shows `consent.encrypted_note`, and "Allow" takes DK through `withDataKeyFrom`:
+  this browser's device wrap with no touch, else the unlock step (`ConsentUnlock`: a passkey's PRF
+  or the recovery key, nothing kept); `allowAssistant` then makes `S` and the `assistant` wrap,
+  posts the consent with `wk`, PUTs the wrap (`x-wambito-user` named), zeroes `S`. A refused PUT
+  shows `ConsentWrapFailed`; "Try again" revokes the consent first and gives a new `S`.
 - `/confirm-email?token=…` (`routes/confirm-email.tsx`, `features/confirm-email/`, under the app
   layout, public): the page of an admin-started email change. It posts the token only when the
   person taps the button (a mail scanner opening the link spends nothing), then sends them to

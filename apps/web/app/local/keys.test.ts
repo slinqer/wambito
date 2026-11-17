@@ -60,6 +60,7 @@ import {
   unlockWithPasskey,
   unlockWithRecovery,
   withDataKey,
+  withDataKeyFrom,
 } from "./keys.ts";
 
 /** The record keys of the keyring's current version. */
@@ -1237,5 +1238,88 @@ describe("unlocking an account that rotated", () => {
     );
     expect(api.puts.length).toBe(puts);
     expect(await stored(userId)).toEqual(before);
+  });
+});
+
+describe("withDataKeyFrom", () => {
+  const CRED = "cHJmLWNyZWRlbnRpYWw";
+
+  it("withDataKeyFrom opens DK from a passkey and from the recovery key without enrolling", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery")!;
+    const dk = await unwrapDataKey(
+      parseRecoveryKey(recoveryKey as string),
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const prf = new Uint8Array(32).fill(7);
+    api.wraps.push({
+      id: "01930000-0000-7000-8000-0000000000c1",
+      kind: "passkey",
+      ref: CRED,
+      keyV: 1,
+      wrapped: toBase64Url(await wrapDataKey(prf, { kind: "passkey", userId, keyV: 1 }, dk)),
+      publicKey: null,
+      attestation: null,
+      label: null,
+    });
+    // A browser that holds nothing for this account.
+    await forgetDevice(userId);
+    const putsBefore = api.puts.length;
+
+    const seen: Array<{ dk: Uint8Array; copy: Uint8Array; keyV: number }> = [];
+    const fn = async (key: Uint8Array, keyV: number) => {
+      seen.push({ dk: key, copy: key.slice(), keyV });
+      return "done";
+    };
+    expect(
+      await withDataKeyFrom({ userId, fetch: api.fetch }, { credentialId: CRED, prf }, fn),
+    ).toBe("done");
+    expect(
+      await withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: recoveryKey as string }, fn),
+    ).toBe("done");
+
+    for (const entry of seen) {
+      expect(entry.copy).toEqual(dk);
+      expect(entry.keyV).toBe(1);
+      // zeroed once fn settled
+      expect(entry.dk.every((b) => b === 0)).toBe(true);
+    }
+    // nothing enrolled, sent or kept
+    expect(api.puts.length).toBe(putsBefore);
+    expect(await loadLocalKeys(userId)).toBeNull();
+    expect(api.wraps.filter((w) => w.kind === "device")).toHaveLength(1);
+
+    // the wrong secrets open nothing, and fn never runs
+    const never = vi.fn(fn);
+    await expect(
+      withDataKeyFrom(
+        { userId, fetch: api.fetch },
+        { credentialId: CRED, prf: new Uint8Array(32).fill(8) },
+        never,
+      ),
+    ).rejects.toEqual(new KeysError("no_passkey_wrap"));
+    await expect(
+      withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: "nope" }, never),
+    ).rejects.toEqual(new KeysError("bad_recovery_key"));
+    const other = formatRecoveryKey(crypto.getRandomValues(new Uint8Array(16)));
+    await expect(
+      withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: other }, never),
+    ).rejects.toEqual(new KeysError("wrong_recovery_key"));
+    expect(never).not.toHaveBeenCalled();
+  });
+
+  it("withDataKeyFrom with device is this browser's own device wrap", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const keyV = await withDataKeyFrom(
+      { userId, fetch: api.fetch },
+      { device: true },
+      async (_dk, v) => v,
+    );
+    expect(keyV).toBe(1);
   });
 });
