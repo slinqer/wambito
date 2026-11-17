@@ -64,7 +64,7 @@ private val rowBox = DpSize(220.dp, 40.dp)
  * Both widgets draw the layout that fits the box they really have, not the one they were added
  * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened.
  */
-val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), rowBox, mediumBox))
+val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), DpSize(150.dp, 40.dp), rowBox, mediumBox))
 
 /** The layout for a box of [size]: medium when it is wide and tall, row when only wide, else small. */
 fun widgetSizeFor(size: DpSize): WidgetSize = when {
@@ -72,6 +72,9 @@ fun widgetSizeFor(size: DpSize): WidgetSize = when {
     size.width >= rowBox.width -> WidgetSize.ROW
     else -> WidgetSize.SMALL
 }
+
+/** Whether the small layout has room for the amount: from 150 dp wide; below it, only the buttons. */
+fun smallShowsAmount(size: DpSize): Boolean = size.width >= 150.dp
 
 /**
  * The colours the widget uses, from the app's tokens (lib/theme/tokens.g.dart, generated from
@@ -237,15 +240,22 @@ private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
     )
 }
 
-/** The amount alone on one line, ellipsized: for the boxes too short for a label above it. */
+/**
+ * The amount alone on one line, ellipsized: for the boxes too short for a label above it. With
+ * [staleInDescription] (no room for the stale line) the stale text is read aloud with the amount.
+ */
 @Composable
-private fun AmountLine(model: WidgetModel.Figures, size: Int, modifier: GlanceModifier) {
+private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription: Boolean, modifier: GlanceModifier) {
+    val stale = model.stale.takeIf { staleInDescription }
+    val description = if (stale == null) {
+        model.amountDescription
+    } else {
+        listOf(model.amountDescription ?: model.amount, stale).joinToString(", ")
+    }
     Text(
         text = model.amount,
         maxLines = 1,
-        modifier = modifier.let { base ->
-            model.amountDescription?.let { description -> base.semantics { contentDescription = description } } ?: base
-        },
+        modifier = description?.let { modifier.semantics { contentDescription = it } } ?: modifier,
         style = TextStyle(
             color = WidgetPalette.color("ink", model.theme),
             fontSize = size.sp,
@@ -254,44 +264,62 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, modifier: GlanceMo
     )
 }
 
-/** Small (2×1): the amount on one line, then ＋ and 🎤 at 36 dp. No label: there is no room. */
+/**
+ * The shared one-line layout of small and row: the amount (when [showAmount]) with the stale line
+ * under it (when [staleLine]), then ＋ and 🎤. Without the amount the buttons are centred.
+ */
 @Composable
-fun SmallWidgetContent(model: WidgetModel) {
-    if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
-    model as WidgetModel.Figures
+private fun LineWidgetContent(
+    model: WidgetModel.Figures,
+    showAmount: Boolean,
+    staleLine: Boolean,
+    padding: Dp,
+    amountSize: Int,
+    buttonSize: Dp,
+    gap: Dp,
+) {
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(WidgetPalette.color("surface", model.theme))
             .cornerRadius(20.dp)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .padding(horizontal = padding, vertical = 2.dp)
             .clickable(openApp()),
+        horizontalAlignment = if (showAmount) Alignment.Start else Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AmountLine(model, size = 14, modifier = GlanceModifier.defaultWeight())
-        Spacer(GlanceModifier.width(4.dp))
-        ButtonsRow(model, size = 36.dp, gap = 4.dp)
+        if (showAmount) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                AmountLine(model, amountSize, staleInDescription = !staleLine, modifier = GlanceModifier)
+                if (staleLine) Stale(model)
+            }
+            Spacer(GlanceModifier.width(gap))
+        }
+        ButtonsRow(model, size = buttonSize, gap = gap)
     }
 }
 
-/** Row (4×1): the amount on one line, then ＋ and 🎤 at 40 dp. A 4×1 is too short for a label. */
+/**
+ * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 at 36 dp;
+ * no label, no room. Under 150 dp wide ([showAmount] false) only the two buttons.
+ */
+@Composable
+fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
+    if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
+    LineWidgetContent(
+        model as WidgetModel.Figures, showAmount, staleLine = false,
+        padding = 8.dp, amountSize = 14, buttonSize = 36.dp, gap = 4.dp,
+    )
+}
+
+/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 at 40 dp. */
 @Composable
 fun RowWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
-    model as WidgetModel.Figures
-    Row(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(WidgetPalette.color("surface", model.theme))
-            .cornerRadius(20.dp)
-            .padding(horizontal = 14.dp, vertical = 2.dp)
-            .clickable(openApp()),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AmountLine(model, size = 20, modifier = GlanceModifier.defaultWeight())
-        Spacer(GlanceModifier.width(8.dp))
-        ButtonsRow(model, size = 40.dp, gap = 8.dp)
-    }
+    LineWidgetContent(
+        model as WidgetModel.Figures, showAmount = true, staleLine = true,
+        padding = 14.dp, amountSize = 20, buttonSize = 40.dp, gap = 8.dp,
+    )
 }
 
 /** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ and 🎤 (40 dp, so they fit 100 dp). */
@@ -372,7 +400,7 @@ fun MediumWidgetContent(model: WidgetModel) {
 @Composable
 fun SizedWidgetContent(model: WidgetModel) {
     when (widgetSizeFor(LocalSize.current)) {
-        WidgetSize.SMALL -> SmallWidgetContent(model)
+        WidgetSize.SMALL -> SmallWidgetContent(model, showAmount = smallShowsAmount(LocalSize.current))
         WidgetSize.ROW -> RowWidgetContent(model)
         WidgetSize.MEDIUM -> MediumWidgetContent(model)
     }

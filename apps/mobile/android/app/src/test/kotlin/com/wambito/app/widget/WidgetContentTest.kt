@@ -91,10 +91,10 @@ class WidgetContentTest {
         }
 
     @Test
-    fun `a 2×1 box draws the small layout with both buttons, whichever widget it is`() =
+    fun `a 150 dp wide box draws the small layout with amount and both buttons, whichever widget it is`() =
         runGlanceAppWidgetUnitTest {
             setContext(context)
-            setAppWidgetSize(DpSize(110.dp, 40.dp))
+            setAppWidgetSize(DpSize(150.dp, 40.dp))
             provideComposable { SizedWidgetContent(model(snapshot())) }
             onNode(hasText("$1.500.000")).assertExists()
             onNode(hasContentDescription("Agregar gasto")).assertExists()
@@ -202,6 +202,45 @@ class WidgetContentTest {
         onNode(hasText("hace un rato")).assertExists()
     }
 
+    private fun offline() =
+        model(snapshot(updatedAt = now.minusSeconds(3600)).copy(refreshFailedAt = now.minusSeconds(60)))
+
+    @Test
+    fun `offline, row - the stale text sits under the amount`() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        provideComposable { RowWidgetContent(offline()) }
+        onNode(hasText("$1.500.000")).assertExists()
+        onNode(hasText("hace un rato")).assertExists()
+    }
+
+    @Test
+    fun `offline, small - the stale text is in the amount's description`() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        provideComposable { SmallWidgetContent(offline()) }
+        onNode(hasContentDescription("$1.500.000, hace un rato")).assertExists()
+        onNode(hasText("hace un rato")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `small below 150 dp wide - only the two buttons, and a tap elsewhere opens home`() =
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(DpSize(110.dp, 40.dp))
+            provideComposable { SizedWidgetContent(model(snapshot())) }
+            onNode(hasText("$1.500.000")).assertDoesNotExist()
+            onNode(hasContentDescription("Agregar gasto")).assertExists()
+            onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
+            onNode(hasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.HOME))).assertExists()
+        }
+
+    @Test
+    fun `small shows its amount from 150 dp wide`() {
+        assertEquals(false, smallShowsAmount(DpSize(110.dp, 40.dp)))
+        assertEquals(false, smallShowsAmount(DpSize(149.dp, 40.dp)))
+        assertEquals(true, smallShowsAmount(DpSize(150.dp, 40.dp)))
+        assertEquals(true, smallShowsAmount(DpSize(180.dp, 110.dp)))
+    }
+
     @Test
     fun `amount hidden - nothing about the money on either size, read aloud as hidden`() {
         val over = snapshot(remaining = -50000000, spent = 250000000, hideAmount = true, mood = "worried")
@@ -219,7 +258,7 @@ class WidgetContentTest {
                 onNode(hasText("$")).assertDoesNotExist()
                 onNode(hasText("Te pasaste")).assertDoesNotExist()
                 onNode(hasText("Te quedan")).assertDoesNotExist()
-                if (hasLabel) onNode(hasText("Este mes")).assertExists()
+                if (hasLabel) onNode(hasText("Este mes")).assertExists() else onNode(hasText("Este mes")).assertDoesNotExist()
                 onNode(hasContentDescription("del presupuesto")).assertDoesNotExist()
                 onNode(isLinearProgressIndicator(1f)).assertDoesNotExist()
             }
@@ -246,7 +285,7 @@ class WidgetContentTest {
     fun `after sign out the widget never shows the previous figure`() {
         val prefs = WidgetSnapshot.preferences(context)
         prefs.edit().putString(WidgetSnapshot.KEY, snapshot().copy(updatedAt = Instant.now()).toJson()).commit()
-        for (box in listOf(DpSize(110.dp, 40.dp), DpSize(250.dp, 110.dp))) {
+        for (box in listOf(DpSize(150.dp, 40.dp), DpSize(250.dp, 110.dp))) {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
                 setAppWidgetSize(box)
@@ -260,7 +299,7 @@ class WidgetContentTest {
         prefs.edit()
             .putString(WidgetSnapshot.KEY, """{"v":3,"signedIn":false,"hideAmount":false,"theme":"dark","locale":"es"}""")
             .commit()
-        for (box in listOf(DpSize(110.dp, 40.dp), DpSize(250.dp, 110.dp))) {
+        for (box in listOf(DpSize(150.dp, 40.dp), DpSize(250.dp, 110.dp))) {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
                 setAppWidgetSize(box)
