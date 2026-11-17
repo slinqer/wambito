@@ -659,9 +659,7 @@ describe("a call the API never answers is the unavailable error, and frees the a
     const error = await first;
     expect(hung).toBe(1);
     expect(error.code).toBe("unavailable");
-    expect((await second).map((c) => c.name)).toEqual(
-      expect.arrayContaining(["Food", "Salary"]),
-    );
+    expect((await second).map((c) => c.name)).toEqual(expect.arrayContaining(["Food", "Salary"]));
   });
 });
 
