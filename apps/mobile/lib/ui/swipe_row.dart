@@ -248,9 +248,10 @@ class RowDragRecognizer extends OneSequenceGestureRecognizer {
 }
 
 /// A row with swipe shortcuts (the web's `SwipeRow`, Task 12c): left reveals a red "Borrar", right
-/// reveals "Editar" ("Pagado" on a pending row). The row follows the finger; let go past 40 % of its
-/// width (or flicked) the action runs, a shorter swipe leaves it open (tap it to run it, tap
-/// anywhere else or scroll to close). Only one row is open at a time (a [SwipeScope] above).
+/// reveals "Editar" ("Pagado" on a pending row). The row follows the finger. Left never deletes by
+/// itself: a long or fast swipe only opens Borrar and a tap on it deletes. Right, let go past 40 %
+/// of its width (or flicked) Editar / Pagado runs; a shorter swipe leaves it open (tap it to run it,
+/// tap anywhere else or scroll to close). Only one row is open at a time (a [SwipeScope] above).
 ///
 /// Swipes are shortcuts only: the screen-reader actions of the row do the same. Under the system's
 /// "remove animations" the row fades instead of moving.
@@ -525,10 +526,10 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     );
     _armed = null;
     switch (outcome) {
-      case RowRelease.commitLeft:
-        unawaited(_remove(velocity: vx));
       case RowRelease.commitRight:
         _runRight(velocity: vx);
+      case RowRelease.commitLeft:
+        unawaited(_remove(velocity: vx));
       case RowRelease.openLeft:
         _opened(Side.left, vx);
       case RowRelease.openRight:
@@ -607,7 +608,8 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
                       spacing: 2,
                       children: [
                         AnimatedScale(
-                          // Past the threshold the action pops: letting go now runs it.
+                          // Past the threshold the action pops: on the right, letting go now runs it; on the left, it
+                          // opens Borrar.
                           scale: armed ? 1.35 : 1,
                           duration: _reduceMotion ? Duration.zero : WambitoTokens.durationPress,
                           curve: Curves.ease,

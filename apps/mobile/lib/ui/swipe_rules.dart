@@ -11,13 +11,15 @@ abstract final class SwipeFeel {
   /// px the finger moves before a gesture picks an axis (sideways, or the list's scroll).
   static const axisSlop = 8.0;
 
-  /// px/s: a release faster than this is a flick, and goes its way whatever the distance.
+  /// px/s: a release faster than this is a flick: to the right it runs the action whatever the
+  /// distance, to the left it opens Borrar.
   static const flickVelocity = 500.0;
 
   /// Toward a side with no action, content moves 0.3x the finger.
   static const rubberBand = 0.3;
 
-  /// A row runs its action when let go past this fraction of its width.
+  /// A row swiped right runs its action when let go past this fraction of its width; swiped left it
+  /// opens Borrar instead.
   static const rowThreshold = 0.4;
 
   /// px: how much of an action a short swipe leaves open.

@@ -82,8 +82,8 @@ final homeViewRequestProvider = NotifierProvider<HomeViewRequest, HomeView?>(Hom
 /// header (the wordmark, the month with ‹ ›, the face button), Wambi's line, "Te quedan" (or,
 /// without budgets, "Gastado este mes") in large type, a card or two for an account that skipped
 /// the setup, and under the Movimientos | Categorías tabs the movements by day, with the web's
-/// gestures: swipe left deletes (with an 8 s Deshacer), swipe right edits, or marks a pending row
-/// paid. Wambi names a save or a payment for 10 s, then goes back to the month's line. The last
+/// gestures: swipe left opens Borrar (a tap on it deletes, with an 8 s Deshacer), swipe right edits, or
+/// marks a pending row paid. Wambi names a save or a payment for 10 s, then goes back to the month's line. The last
 /// figures stay on screen while offline. The bottom bar has Inicio, ＋ (the add sheet), the 🎤
 /// (quick capture, listening) and Análisis.
 class HomeScreen extends ConsumerStatefulWidget {
