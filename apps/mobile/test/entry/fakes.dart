@@ -43,6 +43,9 @@ class FakeAuthApi implements AuthApi {
 
   /// Who `GET /v1/me` says every token is, and how many passkeys the server lists for them.
   String account = 'user-1';
+
+  /// Who `GET /v1/me` says these tokens are, instead of [account].
+  final accounts = <String, String>{};
   int passkeysOnAccount = 0;
 
   /// Whether the passkey signs in a guest (a guest can add one, spec section 4.3).
@@ -100,7 +103,7 @@ class FakeAuthApi implements AuthApi {
       guest: guest,
       // Like the API's profile: a guest has no welcome to finish.
       onboardingPending: !guest && (pendingOnboarding[token] ?? false),
-      userId: account,
+      userId: accounts[token] ?? account,
     );
   }
 
@@ -246,7 +249,12 @@ class FakeAuthApi implements AuthApi {
   Future<void> deleteUser(String token) async {
     calls.add('deleteUser $token');
     await onDeleteUser?.call();
-    _fail('deleteUser');
+    try {
+      _fail('deleteUser');
+    } on AuthFailure catch (failure) {
+      // As the real one: a 401 (the user or its session already gone) counts as done.
+      if (failure.status != 401) rethrow;
+    }
   }
 }
 

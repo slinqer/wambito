@@ -50,7 +50,8 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
   Future<void> clearQueue() async => calls.add('clearQueue');
 
   @override
-  Future<void> sendQueued(String userId) async => calls.add('sendQueued $userId');
+  Future<void> sendQueued(String userId, {String? from}) async =>
+      calls.add(from == null ? 'sendQueued $userId' : 'sendQueued $userId from $from');
 
   /// The `before` of each [keepOnlyNotifications], in order.
   final keepBefore = <DateTime>[];

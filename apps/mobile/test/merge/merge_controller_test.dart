@@ -1,5 +1,6 @@
 // The merge of this phone's anonymous account into an existing email account (phone-first spec
 // 7.2, ruling 10): two real SQLite vaults in a temp dir, a fake auth server and a fake sync.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show SynchronousFuture;
@@ -10,6 +11,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/auth_api.dart' show AuthFailure;
 import 'package:wambito/api/session.dart';
+import 'package:wambito/capture_auto/capture_platform.dart' show autoCapturePlatformProvider;
+import 'package:wambito/local/merge.dart' show CarryMode, carryRecords;
 import 'package:wambito/crypto/records.dart' show RecordType;
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
@@ -24,6 +27,7 @@ import 'package:wambito/merge/merge_controller.dart';
 import 'package:wambito/vault/encryption_mode.dart';
 import 'package:wambito/vault/vault_providers.dart';
 
+import '../capture_auto/fakes.dart';
 import '../entry/fakes.dart';
 import '../home/fakes.dart';
 import '../local/merge_test.dart' show category, dump, settings, settingsIdOf, transaction;
@@ -44,12 +48,15 @@ class FakeSync {
   bool offline = false;
   var runs = 0;
 
+  /// Ids the server answers `id_taken` (someone else's): the sync drops them, unversioned.
+  final refused = <String>{};
+
   Future<bool> run(SqliteStore store) async {
     runs += 1;
     if (offline) return false;
     var version = 100;
     for (final entry in await store.readOutbox(1000)) {
-      await store.ackOutbox(entry.id, ++version, entry.seq);
+      await store.ackOutbox(entry.id, refused.contains(entry.id) ? 0 : ++version, entry.seq);
     }
     return true;
   }
@@ -67,6 +74,7 @@ void main() {
   late FakeSync sync;
   late List<String> forgotten;
   late SqliteStore accountStore;
+  late FakeAutoCapturePlatform capture;
   var targetReady = false;
 
   Future<SqliteStore> open(String id) =>
@@ -116,6 +124,7 @@ void main() {
           return SynchronousFuture<VaultAccount?>(account);
         }),
         forgetVaultProvider.overrideWithValue(forget),
+        autoCapturePlatformProvider.overrideWithValue(capture),
         mergeDepsProvider.overrideWithValue(
           MergeDeps(
             listHolds: () => listVaultHolds(directory: dir.path, factory: databaseFactoryFfi),
@@ -139,6 +148,7 @@ void main() {
             store: accountStore,
             sync: () => sync.run(accountStore),
             pendingChanges: () => pendingOf(accountStore),
+            serverVersion: (type, id) async => (await accountStore.rawRecord(type, id))?.version,
           );
         }),
       ],
@@ -174,6 +184,7 @@ void main() {
     dir = Directory.systemTemp.createTempSync('wambito-merge-ctl');
     auth = FakeAuthApi();
     sync = FakeSync();
+    capture = FakeAutoCapturePlatform();
     forgotten = [];
     targetReady = false;
     FlutterSecureStorage.setMockInitialValues({
@@ -562,5 +573,117 @@ void main() {
     expect(hold?.target, email);
     expect((await kept())[mergeTokenKey(anonId)], anonToken);
     expect(auth.calls.where((c) => c.startsWith('sendCode')), isEmpty);
+  });
+
+  test(
+    'the merge\'s sign-in takes the captures queued for the guest, and a cancel gives them back',
+    () async {
+      auth
+        ..account = accountId
+        ..accounts[anonToken] = anonId;
+      final container = await signedInToTheAccount();
+      await pumpEventQueue();
+      expect(capture.callsNamed('sendQueued').last, 'sendQueued $accountId from $anonId');
+      expect(capture.callsNamed('sendQueued'), isNot(contains('sendQueued $accountId')));
+
+      capture.calls.clear();
+      await container.read(mergeControllerProvider.notifier).cancel();
+      await pumpEventQueue();
+      expect(capture.callsNamed('sendQueued'), ['sendQueued $anonId from $accountId']);
+    },
+  );
+
+  test('killed while the cancel signs the email account out: the restart is the guest with its '
+      'data', () async {
+    final container = await signedInToTheAccount();
+    auth.holdSignOut = Completer<void>();
+    await container.read(mergeControllerProvider.notifier).cancel();
+    // The sign-out on the server is still waiting: the app is killed.
+    container.dispose();
+
+    final again = app();
+    await again.read(sessionProvider.notifier).ready;
+    expect(again.read(sessionProvider).stored?.token, anonToken);
+    expect(again.read(sessionProvider).isGuest, isTrue);
+    expect(fileOf(anonId), isTrue);
+    expect((await kept())['wambito.vault.$anonId.device'], 'BBBB');
+    final store = await open(anonId);
+    expect((await store.get(RecordType.transaction, pTx))?.body['categoryId'], pFood);
+    await store.close();
+    auth.holdSignOut!.complete();
+  });
+
+  test(
+    'killed after the carry committed but before its mark: the next run never carries again',
+    () async {
+      final first = await signedInToTheAccount();
+      first.dispose();
+      // The carry committed in the account's vault; the process died before the old vault said so.
+      final source = await open(anonId);
+      await carryRecords(source, accountStore, mode: CarryMode.merge, intoUserId: accountId);
+      await source.close();
+      final edited = Map<String, Object?>.of(
+        (await accountStore.get(RecordType.transaction, pTx))!.body,
+      )..['name'] = 'Mercado del barrio';
+      await accountStore.put(RecordType.transaction, pTx, edited);
+
+      final container = app();
+      await container.read(sessionProvider.notifier).ready;
+      final merge = container.read(mergeControllerProvider.notifier);
+      await merge.resume();
+      targetReady = true;
+      container.invalidate(mergeTargetProvider);
+      await merge.run();
+
+      expect(container.read(mergeControllerProvider), isA<MergeDone>());
+      expect(
+        (await accountStore.get(RecordType.transaction, pTx))?.body['name'],
+        'Mercado del barrio',
+      );
+    },
+  );
+
+  test('keep only the account\'s data, then a failure: the next start finishes it and never stops '
+      'at the currency again', () async {
+    await accountStore.close();
+    await databaseFactoryFfi.deleteDatabase(p.join(dir.path, vaultFileName(accountId)));
+    await accountVault(currency: 'USD');
+    final first = await signedInToTheAccount();
+    targetReady = true;
+    first.invalidate(mergeTargetProvider);
+    await first.read(mergeControllerProvider.notifier).run();
+    expect(first.read(mergeControllerProvider), isA<MergeCurrencyStop>());
+    auth.failures['deleteUser'] = const AuthFailure(status: 0);
+    await first.read(mergeControllerProvider.notifier).keepAccountOnly();
+    expect(first.read(mergeControllerProvider), isA<MergeFailed>());
+    first.dispose();
+
+    final container = app();
+    await container.read(sessionProvider.notifier).ready;
+    final merge = container.read(mergeControllerProvider.notifier);
+    await merge.resume();
+    container.invalidate(mergeTargetProvider);
+    await merge.run();
+
+    expect(container.read(mergeControllerProvider), isA<MergeDone>());
+    expect(fileOf(anonId), isFalse);
+    expect(await accountStore.get(RecordType.transaction, pTx), isNull);
+  });
+
+  test('a carried record the server refuses for good keeps the anonymous user', () async {
+    final container = await signedInToTheAccount();
+    targetReady = true;
+    container.invalidate(mergeTargetProvider);
+    sync.refused.add(pTx);
+    await container.read(mergeControllerProvider.notifier).run();
+
+    final state = container.read(mergeControllerProvider);
+    expect(state, isA<MergeFailed>());
+    expect((state as MergeFailed).code, 'refused');
+    expect(state.carried, isTrue);
+    expect(await pendingOf(accountStore), 0);
+    expect(deletes(), 0);
+    expect(fileOf(anonId), isTrue);
+    expect((await kept())[mergeTokenKey(anonId)], anonToken);
   });
 }

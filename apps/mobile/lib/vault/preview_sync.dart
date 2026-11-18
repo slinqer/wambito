@@ -88,13 +88,16 @@ final previewSyncProvider = Provider<void>((ref) {
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
       // Read now, not after the native write: the container may be gone by then.
       final capture = ref.read(autoCapturePlatformProvider);
+      final handover = ref.read(captureHandoverProvider);
       final userId = now.userId;
       // After the mode is written: the jobs already know the account when the queue is handed over.
       unawaited(
         written.then<void>(
           (_) => userId == null
               ? null
-              : capture.sendQueued(userId).then<void>((_) {}, onError: (Object _) {}),
+              : capture
+                    .sendQueued(userId, from: handover[userId])
+                    .then<void>((_) {}, onError: (Object _) {}),
         ),
       );
     } else {

@@ -20,6 +20,7 @@ import 'passkeys.dart';
 import '../vault/encryption_mode.dart'
     show
         EncryptionMode,
+        EncryptionStore,
         VaultAccount,
         encryptionStoreProvider,
         freshVaultAccountProvider,
@@ -243,6 +244,7 @@ class SessionController extends Notifier<SessionState> {
     bool onboardingKnown = true,
     String? offerPasskeyFor,
     String? userId,
+    String? capturesFrom,
   }) async {
     // Another token is another session (a guest replaced by an email account, say): what the old
     // one left on this phone goes with it. The same token (a claim, a corrected flag) keeps it.
@@ -266,7 +268,7 @@ class SessionController extends Notifier<SessionState> {
       offerPasskeyFor: guest ? null : offerPasskeyFor,
     );
     ref.read(widgetSyncProvider).signedIn();
-    _sendQueuedCaptures(token, userId);
+    _sendQueuedCaptures(token, userId, from: capturesFrom);
   }
 
   /// Tells Android whose the queue of detected captures is now, so it drops another account's and
@@ -274,13 +276,18 @@ class SessionController extends Notifier<SessionState> {
   /// Asks the server for the account id only when [userId] is not known and there is an Android
   /// side. Not waited for, and a failure (offline) only leaves the queue for the next sign-in or
   /// start: nothing is sent to an account that could not be told.
-  void _sendQueuedCaptures(String token, String? userId) {
+  ///
+  /// [from]: the account whose data this one takes over (a merge, or its cancel): its captures are
+  /// re-tagged instead of dropped ([captureHandoverProvider] keeps it for the later hand-overs).
+  void _sendQueuedCaptures(String token, String? userId, {String? from}) {
     final platform = ref.read(autoCapturePlatformProvider);
+    final handover = ref.read(captureHandoverProvider);
+    if (from != null && userId != null) handover[userId] = from;
     Future<void> send() async {
       if (await platform.status() == null) return;
       final id = userId ?? await _auth.accountId(token);
       if (!ref.mounted || state.stored?.token != token) return;
-      await platform.sendQueued(id);
+      await platform.sendQueued(id, from: from ?? handover[id]);
     }
 
     unawaited(send().then<void>((_) {}, onError: (Object _) {}));
@@ -312,9 +319,24 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Signs in with the emailed code (typed, or from the magic link). Guarded like [sendCode].
-  Future<void> verifyCode(String email, String code, {bool replaceGuest = false}) async {
+  /// [keepCapturesOf]: a merge's sign-in (phone-first spec 7.2) passes the guest's account id, so
+  /// the bank-notification captures and "Bien" confirms queued for it go to the new account instead
+  /// of being dropped.
+  Future<void> verifyCode(
+    String email,
+    String code, {
+    bool replaceGuest = false,
+    String? keepCapturesOf,
+  }) async {
     await ready;
     _guardGuest(replaceGuest);
+    // A merge waiting for this email's sign-in (the code, or its link) carries the guest's captures.
+    final merging = ref.read(mergeSignInProvider);
+    final mergeEmail = merging.email;
+    keepCapturesOf ??=
+        mergeEmail != null && mergeEmail.trim().toLowerCase() == email.trim().toLowerCase()
+        ? merging.guestUserId
+        : null;
     final token = await _auth.verifyCode(email, code);
     // The code is spent: the session is on the phone before anything else is asked, so a slow or
     // dropped connection can never leave a spent code and no session.
@@ -330,6 +352,7 @@ class SessionController extends Notifier<SessionState> {
       onboardingKnown: standing != null,
       offerPasskeyFor: offer,
       userId: standing?.userId,
+      capturesFrom: keepCapturesOf,
     );
   }
 
@@ -521,24 +544,67 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// A merge into an email account (phone-first spec 7.2) is called off after its sign-in (ruling
-  /// 10): this phone signs out of the email account on the server (best effort, as [signOut]) and
-  /// forgets that account's vault, then the anonymous session kept aside ([guestToken]) is the
-  /// session again, with its vault and keys as they were. [guestUserId] is that session's account:
-  /// its vault is never the one forgotten, even when the email account was not learned yet and the
-  /// account kept last is the guest's.
+  /// 10): the anonymous session kept aside ([guestToken], account [guestUserId]) is the session again
+  /// first, with its vault and keys as they were; then the email account's vault is forgotten by its
+  /// id (only an id learned for that session, never the account kept last, which may be the guest);
+  /// then that session is signed out on the server, best effort and not waited for. A process killed
+  /// anywhere in between restarts in the guest's session with its data. The captures queued for the
+  /// email account meanwhile are re-tagged for the guest.
   Future<void> returnToGuest(String guestToken, {String? guestUserId}) async {
     await ready;
     final token = state.stored?.token;
-    if (token != null && token != guestToken) {
-      try {
-        await _auth.signOut(token).timeout(signOutWait);
-      } on Object {
-        // Forgotten here all the same, as at a sign-out.
-      }
-      ref.read(signInRecoveryKeyProvider).clear();
-      await _forgetVault(token: token, keep: guestUserId);
+    if (token == null || token == guestToken) {
+      await _signedIn(guestToken, guest: true, userId: guestUserId);
+      return;
     }
-    await _signedIn(guestToken, guest: true, userId: guestUserId);
+    final accountId = await _accountIdOf(token);
+    ref.read(signInRecoveryKeyProvider).clear();
+    await _signedIn(
+      guestToken,
+      guest: true,
+      userId: guestUserId,
+      capturesFrom: accountId == guestUserId ? null : accountId,
+    );
+    if (accountId != null && accountId != guestUserId) {
+      final keys = ref.read(keyStorageProvider);
+      try {
+        await ref.read(forgetVaultProvider)(accountId, keys);
+      } on Object {
+        try {
+          await keys.deleteAll(accountId);
+        } on Object {
+          // Swept at a later sign-in (the account is not the guest's).
+        }
+      }
+      await _forgetKept(accountId, token);
+    }
+    unawaited(_auth.signOut(token).timeout(signOutWait).then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  /// The account of the session [token], as learned for it (the known account, else what was kept
+  /// for that session); null when neither says.
+  Future<String?> _accountIdOf(String token) async {
+    final known = ref.read(knownAccountProvider);
+    if (known.owner == sessionOwnerOf(token) && known.id != null) return known.id;
+    try {
+      return (await ref.read(encryptionStoreProvider).recall(token))?.profile.id;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// Forgets the mode kept for [userId], and the kept account when it is still [token]'s.
+  Future<void> _forgetKept(String userId, String token) async {
+    final store = ref.read(encryptionStoreProvider);
+    try {
+      if (await store.recall(token) != null) {
+        await store.forget(userId);
+      } else {
+        await appSecureStorage.delete(key: EncryptionStore.modeKey(userId));
+      }
+    } on Object {
+      // Personal but not secret; the next sweep takes it.
+    }
   }
 
   /// The server no longer knows the session (it expired, or the account signed out everywhere): it
@@ -586,8 +652,7 @@ class SessionController extends Notifier<SessionState> {
   /// the session and puts the rest right at the next start. The account is the one the phone kept
   /// for this session ([EncryptionStore.recall]): no network is asked, and an account whose mode
   /// was never learned has no vault. A failure never keeps the person signed in; the keys go anyway.
-  /// The vault of [keep] (a session kept aside, [returnToGuest]) is never the one forgotten.
-  Future<void> _forgetVault({String? token, String? keep}) async {
+  Future<void> _forgetVault({String? token}) async {
     token ??= state.stored?.token;
     if (token == null) return;
     final store = ref.read(encryptionStoreProvider);
@@ -600,7 +665,7 @@ class SessionController extends Notifier<SessionState> {
       // Else the account kept last: a session that expired kept it, and the person signed in
       // again but the server has not said who they are yet. Sign-out leaves no vault behind.
       final found = id ?? account?.profile.id ?? await store.keptAccountId();
-      if (found == null || found == keep) return;
+      if (found == null) return;
       userId = found;
     } on Object {
       return;
@@ -681,6 +746,16 @@ class SignInRecoveryKey {
     secret?.fillRange(0, secret.length, 0);
   }
 }
+
+/// A merge into an email account waiting for its sign-in (phone-first spec 7.2), set by the merge
+/// (`lib/merge/merge_controller.dart`): an email sign-in to [email] takes over [guestUserId]'s
+/// queued captures (`verifyCode`'s `keepCapturesOf`).
+class MergeSignIn {
+  String? email;
+  String? guestUserId;
+}
+
+final mergeSignInProvider = Provider<MergeSignIn>((ref) => MergeSignIn());
 
 /// The app's [SignInRecoveryKey] (memory only).
 final signInRecoveryKeyProvider = Provider<SignInRecoveryKey>((ref) {

@@ -43,7 +43,9 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
                 if (userId == null) {
                     result.error("bad_args", "userId is required", null)
                 } else {
-                    CaptureScheduler.sendQueued(activity, userId)
+                    // `from`: a merge's other account, whose captures are re-tagged, not dropped.
+                    val from = call.argument<String>("from")?.takeIf { it.isNotEmpty() }
+                    CaptureScheduler.sendQueued(activity, userId, from)
                     result.success(null)
                 }
             }

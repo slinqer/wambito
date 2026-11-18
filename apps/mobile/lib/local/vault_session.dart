@@ -202,6 +202,10 @@ class VaultSession {
   Future<int> pendingChanges() async =>
       (await _store.readOutbox(_all)).where((e) => !e.reseal && !e.abandoned).length;
 
+  /// The server's version of a record (0 until the server took it); null without the record.
+  Future<int?> serverVersion(RecordType type, String id) async =>
+      (await _store.rawRecord(type, id))?.version;
+
   /// Stops the sync and closes the store; completes once the file is released.
   Future<void> close() {
     _closing = true;

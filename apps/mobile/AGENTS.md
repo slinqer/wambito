@@ -26,7 +26,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `test/parity/capture_how_parity_test.dart`.
   `capture_platform.dart` wraps the `wambito/capture` channel (`autoCapturePlatformProvider`; no channel ⇒ `status()` null ⇒ the section
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
-  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue). A `preview` account has
+  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue); a merge passes
+  `from` (`sendQueued(userId, from:)`, Kotlin `CaptureQueue.adopt(userId, mark, from)`): the captures tagged `from`
+  are re-tagged and its confirms kept, never dropped (`verifyCode(keepCapturesOf:)`, `returnToGuest`; the process-wide
+  `captureHandoverProvider` makes the later hand-overs, `previewSyncProvider`'s too, pass it as well). A `preview` account has
   the same switches: `previewSyncProvider` hands the queue over with `sendQueued` (never `clearQueue`), and Android's
   `SendCapturesWorker` / `ConfirmCaptureWorker` run `captureMain` (no `CaptureApi`, no network constraint). Only a
   `done`/`changed` run changes the queue (Dart's `ackQueued`); any other outcome or `timeout` keeps it and retries up to
@@ -262,12 +265,17 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   holds its vault `merging` (target = the email) before any code is sent; the caller then signs in with
   `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`): currency check
   (`currencyOf`; a difference stops before any write), `carryRecords(mode: merge)` under the old vault's lease, then
-  `meta.mergeCarried` in the old vault (never carried twice), sync until `pendingChanges() == 0`, then
-  `AuthApi.deleteUser` (`DELETE /v1/me` with the kept token; 401 = done), `forgetVault(anonId)` and the token key.
+  `meta.mergeCarried` in the old vault (never carried twice: a phone id already in the account's vault also counts as
+  carried, so a crash before the mark never reruns it), sync until `pendingChanges() == 0`, every carried record with a
+  server version (`VaultSession.serverVersion`; one refused for good, `id_taken` or given up, is `MergeFailed('refused')`
+  and nothing is deleted), then `AuthApi.deleteUser` (`DELETE /v1/me` with the kept token; 401 = done),
+  `forgetVault(anonId)` and the token key. The email sign-in finds the merge through `mergeSignInProvider` and keeps the
+  guest's queued captures (`MergeController.guestUserId`).
   The old vault is read on its own connection (`SqliteStore.open(id, background: true)`, no keys). `cancel()`
-  (ruling 10): after the sign-in `SessionController.returnToGuest(token, guestUserId:)` (server sign-out of the
-  email account, its vault forgotten, never the guest's), then the hold goes; refused once carried.
-  `keepAccountOnly()` deletes the anonymous user and its vault and carries nothing. `mergeResumeProvider` (watched
+  (ruling 10): after the sign-in `SessionController.returnToGuest(token, guestUserId:)` (the guest session written
+  first, then the email account's vault forgotten by the id learned for that session, then its server sign-out, not
+  waited for), then the hold goes; refused once carried. `keepAccountOnly()` marks `meta.mergeDiscard` in the old vault,
+  then deletes the anonymous user and its vault and carries nothing (a later run finishes it the same way). `mergeResumeProvider` (watched
   in `app.dart` before the seen ping) resumes from `listVaultHolds` at start, on account changes and on resume (a
   hold whose file is unreadable, or without its token, is left alone); still in the phone's own session the hold
   stays (the email's link may come). `mergeBlocksAppProvider` keeps the router on `/merge` (`MergeScreen`:
@@ -497,8 +505,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes: returns `(holds:, unreadable:)`, a vault file whose hold cannot be read is listed in `unreadable`, never dropped; `hold()` throws on a malformed hold). The
   stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
 - `wambito.vault.<anonId>.mergeToken` (secure storage): the anonymous session's token while its vault is merged
-  into an email account (swept with that vault's keys); and meta key `mergeCarried` in that vault (the carry
-  committed).
+  into an email account (swept with that vault's keys); and meta keys `mergeCarried` (the carry committed) and
+  `mergeDiscard` (only the account's data kept) in that vault.
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.

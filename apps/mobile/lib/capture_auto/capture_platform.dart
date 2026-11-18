@@ -57,8 +57,10 @@ abstract interface class AutoCapturePlatform {
   Future<void> clearQueue();
 
   /// [userId] signed in: the queue becomes theirs (captures queued for another account, or for no
-  /// known one, are dropped) and what is left is sent.
-  Future<void> sendQueued(String userId);
+  /// known one, are dropped) and what is left is sent. [from] is an account whose data [userId]
+  /// takes over (a merge, or a merge called off): its captures are re-tagged and its "Bien"
+  /// confirms kept, never dropped.
+  Future<void> sendQueued(String userId, {String? from});
 
   /// Takes away the phone notifications of [ids]: they were confirmed in the app.
   Future<void> dismissNotifications(List<String> ids);
@@ -119,7 +121,8 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
   Future<void> clearQueue() => _call<void>('clearQueue');
 
   @override
-  Future<void> sendQueued(String userId) => _call<void>('sendQueued', {'userId': userId});
+  Future<void> sendQueued(String userId, {String? from}) =>
+      _call<void>('sendQueued', {'userId': userId, 'from': ?from});
 
   @override
   Future<void> dismissNotifications(List<String> ids) => _call<void>('dismiss', {'ids': ids});
@@ -149,6 +152,11 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
 }
 
 /// The platform side of automatic capture (replaced in tests).
+/// The captures one account hands to another in this process (`to → from`): a merge's sign-in and
+/// its cancel set it, and every `sendQueued` for `to` passes `from`, so no hand-over of the queue
+/// (the session's, [previewSyncProvider]'s) drops what the merge carries.
+final captureHandoverProvider = Provider<Map<String, String>>((ref) => {});
+
 final autoCapturePlatformProvider = Provider<AutoCapturePlatform>(
   (ref) => const ChannelAutoCapturePlatform(),
 );

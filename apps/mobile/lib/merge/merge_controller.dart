@@ -16,7 +16,8 @@ import '../api/session.dart';
 import '../local/db.dart' show VaultHold, VaultHoldKind, listVaultHolds;
 import '../local/merge.dart';
 import '../local/sqlite_store.dart';
-import '../local/store.dart' show FinanceStore;
+import '../crypto/records.dart' show RecordType;
+import '../local/store.dart' show FinanceStore, ReadOptions;
 import '../local/vault_lock.dart';
 import '../local/vault_session.dart' show appLeaseWait;
 import '../storage/secure_storage.dart';
@@ -84,6 +85,21 @@ String mergeTokenKey(String anonId) => 'wambito.vault.$anonId.mergeToken';
 /// The old vault's meta key set once the carry committed (an ISO instant).
 const mergeCarriedMeta = 'mergeCarried';
 
+/// The old vault's meta key set once "Keep only the account's data" was chosen (an ISO instant): a
+/// later run finishes without carrying, and the currency stop never shows again.
+const mergeDiscardMeta = 'mergeDiscard';
+
+/// The record types a merge carries under their own ids: one of them in the account's vault proves
+/// the carry committed (a phone's ids never exist in another user's vault), and each must reach the
+/// server before the anonymous user is deleted.
+const _ownIdTypes = [
+  RecordType.category,
+  RecordType.account,
+  RecordType.transaction,
+  RecordType.recurrence,
+  RecordType.budget,
+];
+
 /// The account's open vault, which the phone's records go into.
 class MergeTarget {
   const MergeTarget({
@@ -92,6 +108,7 @@ class MergeTarget {
     required this.store,
     required this.sync,
     required this.pendingChanges,
+    required this.serverVersion,
   });
 
   final String userId;
@@ -101,6 +118,10 @@ class MergeTarget {
   /// One sync run; false when it stopped early (offline, a server error).
   final Future<bool> Function() sync;
   final Future<int> Function() pendingChanges;
+
+  /// The server's version of a record in the vault: 0 until the server took it (a change it
+  /// refused for good, `id_taken` or given up on, stays 0); null without the record.
+  final Future<int?> Function(RecordType type, String id) serverVersion;
 }
 
 /// The signed-in `preview` account's open vault, once the gate is Ready, while a merge is on;
@@ -117,6 +138,7 @@ final mergeTargetProvider = Provider<MergeTarget?>((ref) {
     store: session.store,
     sync: () async => (await session.sync()).ok,
     pendingChanges: session.pendingChanges,
+    serverVersion: session.serverVersion,
   );
 });
 
@@ -169,10 +191,18 @@ class MergeController extends Notifier<MergeState> {
   _Job? _job;
   var _busy = false;
 
-  /// "Keep only the account's data" was chosen: a retry finishes without carrying.
-  var _discard = false;
-
   MergeDeps get _deps => ref.read(mergeDepsProvider);
+
+  /// The phone's own account id while a merge is on: a merge's sign-in passes it to
+  /// `SessionController.verifyCode(keepCapturesOf:)` (the session also finds it by itself through
+  /// [mergeSignInProvider]).
+  String? get guestUserId => _job?.anonId;
+
+  void _follow(_Job? job) {
+    ref.read(mergeSignInProvider)
+      ..email = job?.email
+      ..guestUserId = job?.anonId;
+  }
 
   @override
   MergeState build() => const MergeIdle();
@@ -192,18 +222,20 @@ class MergeController extends Notifier<MergeState> {
     final anonId = account.profile.id;
     // The token first: a hold without it could never delete the anonymous user.
     await _deps.storage.write(key: mergeTokenKey(anonId), value: token);
-    await _withSource(
-      anonId,
-      (source) => source.setHold(
+    await _withSource(anonId, (source) async {
+      // What an earlier merge of this vault left goes: this one starts from nothing.
+      await source.setMeta(mergeCarriedMeta, null);
+      await source.setMeta(mergeDiscardMeta, null);
+      await source.setHold(
         VaultHold(
           VaultHoldKind.merging,
           target: email,
           since: _deps.now().toUtc().toIso8601String(),
         ),
-      ),
-    );
+      );
+    });
     _job = (anonId: anonId, email: email, token: token);
-    _discard = false;
+    _follow(_job);
     state = MergeSigningIn(email);
   }
 
@@ -226,6 +258,7 @@ class MergeController extends Notifier<MergeState> {
       if (token == null) return;
       if (!ref.mounted || _job != null) return;
       job = _job = (anonId: held.userId, email: held.hold.target!, token: token);
+      _follow(job);
     }
     if (account.profile.id == job.anonId) {
       // Still the phone's own session: the code (or the email's link, which may come after a
@@ -256,13 +289,16 @@ class MergeController extends Notifier<MergeState> {
     _busy = true;
     var carried = false;
     try {
-      if (_discard) {
-        await _finish(job);
-        return;
-      }
       final source = await _deps.openSource(job.anonId);
+      final List<(RecordType, String)> kept;
       try {
-        carried = await source.getMeta(mergeCarriedMeta) != null;
+        if (await source.getMeta(mergeDiscardMeta) != null) {
+          await source.close();
+          await _finish(job);
+          return;
+        }
+        carried =
+            await source.getMeta(mergeCarriedMeta) != null || await _committed(source, target);
         if (!carried) {
           final lease = await _deps.lease(job.anonId);
           if (lease == null) {
@@ -282,20 +318,20 @@ class MergeController extends Notifier<MergeState> {
               mode: CarryMode.merge,
               intoUserId: target.userId,
             );
-            // A crash before this line reruns the carry at once on the next start (it is
-            // idempotent), before the person could edit what it wrote.
-            await source.setMeta(mergeCarriedMeta, _deps.now().toUtc().toIso8601String());
             carried = true;
           } finally {
             await lease.release();
           }
         }
+        // Also after a crash between the carry's commit and this mark: [_committed] saw it.
+        await source.setMeta(mergeCarriedMeta, _deps.now().toUtc().toIso8601String());
+        kept = await _keptIds(source, target);
       } finally {
-        await source.close();
+        if (!source.isClosed) await source.close();
       }
       // From here no session names the old vault (the token is the account's): nothing writes
       // into it before it is forgotten.
-      await _upload(job, target);
+      await _upload(job, target, kept);
     } on Object catch (error) {
       if (ref.mounted) state = MergeFailed(_codeOf(error), carried: carried);
     } finally {
@@ -303,7 +339,29 @@ class MergeController extends Notifier<MergeState> {
     }
   }
 
-  Future<void> _upload(_Job job, MergeTarget target) async {
+  /// The phone's live records of [_ownIdTypes] as the account's vault holds them now.
+  Future<List<(RecordType, String)>> _keptIds(SqliteStore source, MergeTarget target) async => [
+    for (final type in _ownIdTypes)
+      for (final r in await source.list(type))
+        if (await target.store.get(type, r.id, const ReadOptions(includeDeleted: true)) != null)
+          (type, r.id),
+  ];
+
+  /// Whether the carry already committed: one of the phone's own ids is in the account's vault.
+  Future<bool> _committed(SqliteStore source, MergeTarget target) async {
+    for (final type in _ownIdTypes) {
+      for (final r in await source.list(type)) {
+        final there = await target.store.get(type, r.id, const ReadOptions(includeDeleted: true));
+        if (there != null) return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _upload(_Job job, MergeTarget target, List<(RecordType, String)> kept) async {
+    // `pendingChanges` leaves out re-seals (the server already has those records) and changes the
+    // sync gave up on; the latter, and an `id_taken` the sync drops, are caught below: every carried
+    // record must have a server version before the anonymous user goes.
     var pending = await target.pendingChanges();
     state = MergeUploading(pending);
     while (pending > 0) {
@@ -316,22 +374,25 @@ class MergeController extends Notifier<MergeState> {
       if (!ok || left >= pending) return;
       pending = left;
     }
+    for (final (type, id) in kept) {
+      if ((await target.serverVersion(type, id) ?? 0) == 0) {
+        // The server will not take it: the anonymous user (and its copy on the server) stays.
+        state = const MergeFailed('refused', carried: true);
+        return;
+      }
+    }
     await _finish(job);
   }
 
-  /// The anonymous user goes on the server (a 401: already gone), then its vault, its keys and the
-  /// kept token here.
+  /// The anonymous user goes on the server (`deleteUser`: a 401 is already gone), then its vault,
+  /// its keys and the kept token here.
   Future<void> _finish(_Job job) async {
-    try {
-      await ref.read(authApiProvider).deleteUser(job.token);
-    } on AuthFailure catch (failure) {
-      if (failure.status != 401) rethrow;
-    }
+    await ref.read(authApiProvider).deleteUser(job.token);
     await ref.read(forgetVaultProvider)(job.anonId, ref.read(keyStorageProvider));
     await _deps.storage.delete(key: mergeTokenKey(job.anonId));
     await _deps.storage.delete(key: EncryptionStore.modeKey(job.anonId));
     _job = null;
-    _discard = false;
+    _follow(null);
     if (ref.mounted) state = const MergeDone();
   }
 
@@ -350,6 +411,8 @@ class MergeController extends Notifier<MergeState> {
       job.anonId,
       (source) async => await source.getMeta(mergeCarriedMeta) != null,
     );
+    // ("Keep only the account's data" chosen and its delete failed: cancelling is still possible,
+    // nothing was deleted; the next `begin` clears the mark.)
     if (carried) throw StateError('The records are already in the account');
     if (ref.read(sessionProvider).stored?.token != job.token) {
       await ref.read(sessionProvider.notifier).returnToGuest(job.token, guestUserId: job.anonId);
@@ -368,8 +431,13 @@ class MergeController extends Notifier<MergeState> {
       throw StateError('Not signed in to the account');
     }
     _busy = true;
-    _discard = true;
     try {
+      // Kept in the old vault before the delete: a later run (after a crash or a failure) finishes
+      // the same way and never shows the currency stop again.
+      await _withSource(
+        job.anonId,
+        (source) => source.setMeta(mergeDiscardMeta, _deps.now().toUtc().toIso8601String()),
+      );
       await _finish(job);
     } on Object catch (error) {
       if (ref.mounted) state = MergeFailed(_codeOf(error));
@@ -381,7 +449,10 @@ class MergeController extends Notifier<MergeState> {
   Future<void> _clear(_Job job) async {
     await _withSource(job.anonId, (source) => source.setHold(null));
     await _deps.storage.delete(key: mergeTokenKey(job.anonId));
-    if (identical(_job, job)) _job = null;
+    if (identical(_job, job)) {
+      _job = null;
+      _follow(null);
+    }
   }
 
   Future<T> _withSource<T>(String anonId, Future<T> Function(SqliteStore source) use) async {
