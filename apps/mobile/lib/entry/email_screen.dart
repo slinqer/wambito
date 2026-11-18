@@ -11,7 +11,7 @@ import '../home/wambi_face.dart';
 import '../l10n/app_localizations.dart';
 import '../merge/merge_controller.dart' show mergeControllerProvider;
 import '../merge/merge_offer.dart';
-import '../protect/protect_actions.dart' show afterClaim;
+import '../protect/protect_actions.dart' show afterClaim, keyAfterClaimMarksProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/lk_icons.dart';
@@ -19,6 +19,7 @@ import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/web_text_field.dart';
 import '../vault/preview.dart' show isPreviewProvider;
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'auth_errors.dart';
 import 'code_formatter.dart';
 import 'code_input.dart';
@@ -316,8 +317,15 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
     _merging = false;
     try {
       await ref.read(mergeControllerProvider.notifier).cancel();
-    } on Object {
-      // Nothing was signed in: the hold is cleared on the next start's resume or the next begin.
+    } on Object catch (error) {
+      // The hold stays (the next start's resume picks the merge up again, waiting for the email's
+      // sign-in; only a cancel or a later begin clears it): the person is told it did not go.
+      if (mounted) {
+        setState(() {
+          _error = unexpectedErrorFor(error);
+          _errorIsPasskey = false;
+        });
+      }
     }
   }
 
@@ -370,6 +378,17 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
     final finishing = claim && _previewGuest;
     final claimFinishing = ref.read(claimFinishingProvider.notifier);
     final keepCapturesOf = _merging ? ref.read(mergeControllerProvider.notifier).guestUserId : null;
+    // The recovery key this claim asks for is owed from now on, so a process killed on its page
+    // shows it again when the vault next opens (`KeyAfterClaimMarks`).
+    final userId = ref.read(vaultSessionProvider)?.userId;
+    if (finishing && userId != null) {
+      try {
+        await ref.read(keyAfterClaimMarksProvider).owe(userId);
+      } on Object {
+        // The claim's own key page still comes; only a kill on it would not bring it back.
+      }
+      if (!mounted) return;
+    }
     if (finishing) claimFinishing.finishing = true;
     try {
       final ok = await _run(
@@ -406,16 +425,18 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
   void _resend() =>
       _mode == _Mode.claim ? _claim(_sentTo, again: true) : _sendSignIn(_sentTo, again: true);
 
-  void _changeEmail() => setState(() {
+  void _changeEmail() {
+    setState(() {
+      // A new email gets its own question (and warning) for a guest.
+      _replaceGuest = false;
+      _stage = _Stage.email;
+      _error = null;
+      _errorIsPasskey = false;
+      _resent = false;
+    });
     // Out of a merge's code: the merge is called off, and the guest stays as it was.
     if (_merging) unawaited(_cancelMerge());
-    // A new email gets its own question (and warning) for a guest.
-    _replaceGuest = false;
-    _stage = _Stage.email;
-    _error = null;
-    _errorIsPasskey = false;
-    _resent = false;
-  });
+  }
 
   /// The web's `w-full`.
   Widget _full(Widget child) => SizedBox(width: double.infinity, child: child);

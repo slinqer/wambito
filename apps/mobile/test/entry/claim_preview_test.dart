@@ -2,6 +2,8 @@
 // key with no way out until it is saved (unless one was saved already), then the passkey offer, once.
 // An email that has an account already offers the merge (spec 7.2): yes holds the guest's vault and
 // sends that email's code; no leaves everything as it was.
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart';
@@ -10,8 +12,11 @@ import 'package:wambito/entry/passkey_offer_screen.dart';
 import 'package:wambito/home/home_screen.dart';
 import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/merge/merge_controller.dart';
+import 'package:wambito/local/prf.dart' show PasskeyPrf;
+import 'package:wambito/protect/protect_actions.dart';
 import 'package:wambito/protect/protect_status.dart';
 import 'package:wambito/security/screen_lock.dart';
+import 'package:wambito/settings/passkeys_settings.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/vault/preview.dart' show isPreviewProvider;
@@ -51,32 +56,86 @@ class _Merge extends MergeController {
   Future<void> run() async {}
 }
 
+/// The claim's owed keys, in memory, kept across a restart of the app.
+class _Marks implements KeyAfterClaimMarks {
+  final owing = <String>{};
+
+  @override
+  Future<bool> owed(String userId) async => owing.contains(userId);
+
+  @override
+  Future<void> owe(String userId) async => owing.add(userId);
+
+  @override
+  Future<void> clear(String userId) async => owing.remove(userId);
+}
+
+/// The account's passkeys: adding one gives its PRF to the wrap when [givesPrf].
+class _PrfPasskeys implements SettingsPasskeys {
+  _PrfPasskeys({required this.givesPrf});
+
+  final bool givesPrf;
+  var adds = 0;
+
+  @override
+  Future<bool> supported() async => true;
+
+  @override
+  Future<List<PasskeyItem>> list() async => [];
+
+  @override
+  Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async {
+    adds += 1;
+    if (givesPrf && prf != null) {
+      await prf.keep(PasskeyPrf(credentialId: 'cred-1', prf: Uint8List(32)));
+    }
+    return PasskeyOutcome.added;
+  }
+
+  @override
+  Future<void> remove(String id) async {}
+}
+
 class _Preview {
-  _Preview(this.env, this.vault, this.security, this.merge);
+  _Preview(this.env, this.vault, this.security, this.merge, this.marks);
 
   final SettingsEnv env;
   final FakeVault vault;
   final FakeSecurity security;
   final _Merge merge;
+  final _Marks marks;
 }
 
-/// A `preview` guest on `/progress`, its vault open, the phone with passkeys.
-Future<_Preview> _pumpPreviewGuest(WidgetTester t, {String? recoveryKeySavedAt}) async {
-  final vault = FakeVault(recoveryKeySavedAt: recoveryKeySavedAt);
-  await t.runAsync(() => vault.seeded);
+/// A `preview` guest on `/progress`, its vault open, the phone with passkeys. With [guest] false
+/// and [location] null, the same phone started again after the claim ([vault] and [marks] kept).
+Future<_Preview> _pumpPreviewGuest(
+  WidgetTester t, {
+  String? recoveryKeySavedAt,
+  bool guest = true,
+  String? location = '/progress',
+  FakeVault? vault,
+  _Marks? marks,
+  LockCheck lock = LockCheck.noLock,
+  SettingsPasskeys? passkeys,
+}) async {
+  vault ??= FakeVault(recoveryKeySavedAt: recoveryKeySavedAt);
+  await t.runAsync(() => vault!.seeded);
+  marks ??= _Marks();
   final security = FakeSecurity();
   final merge = _Merge();
   final env = await pumpSettingsApp(
     t,
-    guest: true,
+    guest: guest,
     passkeysSupported: true,
-    location: '/progress',
+    location: location,
     overrides: [
+      keyAfterClaimMarksProvider.overrideWithValue(marks),
+      settingsPasskeysProvider.overrideWithValue(passkeys ?? _PrfPasskeys(givesPrf: true)),
       isPreviewProvider.overrideWithValue(true),
       vaultSessionProvider.overrideWithValue(vault),
       securityApiProvider.overrideWithValue(security),
       securitySnapshotProvider.overrideWith((ref) async => snapshotOf()),
-      screenLockProvider.overrideWithValue(FakeLock(LockCheck.noLock)),
+      screenLockProvider.overrideWithValue(FakeLock(lock)),
       protectStatusProvider.overrideWith(
         (ref) async => const ProtectStatus(
           recoveryKey: false,
@@ -88,7 +147,9 @@ Future<_Preview> _pumpPreviewGuest(WidgetTester t, {String? recoveryKeySavedAt})
       mergeControllerProvider.overrideWith(() => merge),
     ],
   );
-  return _Preview(env, vault, security, merge);
+  // The vault's open at start: home's look for an owed key runs after a frame.
+  await _settle(t);
+  return _Preview(env, vault, security, merge, marks);
 }
 
 /// Lets the fake vault's queue (built in the real zone) and the screens answer.
@@ -191,6 +252,87 @@ void main() {
       await _settle(t);
       expect(p.env.container.read(sessionProvider).offerPasskeyFor, isNull);
       expect(find.byType(PasskeyOfferScreen), findsNothing);
+    });
+
+    testWidgets('killed on the key page: on the next start the key page shows again', (t) async {
+      final p = await _pumpPreviewGuest(t);
+      await _claim(t, 'ana@correo.com');
+      await _enterCode(t, '123456');
+      expect(find.byType(RecoveryKeySetupView), findsOneWidget);
+      expect(p.marks.owing, {'user-1'});
+
+      // The process dies here; the phone starts again signed in to the account with its email.
+      final again = await _pumpPreviewGuest(
+        t,
+        guest: false,
+        location: null,
+        vault: p.vault,
+        marks: p.marks,
+      );
+      expect(find.byType(RecoveryKeySetupView), findsOneWidget);
+      expect(find.text('CANCELAR'), findsNothing);
+      await _checkAndSave(t);
+      expect(again.marks.owing, isEmpty);
+      expect(find.byType(PasskeyOfferScreen), findsOneWidget);
+    });
+
+    testWidgets('the screen lock refused: the key is still owed and no passkey offer', (t) async {
+      final p = await _pumpPreviewGuest(t, lock: LockCheck.cancelled);
+      await _claim(t, 'ana@correo.com');
+      await _enterCode(t, '123456');
+
+      expect(p.env.stored?.guest, isFalse);
+      expect(find.byType(RecoveryKeySetupView), findsNothing);
+      expect(find.byType(PasskeyOfferScreen), findsNothing);
+      expect(p.env.container.read(sessionProvider).offerPasskeyFor, isNull);
+      expect(p.marks.owing, {'user-1'});
+
+      // The next time the vault opens, the key page comes back.
+      await _pumpPreviewGuest(t, guest: false, location: null, vault: p.vault, marks: p.marks);
+      expect(find.byType(RecoveryKeySetupView), findsOneWidget);
+      await _checkAndSave(t);
+      expect(p.marks.owing, isEmpty);
+      expect(find.byType(PasskeyOfferScreen), findsOneWidget);
+    });
+
+    testWidgets('the passkey offered after the claim wraps the data key with its PRF', (t) async {
+      final passkeys = _PrfPasskeys(givesPrf: true);
+      final p = await _pumpPreviewGuest(
+        t,
+        recoveryKeySavedAt: '2026-11-01T10:00:00.000Z',
+        passkeys: passkeys,
+      );
+      final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+      await _claim(t, 'ana@correo.com');
+      await _enterCode(t, '123456');
+      await t.tap(find.byKey(const Key('offer.add')));
+      await _settle(t);
+
+      expect(passkeys.adds, 1);
+      expect(p.security.calls, contains('addPasskeyWrap cred-1'));
+      expect(p.env.auth.calls.where((c) => c.startsWith('passkeyRegister ')), isEmpty);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text(l10n.passkeyOfferAdded), findsOneWidget);
+      expect(find.text(l10n.protectPasskeyNoPrf), findsNothing);
+    });
+
+    testWidgets('a passkey with no PRF says it cannot open the data', (t) async {
+      final passkeys = _PrfPasskeys(givesPrf: false);
+      final p = await _pumpPreviewGuest(
+        t,
+        recoveryKeySavedAt: '2026-11-01T10:00:00.000Z',
+        passkeys: passkeys,
+      );
+      final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+      await _claim(t, 'ana@correo.com');
+      await _enterCode(t, '123456');
+      await t.tap(find.byKey(const Key('offer.add')));
+      await _settle(t);
+
+      expect(passkeys.adds, 1);
+      expect(p.security.calls.where((c) => c.startsWith('addPasskeyWrap')), isEmpty);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text(l10n.protectPasskeyNoPrf), findsOneWidget);
     });
 
     testWidgets('the preview /progress says what an email adds and has no passkey section', (

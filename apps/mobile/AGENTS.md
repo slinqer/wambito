@@ -250,7 +250,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `preview` guest's claim, `protectWithRecoveryKey(canLeave: false)` when the settings record's `recoveryKeySavedAt`
   is null (read from the vault, never `protectStatusProvider`, which is null once the account has an email), then
   `SessionController.offerPasskey()` (`offerPasskeyFor` when `PasskeyOffer.dueFor` says so): the only passkey offer
-  after a claim, `confirmClaim` offers nothing. The email screen runs it under `claimFinishingProvider`, which keeps
+  after a claim, `confirmClaim` offers nothing. The key is owed (`KeyAfterClaimMarks`, secure storage
+  `wambito.protect.<userId>.keyAfterClaim`, written just before `confirmClaim`, cleared once the key is saved): a key
+  that could not be made (lock refused, offline) stops there, no offer; a kill on its page, or that, brings the page
+  back when the vault opens with home there (`resumeKeyAfterClaim`, from `HomeScreen`). For a `preview` account with
+  its vault open the offer page makes the passkey with `protectWithPasskey` (PRF wrap; no PRF toasts
+  `protectPasskeyNoPrf`); otherwise `registerPasskey`. The email screen runs it under `claimFinishingProvider`, which keeps
   `/entry/email` open past the router's "no email screen once there is an email" (`sessionRedirect(finishingClaim:)`).
   A `preview` guest's email_taken asks `askMerge`; yes is `MergeController.begin` then `sendCode(replaceGuest: true)`,
   the code is `verifyCode(keepCapturesOf: guestUserId)`, and backing out of it ("Usar otro correo", back) is
@@ -530,7 +535,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
-  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed` and `home.protect.<userId>`; channel
+  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed`, `home.protect.<userId>` and `wambito.protect.<userId>.keyAfterClaim`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
   Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;

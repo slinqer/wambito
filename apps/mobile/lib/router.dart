@@ -159,6 +159,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       state.uri,
       vault: vault.value,
       merge: merge.value,
+      // Read, not listened to: clearing it sends nobody anywhere; the email screen goes on by
+      // itself once its claim is finished (`context.go('/')`, or the passkey offer's redirect).
       finishingClaim: ref.read(claimFinishingProvider),
     ),
     routes: [

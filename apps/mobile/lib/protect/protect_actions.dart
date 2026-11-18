@@ -7,8 +7,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../api/session.dart' show sessionProvider, SessionController;
+import '../api/session.dart'
+    show SessionController, SessionStatus, claimFinishingProvider, sessionProvider;
 import '../crypto/records.dart' show RecordType;
 import '../l10n/app_localizations.dart';
 import '../local/rotate.dart' show NewRecoveryKey;
@@ -18,7 +20,9 @@ import '../settings/passkeys_section.dart' show settingsPasskeyListProvider;
 import '../settings/passkeys_settings.dart';
 import '../settings/security/recovery_setup_page.dart';
 import '../settings/security/security_api.dart';
+import '../storage/secure_storage.dart' show appSecureStorage;
 import '../ui/toast.dart';
+import '../vault/preview.dart' show isPreviewProvider;
 import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'protect_status.dart';
 
@@ -120,27 +124,100 @@ Future<bool> protectWithRecoveryKey(
   return true;
 }
 
+/// Whether an account still owes the recovery key its claim asked for: secure storage
+/// `wambito.protect.<userId>.keyAfterClaim`, written just before a `preview` guest's claim and
+/// cleared once the key is saved. A process killed on the key page (or a key that could not be
+/// made) leaves it, so the key page comes back when the vault next opens ([resumeKeyAfterClaim]).
+/// The account's `recoveryKeySavedAt` alone cannot say it: accounts made on the web have it null too.
+abstract interface class KeyAfterClaimMarks {
+  Future<bool> owed(String userId);
+  Future<void> owe(String userId);
+  Future<void> clear(String userId);
+}
+
+/// The secure-storage key of [KeyAfterClaimMarks] (persistent: renaming it needs a migration).
+String keyAfterClaimKey(String userId) => 'wambito.protect.$userId.keyAfterClaim';
+
+class SecureKeyAfterClaimMarks implements KeyAfterClaimMarks {
+  const SecureKeyAfterClaimMarks(this.storage);
+
+  final FlutterSecureStorage storage;
+
+  @override
+  Future<bool> owed(String userId) async =>
+      await storage.read(key: keyAfterClaimKey(userId)) != null;
+
+  @override
+  Future<void> owe(String userId) => storage.write(key: keyAfterClaimKey(userId), value: '1');
+
+  @override
+  Future<void> clear(String userId) => storage.delete(key: keyAfterClaimKey(userId));
+}
+
+final keyAfterClaimMarksProvider = Provider<KeyAfterClaimMarks>(
+  (ref) => const SecureKeyAfterClaimMarks(appSecureStorage),
+);
+
 /// What follows a `preview` guest's claim of an email (phone-first spec 7.1, ruling 20): the
 /// recovery key, with no way out until it is saved, when the vault's settings record says none was
 /// saved yet (read from the record itself: `protectStatusProvider` says nothing once the account
 /// has an email), then the passkey offer ([SessionController.offerPasskey]), the only one after a
-/// claim. A key that could not be made (offline, the screen lock refused) still leads on to the
-/// offer; Settings can make it later.
+/// claim. A key that could not be made (the screen lock refused, offline) is still owed: the mark
+/// ([KeyAfterClaimMarks]) stays, nothing else is offered, and the key page comes back when the vault
+/// next opens. The mark goes once the key is saved (or one already was).
 Future<void> afterClaim(BuildContext context, WidgetRef ref) async {
   final session = ref.read(vaultSessionProvider);
+  final marks = ref.read(keyAfterClaimMarksProvider);
   if (session != null) {
     final savedAt = await recoveryKeySavedAt(session.store);
     if (!context.mounted) return;
-    if (savedAt == null) await protectWithRecoveryKey(context, ref, canLeave: false);
-    if (!context.mounted) return;
+    if (savedAt == null && !await protectWithRecoveryKey(context, ref, canLeave: false)) return;
+    try {
+      await marks.clear(session.userId);
+    } on Object {
+      // The key is saved: a mark left behind only finds `recoveryKeySavedAt` set and goes then.
+    }
   }
   await ref.read(sessionProvider.notifier).offerPasskey();
+}
+
+/// When the vault opens (home, at start or after an unlock): an account with an email whose claim
+/// still owes its recovery key ([KeyAfterClaimMarks]) gets [afterClaim] again, the key page with no
+/// way out, then the passkey offer. A key saved meanwhile (from Settings, or another phone) only
+/// clears the mark. Nothing for a guest, a `plain` account, or while the email screen finishes a
+/// claim itself.
+Future<void> resumeKeyAfterClaim(BuildContext context, WidgetRef ref) async {
+  final session = ref.read(vaultSessionProvider);
+  // A vault with no session read yet (a screen shown on its own, as tests do) owes nothing here.
+  if (session == null || !ref.exists(sessionProvider)) return;
+  final signedIn = ref.read(sessionProvider);
+  if (signedIn.status != SessionStatus.signedIn ||
+      signedIn.isGuest ||
+      !ref.read(isPreviewProvider) ||
+      ref.read(claimFinishingProvider)) {
+    return;
+  }
+  final marks = ref.read(keyAfterClaimMarksProvider);
+  if (!await marks.owed(session.userId)) return;
+  if (await recoveryKeySavedAt(session.store) != null) {
+    await marks.clear(session.userId);
+    return;
+  }
+  if (!context.mounted || ref.read(vaultSessionProvider) != session) return;
+  await afterClaim(context, ref);
 }
 
 /// Step 2: adds a passkey whose PRF wraps the data key (`SettingsPasskeys.add(prf:)`). A password
 /// manager that gives no PRF still adds a passkey that signs in; the status then says it cannot
 /// open the data.
-Future<PasskeyOutcome> protectWithPasskey(BuildContext context, WidgetRef ref) async {
+///
+/// [onPrfKept] is told when the new passkey's PRF made its wrap (the passkey opens the data); an
+/// `added` without it is a passkey that only signs in.
+Future<PasskeyOutcome> protectWithPasskey(
+  BuildContext context,
+  WidgetRef ref, {
+  VoidCallback? onPrfKept,
+}) async {
   final security = ref.read(securityApiProvider);
   if (security == null) return PasskeyOutcome.failed;
   final l10n = AppLocalizations.of(context);
@@ -150,7 +227,10 @@ Future<PasskeyOutcome> protectWithPasskey(BuildContext context, WidgetRef ref) a
       .add(
         prf: PasskeyPrfUse(
           explainSecondTouch: () => toasts?.say(l10n.settingsPasskeysSecondTouch),
-          keep: security.addPasskeyWrap,
+          keep: (passkey) async {
+            await security.addPasskeyWrap(passkey);
+            onPrfKept?.call();
+          },
         ),
       );
   switch (outcome) {
