@@ -727,6 +727,23 @@
       "email_lead": "Con un'email entri sul web con un codice, colleghi gli assistenti e rientri se perdi l'impronta.",
       "email_action": "Aggiungi un'email"
     },
+    "add_email": {
+      "title": "Crea il tuo account",
+      "lead": "Scrivi la tua email e ti mandiamo un codice a 6 cifre. I tuoi dati e le tue chiavi restano gli stessi.",
+      "email_label": "La tua email",
+      "email_placeholder": "ana@esempio.it",
+      "send": "Invia il codice",
+      "sending": "Invio…",
+      "code_title": "Controlla la tua email",
+      "code_lead": "Abbiamo mandato un codice a 6 cifre a <strong>{email}</strong>. Scrivilo qui.",
+      "confirm": "Conferma",
+      "confirming": "Conferma…",
+      "resend": "Reinvia il codice",
+      "change_email": "Usa un'altra email",
+      "cancel": "Non ora",
+      "done": "Fatto: il tuo account ora ha un'email.",
+      "taken": "Questa email ha già un account Wambito. Apri Wambito sul telefono per portare questi dati al suo interno."
+    },
     "security": {
       "title": "Sicurezza",
       "lead": "I tuoi dati sono cifrati. Questi dispositivi possono aprirli.",

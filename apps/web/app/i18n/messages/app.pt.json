@@ -727,6 +727,23 @@
       "email_lead": "Com um email entras na web com um código, ligas assistentes e voltas a entrar se perderes a impressão digital.",
       "email_action": "Adiciona um email"
     },
+    "add_email": {
+      "title": "Cria a tua conta",
+      "lead": "Escreve o teu email e enviamos um código de 6 dígitos. Os teus dados e as tuas chaves continuam os mesmos.",
+      "email_label": "O teu email",
+      "email_placeholder": "ana@exemplo.pt",
+      "send": "Enviar código",
+      "sending": "A enviar…",
+      "code_title": "Verifica o teu email",
+      "code_lead": "Enviámos um código de 6 dígitos para <strong>{email}</strong>. Escreve-o aqui.",
+      "confirm": "Confirmar",
+      "confirming": "A confirmar…",
+      "resend": "Reenviar código",
+      "change_email": "Usar outro email",
+      "cancel": "Agora não",
+      "done": "Feito: a tua conta já tem email.",
+      "taken": "Este email já tem uma conta Wambito. Abre o Wambito no telemóvel para trazeres estes dados para ela."
+    },
     "security": {
       "title": "Segurança",
       "lead": "Os teus dados estão cifrados. Estes dispositivos podem abri-los.",

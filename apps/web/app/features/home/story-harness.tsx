@@ -330,6 +330,12 @@ export interface HomeApiOptions {
   failRevoke?: boolean;
   /** The profile is a guest's (`isAnonymous`). */
   guest?: boolean;
+  /**
+   * `POST /v1/me/claim-email/*` (adding an email to a guest): `taken` refuses every address with
+   * 409 `email_taken`; otherwise the code 123456 claims it (the profile gets the email, no longer
+   * a guest) and any other code is a 400 `invalid_code`.
+   */
+  claim?: "ok" | "taken";
 }
 
 /** One budget amount, from its month on (until a later one), as the API keeps them. */
@@ -394,6 +400,7 @@ function homeFetch({
   assistants: initialAssistants = [],
   failRevoke = false,
   guest = false,
+  claim = "ok",
 }: HomeApiOptions): typeof fetch {
   let assistants = [...initialAssistants];
   let categories: FakeCategory[] =
@@ -510,6 +517,17 @@ function homeFetch({
     if (path === "/api/v1/me" && request.method === "DELETE") {
       if (failDelete) return Response.json({ code: "internal_error" }, { status: 503 });
       return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/me/claim-email/send") {
+      if (claim === "taken") return Response.json({ code: "email_taken" }, { status: 409 });
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/me/claim-email/verify") {
+      const claimed = body as { email: string; code: string };
+      if (claimed.code !== "123456")
+        return Response.json({ code: "invalid_code" }, { status: 400 });
+      profile = { ...profile, email: claimed.email, isAnonymous: false };
+      return Response.json(profile);
     }
     if (path === "/api/v1/me") return Response.json(profile);
     if (path === "/api/v1/me/assistants") return Response.json({ items: assistants });

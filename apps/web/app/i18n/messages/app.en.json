@@ -727,6 +727,23 @@
       "email_lead": "With an email you sign in on the web with a code, connect assistants, and get back in if your passkey is gone.",
       "email_action": "Add an email"
     },
+    "add_email": {
+      "title": "Create your account",
+      "lead": "Type your email and we'll send a 6-digit code. Your data and your keys stay the same.",
+      "email_label": "Your email",
+      "email_placeholder": "ana@example.com",
+      "send": "Send code",
+      "sending": "Sending…",
+      "code_title": "Check your email",
+      "code_lead": "We sent a 6-digit code to <strong>{email}</strong>. Type it here.",
+      "confirm": "Confirm",
+      "confirming": "Confirming…",
+      "resend": "Resend code",
+      "change_email": "Use another email",
+      "cancel": "Not now",
+      "done": "Done: your account now has an email.",
+      "taken": "This email already has a Wambito account. Open Wambito on your phone to bring this data into it."
+    },
     "security": {
       "title": "Security",
       "lead": "Your data is encrypted. These devices can open it.",

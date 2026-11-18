@@ -332,8 +332,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `passkeys.supported()`): `PasskeysApi.add({ userId, explainSecondTouch, keep })`, `keep` =
   `SecurityApi.addPasskeyWrap`; done only when a passkey wrap exists, never the passkey row; a
   passkey without one shows `settings.protect.no_prf`. Step 3 "Create account (add an email)":
-  `Settings`' `onAddEmail` prop (and `HomeStage`'s), hidden without it. Stories
-  `Settings/Protect`, web-only, not in parity.json; copy under `settings.protect.*`.
+  opens `AddEmail` in a `Takeover` from `Settings` (its `onAddEmail` prop, and `HomeStage`'s,
+  replaces the opening for stories). `add-email.ts` `claimEmail(api)` → `{ send(email), verify(email,
+  code) }` over `/v1/me/claim-email/send|verify`, rejecting with `ClaimError.key` (sign-in's
+  `errors.*` keys; 409 `email_taken` is `settings.add_email.taken`: the web never merges, it says
+  to bring the data in from the phone, ruling 5). `AddEmail({ claim, onDone, onCancel? })`: email,
+  then sign-in's `CodeInput`, then `queryKeys.me()` invalidated (the profile shows the email, the
+  Protect block goes; the user id and keys do not change). `HomeStage` `claim: "ok" | "taken"`
+  fakes the routes (code 123456). Stories `Settings/Protect` and `Settings/Add email`, web-only,
+  not in parity.json; copy under `settings.protect.*` and `settings.add_email.*`.
   `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule

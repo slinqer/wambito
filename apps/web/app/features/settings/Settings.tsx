@@ -1,6 +1,6 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslations } from "use-intl";
-import { useApiMode } from "../../api/ApiProvider.tsx";
+import { useApi, useApiMode } from "../../api/ApiProvider.tsx";
 import { useMe } from "../../api/queries.ts";
 import { PageHeader } from "../../ui/PageHeader.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
@@ -10,6 +10,8 @@ import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
 import { useVaultSession } from "../vault/vault-context.ts";
+import { AddEmail } from "./AddEmail.tsx";
+import { claimEmail } from "./add-email.ts";
 import { DeleteAccount } from "./DeleteAccount.tsx";
 import { FeedbackSection } from "./FeedbackSection.tsx";
 import { PasskeysSection } from "./PasskeysSection.tsx";
@@ -17,6 +19,7 @@ import { PreferencesSection } from "./PreferencesSection.tsx";
 import { ProtectSection } from "./ProtectSection.tsx";
 import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
+import { Takeover } from "./RemoveDeviceSheet.tsx";
 import { SecuritySection } from "./SecuritySection.tsx";
 import { liveSecurity, type SecurityApi } from "./security.ts";
 import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
@@ -36,8 +39,8 @@ export interface SettingsProps {
   /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
   security?: SecurityApi;
   /**
-   * "Protect your data"'s step 3, "Create account (add an email)" (Task 10's flow); the step is
-   * hidden without it.
+   * Stands in for "Protect your data"'s step 3, "Create account (add an email)", which opens
+   * `AddEmail` here by default; stories use it to watch the tap.
    */
   onAddEmail?: () => void;
 }
@@ -77,6 +80,9 @@ export function Settings({
   const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
   // An encrypted account's devices and keys (every one, an anonymous account made by the phone too).
   const security = local ? (securityProp ?? vaultSecurity) : null;
+  const api = useApi();
+  const claim = useMemo(() => claimEmail(api), [api]);
+  const [addingEmail, setAddingEmail] = useState(false);
   const dataOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
 
@@ -99,7 +105,7 @@ export function Settings({
             security={security}
             passkeys={passkeys}
             profile={me}
-            onAddEmail={onAddEmail}
+            onAddEmail={onAddEmail ?? (() => setAddingEmail(true))}
           />
         )}
         <PasskeysSection
@@ -111,6 +117,11 @@ export function Settings({
         />
         {security && (
           <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
+        )}
+        {addingEmail && (
+          <Takeover label={t("add_email.title")}>
+            <AddEmail claim={claim} onDone={() => setAddingEmail(false)} />
+          </Takeover>
         )}
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">
