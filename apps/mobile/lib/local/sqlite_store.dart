@@ -205,6 +205,12 @@ Future<void> _deleteOutbox(DatabaseExecutor db, String id) =>
 ///
 /// Not ported from the web's store: the BroadcastChannel across tabs and `versionchange` (the phone
 /// has one process), `migrateLegacyKeys` and the `keys` store (the keys live in secure storage).
+/// SQLite's `SQLITE_BUSY` primary result code (`database is locked`).
+const _sqliteBusy = 5;
+
+/// How long a write waits for another connection's lock: `busy_timeout` in `openVault`.
+const _busyBudget = Duration(seconds: 5);
+
 class SqliteStore implements FinanceStore {
   SqliteStore._(this._db);
 
@@ -259,6 +265,31 @@ class SqliteStore implements FinanceStore {
     return next;
   }
 
+  /// [_db.transaction] that waits in Dart when another connection holds the file's write lock.
+  ///
+  /// `busy_timeout` (5 s, `openVault`) makes SQLite itself wait, but under the Dart VM on Linux (the
+  /// host tests on CI) the signals the VM sends its threads cut SQLite's sleeps short, and it gave
+  /// up after about 60 ms. Only a failed `BEGIN` is retried: nothing of [fn] has run then. A phone's
+  /// SQLite runs on the platform's threads and waits by itself; this then never loops.
+  Future<T> _txn<T>(Future<T> Function(Transaction txn) fn) async {
+    final waited = Stopwatch()..start();
+    var pause = const Duration(milliseconds: 10);
+    while (true) {
+      var began = false;
+      try {
+        return await _db.transaction((txn) {
+          began = true;
+          return fn(txn);
+        });
+      } on DatabaseException catch (e) {
+        final busy = ((e.getResultCode() ?? 0) & 0xff) == _sqliteBusy;
+        if (began || !busy || waited.elapsed >= _busyBudget) rethrow;
+      }
+      await Future<void>.delayed(pause);
+      if (pause < const Duration(milliseconds: 200)) pause *= 2;
+    }
+  }
+
   void _fire() {
     for (final listener in List.of(_listeners)) {
       listener();
@@ -272,7 +303,7 @@ class SqliteStore implements FinanceStore {
   /// throws, and subscribers hear of it after the commit when it wrote.
   Future<R> _write<R>(Future<R> Function(_Ops ops) fn) => _enqueue(() async {
     final wrote = _Wrote();
-    final result = await _db.transaction(
+    final result = await _txn(
       (txn) => runZoned(() => fn(_Ops(txn, wrote)), zoneValues: {_inTransaction: this}),
     );
     if (wrote.value) _fire();
@@ -327,7 +358,7 @@ class SqliteStore implements FinanceStore {
   /// body, so a `bodiless` tombstone is no longer one; otherwise the flag stays.
   Future<void> ackOutbox(String id, int version, int seq, [int? keyV, bool bodySent = false]) =>
       _enqueue(
-        () => _db.transaction((txn) async {
+        () => _txn((txn) async {
           final entry = await _outboxEntry(txn, id);
           if (entry == null) return;
           final row = await _row(txn, entry.type, id);
@@ -358,7 +389,7 @@ class SqliteStore implements FinanceStore {
   /// `tombstoneBody`, or a local delete) count as records; the push sends their entry as a delete.
   /// Returns how many it added. Notifies nobody.
   Future<int> queueReseal(int current, int limit) => _enqueue(
-    () => _db.transaction((txn) async {
+    () => _txn((txn) async {
       final entries = (await txn.query(outboxTable)).map(_entryOf).toList();
       final pending = {for (final e in entries) e.id};
       var room = limit - entries.where((e) => e.reseal).length;
@@ -417,7 +448,7 @@ class SqliteStore implements FinanceStore {
   /// The engine gives up on the change read as [seq] for now: stores [park] on it. A no-op when a
   /// newer local write replaced it.
   Future<void> parkOutbox(String id, int seq, OutboxPark park) => _enqueue(
-    () => _db.transaction((txn) async {
+    () => _txn((txn) async {
       final entry = await _outboxEntry(txn, id);
       if (entry?.seq == seq) await _putOutbox(txn, entry!.copyWith(park: park));
     }),
@@ -426,7 +457,7 @@ class SqliteStore implements FinanceStore {
   /// The engine gives up on the change read as [seq] for good: stores [park] and `abandoned`, so
   /// it is never pushed again and remote writes of the id go through (and remove the entry).
   Future<void> abandonOutbox(String id, int seq, OutboxPark park) => _enqueue(
-    () => _db.transaction((txn) async {
+    () => _txn((txn) async {
       final entry = await _outboxEntry(txn, id);
       if (entry?.seq == seq) {
         await _putOutbox(txn, entry!.copyWith(park: park, abandoned: true));
@@ -445,7 +476,7 @@ class SqliteStore implements FinanceStore {
     ServerCopy server,
     Rebased Function(Json? local) rebase,
   ) => _enqueue(() async {
-    await _db.transaction((txn) async {
+    await _txn((txn) async {
       final entry = await _outboxEntry(txn, id);
       if (entry == null) return;
       final row = await _row(txn, type, id);
@@ -525,7 +556,7 @@ class SqliteStore implements FinanceStore {
   /// is set aside with its current body (`setAside`), so no pending change is lost if the download
   /// fails. Notifies subscribers.
   Future<void> wipeRecords() => _enqueue(() async {
-    await _db.transaction((txn) async {
+    await _txn((txn) async {
       for (final entry in (await txn.query(outboxTable)).map(_entryOf)) {
         if (entry.setAside != null) continue;
         if (entry.abandoned) {
