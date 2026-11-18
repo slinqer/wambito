@@ -515,4 +515,26 @@ void main() {
       throwsA(isA<AuthFailure>().having((f) => f.status, 'status', 0)),
     );
   });
+
+  test('deleteDeviceWrap sends DELETE /v2/keys/{id} with that bearer and the account, and a 404 '
+      'counts as done', () async {
+    await api.deleteDeviceWrap('tok', userId: 'user_p', wrapId: 'wrap_p');
+    expect(last().method, 'DELETE');
+    expect(last().uri.path, '/api/v2/keys/wrap_p');
+    expect(last().headers['Authorization'], 'Bearer tok');
+    expect(last().headers['x-wambito-user'], 'user_p');
+
+    adapter.replies['DELETE /api/v2/keys/wrap_p'] = const _Reply(404, {
+      'type': 'about:blank',
+      'status': 404,
+      'code': 'not_found',
+    });
+    await api.deleteDeviceWrap('tok', userId: 'user_p', wrapId: 'wrap_p');
+
+    adapter.replies['DELETE /api/v2/keys/wrap_p'] = const _Reply(500);
+    await expectLater(
+      api.deleteDeviceWrap('tok', userId: 'user_p', wrapId: 'wrap_p'),
+      throwsA(isA<AuthFailure>().having((f) => f.status, 'status', 500)),
+    );
+  });
 }

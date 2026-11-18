@@ -268,6 +268,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
   (`forgetVault`), the kept account and mode, before the token goes; Settings asks
   `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
+  Before ending the session, `signOut` deletes this phone's own device wrap (`AuthApi.deleteDeviceWrap`,
+  `DELETE /v2/keys/{deviceWrapId}`, so Settings → Devices keeps no leftover row): only a `preview` account
+  with a kept wrap id whose vault is not held; both calls share one `signOutWait` budget and every failure is
+  ignored (the wrap stays). A 401 / `sessionExpired` never deletes it. Tests: `test/api/session_vault_test.dart`.
   A 401 is told apart by its code (phone-first spec 10, `lib/api/unauthorized.dart`: `Unauthorized`
   `deviceRemoved`, `userDeleted`, `expired` = `unauthenticated` or anything else; `unauthorizedOf(code)`,
   `unauthorizedOfError(dio)`). `GET /v1/me` at start (`AuthApi.standing(token, userId:)`), in
@@ -545,8 +549,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
   `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
-  removes B with `TypedRecovery`, a background sync re-seals under the new key version and B's next sync ends
-  `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
+  removes B with `DELETE /v2/keys/{id}` (no rotation) and B's next sync ends `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
   `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
