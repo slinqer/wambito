@@ -547,9 +547,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   other. The first two share the seeded account, each after `seed:e2e-preview` in the api container:
   `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
   code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
-  `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
+  `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B, signed in on its own session, pairs through `/v2/pairing` (`startPairing`, `findPairing` +
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
-  removes B with `DELETE /v2/keys/{id}` (no rotation) and B's next sync ends `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
+  removes B with `DELETE /v2/keys/{id}` (no rotation): B's wrap is gone and B's next call is 401 (`unauthenticated`, since the seeded account is a plain user let into preview; `device_removed` is for encrypted users); `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
   `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users

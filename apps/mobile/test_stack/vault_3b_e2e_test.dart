@@ -13,7 +13,6 @@ import 'package:wambito/local/keys.dart' as keys;
 import 'package:wambito/local/pairing.dart';
 import 'package:wambito/local/rotate.dart';
 import 'package:wambito/local/sqlite_store.dart';
-import 'package:wambito/local/sync.dart' show SyncProblemCode;
 import 'package:wambito/local/vault_lock.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/vault/encryption_mode.dart';
@@ -87,7 +86,10 @@ void main() {
     await a.session!.close();
 
     // 2. Phone B pairs through /v2/pairing: its code typed on A, the numbers compared, A approves.
-    final b = Phone(token, Directory('${root.path}/b')..createSync());
+    // B signs in on its own, as a second phone does: its wrap belongs to its own session, which a
+    // removal ends (with A's session shared, the server would keep it for A's wrap).
+    final (token: tokenB, profile: _) = await signIn();
+    final b = Phone(tokenB, Directory('${root.path}/b')..createSync());
     final pairing = await startPairing(b.options);
     final approver = await findPairing(a.options, code: pairing.code);
     final numberOnB = await pairing.number();
@@ -99,8 +101,6 @@ void main() {
     expect(bWrap, isNotNull);
     // B opens its vault and keeps it open: a vault session is one per process and account.
     final sessionB = await _open(b, profile);
-    var removedByAccount = false;
-    sessionB.onRemoved(() => removedByAccount = true);
 
     // 3. A background run on A (its app closed) saves a queued capture, then syncs it.
     final queued = QueuedCapture(
@@ -154,15 +154,22 @@ void main() {
     expect(found.single['amount'], -_cents);
 
     // 4. A removes B as Settings → Security does (`SecurityApi.removeDevice`): `DELETE /v2/keys/{id}`
-    // deletes B's wrap and ends its session, with no rotation. B's next sync ends deviceRemoved and
-    // its vault and keys are gone.
+    // deletes B's wrap and ends B's session, with no rotation. B's next call is refused (401). The
+    // seeded account is a `plain` user let into preview (`E2E_PREVIEW_USER_IDS`), so the server
+    // says `unauthenticated` rather than `device_removed` (spec 2026-11-15 section 11: the code is
+    // for encrypted users); what the phone does with `device_removed` is in test/api.
     await keys.api(a.options)('/v2/keys/${bWrap!}', method: 'DELETE');
-    expect((await sessionB.sync()).problem, SyncProblemCode.deviceRemoved);
-    for (var i = 0; i < 50 && !removedByAccount; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    expect(removedByAccount, isTrue);
-    expect(await b.options.storage.deviceWrapId(userId), isNull);
+    final refused = await b.network.get<Object?>(
+      '/v1/me',
+      options: Options(validateStatus: (_) => true),
+    );
+    expect(refused.statusCode, 401);
+    final left = (await keys.api(a.options)('/v2/keys')).data! as Map<String, Object?>;
+    expect(
+      (left['wraps']! as List).cast<Map<String, Object?>>().map((w) => w['id']),
+      isNot(contains(bWrap)),
+    );
+    await sessionB.close();
 
     // 5. A makes a new recovery key: it signs in, the old one does not (the old key's verifier was
     // set up with the account, so it worked until now).

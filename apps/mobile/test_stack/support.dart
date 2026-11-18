@@ -213,7 +213,9 @@ Future<void> until(
 /// The seeded preview account signs in with an email code, as the app's AuthApi does: its bearer
 /// token and profile.
 Future<({String token, VaultProfile profile})> signIn() async {
-  final auth = HttpAuthApi(server: api, hints: hints);
+  // An address of its own per request, like [authApi]: a test that signs in twice (two phones)
+  // stays under the stack's sign-in limit.
+  final auth = authApi();
   final old = await mailIds();
   await auth.sendCode(email);
   final token = await auth.verifyCode(email, await readCode(old));
