@@ -287,7 +287,6 @@ class _ChangeKeysBodyState extends State<_ChangeKeysBody> {
               l10n.settingsSecurityDroppedItem(
                 d.label ?? l10n.settingsSecurityUnnamed,
                 switch (d.reason) {
-                  'removed' => 'removed',
                   'revoked' => 'revoked',
                   _ => 'other',
                 },

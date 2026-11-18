@@ -546,7 +546,7 @@
   "settingsSecurityChangeKeysFailed": "Não conseguimos mudar as tuas chaves. Tenta outra vez.",
   "settingsSecurityChangeKeysSuggest": "Se mais alguém teve a tua chave, muda-a: não conseguirá ler nada do que guardares a partir de agora.",
   "settingsSecurityDroppedLead": "Também ficaram de fora:",
-  "settingsSecurityDroppedItem": "{name} ({reason, select, removed {removido agora} revoked {removido antes} other {não verificado}})",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {removido antes} other {não verificado}})",
   "settingsSecurityPasskeysNote": "As impressões digitais que não usaste agora já não abrem os teus dados: volta a ativá-las nas impressões digitais.",
   "settingsSecurityNewKeyTitle": "Criar uma chave de recuperação nova",
   "settingsSecurityNewKeySaved": "A tua chave de recuperação nova ficou guardada. A anterior já não funciona.",

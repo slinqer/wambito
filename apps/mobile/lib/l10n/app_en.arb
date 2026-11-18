@@ -1487,7 +1487,7 @@
   "settingsSecurityChangeKeysFailed": "We couldn't change your keys. Try again.",
   "settingsSecurityChangeKeysSuggest": "If someone else had your key, change it: they won't be able to read anything you save from now on.",
   "settingsSecurityDroppedLead": "These were left out too:",
-  "settingsSecurityDroppedItem": "{name} ({reason, select, removed {removed now} revoked {removed earlier} other {not verified}})",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {removed earlier} other {not verified}})",
   "settingsSecurityPasskeysNote": "Fingerprints you didn't use just now no longer open your data: turn them on again under fingerprints.",
   "settingsSecurityNewKeyTitle": "Make a new recovery key",
   "settingsSecurityNewKeySaved": "Your new recovery key is saved. The old one no longer works.",

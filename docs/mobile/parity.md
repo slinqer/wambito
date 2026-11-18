@@ -398,10 +398,10 @@ when the app's picture changes. The web shots are regenerated only when the web 
     field keeps its border when the delete is refused.
 - **Settings → Security** has no pairs yet; its copy follows the web's `settings.security` keys. Removing a device is the
   web's `RemoveDeviceSheet` (title, body, "Quitar", "Quitando…", the toast "{name} ya no tiene acceso."), after the phone's
-  screen lock. "Cambiar llaves" is the web's "Change keys" (`ChangeKeysSheet`: its body, "Cambiando…", "Tus claves
+  screen lock. "Cambiar claves" is the web's "Change keys" (`ChangeKeysSheet`: its body, "Cambiando…", "Tus claves
   cambiaron.", the failure line), plus what only the phone has: the screen lock first, a new recovery key as a second way
   (the setup screen), and the list of what was left out. After a removal from the sign-in notice's "That wasn't me", the
-  sheet's done step says "Si alguien más tuvo tu llave, cámbiala: …" with a "Cambiar llaves" button; the web has no notice.
+  sheet's done step says "Si alguien más tuvo tu clave, cámbiala: …" with a "Cambiar claves" button; the web has no notice.
 - **The confirm sheet (`confirm-sheet-open*`).** `ui-confirmsheet--*` were added (the web had no story of it). A `flex-1`
   button is its own padding and border and an equal share of what is left, so "Cancelar" (8px a side) is narrower than
   the action (24px and a 2px border): `flexOneRow`. The guest's questions (`ChoiceSheet`: sign out, change server, the

@@ -546,7 +546,7 @@
   "settingsSecurityChangeKeysFailed": "Non siamo riusciti a cambiare le tue chiavi. Riprova.",
   "settingsSecurityChangeKeysSuggest": "Se qualcun altro ha avuto la tua chiave, cambiala: non potrà leggere niente di ciò che salvi da ora in poi.",
   "settingsSecurityDroppedLead": "Sono rimasti fuori anche:",
-  "settingsSecurityDroppedItem": "{name} ({reason, select, removed {rimosso ora} revoked {rimosso prima} other {non verificato}})",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {rimosso prima} other {non verificato}})",
   "settingsSecurityPasskeysNote": "Le impronte che non hai usato ora non aprono più i tuoi dati: riattivale tra le impronte.",
   "settingsSecurityNewKeyTitle": "Crea una nuova chiave di recupero",
   "settingsSecurityNewKeySaved": "La tua nuova chiave di recupero è salvata. Quella vecchia non funziona più.",

@@ -2395,7 +2395,7 @@
       }
     }
   },
-  "settingsSecurityChangeKeys": "Cambiar llaves",
+  "settingsSecurityChangeKeys": "Cambiar claves",
   "@settingsSecurityChangeKeys": {
     "description": "Settings → Security: the action, sheet title and button that rotate the encryption keys without removing a device."
   },
@@ -2403,14 +2403,14 @@
   "settingsSecurityChanging": "Cambiando…",
   "settingsSecurityChangeKeysDone": "Tus claves cambiaron.",
   "settingsSecurityChangeKeysFailed": "No pudimos cambiar tus claves. Inténtalo otra vez.",
-  "settingsSecurityChangeKeysSuggest": "Si alguien más tuvo tu llave, cámbiala: lo que guardes desde ahora no lo podrá leer.",
+  "settingsSecurityChangeKeysSuggest": "Si alguien más tuvo tu clave, cámbiala: lo que guardes desde ahora no lo podrá leer.",
   "@settingsSecurityChangeKeysSuggest": {
     "description": "Done step of a removal that came from the sign-in notice's \"That wasn't me\": suggests changing the keys."
   },
   "settingsSecurityDroppedLead": "También quedaron fuera:",
-  "settingsSecurityDroppedItem": "{name} ({reason, select, removed {quitado ahora} revoked {quitado antes} other {sin verificar}})",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {quitado antes} other {sin verificar}})",
   "@settingsSecurityDroppedItem": {
-    "description": "A device left out of a rotation, with why (removed, revoked, other).",
+    "description": "A device left out of a rotation, with why (revoked, other).",
     "placeholders": {
       "name": {
         "type": "String"
