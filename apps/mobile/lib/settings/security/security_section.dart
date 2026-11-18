@@ -13,7 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../local/rotate.dart' show NewRecoveryKey;
 import '../../protect/protect_actions.dart' show markRecoveryKeySaved;
-import '../../protect/protect_status.dart' show protectStatusProvider;
+import '../../protect/protect_status.dart' show protectStatusProvider, recoveryKeySavedAt;
+import '../../vault/encryption_mode.dart' show currentVaultAccountProvider;
 import '../../security/screen_lock.dart';
 import '../../theme/surfaces.dart';
 import '../../theme/text_styles.dart';
@@ -93,11 +94,25 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final toasts = ToastHost.of(context);
     setState(() => _busy = true);
     try {
+      // A guest who never saved a shown key has none to type (ruling 3); an email account whose
+      // settings predate `recoveryKeySavedAt` still is asked for it (D17).
+      final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
+      final session = ref.read(vaultSessionProvider);
+      var noKeyYet = false;
+      if (anonymous && session != null) {
+        try {
+          noKeyYet = await recoveryKeySavedAt(session.store) == null;
+        } on Object {
+          // Unreadable: the key is asked, as for any account.
+        }
+      }
+      if (!mounted) return;
       final ok = await confirmSensitive(
         context,
         ref,
         reason: l10n.settingsSecurityLockNewKey,
         checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
       );
       if (!ok || !mounted) return;
       final NewRecoveryKey prepared;
@@ -135,7 +150,6 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       toasts.say(l10n.settingsSecurityNewKeySaved);
       _changed();
       // A key the person saw is saved: "Protect your data" counts it, on every phone of the account.
-      final session = ref.read(vaultSessionProvider);
       if (session != null) {
         unawaited(
           markRecoveryKeySaved(

@@ -5,20 +5,29 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/approve_device_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/security_section.dart';
+import 'package:wambito/vault/encryption_mode.dart' show currentVaultAccountProvider;
 import 'package:wambito/vault/preview.dart' show isPreviewProvider;
+import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
 
 import '../../support/fonts.dart';
 import '../../support/ui_app.dart';
 import '../harness.dart';
+import '../../protect/fakes.dart';
 import 'fake_security.dart';
 
-Future<void> pumpSection(WidgetTester t, FakeSecurity security, ScreenLock lock) async {
+Future<void> pumpSection(
+  WidgetTester t,
+  FakeSecurity security,
+  ScreenLock lock, {
+  List<Override> overrides = const [],
+}) async {
   t.view
     ..physicalSize = const Size(824, 3200)
     ..devicePixelRatio = 2;
@@ -28,6 +37,12 @@ Future<void> pumpSection(WidgetTester t, FakeSecurity security, ScreenLock lock)
       overrides: [
         securityApiProvider.overrideWithValue(security),
         screenLockProvider.overrideWithValue(lock),
+        // No account nor vault unless the test gives them: the section asks the key as for any account.
+        if (!overrides.any((o) => o.origin == currentVaultAccountProvider))
+          currentVaultAccountProvider.overrideWithValue(null),
+        if (!overrides.any((o) => o.origin == vaultSessionProvider))
+          vaultSessionProvider.overrideWithValue(null),
+        ...overrides,
       ],
       child: uiApp(
         SingleChildScrollView(child: SecuritySection(timeZone: 'America/Bogota')),
@@ -186,6 +201,49 @@ void main() {
       await t.pumpAndSettle();
       expect(security.calls, ['newRecoveryKey']);
       expect(find.text(recoveryKeyText.split('-').first), findsOneWidget);
+    });
+
+    testWidgets('a preview guest with no saved key and no lock is not asked for a key', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.newKey');
+      expect(find.byKey(const Key('screenLock.key')), findsNothing);
+      expect(security.calls, ['newRecoveryKey']);
+    });
+
+    testWidgets('an email account with no saved-key mark and no lock is still asked', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(anonymous: false), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.newKey');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+      expect(security.calls, isEmpty);
+    });
+
+    testWidgets('a preview guest with a saved key and no lock is asked for it', (t) async {
+      final vault = FakeVault(recoveryKeySavedAt: '2026-11-18T10:00:00.000Z');
+      await t.runAsync(() => vault.seeded);
+      await pumpSection(
+        t,
+        FakeSecurity(),
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.newKey');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
     });
 
     testWidgets('the key is committed only after the four characters are typed back', (t) async {

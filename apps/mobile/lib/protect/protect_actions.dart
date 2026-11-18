@@ -107,7 +107,11 @@ Future<bool> protectWithRecoveryKey(
       // The next key says what is wrong, if anything still is.
     }
   }
-  await markRecoveryKeySaved(session, DateTime.now());
+  try {
+    await markRecoveryKeySaved(session, DateTime.now());
+  } on Object {
+    // The key is saved on the server; only the step's mark failed (it is made again next time).
+  }
   ref
     ..invalidate(protectStatusProvider)
     ..invalidate(securitySnapshotProvider);

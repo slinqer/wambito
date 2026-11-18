@@ -29,6 +29,7 @@ import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
 import '../protect/protect_block.dart';
+import '../protect/protect_status.dart' show protectStatusProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
@@ -303,8 +304,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (signedInAs != null) Text(signedInAs, style: signedInStyle),
           ],
         ),
-        // A `preview` account without email: "Protect your data" (it draws nothing otherwise).
-        if (!webOnly) const ProtectBlock(),
+        // A `preview` account without email: "Protect your data". Only with a status, so other
+        // accounts get no extra gap.
+        if (!webOnly && ref.watch(protectStatusProvider.select((s) => s.value != null)))
+          const ProtectBlock(),
         // Its block offers adding an email, so "Guarda tu progreso" is for a `plain` guest only.
         if (guest && !webOnly && !ref.watch(isPreviewProvider))
           SettingsSection(
@@ -379,7 +382,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (profile != null) TimeAndMoneySection(profile: profile),
         PasskeysSection(
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
-          guest: guest && !webOnly,
+          // A `preview` guest adds a passkey here too ("Protect your data" step 2).
+          guest: guest && !webOnly && !ref.watch(isPreviewProvider),
         ),
         // An encrypted account's devices and recovery key (Settings → Security), with or without
         // email. Plain accounts see nothing of it.
