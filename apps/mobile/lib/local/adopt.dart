@@ -321,7 +321,7 @@ Future<AdoptOutcome> adoptOrphan(String oldUserId, AdoptDeps deps) async {
     try {
       return await deps.hasQueuedCaptures?.call(oldUserId) ?? false;
     } on Object {
-      return true; // Cannot tell: the safe side keeps them.
+      return true; // Android could not read its queue: the safe side keeps them.
     }
   }
 

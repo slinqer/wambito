@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
@@ -58,6 +59,15 @@ final forgetVaultProvider = Provider<Future<void> Function(String userId, KeySto
   (ref) =>
       (userId, storage) => forgetVault(userId, storage),
 );
+
+/// Whether the last adoption of a deleted account's vault stopped at a `plain` new user
+/// (`SessionController.adoptionStepped`): a change makes the waiting gate check again, so it says
+/// why at once.
+final adoptionNeedsEncryptedServerProvider = Provider<ValueNotifier<bool>>((ref) {
+  final notifier = ValueNotifier(false);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
 
 /// Reads a vault's hold from its file ([vaultHoldOf]); tests put their own folder in.
 final vaultHoldReaderProvider = Provider<Future<VaultHold?> Function(String userId)>(
@@ -294,6 +304,14 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
   /// unsubscribes.
   VaultSession? wired;
   final detach = <void Function()>[];
+
+  // The adoption's stop changed (a `plain` new user, or no longer): a Locked gate checks again.
+  void adoptionChanged() {
+    if (!gate.disposed) gate.retry();
+  }
+
+  final adoptionWait = ref.read(adoptionNeedsEncryptedServerProvider)..addListener(adoptionChanged);
+  detach.add(() => adoptionWait.removeListener(adoptionChanged));
 
   // Another session signed in (or none): the gate keeps nothing, tells nothing, and its vault
   // session closes; the vault file and the keys stay (a sign-out deletes them, Task 14).

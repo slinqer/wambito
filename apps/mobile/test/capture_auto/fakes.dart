@@ -76,6 +76,17 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
     return (captures: [...queuedCaptures], confirms: [...queuedConfirms]);
   }
 
+  /// What [hasQueued] throws when set (Android could not read the queue).
+  Object? hasQueuedError;
+
+  @override
+  Future<bool> hasQueued(String userId) async {
+    calls.add('hasQueued $userId');
+    final error = hasQueuedError;
+    if (error != null) throw error;
+    return queuedCaptures.isNotEmpty;
+  }
+
   @override
   Future<void> ackQueued(List<String> keys, List<String> confirms) async =>
       calls.add('ackQueued ${keys.join(',')} | ${confirms.join(',')}');

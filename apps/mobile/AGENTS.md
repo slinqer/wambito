@@ -238,17 +238,21 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   user's vault (opened on its own: nothing seeded), then the old vault forgotten; offline (or a 5xx) before the carry
   is `waiting`. `adoptOrphan(oldUserId, deps)` → `AdoptOutcome` (`adopted`, `wiped`, `waiting`): holds the vault
   `orphaned` first; no data (ruling 18: no live transaction, recurrence, budget or merchant, and no capture still
-  queued for that user: `hasQueuedCaptures`, `takeQueued` on the app's `wambito/capture`, read only) and no adoption
+  queued for that user: `hasQueuedCaptures` = `AutoCapturePlatform.hasQueued` over `takeQueued` on the app's
+  `wambito/capture`, read only; a `PlatformException` counts as captures, no Android side as none) and no adoption
   under way wipes it and signs out (`onWiped`); else the routine, then `onAdopted` (the session becomes the new user's,
   taking the deleted user's queued captures over: `captureHandoverProvider.keep` then `_signedIn(capturesFrom:)`)
   and the kept token goes. `resumeAdoption(deps)` (`adoptionResumeProvider`, watched in `app.dart` before the
   merge's: at start and on resume) goes on with every `orphaned` hold of `listVaultHolds` when `mayResume` allows
   (signed out, or still in that account's session); a vault in `unreadable` is left alone. `adoptDepsProvider`
   (tests override it); adoptions run one after the other, never one in place of another
-  (`SessionController._adoption`). The gate never opens a vault held `orphaned` (`refuseAdopted`, before and
+  (`SessionController._adoption`), and a 401's adoption queued behind another runs only while the session is
+  still that dead token. `onAdopted` waits for `sendQueued(newUserId, from: oldUserId)` itself, so the queue is
+  never left tagged to the deleted user. The gate never opens a vault held `orphaned` (`refuseAdopted`, before and
   after `openVaultSession`, through `vaultHoldReaderProvider`): it asks the adoption to go on and shows Locked
   `offline` (`adopting`), or `LockedKind.plainServer` (`vaultLockedPlainServer*`) when the adoption stopped at a
-  `plain` new user (`adoptionNeedsEncryptedServer`). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
+  `plain` new user (`adoptionNeedsEncryptedServer`, kept in `adoptionNeedsEncryptedServerProvider`, whose change makes
+  a Locked gate check again by itself). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
   What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",

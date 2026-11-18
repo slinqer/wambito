@@ -37,7 +37,12 @@ import '../vault/encryption_mode.dart'
         vaultOwnerProvider;
 import '../vault/finance_guard.dart';
 import '../vault/vault_providers.dart'
-    show forgetVaultProvider, keyStorageProvider, staleVaultsProvider, vaultSessionProvider;
+    show
+        adoptionNeedsEncryptedServerProvider,
+        forgetVaultProvider,
+        keyStorageProvider,
+        staleVaultsProvider,
+        vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -693,7 +698,13 @@ class SessionController extends Notifier<SessionState> {
       case Unauthorized.deviceRemoved:
         await _wipeAndSignOut(stored);
       case Unauthorized.userDeleted:
-        await _adopting(() => adoptOrphan(userId, _adoptDeps()));
+        await _adopting(() async {
+          // Queued behind another ask for the same 401 (the start's and the gate's): once the
+          // session moved on (that one adopted, or another account signed in), nothing is left
+          // to do, and a second new user must never take the session.
+          if (state.stored?.token != stored) return null;
+          return adoptOrphan(userId, _adoptDeps());
+        });
       case Unauthorized.expired:
         break;
     }
@@ -716,8 +727,16 @@ class SessionController extends Notifier<SessionState> {
   Future<void>? _adoption;
 
   /// Whether the last adoption stopped at a `plain` new user (the gate says why it waits).
-  bool get adoptionNeedsEncryptedServer => _needsEncryptedServer;
-  var _needsEncryptedServer = false;
+  bool get adoptionNeedsEncryptedServer => ref.read(adoptionNeedsEncryptedServerProvider).value;
+
+  /// Where an adoption's routine stopped ([AdoptDeps.onStep]): when that changes whether it waits
+  /// for a server that keeps data encrypted, the gate waiting on the vault checks again at once
+  /// (its recheck refuses the vault again, now saying why), with no tap on retry.
+  void adoptionStepped(AdoptStep step) {
+    if (!ref.mounted) return;
+    // A change notifies the gate's wiring (vault_providers.dart), which rechecks.
+    ref.read(adoptionNeedsEncryptedServerProvider).value = step == AdoptStep.plainUser;
+  }
 
   Future<void> _adopting(Future<Object?> Function() run) {
     final next = (_adoption ?? Future<void>.value()).then((_) async {
@@ -745,6 +764,15 @@ class SessionController extends Notifier<SessionState> {
     await _adopting(() => resumeAdoption(_adoptDeps()));
   }
 
+  /// The id of [token]'s account (`GET /v1/me`); null when the server could not say.
+  Future<String?> _accountOrNull(String token) async {
+    try {
+      return await _auth.accountId(token);
+    } on Object {
+      return null;
+    }
+  }
+
   /// [adoptDepsProvider] with the session's part: the new user's session, the wipe's sign-out, and
   /// which held vault may be adopted now.
   AdoptDeps _adoptDeps() => ref
@@ -752,8 +780,19 @@ class SessionController extends Notifier<SessionState> {
       .withSession(
         onAdopted: (token, {required fromUserId}) async {
           // Before the token: a process killed right after still hands the captures over.
-          await ref.read(captureHandoverProvider).keep(token, fromUserId);
-          await _signedIn(token, guest: true, capturesFrom: fromUserId);
+          final handover = ref.read(captureHandoverProvider);
+          await handover.keep(token, fromUserId);
+          final userId = await _accountOrNull(token);
+          await _signedIn(token, guest: true, userId: userId, capturesFrom: fromUserId);
+          // Waited for here (the sign-in's own hand-over is not): the queue is the new user's
+          // before anything else looks at it, never left tagged to the deleted one.
+          if (userId == null) return;
+          try {
+            await ref.read(autoCapturePlatformProvider).sendQueued(userId, from: fromUserId);
+            await handover.done(token);
+          } on Object {
+            // The kept hand-over re-tags at the next start.
+          }
         },
         onWiped: (oldUserId) async {
           final token = state.stored?.token;
@@ -767,7 +806,7 @@ class SessionController extends Notifier<SessionState> {
           final token = state.stored?.token;
           return token == null || await _accountIdOf(token) == oldUserId;
         },
-        onStep: (step) => _needsEncryptedServer = step == AdoptStep.plainUser,
+        onStep: adoptionStepped,
       );
 
   /// This phone was removed from the account, or its deleted account's vault was empty: what the
@@ -959,8 +998,7 @@ final adoptDepsProvider = Provider<AdoptDeps>(
     keepToken: (token) => appSecureStorage.write(key: adoptTokenKey, value: token),
     forgetToken: () => appSecureStorage.delete(key: adoptTokenKey),
     // Android's queue: captures not saved yet are data, so an empty vault with some is adopted.
-    hasQueuedCaptures: (id) async =>
-        (await ref.read(autoCapturePlatformProvider).takeQueued(id)).captures.isNotEmpty,
+    hasQueuedCaptures: (id) => ref.read(autoCapturePlatformProvider).hasQueued(id),
     // The app's open vault of the old account stops taking writes before the carry reads it.
     stopWrites: (id) async {
       final open = ref.read(vaultSessionProvider);

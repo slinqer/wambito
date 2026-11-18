@@ -81,6 +81,11 @@ abstract interface class AutoCapturePlatform {
   /// Nothing is removed until [ackQueued].
   Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId);
 
+  /// Whether captures still wait in the queue for [userId] (read only): a deleted account's vault
+  /// with some is adopted, never wiped (lib/local/adopt.dart). False where there is no queue (no
+  /// Android side); throws when Android could not read it, so the caller keeps them.
+  Future<bool> hasQueued(String userId);
+
   /// The engine saved these captures (by `key`) and applied these confirms: they leave the queue.
   Future<void> ackQueued(List<String> keys, List<String> confirms);
 }
@@ -150,6 +155,18 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
     }
     final confirms = [...((raw?['confirms'] as List?) ?? const []).whereType<String>()];
     return (captures: captures, confirms: confirms);
+  }
+
+  @override
+  Future<bool> hasQueued(String userId) async {
+    final Map<Object?, Object?>? raw;
+    try {
+      raw = await _channel.invokeMethod<Map<Object?, Object?>>('takeQueued', {'userId': userId});
+    } on MissingPluginException {
+      return false; // No Android side (iOS has no capture queue).
+    }
+    final captures = raw?['captures'];
+    return captures is List && captures.isNotEmpty;
   }
 
   @override

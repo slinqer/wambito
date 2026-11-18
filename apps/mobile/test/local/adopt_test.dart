@@ -2,6 +2,7 @@
 // SQLite vaults in a temp dir, a fake auth server, a fake `/v2/keys` and a fake `/v2/sync`.
 import 'dart:io';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/auth_api.dart' show AuthFailure;
 import 'package:wambito/api/session.dart';
+import 'package:wambito/api/unauthorized.dart';
 import 'package:wambito/background/queued_capture.dart';
 import 'package:wambito/capture_auto/capture_platform.dart' show autoCapturePlatformProvider;
 import 'package:wambito/crypto/crypto.dart';
@@ -113,7 +115,7 @@ void main() {
     forgetToken: () => const FlutterSecureStorage().delete(key: adoptTokenKey),
     directory: dir.path,
     factory: databaseFactoryFfi,
-    hasQueuedCaptures: (id) async => (await capture.takeQueued(id)).captures.isNotEmpty,
+    hasQueuedCaptures: capture.hasQueued,
     listHolds: listing,
   );
 
@@ -166,10 +168,7 @@ void main() {
   });
   tearDown(() => dir.deleteSync(recursive: true));
 
-  /// The app's session over [deps], with the start's `GET /v1/me` of the deleted user answering
-  /// [code].
-  Future<ProviderContainer> startWith401(String code) async {
-    auth.failures['isGuest'] = AuthFailure(code: code, status: 401);
+  ProviderContainer containerFor() {
     final container = ProviderContainer(
       overrides: [
         authApiProvider.overrideWithValue(auth),
@@ -182,6 +181,14 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    return container;
+  }
+
+  /// The app's session over [deps], with the start's `GET /v1/me` of the deleted user answering
+  /// [code].
+  Future<ProviderContainer> startWith401(String code) async {
+    auth.failures['isGuest'] = AuthFailure(code: code, status: 401);
+    final container = containerFor();
     final session = container.read(sessionProvider.notifier);
     await session.ready;
     await session.refreshed;
@@ -433,17 +440,7 @@ void main() {
 
   test('a vault without records but with captures still queued is adopted, not wiped', () async {
     await oldVault(data: false);
-    capture.queuedCaptures = [
-      const QueuedCapture(
-        key: 'k1',
-        kind: 'expense',
-        amount: 1250,
-        currency: 'EUR',
-        merchant: 'Mercadona',
-        capturedAt: '2026-11-18T10:00:00.000Z',
-        source: 'revolut',
-      ),
-    ];
+    capture.queuedCaptures = [_queued];
     final container = await startWith401('user_deleted');
     expect(auth.signInAsGuestCalls, 1);
     expect(container.read(sessionProvider).stored?.token, isNot(oldToken));
@@ -451,6 +448,35 @@ void main() {
     // The queue is never cleared: it is re-tagged to the new user.
     expect(capture.calls, isNot(contains('clearQueue')));
     expect(capture.callsNamed('sendQueued'), anyElement(endsWith(' from $oldId')));
+  });
+
+  test('two asks for the same 401 user_deleted, with a capture queued: one new user, the session '
+      'on it with its data', () async {
+    await oldVault();
+    capture.queuedCaptures = [_queued];
+    auth.failures['isGuest'] = const AuthFailure(code: 'user_deleted', status: 401);
+    final container = containerFor();
+    final session = container.read(sessionProvider.notifier);
+    await session.ready;
+    // The start's 401 and the gate's, for the same dead session.
+    final second = session.sessionEnded(token: oldToken, kind: Unauthorized.userDeleted);
+    await session.refreshed;
+    await second;
+    expect(auth.signInAsGuestCalls, 1);
+    expect(container.read(sessionProvider).stored?.token, 'guest-token-1');
+    final store = await open('new_1');
+    expect((await store.list(RecordType.transaction)).single.id, tx);
+    await store.close();
+    // The queue was handed to the new user before anything else could look at it.
+    expect(capture.callsNamed('sendQueued'), anyElement(endsWith(' from $oldId')));
+  });
+
+  test('a queue Android cannot read counts as data: the empty vault is adopted', () async {
+    await oldVault(data: false);
+    capture.hasQueuedError = PlatformException(code: 'io');
+    final container = await startWith401('user_deleted');
+    expect(auth.signInAsGuestCalls, 1);
+    expect(container.read(sessionProvider).stored?.token, isNot(oldToken));
   });
 
   test('killed after the old vault was forgotten and before the session changed: the next '
@@ -505,3 +531,13 @@ Future<void> until(bool Function() condition) async {
     await Future<void>.delayed(const Duration(milliseconds: 5));
   }
 }
+
+const _queued = QueuedCapture(
+  key: 'k1',
+  kind: 'expense',
+  amount: 1250,
+  currency: 'EUR',
+  merchant: 'Mercadona',
+  capturedAt: '2026-11-18T10:00:00.000Z',
+  source: 'revolut',
+);

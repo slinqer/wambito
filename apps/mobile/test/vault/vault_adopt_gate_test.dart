@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/crypto/crypto.dart';
+import 'package:wambito/local/adopt.dart' show AdoptStep;
 import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind, vaultHoldOf;
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/sqlite_store.dart';
@@ -24,13 +25,9 @@ class _Session extends FixedSession {
   _Session(super.initial);
 
   var resumes = 0;
-  var plain = false;
 
   @override
   Future<void> resumeAdoptions() async => resumes += 1;
-
-  @override
-  bool get adoptionNeedsEncryptedServer => plain;
 }
 
 void main() {
@@ -91,10 +88,15 @@ void main() {
       expect(c.read(vaultSessionProvider), isNull);
       expect(session.resumes, greaterThan(0));
 
-      // The adoption stopped at a new user that keeps data in clear: the gate says so.
-      session.plain = true;
-      c.read(vaultGateProvider)!.retry();
+      // The adoption stopped at a new user that keeps data in clear: the gate says so at once,
+      // without a tap on retry.
+      session.adoptionStepped(AdoptStep.plainUser);
       await until(() => stateOf(c) == const Locked<VaultSession>(LockedKind.plainServer, false));
+      // The same stop again changes nothing (no loop of rechecks).
+      final resumes = session.resumes;
+      session.adoptionStepped(AdoptStep.plainUser);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(session.resumes, resumes);
 
       // No hold any more (another way out): the vault opens as before.
       await hold(null);
