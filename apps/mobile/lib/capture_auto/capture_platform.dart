@@ -1,5 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../home/home_cache.dart' show sessionOwnerOf;
+import '../storage/secure_storage.dart';
 
 import '../background/queued_capture.dart';
 
@@ -152,10 +158,47 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
 }
 
 /// The platform side of automatic capture (replaced in tests).
-/// The captures one account hands to another in this process (`to → from`): a merge's sign-in and
-/// its cancel set it, and every `sendQueued` for `to` passes `from`, so no hand-over of the queue
-/// (the session's, [previewSyncProvider]'s) drops what the merge carries.
-final captureHandoverProvider = Provider<Map<String, String>>((ref) => {});
+/// The captures a session takes over from another account (a merge's sign-in takes the guest's; its
+/// cancel gives back what came in meanwhile), kept in secure storage `wambito.capture.handover` as
+/// `{owner, from}` (owner: the hash of the new session's token, [sessionOwnerOf]) **before** that
+/// token is written: a process killed in between still re-tags at the next start instead of
+/// dropping. Every hand-over of the queue for that session (the session's, the preview sync's)
+/// passes `from` until one went through ([done]).
+class CaptureHandover {
+  const CaptureHandover([this._storage = appSecureStorage]);
+
+  static const key = 'wambito.capture.handover';
+
+  final FlutterSecureStorage _storage;
+
+  Future<void> keep(String token, String from) =>
+      _storage.write(key: key, value: jsonEncode({'owner': sessionOwnerOf(token), 'from': from}));
+
+  /// The account [token]'s session takes captures over from, or null.
+  Future<String?> fromFor(String token) async {
+    try {
+      final raw = await _storage.read(key: key);
+      if (raw == null) return null;
+      final doc = jsonDecode(raw);
+      if (doc is! Map || doc['owner'] != sessionOwnerOf(token)) return null;
+      final from = doc['from'];
+      return from is String ? from : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The hand-over for [token]'s session went through.
+  Future<void> done(String token) async {
+    try {
+      if (await fromFor(token) != null) await _storage.delete(key: key);
+    } on Object {
+      // Re-tagging again later is harmless.
+    }
+  }
+}
+
+final captureHandoverProvider = Provider<CaptureHandover>((ref) => const CaptureHandover());
 
 final autoCapturePlatformProvider = Provider<AutoCapturePlatform>(
   (ref) => const ChannelAutoCapturePlatform(),

@@ -89,17 +89,6 @@ const mergeCarriedMeta = 'mergeCarried';
 /// later run finishes without carrying, and the currency stop never shows again.
 const mergeDiscardMeta = 'mergeDiscard';
 
-/// The record types a merge carries under their own ids: one of them in the account's vault proves
-/// the carry committed (a phone's ids never exist in another user's vault), and each must reach the
-/// server before the anonymous user is deleted.
-const _ownIdTypes = [
-  RecordType.category,
-  RecordType.account,
-  RecordType.transaction,
-  RecordType.recurrence,
-  RecordType.budget,
-];
-
 /// The account's open vault, which the phone's records go into.
 class MergeTarget {
   const MergeTarget({
@@ -339,24 +328,18 @@ class MergeController extends Notifier<MergeState> {
     }
   }
 
-  /// The phone's live records of [_ownIdTypes] as the account's vault holds them now.
+  /// The ids the carry gives the phone's records ([mergedIdsOf]) that the account's vault holds.
   Future<List<(RecordType, String)>> _keptIds(SqliteStore source, MergeTarget target) async => [
-    for (final type in _ownIdTypes)
-      for (final r in await source.list(type))
-        if (await target.store.get(type, r.id, const ReadOptions(includeDeleted: true)) != null)
-          (type, r.id),
+    for (final (type, id) in await mergedIdsOf(source, target.userId))
+      if (await target.store.get(type, id, const ReadOptions(includeDeleted: true)) != null)
+        (type, id),
   ];
 
-  /// Whether the carry already committed: one of the phone's own ids is in the account's vault.
-  Future<bool> _committed(SqliteStore source, MergeTarget target) async {
-    for (final type in _ownIdTypes) {
-      for (final r in await source.list(type)) {
-        final there = await target.store.get(type, r.id, const ReadOptions(includeDeleted: true));
-        if (there != null) return true;
-      }
-    }
-    return false;
-  }
+  /// Whether the carry already committed: one of the ids it gives the phone's records is in the
+  /// account's vault (they derive from the account and the phone's own ids, so nothing else has
+  /// them).
+  Future<bool> _committed(SqliteStore source, MergeTarget target) async =>
+      (await _keptIds(source, target)).isNotEmpty;
 
   Future<void> _upload(_Job job, MergeTarget target, List<(RecordType, String)> kept) async {
     // `pendingChanges` leaves out re-seals (the server already has those records) and changes the

@@ -2,6 +2,13 @@
 // start, a deleted user's data; ruling 7) and the merge into an existing account (spec 7.2 step 5,
 // rulings 11 and 12). Every record lands as a local write of the target, so the target's outbox
 // pushes it with no base version, sealed under the target's user id and data key.
+//
+// A merge gives every carried record a new id (ruling P17): the server's record ids are global, and
+// the phone's anonymous user already owns the old ones there (`id_taken`). The new id is
+// deterministic, `mergedId(targetUserId, oldId)`, so a rerun writes the same ids; an occurrence of a
+// carried recurrence is derived from the rule's new id as the backend derives it
+// (`uuidv5(ruleId, '<month>:<rev>')`). An adoption keeps the ids (its old user is gone or never
+// pushed).
 import '../core/records.dart' show Json;
 import '../crypto/records.dart' show RecordType;
 import 'captures.dart' show merchantRecordId;
@@ -43,6 +50,65 @@ String foldedName(String name) => name.trim().toLowerCase();
 
 String _seedId(String userId, String name) => uuidv5(uuidv5(seedNamespace, userId), name);
 
+/// The namespace of the ids a merge gives the records it carries (never changed: a resume finds
+/// what an earlier run wrote by it).
+const mergeNamespace = '0c55f843-c1d0-4881-aece-c05d06865afa';
+
+/// The id a merge into [targetUserId]'s vault gives the record [oldId].
+String mergedId(String targetUserId, String oldId) =>
+    uuidv5(mergeNamespace, '$targetUserId:$oldId');
+
+/// The id a merge gives the transaction [t] (live or a tombstone): an occurrence of one of
+/// [ruleRevs]'s rules (its id is `uuidv5(ruleId, '<month>:<rev>')` for a revision up to the rule's)
+/// is derived the same way from the rule's new id; any other transaction takes [mergedId].
+String mergedTransactionId(String targetUserId, StoredRecord t, Map<String, int> ruleRevs) {
+  final rule = t.body['recurrenceId'];
+  final month = t.body['occurrenceMonth'];
+  if (rule is String && month is String) {
+    final rev = ruleRevs[rule];
+    if (rev != null) {
+      for (var r = 0; r <= rev; r++) {
+        if (uuidv5(rule, '$month:$r') == t.id) {
+          return uuidv5(mergedId(targetUserId, rule), '$month:$r');
+        }
+      }
+    }
+  }
+  return mergedId(targetUserId, t.id);
+}
+
+/// The rules of [rules] and their current revisions.
+Map<String, int> _revsOf(List<StoredRecord> rules) => {
+  for (final r in rules) r.id: (r.body['rev'] as int?) ?? 0,
+};
+
+/// The types a merge carries under ids of their own (the others are matched or derived from the
+/// user, as settings and merchants).
+const _ownIdTypes = [
+  RecordType.category,
+  RecordType.account,
+  RecordType.transaction,
+  RecordType.recurrence,
+  RecordType.budget,
+];
+
+/// The ids a merge of [from] into [targetUserId]'s vault gives [from]'s live records of the types
+/// carried under their own ids (matched categories and accounts included: they are absent from the
+/// target). A resume looks for them to tell whether the carry committed.
+Future<List<(RecordType, String)>> mergedIdsOf(FinanceStore from, String targetUserId) async {
+  final revs = _revsOf(await from.list(RecordType.recurrence));
+  return [
+    for (final type in _ownIdTypes)
+      for (final r in await from.list(type))
+        (
+          type,
+          type == RecordType.transaction
+              ? mergedTransactionId(targetUserId, r, revs)
+              : mergedId(targetUserId, r.id),
+        ),
+  ];
+}
+
 /// Copies [from]'s live records into [into] in one transaction of [into]. Tombstones stay behind,
 /// except a deleted occurrence of a carried recurrence: it is what keeps the rule from making that
 /// month's occurrence again, so it is carried as a tombstone (with its body). A second run writes
@@ -67,6 +133,14 @@ Future<CarryReport> carryRecords(
         r,
   ];
   final merge = mode == CarryMode.merge;
+  final revs = _revsOf(source[RecordType.recurrence]!);
+
+  /// The id [r] of [type] is carried under: a new one in a merge, its own in an adoption.
+  String idOf(RecordType type, StoredRecord r) => !merge
+      ? r.id
+      : type == RecordType.transaction
+      ? mergedTransactionId(intoUserId, r, revs)
+      : mergedId(intoUserId, r.id);
 
   return into.transaction((tx) async {
     var written = 0;
@@ -75,7 +149,9 @@ Future<CarryReport> carryRecords(
 
     /// The target's records of [type], without earlier copies of the source's.
     Future<List<StoredRecord>> theirs(RecordType type) async {
-      final copied = {for (final r in source[type]!) r.id};
+      final copied = {
+        for (final r in source[type]!) ...[r.id, idOf(type, r)],
+      };
       return [
         for (final r in await tx.list(type))
           if (!copied.contains(r.id)) r,
@@ -122,11 +198,15 @@ Future<CarryReport> carryRecords(
           }
           final renamed = '${name.trim()} $n';
           usedNames.add(foldedName(renamed));
-          await put(RecordType.category, c.id, {...c.body, 'name': renamed});
+          final id = idOf(RecordType.category, c);
+          if (id != c.id) remapped[c.id] = id;
+          await put(RecordType.category, id, {...c.body, 'name': renamed});
           continue;
         }
       }
-      await put(RecordType.category, c.id, c.body);
+      final id = idOf(RecordType.category, c);
+      if (id != c.id) remapped[c.id] = id;
+      await put(RecordType.category, id, c.body);
     }
 
     // Accounts: matched by the same folded name.
@@ -141,7 +221,9 @@ Future<CarryReport> carryRecords(
         dropped += 1;
         continue;
       }
-      await put(RecordType.account, a.id, a.body);
+      final id = idOf(RecordType.account, a);
+      if (id != a.id) remapped[a.id] = id;
+      await put(RecordType.account, id, a.body);
     }
 
     // Settings: a merge keeps the account's; an adoption moves the phone's to the new user's seed
@@ -171,27 +253,33 @@ Future<CarryReport> carryRecords(
         dropped += 1;
         continue;
       }
-      await put(RecordType.budget, b.id, {...b.body, 'categoryId': categoryId});
+      final id = idOf(RecordType.budget, b);
+      if (id != b.id) remapped[b.id] = id;
+      await put(RecordType.budget, id, {...b.body, 'categoryId': categoryId});
     }
 
-    // Recurrences and transactions (their occurrences too) keep their ids.
+    // Recurrences, then transactions: an occurrence's id follows its rule's (adopt keeps both).
     for (final r in source[RecordType.recurrence]!) {
-      await put(RecordType.recurrence, r.id, {
-        ...r.body,
-        'categoryId': mapped(r.body['categoryId']),
-      });
+      final id = idOf(RecordType.recurrence, r);
+      if (id != r.id) remapped[r.id] = id;
+      await put(RecordType.recurrence, id, {...r.body, 'categoryId': mapped(r.body['categoryId'])});
     }
     Json repointed(Json t) => {
       ...t,
       'categoryId': mapped(t['categoryId']),
       'accountId': mapped(t['accountId']),
+      if (t.containsKey('recurrenceId')) 'recurrenceId': mapped(t['recurrenceId']),
     };
     for (final t in source[RecordType.transaction]!) {
-      await put(RecordType.transaction, t.id, repointed(t.body));
+      final id = idOf(RecordType.transaction, t);
+      if (id != t.id) remapped[t.id] = id;
+      await put(RecordType.transaction, id, repointed(t.body));
     }
     for (final t in deletedOccurrences) {
-      await put(RecordType.transaction, t.id, repointed(t.body));
-      await tx.delete(RecordType.transaction, t.id);
+      final id = idOf(RecordType.transaction, t);
+      if (id != t.id) remapped[t.id] = id;
+      await put(RecordType.transaction, id, repointed(t.body));
+      await tx.delete(RecordType.transaction, id);
     }
 
     // Merchants: their ids derive from the user, so they move to the target's; the target's own

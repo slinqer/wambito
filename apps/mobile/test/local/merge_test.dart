@@ -102,6 +102,9 @@ Future<Map<String, List<Object>>> dump(FinanceStore store) async => {
 Future<Json?> body(FinanceStore store, RecordType type, String id) async =>
     (await store.get(type, id))?.body;
 
+/// The id a merge into the account gives a phone record.
+String m(String id) => mergedId(accountUser, id);
+
 // Phone ids (v7-looking) and account ids, invented.
 const pFood = '01930000-0000-7000-8000-00000000a001';
 const pSalary = '01930000-0000-7000-8000-00000000a002';
@@ -110,6 +113,7 @@ const pRule = '01930000-0000-7000-8000-00000000a004';
 const pBudget = '01930000-0000-7000-8000-00000000a005';
 const pGone = '01930000-0000-7000-8000-00000000a006';
 const pAccount = '01930000-0000-7000-8000-00000000a007';
+const pOtherCat = '01930000-0000-7000-8000-00000000a00a';
 const aFood = '01930000-0000-7000-8000-00000000b001';
 const aSalary = '01930000-0000-7000-8000-00000000b002';
 const aBudget = '01930000-0000-7000-8000-00000000b005';
@@ -246,12 +250,13 @@ void main() {
       expect(await body(into, RecordType.category, pFood), isNull);
       expect(await body(into, RecordType.category, pSalary), isNull);
       expect(await body(into, RecordType.account, pAccount), isNull);
+      expect(await body(into, RecordType.transaction, pTx), isNull);
       expect(
-        await body(into, RecordType.transaction, pTx),
+        await body(into, RecordType.transaction, m(pTx)),
         transaction(aFood, accountId: aAccount),
       );
-      expect(await body(into, RecordType.recurrence, pRule), recurrence(aSalary));
-      expect(await body(into, RecordType.budget, pSalaryBudget), budget(aSalary));
+      expect(await body(into, RecordType.recurrence, m(pRule)), recurrence(aSalary));
+      expect(await body(into, RecordType.budget, m(pSalaryBudget)), budget(aSalary));
       expect(
         await body(into, RecordType.merchant, merchantRecordId(accountUser, 'exito')),
         merchant('exito', aFood),
@@ -260,6 +265,9 @@ void main() {
         pFood: aFood,
         pSalary: aSalary,
         pAccount: aAccount,
+        pSalaryBudget: m(pSalaryBudget),
+        pRule: m(pRule),
+        pTx: m(pTx),
         merchantRecordId(phoneUser, 'exito'): merchantRecordId(accountUser, 'exito'),
       });
       expect(report.dropped, 3);
@@ -274,8 +282,8 @@ void main() {
 
       await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
 
-      expect(await body(into, RecordType.category, pFood), category('Comida 2', kind: 'income'));
-      expect((await body(into, RecordType.transaction, pTx))?['categoryId'], pFood);
+      expect(await body(into, RecordType.category, m(pFood)), category('Comida 2', kind: 'income'));
+      expect((await body(into, RecordType.transaction, m(pTx)))?['categoryId'], m(pFood));
       expect(await body(into, RecordType.category, aFood), category('comida'));
     });
 
@@ -292,9 +300,9 @@ void main() {
 
       final report = await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
 
-      expect(await body(into, RecordType.category, pFood), category('Comida'));
-      expect((await body(into, RecordType.transaction, pTx))?['categoryId'], pFood);
-      expect(report.remapped, isEmpty);
+      expect(await body(into, RecordType.category, m(pFood)), category('Comida'));
+      expect((await body(into, RecordType.transaction, m(pTx)))?['categoryId'], m(pFood));
+      expect(report.remapped, {pFood: m(pFood), pTx: m(pTx)});
     });
 
     test("merge: the account's settings win", () async {
@@ -332,7 +340,7 @@ void main() {
         final budgets = {for (final r in await into.list(RecordType.budget)) r.id: r.body};
         expect(budgets, {
           aBudget: budget(aFood, amount: 70000000),
-          pOtherBudget: budget(pOther, amount: 20000000),
+          m(pOtherBudget): budget(m(pOther), amount: 20000000),
         });
       },
     );
@@ -355,7 +363,7 @@ void main() {
       expect((await into.list(RecordType.merchant)).map((r) => r.id), [theirs]);
     });
 
-    test('merge: occurrence ids are kept and do not collide', () async {
+    test('merge: occurrence ids are derived from the rule\'s new id and do not collide', () async {
       final from = createMemoryStore();
       final into = await theAccount();
       final theirOccurrence = uuidv5(aRule, '2026-11:0');
@@ -376,16 +384,63 @@ void main() {
 
       await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
 
-      expect(ourOccurrence, isNot(theirOccurrence));
+      // As the account's backend derives it, so it never makes that month's occurrence again.
+      final carried = uuidv5(m(pRule), '2026-11:0');
+      expect(carried, isNot(theirOccurrence));
+      expect(await body(into, RecordType.transaction, ourOccurrence), isNull);
       expect(
-        await body(into, RecordType.transaction, ourOccurrence),
-        transaction(aFood, recurrenceId: pRule, occurrenceMonth: '2026-11'),
+        await body(into, RecordType.transaction, carried),
+        transaction(aFood, recurrenceId: m(pRule), occurrenceMonth: '2026-11'),
       );
       expect(
         await body(into, RecordType.transaction, theirOccurrence),
         transaction(aFood, recurrenceId: aRule, occurrenceMonth: '2026-11'),
       );
-      expect(await body(into, RecordType.recurrence, pRule), recurrence(aFood));
+      expect(await body(into, RecordType.recurrence, m(pRule)), recurrence(aFood));
+    });
+
+    test('merge: a deleted occurrence is carried as a tombstone under the derived id', () async {
+      final from = createMemoryStore();
+      final into = await theAccount();
+      final rev1 = {...recurrence(pFood), 'rev': 1};
+      final old = uuidv5(pRule, '2026-10:1');
+      await from.put(RecordType.category, pFood, category('Comida'));
+      await from.put(RecordType.recurrence, pRule, rev1);
+      await from.put(
+        RecordType.transaction,
+        old,
+        transaction(pFood, recurrenceId: pRule, occurrenceMonth: '2026-10'),
+      );
+      await from.delete(RecordType.transaction, old);
+
+      await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
+
+      final tomb = await into.get(
+        RecordType.transaction,
+        uuidv5(m(pRule), '2026-10:1'),
+        const ReadOptions(includeDeleted: true),
+      );
+      expect(tomb?.deleted, isTrue);
+      expect(tomb?.body['recurrenceId'], m(pRule));
+    });
+
+    test('mergedIdsOf names what the carry writes', () async {
+      final from = createMemoryStore();
+      final into = await theAccount();
+      await from.put(RecordType.category, pOtherCat, category('Viajes'));
+      await from.put(RecordType.recurrence, pRule, recurrence(pOtherCat));
+      final occurrence = uuidv5(pRule, '2026-11:0');
+      await from.put(
+        RecordType.transaction,
+        occurrence,
+        transaction(pOtherCat, recurrenceId: pRule, occurrenceMonth: '2026-11'),
+      );
+
+      await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
+
+      for (final (type, id) in await mergedIdsOf(from, accountUser)) {
+        expect(await into.get(type, id), isNotNull, reason: '$type $id');
+      }
     });
   });
 

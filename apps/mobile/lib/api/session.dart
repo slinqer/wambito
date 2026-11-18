@@ -278,16 +278,18 @@ class SessionController extends Notifier<SessionState> {
   /// start: nothing is sent to an account that could not be told.
   ///
   /// [from]: the account whose data this one takes over (a merge, or its cancel): its captures are
-  /// re-tagged instead of dropped ([captureHandoverProvider] keeps it for the later hand-overs).
+  /// re-tagged instead of dropped; [CaptureHandover] keeps it (written before the token) for this
+  /// session's later hand-overs, a restart's included, until one went through.
   void _sendQueuedCaptures(String token, String? userId, {String? from}) {
     final platform = ref.read(autoCapturePlatformProvider);
     final handover = ref.read(captureHandoverProvider);
-    if (from != null && userId != null) handover[userId] = from;
     Future<void> send() async {
       if (await platform.status() == null) return;
       final id = userId ?? await _auth.accountId(token);
       if (!ref.mounted || state.stored?.token != token) return;
-      await platform.sendQueued(id, from: from ?? handover[id]);
+      final carried = from ?? await handover.fromFor(token);
+      await platform.sendQueued(id, from: carried);
+      if (carried != null) await handover.done(token);
     }
 
     unawaited(send().then<void>((_) {}, onError: (Object _) {}));
@@ -338,6 +340,8 @@ class SessionController extends Notifier<SessionState> {
         ? merging.guestUserId
         : null;
     final token = await _auth.verifyCode(email, code);
+    // Before the token: a process killed right after still hands the guest's captures over.
+    if (keepCapturesOf != null) await ref.read(captureHandoverProvider).keep(token, keepCapturesOf);
     // The code is spent: the session is on the phone before anything else is asked, so a slow or
     // dropped connection can never leave a spent code and no session.
     await _store.write(token, guest: false);
@@ -559,6 +563,9 @@ class SessionController extends Notifier<SessionState> {
     }
     final accountId = await _accountIdOf(token);
     ref.read(signInRecoveryKeyProvider).clear();
+    if (accountId != null && accountId != guestUserId) {
+      await ref.read(captureHandoverProvider).keep(guestToken, accountId);
+    }
     await _signedIn(
       guestToken,
       guest: true,

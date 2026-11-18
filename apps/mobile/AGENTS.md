@@ -28,8 +28,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
   (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue); a merge passes
   `from` (`sendQueued(userId, from:)`, Kotlin `CaptureQueue.adopt(userId, mark, from)`): the captures tagged `from`
-  are re-tagged and its confirms kept, never dropped (`verifyCode(keepCapturesOf:)`, `returnToGuest`; the process-wide
-  `captureHandoverProvider` makes the later hand-overs, `previewSyncProvider`'s too, pass it as well). A `preview` account has
+  are re-tagged and its confirms kept, never dropped (`verifyCode(keepCapturesOf:)`, `returnToGuest`).
+  `CaptureHandover` (`captureHandoverProvider`) keeps `{owner, from}` in secure storage `wambito.capture.handover`
+  before the new token is written, so every hand-over of that session (a restart's, `previewSyncProvider`'s) passes
+  `from` until one went through. A `preview` account has
   the same switches: `previewSyncProvider` hands the queue over with `sendQueued` (never `clearQueue`), and Android's
   `SendCapturesWorker` / `ConfirmCaptureWorker` run `captureMain` (no `CaptureApi`, no network constraint). Only a
   `done`/`changed` run changes the queue (Dart's `ackQueued`); any other outcome or `timeout` keeps it and retries up to
@@ -98,8 +100,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   with `recoveryKeySavedAt` null and no `revokedDevices`; `merge` drops a phone category or `account` that
   matches the account's by `foldedName` (trim, lower case) and kind (not archived), renames same name other
   kind `"<name> 2"`, keeps the account's settings, a phone budget only where the account has none for that
-  category; both re-key merchants to `merchantRecordId(intoUserId, key)` (the target's wins) and keep
-  transaction, recurrence and occurrence ids; tombstones stay behind except a deleted occurrence of a carried
+  category; both re-key merchants to `merchantRecordId(intoUserId, key)` (the target's wins). `adopt` keeps every other
+  id; `merge` gives each carried record `mergedId(targetUserId, oldId)` (`uuidv5(mergeNamespace, '<target>:<old>')`,
+  ruling P17: the server's record ids are global and the guest already owns the old ones) and rewrites `categoryId`,
+  `accountId`, `recurrenceId` through the same map; an occurrence of a carried rule is re-derived as
+  `uuidv5(newRuleId, '<month>:<rev>')`, as the backend derives it; `mergedIdsOf` lists those ids; tombstones stay behind except a deleted occurrence of a carried
   rule, carried as a tombstone so the rule does not make it again; `currencyOf` for the currency stop).
   `stale_vaults.dart` =
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
@@ -265,8 +270,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   holds its vault `merging` (target = the email) before any code is sent; the caller then signs in with
   `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`): currency check
   (`currencyOf`; a difference stops before any write), `carryRecords(mode: merge)` under the old vault's lease, then
-  `meta.mergeCarried` in the old vault (never carried twice: a phone id already in the account's vault also counts as
-  carried, so a crash before the mark never reruns it), sync until `pendingChanges() == 0`, every carried record with a
+  `meta.mergeCarried` in the old vault (never carried twice: one of `mergedIdsOf`'s ids already in the account's vault
+  also counts as carried, so a crash before the mark never reruns it), sync until `pendingChanges() == 0`, every carried record with a
   server version (`VaultSession.serverVersion`; one refused for good, `id_taken` or given up, is `MergeFailed('refused')`
   and nothing is deleted), then `AuthApi.deleteUser` (`DELETE /v1/me` with the kept token; 401 = done),
   `forgetVault(anonId)` and the token key. The email sign-in finds the merge through `mergeSignInProvider` and keeps the
@@ -506,7 +511,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
 - `wambito.vault.<anonId>.mergeToken` (secure storage): the anonymous session's token while its vault is merged
   into an email account (swept with that vault's keys); and meta keys `mergeCarried` (the carry committed) and
-  `mergeDiscard` (only the account's data kept) in that vault.
+  `mergeDiscard` (only the account's data kept) in that vault; `wambito.capture.handover` (secure storage, the
+  captures a new session takes over from another account); the merge namespace `mergeNamespace` in
+  `lib/local/merge.dart` (merged ids derive from it).
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.

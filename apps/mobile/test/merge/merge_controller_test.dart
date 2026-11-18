@@ -12,7 +12,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/auth_api.dart' show AuthFailure;
 import 'package:wambito/api/session.dart';
 import 'package:wambito/capture_auto/capture_platform.dart' show autoCapturePlatformProvider;
-import 'package:wambito/local/merge.dart' show CarryMode, carryRecords;
+import 'package:wambito/local/merge.dart' show CarryMode, carryRecords, mergedId;
 import 'package:wambito/crypto/records.dart' show RecordType;
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
@@ -39,6 +39,9 @@ const email = 'ana@wambito.test';
 const anonToken = 'guest-token-phone';
 const pFood = '01930000-0000-7000-8000-00000000a001';
 const pTx = '01930000-0000-7000-8000-00000000a003';
+
+/// The id the merge gives the phone's movement in the account.
+final mTx = mergedId(accountId, pTx);
 const aFood = '01930000-0000-7000-8000-00000000b001';
 const aTx = '01930000-0000-7000-8000-00000000b003';
 
@@ -48,14 +51,19 @@ class FakeSync {
   bool offline = false;
   var runs = 0;
 
-  /// Ids the server answers `id_taken` (someone else's): the sync drops them, unversioned.
+  /// Ids the server answers `id_taken` (another user owns them, as the guest owns what it synced):
+  /// the sync drops them, unversioned, as the real engine does.
   final refused = <String>{};
+
+  /// Every id pushed, in order.
+  final pushed = <String>[];
 
   Future<bool> run(SqliteStore store) async {
     runs += 1;
     if (offline) return false;
     var version = 100;
     for (final entry in await store.readOutbox(1000)) {
+      pushed.add(entry.id);
       await store.ackOutbox(entry.id, refused.contains(entry.id) ? 0 : ++version, entry.seq);
     }
     return true;
@@ -238,7 +246,7 @@ void main() {
 
       expect(container.read(mergeControllerProvider), isA<MergeDone>());
       // The phone's movement is in the account; its "Comida" became the account's.
-      final movement = await accountStore.get(RecordType.transaction, pTx);
+      final movement = await accountStore.get(RecordType.transaction, mTx);
       expect(movement?.body['categoryId'], aFood);
       expect(await accountStore.get(RecordType.category, pFood), isNull);
       expect(auth.calls.where((c) => c.startsWith('deleteUser')), ['deleteUser $anonToken']);
@@ -280,7 +288,7 @@ void main() {
     await merge.run();
 
     expect(container.read(mergeControllerProvider), isA<MergeDone>());
-    expect((await accountStore.get(RecordType.transaction, pTx))?.body['categoryId'], aFood);
+    expect((await accountStore.get(RecordType.transaction, mTx))?.body['categoryId'], aFood);
     expect(deletes(), 1);
     expect(fileOf(anonId), isFalse);
   });
@@ -298,9 +306,9 @@ void main() {
     // The person edits the carried movement before the next start: a later run never carries
     // the phone's copy over it again.
     final edited = Map<String, Object?>.of(
-      (await accountStore.get(RecordType.transaction, pTx))!.body,
+      (await accountStore.get(RecordType.transaction, mTx))!.body,
     )..['name'] = 'Mercado del barrio';
-    await accountStore.put(RecordType.transaction, pTx, edited);
+    await accountStore.put(RecordType.transaction, mTx, edited);
 
     // Still offline at the next start.
     final second = app();
@@ -323,7 +331,7 @@ void main() {
     expect(third.read(mergeControllerProvider), isA<MergeDone>());
     expect(deletes(), 1);
     expect(
-      (await accountStore.get(RecordType.transaction, pTx))?.body['name'],
+      (await accountStore.get(RecordType.transaction, mTx))?.body['name'],
       'Mercado del barrio',
     );
     expect(await pendingOf(accountStore), 0);
@@ -404,7 +412,7 @@ void main() {
       expect(forgotten, [anonId]);
       expect(fileOf(anonId), isFalse);
       expect(await dump(accountStore), before);
-      expect(await accountStore.get(RecordType.transaction, pTx), isNull);
+      expect(await accountStore.get(RecordType.transaction, mTx), isNull);
       expect((await kept()).containsKey(mergeTokenKey(anonId)), isFalse);
       // Still signed in to the account.
       expect(container.read(sessionProvider).stored?.token, isNot(anonToken));
@@ -530,7 +538,7 @@ void main() {
     expect(forgotten, isEmpty);
     expect(deletes(), 0);
     expect((await kept())[mergeTokenKey(anonId)], anonToken);
-    expect(await accountStore.get(RecordType.transaction, pTx), isNull);
+    expect(await accountStore.get(RecordType.transaction, mTx), isNull);
   });
 
   test(
@@ -623,9 +631,9 @@ void main() {
       await carryRecords(source, accountStore, mode: CarryMode.merge, intoUserId: accountId);
       await source.close();
       final edited = Map<String, Object?>.of(
-        (await accountStore.get(RecordType.transaction, pTx))!.body,
+        (await accountStore.get(RecordType.transaction, mTx))!.body,
       )..['name'] = 'Mercado del barrio';
-      await accountStore.put(RecordType.transaction, pTx, edited);
+      await accountStore.put(RecordType.transaction, mTx, edited);
 
       final container = app();
       await container.read(sessionProvider.notifier).ready;
@@ -637,7 +645,7 @@ void main() {
 
       expect(container.read(mergeControllerProvider), isA<MergeDone>());
       expect(
-        (await accountStore.get(RecordType.transaction, pTx))?.body['name'],
+        (await accountStore.get(RecordType.transaction, mTx))?.body['name'],
         'Mercado del barrio',
       );
     },
@@ -667,14 +675,14 @@ void main() {
 
     expect(container.read(mergeControllerProvider), isA<MergeDone>());
     expect(fileOf(anonId), isFalse);
-    expect(await accountStore.get(RecordType.transaction, pTx), isNull);
+    expect(await accountStore.get(RecordType.transaction, mTx), isNull);
   });
 
   test('a carried record the server refuses for good keeps the anonymous user', () async {
     final container = await signedInToTheAccount();
     targetReady = true;
     container.invalidate(mergeTargetProvider);
-    sync.refused.add(pTx);
+    sync.refused.add(mTx);
     await container.read(mergeControllerProvider.notifier).run();
 
     final state = container.read(mergeControllerProvider);
@@ -685,5 +693,40 @@ void main() {
     expect(deletes(), 0);
     expect(fileOf(anonId), isTrue);
     expect((await kept())[mergeTokenKey(anonId)], anonToken);
+  });
+
+  test('a synced guest\'s merge pushes no id the guest already owns, and finishes', () async {
+    // The guest synced its records before: on the server those ids are the anonymous user's.
+    final owned = <String>{settingsIdOf(anonId), pFood, pTx};
+    sync.refused.addAll(owned);
+    final container = await signedInToTheAccount();
+    targetReady = true;
+    container.invalidate(mergeTargetProvider);
+    await container.read(mergeControllerProvider.notifier).run();
+
+    expect(sync.pushed.where(owned.contains), isEmpty);
+    expect(container.read(mergeControllerProvider), isA<MergeDone>());
+    expect((await accountStore.rawRecord(RecordType.transaction, mTx))?.version, greaterThan(0));
+    expect(await accountStore.get(RecordType.transaction, pTx), isNull);
+    expect(deletes(), 1);
+  });
+
+  test('killed right after the merge\'s sign-in: the next start still hands the guest\'s captures '
+      'over', () async {
+    auth
+      ..account = accountId
+      ..accounts[anonToken] = anonId;
+    // Nothing reaches Android before the kill.
+    capture.available = false;
+    final first = await signedInToTheAccount();
+    first.dispose();
+
+    capture
+      ..available = true
+      ..calls.clear();
+    final again = app();
+    await again.read(sessionProvider.notifier).refreshed;
+    await pumpEventQueue();
+    expect(capture.callsNamed('sendQueued').first, 'sendQueued $accountId from $anonId');
   });
 }
