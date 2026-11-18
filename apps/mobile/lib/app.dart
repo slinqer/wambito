@@ -8,6 +8,7 @@ import 'home/widget_sync.dart';
 import 'capture/prewarm.dart';
 import 'launch/launch_links.dart';
 import 'l10n/app_localizations.dart';
+import 'merge/merge_controller.dart';
 import 'notices/notice_sync.dart';
 import 'router.dart';
 import 'settings/locale_resolution.dart';
@@ -49,6 +50,9 @@ class WambitoApp extends ConsumerWidget {
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
     ref.watch(vaultChangedProvider);
+    // Picks up a merge into an email account at start and on resume (before the seen ping, as the
+    // plan's lifecycle order has it), and runs it once the account's vault opens.
+    ref.watch(mergeResumeProvider);
     // Tells the server, once a local day, that the app was opened (every account, headless runs never).
     ref.watch(seenSyncProvider);
     return MaterialApp.router(

@@ -520,6 +520,27 @@ class SessionController extends Notifier<SessionState> {
     state = SessionState.signedOut;
   }
 
+  /// A merge into an email account (phone-first spec 7.2) is called off after its sign-in (ruling
+  /// 10): this phone signs out of the email account on the server (best effort, as [signOut]) and
+  /// forgets that account's vault, then the anonymous session kept aside ([guestToken]) is the
+  /// session again, with its vault and keys as they were. [guestUserId] is that session's account:
+  /// its vault is never the one forgotten, even when the email account was not learned yet and the
+  /// account kept last is the guest's.
+  Future<void> returnToGuest(String guestToken, {String? guestUserId}) async {
+    await ready;
+    final token = state.stored?.token;
+    if (token != null && token != guestToken) {
+      try {
+        await _auth.signOut(token).timeout(signOutWait);
+      } on Object {
+        // Forgotten here all the same, as at a sign-out.
+      }
+      ref.read(signInRecoveryKeyProvider).clear();
+      await _forgetVault(token: token, keep: guestUserId);
+    }
+    await _signedIn(guestToken, guest: true, userId: guestUserId);
+  }
+
   /// The server no longer knows the session (it expired, or the account signed out everywhere): it
   /// ends here without telling the server, as [_refresh] does on a 401. The home cache, the saves
   /// waiting for the network and the widget's figures go, as at a sign-out; the vault of a `preview`
@@ -565,7 +586,8 @@ class SessionController extends Notifier<SessionState> {
   /// the session and puts the rest right at the next start. The account is the one the phone kept
   /// for this session ([EncryptionStore.recall]): no network is asked, and an account whose mode
   /// was never learned has no vault. A failure never keeps the person signed in; the keys go anyway.
-  Future<void> _forgetVault({String? token}) async {
+  /// The vault of [keep] (a session kept aside, [returnToGuest]) is never the one forgotten.
+  Future<void> _forgetVault({String? token, String? keep}) async {
     token ??= state.stored?.token;
     if (token == null) return;
     final store = ref.read(encryptionStoreProvider);
@@ -578,7 +600,7 @@ class SessionController extends Notifier<SessionState> {
       // Else the account kept last: a session that expired kept it, and the person signed in
       // again but the server has not said who they are yet. Sign-out leaves no vault behind.
       final found = id ?? account?.profile.id ?? await store.keptAccountId();
-      if (found == null) return;
+      if (found == null || found == keep) return;
       userId = found;
     } on Object {
       return;

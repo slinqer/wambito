@@ -11,6 +11,7 @@ import '../api/session.dart';
 import '../entry/sign_in_frame.dart';
 import '../files/files_channel.dart';
 import '../l10n/app_localizations.dart';
+import '../merge/merge_controller.dart';
 import 'encryption_mode.dart';
 import 'locked_view.dart';
 import 'pair_new_device_view.dart';
@@ -60,6 +61,7 @@ class VaultScreen extends ConsumerWidget {
     final gate = ref.watch(vaultGateProvider);
     final state = ref.watch(vaultGateStateProvider);
     void signOut() => unawaited(_signOut(context, ref));
+    final merging = ref.watch(mergeControllerProvider) is MergeWaitingUnlock;
     if (gate == null || state == null) {
       // No gate: the mode of the account is not known yet, or could not be learned (an offline
       // first start with nothing kept). A `plain` account never stays here (the router).
@@ -97,7 +99,14 @@ class VaultScreen extends ConsumerWidget {
             ? gate.unlockWithPasskey
             : null,
         onPair: () => unawaited(gate.pair()),
-        onSignOut: signOut,
+        merging: merging,
+        // While a merge waits, leaving calls it off: back to this phone's own session and data
+        // (ruling 10), never a held vault left behind.
+        onSignOut: merging
+            ? () => unawaited(
+                ref.read(mergeControllerProvider.notifier).cancel().catchError((Object _) {}),
+              )
+            : signOut,
       ),
       Pairing() => PairNewDeviceView(
         // The gate owns the request: it cancels one when a new one starts and when this is left.

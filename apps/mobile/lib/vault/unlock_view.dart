@@ -34,6 +34,7 @@ class UnlockView extends StatefulWidget {
     this.onPasskey,
     this.onPair,
     required this.onSignOut,
+    this.merging = false,
   });
 
   /// [Unlock.removed] or [Unlock.unverified]: why the phone is asked again.
@@ -55,6 +56,9 @@ class UnlockView extends StatefulWidget {
 
   /// Signs out (and wipes this phone's vault): the way out.
   final VoidCallback onSignOut;
+
+  /// A merge waits for this account's data: one line says why it is asked.
+  final bool merging;
 
   @override
   State<UnlockView> createState() => _UnlockViewState();
@@ -142,6 +146,8 @@ class _UnlockViewState extends State<UnlockView> {
               ),
             ),
           ),
+        if (widget.merging)
+          EntryLead(l10n.unlockMergeWaiting, key: const Key('unlock.mergeWaiting'), ink: true),
         EntryLead(l10n.vaultUnlockLead),
         SizedBox(
           width: double.infinity,

@@ -238,6 +238,16 @@ class FakeAuthApi implements AuthApi {
 
   /// While set, signOut waits for it (a server that accepts the connection and then says nothing).
   Completer<void>? holdSignOut;
+
+  /// Called by `deleteUser` before it answers (a test looks at the phone at that moment).
+  Future<void> Function()? onDeleteUser;
+
+  @override
+  Future<void> deleteUser(String token) async {
+    calls.add('deleteUser $token');
+    await onDeleteUser?.call();
+    _fail('deleteUser');
+  }
 }
 
 /// The phone's passkey prompt, answered at once.

@@ -495,4 +495,24 @@ void main() {
       );
     });
   });
+
+  test('deleteUser sends DELETE /v1/me with that bearer, and a 401 counts as done', () async {
+    await api.deleteUser('anon-token');
+    expect(last().method, 'DELETE');
+    expect(last().uri.path, '/api/v1/me');
+    expect(last().headers['Authorization'], 'Bearer anon-token');
+
+    adapter.replies['DELETE /api/v1/me'] = const _Reply(401, {
+      'type': 'about:blank',
+      'status': 401,
+      'code': 'unauthenticated',
+    });
+    await api.deleteUser('anon-token');
+
+    adapter.offline = true;
+    await expectLater(
+      api.deleteUser('anon-token'),
+      throwsA(isA<AuthFailure>().having((f) => f.status, 'status', 0)),
+    );
+  });
 }

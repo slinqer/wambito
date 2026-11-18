@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/merge/merge_controller.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/files/files_channel.dart';
 import 'package:wambito/local/keys.dart' show LocalKeys;
@@ -136,6 +138,7 @@ void main() {
     Locale locale = const Locale('es'),
     int unsent = 0,
     void Function(FakeGate gate)? prepare,
+    List<Override> extra = const [],
   }) async {
     final gate = FakeGate(state);
     prepare?.call(gate);
@@ -154,6 +157,7 @@ void main() {
           sessionProvider.overrideWith(() => session),
           unsentChangesProvider.overrideWithValue(() async => unsent),
           pairingTimeZoneProvider.overrideWithValue('America/Bogota'),
+          ...extra,
         ],
         child: uiApp(
           locale: locale,
@@ -298,6 +302,27 @@ void main() {
   });
 
   group('unlock', () {
+    testWidgets('while a merge waits, Unlock says why and signing out calls the merge off', (
+      tester,
+    ) async {
+      final merge = _WaitingMerge();
+      await pumpScreen(
+        tester,
+        const Unlock(),
+        extra: [mergeControllerProvider.overrideWith(() => merge)],
+      );
+      expect(find.byKey(const Key('unlock.mergeWaiting')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.signOut')));
+      await tester.pumpAndSettle();
+      expect(merge.cancels, 1);
+      expect(session.signOuts, isEmpty);
+    });
+
+    testWidgets('without a merge, Unlock has no merge line', (tester) async {
+      await pumpScreen(tester, const Unlock());
+      expect(find.byKey(const Key('unlock.mergeWaiting')), findsNothing);
+    });
+
     testWidgets('asks for the recovery key, and submit waits for text', (tester) async {
       await pumpScreen(tester, const Unlock());
       expect(find.text('Abre tus datos aquí'), findsOneWidget);
@@ -527,4 +552,14 @@ void main() {
       expect(session.signOuts, ['t']);
     });
   });
+}
+
+class _WaitingMerge extends MergeController {
+  var cancels = 0;
+
+  @override
+  MergeState build() => const MergeWaitingUnlock();
+
+  @override
+  Future<void> cancel() async => cancels += 1;
 }

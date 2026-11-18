@@ -254,6 +254,26 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   used by Settings' sign out and server change for a `preview` guest with neither step done ("Protect first" opens
   the recovery key and leaves nothing); with a step done there is no warning; with the passkey wraps unreadable
   (offline) the sheet adds a note instead of claiming there is no passkey. A `plain` guest keeps `warnGuestLeaving`.
+- `lib/merge/`: merging this phone's anonymous `preview` account into an existing email account (phone-first spec
+  7.2). `merge_offer.dart` `askMerge(context, email)` (the question and "this phone's recovery key stops working",
+  `merge.yes`); `merge_controller.dart` `MergeController` (`mergeControllerProvider`, states `MergeIdle`,
+  `MergeSigningIn`, `MergeWaitingUnlock`, `MergeCurrencyStop(phone, account)`, `MergeUploading(pending)`, `MergeDone`,
+  `MergeFailed(code, carried)`): `begin(email)` keeps the anonymous token (`wambito.vault.<anonId>.mergeToken`) and
+  holds its vault `merging` (target = the email) before any code is sent; the caller then signs in with
+  `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`): currency check
+  (`currencyOf`; a difference stops before any write), `carryRecords(mode: merge)` under the old vault's lease, then
+  `meta.mergeCarried` in the old vault (never carried twice), sync until `pendingChanges() == 0`, then
+  `AuthApi.deleteUser` (`DELETE /v1/me` with the kept token; 401 = done), `forgetVault(anonId)` and the token key.
+  The old vault is read on its own connection (`SqliteStore.open(id, background: true)`, no keys). `cancel()`
+  (ruling 10): after the sign-in `SessionController.returnToGuest(token, guestUserId:)` (server sign-out of the
+  email account, its vault forgotten, never the guest's), then the hold goes; refused once carried.
+  `keepAccountOnly()` deletes the anonymous user and its vault and carries nothing. `mergeResumeProvider` (watched
+  in `app.dart` before the seen ping) resumes from `listVaultHolds` at start, on account changes and on resume (a
+  hold whose file is unreadable, or without its token, is left alone); still in the phone's own session the hold
+  stays (the email's link may come). `mergeBlocksAppProvider` keeps the router on `/merge` (`MergeScreen`:
+  progress, the currency stop with `merge.cancel` and `merge.keepAccount` + `merge.keepAccountConfirm`) while it
+  waits for the account's vault, at the currency stop and after a failure before the carry; Unlock shows
+  `unlock.mergeWaiting` and its sign-out calls the merge off. Tests: `test/merge/`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,
@@ -476,6 +496,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Vault holds: `meta.hold` in a vault file (`VaultHold`: `provisional`, `orphaned`, `merging`;
   `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes: returns `(holds:, unreadable:)`, a vault file whose hold cannot be read is listed in `unreadable`, never dropped; `hold()` throws on a malformed hold). The
   stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
+- `wambito.vault.<anonId>.mergeToken` (secure storage): the anonymous session's token while its vault is merged
+  into an email account (swept with that vault's keys); and meta key `mergeCarried` in that vault (the carry
+  committed).
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.

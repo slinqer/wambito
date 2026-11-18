@@ -4481,5 +4481,122 @@
         "type": "int"
       }
     }
+  },
+  "mergeOfferQuestion": "Este correo ya tiene una cuenta de Wambito. ¿Traemos a ella los datos de este teléfono?",
+  "@mergeOfferQuestion": {
+    "description": "Merge offer (phone-first spec 7.2): the claimed email already has an account."
+  },
+  "mergeOfferBody": "Entras a {email} con el código que te mandamos y abres sus datos; luego los de este teléfono se suman a ellos.",
+  "@mergeOfferBody": {
+    "description": "Merge offer: what happens next.",
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "ana@correo.com"
+      }
+    }
+  },
+  "mergeOfferKeyNote": "La clave de recuperación de este teléfono deja de servir: desde entonces tus datos los abre la de la cuenta.",
+  "@mergeOfferKeyNote": {
+    "description": "Merge offer: shown before the sign-in (spec 7.2)."
+  },
+  "mergeOfferYes": "Traer mis datos",
+  "@mergeOfferYes": {
+    "description": "Merge offer: the yes button."
+  },
+  "unlockMergeWaiting": "Abre esta cuenta para traer a ella los datos de este teléfono.",
+  "@unlockMergeWaiting": {
+    "description": "Unlock, while a merge waits for the account's data."
+  },
+  "mergeWorking": "Trayendo los datos de este teléfono…",
+  "@mergeWorking": {
+    "description": "Merge: while the phone's data is brought into the account."
+  },
+  "mergeUploadingTitle": "Enviando tus datos a la cuenta",
+  "@mergeUploadingTitle": {
+    "description": "Merge: the data is in the account and is being sent."
+  },
+  "mergeUploadingLead": "{count, plural, =0{Ya casi.} =1{Falta 1 cambio por enviar.} other{Faltan {count} cambios por enviar.}}",
+  "@mergeUploadingLead": {
+    "description": "Merge: changes still to send.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeUploadingNote": "Sin conexión, sigue sola cuando vuelva. Mientras, puedes usar Wambito.",
+  "@mergeUploadingNote": {
+    "description": "Merge: the upload goes on by itself."
+  },
+  "mergeKeepUsing": "Seguir usando Wambito",
+  "@mergeKeepUsing": {
+    "description": "Merge: leave the screen while the upload goes on."
+  },
+  "mergeDoneTitle": "¡Listo! Los datos de este teléfono ya están en tu cuenta.",
+  "@mergeDoneTitle": {
+    "description": "Merge: done."
+  },
+  "mergeDoneGo": "Ir al inicio",
+  "@mergeDoneGo": {
+    "description": "Merge: done, go home."
+  },
+  "mergeCurrencyTitle": "Las monedas no coinciden",
+  "@mergeCurrencyTitle": {
+    "description": "Merge currency stop: the title."
+  },
+  "mergeCurrencyStop": "Tu cuenta usa {account} y este teléfono {phone}.",
+  "@mergeCurrencyStop": {
+    "description": "Merge currency stop (spec 7.2): the account's currency, then the phone's.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "example": "COP"
+      },
+      "phone": {
+        "type": "String",
+        "example": "USD"
+      }
+    }
+  },
+  "mergeCurrencyLead": "No podemos juntar movimientos en monedas distintas. Elige qué hacemos.",
+  "@mergeCurrencyLead": {
+    "description": "Merge currency stop: why, and the choice."
+  },
+  "mergeCancel": "Cancelar y seguir como estaba",
+  "@mergeCancel": {
+    "description": "Merge: cancel; back to this phone's session without email, with its data (ruling 10)."
+  },
+  "mergeKeepAccount": "Quedarme solo con los datos de la cuenta",
+  "@mergeKeepAccount": {
+    "description": "Merge currency stop: keep only the account's data."
+  },
+  "mergeKeepAccountTitle": "¿Borrar los datos de este teléfono?",
+  "@mergeKeepAccountTitle": {
+    "description": "Merge: the confirm before discarding the phone's data."
+  },
+  "mergeKeepAccountBody": "Lo que anotaste en este teléfono sin correo se borra para siempre y te quedas con los datos de la cuenta.",
+  "@mergeKeepAccountBody": {
+    "description": "Merge: what discarding the phone's data means."
+  },
+  "mergeKeepAccountConfirm": "Borrar y seguir",
+  "@mergeKeepAccountConfirm": {
+    "description": "Merge: confirm discarding the phone's data."
+  },
+  "mergeFailedTitle": "No pudimos terminar de traer tus datos",
+  "@mergeFailedTitle": {
+    "description": "Merge: a step failed."
+  },
+  "mergeFailedLead": "Tus datos siguen guardados en este teléfono. Inténtalo otra vez.",
+  "@mergeFailedLead": {
+    "description": "Merge: a step failed; nothing is lost."
+  },
+  "mergeFailedPlain": "Esa cuenta todavía no guarda datos cifrados, así que no podemos traer a ella los de este teléfono.",
+  "@mergeFailedPlain": {
+    "description": "Merge: the email account keeps no encrypted data yet."
+  },
+  "mergeRetry": "Intentar de nuevo",
+  "@mergeRetry": {
+    "description": "Merge: try the failed step again."
   }
 }

@@ -14,6 +14,8 @@ import 'debug/prf_probe_screen.dart';
 import 'home/home_screen.dart';
 import 'import/import_screen.dart';
 import 'insights/insights_screen.dart';
+import 'merge/merge_controller.dart';
+import 'merge/merge_screen.dart';
 import 'progress/progress_screen.dart';
 import 'recurring/recurring_screen.dart';
 import 'review/review_screen.dart';
@@ -68,8 +70,15 @@ VaultRoute vaultRouteOf(Ref ref) {
 ///   person was going from the sign-in screens; its address is for that moment only;
 /// - signed in with a `preview` account (the [vault]): every screen but the magic link, the entry
 ///   screens and the debug ones goes to `/unlock` until its vault is open, and `/unlock` goes home
-///   once it is; while the mode is unknown, the loading route.
-String? sessionRedirect(SessionState session, Uri location, {VaultRoute vault = VaultRoute.open}) {
+///   once it is; while the mode is unknown, the loading route;
+/// - while a merge needs the person or must not be left ([merge], `mergeBlocksAppProvider`), every
+///   such screen is `/merge` once the vault is open.
+String? sessionRedirect(
+  SessionState session,
+  Uri location, {
+  VaultRoute vault = VaultRoute.open,
+  bool merge = false,
+}) {
   final path = location.path;
   if (path == '/auth/verify') return null;
   switch (session.status) {
@@ -89,6 +98,7 @@ String? sessionRedirect(SessionState session, Uri location, {VaultRoute vault = 
           case VaultRoute.locked:
             return path == '/unlock' ? null : '/unlock';
           case VaultRoute.open:
+            if (merge) return path == '/merge' ? null : '/merge';
             if (path == '/unlock') return '/';
         }
       }
@@ -115,6 +125,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final session = ValueNotifier<SessionState>(ref.read(sessionProvider));
   // The vault's standing, with the session: either changing sends the redirect round again.
   final vault = ValueNotifier<VaultRoute>(vaultRouteOf(ref));
+  final merge = ValueNotifier<bool>(ref.read(mergeBlocksAppProvider));
   final refresh = _Refresh();
   void update() {
     vault.value = vaultRouteOf(ref);
@@ -128,12 +139,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(vaultAccountProvider, (_, _) => update());
   ref.listen(currentVaultAccountProvider, (_, _) => update());
   ref.listen(vaultGateStateProvider, (_, _) => update());
+  ref.listen(mergeBlocksAppProvider, (_, next) {
+    merge.value = next;
+    update();
+  });
   final router = GoRouter(
     refreshListenable: refresh,
     // A location no route has (an address Android hands over that is not one of the app's, such as
     // the `glance-action:/CALLBACK?...` a tap on the widget carried) is home, never "Page Not Found".
     onException: (context, state, router) => router.go('/'),
-    redirect: (context, state) => sessionRedirect(session.value, state.uri, vault: vault.value),
+    redirect: (context, state) =>
+        sessionRedirect(session.value, state.uri, vault: vault.value, merge: merge.value),
     routes: [
       GoRoute(
         path: '/',
@@ -208,6 +224,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/loading', builder: (context, state) => const Scaffold()),
       // A `preview` account's vault: the recovery key, Unlock or Locked, until it is open.
       GoRoute(path: '/unlock', builder: (context, state) => const VaultScreen()),
+      // A merge into an email account: its progress and its currency stop.
+      GoRoute(path: '/merge', builder: (context, state) => const MergeScreen()),
       GoRoute(path: '/entry', builder: (context, state) => const EntryScreen()),
       GoRoute(
         path: '/entry/email',
@@ -237,6 +255,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     router.dispose();
     session.dispose();
     vault.dispose();
+    merge.dispose();
     refresh.dispose();
   });
   return router;

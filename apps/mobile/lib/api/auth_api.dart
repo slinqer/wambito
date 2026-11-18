@@ -141,6 +141,11 @@ abstract interface class AuthApi {
 
   /// Ends the session on the server (best effort).
   Future<void> signOut(String token);
+
+  /// Deletes the user behind [token] and everything it has on the server (`DELETE /v1/me` with
+  /// that bearer): a merge's last step, for the phone's anonymous user. A 401 counts as done (the
+  /// user, or its session, is already gone).
+  Future<void> deleteUser(String token);
 }
 
 /// [AuthApi] over HTTP, with the request shapes of the web app's sign-in (Better Auth's routes
@@ -433,6 +438,15 @@ class HttpAuthApi implements AuthApi {
       options: Options(headers: _bearer(token)),
     );
   });
+
+  @override
+  Future<void> deleteUser(String token) async {
+    try {
+      await _settle(() => _api.deleteMe(headers: _bearer(token)));
+    } on AuthFailure catch (failure) {
+      if (failure.status != 401) rethrow;
+    }
+  }
 }
 
 /// The auth server at the configured URL, with the phone's hints.
