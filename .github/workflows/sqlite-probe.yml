@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [matrix]
+        mode: [two-conn, suite-1, suite-2]
     defaults:
       run:
         working-directory: apps/mobile
