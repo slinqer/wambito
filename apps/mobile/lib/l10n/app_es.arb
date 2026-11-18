@@ -4739,8 +4739,17 @@
     }
   },
   "signinNoticeBody": "Si no fuiste tú, quita ese dispositivo ahora.",
+  "@signinNoticeBody": {
+    "description": "The sign-in notice: what to do if the person did not open the session."
+  },
   "signinNoticeNotMe": "No fui yo",
+  "@signinNoticeNotMe": {
+    "description": "The sign-in notice: button that goes to the device's removal."
+  },
   "signinNoticeOk": "Entendido",
+  "@signinNoticeOk": {
+    "description": "The sign-in notice: button that records the look."
+  },
   "signinNoticeMore": "{count, plural, =1{Y se agregó {count} dispositivo más.} other{Y se agregaron {count} dispositivos más.}}",
   "@signinNoticeMore": {
     "description": "The sign-in notice: how many more new devices there are besides the one named.",

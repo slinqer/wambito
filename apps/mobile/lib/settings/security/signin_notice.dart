@@ -125,8 +125,7 @@ Future<void> showSigninNotice(BuildContext context, WidgetRef ref) async {
   if (!context.mounted) return;
   final l10n = AppLocalizations.of(context);
   // The newest first: it is the one the title names.
-  final newest = fresh.reversed.toList()
-    ..sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+  final newest = [...fresh]..sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
   final answer = await LkSheet.show<_Answer>(
     context,
     title: l10n.signinNoticeTitle(newest.first.label ?? l10n.settingsSecurityUnnamed),
@@ -205,7 +204,8 @@ class _NoticeBody extends StatelessWidget {
   }
 }
 
-/// How long the notice waits for home to be free, and how often it looks.
+/// How long the notice waits for home to be free, and how often it looks. After the 5 minutes the
+/// look is given up; the next resume (or start) asks again.
 const _waitForHome = Duration(minutes: 5);
 const _lookEvery = Duration(milliseconds: 250);
 
@@ -240,6 +240,8 @@ class _SigninNoticeHostState extends ConsumerState<SigninNoticeHost> with Widget
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A resume while a look is still running (waiting for home, or the sheet open) is dropped: that
+    // look is already going to say what there is, and `_look` never overlaps itself.
     if (state == AppLifecycleState.resumed && ref.read(vaultSessionProvider) != null) {
       unawaited(_look());
     }
@@ -266,9 +268,16 @@ class _SigninNoticeHostState extends ConsumerState<SigninNoticeHost> with Widget
     final navigator = router.routerDelegate.navigatorKey;
     bool free() {
       final context = navigator.currentContext;
+      // The router has no location yet while the app is still starting: not free, ask again.
+      final String path;
+      try {
+        path = router.state.uri.path;
+      } on Object {
+        return false;
+      }
       return mounted &&
           ref.read(vaultSessionProvider) != null &&
-          router.state.uri.path == '/' &&
+          path == '/' &&
           context != null &&
           context.mounted &&
           !Navigator.of(context).canPop();

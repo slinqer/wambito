@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wambito/local/keys.dart' show WrapDto;
+import 'package:wambito/local/vault_session.dart' show VaultSession;
+import 'package:wambito/l10n/app_localizations.dart';
+import 'package:wambito/theme/theme.dart';
 import 'package:wambito/router.dart' show routerProvider;
 import 'package:wambito/security/screen_lock.dart' show LockCheck, screenLockProvider;
 import 'package:wambito/settings/security/security_api.dart';
@@ -15,6 +18,8 @@ import '../../support/fonts.dart';
 import '../../support/plain_account.dart';
 import '../../support/ui_app.dart';
 import 'fake_security.dart';
+
+class _FakeSession extends Fake implements VaultSession {}
 
 class _Store implements SeenDevicesStore {
   _Store([this.ids]);
@@ -237,5 +242,111 @@ void main() {
     await t.pumpAndSettle();
     expect(security.loads, 0);
     expect(store.keeps, 0);
+  });
+
+  group('SigninNoticeHost with a Ready vault', () {
+    late GoRouter router;
+
+    Future<void> pumpHost(WidgetTester t, _Store store, {String at = '/'}) async {
+      router = GoRouter(
+        initialLocation: at,
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (c, s) => const Scaffold(body: Text('home')),
+          ),
+          GoRoute(
+            path: '/other',
+            builder: (c, s) => const Scaffold(body: Text('other')),
+          ),
+        ],
+      );
+      t.view
+        ..physicalSize = const Size(824, 2400)
+        ..devicePixelRatio = 2;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        ProviderScope(
+          overrides: [
+            vaultSessionProvider.overrideWithValue(_FakeSession()),
+            routerProvider.overrideWithValue(router),
+            securityApiProvider.overrideWithValue(FakeSecurity(_snapshot([_laptop]))),
+            seenDevicesStoreProvider.overrideWithValue(store),
+            screenLockProvider.overrideWithValue(FakeLock(LockCheck.passed)),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: nightTheme,
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => SigninNoticeHost(child: child!),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      // the host's look polls every 250 ms until home is free
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pumpAndSettle();
+    }
+
+    Future<void> resume(WidgetTester t) async {
+      for (final s in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        t.binding.handleAppLifecycleStateChanged(s);
+      }
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pumpAndSettle();
+    }
+
+    final notice = find.text('A session was opened on Firefox on Linux');
+
+    testWidgets('one notice on start', (t) async {
+      await pumpHost(t, _Store({ownId}));
+      expect(notice, findsOneWidget);
+      await t.tap(find.byKey(const Key('signinNotice.ok')));
+      await t.pumpAndSettle();
+      expect(notice, findsNothing);
+    });
+
+    testWidgets('none while another route is open; it shows once home is free', (t) async {
+      await pumpHost(t, _Store({ownId}), at: '/other');
+      expect(notice, findsNothing);
+      router.go('/');
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pumpAndSettle();
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pumpAndSettle();
+      expect(notice, findsOneWidget);
+    });
+
+    testWidgets('a resume says it again only when the answer was not recorded', (t) async {
+      await pumpHost(t, _Store({ownId}));
+      // closed without answering: nothing recorded
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      expect(notice, findsNothing);
+      await resume(t);
+      expect(notice, findsOneWidget);
+      await t.tap(find.byKey(const Key('signinNotice.ok')));
+      await t.pumpAndSettle();
+      await resume(t);
+      expect(notice, findsNothing);
+    });
+
+    testWidgets('a resume while the notice is open does not open a second one', (t) async {
+      await pumpHost(t, _Store({ownId}));
+      await resume(t);
+      expect(notice, findsOneWidget);
+      await t.tap(find.byKey(const Key('signinNotice.ok')));
+      await t.pumpAndSettle();
+      expect(notice, findsNothing);
+    });
   });
 }
