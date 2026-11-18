@@ -1291,8 +1291,8 @@ final adoptDepsProvider = Provider<AdoptDeps>(
 
 final sessionProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
 
-/// The adoption's start and resume hook (app.dart: after the provisional promotion, before the
-/// merge's, as the plan's lifecycle order has it): [SessionController.resumeAdoptions] once the
+/// The adoption's start and resume hook (app.dart: registered after the provisional promotion's,
+/// before the merge's, in the plan's lifecycle order; none of them waits for another): [SessionController.resumeAdoptions] once the
 /// stored session is read, and each time the app comes back.
 final adoptionResumeProvider = Provider<void>((ref) {
   final session = ref.read(sessionProvider.notifier);
@@ -1326,8 +1326,8 @@ bool isOfflineError(Object error) => switch (error) {
 /// and on resume; tests).
 final provisionalPromotionEveryProvider = Provider<Duration?>((ref) => const Duration(minutes: 1));
 
-/// The provisional promotion's hook (app.dart: first, before the adoption's and the merge's, as
-/// the plan's lifecycle order has it): [SessionController.promoteProvisional] at start, on resume
+/// The provisional promotion's hook (app.dart: registered first, before the adoption's and the
+/// merge's, in the plan's lifecycle order; none of them waits for another): [SessionController.promoteProvisional] at start, on resume
 /// and every [provisionalPromotionEveryProvider] while provisional. A server found to make `plain`
 /// users is asked again only at the next start (each try there makes an anonymous user).
 final provisionalPromotionProvider = Provider<void>((ref) {

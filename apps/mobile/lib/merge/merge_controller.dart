@@ -578,7 +578,8 @@ void reportMergeError(Object error, StackTrace stack, String step) {
   }());
 }
 
-/// The merge's start and resume hook (app.dart, after the adoption's and before the seen ping):
+/// The merge's start and resume hook (app.dart, registered after the adoption's and before the seen
+/// ping; none of them waits for another):
 /// [MergeController.resume] when the signed-in account is known or changes and when the app comes
 /// back, then [MergeController.run]; and a run as soon as the account's vault opens.
 final mergeResumeProvider = Provider<void>((ref) {
