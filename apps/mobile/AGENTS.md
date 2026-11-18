@@ -35,7 +35,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
-  (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app); server defaults to `https://app.wambito.com`,
+  (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app; `-version`: `wambito/device` `appVersion`, sent only if it matches `^[A-Za-z0-9.+_-]{1,64}$`); `lib/api/seen.dart` (`SeenPing`, watched in `app.dart`) posts `/v2/me/seen` once per local day and account on start and resume, keeping the day only after a 2xx; a headless run never calls it; server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Android side of `wambito/device` (`MainActivity.kt`): `timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`, and the widget card's `widgetInstalled`, `widgetPinSupported`, `pinWidget` (`lib/home/widget_pin.dart`; they use the manifest's receivers, `widget/WidgetPinning.kt`, tested by `WidgetPinningTest`).
 - Storage: secure storage for session and settings; widget snapshot JSON under
@@ -426,6 +426,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Traps
 
+- `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,

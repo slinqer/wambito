@@ -17,6 +17,7 @@ import 'package:wambito/review/review_repository.dart';
 
 import '../home/fakes.dart';
 import '../review/fakes.dart' show FakeReviewRepository;
+import '../support/seen_ping.dart';
 import '../support/plain_account.dart';
 
 /// An auth server in memory: records every call, answers with made-up tokens, and fails a call
@@ -308,6 +309,7 @@ Future<ProviderContainer> pumpApp(
     overrides: [
       // The account is `plain`: the vault's screens are test/vault's business, not these.
       if (plain) plainAccount(),
+      quietSeenPing(),
       // The tests settle the frames: a running time bar would wait a toast's life out.
       toastBarAnimatesProvider.overrideWithValue(false),
       authApiProvider.overrideWithValue(auth),

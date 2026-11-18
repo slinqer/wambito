@@ -224,6 +224,18 @@ void main() {
     expect(m.calls.released, ['released']);
   });
 
+  // A regression guard: it passes before /v2/me/seen exists, and must keep passing.
+  test('a headless run never calls /v2/me/seen', () async {
+    final m = _make();
+    await runBackground(
+      m.deps,
+      m.effects,
+      captures: [_capture('k1')],
+      ack: (keys, confirms) async {},
+    );
+    expect(_server.requests.where((r) => r.uri.path.contains('/me/seen')), isEmpty);
+  });
+
   test('a capture sent again merges (200) and is acked and answered', () async {
     final first = _make();
     await runBackground(first.deps, first.effects, captures: [_capture('k1')]);

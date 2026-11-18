@@ -22,6 +22,7 @@ import 'package:wambito/settings/settings_store.dart';
 import 'package:wambito/settings/url_opener.dart';
 
 import '../capture/fakes.dart';
+import '../support/seen_ping.dart';
 import '../support/plain_account.dart';
 import '../entry/fakes.dart';
 import '../feedback/fakes.dart';
@@ -133,6 +134,7 @@ Future<SettingsEnv> pumpSettingsApp(
   final defaults = <Override>[
     // The account is `plain`: the vault's screens are test/vault's business, not these.
     plainAccount(),
+    quietSeenPing(),
     // The tests settle the frames: a running time bar would wait the toast's life out.
     toastBarAnimatesProvider.overrideWithValue(false),
     // The debug-only rows are off, as in a release build.

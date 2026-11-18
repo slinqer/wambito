@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'feedback/celebration.dart';
 import 'feedback/feedback.dart';
+import 'api/seen.dart';
 import 'home/widget_sync.dart';
 import 'capture/prewarm.dart';
 import 'launch/launch_links.dart';
@@ -48,6 +49,8 @@ class WambitoApp extends ConsumerWidget {
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
     ref.watch(vaultChangedProvider);
+    // Tells the server, once a local day, that the app was opened (every account, headless runs never).
+    ref.watch(seenSyncProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       theme: dayTheme,
