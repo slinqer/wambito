@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [pragma, alone]
+        mode: [matrix]
     defaults:
       run:
         working-directory: apps/mobile
@@ -25,6 +25,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
+      - name: matrix probe
+        if: matrix.mode == 'matrix'
+        run: flutter test test/probe/matrix_probe_test.dart --reporter expanded 2>&1 | sed -n '/MATRIX/,/All tests\|Some tests/p'
       - name: pragma probe
         if: matrix.mode == 'pragma'
         run: flutter test test/probe/pragma_probe_test.dart --reporter expanded 2>&1 | sed -n '/PRAGMA/,/All tests\|Some tests/p'
