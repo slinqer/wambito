@@ -196,6 +196,22 @@ void main() {
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
     });
 
+    test('the adoption\'s "needs an encrypted server" goes with a sign-out and with another '
+        'account', () async {
+      final container = containerWith();
+      final controller = container.read(sessionProvider.notifier);
+      await controller.ready;
+      final waiting = container.read(adoptionNeedsEncryptedServerProvider);
+      waiting.value = true;
+      await controller.signOut();
+      expect(waiting.value, isFalse);
+
+      waiting.value = true;
+      await controller.verifyCode('otra@wambito.test', '123456');
+      expect(container.read(sessionProvider).stored?.token, isNot('tok'));
+      expect(waiting.value, isFalse);
+    });
+
     test('accountDeleted does the same, before the token', () async {
       final container = containerWith();
       final controller = container.read(sessionProvider.notifier);

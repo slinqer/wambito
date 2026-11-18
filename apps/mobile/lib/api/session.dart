@@ -394,6 +394,8 @@ class SessionController extends Notifier<SessionState> {
     // one left on this phone goes with it. The same token (a claim, a corrected flag) keeps it.
     final previous = state.stored?.token;
     if (previous != null && previous != token) await _forgetWidget();
+    // Another account's adoption no longer waits here: the gate's reason goes with it.
+    if (previous != token) _resetAdoptionWait();
     await _store.write(
       token,
       guest: guest,
@@ -842,11 +844,17 @@ class SessionController extends Notifier<SessionState> {
       }
     }
     ref.read(signInRecoveryKeyProvider).clear();
+    _resetAdoptionWait();
     await _forgetVault();
     await _forgetWidget();
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// [adoptionNeedsEncryptedServerProvider] back to false (the next adoption's step sets it again).
+  void _resetAdoptionWait() {
+    if (ref.mounted) ref.read(adoptionNeedsEncryptedServerProvider).value = false;
   }
 
   /// A merge into an email account (phone-first spec 7.2) is called off after its sign-in (ruling
