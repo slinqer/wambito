@@ -46,7 +46,9 @@ class VaultScreen extends ConsumerWidget {
     // The vault is not open, yet it may be kept with changes not sent (a key version that did not
     // verify, a failed open): they are counted from its file and asked about, as at Settings'
     // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). An account without
-    // email is not warned otherwise: a sign-out from here loses only what this sheet counts.
+    // email is not warned otherwise: a sign-out from here loses only what this sheet counts, and a
+    // held vault (an adoption or a merge waiting) loses nothing: the sign-out keeps it for its own
+    // flow (SessionController._forgetVault).
     final count = ref.read(unsentChangesProvider);
     if (!await confirmUnsentSignOut(context, count: count)) return;
     try {

@@ -8,6 +8,8 @@ import 'package:wambito/api/auth_api.dart' show AuthFailure;
 import 'package:wambito/api/session.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
+import 'package:wambito/api/server_url.dart';
+import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind;
 import 'package:wambito/local/install_marker.dart';
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/sync.dart' show SyncResult;
@@ -58,9 +60,10 @@ void main() {
     late FakeAuthApi auth;
     final deleted = <String>[];
 
-    ProviderContainer containerWith() {
+    ProviderContainer containerWith({Map<String, VaultHold> holds = const {}}) {
       final container = ProviderContainer(
         overrides: [
+          vaultHoldReaderProvider.overrideWithValue((userId) async => holds[userId]),
           authApiProvider.overrideWithValue(auth),
           passkeysProvider.overrideWithValue(FakePasskeys()),
           widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
@@ -130,6 +133,69 @@ void main() {
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
     });
 
+    // Final review finding 1: a held vault (an adoption waiting, a merge, a provisional vault) is
+    // the only copy of its data; only its own flow forgets it, never a sign-out.
+    for (final kind in VaultHoldKind.values) {
+      test('signOut keeps a vault held ${kind.name}: its file, its keys and the kept account, for '
+          'its own flow to resume', () async {
+        final container = containerWith(
+          holds: {'user_p': VaultHold(kind, since: '2026-11-18T00:00:00Z')},
+        );
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.signOut();
+
+        expect(deleted, isEmpty);
+        expect(_log, isNot(contains('vault wiped')));
+        final left = await kept();
+        expect(left['wambito.vault.user_p.dk.1'], 'AAAA');
+        expect(left['wambito.vault.user_p.device'], 'BBBB');
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+        expect(left.containsKey(SessionStore.tokenKey), isFalse);
+      });
+    }
+
+    test(
+      'a hold that cannot be read keeps the vault too (nothing is deleted on a guess)',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            authApiProvider.overrideWithValue(auth),
+            passkeysProvider.overrideWithValue(FakePasskeys()),
+            widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+            homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+            vaultHoldReaderProvider.overrideWithValue(
+              (userId) async => throw const FormatException('unreadable vault hold'),
+            ),
+            forgetVaultProvider.overrideWithValue((userId, storage) async => deleted.add(userId)),
+          ],
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.signOut();
+        expect(deleted, isEmpty);
+        expect((await kept())['wambito.vault.user_p.dk.1'], 'AAAA');
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      },
+    );
+
+    test('a server change while an adoption waits keeps the held vault and its keys', () async {
+      final container = containerWith(
+        holds: {'user_p': const VaultHold(VaultHoldKind.orphaned, since: '2026-11-18T00:00:00Z')},
+      );
+      await container.read(sessionProvider.notifier).ready;
+      expect(
+        await container.read(serverUrlProvider.notifier).change('https://my.server.org'),
+        isTrue,
+      );
+
+      expect(deleted, isEmpty);
+      final left = await kept();
+      expect(left['wambito.vault.user_p.dk.1'], 'AAAA');
+      expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+    });
+
     test('accountDeleted does the same, before the token', () async {
       final container = containerWith();
       final controller = container.read(sessionProvider.notifier);
@@ -150,6 +216,7 @@ void main() {
           passkeysProvider.overrideWithValue(FakePasskeys()),
           widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
           homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+          vaultHoldReaderProvider.overrideWithValue((userId) async => null),
           forgetVaultProvider.overrideWithValue((userId, storage) async {
             throw StateError('the file is locked');
           }),
@@ -254,6 +321,7 @@ void main() {
               ..owner = sessionOwnerOf('tok')
               ..id = 'user_p',
           ),
+          vaultHoldReaderProvider.overrideWithValue((userId) async => null),
           forgetVaultProvider.overrideWithValue(
             (userId, storage) =>
                 forgetVault(userId, storage, deleteStore: (id) async => deleted.add(id)),

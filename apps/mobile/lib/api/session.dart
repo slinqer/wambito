@@ -44,6 +44,7 @@ import '../vault/vault_providers.dart'
         forgetVaultProvider,
         keyStorageProvider,
         staleVaultsProvider,
+        vaultHoldReaderProvider,
         vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
@@ -1118,6 +1119,11 @@ class SessionController extends Notifier<SessionState> {
     } on Object {
       return;
     }
+    // A held vault (an adoption waiting, a merge, a provisional vault) may be the only copy of its
+    // data: only its own flow forgets it (the adoption, the merge's end, the promotion), never a
+    // sign-out or a server change. Its file, its keys and what was kept of it stay for the
+    // hold-aware sweep and the resumes; a hold that cannot be read keeps them too.
+    if (await _isHeld(userId)) return;
     final keys = ref.read(keyStorageProvider);
     try {
       await ref.read(forgetVaultProvider)(userId, keys);
@@ -1130,6 +1136,16 @@ class SessionController extends Notifier<SessionState> {
       }
     }
     await store.forget(userId);
+  }
+
+  /// Whether [userId]'s vault carries a hold ([vaultHoldReaderProvider]); true when it cannot be
+  /// read (the safe side).
+  Future<bool> _isHeld(String userId) async {
+    try {
+      return await ref.read(vaultHoldReaderProvider)(userId) != null;
+    } on Object {
+      return true;
+    }
   }
 
   /// The captures detected from notifications and still waiting to be sent belong to the account
