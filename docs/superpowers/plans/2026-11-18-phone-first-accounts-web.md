@@ -191,7 +191,7 @@ Each with what it costs if wrong. "Founder" marks an answer given on 2026-11-18.
    signs in and the same text unlocks. Pinned in Task 4.
 4. **An unticked sign-in on a shared computer:** no `Max-Age` on the cookie, and once the session
    cookie is gone, the next app page finds no `wambito-vault-*` database. Pinned in Task 5 and the
-   e2e of Task 12.
+   e2e of Task 13.
 5. **Another account's vault left in this browser when a QR sign-in finishes:** it is swept, and
    the new account's vault is never the one swept (enrollment runs after `deleteStaleVaults(userId)`).
    Pinned in Task 2.
