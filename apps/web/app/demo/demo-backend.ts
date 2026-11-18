@@ -169,8 +169,8 @@ async function seedStore(
       locale: profile.locale,
       timezone: profile.timezone,
       onboardingCompletedAt: since,
-      recoveryKeySavedAt: null,
       revokedDevices: [],
+      recoveryKeySavedAt: null,
     });
   });
 }
