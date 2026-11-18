@@ -926,6 +926,16 @@
       "passkey": "Usa una passkey",
       "pair": "Da un altro dispositivo"
     },
+    "install": {
+      "title": "Wambito vive sul tuo telefono",
+      "lead": "Registra una spesa con due tocchi, a voce o da una notifica della banca. I tuoi dati sono già cifrati: l'app li apre con te.",
+      "android": "Scarica per Android",
+      "release": "Vedi la versione su GitHub",
+      "play": "Google Play",
+      "fdroid": "F-Droid",
+      "app_store": "App Store",
+      "continue": "Continua nel browser"
+    },
     "locked": {
       "title": "Non siamo riusciti ad aprire i tuoi dati",
       "lead": "Sono ancora al sicuro. Riprova.",

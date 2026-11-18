@@ -926,6 +926,16 @@
       "passkey": "Use a passkey",
       "pair": "From another device"
     },
+    "install": {
+      "title": "Wambito lives on your phone",
+      "lead": "Log an expense in two taps, by voice or from a bank notification. Your data is already encrypted: the app opens it with you.",
+      "android": "Download for Android",
+      "release": "See the release on GitHub",
+      "play": "Google Play",
+      "fdroid": "F-Droid",
+      "app_store": "App Store",
+      "continue": "Continue in the browser"
+    },
     "locked": {
       "title": "We could not open your data",
       "lead": "It is still safe. Try again.",

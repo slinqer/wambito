@@ -253,7 +253,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
-  ready, else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
+  ready; a setup committed in this browser goes through `install` first (`InstallApp`: Wambi, the
+  Android APK and release links, a store button only for a non-null `PLAY_HREF`/`FDROID_HREF`/`APP_STORE_HREF`
+  in `landing/links.ts` `STORE_LINKS`; `gate.installDone()` opens the vault; never after an unlock, a
+  pairing or a known browser; story `Vault/Install app`, copy `vault.install.*`), else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
   from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
   passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is

@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Navigate } from "react-router";
 import { useTranslations } from "use-intl";
-import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
+import { ApiProvider } from "../../api/ApiProvider.tsx";
 import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
@@ -25,9 +25,9 @@ import {
   type VaultProfile,
   type VaultSession,
 } from "../../local/vault-session.ts";
-import { landingLink } from "../../site/config.ts";
-import { liveSignOut, useSignOut } from "../home/use-sign-out.ts";
+import { useSignOut } from "../home/use-sign-out.ts";
 import { ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
+import { InstallApp } from "./InstallApp.tsx";
 import { Locked } from "./Locked.tsx";
 import { PairNewDevice } from "./PairNewDevice.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
@@ -156,6 +156,8 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           onSignOut={() => void signOut()}
         />
       );
+    case "install":
+      return <InstallApp onContinue={() => void gate.installDone()} />;
     case "unlock":
       return (
         <Unlock

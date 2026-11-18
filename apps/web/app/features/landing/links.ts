@@ -19,6 +19,32 @@ export const ANDROID_APK_HREF = `${GITHUB_HREF}/releases/download/mobile-v${ANDR
 /** The release page: the 32-bit APK, the checksums and the signing certificate. */
 export const ANDROID_RELEASE_HREF = `${GITHUB_HREF}/releases/tag/mobile-v${ANDROID_VERSION}`;
 
+/** Google Play listing; null until the app is published there (the install offer hides its button). */
+export const PLAY_HREF: string | null = null;
+
+/** F-Droid listing; null until the app is published there. */
+export const FDROID_HREF: string | null = null;
+
+/** App Store listing; null until the app is published there. */
+export const APP_STORE_HREF: string | null = null;
+
+/** Where each way to get the phone app lives; a button shows only for a non-null link. */
+export interface StoreLinks {
+  apk: string | null;
+  release: string | null;
+  play: string | null;
+  fdroid: string | null;
+  appStore: string | null;
+}
+
+export const STORE_LINKS: StoreLinks = {
+  apk: ANDROID_APK_HREF,
+  release: ANDROID_RELEASE_HREF,
+  play: PLAY_HREF,
+  fdroid: FDROID_HREF,
+  appStore: APP_STORE_HREF,
+};
+
 /** The account creation page (the email code form): the landing's "Crear cuenta" door. */
 export const CREATE_ACCOUNT_PATH = "/create-account";
 

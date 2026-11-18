@@ -6,8 +6,8 @@ import type { UnlockError } from "./Unlock.tsx";
  *
  *   checking ─ keys in this browser ──────────────────────────────▶ opening ─▶ ready
  *      │                                                               ▲
- *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
- *      │     (a no-email account commits at once, nothing to show)                │
+ *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing ─▶ install ─ done ─▶
+ *      │     (a no-email account commits at once, nothing to show)       opening (never after an unlock)
  *      └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
  *                              ├─ the sign-in's passkey PRF opens a wrap ─▶ opening
  *                              └─ "From another device" ─▶ pairing ─ finish() ─▶ opening
@@ -113,6 +113,8 @@ export type VaultGateState<S = unknown> =
   | { status: "checking" }
   | { status: "setup"; recoveryKey: string }
   | { status: "committing" }
+  /** A setup just committed in this browser: the app is offered once, then the vault opens. */
+  | { status: "install" }
   /**
    * `notice: "removed"`: this browser was removed from the account (its vault is gone).
    * `notice: "unverified"`: a new key version did not verify (its vault is kept).
@@ -130,6 +132,8 @@ export interface VaultGate<S = unknown, K = GateKeys> {
   start(): void;
   /** The person typed four characters back on the setup screen. */
   confirmSetup(): Promise<void>;
+  /** Install's "Continue": opens the vault with the keys the setup committed. */
+  installDone(): Promise<void>;
   /** The Unlock screen's submit: null when it worked, else why not (the screen shows it). */
   unlock(text: string): Promise<UnlockError | null>;
   /** Unlock's "Use a passkey": null when it worked or was cancelled, else why not. */
@@ -379,6 +383,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     set({ status: "setup", recoveryKey: prepared.recoveryKey });
   }
 
+  /** The keys a committed setup holds while Install shows. */
+  let installKeys: K | null = null;
+
   async function commit(): Promise<void> {
     const current = prepared;
     if (!current) return check();
@@ -395,7 +402,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     }
     prepared = null;
     await wrapPending();
-    return open(keys, true);
+    // Only a setup committed here offers the app; an unlock, a pairing or a known browser never.
+    installKeys = keys;
+    set({ status: "install" });
   }
 
   return {
@@ -410,6 +419,12 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       void check();
     },
     confirmSetup: () => (state.status === "setup" ? commit() : Promise.resolve()),
+    async installDone() {
+      const keys = installKeys;
+      if (state.status !== "install" || keys === null) return;
+      installKeys = null;
+      await open(keys, true);
+    },
     async unlock(text) {
       if (state.status !== "unlock") return null;
       if (!(await sameSession())) return null;

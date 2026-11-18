@@ -926,6 +926,16 @@
       "passkey": "Usar una llave de acceso",
       "pair": "Desde otro dispositivo"
     },
+    "install": {
+      "title": "Wambito vive en tu teléfono",
+      "lead": "Anota un gasto en dos toques, con la voz o desde una notificación del banco. Tus datos ya están cifrados: la app los abre contigo.",
+      "android": "Descargar para Android",
+      "release": "Ver la versión en GitHub",
+      "play": "Google Play",
+      "fdroid": "F-Droid",
+      "app_store": "App Store",
+      "continue": "Continuar en el navegador"
+    },
     "locked": {
       "title": "No pudimos abrir tus datos",
       "lead": "Siguen a salvo. Inténtalo de nuevo.",

@@ -49,8 +49,64 @@ describe("vault gate", () => {
 
     await gate.confirmSetup();
     expect(commit).toHaveBeenCalledTimes(1);
+    expect(gate.getState()).toEqual({ status: "install" });
+    expect(deps.open).not.toHaveBeenCalled();
+    await gate.installDone();
     expect(deps.open).toHaveBeenCalledWith({ k: "new" }, true);
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
+  });
+
+  it("a setup committed here shows install, then ready", async () => {
+    const { gate, seen } = gateWith();
+    gate.start();
+    await settle();
+    await gate.confirmSetup();
+    expect(seen).toContain("install");
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
+    expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
+  });
+
+  it("an unlock, a pairing or a known browser never shows install", async () => {
+    const kept = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
+    kept.gate.start();
+    await settle();
+    expect(kept.seen).not.toContain("install");
+
+    const unlocked = gateWith({
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+    });
+    unlocked.gate.start();
+    await settle();
+    expect(unlocked.gate.getState()).toEqual({ status: "unlock" });
+    await unlocked.gate.unlock("ABCD-EFGH");
+    expect(unlocked.seen).not.toContain("install");
+    expect(unlocked.gate.getState().status).toBe("ready");
+
+    const pairing = {
+      id: "p-1",
+      code: "ABCDEFGH",
+      qr: "wambito://pair?id=p-1&key=k",
+      expiresAt: "2026-11-10T12:10:00Z",
+      number: vi.fn(async () => "123456"),
+      finish: vi.fn(async () => ({ k: "paired" })),
+      cancel: vi.fn(),
+    };
+    const paired = gateWith({
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+      startPairing: vi.fn(async () => pairing),
+    });
+    paired.gate.start();
+    await settle();
+    await paired.gate.pair();
+    await paired.gate.startPairing();
+    await settle();
+    expect(paired.seen).not.toContain("install");
+    expect(paired.gate.getState()).toEqual({ status: "ready", session: { id: "paired" } });
   });
 
   it("a guest commits at once: there is no key to show", async () => {
@@ -62,6 +118,8 @@ describe("vault gate", () => {
     await settle();
     expect(commit).toHaveBeenCalledTimes(1);
     expect(seen).not.toContain("setup");
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "guest" } });
   });
 
@@ -82,6 +140,8 @@ describe("vault gate", () => {
     await settle();
     expect(commit).toHaveBeenCalledTimes(2);
     expect(prepareAccount).toHaveBeenCalledTimes(1);
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
   });
 
@@ -128,6 +188,8 @@ describe("vault gate", () => {
     });
     gate.start();
     await settle();
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "locked", kind: "error", retrying: false });
 
     gate.retry();
@@ -453,6 +515,7 @@ describe("vault gate", () => {
       expect(addPasskeyWrap).toHaveBeenCalledWith(
         expect.objectContaining({ credentialId: "cred-1" }),
       );
+      await gate.installDone();
       expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
     });
 

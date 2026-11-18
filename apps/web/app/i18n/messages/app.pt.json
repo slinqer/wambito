@@ -926,6 +926,16 @@
       "passkey": "Usar uma chave de acesso",
       "pair": "A partir de outro dispositivo"
     },
+    "install": {
+      "title": "O Wambito vive no teu telemóvel",
+      "lead": "Regista uma despesa com dois toques, por voz ou a partir de uma notificação do banco. Os teus dados já estão cifrados: a app abre-os contigo.",
+      "android": "Descarregar para Android",
+      "release": "Ver a versão no GitHub",
+      "play": "Google Play",
+      "fdroid": "F-Droid",
+      "app_store": "App Store",
+      "continue": "Continuar no navegador"
+    },
     "locked": {
       "title": "Não conseguimos abrir os teus dados",
       "lead": "Continuam em segurança. Tenta outra vez.",
