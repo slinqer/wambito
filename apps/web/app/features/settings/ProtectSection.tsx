@@ -13,11 +13,13 @@ import type { PasskeysApi } from "./passkeys.ts";
 import { protectStatus } from "./protect-model.ts";
 import { Takeover } from "./RemoveDeviceSheet.tsx";
 import { useRecoveryKeyStep } from "./recovery-key-step.ts";
-import { SECURITY_KEY, type SecurityApi, type SecuritySnapshot } from "./security.ts";
+import {
+  protectSettingsKey,
+  SECURITY_KEY,
+  type SecurityApi,
+  type SecuritySnapshot,
+} from "./security.ts";
 import { passkeyRows } from "./security-model.ts";
-
-/** The react-query key of `SecurityApi.settings()` (what Protect reads of the settings record). */
-export const PROTECT_SETTINGS_KEY = ["protect-settings"] as const;
 
 /**
  * "Protect your data" (spec 2026-11-15 section 5.2, Proton's recovery checklist): for an account
@@ -58,7 +60,7 @@ export function ProtectSection({
     enabled: anonymous,
   });
   const settings = useQuery({
-    queryKey: PROTECT_SETTINGS_KEY,
+    queryKey: protectSettingsKey(profile.id),
     queryFn: () => security.settings(),
     enabled: anonymous,
   });
@@ -75,7 +77,6 @@ export function ProtectSection({
     cancel,
   } = useRecoveryKeyStep(security, async () => {
     toast.show({ message: t("recovery_saved") });
-    await qc.invalidateQueries({ queryKey: PROTECT_SETTINGS_KEY });
     void qc.invalidateQueries({ queryKey: SECURITY_KEY });
   });
   const [adding, setAdding] = useState(false);
@@ -191,9 +192,7 @@ export function ProtectSection({
                 className="self-start"
                 disabled={adding}
                 aria-busy={adding || undefined}
-                aria-describedby={
-                  linkFailed || status.passkeyWithoutPrf ? noPrfId : undefined
-                }
+                aria-describedby={linkFailed || status.passkeyWithoutPrf ? noPrfId : undefined}
                 onClick={() => void addPasskey()}
               >
                 <FingerprintIcon />

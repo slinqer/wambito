@@ -328,7 +328,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   an email; "N of 2" (`show`) until step 1 or 2 is done (`protected`), then a quiet list with
   "Done"). Step 1 "Save a recovery key" asks nothing (web ruling 16): `newRecoveryKey()`,
   `RecoveryKeySetup`, `commit()` (a failed commit keeps the setup, as in Security), then
-  `markRecoveryKeySaved()` and `PROTECT_SETTINGS_KEY` refetched. Step 2 (only where
+  `markRecoveryKeySaved()` and `protectSettingsKey(userId)` (`security.ts`, per user) refetched. Step 2 (only where
   `passkeys.supported()`): `PasskeysApi.add({ userId, explainSecondTouch, keep })`, `keep` =
   `SecurityApi.addPasskeyWrap`; done only when a passkey wrap exists, never the passkey row; a
   passkey without one shows `settings.protect.no_prf`, or `settings.protect.link_failed` when its

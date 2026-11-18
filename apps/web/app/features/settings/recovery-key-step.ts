@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { type Problem, problemOf } from "./RemoveDeviceSheet.tsx";
-import { SECURITY_KEY, type SecurityApi } from "./security.ts";
+import { protectSettingsKey, SECURITY_KEY, type SecurityApi } from "./security.ts";
 
 export type KeyStep =
   | { step: "idle"; busy: boolean; problem: Problem | null }
@@ -19,7 +19,8 @@ export type KeyStep =
  * `AddEmail` (spec 2026-11-15 section 7.1: the key screen comes right after the email when none
  * was saved). No check of a current key (web ruling 16: the open vault and the session are the
  * proof): `newRecoveryKey()`, the person types four characters back, `commit()` (a failed commit may
- * be saved: the setup stays), then `markRecoveryKeySaved()`, then `onSaved`.
+ * be saved: the setup stays), then `markRecoveryKeySaved()`, Protect's `protectSettingsKey(userId)`
+ * refetched, then `onSaved`.
  */
 export function useRecoveryKeyStep(security: SecurityApi, onSaved: () => void | Promise<void>) {
   const qc = useQueryClient();
@@ -60,6 +61,7 @@ export function useRecoveryKeyStep(security: SecurityApi, onSaved: () => void | 
     } catch {
       // The key is saved on the server; only the checklist's mark is missing (the step stays open).
     }
+    await qc.invalidateQueries({ queryKey: protectSettingsKey(security.pairing.userId) });
     idle();
     await onSaved();
   }

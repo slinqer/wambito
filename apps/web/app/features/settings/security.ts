@@ -21,6 +21,12 @@ import type { SecurityWrap } from "./security-model.ts";
 /** The react-query key of `SecurityApi.load()` (Security and the passkeys' "Unlocks" share it). */
 export const SECURITY_KEY = ["security"] as const;
 
+/**
+ * The react-query key of `SecurityApi.settings()` (what Protect reads of the settings record), per
+ * user: another account signed in on this tab never sees the last one's mark.
+ */
+export const protectSettingsKey = (userId: string) => ["protect-settings", userId] as const;
+
 /** What Settings → Security reads: the wraps, this browser's, the revoked list, the checks. */
 export interface SecuritySnapshot {
   wraps: SecurityWrap[];
