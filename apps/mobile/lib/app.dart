@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'feedback/celebration.dart';
 import 'feedback/feedback.dart';
 import 'api/seen.dart';
-import 'api/session.dart' show adoptionResumeProvider;
+import 'api/session.dart' show adoptionResumeProvider, provisionalPromotionProvider;
 import 'home/widget_sync.dart';
 import 'capture/prewarm.dart';
 import 'launch/launch_links.dart';
@@ -51,6 +51,9 @@ class WambitoApp extends ConsumerWidget {
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
     ref.watch(vaultChangedProvider);
+    // Promotes an offline first run's provisional vault once the network answers: at start, on
+    // resume and every minute (first, as the plan's lifecycle order has it).
+    ref.watch(provisionalPromotionProvider);
     // Goes on with a deleted account's adoption at start and on resume (before the merge's, as the
     // plan's lifecycle order has it).
     ref.watch(adoptionResumeProvider);

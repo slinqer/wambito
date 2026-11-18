@@ -3,11 +3,16 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:wambito/api/auth_api.dart';
+import 'package:wambito/api/server_url.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/home/home_screen.dart';
 import 'package:wambito/home/wambi_face.dart';
+import 'package:wambito/local/memory_store.dart' show createMemoryStore;
+import 'package:wambito/local/provisional.dart';
 import 'package:wambito/progress/progress_screen.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/ui/lk_icons.dart';
@@ -186,6 +191,81 @@ void main() {
       await tester.pumpAndSettle();
       expect(location(container), '/progress');
       expect(find.byType(ProgressScreen), findsOneWidget);
+    });
+  });
+
+  group('offline first run', () {
+    /// The provisional vaults opened, in memory.
+    late List<String> opened;
+    setUp(() => opened = []);
+
+    List<Override> offline({bool byBuild = false}) => [
+      newUsersEncryptedByBuildProvider.overrideWithValue(byBuild),
+      provisionalPromotionEveryProvider.overrideWithValue(null),
+      provisionalOpenerProvider.overrideWithValue((id) async {
+        opened.add(id);
+        return LocalOnlyVault(id, createMemoryStore());
+      }),
+    ];
+
+    Future<void> startOffline(WidgetTester tester) async {
+      auth.failures['signInAsGuest'] = const AuthFailure(status: 0);
+      await tester.tap(find.byKey(const Key('entry.start')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('offline Start with nothing known about the server says it needs a connection, '
+        'makes nothing, and Try again signs in once online', (tester) async {
+      final container = await pumpApp(tester, auth: auth, overrides: offline());
+      await startOffline(tester);
+
+      expect(find.byKey(const Key('entry.needsConnection')), findsOneWidget);
+      expect(
+        find.text('Para empezar necesito internet una vez. Conéctate y lo intentamos de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.byType(HomeScreen), findsNothing);
+      expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      expect(opened, isEmpty);
+      expect(
+        (await const FlutterSecureStorage().readAll()).containsKey(SessionStore.provisionalKey),
+        isFalse,
+      );
+
+      await tester.tap(find.byKey(const Key('entry.tryAgain')));
+      await tester.pumpAndSettle();
+      expect(auth.signInAsGuestCalls, 2);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(_stored(container)?.token, 'guest-token-1');
+      expect(opened, isEmpty);
+    });
+
+    testWidgets('offline Start after this phone saw the server make an encrypted user opens the '
+        'provisional vault', (tester) async {
+      final container = await pumpApp(tester, auth: auth, overrides: offline());
+      await rememberNewUsersEncrypted(container.read(serverUrlProvider));
+      container.invalidate(newUsersEncryptedProvider);
+      await startOffline(tester);
+
+      expect(find.byKey(const Key('entry.needsConnection')), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      final session = container.read(sessionProvider);
+      expect(session.status, SessionStatus.provisional);
+      expect(opened, [session.localId]);
+      expect(_stored(container), isNull);
+    });
+
+    testWidgets('the build define alone also allows it', (tester) async {
+      final container = await pumpApp(tester, auth: auth, overrides: offline(byBuild: true));
+      await startOffline(tester);
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(container.read(sessionProvider).status, SessionStatus.provisional);
+      expect(opened, hasLength(1));
+      // No sign-in while provisional: the entry screens go home.
+      container.read(routerProvider).go('/entry/email');
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
     });
   });
 
@@ -828,7 +908,8 @@ void main() {
       await tester.tap(find.text('EMPEZAR'));
       await tester.pumpAndSettle();
 
-      expect(find.text(network), findsOneWidget);
+      // Nothing known about the server: it needs a connection this once (ruling 8).
+      expect(find.byKey(const Key('entry.needsConnection')), findsOneWidget);
       expect(enabled(tester, find.byKey(const Key('entry.start'))), isTrue);
       expect(find.text('EMPEZAR'), findsOneWidget);
 
@@ -909,7 +990,11 @@ void main() {
       await tester.tap(find.text('START'));
       await tester.pumpAndSettle();
 
-      expect(find.text('No connection. Check your internet and try again.'), findsOneWidget);
+      expect(
+        find.text('To start I need the internet, just this once. Connect and we try again.'),
+        findsOneWidget,
+      );
+      expect(find.text('TRY AGAIN'), findsOneWidget);
     });
   });
 

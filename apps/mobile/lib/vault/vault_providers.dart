@@ -277,8 +277,9 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     }
   }
 
-  /// A vault held `orphaned` is being adopted into a new user (lib/local/adopt.dart): it never opens
-  /// (a write now would be lost when the adoption forgets it), the adoption is asked to go on, and
+  /// A vault held `orphaned` (or `provisional`, an offline first run's) is being adopted into a new
+  /// user (lib/local/adopt.dart): it never opens (a write now would be lost when the adoption
+  /// forgets it), the adoption is asked to go on, and
   /// the gate says why it waits: `plain_server` when the new user would keep data in clear, else
   /// `adopting` (shown as offline; a retry asks again). A hold that cannot be read opens as before.
   Future<void> refuseAdopted() async {
@@ -290,7 +291,9 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     } on Object {
       return;
     }
-    if (hold?.kind != VaultHoldKind.orphaned) return;
+    // A `provisional` hold is an offline first run's vault being promoted: no write may land in
+    // it after the carry read it, so it never opens as an account's vault either.
+    if (hold?.kind != VaultHoldKind.orphaned && hold?.kind != VaultHoldKind.provisional) return;
     final session = read(sessionProvider.notifier);
     unawaited(session.resumeAdoptions().catchError((Object _) {}));
     throw GateError(session.adoptionNeedsEncryptedServer ? 'plain_server' : 'adopting');

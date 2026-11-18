@@ -184,7 +184,21 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `error`, `offline`, `unsupported`; `PairingFrom` only `unlock`), while `prepareAccount(guest: isAnonymous)` still
   sets an account without email up with no key shown. The welcome (`lib/entry/entry_screen.dart`) is Wambi,
   "Start" (`entry.start`, `POST /auth/sign-in/anonymous`) and "I already have an account" (`entry.haveAccount`, a
-  link to `/entry/email`). Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
+  link to `/entry/email`). Offline, "Start" (`SessionController.startGuest`, ruling 8) opens a provisional vault
+  only when new users are known to be encrypted (`newUsersEncryptedProvider` in `lib/api/server_url.dart`: the
+  build define `WAMBITO_NEW_USERS_ENCRYPTED`, `newUsersEncryptedByBuild` in `server_address.dart`, or
+  `wambito.server.<host>.newUsers` = `encrypted`, written when `GET /v1/me` first says an anonymous user is
+  `preview`); else `NeedsConnection` (`lib/entry/needs_connection.dart`, keys `entry.needsConnection`,
+  `entry.tryAgain`) and nothing is made. Provisional (`SessionState.provisional(localId)`, `SessionStatus.provisional`,
+  no token: the jobs, the widget and capture see it signed out; no sign-in, the entry routes go home) the screens'
+  `/v1` is the vault of `lib/local/provisional.dart` (`openProvisionalVault`: id `local-<uuidv7>`, held
+  `provisional`, seeded from the hints; no keys, no sync; `provisionalVaultProvider`, a `FinanceGuard` after it), and
+  Settings shows only the preferences and a line (`settings.provisional`: `provisionalWaiting`, or
+  `ProvisionalBlock.plainServer` / `noGuests`). `promoteProvisional` (app.dart's first hook: start, resume, every
+  minute) is `adoptVaultIntoNewUser(localId, …)` with its token under `session.provisionalToken` and the app's vault
+  stopped before the carry: `adopted` signs the new anonymous user in (captures re-tagged from the local id);
+  `plainUser` signs that session out on the server, forgets the kept `newUsers`, keeps the vault held and is tried
+  again only at the next start; a 403 is `noGuests`. Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
   (`lib/entry/recovery_sign_in_screen.dart`, route `/entry/recovery`, signed out only; keys `recovery.input`,
   `recovery.submit`): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
   (`keysParseRecoveryKey`; one that does not parse is `bad_recovery_key`, nothing sent), posts only `recoveryVerifier`'s
@@ -565,6 +579,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   captures a new session takes over from another account); the merge namespace `mergeNamespace` in
   `lib/local/merge.dart` (merged ids derive from it).
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
+- `session.provisional` (secure storage, `SessionStore.provisionalKey`): the offline first run's local vault id,
+  written before its vault is made (a restart reopens it, never a second); `session.provisionalToken`
+  (`provisionalTokenKey`): the token of the user it is being promoted into, kept until the session is that user's;
+  `wambito.server.<host>.newUsers` (`newUsersKeyOf`): `encrypted` once this phone saw that server make a `preview`
+  anonymous user. Persistent names.
 - `wambito.adopt.token` (secure storage, `adoptTokenKey`): the token of the new anonymous user a deleted account's
   vault is adopted into, kept from its sign-up until the session is that user's. Outside `wambito.vault.*` on
   purpose: the old vault's keys go before the session changes, and a sweep must never take it.

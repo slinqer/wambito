@@ -1018,5 +1018,10 @@
   "mergeFailedTitle": "Não conseguimos terminar de trazer os teus dados",
   "mergeFailedLead": "Os teus dados continuam guardados neste telefone. Tenta outra vez.",
   "mergeFailedPlain": "Essa conta ainda não guarda dados cifrados, por isso não podemos trazer para ela os deste telefone.",
-  "mergeRetry": "Tentar de novo"
+  "mergeRetry": "Tentar de novo",
+  "entryNeedsConnection": "Para começar preciso de internet, só desta vez. Liga-te e tentamos de novo.",
+  "entryTryAgain": "Tentar de novo",
+  "provisionalWaiting": "Os teus dados estão neste telemóvel. Assim que houver internet, crio a tua conta para eles.",
+  "provisionalPlainServer": "Os teus dados continuam neste telemóvel. Este servidor não guarda os dados cifrados, por isso espero por um que o faça.",
+  "provisionalNoGuests": "Os teus dados continuam neste telemóvel. Por agora este servidor não aceita contas novas sem email."
 }

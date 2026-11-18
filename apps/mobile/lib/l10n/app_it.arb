@@ -1018,5 +1018,10 @@
   "mergeFailedTitle": "Non siamo riusciti a portare tutti i tuoi dati",
   "mergeFailedLead": "I tuoi dati sono ancora salvati su questo telefono. Riprova.",
   "mergeFailedPlain": "Quell'account non salva ancora dati cifrati, quindi non possiamo portarci quelli di questo telefono.",
-  "mergeRetry": "Riprova"
+  "mergeRetry": "Riprova",
+  "entryNeedsConnection": "Per iniziare mi serve internet, solo questa volta. Connettiti e riproviamo.",
+  "entryTryAgain": "Riprova",
+  "provisionalWaiting": "I tuoi dati sono su questo telefono. Appena c’è internet, creo il tuo account per loro.",
+  "provisionalPlainServer": "I tuoi dati restano su questo telefono. Questo server non conserva i dati cifrati, quindi aspetto uno che lo faccia.",
+  "provisionalNoGuests": "I tuoi dati restano su questo telefono. Per ora questo server non accetta nuovi account senza email."
 }

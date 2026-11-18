@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/gen/wambito_api.dart';
+import '../api/server_url.dart'
+    show newUsersEncryptedProvider, rememberNewUsersEncrypted, serverUrlProvider;
 import '../api/session.dart';
 import '../home/home_cache.dart' show homeCacheStoreProvider, sessionOwnerOf;
 import '../local/vault_session.dart' show VaultProfile;
@@ -216,6 +218,12 @@ final freshVaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) =>
   // A session that has meanwhile ended (or changed) keeps nothing and sweeps nothing.
   if (!ref.mounted) return account;
   await store.remember(token, account);
+  // An anonymous `preview` user: this server makes encrypted new users, so an offline "Start" on
+  // it may open a provisional vault from now on (ruling 8).
+  if (ref.mounted && account.mode == EncryptionMode.preview && me.isAnonymous) {
+    await rememberNewUsersEncrypted(ref.read(serverUrlProvider));
+    if (ref.mounted) ref.invalidate(newUsersEncryptedProvider);
+  }
   if (ref.mounted) {
     final sweep = ref.read(staleVaultsProvider);
     unawaited(sweep(me.id).catchError((Object _) {}));

@@ -2215,5 +2215,10 @@
   "mergeFailedTitle": "We couldn't finish bringing your data",
   "mergeFailedLead": "Your data is still kept on this phone. Try again.",
   "mergeFailedPlain": "That account doesn't keep encrypted data yet, so this phone's data can't go into it.",
-  "mergeRetry": "Try again"
+  "mergeRetry": "Try again",
+  "entryNeedsConnection": "To start I need the internet, just this once. Connect and we try again.",
+  "entryTryAgain": "Try again",
+  "provisionalWaiting": "Your data is on this phone. As soon as there is internet, I make your account for it.",
+  "provisionalPlainServer": "Your data stays on this phone. This server does not keep data encrypted, so I wait for one that does.",
+  "provisionalNoGuests": "Your data stays on this phone. This server takes no new accounts without email for now."
 }

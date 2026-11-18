@@ -4610,5 +4610,25 @@
   "mergeRetry": "Intentar de nuevo",
   "@mergeRetry": {
     "description": "Merge: try the failed step again."
+  },
+  "entryNeedsConnection": "Para empezar necesito internet una vez. Conéctate y lo intentamos de nuevo.",
+  "@entryNeedsConnection": {
+    "description": "First run: \"Start\" found no network, and this server is not known to make encrypted users, so nothing was made (Wambi speaks)."
+  },
+  "entryTryAgain": "Intentar de nuevo",
+  "@entryTryAgain": {
+    "description": "First run, under entryNeedsConnection: tries \"Start\" again."
+  },
+  "provisionalWaiting": "Tus datos están en este teléfono. En cuanto haya internet, les creo tu cuenta.",
+  "@provisionalWaiting": {
+    "description": "Settings, on an offline first run: the data waits on the phone for the network to make the account."
+  },
+  "provisionalPlainServer": "Tus datos siguen en este teléfono. Este servidor no guarda los datos cifrados, así que espero a uno que sí lo haga.",
+  "@provisionalPlainServer": {
+    "description": "Settings, on an offline first run whose server made a plain (unencrypted) user: nothing was sent; it waits for a server that keeps data encrypted."
+  },
+  "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
+  "@provisionalNoGuests": {
+    "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
   }
 }

@@ -7,6 +7,7 @@ import '../api/session.dart';
 import '../l10n/app_localizations.dart';
 import '../ui/press_button.dart';
 import 'auth_errors.dart';
+import 'needs_connection.dart';
 import 'sign_in_frame.dart';
 
 /// The welcome (phone-first accounts, spec section 4): Wambi on the web's sign-in frame, "Start"
@@ -15,7 +16,9 @@ import 'sign_in_frame.dart';
 /// encrypted new users the vault gate then sets the account up without a recovery key; on one that
 /// makes `plain` users it is today's guest. "I already have an account" opens the sign-in (email code
 /// or magic link, and the passkey) without making any account. A brand-new person has no passkey,
-/// so it lives on that step.
+/// so it lives on that step. Without network, "Start" opens a provisional vault where new users
+/// are known to be encrypted (`SessionController.startGuest`); elsewhere [NeedsConnection] says it
+/// needs a connection, with "Try again".
 class EntryScreen extends ConsumerStatefulWidget {
   const EntryScreen({super.key});
 
@@ -29,6 +32,9 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
   _Busy _busy = _Busy.none;
   AuthError? _error;
 
+  /// The last "Start" found no network (and could not start offline): [NeedsConnection] says so.
+  bool _offline = false;
+
   Future<void> _run(
     _Busy busy,
     Future<void> Function() action,
@@ -40,14 +46,27 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
     });
     try {
       await action();
-    } on AuthFailure catch (failure) {
-      if (mounted) setState(() => _error = onFail(failure));
-    } catch (error) {
-      // Never an unhandled error with a busy button: a message, and the buttons work again.
-      if (mounted) {
-        setState(() {
-          _error = unexpectedErrorFor(error);
-        });
+      if (mounted) setState(() => _offline = false);
+    } on Object catch (error) {
+      // No network, on a server not known to make encrypted users: nothing was made, and the
+      // welcome says it needs a connection (ruling 8).
+      if (isOfflineError(error)) {
+        if (mounted) setState(() => _offline = true);
+      } else if (error is AuthFailure) {
+        if (mounted) {
+          setState(() {
+            _offline = false;
+            _error = onFail(error);
+          });
+        }
+      } else {
+        // Never an unhandled error with a busy button: a message, and the buttons work again.
+        if (mounted) {
+          setState(() {
+            _offline = false;
+            _error = unexpectedErrorFor(error);
+          });
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = _Busy.none);
@@ -90,6 +109,7 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
             onPressed: busy ? null : () => context.push('/entry/email'),
           ),
         ),
+        if (_offline) NeedsConnection(onTryAgain: busy ? null : _start),
         if (error != null) FieldError(error.message(l10n), textAlign: TextAlign.center),
       ],
     );

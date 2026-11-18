@@ -334,6 +334,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final titleStyle = LkText.pageTitle.copyWith(color: colors.ink);
     final signedInStyle = LkText.bodySm.copyWith(color: colors.inkMuted);
 
+    final preferences = SettingsSection(
+      title: l10n.settingsPreferences,
+      children: [
+        Choices<String>(
+          legend: l10n.settingsLanguage,
+          value:
+              locale?.languageCode ??
+              (webOnly ? Localizations.localeOf(context).languageCode : 'auto'),
+          options: [
+            if (!webOnly)
+              Choice('auto', l10n.settingsLanguageAuto, key: const Key('settings.language.auto')),
+            Choice('es', l10n.settingsLanguageEs, key: const Key('settings.language.es')),
+            Choice('en', l10n.settingsLanguageEn, key: const Key('settings.language.en')),
+            Choice('it', l10n.settingsLanguageIt, key: const Key('settings.language.it')),
+            Choice('pt', l10n.settingsLanguagePt, key: const Key('settings.language.pt')),
+          ],
+          onChanged: (code) => unawaited(
+            ref.read(localeOverrideProvider.notifier).set(code == 'auto' ? null : Locale(code)),
+          ),
+        ),
+        Choices<ThemeMode>(
+          legend: l10n.settingsTheme,
+          hint: l10n.settingsThemeHint,
+          value: themeMode,
+          options: [
+            Choice(
+              ThemeMode.system,
+              l10n.settingsThemeSystem,
+              key: const Key('settings.theme.system'),
+            ),
+            Choice(ThemeMode.dark, l10n.settingsThemeNight, key: const Key('settings.theme.night')),
+            Choice(ThemeMode.light, l10n.settingsThemeDay, key: const Key('settings.theme.day')),
+          ],
+          onChanged: (mode) => unawaited(ref.read(themeModeProvider.notifier).set(mode)),
+        ),
+        SettingSwitch(
+          key: const Key('settings.sound'),
+          label: l10n.settingsSound,
+          // The web's line says vibration stays on; here it is a setting of its own.
+          hint: vibration ? l10n.settingsSoundHint : l10n.settingsSoundHintVibrationOff,
+          value: sound,
+          onChanged: (on) => unawaited(ref.read(soundEnabledProvider.notifier).set(on)),
+        ),
+      ],
+    );
+    final provisional = ref.watch(sessionProvider.select((s) => s.isProvisional));
+    final block = ref.watch(sessionProvider.select((s) => s.provisionalBlock));
+    // An offline first run (lib/local/provisional.dart): no account yet, so only this phone's own
+    // preferences and why the account waits; no sign-in, no server, no account card.
+    if (provisional && !webOnly) {
+      return ManagePage(
+        current: 'settings',
+        onAdd: () => unawaited(openAddSheet(context)),
+        onMic: () => unawaited(openCapture(context, listen: true)),
+        onNavigate: (to) => navigateFromShell(context, ref, to, current: 'settings'),
+        header: PageHeader(
+          backLabel: l10n.manageBack,
+          backShort: l10n.manageBackShort,
+          onBack: _back,
+        ),
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: WambitoTokens.space1,
+            children: [
+              Semantics(header: true, child: Text(l10n.settingsTitle, style: titleStyle)),
+              Text(
+                switch (block) {
+                  ProvisionalBlock.plainServer => l10n.provisionalPlainServer,
+                  ProvisionalBlock.noGuests => l10n.provisionalNoGuests,
+                  null => l10n.provisionalWaiting,
+                },
+                key: const Key('settings.provisional'),
+                style: signedInStyle,
+              ),
+            ],
+          ),
+          preferences,
+        ],
+      );
+    }
     return ManagePage(
       current: 'settings',
       onAdd: () => unawaited(openAddSheet(context)),
@@ -371,63 +452,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-        SettingsSection(
-          title: l10n.settingsPreferences,
-          children: [
-            Choices<String>(
-              legend: l10n.settingsLanguage,
-              value:
-                  locale?.languageCode ??
-                  (webOnly ? Localizations.localeOf(context).languageCode : 'auto'),
-              options: [
-                if (!webOnly)
-                  Choice(
-                    'auto',
-                    l10n.settingsLanguageAuto,
-                    key: const Key('settings.language.auto'),
-                  ),
-                Choice('es', l10n.settingsLanguageEs, key: const Key('settings.language.es')),
-                Choice('en', l10n.settingsLanguageEn, key: const Key('settings.language.en')),
-                Choice('it', l10n.settingsLanguageIt, key: const Key('settings.language.it')),
-                Choice('pt', l10n.settingsLanguagePt, key: const Key('settings.language.pt')),
-              ],
-              onChanged: (code) => unawaited(
-                ref.read(localeOverrideProvider.notifier).set(code == 'auto' ? null : Locale(code)),
-              ),
-            ),
-            Choices<ThemeMode>(
-              legend: l10n.settingsTheme,
-              hint: l10n.settingsThemeHint,
-              value: themeMode,
-              options: [
-                Choice(
-                  ThemeMode.system,
-                  l10n.settingsThemeSystem,
-                  key: const Key('settings.theme.system'),
-                ),
-                Choice(
-                  ThemeMode.dark,
-                  l10n.settingsThemeNight,
-                  key: const Key('settings.theme.night'),
-                ),
-                Choice(
-                  ThemeMode.light,
-                  l10n.settingsThemeDay,
-                  key: const Key('settings.theme.day'),
-                ),
-              ],
-              onChanged: (mode) => unawaited(ref.read(themeModeProvider.notifier).set(mode)),
-            ),
-            SettingSwitch(
-              key: const Key('settings.sound'),
-              label: l10n.settingsSound,
-              // The web's line says vibration stays on; here it is a setting of its own.
-              hint: vibration ? l10n.settingsSoundHint : l10n.settingsSoundHintVibrationOff,
-              value: sound,
-              onChanged: (on) => unawaited(ref.read(soundEnabledProvider.notifier).set(on)),
-            ),
-          ],
-        ),
+        preferences,
         if (profile != null) TimeAndMoneySection(profile: profile),
         PasskeysSection(
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,

@@ -61,6 +61,8 @@ VaultRoute vaultRouteOf(Ref ref) {
 /// - the magic link (`/auth/verify`) always opens: it decides for itself, guests included;
 /// - while the stored session is read, a blank screen;
 /// - signed out, only the entry screens (the recovery-key sign-in too);
+/// - provisional (an offline first run, lib/local/provisional.dart), an open vault: every screen
+///   but the sign-in ones, the welcome, Unlock, the merge and "Guarda tu progreso", which go home;
 /// - signed in, never the first-run screen nor the recovery-key sign-in, and the email screen and "Guarda tu progreso" only for
 ///   a guest (to save their progress, or to sign in as another account after a warning);
 /// - signed in with the welcome to do (an account with no `onboardingCompletedAt`), the welcome from
@@ -84,10 +86,27 @@ String? sessionRedirect(
   bool finishingClaim = false,
 }) {
   final path = location.path;
+  // An offline first run is an open vault with no account: home and its screens, never a sign-in
+  // (the magic link included), the welcome, Unlock, a merge or "Guarda tu progreso".
+  if (session.status == SessionStatus.provisional) {
+    final blocked =
+        path == '/auth/verify' ||
+        path == '/entry' ||
+        path.startsWith('/entry/') ||
+        path == '/loading' ||
+        path == '/unlock' ||
+        path == '/merge' ||
+        path == '/progress' ||
+        path == '/welcome' ||
+        path.startsWith('/welcome/');
+    return blocked ? '/' : null;
+  }
   if (path == '/auth/verify') return null;
   switch (session.status) {
     case SessionStatus.loading:
       return path == '/loading' ? null : '/loading';
+    case SessionStatus.provisional:
+      return null; // Above.
     case SessionStatus.signedOut:
       return path == '/entry' || path == '/entry/email' || path == '/entry/recovery'
           ? null

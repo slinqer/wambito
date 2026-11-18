@@ -130,6 +130,35 @@ class AdoptDeps {
   /// Where each [adoptOrphan]'s routine stopped (the gate says why it waits: a `plain` new user).
   final void Function(AdoptStep step)? onStep;
 
+  /// These deps with another kept token and another stop of the old vault's writes: the offline
+  /// start's promotion (Task 11) keeps its token under its own key and closes the provisional vault.
+  AdoptDeps withTokens({
+    required Future<String?> Function() keptToken,
+    required Future<void> Function(String token) keepToken,
+    required Future<void> Function() forgetToken,
+    Future<void> Function(String userId)? stopWrites,
+  }) => AdoptDeps(
+    auth: auth,
+    keys: keys,
+    network: network,
+    openStore: openStore,
+    lease: lease,
+    forgetVault: forgetVault,
+    now: now,
+    keptToken: keptToken,
+    keepToken: keepToken,
+    forgetToken: forgetToken,
+    directory: directory,
+    factory: factory,
+    stopWrites: stopWrites ?? this.stopWrites,
+    onAdopted: onAdopted,
+    onWiped: onWiped,
+    mayResume: mayResume,
+    hasQueuedCaptures: hasQueuedCaptures,
+    listHolds: listHolds,
+    onStep: onStep,
+  );
+
   /// These deps with the session's part.
   AdoptDeps withSession({
     Future<void> Function(String token, {required String fromUserId})? onAdopted,
