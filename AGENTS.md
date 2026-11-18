@@ -55,10 +55,12 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   `check-fdroid-lock.sh`, tested by `test-fdroid-checks.sh`), no-Google check, debug build, Gradle
   lock check, Gradle unit tests, native-switch test (`test-native-switch.sh`), release build.
 - `mobile-e2e` (filter: the `mobile` paths plus `apps/api/**` and `packages/{crypto,core,db}/**`): Flutter,
-  the root stack on the real clock, then `apps/mobile/scripts/run-vault-e2e.sh`: the phone's vault
-  (`test_stack/`, tag `stack`: `vault_e2e_test.dart` and `vault_3b_e2e_test.dart`, pairing, background
-  capture and sync, device removal, a new recovery key) against the real API, and `psql` finds no plain
-  text in `records`.
+  the root stack on the real clock with `NEW_USERS_ENCRYPTED=true`, then
+  `apps/mobile/scripts/run-vault-e2e.sh`: the phone's vault (`test_stack/`, tag `stack`:
+  `vault_e2e_test.dart` and `vault_3b_e2e_test.dart`, pairing, background capture and sync, device
+  removal, a new recovery key; `phone_first_e2e_test.dart`, the first run without email, a merge, a
+  recovery-key sign-in, a web QR approved) against the real API, and `psql` finds no plain text in
+  `records` and no merged guest's user row.
 - `ios` (same filter; macOS runner): pub get, the signing guard and its test
   (`apps/mobile/scripts/check-ios-signing.sh`), `swift test` on `ios/WambitoNative`,
   `flutter build ios --release --no-codesign`.

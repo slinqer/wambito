@@ -52,6 +52,7 @@ services:
       # records (`GET /v1/me` `encryption: "preview"`). In development the seeded `preview-e2e`
       # (preview@wambito.test, `pnpm --filter @wambito/api seed:e2e-preview`); override it from the shell.
       E2E_PREVIEW_USER_IDS: ${E2E_PREVIEW_USER_IDS:-preview-e2e}
+      NEW_USERS_ENCRYPTED: ${NEW_USERS_ENCRYPTED:-false}
       # The MCP's public key for the assistant secret (`wk` claim). DEV-ONLY, the pair in
       # .env.example (public in this repo): never use it in production; deploy/personal has its own.
       MCP_WK_PUBLIC_KEY: '{"crv":"X25519","x":"CMdyb71RFPM5XsuizCiPU7FSFoa-3_D3pGaX9uFe3Ek","kty":"OKP"}'

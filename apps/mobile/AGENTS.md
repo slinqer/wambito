@@ -364,7 +364,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `MergeSigningIn`, `MergeWaitingUnlock`, `MergeCurrencyStop(phone, account)`, `MergeUploading(pending)`, `MergeDone`,
   `MergeFailed(code, carried)`): `begin(email)` keeps the anonymous token (`wambito.vault.<anonId>.mergeToken`) and
   holds its vault `merging` (target = the email) before any code is sent; the caller then signs in with
-  `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`): currency check
+  `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`, read through `ref.container`: it watches
+  the controller, so a `ref.read` is riverpod's debug-mode dependency loop): currency check
   (`currencyOf`; a difference stops before any write), `carryRecords(mode: merge)` under the old vault's lease, then
   `meta.mergeCarried` in the old vault (never carried twice: one of `mergedIdsOf`'s ids already in the account's vault
   also counts as carried, so a crash before the mark never reruns it), sync until `pendingChanges() == 0`, every carried record with a
@@ -528,10 +529,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
-- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`,
-  and `docker compose up -d --build api` after the API code changed: a stale image 404s the newer routes):
-  `scripts/run-vault-e2e.sh` runs two stack tests one after the other (they share the account), each after
-  `seed:e2e-preview` in the api container: `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
+- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env;
+  NEW_USERS_ENCRYPTED=true docker compose up -d`, and `--build api` after the API code changed: a stale image
+  404s the newer routes): `scripts/run-vault-e2e.sh` first checks that a new guest's `/v1/me` says `preview`
+  (else it stops: "start the stack with NEW_USERS_ENCRYPTED=true"), then runs three stack tests one after the
+  other. The first two share the seeded account, each after `seed:e2e-preview` in the api container:
+  `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
   code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
   `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
@@ -539,12 +542,23 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
-  `body: null`) is `not_found` on C). `test_stack/support.dart` holds the shared phone, gate and sign-in helpers; a vault
-  session is one per process and account, so only one phone has its session open at a time. After each it checks
-  with `psql` that `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
-  `records.body` holds the test's word (`almuerzo`, `panaderia`) in the clear (must print 0; a byte search, as a
-  sealed body is not UTF-8). Each test signs in with an email code and the API allows 5 per address in 10 minutes
-  (in memory): after a third run, `docker compose restart api`. CI's `mobile-build` fails when a release APK
+  `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
+  (`phone-first-<run>@wambito.test`, new each run): a guest (`startGuest`) protects (`newRecoveryKey`, its
+  verifier signs in) and claims an email; a guest of its own merges into an email account through
+  `MergeController` in a `ProviderContainer` over the stack (the held vault survives the sweep, no id the guest
+  owns is pushed, the carried deleted occurrence goes as a new tombstone, the guest's token then gets 401);
+  phone C signs in with A's recovery key typed loosely; A approves a web QR for `WebSignin` (the browser's
+  stand-in), which opens A's data key with `openFromPairing`. Its tests 3 and 4 reuse test 1's phone A (fewer
+  email codes): run the whole file. It writes its users' ids to `WAMBITO_E2E_REPORT`. `test_stack/support.dart`
+  holds the shared phone (`Phone(token, dir, account:, storage:)`), gate, sign-in, `startGuest`,
+  `signUpWithEmail`, `authApi()` (each auth request from its own `x-forwarded-for`: Better Auth allows 3
+  sign-ins per address in 10 seconds) and `WebSignin`; a vault session is one per process and account, so only
+  one phone has its session open at a time. After each it checks with `psql` that the accounts have records
+  (> 0), no rows in `transactions` / `categories`, and that no `records.body` holds the test's words
+  (`almuerzo`, `panaderia`, `cafeteria`, `mercado`) in the clear (must print 0; a byte search, as a sealed body
+  is not UTF-8); after the third, that the merged guest's `user` row is gone. The first two sign in with an email
+  code and the API allows 5 per address in 10 minutes (in memory): after a third run, `docker compose restart
+  api`. CI's `mobile-build` fails when a release APK
   lists `libsqlite3.so` (sqflite uses the system SQLite; the ffi dev dependency must stay out). `test_stack/` is outside `test/`, so `flutter test`
   never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
@@ -615,6 +629,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `mergeDiscard` (only the account's data kept) in that vault; `wambito.capture.handover` (secure storage, the
   captures a new session takes over from another account); the merge namespace `mergeNamespace` in
   `lib/local/merge.dart` (merged ids derive from it).
+- `recoveryKeySavedAt` on the synced `settings` record (`packages/core` and `lib/core/records.dart`; the web reads
+  it too) says step 1 of "Protect your data" is done; renaming it re-nags every account on every device. The
+  scanner channel's argument `prefixes` (`wambito/scanner` `scan`) is read by Kotlin and Swift: rename all three.
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - `wambito.vault.<userId>.seenDevices` (secure storage) is the JSON list of device wrap ids the sign-in notice last looked at; it goes with `KeyStorage.deleteAll`. Renaming it would make every phone's next look silent.
 - `session.provisional` (secure storage, `SessionStore.provisionalKey`): the offline first run's local vault id,
