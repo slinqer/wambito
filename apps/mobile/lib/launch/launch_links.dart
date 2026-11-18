@@ -170,13 +170,29 @@ class LaunchLinks {
     // link is dropped, and the person scans again once it is (ruling 14). A `plain` account has
     // nothing to approve with.
     // Nor while an approval is open: a link never swaps the request under the person's tap (P18).
+    // The check and the mark are one synchronous step: a second link that arrives before the
+    // first one's screen is up finds the first pending and is dropped too.
     final signinQr = launchSigninQrOf(link);
-    if (action == LaunchAction.signin &&
+    final signin = action == LaunchAction.signin;
+    if (signin &&
         (signinQr == null ||
             _ref.read(securityApiProvider) == null ||
-            _ref.read(openSigninApprovalsProvider).any)) {
+            _ref.read(openSigninApprovalsProvider).any ||
+            _signinPending)) {
       return;
     }
+    if (signin) _signinPending = true;
+    try {
+      await _go(action, link, signinQr);
+    } finally {
+      if (signin) _signinPending = false;
+    }
+  }
+
+  /// A `signin` link is on its way to its approval screen ([open]), which is not open yet.
+  var _signinPending = false;
+
+  Future<void> _go(LaunchAction action, String link, String? signinQr) async {
     final router = _ref.read(routerProvider);
     router.go('/');
     // Home must be the page under the sheet before it opens: a sheet opened over the loading screen
@@ -214,6 +230,8 @@ class LaunchLinks {
         unawaited(router.push(id == null ? '/review' : '/review/${Uri.encodeComponent(id)}'));
       case LaunchAction.signin:
         unawaited(router.push('/settings/signin?qr=${Uri.encodeQueryComponent(signinQr!)}'));
+        // Pending until the screen is up and counts as open (its first frame).
+        await WidgetsBinding.instance.endOfFrame;
     }
   }
 }

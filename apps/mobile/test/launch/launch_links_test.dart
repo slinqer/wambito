@@ -643,6 +643,35 @@ void main() {
       expect(security.calls.where((c) => c.contains('0123456789ff')), isEmpty);
     });
 
+    testWidgets('two links back to back open one approval: the second is dropped', (tester) async {
+      final security = FakeSecurity()
+        ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(security),
+        ],
+      );
+      const other = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ff&key=$_key';
+      // Both arrive before the first approval screen is up.
+      links
+        ..open(_signinQr)
+        ..open(other);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      expect(env.router.state.uri.queryParameters['qr'], _signinQr);
+      expect(security.calls.where((c) => c.contains('0123456789ff')), isEmpty);
+      // Once that one is gone, a later link opens again.
+      env.router.pop();
+      await tester.pumpAndSettle();
+      links.open(other);
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.queryParameters['qr'], other);
+    });
+
     testWidgets('a locked vault drops it, and so does a link that is not a QR', (tester) async {
       final security = FakeSecurity();
       final links = FakeLaunchLinks();
