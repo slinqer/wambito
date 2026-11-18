@@ -723,6 +723,7 @@
       "passkey_added": "Fatto: la tua impronta apre anche i tuoi dati.",
       "passkey_failed": "Non siamo riusciti a salvare la tua impronta. Riprova.",
       "no_prf": "Questa impronta ti fa entrare, ma non può aprire i tuoi dati. Aggiungi una chiave di recupero.",
+      "link_failed": "Non siamo riusciti a collegare questa impronta ai tuoi dati. Riprova con «Attiva» in «Entra con l'impronta».",
       "email_title": "Crea il tuo account (aggiungi un'email)",
       "email_lead": "Con un'email entri sul web con un codice, colleghi gli assistenti e rientri se perdi l'impronta.",
       "email_action": "Aggiungi un'email"

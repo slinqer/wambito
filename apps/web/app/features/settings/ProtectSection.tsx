@@ -28,7 +28,8 @@ export const PROTECT_SETTINGS_KEY = ["protect-settings"] as const;
  *    commit may be saved: the setup stays, as in Security), then `markRecoveryKeySaved()`.
  * 2. "Add a passkey" (only where this browser can make one): the new passkey's PRF wraps the data
  *    key (`SecurityApi.addPasskeyWrap`). Done only when a passkey wrap exists; a passkey without one
- *    stays (it signs in) and the no-PRF line says so.
+ *    stays (it signs in) and the no-PRF line says so; a wrap that could not be saved says to try
+ *    again with Turn on in Passkeys instead.
  * 3. "Create account (add an email)": `onAddEmail`; hidden without it.
  */
 export function ProtectSection({
@@ -78,6 +79,8 @@ export function ProtectSection({
     void qc.invalidateQueries({ queryKey: SECURITY_KEY });
   });
   const [adding, setAdding] = useState(false);
+  /** The last new passkey was made, but its wrap could not be saved (not a missing PRF). */
+  const [linkFailed, setLinkFailed] = useState(false);
   const inFlight = useRef(false);
 
   const wraps = snapshot.data?.wraps;
@@ -97,17 +100,27 @@ export function ProtectSection({
     if (inFlight.current) return;
     inFlight.current = true;
     setAdding(true);
+    setLinkFailed(false);
+    let keepFailed = false;
     try {
       const outcome = await passkeys.add({
         userId: profile.id,
         explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
-        keep: (passkey) => security.addPasskeyWrap(passkey),
+        keep: async (passkey) => {
+          try {
+            await security.addPasskeyWrap(passkey);
+          } catch (error) {
+            keepFailed = true;
+            throw error;
+          }
+        },
       });
       if (outcome === "failed") {
         toast.show({ tone: "error", message: t("passkey_failed") });
         return;
       }
       if (outcome !== "added") return;
+      setLinkFailed(keepFailed);
       await Promise.all([
         qc.invalidateQueries({ queryKey: PASSKEYS_KEY }),
         qc.invalidateQueries({ queryKey: SECURITY_KEY }),
@@ -178,16 +191,18 @@ export function ProtectSection({
                 className="self-start"
                 disabled={adding}
                 aria-busy={adding || undefined}
-                aria-describedby={status.passkeyWithoutPrf ? noPrfId : undefined}
+                aria-describedby={
+                  linkFailed || status.passkeyWithoutPrf ? noPrfId : undefined
+                }
                 onClick={() => void addPasskey()}
               >
                 <FingerprintIcon />
                 {adding ? t("passkey_adding") : t("passkey_action")}
               </PressButton>
             )}
-            {status.passkeyWithoutPrf && (
+            {!status.passkey && (linkFailed || status.passkeyWithoutPrf) && (
               <p id={noPrfId} className="m-0 text-[14px] text-over">
-                {t("no_prf")}
+                {t(linkFailed ? "link_failed" : "no_prf")}
               </p>
             )}
           </li>

@@ -723,6 +723,7 @@
       "passkey_added": "Pronto: a tua impressão digital também abre os teus dados.",
       "passkey_failed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez.",
       "no_prf": "Esta impressão digital deixa-te entrar, mas não pode abrir os teus dados. Adiciona uma chave de recuperação.",
+      "link_failed": "Não conseguimos ligar esta impressão digital aos teus dados. Tenta outra vez com «Ativar» em «Entrar com impressão digital».",
       "email_title": "Cria a tua conta (adiciona um email)",
       "email_lead": "Com um email entras na web com um código, ligas assistentes e voltas a entrar se perderes a impressão digital.",
       "email_action": "Adiciona um email"

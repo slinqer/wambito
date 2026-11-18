@@ -331,7 +331,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `markRecoveryKeySaved()` and `PROTECT_SETTINGS_KEY` refetched. Step 2 (only where
   `passkeys.supported()`): `PasskeysApi.add({ userId, explainSecondTouch, keep })`, `keep` =
   `SecurityApi.addPasskeyWrap`; done only when a passkey wrap exists, never the passkey row; a
-  passkey without one shows `settings.protect.no_prf`. Step 3 "Create account (add an email)":
+  passkey without one shows `settings.protect.no_prf`, or `settings.protect.link_failed` when its
+  PRF came but the wrap could not be saved (`keep` threw; `addPasskey` swallows it). Step 3 "Create account (add an email)":
   opens `AddEmail` in a `Takeover` from `Settings` (its `onAddEmail` prop, and `HomeStage`'s,
   replaces the opening for stories). `add-email.ts` `claimEmail(api)` → `{ send(email), verify(email,
   code) }` over `/v1/me/claim-email/send|verify`, rejecting with `ClaimError.key` (sign-in's

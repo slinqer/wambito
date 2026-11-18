@@ -723,6 +723,7 @@
       "passkey_added": "Done: your passkey opens your data too.",
       "passkey_failed": "We couldn't save your passkey. Try again.",
       "no_prf": "This passkey can sign you in but cannot open your data. Add a recovery key.",
+      "link_failed": "We could not link this passkey to your data. Try again with “Turn on” under “Sign in with your fingerprint”.",
       "email_title": "Create account (add an email)",
       "email_lead": "With an email you sign in on the web with a code, connect assistants, and get back in if your passkey is gone.",
       "email_action": "Add an email"

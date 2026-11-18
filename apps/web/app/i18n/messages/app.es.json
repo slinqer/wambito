@@ -723,6 +723,7 @@
       "passkey_added": "Listo: tu huella también abre tus datos.",
       "passkey_failed": "No pudimos guardar tu huella. Inténtalo otra vez.",
       "no_prf": "Esta huella te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
+      "link_failed": "No pudimos vincular esta huella a tus datos. Inténtalo otra vez con «Activar» en «Entrar con tu huella».",
       "email_title": "Crea tu cuenta (agrega un email)",
       "email_lead": "Con un email entras en la web con un código, conectas asistentes y vuelves a entrar si pierdes tu huella.",
       "email_action": "Agrega un email"

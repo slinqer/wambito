@@ -39,8 +39,11 @@ interface FakeOptions {
   /** The person's passkeys, and which of them have a wrap. */
   passkeys?: PasskeyItem[];
   wrapped?: string[];
-  /** What a new passkey's provider gives (default: a PRF, so it gets its wrap). */
-  newPasskey?: "prf" | "no_prf";
+  /**
+   * What a new passkey's provider gives (default: a PRF, so it gets its wrap); `keep_fails`: a PRF,
+   * but the wrap's PUT fails (the passkey stays, as `addPasskey` swallows it).
+   */
+  newPasskey?: "prf" | "no_prf" | "keep_fails";
   /** Whether this browser can make a passkey (default yes). */
   supported?: boolean;
 }
@@ -79,6 +82,7 @@ function fake({
     reloadKeys: fn(async () => {}),
     evaluatePrf: fn(async () => null),
     addPasskeyWrap: fn(async ({ credentialId }: { credentialId: string; prf: Uint8Array }) => {
+      if (newPasskey === "keep_fails") throw new Error("offline");
       wraps = [...wraps, wrap({ id: `p-${credentialId}`, kind: "passkey", ref: credentialId })];
     }),
     settings: fn(async () => ({ recoveryKeySavedAt })),
@@ -96,8 +100,12 @@ function fake({
       const item = passkey(items.length + 1);
       items = [...items, item];
       // A provider with PRF hands the new passkey's secret over; without it nothing is kept.
-      if (newPasskey === "prf" && vault?.keep) {
-        await vault.keep({ credentialId: item.credentialId, prf: new Uint8Array(32).fill(7) });
+      if (newPasskey !== "no_prf" && vault?.keep) {
+        try {
+          await vault.keep({ credentialId: item.credentialId, prf: new Uint8Array(32).fill(7) });
+        } catch {
+          // as `addPasskey`: the passkey was added and signs in, it only does not open the data
+        }
       }
       return "added" as const;
     }),
@@ -264,6 +272,28 @@ export const AddPasskeyWithoutPrf: Story = {
       await block.findByText(/Esta huella te deja entrar, pero no puede abrir tus datos/),
     ).toBeVisible();
     await expect(security.addPasskeyWrap).not.toHaveBeenCalled();
+    await expect(block.getByText("0 de 2")).toBeVisible();
+  },
+};
+
+/**
+ * The passkey was made with a PRF but its wrap could not be saved: the step says so and points to
+ * Turn on in Passkeys, never the no-PRF line (the provider is not the cause).
+ */
+export const AddPasskeyKeepFails: Story = {
+  name: "add a passkey whose wrap could not be saved",
+  args: { options: { newPasskey: "keep_fails" } },
+  play: async ({ canvasElement }) => {
+    const { security } = fakeOf();
+    const block = await protect(canvasElement);
+    await userEvent.click(block.getByRole("button", { name: "Agrega una huella" }));
+    await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledOnce());
+    await expect(
+      await block.findByText(
+        "No pudimos vincular esta huella a tus datos. Inténtalo otra vez con «Activar» en «Entrar con tu huella».",
+      ),
+    ).toBeVisible();
+    await expect(block.queryByText(/no puede abrir tus datos/)).toBeNull();
     await expect(block.getByText("0 de 2")).toBeVisible();
   },
 };
