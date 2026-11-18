@@ -324,11 +324,13 @@ export async function rotateKeys(
         }
         posted = true;
       }
+      // Kept here before the verifier: a failed PUT never leaves this browser without the new
+      // version the server already holds. A retry keeps again (idempotent) and puts it again.
+      await keepRotated(userId, prepared.keyV, prepared.keys, options.remove);
       if (verifier && !verifierSent) {
         await putVerifier(options, verifier);
         verifierSent = true;
       }
-      await keepRotated(userId, prepared.keyV, prepared.keys, options.remove);
       done = { keyV: prepared.keyV, dropped: prepared.dropped };
       return done;
     }

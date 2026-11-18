@@ -118,6 +118,8 @@ function fakeKeys() {
     /** Every `PUT /v2/recovery/verifier` body kept, in order; `verifier`: the one in force. */
     verifiers: [] as Array<{ lookupHash: string; authHash: string }>,
     verifier: null as { lookupHash: string; authHash: string } | null,
+    /** The next verifier PUT fails with a 500. */
+    failVerifier: false,
   };
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -153,6 +155,10 @@ function fakeKeys() {
     const url = new URL(String(input), "http://x");
     const method = init?.method ?? "GET";
     if (url.pathname === "/api/v2/recovery/verifier" && method === "PUT") {
+      if (state.failVerifier) {
+        state.failVerifier = false;
+        return json({ code: "internal" }, 500);
+      }
       if (!state.wraps.some((w) => w.kind === "recovery")) {
         return json({ code: "recovery_required" }, 409);
       }
@@ -897,6 +903,19 @@ describe("the recovery verifier", () => {
     expect(a.api.verifiers).toEqual([await verifierOf(prepared.recoveryKey as string)]);
     expect(a.api.verifier).toEqual(await verifierOf(prepared.recoveryKey as string));
     expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+
+  it("a failed verifier PUT after the rotation committed leaves the new keyV kept here; the retry puts it", async () => {
+    const a = await account();
+    a.api.verifiers.length = 0;
+    const prepared = await rotateKeys({ ...a.options, remove: [], recovery: { fresh: true } });
+    a.api.failVerifier = true;
+    await expect(prepared.commit()).rejects.toBeInstanceOf(KeysError);
+    expect(a.api.rotations).toHaveLength(1);
+    expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(2);
+    await expect(prepared.commit()).resolves.toMatchObject({ keyV: 2 });
+    expect(a.api.rotations).toHaveLength(1);
+    expect(a.api.verifiers).toEqual([await verifierOf(prepared.recoveryKey as string)]);
   });
 });
 
