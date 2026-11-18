@@ -490,8 +490,13 @@ class SqliteStore implements FinanceStore {
 
   Future<void> setMeta(String key, Object? value) => _enqueue(() => _setMeta(_db, key, value));
 
-  /// The mark the stale-vault sweep honours (`meta.hold`); null when the vault is not held.
-  Future<VaultHold?> hold() => _enqueue(() async => VaultHold.fromJson(await _meta(_db, 'hold')));
+  /// The mark the stale-vault sweep honours (`meta.hold`); null when the vault is not held. Throws
+  /// a [FormatException] on a malformed hold, never reads it as "not held".
+  Future<VaultHold?> hold() => _enqueue(() async {
+    final raw = await _meta(_db, 'hold');
+    if (raw == null) return null;
+    return VaultHold.fromJson(raw) ?? (throw const FormatException('unreadable vault hold'));
+  });
 
   /// Holds the vault, or clears the hold with null.
   Future<void> setHold(VaultHold? hold) => _enqueue(

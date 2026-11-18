@@ -56,6 +56,13 @@ void main() {
       await store.close();
     });
 
+    test('a malformed hold throws instead of reading as not held', () async {
+      final store = await fresh();
+      await store.setMeta('hold', {'kind': 'nope'});
+      await expectLater(store.hold(), throwsA(isA<FormatException>()));
+      await store.close();
+    });
+
     test('vaultHoldOf reads it while the store is open elsewhere', () async {
       final userId = freshUser();
       final store = await openFor(userId);

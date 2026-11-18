@@ -374,23 +374,26 @@ final _vaultFileName = RegExp(r'^wambito-vault-([A-Za-z0-9_-]{1,128})\.db$');
 
 /// Every vault file in the folder that carries a hold. `userId` is the file's id: the anonymous
 /// id for `merging` (which also names `wambito.vault.<userId>.mergeToken`), the old id for
-/// `orphaned`, the local id for `provisional`. A file that cannot be read is skipped.
-Future<List<({String userId, VaultHold hold})>> listVaultHolds({
+/// `orphaned`, the local id for `provisional`. A file whose hold cannot be read (corrupt file,
+/// malformed hold) is not dropped: its id is in `unreadable`, so a resume can tell "no holds" from
+/// "a hold I cannot read" (and must leave that vault alone).
+Future<({List<({String userId, VaultHold hold})> holds, List<String> unreadable})> listVaultHolds({
   String? directory,
   DatabaseFactory? factory,
 }) async {
   final folder = Directory(directory ?? await defaultVaultDirectory());
-  if (!folder.existsSync()) return const [];
-  final found = <({String userId, VaultHold hold})>[];
+  final holds = <({String userId, VaultHold hold})>[];
+  final unreadable = <String>[];
+  if (!folder.existsSync()) return (holds: holds, unreadable: unreadable);
   for (final entry in folder.listSync()) {
     final id = _vaultFileName.firstMatch(p.basename(entry.path))?.group(1);
     if (id == null) continue;
     try {
       final hold = await vaultHoldOf(id, directory: folder.path, factory: factory);
-      if (hold != null) found.add((userId: id, hold: hold));
+      if (hold != null) holds.add((userId: id, hold: hold));
     } on Object {
-      // Skipped: the next call tries again.
+      unreadable.add(id);
     }
   }
-  return found;
+  return (holds: holds, unreadable: unreadable);
 }

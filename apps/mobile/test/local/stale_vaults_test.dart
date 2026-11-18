@@ -6,7 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind, listVaultHolds, vaultFileName;
+import 'package:wambito/local/db.dart'
+    show VaultHold, VaultHoldKind, listVaultHolds, vaultFileName, vaultHoldOf;
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/stale_vaults.dart';
@@ -149,7 +150,7 @@ void main() {
 
     Future<VaultHold?> holdOf(String id) async {
       final all = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
-      for (final h in all) {
+      for (final h in all.holds) {
         if (h.userId == id) return h.hold;
       }
       return null;
@@ -204,11 +205,33 @@ void main() {
         );
         await unheld.close();
         final all = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
-        final byId = {for (final h in all) h.userId: h.hold};
+        final byId = {for (final h in all.holds) h.userId: h.hold};
+        expect(all.unreadable, isEmpty);
         expect(byId.keys.toSet(), {'bea', 'dan'});
         expect([byId['bea']?.kind, byId['bea']?.target], [VaultHoldKind.orphaned, 'new']);
         expect(byId['dan']?.kind, VaultHoldKind.provisional);
       },
     );
+
+    test('the real vaultHoldOf throws on a corrupt file, so the sweep keeps it', () async {
+      File(p.join(dir.path, vaultFileName('bea'))).writeAsStringSync('not a database');
+      await hold('dan', const VaultHold(VaultHoldKind.provisional, since: 't'));
+      // A malformed hold in a real vault.
+      final bad = await SqliteStore.open('ana', directory: dir.path, factory: databaseFactoryFfi);
+      await bad.setMeta('hold', {'kind': 'nope'});
+      await bad.close();
+      await deleteStaleVaults(
+        'zed',
+        forget: forget,
+        directory: () async => dir.path,
+        holdOf: (id) => vaultHoldOf(id, directory: dir.path, factory: databaseFactoryFfi),
+      );
+      expect(forgotten, isNot(containsAll(['bea'])));
+      expect(forgotten, isNot(contains('ana')));
+      expect(forgotten, isNot(contains('dan')));
+      final listed = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
+      expect(listed.unreadable..sort(), ['ana', 'bea']);
+      expect(listed.holds.map((h) => h.userId), ['dan']);
+    });
   });
 }

@@ -464,7 +464,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 ## Traps
 
 - Vault holds: `meta.hold` in a vault file (`VaultHold`: `provisional`, `orphaned`, `merging`;
-  `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes). The
+  `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes: returns `(holds:, unreadable:)`, a vault file whose hold cannot be read is listed in `unreadable`, never dropped; `hold()` throws on a malformed hold). The
   stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
