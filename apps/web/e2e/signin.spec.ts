@@ -98,13 +98,14 @@ const qrCode = (page: Page) =>
 /** The account's phone: browser B, its user id and recovery key. */
 let phone: { opened: Opened; userId: string; recoveryKey: string } | undefined;
 
-const approve = async (code: string) => {
+const approve = async (code: string, beforeSeal?: (number: string) => Promise<void>) => {
   if (!phone) throw new Error("the first test makes the account");
-  await approveSignin({
+  return approveSignin({
     request: phone.opened.context.request,
     userId: phone.userId,
     code,
     recoveryKey: phone.recoveryKey,
+    ...(beforeSeal ? { beforeSeal } : {}),
   });
 };
 
@@ -156,7 +157,15 @@ test("a browser signs in by the code the phone approves and sees the account's m
     a.page.getByRole("checkbox", { name: "Mantener la sesión abierta en este navegador" }),
   ).toBeChecked();
   const code = (await qrCode(a.page).innerText()).trim();
-  await approve(code);
+  // The number line (ruling 8) shows the phone's 6 digits: both sides order the keys alike.
+  const shown = await approve(code, async (number) => {
+    await expect(
+      a.page.getByText(
+        `Si tu celular muestra un número, debe ser ${number.slice(0, 3)} ${number.slice(3)}`,
+      ),
+    ).toBeVisible({ timeout: 20_000 });
+  });
+  expect(shown).toMatch(/^\d{6}$/);
 
   await expect(a.page).toHaveURL(/\/app$/, { timeout: 30_000 });
   await expect(a.page.getByText(NAME, { exact: true })).toBeVisible();

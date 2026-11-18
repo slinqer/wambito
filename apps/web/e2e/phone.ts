@@ -4,6 +4,7 @@ import {
   fromBase64Url,
   generateDeviceKeyPair,
   pairingCommitment,
+  pairingNumber,
   parseRecoveryKey,
   sealToDevice,
   toBase64Url,
@@ -38,14 +39,17 @@ interface Wrap {
  * the request's commitment; the data key comes from the recovery wrap (`GET /v2/keys`, opened with
  * the recovery key); an ephemeral `A` approves; once the browser has revealed its key (`GET
  * /v2/signin/{id}` polled), it is checked against the commitment and DK is sealed to it under
- * `{ kind: "device", userId, keyV }`.
+ * `{ kind: "device", userId, keyV }`. Returns the 6 digits the phone shows,
+ * `pairingNumber(browserKey, approverKey)`; `beforeSeal` runs with them before the seal, while the
+ * browser shows its number line (it moves on once sealed).
  */
 export async function approveSignin(options: {
   request: APIRequestContext;
   userId: string;
   code: string;
   recoveryKey: string;
-}): Promise<void> {
+  beforeSeal?: (number: string) => Promise<void>;
+}): Promise<string> {
   const { request, userId, code, recoveryKey } = options;
   const headers = { "x-wambito-user": userId };
 
@@ -93,6 +97,8 @@ export async function approveSignin(options: {
     expect(toBase64Url(await pairingCommitment(browserKey)), "the commitment holds").toBe(
       found.commitment,
     );
+    const number = await pairingNumber(browserKey, approver.publicKey);
+    await options.beforeSeal?.(number);
 
     const sealed = await sealToDevice(
       browserKey,
@@ -105,6 +111,7 @@ export async function approveSignin(options: {
       data: { sealed: toBase64Url(sealed), keyV },
     });
     expect(sealRes.status(), await sealRes.text()).toBe(204);
+    return number;
   } finally {
     secret.fill(0);
     dataKey?.fill(0);
