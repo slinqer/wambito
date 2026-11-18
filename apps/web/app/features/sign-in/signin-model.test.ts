@@ -63,6 +63,8 @@ type FakeRequest = WebSignin & {
 function fakeStart(clock: PairingClock) {
   const requests: FakeRequest[] = [];
   let failNext: unknown = null;
+  /** How far the server's clock is behind this browser's (a fast client clock). */
+  const skew = { ms: 0 };
   const start = vi.fn(async (options: { remember: boolean; label: string }) => {
     if (failNext) {
       const error = failNext;
@@ -103,7 +105,7 @@ function fakeStart(clock: PairingClock) {
       id: `0190a1b2-c3d4-7e5f-8a9b-${String(n).padStart(12, "0")}`,
       code: `ABCDEFG${n % 10}`,
       qr: `wambito://signin?id=${n}&key=k`,
-      expiresAt: new Date(clock.now() + TTL).toISOString(),
+      expiresAt: new Date(clock.now() - skew.ms + TTL).toISOString(),
       remember: options.remember,
       label: options.label,
       number: () => numberP,
@@ -121,6 +123,7 @@ function fakeStart(clock: PairingClock) {
   return {
     start,
     requests,
+    skew,
     failOnce(error: unknown) {
       failNext = error;
     },
@@ -334,6 +337,51 @@ describe("createQrSignin", () => {
     fake.requests[2]?.fail(new Error("boom"));
     await flush();
     expect(model.state()).toEqual({ status: "failed", code: "server" });
+  });
+
+  it("a fast browser clock (expiresAt already past here) opens one request, not a loop; it renews on this browser's own 2 minutes", async () => {
+    const { time, fake, model } = setup();
+    fake.skew.ms = 3 * TTL;
+    // the first request was made before the skew: renew it to get a skewed one
+    await flush();
+    await time.advance(TTL);
+    expect(fake.start).toHaveBeenCalledTimes(2);
+    expect(Date.parse(fake.requests[1]?.expiresAt ?? "")).toBeLessThan(time.clock.now());
+    await time.advance(1000);
+    expect(fake.start).toHaveBeenCalledTimes(2);
+    expect(model.state().status === "showing" && model.state()).toMatchObject({
+      request: fake.requests[1],
+    });
+    await time.advance(TTL - 1000 - 1);
+    expect(fake.start).toHaveBeenCalledTimes(2);
+    await time.advance(1);
+    expect(fake.start).toHaveBeenCalledTimes(3);
+  });
+
+  it("a fast browser clock: becoming visible does not count the skewed expiresAt as passed", async () => {
+    const { time, fake, page } = setup();
+    fake.skew.ms = 3 * TTL;
+    await flush();
+    await time.advance(TTL);
+    expect(fake.start).toHaveBeenCalledTimes(2);
+    page.set(false);
+    page.set(true);
+    await flush();
+    expect(fake.start).toHaveBeenCalledTimes(2);
+  });
+
+  it("a toggle on a page hidden during the 500 ms opens nothing until it is visible", async () => {
+    const { time, fake, model, page } = setup();
+    await flush();
+    model.setRemember(false);
+    page.set(false);
+    await time.advance(REMEMBER_DELAY_MS);
+    expect(fake.start).toHaveBeenCalledTimes(1);
+    expect(model.state().status).toBe("paused");
+    page.set(true);
+    await flush();
+    expect(fake.start).toHaveBeenCalledTimes(2);
+    expect(fake.requests[1]?.remember).toBe(false);
   });
 
   it("stop() cancels the request and opens nothing more", async () => {

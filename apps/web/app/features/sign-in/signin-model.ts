@@ -1,5 +1,6 @@
 import type { PairingClock } from "../../local/relay.ts";
 import {
+  SIGNIN_TTL_MS,
   SigninError,
   type SigninErrorCode,
   type startSignin,
@@ -8,7 +9,7 @@ import {
 
 /**
  * The QR panel's model (spec 2026-11-15 section 8; web plan rulings 8–10): one sign-in request at
- * a time, renewed at its `expiresAt` while the page is visible, never once the phone answered.
+ * a time, renewed at its end (2 minutes on this browser's clock) while the page is visible, never once the phone answered.
  * Pure: the request maker, the clock and the page's visibility are injected.
  */
 
@@ -72,6 +73,8 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
   /** Every handler checks its generation: a dropped request's answers change nothing. */
   let gen = 0;
   let request: WebSignin | null = null;
+  /** When the shown request ends on this browser's clock (`SIGNIN_TTL_MS` from its opening). */
+  let deadline = 0;
   /** The current generation's timers (expiry, retry, the box's delay). */
   let timers = new AbortController();
   const listeners = new Set<() => void>();
@@ -131,8 +134,8 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
 
   const watch = (mine: number, started: WebSignin) => {
     const signal = timers.signal;
-    // ruling 10: replaced at its expiresAt only while no phone answered
-    void waitUntil(clock, Date.parse(started.expiresAt), signal).then((due) => {
+    // ruling 10: replaced at its end only while no phone answered
+    void waitUntil(clock, deadline, signal).then((due) => {
       if (due && mine === gen && !stopped && state.status === "showing") expired();
     });
     started.number().then(
@@ -163,6 +166,9 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
     if (stopped) return;
     drop();
     const mine = gen;
+    // the request's end on this browser's clock, as `signin.ts` caps it: the server's `expiresAt`
+    // is another clock, and a fast one here would make every new QR look expired at once
+    const openedAt = clock.now();
     set({ status: "opening" });
     deps.start({ remember, label: deps.label, clock }).then(
       (started) => {
@@ -171,6 +177,7 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
           return;
         }
         request = started;
+        deadline = openedAt + SIGNIN_TTL_MS;
         set({ status: "showing", request: started });
         watch(mine, started);
       },
@@ -184,7 +191,7 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
       return open();
     }
     // a background tab's timers may fire late: an expired QR is never shown again
-    if (state.status === "showing" && clock.now() >= Date.parse(state.request.expiresAt)) {
+    if (state.status === "showing" && clock.now() >= deadline) {
       expired();
     }
   };
@@ -216,7 +223,10 @@ export function createQrSignin(deps: QrSigninDeps): QrSignin {
       const mine = gen;
       set({ status: "opening" });
       void waitUntil(clock, clock.now() + REMEMBER_DELAY_MS, timers.signal).then((due) => {
-        if (due && mine === gen) open();
+        if (!due || mine !== gen) return;
+        // hidden meanwhile: the request opens once the page is visible
+        if (deps.visible()) open();
+        else set({ status: "paused" });
       });
     },
     retry() {

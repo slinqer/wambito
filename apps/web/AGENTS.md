@@ -340,10 +340,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   clock and page. `QrState`: `opening` → `showing` (QR, no phone yet) → `approved` (`number()`
   resolved: never replaced, runs to its end) → `finishing` (`ready()`) → `done { userId }`; `failed
   { code, retryAt? }`; `paused` (hidden page whose request ran out). One request at a time, every
-  dropped one `cancel()`ed. A `showing` request is replaced at `expiresAt` while visible; hidden,
+  dropped one `cancel()`ed. A `showing` request is replaced at its end on this browser's clock (`SIGNIN_TTL_MS` from its opening, never the server's `expiresAt`: a fast client clock would renew in a loop) while visible; hidden,
   it stops there and opens one new request when visible again (also when a throttled timer is
   late: an expired QR is never shown). `remember()` starts true; `setRemember` cancels the shown QR
-  at once and opens a new one after `REMEMBER_DELAY_MS` (500 ms) without another change; ignored
+  at once and opens a new one after `REMEMBER_DELAY_MS` (500 ms) without another change (`paused` if hidden by then); ignored
   from `approved` on. `too_many` retries by itself at `retryAt` (`retry-after`, else 60 s);
   `expired` renews by itself when visible; other codes (a non-`SigninError`, such as the enroll's
   `KeysError`, is `server`) wait for `retry()`. `stop()`: cancel, no more requests. `QrSignIn.tsx`
