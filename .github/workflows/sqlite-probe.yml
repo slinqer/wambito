@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [matrix, alone, suite-1, suite-2]
+        mode: [matrix]
     defaults:
       run:
         working-directory: apps/mobile
@@ -24,8 +24,6 @@ jobs:
           flutter-version: ${{ steps.flutter-version.outputs.version }}
           channel: stable
           cache: true
-      - name: system libsqlite3
-        run: ls -l /usr/lib/x86_64-linux-gnu/libsqlite3* || true
       - run: flutter pub get --enforce-lockfile
       - name: matrix probe
         if: matrix.mode == 'matrix'

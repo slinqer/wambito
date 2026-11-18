@@ -152,12 +152,3 @@ flutter:
     - family: Nunito
       fonts:
         - asset: assets/fonts/Nunito-Variable.ttf
-
-# The host tests' SQLite (sqflite_common_ffi → package:sqlite3, dev only) is the operating
-# system's, like the phone's: package:sqlite3's own Linux build has no usleep, so its busy handler
-# sleeps with sleep(), which the Dart VM's signals cut short (5 s of busy_timeout became ~60 ms
-# on CI, and two connections then failed with "database is locked").
-hooks:
-  user_defines:
-    sqlite3:
-      source: system
