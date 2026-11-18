@@ -318,7 +318,6 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         }
         return session;
       },
-      guest: profile.isAnonymous,
       userId: userId,
       sessionUserId: sessionUserId,
       reload: reload,

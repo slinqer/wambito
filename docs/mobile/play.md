@@ -54,7 +54,7 @@ apps/mobile/scripts/check-fastlane.sh
 ## App content (Policy and programs → App content)
 
 - **Privacy policy**: `https://wambito.com/privacy`.
-- **App access**: "All or some functionality is restricted" is not needed: the app starts without an account (guest, "Probar sin correo"). Add an instruction for reviewers: "Tap 'Probar sin correo' on the first screen to use the app as a guest. Automatic capture (Settings → Captura automática) reads notifications from Revolut and Google Wallet only, and needs one of those apps with a payment to show anything."
+- **App access**: "All or some functionality is restricted" is not needed: the app starts without an account ("Empezar" makes one without email). Add an instruction for reviewers: "Tap 'Empezar' on the first screen to use the app without an email. Automatic capture (Settings → Captura automática) reads notifications from Revolut and Google Wallet only, and needs one of those apps with a payment to show anything."
 - **Ads**: No, the app contains no ads.
 - **Content rating** (IARC questionnaire): category **All other app types** (utility, productivity). No violence, sexuality, language, controlled substances or gambling; users do not interact or exchange content with each other; no location sharing; no digital purchases. The expected rating is the lowest (PEGI 3 / Everyone).
 - **Target audience**: 18 and over only. Not designed for children; no appeal to children.

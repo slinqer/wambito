@@ -376,13 +376,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
           guest: guest && !webOnly,
         ),
-        // An encrypted account's devices and recovery key (Settings → Security). Plain accounts see
-        // nothing of it; a guest only approves a new device.
+        // An encrypted account's devices and recovery key (Settings → Security), with or without
+        // email. Plain accounts see nothing of it.
         if (!webOnly && ref.watch(isPreviewProvider))
-          SecuritySection(
-            timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
-            guest: guest,
-          ),
+          SecuritySection(timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone),
         // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
         // pairs yet, so the web-only pictures leave it out.
         if (!webOnly)

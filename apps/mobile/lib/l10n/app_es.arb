@@ -25,21 +25,17 @@
   "@wambiWaves": {
     "description": "Screen-reader label of the waving Wambi."
   },
-  "entryGuest": "Probar sin correo",
-  "@entryGuest": {
-    "description": "First run: start as a guest, with no email."
+  "entryStart": "Empezar",
+  "@entryStart": {
+    "description": "First run: the primary button; creates the account in the background, nothing is asked."
   },
-  "entryGuestHint": "Puedes agregar tu correo después.",
-  "@entryGuestHint": {
-    "description": "Under the guest choice."
+  "entryStartBusy": "Preparando tu cuenta…",
+  "@entryStartBusy": {
+    "description": "While the account behind \"Start\" is created."
   },
-  "entryGuestBusy": "Preparando tu cuenta…",
-  "@entryGuestBusy": {
-    "description": "While the guest account is created."
-  },
-  "entryEmail": "Entrar con mi correo",
-  "@entryEmail": {
-    "description": "First run: sign in with an email code or magic link."
+  "entryHaveAccount": "Ya tengo una cuenta",
+  "@entryHaveAccount": {
+    "description": "First run: a link to the sign-in (email, passkey); no account is created."
   },
   "emailPasskey": "Usar passkey",
   "@emailPasskey": {
@@ -2328,7 +2324,6 @@
     "description": "Settings section for an encrypted account's devices and recovery key."
   },
   "settingsSecurityLead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
-  "settingsSecurityGuestLead": "Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo.",
   "settingsSecurityThisPhone": "Este teléfono",
   "settingsSecurityUnnamed": "Dispositivo",
   "settingsSecurityAdded": "Agregado el {date}",
@@ -4295,34 +4290,6 @@
   "vaultLockedUnsupportedLead": "Para cuidar tus datos, Wambito necesita que el teléfono guarde la clave de forma segura. Actualiza el sistema o abre Wambito en otro dispositivo.",
   "@vaultLockedUnsupportedLead": {
     "description": "Locked: why, and what to do."
-  },
-  "vaultLockedGuestTitle": "Tus datos no se pueden abrir aquí",
-  "@vaultLockedGuestTitle": {
-    "description": "Locked: a guest whose data lives on another device."
-  },
-  "vaultLockedGuestLead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allí. Apruébalo desde ese dispositivo, o cierra sesión.",
-  "@vaultLockedGuestLead": {
-    "description": "Locked: a guest whose data lives on another device, what to do."
-  },
-  "vaultLockedDeleteAccount": "Eliminar esta cuenta",
-  "@vaultLockedDeleteAccount": {
-    "description": "Locked, guest: asks to delete the account."
-  },
-  "vaultLockedDeleteLead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
-  "@vaultLockedDeleteLead": {
-    "description": "Locked, guest: what deleting means."
-  },
-  "vaultLockedDeleteConfirm": "Sí, eliminarla",
-  "@vaultLockedDeleteConfirm": {
-    "description": "Locked, guest: confirms deleting."
-  },
-  "vaultLockedDeleting": "Eliminando…",
-  "@vaultLockedDeleting": {
-    "description": "Locked, guest: while deleting."
-  },
-  "vaultLockedDeleteFailed": "No pudimos eliminarla. Inténtalo de nuevo.",
-  "@vaultLockedDeleteFailed": {
-    "description": "Locked, guest: deleting failed."
   },
   "vaultRemoved": "Este teléfono se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
   "@vaultRemoved": {

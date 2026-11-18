@@ -154,18 +154,23 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   stays false, so its finance calls wait for the server's answer). The router reads
   `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
-  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (guest: the same button, and
-  delete the account), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
+  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
+  sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
   groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
   a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
-  stops polling); Checking, Opening and Committing show a loading line. The other side of a pairing is
+  stops polling); Checking, Opening and Committing show a loading line. The gate has no guest branch (phone-first
+  accounts): every `preview` account with wraps elsewhere, with or without email, gets Unlock (`LockedKind` is
+  `error`, `offline`, `unsupported`; `PairingFrom` only `unlock`), while `prepareAccount(guest: isAnonymous)` still
+  sets an account without email up with no key shown. The welcome (`lib/entry/entry_screen.dart`) is Wambi,
+  "Start" (`entry.start`, `POST /auth/sign-in/anonymous`) and "I already have an account" (`entry.haveAccount`, a
+  link to `/entry/email`). The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
   "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
   code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
   `scan` → the first `wambito://pair?` QR, or null for a close or a refused permission), then the number, then
   "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
-  `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only; a guest only gets "Approve a new device"):
+  `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
   `security_section.dart` (devices, Remove, Approve, "New recovery key"), `remove_device_sheet.dart` (typed key or a new one),

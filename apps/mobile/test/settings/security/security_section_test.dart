@@ -11,17 +11,14 @@ import 'package:wambito/settings/security/approve_device_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/security_section.dart';
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../../support/fonts.dart';
 import '../../support/ui_app.dart';
+import '../harness.dart';
 import 'fake_security.dart';
 
-Future<void> pumpSection(
-  WidgetTester t,
-  FakeSecurity security,
-  ScreenLock lock, {
-  bool guest = false,
-}) async {
+Future<void> pumpSection(WidgetTester t, FakeSecurity security, ScreenLock lock) async {
   t.view
     ..physicalSize = const Size(824, 3200)
     ..devicePixelRatio = 2;
@@ -33,9 +30,7 @@ Future<void> pumpSection(
         screenLockProvider.overrideWithValue(lock),
       ],
       child: uiApp(
-        SingleChildScrollView(
-          child: SecuritySection(timeZone: 'America/Bogota', guest: guest),
-        ),
+        SingleChildScrollView(child: SecuritySection(timeZone: 'America/Bogota')),
         locale: const Locale('en'),
       ),
     ),
@@ -90,12 +85,33 @@ void main() {
     expect(find.textContaining('Could not read'), findsNothing);
   });
 
-  testWidgets('a guest sees only "Approve a new device" and nothing is loaded', (t) async {
+  testWidgets('a preview guest sees devices, Remove and New recovery key', (t) async {
+    // Settings as a guest (no email) on an encrypted account: the full section, as with an email.
     final security = FakeSecurity();
-    await pumpSection(t, security, FakeLock(LockCheck.passed), guest: true);
+    final env = await pumpSettingsApp(
+      t,
+      guest: true,
+      locale: const Locale('en'),
+      location: '/settings',
+      overrides: [
+        isPreviewProvider.overrideWithValue(true),
+        securityApiProvider.overrideWithValue(security),
+        screenLockProvider.overrideWithValue(FakeLock(LockCheck.passed)),
+      ],
+    );
+    expect(env.stored?.guest, isTrue);
+    await t.scrollUntilVisible(
+      find.byKey(const Key('settings.card.security')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.pumpAndSettle();
+    expect(security.loads, greaterThan(0));
+    expect(find.text('Pixel 9'), findsOneWidget);
+    expect(find.text('Firefox on Linux'), findsOneWidget);
+    expect(find.byKey(const Key('security.remove.$laptopId')), findsOneWidget);
+    expect(find.byKey(const Key('security.newKey')), findsOneWidget);
     expect(find.byKey(const Key('security.approve')), findsOneWidget);
-    expect(find.byKey(const Key('security.newKey')), findsNothing);
-    expect(security.loads, 0);
   });
 
   testWidgets(

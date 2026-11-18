@@ -12,14 +12,16 @@ import '../local/vault_session.dart' show VaultOpenError;
 ///     checking ─ keys on this phone ────────────────────────────────▶ opening ─▶ ready
 ///        │                                                               ▲
 ///        ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
-///        │     (a guest commits at once, nothing to show)                │
+///        │     (no email: commits at once, nothing to show)              │
 ///        └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
 ///                                │     └─ "Add this phone from another device" ─▶ pairing
 ///                                │                                  └─ finish() ─▶ opening
 ///                                └─ the sign-in's passkey PRF opens a wrap ─▶ opening
 ///
-/// Pairing: Unlock's "Add this phone from another device" (and a guest's Locked, which has
-/// nothing else to open with) enters [Pairing]. The screen starts a request through
+/// Every account with wraps elsewhere gets Unlock, with or without email (an anonymous one, which
+/// may have saved no recovery key, opens through pairing there). There is no guest branch.
+///
+/// Pairing: Unlock's "Add this phone from another device" enters [Pairing]. The screen starts a request through
 /// [VaultGate.startPairing] (again for "Start again": the previous one is cancelled) and shows its
 /// QR and code; the gate watches the request's `finish()`, and a finished pairing opens like a
 /// recovery unlock (the pending passkey gets its wrap, the vault opens fresh). A failed pairing
@@ -34,17 +36,16 @@ import '../local/vault_session.dart' show VaultOpenError;
 /// the stash. Every PRF is zeroed once used.
 ///
 /// A phone removed from the account by another device ([removed], from the session's `onRemoved`:
-/// its vault is already deleted) shows Unlock with the `removed` notice; a guest, which has no
-/// recovery key to type, its Locked.
+/// its vault is already deleted) shows Unlock with the `removed` notice.
 ///
 /// A phone that could not verify a new key version ([unverified], from the session's
 /// `onUnverified`, or an opening that fails with `key_unverified`) shows Unlock with the
-/// `unverified` notice, a guest its Locked. Its vault is still here, unsent changes included.
+/// `unverified` notice. Its vault is still here, unsent changes included.
 ///
 /// Any failure outside Unlock's own errors lands on Locked, whose retry repeats the step that
 /// failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
-/// A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock
-/// (a guest: Locked). Two locked kinds have no retry: `unsupported` and `guest`.
+/// A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
+/// One locked kind has no retry: `unsupported`.
 ///
 /// Another account may be signed in by now (a sign-in elsewhere in the app). Before making or
 /// unlocking keys, and when the open vault closes or its sync says `session_changed`, the gate asks
@@ -55,8 +56,8 @@ import '../local/vault_session.dart' show VaultOpenError;
 /// the tests use fakes; the app's gate is a `VaultGate<LocalKeys, VaultSession>`. Errors carry their
 /// code as [KeysError], [VaultOpenError] or [GateError].
 
-/// Why the vault is locked; `unsupported` and `guest` have no retry.
-enum LockedKind { error, offline, unsupported, guest }
+/// Why the vault is locked; `unsupported` has no retry.
+enum LockedKind { error, offline, unsupported }
 
 sealed class VaultGateState<S> {
   const VaultGateState();
@@ -141,8 +142,8 @@ final class Unlock<S> extends VaultGateState<S> {
   String toString() => 'Unlock(notice: $notice)';
 }
 
-/// Where the person came from to pair: Unlock, or a guest's Locked.
-enum PairingFrom { unlock, guest }
+/// Where the person came from to pair: Unlock.
+enum PairingFrom { unlock }
 
 /// The pairing screen: this phone asks another device to open its data (QR and code).
 final class Pairing<S> extends VaultGateState<S> {
@@ -227,7 +228,8 @@ class GateError implements Exception {
   String toString() => 'GateError($code)';
 }
 
-/// A prepared new account: the key to show (null for a guest) and the commit that sends it.
+/// A prepared new account: the key to show (null for an account without email) and the commit that
+/// sends it.
 class GatePrepared<K> {
   const GatePrepared({required this.recoveryKey, required this.commit});
 
@@ -259,7 +261,6 @@ class VaultGateDeps<K, S> {
     required this.prepareAccount,
     required this.unlockWithRecovery,
     required this.open,
-    this.guest = false,
     this.userId,
     this.sessionUserId,
     this.reload,
@@ -283,9 +284,6 @@ class VaultGateDeps<K, S> {
   /// Opens the store, runs the sync and returns the session. `fresh`: the keys were just made or
   /// unlocked, so the first full sync must succeed (a known phone opens on its local data).
   final Future<S> Function(K keys, bool fresh) open;
-
-  /// A guest: never shown a recovery key, so an account with keys elsewhere is `Locked(guest)`.
-  final bool guest;
 
   /// The account this gate is for.
   final String? userId;
@@ -342,7 +340,7 @@ LockedKind _lockedKind(Object? error) => switch (gateErrorCode(error)) {
 };
 
 /// Kinds a retry cannot fix.
-const _final = [LockedKind.unsupported, LockedKind.guest];
+const _final = [LockedKind.unsupported];
 
 String _unlockError(Object? error) {
   final code = gateErrorCode(error);
@@ -481,27 +479,16 @@ class VaultGate<K, S> {
     }
   }
 
-  /// The account has keys made elsewhere: Unlock, or Locked for a guest (nothing to type).
+  /// The account has keys made elsewhere: Unlock.
   void _hasKeysElsewhere() {
     _prepared = null;
-    if (_deps.guest) {
-      // Nothing to unlock with first: a guest has no recovery key to type.
-      _keepPending(null);
-      _set(const Locked(LockedKind.guest, false));
-    } else {
-      _set(const Unlock());
-    }
+    _set(const Unlock());
   }
 
-  /// Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice, a
-  /// guest's Locked.
+  /// Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice.
   void _showNotice(String notice) {
     _prepared = null;
-    if (_deps.guest) {
-      _set(const Locked(LockedKind.guest, false));
-    } else {
-      _set(Unlock(notice: notice));
-    }
+    _set(Unlock(notice: notice));
   }
 
   /// Shows Locked; its retry runs [step].
@@ -710,16 +697,11 @@ class VaultGate<K, S> {
     return _unlockError(tried.error);
   }
 
-  /// "Add this phone from another device" (Unlock, or a guest's Locked): the pairing screen.
+  /// Unlock's "Add this phone from another device": the pairing screen.
   Future<void> pair() async {
-    final from = switch (_state) {
-      Unlock() => PairingFrom.unlock,
-      Locked(kind: LockedKind.guest) => PairingFrom.guest,
-      _ => null,
-    };
-    if (from == null || _deps.startPairing == null) return;
+    if (_state is! Unlock || _deps.startPairing == null) return;
     if (!await _sameSession()) return;
-    _set(Pairing(from));
+    _set(const Pairing(PairingFrom.unlock));
   }
 
   /// The pairing screen asks for a request (again for "Start again": the previous one is
@@ -755,11 +737,7 @@ class VaultGate<K, S> {
     if (state is! Pairing<S>) return;
     _pairingCall++;
     _dropPairing();
-    if (state.from == PairingFrom.guest) {
-      _set(const Locked(LockedKind.guest, false));
-    } else {
-      _set(const Unlock());
-    }
+    _set(const Unlock());
   }
 
   /// Locked's retry.
@@ -781,14 +759,14 @@ class VaultGate<K, S> {
   }
 
   /// This phone was removed from the account (`VaultSession.onRemoved`: its device wrap is gone and
-  /// the vault was deleted): Unlock with the `removed` notice; a guest's Locked.
+  /// the vault was deleted): Unlock with the `removed` notice.
   void removed() {
     if (_state is! Ready) return;
     _showNotice(Unlock.removed);
   }
 
   /// A new key version did not verify (`VaultSession.onUnverified`: the sync stopped, the vault is
-  /// kept): Unlock with the `unverified` notice; a guest's Locked.
+  /// kept): Unlock with the `unverified` notice.
   void unverified() {
     if (_state is! Ready) return;
     _showNotice(Unlock.unverified);

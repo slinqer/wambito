@@ -10,7 +10,6 @@ import 'package:wambito/files/files_channel.dart';
 import 'package:wambito/local/keys.dart' show LocalKeys;
 import 'package:wambito/local/pairing.dart' show PairingError;
 import 'package:wambito/local/vault_session.dart';
-import 'package:wambito/settings/account_deletion.dart';
 import 'package:wambito/ui/press_button.dart';
 import 'package:wambito/vault/pair_new_device_view.dart' show PairingQr;
 import 'package:wambito/vault/vault_gate.dart';
@@ -119,27 +118,14 @@ class FakeFiles implements FilesChannel {
   Future<void> clearShared() async {}
 }
 
-class FakeDeletion implements AccountDeletion {
-  int deletes = 0;
-  bool fails = false;
-
-  @override
-  Future<void> delete() async {
-    deletes += 1;
-    if (fails) throw StateError('offline');
-  }
-}
-
 const key = 'ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-345';
 
 void main() {
   late FakeFiles files;
-  late FakeDeletion deletion;
   late FixedSession session;
 
   setUp(() {
     files = FakeFiles();
-    deletion = FakeDeletion();
   });
 
   Future<FakeGate> pumpScreen(
@@ -165,7 +151,6 @@ void main() {
           vaultGateStateProvider.overrideWithValue(state),
           unlockPasskeyOfferedProvider.overrideWithValue(AsyncData(passkeyOffered)),
           filesChannelProvider.overrideWithValue(files),
-          accountDeletionProvider.overrideWithValue(deletion),
           sessionProvider.overrideWith(() => session),
           unsentChangesProvider.overrideWithValue(() async => unsent),
           pairingTimeZoneProvider.overrideWithValue('America/Bogota'),
@@ -406,14 +391,15 @@ void main() {
       expect(find.text('ADD THIS PHONE FROM ANOTHER DEVICE'), findsOneWidget);
     });
 
-    testWidgets("a guest's Locked offers it too; a plain Locked does not", (tester) async {
-      final gate = await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      await tester.tap(find.byKey(const Key('vault.pair')));
-      await tester.pump();
-      expect(gate.pairs, 1);
-      await pumpScreen(tester, const Locked(LockedKind.error, false));
-      expect(find.byKey(const Key('vault.pair')), findsNothing);
-    });
+    for (final kind in LockedKind.values) {
+      testWidgets('Locked ($kind) offers neither pairing nor deleting the account: pairing starts '
+          'from Unlock', (tester) async {
+        await pumpScreen(tester, Locked(kind, false));
+        expect(find.byKey(const Key('vault.pair')), findsNothing);
+        expect(find.byKey(const Key('vault.deleteAccount')), findsNothing);
+        expect(find.byKey(const Key('vault.signOut')), findsOneWidget);
+      });
+    }
 
     testWidgets('shows the QR, the 8-character code under it and when it expires', (tester) async {
       final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
@@ -510,28 +496,6 @@ void main() {
       await pumpScreen(tester, const Locked(LockedKind.unsupported, false));
       expect(find.byKey(const Key('vault.retry')), findsNothing);
       expect(find.byKey(const Key('vault.signOut')), findsOneWidget);
-    });
-
-    testWidgets('a guest can delete the account in two taps', (tester) async {
-      await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      expect(find.text('Tus datos no se pueden abrir aquí'), findsOneWidget);
-      expect(find.byKey(const Key('vault.retry')), findsNothing);
-      await tester.tap(find.byKey(const Key('vault.deleteAccount')));
-      await tester.pumpAndSettle();
-      expect(deletion.deletes, 0);
-      await tester.tap(find.byKey(const Key('vault.deleteConfirm')));
-      await tester.pumpAndSettle();
-      expect(deletion.deletes, 1);
-    });
-
-    testWidgets('a delete that fails says so and can be tried again', (tester) async {
-      deletion.fails = true;
-      await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      await tester.tap(find.byKey(const Key('vault.deleteAccount')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('vault.deleteConfirm')));
-      await tester.pumpAndSettle();
-      expect(find.text('No pudimos eliminarla. Inténtalo de nuevo.'), findsOneWidget);
     });
 
     for (final state in <VaultGateState<VaultSession>>[

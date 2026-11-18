@@ -11,7 +11,6 @@ import '../api/session.dart';
 import '../entry/sign_in_frame.dart';
 import '../files/files_channel.dart';
 import '../l10n/app_localizations.dart';
-import '../settings/account_deletion.dart';
 import 'encryption_mode.dart';
 import 'locked_view.dart';
 import 'pair_new_device_view.dart';
@@ -45,23 +44,14 @@ class VaultScreen extends ConsumerWidget {
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     // The vault is not open, yet it may be kept with changes not sent (a key version that did not
     // verify, a failed open): they are counted from its file and asked about, as at Settings'
-    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). A guest is not
-    // warned otherwise: a sign-out from here loses only what this sheet counts.
+    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). An account without
+    // email is not warned otherwise: a sign-out from here loses only what this sheet counts.
     final count = ref.read(unsentChangesProvider);
     if (!await confirmUnsentSignOut(context, count: count)) return;
     try {
       await ref.read(sessionProvider.notifier).signOut(discardGuest: true);
     } on Object {
       // The session is forgotten here all the same once the server cannot be told.
-    }
-  }
-
-  Future<bool> _deleteAccount(WidgetRef ref) async {
-    try {
-      await ref.read(accountDeletionProvider).delete();
-      return true;
-    } on Object {
-      return false;
     }
   }
 
@@ -119,8 +109,6 @@ class VaultScreen extends ConsumerWidget {
         retrying: retrying,
         onRetry: gate.retry,
         onSignOut: signOut,
-        onDeleteAccount: kind == LockedKind.guest ? () => _deleteAccount(ref) : null,
-        onPair: kind == LockedKind.guest ? () => unawaited(gate.pair()) : null,
       ),
       _ => const VaultLoading(),
     };

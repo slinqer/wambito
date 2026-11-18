@@ -184,7 +184,7 @@ void main() {
       env.accounts.exportFailure = const HomeFailure(401);
       await _tapExport(t, 'json');
       expect(env.app.stored, isNull);
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
       expect(find.text('Tu archivo está listo'), findsNothing);
       expect(env.files.saved, isEmpty);
       await t.pump(const Duration(seconds: 10));

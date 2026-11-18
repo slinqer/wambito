@@ -110,8 +110,8 @@ Future<String> _signInNew(WidgetTester tester, String label) async {
   final email = _freshEmail(label);
   await SessionStore().clear();
   await tester.pumpWidget(await app.bootstrap());
-  await _pumpUntil(tester, find.byKey(const Key('entry.withEmail')));
-  await _tap(tester, 'entry.withEmail');
+  await _pumpUntil(tester, find.byKey(const Key('entry.haveAccount')));
+  await _tap(tester, 'entry.haveAccount');
   await _pumpUntil(tester, find.byKey(const Key('entry.email')));
   await tester.enterText(find.byKey(const Key('entry.email')), email);
   await _tap(tester, 'entry.send');

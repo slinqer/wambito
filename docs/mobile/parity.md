@@ -338,8 +338,8 @@ when the app's picture changes. The web shots are regenerated only when the web 
     (`_putFocusDown`) where the story has none.
   - **"Usar passkey" is "Entrar con huella" in the pairs** (`EmailScreen.passkeyLabel`), as the detail's "Editar" is
     in the budget pairs: the email screen's button keeps Stage 3's words and the web's sign-in has the others.
-  - **"Probar sin correo" is in no pair.** It sits on the first screen, which the web has no story for (its sign-in
-    has no guest and no first screen with three ways in), so the entry screen, "Guarda tu progreso" and the magic
+  - **The welcome ("Empezar", "Ya tengo una cuenta") is in no pair.** The web has no story for it (its sign-in has
+    no welcome), so the welcome, "Guarda tu progreso" and the magic
     link that finds a guest signed in have their own goldens in `test/entry/goldens`, to review by eye
     (`test/entry/entry_golden_test.dart`).
   - **The code is one text field with six boxes drawn over it**, where the web has six inputs. The ring is on the

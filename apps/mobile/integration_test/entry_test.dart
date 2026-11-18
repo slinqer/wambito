@@ -127,11 +127,11 @@ Future<Map<String, dynamic>> _me() async {
 Future<void> _startApp(WidgetTester tester) async {
   await SessionStore().clear();
   await tester.pumpWidget(await app.bootstrap());
-  await _pumpUntil(tester, find.byKey(const Key('entry.withEmail')));
+  await _pumpUntil(tester, find.byKey(const Key('entry.haveAccount')));
 }
 
 Future<void> _sendCodeTo(WidgetTester tester, String email) async {
-  await _tap(tester, 'entry.withEmail');
+  await _tap(tester, 'entry.haveAccount');
   await _pumpUntil(tester, find.byKey(const Key('entry.email')));
   await tester.enterText(find.byKey(const Key('entry.email')), email);
   await _tap(tester, 'entry.send');
@@ -140,10 +140,10 @@ Future<void> _sendCodeTo(WidgetTester tester, String email) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Probar sin correo creates a guest and lands on home', (tester) async {
+  testWidgets('Start creates a guest and lands on home', (tester) async {
     await _startApp(tester);
 
-    await _tap(tester, 'entry.guest');
+    await _tap(tester, 'entry.start');
     await _pumpUntil(tester, find.byType(HomeScreen));
 
     expect((await SessionStore().read())?.guest, isTrue);
@@ -269,7 +269,7 @@ void main() {
     (tester) async {
       final email = _freshEmail('mobile-claim');
       await _startApp(tester);
-      await _tap(tester, 'entry.guest');
+      await _tap(tester, 'entry.start');
       await _pumpUntil(tester, find.byType(HomeScreen));
       final guest = await _me();
       final guestToken = (await SessionStore().read())!.token;

@@ -54,6 +54,9 @@ class FakeAuthApi implements AuthApi {
     if (failure != null) throw failure;
   }
 
+  /// How many times `POST /auth/sign-in/anonymous` was called.
+  int get signInAsGuestCalls => calls.where((c) => c == 'signInAsGuest').length;
+
   @override
   Future<String> signInAsGuest() async {
     calls.add('signInAsGuest');

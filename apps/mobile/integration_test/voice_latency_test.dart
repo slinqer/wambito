@@ -93,10 +93,10 @@ Future<void> _startAsGuest(WidgetTester tester, ModelStore store, SpeechEngine e
       ],
     ),
   );
-  await _pumpUntil(tester, find.byKey(const Key('entry.guest')));
+  await _pumpUntil(tester, find.byKey(const Key('entry.start')));
   for (var attempt = 0; find.byType(HomeScreen).evaluate().isEmpty; attempt++) {
     if (attempt == 8) throw TestFailure('Could not start a guest');
-    await tester.tap(find.byKey(const Key('entry.guest')));
+    await tester.tap(find.byKey(const Key('entry.start')));
     final end = DateTime.now().add(const Duration(seconds: 8));
     while (DateTime.now().isBefore(end) && find.byType(HomeScreen).evaluate().isEmpty) {
       await tester.pump(const Duration(milliseconds: 100));

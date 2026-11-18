@@ -147,7 +147,7 @@ Options _auth(String token) => Options(headers: {'Authorization': 'Bearer $token
 /// A guest on home with a category of its own, then the capture preview of the fixed sentence with
 /// that category picked for both cards. Returns the token and the category id.
 Future<(String, String)> _captureTwo(WidgetTester tester) async {
-  await _tap(tester, 'entry.guest');
+  await _tap(tester, 'entry.start');
   await _pumpUntil(tester, find.byType(HomeScreen));
   await _pumpUntil(tester, find.byKey(const Key('home.capture')));
 

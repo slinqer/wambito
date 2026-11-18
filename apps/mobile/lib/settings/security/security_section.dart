@@ -1,10 +1,10 @@
 // Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
-// (`preview`) account. A guest (no recovery key) gets only "Approve a new device": nothing is loaded
-// for it. Otherwise: this phone and the other devices that open the data (name, added date, "Not
-// verified" when an attestation fails), each other one with "Remove" (a key rotation,
-// `RemoveDeviceSheet`); "Approve a new device"; "New recovery key"; and how many records could not be
-// read, when any. The sensitive steps (removing a device, making a new key, showing it) ask the
-// phone's screen lock first (spec 7.7, D17), which replaces the web's passkey touch.
+// (`preview`) account, with or without email (the same section for both): this phone and the other
+// devices that open the data (name, added date, "Not verified" when an attestation fails), each
+// other one with "Remove" (a key rotation, `RemoveDeviceSheet`); "Approve a new device"; "New
+// recovery key"; and how many records could not be read, when any. The sensitive steps (removing a
+// device, making a new key, showing it) ask the phone's screen lock first (spec 7.7, D17), which
+// replaces the web's passkey touch.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -29,13 +29,10 @@ import 'security_api.dart';
 import 'security_model.dart';
 
 class SecuritySection extends ConsumerStatefulWidget {
-  const SecuritySection({super.key, required this.timeZone, required this.guest});
+  const SecuritySection({super.key, required this.timeZone});
 
   /// The profile's zone: a device is dated in it.
   final String timeZone;
-
-  /// A guest's reduced section: only approving a new device.
-  final bool guest;
 
   @override
   ConsumerState<SecuritySection> createState() => _SecuritySectionState();
@@ -57,7 +54,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         ),
       ),
     );
-    if (!widget.guest) _changed();
+    _changed();
   }
 
   Future<void> _remove(SecurityApi security, DeviceRow row, bool hasPasskeys) async {
@@ -219,14 +216,6 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         ),
       ],
     );
-    if (widget.guest) {
-      return SettingsSection(
-        key: const Key('settings.card.security'),
-        title: l10n.settingsSecurityTitle,
-        lead: l10n.settingsSecurityGuestLead,
-        children: [approve],
-      );
-    }
     final snapshot = ref.watch(securitySnapshotProvider);
     final data = snapshot.value;
     final rows = data == null

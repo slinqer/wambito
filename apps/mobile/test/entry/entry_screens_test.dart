@@ -105,7 +105,7 @@ void main() {
       tester,
     ) async {
       await pumpApp(tester, auth: auth);
-      await tester.tap(find.byKey(const Key('entry.withEmail')));
+      await tester.tap(find.byKey(const Key('entry.haveAccount')));
       await tester.pumpAndSettle();
       await toCodeStep(tester);
       expect(find.text('Revisa tu correo'), findsOneWidget);
@@ -117,8 +117,8 @@ void main() {
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      // The first screen, with "Probar sin correo" where it always was.
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      // The first screen, with "Start" where it always is.
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
     });
   });
 
@@ -266,21 +266,22 @@ void main() {
   });
 
   group('the first screen', () {
-    testWidgets('keeps "Probar sin correo" first, in the secondary style, and the email primary', (
-      tester,
-    ) async {
-      await pumpApp(tester, auth: auth);
+    testWidgets(
+      'keeps "Start" first, in the primary style, and "I already have an account" a link',
+      (tester) async {
+        await pumpApp(tester, auth: auth);
 
-      final guest = tester.widget<PressButton>(find.byKey(const Key('entry.guest')));
-      final email = tester.widget<PressButton>(find.byKey(const Key('entry.withEmail')));
-      expect(guest.tone, PressTone.secondary);
-      expect(email.tone, PressTone.primary);
-      expect(
-        tester.getTopLeft(find.byKey(const Key('entry.guest'))).dy,
-        lessThan(tester.getTopLeft(find.byKey(const Key('entry.withEmail'))).dy),
-      );
-      expect(find.text('Puedes agregar tu correo después.'), findsOneWidget);
-    });
+        final start = tester.widget<PressButton>(find.byKey(const Key('entry.start')));
+        final haveAccount = tester.widget<PressButton>(find.byKey(const Key('entry.haveAccount')));
+        expect(start.tone, PressTone.primary);
+        expect(haveAccount.tone, PressTone.ghost);
+        expect(haveAccount.link, isTrue);
+        expect(
+          tester.getTopLeft(find.byKey(const Key('entry.start'))).dy,
+          lessThan(tester.getTopLeft(find.byKey(const Key('entry.haveAccount'))).dy),
+        );
+      },
+    );
 
     testWidgets('the day/night switch changes the theme before anyone has signed in', (
       tester,
@@ -320,7 +321,7 @@ void main() {
       await small(tester);
       await pumpApp(tester, auth: auth, passkeys: FakePasskeys());
       expect(tester.takeException(), isNull);
-      await reachable(tester, find.byKey(const Key('entry.withEmail')));
+      await reachable(tester, find.byKey(const Key('entry.haveAccount')));
       // The passkey is not here; the email step has it.
       expect(find.byKey(const Key('entry.passkey')), findsNothing);
     });

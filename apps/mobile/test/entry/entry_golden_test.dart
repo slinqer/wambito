@@ -17,9 +17,9 @@ import '../support/parity.dart';
 import '../support/parity_home.dart' show precacheWambi;
 import 'fakes.dart';
 
-/// The entry screens that have no web story, to review by eye: the first screen with "Probar sin
-/// correo" (the web's sign-in has no guest, so the parity pairs of the sign-in screens do not draw
-/// it), "Guarda tu progreso", and the magic link that finds a guest signed in. They are built from
+/// The entry screens that have no web story, to review by eye: the welcome with "Start" (the web's
+/// sign-in has no welcome, so the parity pairs of the sign-in screens do not draw it), "Guarda tu
+/// progreso", and the magic link that finds a guest signed in. They are built from
 /// the parts of the web's sign-in screens (`lib/entry/sign_in_frame.dart`), in night and in day, at
 /// the phone's size.
 ///
@@ -79,7 +79,7 @@ List<Override> _overrides({bool guest = false, bool passkeys = true}) {
 
 void main() {
   for (final theme in ['night', 'day']) {
-    testWidgets('the first screen, with "Probar sin correo" ($theme)', (t) async {
+    testWidgets('the welcome, with Start ($theme)', (t) async {
       await _golden(t, 'entry', theme, const EntryScreen(), overrides: _overrides());
     });
 
