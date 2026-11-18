@@ -14,6 +14,7 @@ import { DeleteAccount } from "./DeleteAccount.tsx";
 import { FeedbackSection } from "./FeedbackSection.tsx";
 import { PasskeysSection } from "./PasskeysSection.tsx";
 import { PreferencesSection } from "./PreferencesSection.tsx";
+import { ProtectSection } from "./ProtectSection.tsx";
 import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
 import { SecuritySection } from "./SecuritySection.tsx";
@@ -34,6 +35,11 @@ export interface SettingsProps {
   copy?: CopyText;
   /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
   security?: SecurityApi;
+  /**
+   * "Protect your data"'s step 3, "Create account (add an email)" (Task 10's flow); the step is
+   * hidden without it.
+   */
+  onAddEmail?: () => void;
 }
 
 /**
@@ -45,7 +51,8 @@ export interface SettingsProps {
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
  * steps there, and lists nothing. A preview account (`local` mode) has import and export off
  * with a "not available yet" note; passkeys, the assistants and deleting the account work, and
- * Security lists the devices that open the data.
+ * Security lists the devices that open the data; an account without an email (`isAnonymous`) gets
+ * "Protect your data" (`ProtectSection`) above them.
  */
 export function Settings({
   passkeys = livePasskeys,
@@ -53,6 +60,7 @@ export function Settings({
   save = saveToDisk,
   copy,
   security: securityProp,
+  onAddEmail,
 }: SettingsProps) {
   const t = useTranslations("settings");
   const tManage = useTranslations("manage");
@@ -85,6 +93,15 @@ export function Settings({
         </div>
         <PreferencesSection />
         <TimeAndMoneySection me={me} />
+        {security && me.isAnonymous && (
+          // An account without an email: its checklist first (spec 2026-11-15 section 5.2).
+          <ProtectSection
+            security={security}
+            passkeys={passkeys}
+            profile={me}
+            onAddEmail={onAddEmail}
+          />
+        )}
         <PasskeysSection
           passkeys={passkeys}
           timeZone={me.timezone}

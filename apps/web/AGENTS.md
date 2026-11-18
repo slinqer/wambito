@@ -298,7 +298,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   whole section, an anonymous one too):
   `security.ts` `SecurityApi` (`load()` → wraps, `ownId`, `revoked`, `verified` (attestations under
   DK from `withDataKey`), `unreadable` (`quarantineCount()`); `rotate`, `checkRecoveryKey`,
-  `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `pairing`), `liveSecurity(session)`
+  `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `settings()` (the settings
+  record's `recoveryKeySavedAt`), `markRecoveryKeySaved()`, `pairing`), `liveSecurity(session)`
   the default, `Settings`' `security` prop (and `HomeStage`'s) for stories; react-query key
   `SECURITY_KEY`; `security-model.ts` (`deviceRows`: this browser marked and never removable,
   revoked ids left out, "Not verified" when the attestation fails; `passkeyRows`: joined to passkey
@@ -321,6 +322,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
   then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
   `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.
+  "Protect your data" (spec 2026-11-15 section 5.2; `ProtectSection.tsx`, above the passkeys,
+  only for a `local` account whose profile `isAnonymous`): `protect-model.ts` `protectStatus({
+  anonymous, recoveryKeySavedAt, passkeyWrap, passkeyWithoutWrap, passkeysSupported })` (null with
+  an email; "N of 2" (`show`) until step 1 or 2 is done (`protected`), then a quiet list with
+  "Done"). Step 1 "Save a recovery key" asks nothing (web ruling 16): `newRecoveryKey()`,
+  `RecoveryKeySetup`, `commit()` (a failed commit keeps the setup, as in Security), then
+  `markRecoveryKeySaved()` and `PROTECT_SETTINGS_KEY` refetched. Step 2 (only where
+  `passkeys.supported()`): `PasskeysApi.add({ userId, explainSecondTouch, keep })`, `keep` =
+  `SecurityApi.addPasskeyWrap`; done only when a passkey wrap exists, never the passkey row; a
+  passkey without one shows `settings.protect.no_prf`. Step 3 "Create account (add an email)":
+  `Settings`' `onAddEmail` prop (and `HomeStage`'s), hidden without it. Stories
+  `Settings/Protect`, web-only, not in parity.json; copy under `settings.protect.*`.
   `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule

@@ -1,3 +1,4 @@
+import type { SettingsRecord } from "@wambito/core";
 import { createEncryptedStore } from "../../local/encrypted-store.ts";
 import { addPasskeyWrap, api, type KeysOptions, listWraps, withDataKey } from "../../local/keys.ts";
 import {
@@ -14,7 +15,7 @@ import {
   revokedDevices,
   rotateKeys,
 } from "../../local/rotate.ts";
-import type { VaultSession } from "../../local/vault-session.ts";
+import { markRecoveryKeySaved, type VaultSession } from "../../local/vault-session.ts";
 import type { SecurityWrap } from "./security-model.ts";
 
 /** The react-query key of `SecurityApi.load()` (Security and the passkeys' "Unlocks" share it). */
@@ -58,6 +59,10 @@ export interface SecurityApi {
   evaluatePrf(credentialIds?: string[]): Promise<PasskeyPrf | null>;
   /** The touched passkey's wrap, from this browser's device wrap. The caller zeroes the PRF. */
   addPasskeyWrap(passkey: PasskeyPrf): Promise<void>;
+  /** The vault's settings record (what Protect reads), null before the vault has one. */
+  settings(): Promise<Pick<SettingsRecord, "recoveryKeySavedAt"> | null>;
+  /** A recovery key was shown and typed back: `settings.recoveryKeySavedAt`, then a sync. */
+  markRecoveryKeySaved(): Promise<void>;
   /** Approving a new device (`ApproveDevice`). */
   pairing: PairingOptions;
   findPairing?: (
@@ -99,6 +104,16 @@ export function liveSecurity(session: VaultSession): SecurityApi {
     reloadKeys: () => session.reloadKeys(),
     evaluatePrf: (ids) => evaluatePrf(ids),
     addPasskeyWrap: (passkey) => addPasskeyWrap({ ...options, ...passkey }),
+    async settings() {
+      const store = await createEncryptedStore(session.userId);
+      try {
+        const [row] = await store.list("settings");
+        return row ? { recoveryKeySavedAt: row.body.recoveryKeySavedAt ?? null } : null;
+      } finally {
+        store.close();
+      }
+    },
+    markRecoveryKeySaved: () => markRecoveryKeySaved(session, new Date()),
     pairing: options,
     findPairing: findRealPairing,
   };

@@ -861,6 +861,8 @@ export interface HomeStageProps extends HomeApiOptions {
   mode?: ApiMode;
   /** Stands in for the open vault's keys in settings (Security, mode `local`). */
   security?: SecurityApi;
+  /** Settings' "Create account (add an email)" in "Protect your data". */
+  onAddEmail?: () => void;
 }
 
 /**
@@ -878,6 +880,7 @@ export function HomeStage({
   onCopy = async () => {},
   mode,
   security,
+  onAddEmail,
   ...api
 }: HomeStageProps) {
   // The toolbar's language, held here so settings can switch it (the toolbar's provider can't).
@@ -919,6 +922,7 @@ export function HomeStage({
                       save={(blob, filename) => onSave(filename, blob)}
                       copy={onCopy}
                       {...(security ? { security } : {})}
+                      {...(onAddEmail ? { onAddEmail } : {})}
                     />,
                   )}
                 />

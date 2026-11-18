@@ -147,6 +147,8 @@ function fakeSecurity({
     addPasskeyWrap: fn(async ({ credentialId }: { credentialId: string; prf: Uint8Array }) => {
       wraps = [...wraps, wrap({ id: `p-${credentialId}`, kind: "passkey", ref: credentialId })];
     }),
+    settings: fn(async () => ({ recoveryKeySavedAt: null })),
+    markRecoveryKeySaved: fn(async () => {}),
     pairing: { userId: "u-ana" },
     findPairing: fn(() => new Promise<never>(() => {})),
     scanSupported: () => false,
