@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { ApiProblem } from "../api/errors.ts";
+import { wipeForeignEphemeralVaults } from "../local/ephemeral.ts";
 import { deleteStaleVaults } from "../local/stale-vaults.ts";
 import { authClient } from "./auth-client.ts";
 import { DEFAULT_NEXT, safeNext, signInPath } from "./next.ts";
@@ -30,6 +31,11 @@ export interface GuardDeps {
    * session that ended outside the sign-out leaves its vault behind). Failures are ignored.
    */
   onSignedOut?(): Promise<void> | void;
+  /**
+   * A load found someone signed in: the live guards delete an `ephemeral` vault (an unticked
+   * sign-in) of anyone else left in this browser (web plan ruling 11). Failures are ignored.
+   */
+  onSignedIn?(user: SessionUser): Promise<void> | void;
 }
 
 interface SessionResult {
@@ -62,6 +68,7 @@ const liveDeps: GuardDeps = {
   getSession: async () => sessionUserFrom(await authClient.getSession()),
   mode: () => "live",
   onSignedOut: () => deleteStaleVaults(null),
+  onSignedIn: (user) => wipeForeignEphemeralVaults(user.id),
 };
 
 const isOnboarded = (user: SessionUser) => user.onboardingCompletedAt != null;
@@ -81,12 +88,11 @@ export function createGuards(deps: GuardDeps) {
   async function currentUser(): Promise<SessionUser | null> {
     if (deps.mode() === "demo") return DEMO_USER;
     const user = await deps.getSession();
-    if (!user) {
-      try {
-        await deps.onSignedOut?.();
-      } catch {
-        // Next time.
-      }
+    try {
+      if (user) await deps.onSignedIn?.(user);
+      else await deps.onSignedOut?.();
+    } catch {
+      // Next time.
     }
     return user;
   }

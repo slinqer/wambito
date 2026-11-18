@@ -2,7 +2,8 @@
 
 React Router 8 (framework mode, SPA + prerender): the public landing, roadmap, privacy policy and
 account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the signed-in app
-(`/app/*`), sign-in, onboarding (`/welcome`), OAuth consent for assistants, and a fake-backend demo
+(`/app/*`), sign-in (`/sign-in`: the QR for the phone, a recovery key, a passkey or email;
+`/create-account`), onboarding (`/welcome`), OAuth consent for assistants, and a fake-backend demo
 (`/demo/*`).
 
 ## Entry points
@@ -209,7 +210,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
-  ended outside the sign-out. `recovery-signin.ts` `signInWithRecoveryKey(text, { fetch? })` →
+  ended outside the sign-out (signed-in loads sweep other users' `ephemeral` vaults,
+  `local/ephemeral.ts`). `recovery-signin.ts` `signInWithRecoveryKey(text, { fetch? })` →
   `{ userId, keys }` (signed out like `signin.ts`: plain `fetch`, `credentials: "same-origin"`, no
   `x-wambito-user`): parses the typed text once (`parseRecoverySecret`, exported from `keys.ts`),
   derives `recoveryVerifier(secret)`, posts `{ lookup, auth }` base64url to
@@ -363,6 +365,36 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (none for `too_many`, which shows the retry time in `timeZone`, nor `suspended`); `onSignedIn`
   once on `done` (the page navigates and handles a failed finish). Stories `Sign-in/QR`, web-only,
   not in parity.json; copy under `sign_in.qr.*`.
+- `/sign-in` and `/create-account` (`routes/sign-in.tsx`, `routes/create-account.tsx`, both under
+  the app layout with `redirectIfSignedIn`; web plan rulings 1, 3, 12–14): `SignIn({ auth, mode =
+  "sign-in" | "create", qr? })` (`qr`: a `QrFactory(page) → QrSignin`, `liveQrFactory(auth)` by
+  default, faked in stories). `sign-in` (in every build, no flag): the screen's own width decides
+  (`WIDE_PX` 768, measured on the screen root, starting from `window.innerWidth` so a computer's first render is already wide: moving the email field later ends Chrome's passkey autofill request): wide puts the QR panel first and "Other ways to sign
+  in" beside it (fingerprint button, "Recovery key", the email form), narrow puts the other ways
+  first and the QR under "Signing in on a computer? Scan it with your phone"; both are keyed, so the
+  model survives a change of layout. `QrArea` makes the model only once the panel is on screen
+  (`IntersectionObserver`), and its `visible()` is "tab shown and panel on screen", so an off-screen
+  QR is not renewed; it is stopped only on unmount, and while it is `finishing`/`done` the other
+  ways (and leaving the email step) wait. `RecoveryKeySignIn` (a button with `aria-expanded` that
+  opens the field; copy `sign_in.recovery.*`, errors from `vault.unlock.error_*` and
+  `errors.recovery_key_invalid` / `account_suspended`; a 429 waits out `retryAfterS`). `create`:
+  the email code form under "Create your account" (`sign_in.create.*`) with "Already have an
+  account? Sign in" (`/sign-in` with the same query); no QR, recovery or fingerprint button.
+  `auth.ts`: `SignInAuth.signInWithRecoveryKey(text) → RecoveryResult` (`{ userId }` or `{ error,
+  retryAfterS? }`) and `startQrSignin` (= `startSignin`), both from `createSessionSafeAuth`, which
+  watches the `fetch` for the 200 that sets the cookie (`/v2/recovery/sign-in`, the pickup) and,
+  when the unlock or the enroll fails after it, signs out (`liveSignOut`, then
+  `deleteStaleVaults(null)`) before the error reaches the screen: never a session without keys.
+  `useFinishSignIn({ method: "email" | "passkey" | "qr" | "recovery" })`: only `email` may offer a
+  passkey (`offersPasskey(method, destination)` in `auth.ts`); a QR or recovery sign-in passes only
+  the user id. `local/ephemeral.ts` `wipeForeignEphemeralVaults(signedInUserId)`: deletes every
+  vault whose meta `ephemeral` is true but the signed-in user's (all when null), opening each
+  database without a version (never upgrading it); never throws. It runs on every signed-in load of
+  the live guards (`GuardDeps.onSignedIn` in `auth/session.ts`), not in a layout loader: a loader on
+  `app-layout.tsx` would replace every child's `HydrateFallback` and add a session request. Stories
+  in `Sign-in/SignIn`: `Phone first`, `Recovery key`, `Recovery key signs in`, `Create account`,
+  `Phone` (web-only; the parity stories there now show the recovery button and the QR below the
+  email form on a phone).
 - `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
   `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
   consent. An encrypted one (`previewProfile()` in the loader; `device` when `loadLocalKeys` finds

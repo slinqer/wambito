@@ -274,6 +274,21 @@
       "suspended": "Tu cuenta está suspendida. Escríbenos a privacy@wambito.com.",
       "too_many": "Demasiados códigos desde aquí. Wambi pide otro a las {time}.",
       "retry": "Reintentar"
+    },
+    "other_ways": "Otras formas de entrar",
+    "qr_on_computer": "¿Entras en un computador? Escanéalo con tu celular.",
+    "recovery": {
+      "open": "Clave de recuperación",
+      "label": "Tu clave de recuperación",
+      "submit": "Entrar con la clave",
+      "busy": "Entrando…",
+      "too_many": "Demasiados intentos seguidos. Wambi te deja probar otra vez en un momento."
+    },
+    "create": {
+      "meta_title": "Crear cuenta · Wambito",
+      "title": "Crea tu cuenta",
+      "lead": "Sin contraseñas: te mandamos un código a tu correo.",
+      "have_account": "¿Ya tienes cuenta? <link>Entra</link>"
     }
   },
   "verify": {

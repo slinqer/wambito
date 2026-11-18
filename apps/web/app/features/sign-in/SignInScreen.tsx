@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import { useTranslations } from "use-intl";
 import { landingLink } from "../../site/config.ts";
+import { cx } from "../../ui/cx.ts";
 import { ThemeToggle } from "../../ui/ThemeToggle.tsx";
 import { Wambi, type WambiMood } from "../../wambi/Wambi.tsx";
 
@@ -18,15 +19,21 @@ const LOGO_CLASS =
 
 export function SignInScreen({
   mood = "happy",
+  wide = false,
+  rootRef,
   children,
 }: {
   mood?: WambiMood;
+  /** A computer's `/sign-in`: the card holds two columns (the QR, the other ways). */
+  wide?: boolean;
+  /** The whole screen, for a page that lays itself out by the screen's width. */
+  rootRef?: Ref<HTMLDivElement>;
   children: ReactNode;
 }) {
   const t = useTranslations("sign_in");
   const home = landingLink();
   return (
-    <div className="lk-screen flex min-h-dvh flex-col">
+    <div ref={rootRef} className="lk-screen flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-[480px] items-center justify-between px-(--space-4) py-(--space-3)">
         {home.external ? (
           // The landing lives on its own site here: a full page load, not a route of this app.
@@ -41,7 +48,12 @@ export function SignInScreen({
         <ThemeToggle />
       </header>
       <main className="flex flex-1 flex-col items-center px-(--space-4) pb-(--space-6)">
-        <div className="flex w-full max-w-[420px] flex-col items-center gap-(--space-4) sm:mt-(--space-5) sm:rounded-xl sm:border-2 sm:border-stroke sm:bg-surface sm:p-(--space-6) sm:shadow-edge-md">
+        <div
+          className={cx(
+            "flex w-full flex-col items-center gap-(--space-4) sm:mt-(--space-5) sm:rounded-xl sm:border-2 sm:border-stroke sm:bg-surface sm:p-(--space-6) sm:shadow-edge-md",
+            wide ? "max-w-[880px]" : "max-w-[420px]",
+          )}
+        >
           <Wambi mood={mood} size={MASCOT_PX} />
           {children}
         </div>
