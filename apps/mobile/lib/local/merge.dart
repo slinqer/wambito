@@ -114,11 +114,16 @@ Future<List<(RecordType, String)>> mergedIdsOf(FinanceStore from, String targetU
 /// month's occurrence again, so it is carried as a tombstone (with its body). A second run writes
 /// the same bodies under the same ids: the target's own records are told apart from earlier copies
 /// by id, since the source's ids never exist in another user's vault.
+///
+/// [onlyAbsent]: only the records whose target id the target does not hold at all (a tombstone
+/// counts as held) are written: a merge whose target vault lost what was carried (wiped before the
+/// upload) puts back what is missing and never overwrites what is there (a later edit, a delete).
 Future<CarryReport> carryRecords(
   FinanceStore from,
   FinanceStore into, {
   required CarryMode mode,
   required String intoUserId,
+  bool onlyAbsent = false,
 }) async {
   final source = {for (final type in RecordType.values) type: await from.list(type)};
   final liveRules = {for (final r in source[RecordType.recurrence]!) r.id};
@@ -158,9 +163,14 @@ Future<CarryReport> carryRecords(
       ];
     }
 
-    Future<void> put(RecordType type, String id, Json body) async {
+    /// Whether it wrote ([onlyAbsent] skips an id the target holds, a tombstone included).
+    Future<bool> put(RecordType type, String id, Json body) async {
+      if (onlyAbsent && await tx.get(type, id, const ReadOptions(includeDeleted: true)) != null) {
+        return false;
+      }
       await tx.put(type, id, body);
       written += 1;
+      return true;
     }
 
     String? mapped(Object? id) => id is String ? (remapped[id] ?? id) : null;
@@ -278,8 +288,9 @@ Future<CarryReport> carryRecords(
     for (final t in deletedOccurrences) {
       final id = idOf(RecordType.transaction, t);
       if (id != t.id) remapped[t.id] = id;
-      await put(RecordType.transaction, id, repointed(t.body));
-      await tx.delete(RecordType.transaction, id);
+      if (await put(RecordType.transaction, id, repointed(t.body))) {
+        await tx.delete(RecordType.transaction, id);
+      }
     }
 
     // Merchants: their ids derive from the user, so they move to the target's; the target's own

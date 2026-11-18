@@ -357,6 +357,73 @@ void main() {
     expect(await pendingOf(accountStore), 0);
   });
 
+  test(
+    'the account\'s vault wiped after the carry (a sign-out, a removed device): the next sign-in '
+    'carries again what is missing, and the anonymous user goes only once it is on the server',
+    () async {
+      final first = await signedInToTheAccount();
+      targetReady = true;
+      first.invalidate(mergeTargetProvider);
+      sync.offline = true;
+      await first.read(mergeControllerProvider.notifier).run();
+      expect(first.read(mergeControllerProvider), isA<MergeUploading>());
+      first.dispose();
+
+      // The account's vault is gone with nothing of the phone's sent; the same email signs in again
+      // and downloads only what the server has: the account's own records.
+      await accountStore.close();
+      await databaseFactoryFfi.deleteDatabase(p.join(dir.path, vaultFileName(accountId)));
+      sync.offline = false;
+      await accountVault();
+      expect(await accountStore.get(RecordType.transaction, mTx), isNull);
+
+      final container = app();
+      await container.read(sessionProvider.notifier).ready;
+      final merge = container.read(mergeControllerProvider.notifier);
+      await merge.resume();
+      targetReady = true;
+      container.invalidate(mergeTargetProvider);
+      int? versionAtDelete;
+      auth.onDeleteUser = () async =>
+          versionAtDelete = (await accountStore.rawRecord(RecordType.transaction, mTx))?.version;
+      await merge.run();
+
+      expect(container.read(mergeControllerProvider), isA<MergeDone>());
+      expect((await accountStore.get(RecordType.transaction, mTx))?.body['categoryId'], aFood);
+      expect(sync.pushed, contains(mTx));
+      expect(versionAtDelete, greaterThan(0));
+      expect(deletes(), 1);
+    },
+  );
+
+  test('a run that cannot carry the missing records again deletes nothing', () async {
+    final first = await signedInToTheAccount();
+    targetReady = true;
+    first.invalidate(mergeTargetProvider);
+    sync.offline = true;
+    await first.read(mergeControllerProvider.notifier).run();
+    first.dispose();
+    await accountStore.close();
+    await databaseFactoryFfi.deleteDatabase(p.join(dir.path, vaultFileName(accountId)));
+    sync.offline = false;
+    await accountVault();
+
+    // A headless run holds the phone's vault: nothing can be read from it now.
+    final lease = await tryLease(anonId, holder: 'headless', directory: dir.path);
+    final container = app();
+    await container.read(sessionProvider.notifier).ready;
+    final merge = container.read(mergeControllerProvider.notifier);
+    await merge.resume();
+    targetReady = true;
+    container.invalidate(mergeTargetProvider);
+    await merge.run();
+
+    expect(container.read(mergeControllerProvider), isA<MergeFailed>());
+    expect(deletes(), 0);
+    expect(fileOf(anonId), isTrue);
+    await lease?.release();
+  });
+
   test('offline during the upload stays MergeUploading and deletes nothing', () async {
     final container = await signedInToTheAccount();
     targetReady = true;

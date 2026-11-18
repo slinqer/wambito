@@ -481,6 +481,57 @@ void main() {
     }
   });
 
+  test('onlyAbsent puts back only what the target lost, never over an edit or a delete', () async {
+    final from = createMemoryStore();
+    final into = await sqlite();
+    await into.put(RecordType.settings, settingsIdOf(accountUser), settings());
+    await into.put(RecordType.category, aFood, category('Comida'));
+    await from.put(RecordType.category, pFood, category('Comida'));
+    await from.put(RecordType.category, pOtherCat, category('Viajes'));
+    await from.put(RecordType.transaction, pTx, transaction(pFood));
+    await from.put(RecordType.transaction, pGone, transaction(pOtherCat));
+    await from.put(RecordType.recurrence, pRule, recurrence(pOtherCat));
+    await carryRecords(from, into, mode: CarryMode.merge, intoUserId: accountUser);
+
+    // Later: one movement edited, the rule deleted, and the other movement lost.
+    final edited = {...(await body(into, RecordType.transaction, m(pTx)))!, 'name': 'Mercado 2'};
+    await into.put(RecordType.transaction, m(pTx), edited);
+    await into.delete(RecordType.recurrence, m(pRule));
+    final lostId = m(pGone);
+    // A record that is gone entirely (not even a tombstone), as in a wiped vault.
+    final fresh = await sqlite();
+    for (final type in RecordType.values) {
+      for (final r in await into.list(type, const ReadOptions(includeDeleted: true))) {
+        if (r.id == lostId) continue;
+        await fresh.put(type, r.id, r.body);
+        if (r.deleted) await fresh.delete(type, r.id);
+      }
+    }
+
+    final report = await carryRecords(
+      from,
+      fresh,
+      mode: CarryMode.merge,
+      intoUserId: accountUser,
+      onlyAbsent: true,
+    );
+
+    expect(report.written, 1);
+    expect((await body(fresh, RecordType.transaction, lostId))?['categoryId'], m(pOtherCat));
+    expect((await body(fresh, RecordType.transaction, m(pTx)))?['name'], 'Mercado 2');
+    expect(await fresh.get(RecordType.recurrence, m(pRule)), isNull);
+    expect(
+      (await fresh.get(
+        RecordType.recurrence,
+        m(pRule),
+        const ReadOptions(includeDeleted: true),
+      ))?.deleted,
+      isTrue,
+    );
+    await into.close();
+    await fresh.close();
+  });
+
   test('every written record is an outbox entry with no base version', () async {
     final from = createMemoryStore();
     final into = await sqlite();

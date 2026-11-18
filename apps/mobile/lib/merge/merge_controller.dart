@@ -316,6 +316,27 @@ class MergeController extends Notifier<MergeState> {
         }
         // Also after a crash between the carry's commit and this mark: [_committed] saw it.
         await source.setMeta(mergeCarriedMeta, _deps.now().toUtc().toIso8601String());
+        // Carried earlier, but the account's vault no longer holds some of it (wiped by a
+        // sign-out or a removed device before the upload; the same email signed in again): what
+        // is missing is carried again, and only that, so nothing there is overwritten.
+        if (await _missing(source, target)) {
+          final lease = await _deps.lease(job.anonId);
+          if (lease == null) {
+            state = const MergeFailed('busy', carried: true);
+            return;
+          }
+          try {
+            await carryRecords(
+              source,
+              target.store,
+              mode: CarryMode.merge,
+              intoUserId: target.userId,
+              onlyAbsent: true,
+            );
+          } finally {
+            await lease.release();
+          }
+        }
         kept = await _keptIds(source, target);
       } finally {
         if (!source.isClosed) await source.close();
@@ -336,6 +357,26 @@ class MergeController extends Notifier<MergeState> {
       if (await target.store.get(type, id, const ReadOptions(includeDeleted: true)) != null)
         (type, id),
   ];
+
+  /// Whether a movement, recurrence or budget the carry gives an id of its own is not in the
+  /// account's vault at all (categories and accounts may stand matched by name, so their absence
+  /// says nothing; a budget the account had for that category stays absent, and a carry again
+  /// writes nothing for it).
+  Future<bool> _missing(SqliteStore source, MergeTarget target) async {
+    for (final (type, id) in await mergedIdsOf(source, target.userId)) {
+      if (!const {
+        RecordType.transaction,
+        RecordType.recurrence,
+        RecordType.budget,
+      }.contains(type)) {
+        continue;
+      }
+      if (await target.store.get(type, id, const ReadOptions(includeDeleted: true)) == null) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Whether the carry already committed: one of the ids it gives the phone's records is in the
   /// account's vault (they derive from the account and the phone's own ids, so nothing else has
