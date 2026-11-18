@@ -8,7 +8,14 @@ import {
 } from "@wambito/vault";
 import { isLocale, type Locale } from "../i18n/format.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { api, forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
+import {
+  api,
+  forgetDevice,
+  heldDeviceWrapId,
+  type LocalKeys,
+  loadLocalKeys,
+  refreshKeys,
+} from "./keys.ts";
 
 /**
  * A preview account's open vault in this tab (stage 2a): the encrypted store, the local backend the
@@ -375,13 +382,7 @@ export async function forgetOwnDeviceWrap(
     }, options.timeoutMs ?? 3000);
   });
   const attempt = (async () => {
-    const store = await createEncryptedStore(current.userId);
-    let id: string | undefined;
-    try {
-      id = await store.getMeta<string>("deviceWrapId");
-    } finally {
-      store.close();
-    }
+    const id = await heldDeviceWrapId(current.userId);
     if (!id) return;
     await api({ userId: current.userId, fetch: options.fetch })(
       `/v2/keys/${encodeURIComponent(id)}`,

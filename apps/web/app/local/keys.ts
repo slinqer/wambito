@@ -419,7 +419,7 @@ async function enrollTrusted(
 }
 
 /** The device wrap id a vault held here kept at its enroll, if any. */
-async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
+export async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
   const store = await createEncryptedStore(userId);
   try {
     return await store.getMeta<string>("deviceWrapId");

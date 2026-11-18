@@ -813,9 +813,14 @@ describe("forgetOwnDeviceWrap", () => {
     expect(net.live).toEqual(["DELETE /api/v2/keys/wrap_own"]);
   });
 
-  it("does nothing without an active vault or without a deviceWrapId", async () => {
+  it("does nothing without an active vault", async () => {
     const net = fakeNetwork();
     await forgetOwnDeviceWrap({ fetch: net.fetch });
+    expect(net.live).toEqual([]);
+  });
+
+  it("does nothing without a deviceWrapId", async () => {
+    const net = fakeNetwork();
     const profile = profileOf();
     await openVaultSession({ profile, keys: await keys(), fresh: true, fetch: net.fetch });
     await withWrapId(profile.id, undefined);
