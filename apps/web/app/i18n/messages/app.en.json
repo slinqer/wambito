@@ -756,6 +756,7 @@
       "load_failed": "We couldn't load your devices. Try again in a moment.",
       "remove": "Remove",
       "remove_label": "Remove {name}",
+      "removed_done": "{name} no longer has access.",
       "approve": "Approve a new device",
       "approve_lead": "Open your data on a new phone or browser, without your recovery key.",
       "recovery_title": "Recovery key",
@@ -771,19 +772,13 @@
       "passkeys_failed": "We couldn't load your fingerprints, so a new key can't be offered yet.",
       "maybe_saved": "It may have been saved: keep this new key until it says it is done.",
       "remove_sheet": {
-        "title": "Remove {name}?",
-        "body": "It will no longer open your data. Your encryption keys change for that: type your recovery key to confirm. Connected assistants are disconnected and need connecting again.",
+        "title": "Remove {name}",
+        "body": "This device will be signed out of your account and won't receive anything new.",
         "key_label": "Recovery key",
-        "confirm": "Remove it",
+        "confirm": "Remove",
         "removing": "Removing…",
-        "or_new": "Don't have it? Make a new recovery key",
         "rotated_elsewhere": "Another device changed your keys at the same time. Wait a moment while they refresh here, then try again.",
-        "failed": "We couldn't remove it. Try again.",
-        "done_title": "Removed",
-        "done_lead": "{name} can no longer open your data, and it was signed out.",
-        "dropped_lead": "These were left out too:",
-        "dropped_item": "{name} ({reason, select, removed {removed now} revoked {removed earlier} other {not verified}})",
-        "passkeys_note": "Fingerprints you didn't use just now no longer open your data: turn them on again under fingerprints."
+        "failed": "We couldn't remove it. Try again."
       },
       "new_key": {
         "title": "Make a new recovery key",

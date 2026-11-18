@@ -756,6 +756,7 @@
       "load_failed": "Non siamo riusciti a caricare i tuoi dispositivi. Riprova tra un momento.",
       "remove": "Rimuovi",
       "remove_label": "Rimuovi {name}",
+      "removed_done": "{name} non ha più accesso.",
       "approve": "Approva un nuovo dispositivo",
       "approve_lead": "Apri i tuoi dati su un nuovo telefono o browser, senza la chiave di recupero.",
       "recovery_title": "Chiave di recupero",
@@ -771,19 +772,13 @@
       "passkeys_failed": "Non siamo riusciti a caricare le tue impronte, quindi non possiamo ancora offrirti una nuova chiave.",
       "maybe_saved": "Potrebbe essere già stata salvata: conserva questa nuova chiave finché non dice che è pronta.",
       "remove_sheet": {
-        "title": "Rimuovere {name}?",
-        "body": "Non potrà più aprire i tuoi dati. Per questo cambiano le tue chiavi di cifratura: scrivi la tua chiave di recupero per confermare. Gli assistenti collegati vengono scollegati e vanno collegati di nuovo.",
+        "title": "Rimuovi {name}",
+        "body": "Questo dispositivo uscirà dal tuo account e non riceverà più nulla di nuovo.",
         "key_label": "Chiave di recupero",
-        "confirm": "Sì, rimuovilo",
+        "confirm": "Rimuovi",
         "removing": "Rimozione…",
-        "or_new": "Non ce l'hai? Crea una nuova chiave di recupero",
         "rotated_elsewhere": "Un altro dispositivo ha cambiato le tue chiavi nello stesso momento. Aspetta che si aggiornino qui, poi riprova.",
-        "failed": "Non siamo riusciti a rimuoverlo. Riprova.",
-        "done_title": "Fatto",
-        "done_lead": "{name} non può più aprire i tuoi dati e la sua sessione è stata chiusa.",
-        "dropped_lead": "Sono rimasti fuori anche:",
-        "dropped_item": "{name} ({reason, select, removed {rimosso ora} revoked {rimosso prima} other {non verificato}})",
-        "passkeys_note": "Le impronte che non hai usato ora non aprono più i tuoi dati: riattivale tra le impronte."
+        "failed": "Non siamo riusciti a rimuoverlo. Riprova."
       },
       "new_key": {
         "title": "Crea una nuova chiave di recupero",

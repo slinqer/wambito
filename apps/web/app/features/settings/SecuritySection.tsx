@@ -27,7 +27,7 @@ import { type DeviceRow, deviceRows } from "./security-model.ts";
 
 /**
  * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). This browser and the other devices that open the data (label, added date; "Not verified" when
- * an attestation fails), each other one with "Remove" (a key rotation, `RemoveDeviceSheet`);
+ * an attestation fails), each other one with "Remove" (one tap, `RemoveDeviceSheet`: the wrap goes, the keys stay);
  * "Approve a new device" (`ApproveDevice`); "New recovery key" (confirmed by the current key or a
  * passkey touch, then `RecoveryKeySetup`); "Change keys" (a rotation that removes no device,
  * typed recovery key; it disconnects assistants); and how many records could not be read, when any.
@@ -44,6 +44,7 @@ export function SecuritySection({
   const t = useTranslations("settings.security");
   const { locale } = useLocale();
   const qc = useQueryClient();
+  const toast = useToast();
   const snapshot = useQuery({
     queryKey: SECURITY_KEY,
     queryFn: () => security.load(),
@@ -150,10 +151,11 @@ export function SecuritySection({
       <RemoveDeviceSheet
         device={removing}
         security={security}
-        passkeyList={known}
-        canTouch={canTouch}
         onClose={() => setRemoving(null)}
-        onChanged={changed}
+        onRemoved={(row) => {
+          changed();
+          toast.show({ message: t("removed_done", { name: row.label ?? t("unnamed") }) });
+        }}
       />
       <ChangeKeysSheet
         open={changing}

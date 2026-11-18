@@ -311,15 +311,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   empty) also "Lost it? Make a new one without it", the type-back confirming it; with passkeys
   this browser cannot touch, only the typed key, and the copy says why; then `RecoveryKeySetup`,
   `commit()` after the four characters), "Could not read N items" only when N > 0). A failed
-  commit of a new recovery key (here and in `RemoveDeviceSheet`'s "make a new one") may have
+  commit of a new recovery key may have
   been saved: the setup stays with the same key, says `settings.security.maybe_saved`, hides
   Cancel, and Continue retries the same `commit()`; only `rotated_elsewhere` goes back, reloading
-  the keys and invalidating `SECURITY_KEY`; `RemoveDeviceSheet.tsx`
-  (the recovery key typed, or "make a new one": a passkey touch, whose PRF (a copy per try, since
-  `rotateKeys` zeroes it) keeps that passkey's wrap; then `commit()`, `reloadKeys()`, and what was
-  dropped; `rotated_elsewhere` reloads the keys and says to try again; "make a new one" (and New
-  recovery key's touch) waits for the passkey list (`PasskeyList`: disabled while loading, hidden
-  with a retry when it failed; with passkeys but no WebAuthn here, only the typed key); a
+  the keys and invalidating `SECURITY_KEY`; "New recovery key" waits for the passkey list
+  (`PasskeyList`: disabled while loading, hidden with a retry when it failed; with passkeys but no
+  WebAuthn here, only the typed key); `RemoveDeviceSheet.tsx` is confirm-only: one tap calls
+  `SecurityApi.removeDevice(id)` (`DELETE /v2/keys/{id}`: the wrap goes and that device's session
+  ends; no rotation, no recovery key, the keys do not change; a 404 counts as done; offline shows
+  `vault.unlock.error_offline` and keeps the row, any other failure `remove_sheet.failed`), then
+  `SecuritySection` toasts `removed_done` and invalidates `SECURITY_KEY` (the sheet's file also
+  keeps the shared `Takeover`, `RecoveryKeyField`, `PasskeyList`, `keyErrorOf` and `problemOf`); the
+  web's "Change keys" (`ChangeKeysSheet`) still rotates; a
   `Takeover` makes the rest of the page `inert`); `PasskeysSection` with
   `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
   then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories

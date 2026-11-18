@@ -1,6 +1,13 @@
 import type { SettingsRecord } from "@wambito/core";
 import { createEncryptedStore } from "../../local/encrypted-store.ts";
-import { addPasskeyWrap, api, type KeysOptions, listWraps, withDataKey } from "../../local/keys.ts";
+import {
+  addPasskeyWrap,
+  api,
+  KeysError,
+  type KeysOptions,
+  listWraps,
+  withDataKey,
+} from "../../local/keys.ts";
 import {
   type ApproverPairing,
   findPairing as findRealPairing,
@@ -59,6 +66,11 @@ export interface SecurityApi {
   /** Resolves when `text` opens the current recovery wrap (`bad_` / `wrong_recovery_key`). */
   checkRecoveryKey(text: string): Promise<void>;
   newRecoveryKey(): Promise<{ recoveryKey: string; commit(): Promise<void> }>;
+  /**
+   * Removes a device: deletes its wrap (`DELETE /v2/keys/{id}`), which ends its session. The keys
+   * do not change. A 404 resolves (already gone); rejects with `{ code: "offline" | "failed" }`.
+   */
+  removeDevice(id: string): Promise<void>;
   /** After a rotation committed: the sync takes the new keyring. */
   reloadKeys(): Promise<void>;
   /** A passkey touch for its PRF: null when cancelled; `{ code: "no_prf" }` without one. */
@@ -103,6 +115,17 @@ export function liveSecurity(session: VaultSession): SecurityApi {
         });
       }
       return { wraps, ownId, revoked, verified, unreadable };
+    },
+    async removeDevice(id) {
+      try {
+        await api(options)(`/v2/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+      } catch (error) {
+        if (error instanceof KeysError) {
+          if (error.status === 404) return;
+          if (error.code === "offline") throw error;
+        }
+        throw Object.assign(new Error("failed"), { code: "failed" });
+      }
     },
     rotate: (request) => rotateKeys({ ...options, ...request }),
     checkRecoveryKey: (text) => checkRecoveryKey({ ...options, text }),

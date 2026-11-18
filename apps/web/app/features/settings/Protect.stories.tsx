@@ -74,6 +74,7 @@ function fake({
         unreadable: 0,
       }),
     ),
+    removeDevice: fn(async () => {}),
     rotate: fn(async () => {
       throw new Error("not in these stories");
     }),
