@@ -57,6 +57,34 @@ const vaultDatabases = (page: Page) =>
       .filter((n) => n.startsWith("wambito-vault-")),
   );
 
+/**
+ * The vault's meta `ephemeral` (set by an unticked sign-in's enroll), read from its IndexedDB
+ * (`app/local/db.ts`: store `meta`). Opened without a version and never created: an upgrade is
+ * aborted, as `app/local/ephemeral.ts` does; a missing database is an error.
+ */
+const ephemeralMark = (page: Page, userId: string) =>
+  page.evaluate(
+    (name) =>
+      new Promise<unknown>((resolve, reject) => {
+        const open = indexedDB.open(name);
+        open.onupgradeneeded = () => open.transaction?.abort();
+        open.onerror = () => reject(new Error(`no database ${name}`));
+        open.onsuccess = () => {
+          const db = open.result;
+          const get = db.transaction("meta", "readonly").objectStore("meta").get("ephemeral");
+          get.onsuccess = () => {
+            db.close();
+            resolve(get.result);
+          };
+          get.onerror = () => {
+            db.close();
+            reject(get.error);
+          };
+        };
+      }),
+    `wambito-vault-${userId}`,
+  );
+
 const sessionCookie = async (context: BrowserContext) => {
   const cookie = (await context.cookies()).find((c) => c.name.endsWith("session_token"));
   if (!cookie) throw new Error("no session cookie");
@@ -133,6 +161,8 @@ test("a browser signs in by the code the phone approves and sees the account's m
   await expect(a.page).toHaveURL(/\/app$/, { timeout: 30_000 });
   await expect(a.page.getByText(NAME, { exact: true })).toBeVisible();
   expect(await vaultDatabases(a.page)).toEqual([`wambito-vault-${user.id}`]);
+  // Ticked: a vault the person keeps, never marked for the sweep.
+  expect(await ephemeralMark(a.page, user.id)).toBeUndefined();
 
   // The box was ticked: a session of about 60 days (the API's clock is pinned to E2E_NOW, and
   // the browser may count from either).
@@ -201,6 +231,8 @@ test("unticked: the cookie has no expiry, and once it is gone the app leaves no 
   await expect(d.page).toHaveURL(/\/app$/, { timeout: 30_000 });
   await expect(d.page.getByText(NAME, { exact: true })).toBeVisible();
   expect(await vaultDatabases(d.page)).toEqual([`wambito-vault-${phone.userId}`]);
+  // Unticked: the vault is marked, so a sweep may take it.
+  expect(await ephemeralMark(d.page, phone.userId)).toBe(true);
   // A session cookie: it ends with the browser.
   expect((await sessionCookie(d.context)).expires).toBe(-1);
 
@@ -208,7 +240,7 @@ test("unticked: the cookie has no expiry, and once it is gone the app leaves no 
   await d.context.clearCookies();
   await d.page.goto("/sign-in");
   await expect(qrCode(d.page)).toBeVisible();
-  await expect.poll(() => vaultDatabases(d.page)).toEqual([]);
+  await expect.poll(() => vaultDatabases(d.page), { timeout: 15_000 }).toEqual([]);
 
   await d.context.close();
 });

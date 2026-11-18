@@ -77,19 +77,19 @@ export async function approveSignin(options: {
     });
     expect(approveRes.status(), await approveRes.text()).toBe(204);
 
-    let revealed: string | null = null;
+    let revealed = "";
     await expect
       .poll(
         async () => {
           const res = await request.get(`/api/v2/signin/${found.id}`, { headers });
           expect(res.status(), await res.text()).toBe(200);
-          revealed = ((await res.json()) as Viewed).publicKey;
-          return revealed !== null;
+          revealed = ((await res.json()) as Viewed).publicKey ?? "";
+          return revealed !== "";
         },
         { timeout: 20_000, message: "the browser reveals its key" },
       )
       .toBe(true);
-    const browserKey = fromBase64Url(revealed as unknown as string);
+    const browserKey = fromBase64Url(revealed);
     expect(toBase64Url(await pairingCommitment(browserKey)), "the commitment holds").toBe(
       found.commitment,
     );
