@@ -1030,7 +1030,7 @@
   "signinApproveLead": "Sul computer, scegli «Accedi». Poi scansiona il codice QR che compare, o scrivi il suo codice.",
   "signinApproveCodeLabel": "Codice dal computer",
   "signinApproveBadCode": "Quel codice non corrisponde a nessuna richiesta. Controllalo, o aprine uno nuovo sul computer.",
-  "signinApproveQuestion": "Accedere su {label}?",
+  "signinApproveQuestion": "Accedere su «{label}»?",
   "signinApproveWarning": "Scansiona solo un codice che vedi su {host}",
   "signinApproveApprove": "Approva",
   "signinApproveWaiting": "In attesa del computer…",
@@ -1040,5 +1040,8 @@
   "signinApproveMismatchLead": "Il computer non ha ricevuto nulla. Se volevi accedere, ricomincia lì.",
   "signinApproveExpiredLead": "Apri un nuovo codice sul computer e scansionalo di nuovo.",
   "signinApproveFailedTitle": "Non è stato possibile approvare l'accesso",
-  "signinApproveLocked": "Apri prima i tuoi dati su questo telefono."
+  "signinApproveLocked": "Apri prima i tuoi dati su questo telefono.",
+  "signinApproveFromLink": "Questo è arrivato da un link: approva solo se stai accedendo su un computer davanti a te.",
+  "signinApproveUnconfirmedTitle": "Inviato",
+  "signinApproveUnconfirmedLead": "L'ho inviato, ma non ho visto il computer riceverlo. Controllalo: se non ha effettuato l'accesso, ricomincia lì."
 }

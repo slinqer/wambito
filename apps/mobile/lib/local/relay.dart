@@ -52,7 +52,8 @@ const relayTooManyMaxWait = Duration(seconds: 30);
 /// this phone's clock from its start or [restart], or an earlier `expiresAt` through
 /// [setDeadline]), and the flag again once the answer is in: a cancelled request never acts on
 /// what it was told. With [backOffTooMany], a 429 waits (its `retry-after`, else a growing
-/// back-off, never nothing) and asks again while the deadline allows; without, it is `server`.
+/// back-off, never nothing) and asks again; a wait that would reach the deadline is `expired` at
+/// once. Without, a 429 is `server`.
 class RelayClient {
   RelayClient(
     KeysOptions options,
@@ -123,13 +124,15 @@ class RelayClient {
         }
         if (error.status == 429 && backOffTooMany) {
           final said = error.retryAfter;
-          if (said != null) {
-            await _clock.sleep(Duration(seconds: said));
-          } else {
-            await _clock.sleep(wait);
+          final asked = said != null ? Duration(seconds: said) : wait;
+          if (said == null) {
             final next = wait * 2;
             wait = next > relayTooManyMaxWait ? relayTooManyMaxWait : next;
           }
+          // never past the deadline: a wait that outlasts it is the end at once
+          final left = _deadline.difference(_clock.now());
+          if (asked >= left) throw _error('expired');
+          await _clock.sleep(asked);
           continue;
         }
         throw _error('server');

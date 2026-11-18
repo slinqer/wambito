@@ -179,14 +179,14 @@ class FakeSecurity implements SecurityApi {
   }
 
   /// What [findSigninRequest] hands out; unset, it is a [StateError] (no test asked for it).
-  Future<SigninApproval> Function({String? code, String? qr})? findSignin;
+  Future<SigninApproval> Function({String? code, String? qr, bool fromLink})? findSignin;
 
   @override
-  Future<SigninApproval> findSigninRequest({String? code, String? qr}) {
-    calls.add('findSigninRequest code=$code qr=$qr');
+  Future<SigninApproval> findSigninRequest({String? code, String? qr, bool fromLink = false}) {
+    calls.add('findSigninRequest code=$code qr=$qr${fromLink ? ' fromLink' : ''}');
     final find = findSignin;
     if (find == null) return Future.error(StateError('no sign-in request'));
-    return find(code: code, qr: qr);
+    return find(code: code, qr: qr, fromLink: fromLink);
   }
 }
 

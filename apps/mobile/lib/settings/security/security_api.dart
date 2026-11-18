@@ -74,8 +74,9 @@ abstract interface class SecurityApi {
   Future<ApproverPairing> findPairing({String? code, String? qr});
 
   /// Approving a web sign-in (phone-first spec 8.1): finds the browser's request by its typed
-  /// [code] or its scanned [qr]. Nothing is posted until [SigninApproval.approve].
-  Future<SigninApproval> findSigninRequest({String? code, String? qr});
+  /// [code] or its scanned [qr] ([fromLink]: the QR came in a `wambito://signin` link, not from the
+  /// in-app scanner). Nothing is posted until [SigninApproval.approve].
+  Future<SigninApproval> findSigninRequest({String? code, String? qr, bool fromLink = false});
 }
 
 /// The open vault's keys, against the real `/v2/keys`. [touch] is the passkey prompt for
@@ -158,8 +159,8 @@ class _LiveSecurity implements SecurityApi {
       pair.findPairing(_options, code: code, qr: qr);
 
   @override
-  Future<SigninApproval> findSigninRequest({String? code, String? qr}) =>
-      signin.findSigninRequest(_options, code: code, qr: qr);
+  Future<SigninApproval> findSigninRequest({String? code, String? qr, bool fromLink = false}) =>
+      signin.findSigninRequest(_options, code: code, qr: qr, fromLink: fromLink);
 }
 
 /// The open vault's [SecurityApi]; null while no vault is open (signed out, a `plain` account, or

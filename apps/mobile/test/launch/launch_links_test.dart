@@ -595,7 +595,8 @@ void main() {
       'wambito://signin?id=…&key=… opens the approval when the vault is open and is dropped otherwise',
       (tester) async {
         // open: the approval, with the QR looked up at once
-        final security = FakeSecurity()..findSignin = ({code, qr}) => Completer<Never>().future;
+        final security = FakeSecurity()
+          ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
         final links = FakeLaunchLinks();
         final env = await pumpSettingsApp(
           tester,
@@ -609,13 +610,38 @@ void main() {
         await tester.pumpAndSettle();
         expect(env.router.state.uri.path, '/settings/signin');
         expect(find.byType(ApproveSigninScreen), findsOneWidget);
-        expect(security.calls, contains('findSigninRequest code=null qr=$_signinQr'));
+        // a QR from a link is unauthenticated intent: the screen asks for the number
+        expect(security.calls, contains('findSigninRequest code=null qr=$_signinQr fromLink'));
         // Back is home.
         env.router.pop();
         await tester.pumpAndSettle();
         expect(find.byType(HomeScreen), findsOneWidget);
       },
     );
+
+    testWidgets('a link during an open approval is ignored', (tester) async {
+      final security = FakeSecurity()
+        ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(security),
+        ],
+      );
+      links.open(_signinQr);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      // another request arrives while the first one is on screen: dropped, the screen stays
+      const other = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ff&key=$_key';
+      links.open(other);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      expect(env.router.state.uri.queryParameters['qr'], _signinQr);
+      expect(security.calls.where((c) => c.contains('0123456789ff')), isEmpty);
+    });
 
     testWidgets('a locked vault drops it, and so does a link that is not a QR', (tester) async {
       final security = FakeSecurity();

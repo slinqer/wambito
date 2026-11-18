@@ -344,4 +344,62 @@ void main() {
     row.pickedUp = true;
     await sealing;
   });
+
+  test('a link-opened request cannot seal without the number', () async {
+    final w = await world();
+    final row = await w.relay.open(w.browser);
+    final approval = await findSigninRequest(
+      w.options,
+      qr: w.qrOf(row),
+      fromLink: true,
+      clock: w.clock,
+    );
+    expect(approval.fromLink, isTrue);
+    expect(approval.typed, isFalse);
+    expect(approval.comparesNumber, isTrue);
+    await expectLater(approval.seal(), throwsA(isA<StateError>()));
+    final approving = approval.approve();
+    await expectLater(approval.seal(), throwsA(isA<StateError>()));
+    final number = await approving;
+    expect(w.sealPosted, isFalse);
+    // the browser shows the same 6 digits in its QR flow
+    expect(number, await pairingNumber(w.browser.pair.publicKey, fromBase64Url(row.approverKey!)));
+    await approval.seal();
+    expect(row.sealed, isNotNull);
+
+    // the QR's key is still checked
+    final v = await world();
+    final other = await v.relay.open(v.browser);
+    final evil = await generateDeviceKeyPair();
+    v.relay.reveal = (_) => toBase64Url(evil.publicKey);
+    final linked = await findSigninRequest(
+      v.options,
+      qr: v.qrOf(other),
+      fromLink: true,
+      clock: v.clock,
+    );
+    expect(await signinErrorOf(linked.approve()), 'tampered');
+    expect(v.sealPosted, isFalse);
+  });
+
+  test('a retry-after past the deadline is expired at once, with no wait', () async {
+    final w = await world();
+    final row = await w.relay.open(w.browser);
+    final approval = await findSigninRequest(w.options, qr: w.qrOf(row), clock: w.clock);
+    w.relay.intercept = (method, path) =>
+        (429, {'code': 'too_many_requests'}, {'retry-after': '600'});
+    expect(await signinErrorOf(approval.approve()), 'expired');
+    expect(w.clock.sleeps, isEmpty);
+  });
+
+  test('once the seal is out, a pickup it cannot see is unconfirmed, not a failure', () async {
+    final w = await world();
+    w.relay.pickUp = false;
+    w.relay.expires = false;
+    final row = await w.relay.open(w.browser);
+    final approval = await findSigninRequest(w.options, qr: w.qrOf(row), clock: w.clock);
+    await approval.approve();
+    expect(await signinErrorOf(approval.seal()), 'unconfirmed');
+    expect(row.sealed, isNotNull);
+  });
 }

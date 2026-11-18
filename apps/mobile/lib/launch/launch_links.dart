@@ -11,6 +11,7 @@ import '../home/home_controller.dart';
 import '../review/review_controller.dart';
 import '../local/signin_approval.dart' show isSigninQr;
 import '../router.dart';
+import '../settings/security/approve_signin_screen.dart' show openSigninApprovalsProvider;
 import '../settings/security/security_api.dart' show securityApiProvider;
 
 /// What a `wambito://` link asks for (spec section 7.1): the widget's ＋ (`wambito://add`, the add
@@ -168,9 +169,12 @@ class LaunchLinks {
     // A web sign-in needs this phone's data open (an encrypted account, unlocked): otherwise the
     // link is dropped, and the person scans again once it is (ruling 14). A `plain` account has
     // nothing to approve with.
+    // Nor while an approval is open: a link never swaps the request under the person's tap (P18).
     final signinQr = launchSigninQrOf(link);
     if (action == LaunchAction.signin &&
-        (signinQr == null || _ref.read(securityApiProvider) == null)) {
+        (signinQr == null ||
+            _ref.read(securityApiProvider) == null ||
+            _ref.read(openSigninApprovalsProvider).any)) {
       return;
     }
     final router = _ref.read(routerProvider);

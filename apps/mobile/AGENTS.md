@@ -126,15 +126,17 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   a fake relay. Both relays share `relay.dart` (= `relay.ts`: `RelayClient` with `send`/`get`/`post`/`poll(path,
   step over the decoded body)`/`setDeadline`/`restart`/`check`/`cancelled`, errors made by the caller's type;
   `sameBytes`, `key32`, `relayCodePattern`; with `backOffTooMany` a 429 waits its `retry-after`, else 5 s doubling
-  to 30 s, never asks again at once) and `relay_clock.dart` (`PairingClock`, `RealPairingClock`; `pairing.dart`
+  to 30 s, never asks again at once; a wait that would reach the deadline is `expired` at once) and `relay_clock.dart` (`PairingClock`, `RealPairingClock`; `pairing.dart`
   re-exports `PairingClock`; `relay.dart` never imports `pairing.dart`). `signin_approval.dart` is the phone's half
   of `signin.ts` (phone-first spec 8.1): `findSigninRequest(options, code:|qr:)` (QR exactly
   `wambito://signin?id=<uuid>&key=<43>`, `isSigninQr`; pins the commitment, a QR's key must hash to it; posts
-  nothing) → `SigninApproval` (`label`, `expiresAt`, `typed`; `approve()` posts `A.pub` (409 → `tampered`), polls
-  `GET /v2/signin/{id}` for the browser's key and checks it, returns the 6 digits only after a typed code; `seal()`
-  is a `StateError` after a typed code until `approve()` returned, checks the deadline, seals like pairing
-  (`WrapContext(device, userId, keyV)`, `pairingSealToDevice`), waits for the pickup's 404; `cancel()` zeroes `A`).
-  `SigninError` codes `bad_code`, `expired`, `tampered`, `offline`, `server`, `cancelled`. Its 2 minutes
+  nothing; `fromLink:` a QR that came in a link) → `SigninApproval` (`label`, `expiresAt`, `typed`, `fromLink`,
+  `comparesNumber` = typed or from a link; `approve()` posts `A.pub` (409 → `tampered`), polls `GET /v2/signin/{id}`
+  for the browser's key and checks it, returns the 6 digits when `comparesNumber` (null only for the in-app
+  scanner's QR); `seal()` is a `StateError` then until `approve()` returned, checks the deadline, seals like
+  pairing (`WrapContext(device, userId, keyV)`, `sealForApprover` over the `pairingSealToDevice` seam), waits for
+  the pickup's 404 (after the seal is out, anything else is `unconfirmed`); `cancel()` zeroes `A`). `SigninError`
+  codes `bad_code`, `expired`, `tampered`, `offline`, `server`, `cancelled`, `unconfirmed`. Its 2 minutes
   (`signinTtl`) run on the phone's clock from the read, never on the server's `expiresAt`. Seam
   `signinGenerateDeviceKeyPair`; tests `test/local/signin_approval_test.dart` over `fake_signin.dart`.
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
@@ -237,8 +239,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key"),
   `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
   **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
-  "They match" after a typed code; through `SecurityApi.findSigninRequest`; cancels on every way out; with no open
-  vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
+  "They match" after a typed code or for a link-opened QR (ruling P18: any app can send the link, so it is
+  unauthenticated intent; it also shows `signin.fromLink`); the host line is the trust signal, the label is quoted
+  and muted; Approve is off for `signinApproveDelay` (1 s) after a request appears; a seal whose pickup cannot be
+  seen shows "Sent"; through `SecurityApi.findSigninRequest`; registered in `openSigninApprovalsProvider` while
+  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
   Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
@@ -385,7 +390,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito://review` and `wambito://review/<id>` (one segment, `launchReviewIdOf`) push `/review` or
   `/review/<id>` over home, which opens that transaction in the editor. `wambito://signin?id=…&key=…`
   (`LaunchAction.signin`, `launchSigninQrOf`: the exact QR) pushes `/settings/signin?qr=` over home only while
-  `securityApiProvider` is non-null (an open `preview` vault); locked, `plain` or malformed, it is dropped (ruling 14).
+  `securityApiProvider` is non-null (an open `preview` vault) and no approval screen is open
+  (`openSigninApprovalsProvider`); locked, `plain`, malformed or during an approval, it is dropped (rulings 14, P18).
 
 ## Android (`android/app/src/main/kotlin/com/wambito/app/`)
 

@@ -4655,9 +4655,9 @@
   "@signinApproveBadCode": {
     "description": "Approving a web sign-in: a typed code or a QR that finds nothing."
   },
-  "signinApproveQuestion": "¿Iniciar sesión en {label}?",
+  "signinApproveQuestion": "¿Iniciar sesión en «{label}»?",
   "@signinApproveQuestion": {
-    "description": "Approving a web sign-in: the question (spec 8.1); {label} is shown in bold.",
+    "description": "Approving a web sign-in: the question (spec 8.1); {label} is the browser's own name, quoted and muted (it is attacker-chosen), below the host line.",
     "placeholders": {
       "label": {
         "type": "String",
@@ -4716,5 +4716,17 @@
   "signinApproveLocked": "Abre primero tus datos en este teléfono.",
   "@signinApproveLocked": {
     "description": "Approving a web sign-in with the vault no longer open."
+  },
+  "signinApproveFromLink": "Esto llegó por un enlace: aprueba solo si estás iniciando sesión en un computador que tienes enfrente.",
+  "@signinApproveFromLink": {
+    "description": "Approving a web sign-in opened from a wambito://signin link (not the in-app scanner): the extra warning."
+  },
+  "signinApproveUnconfirmedTitle": "Enviado",
+  "@signinApproveUnconfirmedTitle": {
+    "description": "Approving a web sign-in: the seal went out but the browser's pickup could not be seen."
+  },
+  "signinApproveUnconfirmedLead": "Lo envié, pero no pude ver que el computador lo recibiera. Míralo: si no inició sesión, empieza de nuevo allí.",
+  "@signinApproveUnconfirmedLead": {
+    "description": "Approving a web sign-in: unconfirmed pickup, what to do."
   }
 }

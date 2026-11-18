@@ -6,6 +6,13 @@
 // match" seals the data key; after a QR the key in it already authenticates the browser, so
 // Approve seals at once. Cancel before Approve posts nothing.
 //
+// A request opened from a `wambito://signin` link (any app or page can send one, ruling P18) is
+// unauthenticated intent: it always goes through the number and "They match", and says it came
+// from a link. While this screen is open another link is dropped (`openSigninApprovalsProvider`),
+// and Approve stays off for [signinApproveDelay] after a request appears, so a link cannot swap
+// the request under a tap. The browser's label is its own words: quoted and muted, below the
+// host line, which is the trust signal.
+//
 // The request holds an ephemeral private key until it ends, so whenever the screen goes away
 // before it is done (back, Cancel, "They do not match", a failure) the request is cancelled. It
 // needs the vault open (`securityApiProvider`); a `plain` account or a locked vault has none and
@@ -43,10 +50,13 @@ class _Enter extends _View {
 }
 
 class _Ask extends _View {
-  const _Ask(this.approval, {this.approving = false});
+  const _Ask(this.approval, {this.approving = false, this.ready = false});
 
   final SigninApproval approval;
   final bool approving;
+
+  /// [signinApproveDelay] has passed since it appeared: Approve may be tapped.
+  final bool ready;
 }
 
 class _Number extends _View {
@@ -62,9 +72,12 @@ class _Sealing extends _View {
 }
 
 class _Done extends _View {
-  const _Done(this.label);
+  const _Done(this.label, {this.confirmed = true});
 
   final String label;
+
+  /// False when the seal went out but the browser's pickup could not be seen.
+  final bool confirmed;
 }
 
 class _Mismatch extends _View {
@@ -77,6 +90,23 @@ class _Failed extends _View {
   final PairingProblem problem;
 }
 
+/// How long Approve stays off after a request appears on the screen.
+const signinApproveDelay = Duration(seconds: 1);
+
+/// The approval screens open now. A plain registry, not state: read when a link arrives
+/// (lib/launch/launch_links.dart), which drops a `wambito://signin` link while one is open.
+class OpenSigninApprovals {
+  final _open = <Object>{};
+
+  bool get any => _open.isNotEmpty;
+
+  void open(Object screen) => _open.add(screen);
+
+  void close(Object screen) => _open.remove(screen);
+}
+
+final openSigninApprovalsProvider = Provider<OpenSigninApprovals>((ref) => OpenSigninApprovals());
+
 const _mono = TextStyle(
   fontFamily: 'monospace',
   fontFamilyFallback: ['Menlo', 'Roboto Mono', 'Courier'],
@@ -86,7 +116,7 @@ const _mono = TextStyle(
 /// A thrown error as a problem to show; null for a cancel (nothing to say) and for `bad_code`
 /// (the field's). Anything that is not the relay's (a [KeysError] of the vault) is `server`.
 PairingProblem? _problemOf(Object error) => switch (codeOf(error)) {
-  'cancelled' || 'bad_code' => null,
+  'cancelled' || 'bad_code' || 'unconfirmed' => null,
   'expired' => PairingProblem.expired,
   'tampered' => PairingProblem.tampered,
   'offline' => PairingProblem.offline,
@@ -114,16 +144,20 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
 
   /// The request in progress, cancelled when the screen goes away before it is done.
   SigninApproval? _current;
+  Timer? _delay;
+  late final OpenSigninApprovals _registry;
 
   @override
   void initState() {
     super.initState();
+    _registry = ref.read(openSigninApprovalsProvider)..open(this);
     unawaited(_checkScanner());
     final qr = widget.qr;
     if (qr != null) {
       _view = const _Enter(busy: true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_find(qr: qr));
+        // a QR handed to the screen came in a link, never from its own scanner
+        if (mounted) unawaited(_find(qr: qr, fromLink: true));
       });
     }
   }
@@ -140,6 +174,8 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
 
   @override
   void dispose() {
+    _registry.close(this);
+    _delay?.cancel();
     _release();
     _code.dispose();
     _focus.dispose();
@@ -165,6 +201,11 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
 
   void _fail(SigninApproval? from, Object error) {
     if (from != null && _current != from) return;
+    if (from != null && codeOf(error) == 'unconfirmed') {
+      _current = null;
+      setState(() => _view = _Done(from.label, confirmed: false));
+      return;
+    }
     final problem = _problemOf(error);
     if (problem == null) {
       if (codeOf(error) == 'bad_code') setState(() => _view = const _Enter(badCode: true));
@@ -174,13 +215,13 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
     setState(() => _view = _Failed(problem));
   }
 
-  Future<void> _find({String? code, String? qr}) async {
+  Future<void> _find({String? code, String? qr, bool fromLink = false}) async {
     final security = ref.read(securityApiProvider);
     if (security == null) return;
     setState(() => _view = const _Enter(busy: true));
     final SigninApproval found;
     try {
-      found = await security.findSigninRequest(code: code, qr: qr);
+      found = await security.findSigninRequest(code: code, qr: qr, fromLink: fromLink);
     } on Object catch (error) {
       if (mounted) _fail(null, error);
       return;
@@ -191,6 +232,13 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
     }
     _current = found;
     setState(() => _view = _Ask(found));
+    _delay?.cancel();
+    _delay = Timer(signinApproveDelay, () {
+      final view = _view;
+      if (mounted && view is _Ask && view.approval == found) {
+        setState(() => _view = _Ask(found, approving: view.approving, ready: true));
+      }
+    });
   }
 
   Future<void> _scan() async {
@@ -212,7 +260,7 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
   }
 
   Future<void> _approve(SigninApproval approval) async {
-    setState(() => _view = _Ask(approval, approving: true));
+    setState(() => _view = _Ask(approval, approving: true, ready: true));
     final String? number;
     try {
       number = await approval.approve();
@@ -292,9 +340,12 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
       return SignInFrame(
         mood: view is _Done ? WambiMood.celebrating : WambiMood.worried,
         children: [
-          if (view is _Done) ...[
+          if (view is _Done && view.confirmed) ...[
             EntryTitle(l10n.vaultApproveDoneTitle),
-            EntryLead(l10n.signinApproveDoneLead(view.label), strong: view.label),
+            EntryLead(l10n.signinApproveDoneLead(view.label)),
+          ] else if (view is _Done) ...[
+            EntryTitle(l10n.signinApproveUnconfirmedTitle),
+            EntryLead(l10n.signinApproveUnconfirmedLead),
           ] else ...[
             EntryTitle(l10n.vaultApproveMismatchTitle),
             EntryLead(l10n.signinApproveMismatchLead),
@@ -390,8 +441,11 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
       return SignInFrame(
         children: [
           EntryTitle(l10n.signinApproveTitle),
-          EntryLead(l10n.signinApproveQuestion(label), strong: label, ink: true),
-          EntryLead(l10n.signinApproveWarning(host), strong: host),
+          // the host is the trust signal; the label is the browser's own words, quoted and muted
+          EntryLead(l10n.signinApproveWarning(host), strong: host, ink: true),
+          EntryLead(l10n.signinApproveQuestion(label)),
+          if (view.approval.fromLink)
+            FieldError(l10n.signinApproveFromLink, key: const Key('signin.fromLink')),
           if (view.approving)
             Semantics(
               liveRegion: true,
@@ -402,7 +456,9 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
             PressButton.text(
               l10n.signinApproveApprove,
               key: const Key('signin.approve'),
-              onPressed: view.approving ? null : () => unawaited(_approve(view.approval)),
+              onPressed: view.approving || !view.ready
+                  ? null
+                  : () => unawaited(_approve(view.approval)),
             ),
           ),
           _full(

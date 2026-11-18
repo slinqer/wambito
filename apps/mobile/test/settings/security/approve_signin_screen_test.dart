@@ -71,12 +71,18 @@ Future<_World> _world() async {
   final row = await relay.open(browser, label: 'Firefox on Mac');
   final options = KeysOptions(userId: userId, dio: relay.dio(), storage: storage);
   final security = FakeSecurity()
-    ..findSignin = ({code, qr}) =>
-        signin.findSigninRequest(options, code: code, qr: qr, clock: clock);
+    ..findSignin = ({code, qr, fromLink = false}) =>
+        signin.findSigninRequest(options, code: code, qr: qr, fromLink: fromLink, clock: clock);
   return _World(relay, row, 'wambito://signin?id=${row.id}&key=${browser.key}', security);
 }
 
-Future<void> _pump(WidgetTester t, _World w, {String? qr, QrScanner? scanner}) async {
+Future<void> _pump(
+  WidgetTester t,
+  _World w, {
+  String? qr,
+  QrScanner? scanner,
+  bool settle = true,
+}) async {
   t.view
     ..physicalSize = const Size(824, 2400)
     ..devicePixelRatio = 2;
@@ -91,7 +97,7 @@ Future<void> _pump(WidgetTester t, _World w, {String? qr, QrScanner? scanner}) a
       child: uiApp(ApproveSigninScreen(qr: qr), locale: const Locale('en')),
     ),
   );
-  await t.pumpAndSettle();
+  if (settle) await t.pumpAndSettle();
 }
 
 void main() {
@@ -100,7 +106,7 @@ void main() {
   testWidgets("shows the label and the server's host", (t) async {
     final w = await _world();
     await _pump(t, w, qr: w.qr);
-    expect(find.textContaining('Sign in on Firefox on Mac?'), findsOneWidget);
+    expect(find.textContaining('Sign in on “Firefox on Mac”?'), findsOneWidget);
     expect(find.textContaining('Only scan a code you see on money.example.org'), findsOneWidget);
     expect(find.byKey(const Key('signin.approve')), findsOneWidget);
     expect(find.byKey(const Key('signin.cancel')), findsOneWidget);
@@ -126,11 +132,14 @@ void main() {
     expect(scanner.asked, [
       [signinQrPrefix],
     ]);
+    await t.pump(signinApproveDelay);
     await t.tap(find.byKey(const Key('signin.approve')));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('signin.number')), findsNothing);
     expect(w.row.sealed, isNotNull);
     expect(find.textContaining('You are signed in on Firefox on Mac'), findsOneWidget);
+    // the scanner's own QR says nothing of a link
+    expect(find.byKey(const Key('signin.fromLink')), findsNothing);
   });
 
   testWidgets('a typed code: the number, and They match seals it', (t) async {
@@ -139,6 +148,7 @@ void main() {
     await t.enterText(find.byKey(const Key('signin.code')), w.row.code.toLowerCase());
     await t.tap(find.byKey(const Key('signin.submit')));
     await t.pumpAndSettle();
+    await t.pump(signinApproveDelay);
     await t.tap(find.byKey(const Key('signin.approve')));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('signin.number')), findsOneWidget);
@@ -155,6 +165,7 @@ void main() {
     await t.enterText(find.byKey(const Key('signin.code')), w.row.code);
     await t.tap(find.byKey(const Key('signin.submit')));
     await t.pumpAndSettle();
+    await t.pump(signinApproveDelay);
     await t.tap(find.byKey(const Key('signin.approve')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('signin.noMatch')));
@@ -173,5 +184,74 @@ void main() {
       findsOneWidget,
     );
     expect(w.relay.log, isEmpty);
+  });
+
+  testWidgets(
+    'a link-opened request cannot seal without the number, and says it came from a link',
+    (t) async {
+      final w = await _world();
+      await _pump(t, w, qr: w.qr);
+      expect(find.byKey(const Key('signin.fromLink')), findsOneWidget);
+      expect(find.textContaining('This came from a link'), findsOneWidget);
+      await t.pump(signinApproveDelay);
+      await t.tap(find.byKey(const Key('signin.approve')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('signin.number')), findsOneWidget);
+      expect(w.row.sealed, isNull);
+      expect(w.relay.log.any((l) => l.endsWith('/seal')), isFalse);
+      await t.tap(find.byKey(const Key('signin.match')));
+      await t.pumpAndSettle();
+      expect(w.row.sealed, isNotNull);
+    },
+  );
+
+  testWidgets('ApproveSigninScreen(qr:) posts nothing before Approve', (t) async {
+    final w = await _world();
+    await _pump(t, w, qr: w.qr);
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('signin.approve')), findsOneWidget);
+    expect(w.relay.log.where((l) => l.startsWith('POST')), isEmpty);
+    expect(w.row.approverKey, isNull);
+  });
+
+  testWidgets('Approve stays off for a second after the request appears', (t) async {
+    final w = await _world();
+    await _pump(t, w, qr: w.qr, settle: false);
+    // short frames until the request is on screen (settling would let the second pass)
+    final appeared = t.binding.clock.now();
+    for (var i = 0; i < 20 && find.byKey(const Key('signin.approve')).evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+      await t.pump(const Duration(milliseconds: 10));
+    }
+    expect(find.byKey(const Key('signin.approve')), findsOneWidget);
+    expect(t.binding.clock.now().difference(appeared), lessThan(signinApproveDelay));
+    // the request just appeared: a tap does nothing
+    await t.tap(find.byKey(const Key('signin.approve')), warnIfMissed: false);
+    await t.pump();
+    await t.pump();
+    expect(w.row.approverKey, isNull);
+    expect(w.relay.log.where((l) => l.startsWith('POST')), isEmpty);
+    // a second later it takes the tap
+    await t.pump(signinApproveDelay);
+    await t.tap(find.byKey(const Key('signin.approve')));
+    await t.pumpAndSettle();
+    expect(w.row.approverKey, isNotNull);
+  });
+
+  testWidgets('a seal whose pickup cannot be seen says sent, not failed', (t) async {
+    final w = await _world();
+    w.relay.pickUp = false;
+    w.relay.expires = false;
+    final scanner = _Scanner(w.qr);
+    await _pump(t, w, scanner: scanner);
+    await t.tap(find.byKey(const Key('signin.scan')));
+    await t.pumpAndSettle();
+    await t.pump(signinApproveDelay);
+    await t.tap(find.byKey(const Key('signin.approve')));
+    await t.pumpAndSettle();
+    expect(w.row.sealed, isNotNull);
+    expect(find.text('Sent'), findsOneWidget);
+    expect(find.textContaining('I could not see the computer take it'), findsOneWidget);
   });
 }

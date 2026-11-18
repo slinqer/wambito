@@ -6,7 +6,7 @@ import '../crypto/crypto.dart' as crypto;
 import '../crypto/crypto.dart'
     show DeviceKeyPair, WrapContext, WrapKind, fromBase64Url, toBase64Url;
 import 'keys.dart';
-import 'pairing.dart' show normalizePairingCode, pairingSealToDevice;
+import 'pairing.dart' show normalizePairingCode, sealForApprover;
 import 'relay.dart';
 import 'relay_clock.dart';
 
@@ -31,7 +31,8 @@ import 'relay_clock.dart';
 /// Why an approval ended: `bad_code` (a code that cannot be one or finds nothing, or a QR not
 /// exactly `wambito://signin?id=<id>&key=<key>`), `expired` (a 404, or the 2 minutes passed on
 /// this phone's clock), `tampered` (a relayed value that does not match what this phone pinned, a
-/// second approver, a 422), `offline`, `server`, and `cancelled` (after [SigninApproval.cancel]).
+/// second approver, a 422), `offline`, `server`, `cancelled` (after [SigninApproval.cancel]), and
+/// `unconfirmed` (the seal was posted but its pickup could not be seen).
 class SigninError implements Exception {
   const SigninError(this.code);
 
@@ -75,6 +76,7 @@ class SigninApproval {
     required this.label,
     required this.expiresAt,
     required this.typed,
+    required this.fromLink,
     required this._approve,
     required this._seal,
     required this._cancel,
@@ -89,17 +91,27 @@ class SigninApproval {
   /// Found by a typed code (no QR key): the number must be compared before the seal.
   final bool typed;
 
+  /// A QR that came in a link (`wambito://signin?…` opened by any app or page), not from the
+  /// in-app scanner: unauthenticated intent (ruling P18). Its key is still checked, and the number
+  /// must be compared before the seal, as after a typed code.
+  final bool fromLink;
+
+  /// Whether the 6 digits must be compared before [seal]: a typed code or a link.
+  bool get comparesNumber => typed || fromLink;
+
   final Future<String?> Function() _approve;
   final Future<void> Function() _seal;
   final void Function() _cancel;
 
-  /// "Approve": posts `A.pub`, waits for the browser's key and checks it. The 6 digits after a
-  /// typed code; null after a QR (its key already authenticates the browser).
+  /// "Approve": posts `A.pub`, waits for the browser's key and checks it. The 6 digits when
+  /// [comparesNumber]; null after a QR from the in-app scanner (its key, read off the browser's
+  /// screen, already authenticates the browser).
   Future<String?> approve() => _approve();
 
-  /// Seals the data key to the browser and waits for its pickup. After a typed code, a
+  /// Seals the data key to the browser and waits for its pickup. When [comparesNumber], a
   /// [StateError] that sends nothing until [approve] returned (the person compared the number);
-  /// after a QR, it approves first when that was not done.
+  /// after a scanned QR, it approves first when that was not done. Once the seal was posted, a
+  /// pickup that cannot be seen (offline, the 2 minutes) is `unconfirmed`, not a failure.
   Future<void> seal() => _seal();
 
   /// Stops the request and zeroes `A`. Nothing more is sent.
@@ -109,10 +121,12 @@ class SigninApproval {
 /// Finds the request by its typed [code] or its scanned [qr] (exactly one) and pins its commitment
 /// (a QR's key must hash to it). `bad_code` for a code that cannot be one or finds nothing (404) and
 /// for a QR not exactly `wambito://signin?id=<uuid>&key=<base64url 32 bytes>`. Nothing is posted.
+/// [fromLink]: the [qr] came in a link, not from the in-app scanner ([SigninApproval.fromLink]).
 Future<SigninApproval> findSigninRequest(
   KeysOptions options, {
   String? code,
   String? qr,
+  bool fromLink = false,
   PairingClock? clock,
 }) async {
   if ((code == null) == (qr == null)) throw ArgumentError('exactly one of code and qr');
@@ -170,6 +184,8 @@ Future<SigninApproval> findSigninRequest(
   final pair = await signinGenerateDeviceKeyPair();
   final approverKey = toBase64Url(pair.publicKey);
   final isTyped = qrKey == null;
+  // a typed code or a link: the number is the person's check before the seal
+  final compares = isTyped || fromLink;
   Future<Uint8List>? approving;
   Uint8List? browserKey;
 
@@ -207,7 +223,7 @@ Future<SigninApproval> findSigninRequest(
     try {
       net.check();
       await withDataKey(options, (dataKey, keyV) async {
-        final sealed = await pairingSealToDevice(
+        final sealed = await sealForApprover(
           newKey,
           WrapContext(kind: WrapKind.device, userId: options.userId, keyV: keyV),
           dataKey,
@@ -222,11 +238,17 @@ Future<SigninApproval> findSigninRequest(
     } finally {
       _zero(pair.privateKey);
     }
-    // done when the browser picked it up: the relay forgets the request (404)
+    // done when the browser picked it up: the relay forgets the request (404). The seal is out:
+    // anything else from here is a pickup this phone could not see, not a failure.
     try {
       await net.poll<bool>('/v2/signin/$id', (_) async => null, every: signinPoll);
     } on _Gone {
       return;
+    } on SigninError catch (error) {
+      if (error.code == 'cancelled') rethrow;
+      throw const SigninError('unconfirmed');
+    } on KeysError {
+      throw const SigninError('unconfirmed');
     }
   }
 
@@ -236,17 +258,18 @@ Future<SigninApproval> findSigninRequest(
     label: label,
     expiresAt: expiresAt,
     typed: isTyped,
+    fromLink: fromLink && !isTyped,
     approve: () async {
       final key = await approve();
-      final number = isTyped ? await crypto.pairingNumber(key, pair.publicKey) : null;
+      final number = compares ? await crypto.pairingNumber(key, pair.publicKey) : null;
       // set once the number is in hand: from here the person can compare it
       browserKey = key;
       return number;
     },
     seal: () {
-      // after a typed code the number is the only check of a relayed `N`: never seal before the
-      // person could compare it
-      if (isTyped && browserKey == null) return Future.error(StateError('seal before approve'));
+      // after a typed code the number is the only check of a relayed `N`, and after a link the
+      // only check that the browser is the person's: never seal before they could compare it
+      if (compares && browserKey == null) return Future.error(StateError('seal before approve'));
       return sealing ??= (() async => seal(browserKey ?? await approve()))();
     },
     cancel: forget,

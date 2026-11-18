@@ -47,9 +47,7 @@ const pairingPoll = Duration(milliseconds: 1500);
 const pairingTtl = Duration(minutes: 10);
 
 /// Test seams of the web's mocks of `openFromPairing` and `sealToDevice` (to check what the
-/// approver seals and that the opened DK is zeroed). Production code never changes them; the seal
-/// is also the web sign-in approver's (`signin_approval.dart`, ruling 15), so it is not
-/// `@visibleForTesting`.
+/// approver seals and that the opened DK is zeroed). Production code never changes them.
 @visibleForTesting
 Future<Uint8List> Function(
   Uint8List privateKey,
@@ -58,6 +56,7 @@ Future<Uint8List> Function(
   Uint8List approverKey,
 )
 pairingOpenFromPairing = crypto.openFromPairing;
+@visibleForTesting
 Future<Uint8List> Function(
   Uint8List publicKey,
   WrapContext ctx,
@@ -65,6 +64,16 @@ Future<Uint8List> Function(
   DeviceKeyPair? ephemeral,
 })
 pairingSealToDevice = crypto.sealToDevice;
+
+/// An approver's seal of DK to a revealed key from its ephemeral pair, through
+/// [pairingSealToDevice]: the web sign-in approver seals exactly as pairing does (ruling 15,
+/// `signin_approval.dart`).
+Future<Uint8List> sealForApprover(
+  Uint8List publicKey,
+  WrapContext ctx,
+  Uint8List dataKey, {
+  required DeviceKeyPair ephemeral,
+}) => pairingSealToDevice(publicKey, ctx, dataKey, ephemeral: ephemeral);
 
 /// A request on the new phone, as the screen and the gate see it.
 class NewDevicePairing {

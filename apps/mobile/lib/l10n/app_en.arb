@@ -2227,7 +2227,7 @@
   "signinApproveLead": "On the computer, choose “Sign in”. Then scan the QR code it shows, or type its code.",
   "signinApproveCodeLabel": "Code from the computer",
   "signinApproveBadCode": "That code does not match any request. Check it, or open a new one on the computer.",
-  "signinApproveQuestion": "Sign in on {label}?",
+  "signinApproveQuestion": "Sign in on “{label}”?",
   "signinApproveWarning": "Only scan a code you see on {host}",
   "signinApproveApprove": "Approve",
   "signinApproveWaiting": "Waiting for the computer…",
@@ -2237,5 +2237,8 @@
   "signinApproveMismatchLead": "The computer got nothing. If you meant to sign in, start again there.",
   "signinApproveExpiredLead": "Open a new code on the computer and scan it again.",
   "signinApproveFailedTitle": "This sign-in could not be approved",
-  "signinApproveLocked": "Open your data on this phone first."
+  "signinApproveLocked": "Open your data on this phone first.",
+  "signinApproveFromLink": "This came from a link: approve only if you are signing in on a computer in front of you.",
+  "signinApproveUnconfirmedTitle": "Sent",
+  "signinApproveUnconfirmedLead": "I sent it, but I could not see the computer take it. Look at it: if it is not signed in, start again there."
 }

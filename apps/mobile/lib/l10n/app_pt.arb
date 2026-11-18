@@ -1030,7 +1030,7 @@
   "signinApproveLead": "No computador, escolhe «Entrar». Depois lê o código QR que aparece, ou escreve o seu código.",
   "signinApproveCodeLabel": "Código do computador",
   "signinApproveBadCode": "Esse código não corresponde a nenhum pedido. Confirma-o, ou abre um novo no computador.",
-  "signinApproveQuestion": "Entrar em {label}?",
+  "signinApproveQuestion": "Entrar em «{label}»?",
   "signinApproveWarning": "Lê só um código que vejas em {host}",
   "signinApproveApprove": "Aprovar",
   "signinApproveWaiting": "À espera do computador…",
@@ -1040,5 +1040,8 @@
   "signinApproveMismatchLead": "O computador não recebeu nada. Se querias entrar, começa de novo lá.",
   "signinApproveExpiredLead": "Abre um código novo no computador e lê-o outra vez.",
   "signinApproveFailedTitle": "Não foi possível aprovar a entrada",
-  "signinApproveLocked": "Abre primeiro os teus dados neste telefone."
+  "signinApproveLocked": "Abre primeiro os teus dados neste telefone.",
+  "signinApproveFromLink": "Isto chegou por uma ligação: aprova só se estiveres a entrar num computador à tua frente.",
+  "signinApproveUnconfirmedTitle": "Enviado",
+  "signinApproveUnconfirmedLead": "Enviei, mas não consegui ver o computador recebê-lo. Vê lá: se não entrou, começa de novo lá."
 }
