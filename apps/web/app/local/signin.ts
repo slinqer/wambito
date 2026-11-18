@@ -90,6 +90,27 @@ interface SigninPoll {
 
 const BASE = "/api";
 
+/** The shapes `startPairing`'s QR and code use: a UUID, an 8-character code, base64url. */
+const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const CODE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+
+/** The 201 of `POST /v2/signin`, or false: anything else is `server` before a poll. */
+function validStart(body: unknown): boolean {
+  if (typeof body !== "object" || body === null) return false;
+  const { id, code, pollSecret, expiresAt } = body as Record<string, unknown>;
+  return (
+    typeof id === "string" &&
+    ID.test(id) &&
+    typeof code === "string" &&
+    CODE.test(code) &&
+    typeof pollSecret === "string" &&
+    BASE64URL.test(pollSecret) &&
+    typeof expiresAt === "string" &&
+    !Number.isNaN(Date.parse(expiresAt))
+  );
+}
+
 const tampered = () => new SigninError("tampered");
 
 async function problemCode(response: Response): Promise<string | undefined> {
@@ -163,10 +184,6 @@ function relay(options: SigninOptions, signal: AbortSignal, clock: PairingClock)
   };
   return {
     check,
-    /** Only the abort: after the pickup the session exists, the clock no longer ends it. */
-    checkCancelled() {
-      if (signal.aborted) throw new SigninError("cancelled");
-    },
     start: async (body: unknown) =>
       json<{ id: string; code: string; pollSecret: string; expiresAt: string }>(
         await send("/v2/signin", { method: "POST", body }, "server"),
@@ -181,10 +198,12 @@ function relay(options: SigninOptions, signal: AbortSignal, clock: PairingClock)
       send(`/v2/signin/${id}/reveal`, { method: "POST", body: { publicKey } }, (code) =>
         code === "already_set" ? "done" : "retry",
       ),
-    pickup: async (id: string) =>
-      json<{ sealed: unknown; keyV: unknown; userId: unknown }>(
-        await send(`/v2/signin/${id}/pickup`, { method: "POST" }, "server"),
-      ),
+    /** `onAnswered` runs once the pickup answered 200, before its body is read. */
+    pickup: async (id: string, onAnswered: () => void) => {
+      const answer = await send(`/v2/signin/${id}/pickup`, { method: "POST" }, "server");
+      if (typeof answer !== "string") onAnswered();
+      return json<{ sealed: unknown; keyV: unknown; userId: unknown }>(answer);
+    },
     async poll<T>(id: string, step: (state: SigninPoll) => Promise<T | undefined>): Promise<T> {
       for (;;) {
         const state = await json<SigninPoll>(await send(`/v2/signin/${id}`, {}, "server"));
@@ -211,6 +230,7 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
   try {
     const commitment = toBase64Url(await pairingCommitment(pair.publicKey));
     started = await net.start({ commitment, remember: options.remember, label: options.label });
+    if (!validStart(started)) throw new SigninError("server");
   } catch (error) {
     zeroPrivate(pair.privateKey);
     throw error;
@@ -223,6 +243,8 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
   const ready = deferred<{ approverKey: Uint8Array }>();
   let running: Promise<void> | null = null;
   let finishing: Promise<{ userId: string; keys: LocalKeys }> | null = null;
+  /** The pickup answered: the session exists, so `cancel()` no longer stops the enroll. */
+  let pickedUp = false;
 
   const run = async () => {
     let pinned: string | null = null;
@@ -264,7 +286,9 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
     ensureRunning();
     const { approverKey } = await ready.promise;
     try {
-      const picked = await net.pickup(id);
+      const picked = await net.pickup(id, () => {
+        pickedUp = true;
+      });
       const { userId, keyV } = picked;
       if (typeof userId !== "string" || userId === "") throw new SigninError("server");
       if (typeof keyV !== "number" || !Number.isInteger(keyV) || keyV < 1) {
@@ -288,7 +312,6 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
         throw tampered();
       }
       try {
-        net.checkCancelled();
         // another account's vault never outlives this sign-in; ours is made after
         await deleteStaleVaults(userId);
         const keys = await enrollDevice({ userId, fetch: options.fetch }, dataKey, keyV, {
@@ -317,6 +340,8 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
       return finishing;
     },
     cancel() {
+      // after the pickup, finishing the enroll beats a session with no keys
+      if (pickedUp) return;
       abort.abort();
       const error = new SigninError("cancelled");
       number.reject(error);

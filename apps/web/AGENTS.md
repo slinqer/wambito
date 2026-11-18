@@ -22,7 +22,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `quarantine`, `keys`; `deleteVault`), `encrypted-store.ts` (`createEncryptedStore(userId)`: a
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
-  also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta`,
+  also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta/deleteMeta`,
   `quarantine`, `wipeRecords`, `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`,
   `adoptServerCopy`, `restoreSetAside`, `queueReseal(current, limit)` (outbox entries `reseal: true`
   for pushed records under an older `keyV`), `keyVersionsInUse()` (quarantined rows' `keyV`
@@ -83,7 +83,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
   dataKey, keyV, { ephemeral? })` (the same enroll for pairing and the QR sign-in; `ephemeral:
-  true` sets the vault's meta `ephemeral`, false or absent writes nothing; the caller zeroes DK). Key links (spec
+  true` sets the vault's meta `ephemeral`, `false` deletes it (a vault the person asked to keep is
+  never swept), absent leaves it; the caller zeroes DK). Key links (spec
   2026-11-10): `listKeys(call)` → `{ wraps, links: Map<keyV, bytes> }` (an undecodable link is
   missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
   `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
@@ -198,7 +199,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `pairingNumber(N.pub, A.pub)`; on `ready`, `finish()` picks up (the response sets the session
   cookie), opens with `openFromPairing(N.priv, { kind: "device", userId, keyV }, sealed, A.pub)`,
   runs `deleteStaleVaults(userId)`, then `enrollDevice({ userId }, dk, keyV, { ephemeral: !remember })`
-  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`). Stops at `expiresAt` capped at
+  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`; once the pickup answered, `cancel()`
+  no longer stops the enroll). A 201 whose `id` is not a UUID, `code` not 8 code characters,
+  `pollSecret` not base64url or `expiresAt` not a date is `server`, `N.priv` zeroed. Stops at `expiresAt` capped at
   2 minutes (`SIGNIN_TTL_MS`). `SigninError` codes `expired` (404 or the clock), `tampered` (a
   second approver key, `ready` before the reveal, a 422, a blob that does not open), `offline`,
   `server`, `cancelled`, `too_many` (429, `retryAfterS` from `retry-after`), `suspended` (403);

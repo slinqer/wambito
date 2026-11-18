@@ -362,7 +362,8 @@ async function prepareDevice(
  * the number, and the links bring the older versions it reaches (`olderForTrustedKey`; with a vault
  * held here strictly down to its key, else `tampered`). Also the end of a QR sign-in
  * (`signin.ts`), where `ephemeral: true` (the box unticked) marks the vault's meta `ephemeral`, so
- * it is wiped once the session cookie is gone; false or absent writes nothing.
+ * it is wiped once the session cookie is gone; `false` (ticked) deletes that mark, so a vault the
+ * person asked to keep is never swept; absent (pairing) leaves it as it is.
  */
 export async function enrollDevice(
   options: KeysOptions,
@@ -471,7 +472,9 @@ async function keepLocally(
     await store.setMeta("devicePublicKey", device.body.publicKey);
     await store.setMeta("keyV", keyV);
     await store.setMeta("userId", userId);
+    // unticked: wiped once the session cookie is gone; ticked: a vault the person asked to keep
     if (enroll.ephemeral) await store.setMeta("ephemeral", true);
+    else if (enroll.ephemeral === false) await store.deleteMeta("ephemeral");
   } finally {
     store.close();
   }

@@ -97,6 +97,8 @@ function fakeServer(clock: { t: number }) {
     onPoll: undefined as undefined | ((body: Record<string, unknown>) => void),
     onPickup: undefined as undefined | ((body: Record<string, unknown>) => Response | undefined),
     onStart: undefined as undefined | (() => Response | undefined),
+    /** Rewrites the 201 of the opening (a malformed server). */
+    onStarted: undefined as undefined | ((body: Record<string, unknown>) => void),
     /** Who the pickup's session cookie is for: `/v2/keys` then answers for that user only. */
     session: null as string | null,
   };
@@ -124,6 +126,10 @@ function fakeServer(clock: { t: number }) {
         state.wraps.push({ id: put[1] as string, ...body });
         return json(body);
       }
+      if (put && method === "DELETE") {
+        state.wraps = state.wraps.filter((w) => w.id !== put[1]);
+        return new Response(null, { status: 204 });
+      }
       return new Response(null, { status: 404 });
     }
 
@@ -149,15 +155,14 @@ function fakeServer(clock: { t: number }) {
         expiresAt: clock.t + SIGNIN_TTL_MS,
       };
       state.rows.set(id, row);
-      return json(
-        {
-          id,
-          code: row.code,
-          pollSecret: row.pollSecret,
-          expiresAt: new Date(row.expiresAt).toISOString(),
-        },
-        201,
-      );
+      const out: Record<string, unknown> = {
+        id,
+        code: row.code,
+        pollSecret: row.pollSecret,
+        expiresAt: new Date(row.expiresAt).toISOString(),
+      };
+      state.onStarted?.(out);
+      return json(out, 201);
     }
     const match = /^\/v2\/signin\/([0-9a-f-]{36})(?:\/(\w+))?$/.exec(path);
     if (!match) return new Response(null, { status: 404 });
@@ -469,5 +474,68 @@ describe("startSignin", () => {
     expect(keys.keyring.current).toBe(1);
     expect(await names()).not.toContain(vaultName("someone_else"));
     expect(await names()).toContain(vaultName(w.userId));
+  });
+
+  it("a malformed 201 is server, before any poll, and N is zeroed", async () => {
+    const bad: Array<[string, unknown]> = [
+      ["id", "not-an-id"],
+      ["id", undefined],
+      ["pollSecret", ""],
+      ["pollSecret", "not base64url!"],
+      ["pollSecret", 42],
+      ["code", "ABC"],
+      ["code", "abcdefgh"],
+      ["expiresAt", "soon"],
+      ["expiresAt", undefined],
+    ];
+    for (const [field, value] of bad) {
+      const w = world();
+      w.server.onStarted = (body) => {
+        body[field] = value;
+      };
+      handed.nobleNext = true;
+      const error = await startSignin(w.options).catch((e: unknown) => e);
+      expect(error, `${field}: ${String(value)}`).toBeInstanceOf(SigninError);
+      expect((error as SigninError).code).toBe("server");
+      expect(handed.noble.at(-1)?.every((x) => x === 0)).toBe(true);
+      expect(w.server.log.filter((l) => l.path !== "/api/v2/signin")).toHaveLength(0);
+    }
+  });
+
+  it("cancel() once the pickup answered does not stop finish(): the session exists", async () => {
+    const w = world();
+    let signin: Awaited<ReturnType<typeof startSignin>> | undefined;
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await w.server.fetch(input, init);
+      if (String(input).endsWith("/pickup") && response.ok) signin?.cancel();
+      return response;
+    };
+    signin = await startSignin({ ...w.options, fetch });
+    const a = await w.approve(signin.id);
+    await signin.number();
+    await w.seal(signin.id, a);
+    const { userId, keys } = await signin.finish();
+    expect(userId).toBe(w.userId);
+    expect(keys.keyring.current).toBe(1);
+    expect(w.server.wraps.filter((x) => x.kind === "device")).toHaveLength(1);
+    expect(handed.openedPairing[0]?.every((x) => x === 0)).toBe(true);
+  });
+
+  it("a ticked sign-in deletes the ephemeral mark of a vault held here for the same user", async () => {
+    const w = world();
+    const unticked = await startSignin({ ...w.options, remember: false });
+    const a = await w.approve(unticked.id);
+    await unticked.number();
+    await w.seal(unticked.id, a);
+    await unticked.finish();
+    expect(await ephemeralOf(w.userId)).toBe(true);
+
+    // the same person signs in again here with the box ticked: the vault is now kept
+    const ticked = await startSignin(w.options);
+    const b = await w.approve(ticked.id);
+    await ticked.number();
+    await w.seal(ticked.id, b);
+    await ticked.finish();
+    expect(await ephemeralOf(w.userId)).toBeUndefined();
   });
 });
