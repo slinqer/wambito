@@ -27,19 +27,14 @@ Swift (`WambitoNative`, Runner), `flutter_test`, `sqflite_common_ffi`, Gradle un
 delivery's plan `docs/superpowers/plans/2026-11-15-phone-first-accounts-api.md` (its routes and
 codes are fixed; this plan adds no API).
 
-## Questions for the founder
+## Answered by the founder (2026-11-18)
 
-Ranked; each has a ruling below that the plan follows until answered.
-
-1. **Offline first run on a server that still makes `plain` users** (any store build before the
-   switch, first opened without network). Ruling 8 carries only the movements into the plain
-   account and drops budgets, recurrences and category edits made in those offline minutes. The
-   alternative is simpler: on a plain server, "Start" needs the network. Which one?
-2. **"Cancel" at the merge's currency stop** happens after the person signed in to the email
-   account and unlocked it. Ruling 10 puts the phone back on its account without email and signs
-   this phone out of the email account (its vault here forgotten). OK?
-3. **The sign-in notice** (spec 8.3) also fires for a phone added by pairing, not only a browser
-   (ruling 16). OK?
+1. **Offline first run while the server still makes `plain` users:** "Start" needs the network
+   until the switch; no movement is ever sent to a plain account (ruling 8).
+2. **"Cancel" at the merge's currency stop:** back to the session without email with its data, and
+   this phone signed out of the email account (ruling 10, confirmed).
+3. **The sign-in notice** fires for any new device, phones added by pairing too (ruling 16,
+   confirmed).
 
 ## Global Constraints
 
@@ -134,17 +129,24 @@ Each with what it costs if it turns out wrong.
    construction) and then forget the old vault, instead of renaming the file (spec 10 step 3 says
    "moves"). The old vault stays held until the copy is done, so a crash resumes. *Cost:* the vault
    twice on disk for a moment.
-8. **Offline start on a `plain` server** (Question 1): the provisional transactions go to the plain
-   account through `POST /v1/transactions/batch` (≤ 20 per call, `Idempotency-Key`
-   `uuidv5(provisionalId, "batch:<n>")`), categories matched by lower-cased name to
-   `GET /v1/categories`, missing ones created with `POST /v1/categories`; budgets, recurrences and
-   category edits are dropped. *Cost:* those few offline-minute changes are lost on old servers.
+8. **The offline start only where new users are encrypted** (the founder's answer 1). Offline, the
+   phone cannot ask the server, and the API has no public route for it, so it trusts what it knows:
+   `newUsersEncryptedProvider` is true when the build says so (`--dart-define=WAMBITO_NEW_USERS_ENCRYPTED=true`,
+   set for builds made from the switch day on; default false) or when this phone already saw this
+   server create a `preview` anonymous user (kept as `wambito.server.<host>.newUsers` = `encrypted`,
+   written by every "Start" that answered `preview`). Otherwise an offline "Start" says, in Wambi's
+   voice, that it needs a connection the first time, with "Try again"; nothing is made. If a
+   provisional vault's promotion still finds a `plain` user (the flag turned off meanwhile), that
+   anonymous session is signed out on the server, the vault stays held and the screen says it needs
+   a connection to a server that keeps data encrypted; nothing is sent to `/v1`. *Cost:* before the
+   switch, and on a fresh install of a build older than the switch day, the first "Start" needs the
+   network.
 9. **Vault holds** live in the vault's `meta` table, key `hold`, JSON `{ kind, target?, since }`,
    kinds `provisional`, `orphaned`, `merging`; `deleteStaleVaults` reads it read-only from the file
    (as `pendingChangesInVault` does) and skips held vaults and their keys. The merge keeps the
    anonymous token in secure storage `wambito.vault.<anonId>.mergeToken` (swept with that vault).
    *Cost:* one more file read per vault per sweep.
-10. **Merge cancel at the currency stop** (Question 2) restores the kept anonymous session and
+10. **Merge cancel at the currency stop** (confirmed by the founder) restores the kept anonymous session and
     signs this phone out of the email account (server sign-out, its vault here forgotten); "Keep
     only the account's data" deletes the anonymous user and its vault after a confirm. *Cost:* the
     person signs in again later if they change their mind.
@@ -168,10 +170,10 @@ Each with what it costs if it turns out wrong.
 15. **The sealed data key for a web sign-in** uses `WrapContext(kind: device, userId, keyV)` and
     `sealToDevice(N.pub, …, ephemeral: A)`, exactly as pairing (the API plan's tests open it with
     `openFromPairing`). *Cost:* the web delivery must open it the same way.
-16. **The sign-in notice** covers every device wrap that is not this phone's and was not in the
+16. **The sign-in notice** (confirmed by the founder) covers every device wrap that is not this phone's and was not in the
     last look (`wambito.vault.<userId>.seenDevices`, a JSON list of wrap ids); the first look records
     silently. One new device: "That wasn't me" opens its removal sheet; several: Settings → Security.
-    *Cost:* see Question 3.
+    *Cost:* a notice also after the person paired their own phone.
 17. **401s:** `GET /v1/me` at start and in `freshVaultAccountProvider` carries `x-wambito-user` with
     the kept account id, so a deleted user answers `user_deleted`. Only the app acts on the codes;
     a headless run ends with the code and touches nothing.
@@ -205,7 +207,7 @@ Each with what it costs if it turns out wrong.
    text then unlocks. Pinned in Task 5.
 4. **A web sign-in that expires between "Approve" and the seal** (the person reads slowly; 2
    minutes): the phone says it expired and never posts a seal. Pinned in Task 12.
-5. **An offline start opened and killed several times before the network returns:** one provisional
+5. **An offline start (on a server known to make encrypted users) opened and killed several times before the network returns:** one provisional
    id, one vault, and exactly one anonymous user once online (the token is kept before anything is
    carried). Pinned in Task 11.
 
@@ -629,14 +631,18 @@ Each with what it costs if it turns out wrong.
 ### Task 11: The offline first run
 
 **Files:**
-- Create: `lib/local/provisional.dart`, `lib/local/plain_replay.dart`.
-- Modify: `lib/api/session.dart` (`SessionStatus.provisional`, `startGuest` falls back on no network,
+- Create: `lib/local/provisional.dart`, `lib/entry/needs_connection.dart`.
+- Modify: `lib/api/server_address.dart` or `lib/api/server_url.dart` (`newUsersEncryptedProvider`),
+  `lib/entry/entry_screen.dart` (the needs-a-connection state),
+  `lib/api/session.dart` (`SessionStatus.provisional`, `startGuest` falls back on no network only
+  when `newUsersEncryptedProvider` is true,
   `SessionStore` keys, `apiClientProvider` adds the provisional interceptor),
   `lib/router.dart` (provisional = an open vault), `lib/settings/settings_screen.dart` (only local
   preferences and a waiting line; ruling 23), `lib/app.dart` (promotion on start, resume, every
-  minute), ARBs, `apps/mobile/AGENTS.md` (Traps: `session.provisional`, `session.provisionalToken`).
-- Test: `test/local/provisional_test.dart`, `test/local/plain_replay_test.dart`,
-  `test/api/session_provisional_test.dart`.
+  minute), ARBs (`entryNeedsConnection`, `entryTryAgain`, `provisionalPlainServer`), `apps/mobile/AGENTS.md`
+  (Traps: `session.provisional`, `session.provisionalToken`, `wambito.server.<host>.newUsers`).
+- Test: `test/local/provisional_test.dart`, `test/api/session_provisional_test.dart`,
+  `test/entry/entry_test.dart`.
 
 **Interfaces:**
 - Consumes: holds (Task 6), `carryRecords(adopt)`, `seedIfEmpty`, `OpenVaultOptions.seed` (Task 7),
@@ -650,19 +656,23 @@ Each with what it costs if it turns out wrong.
     `provisionalTokenKey = 'session.provisionalToken'`; `provisionalVaultProvider`;
   - `Future<bool> SessionController.promoteProvisional()` — the token kept before anything else;
     `preview`: keys for the user, `carryRecords(adopt)` into the user's new vault, provisional vault
-    forgotten, `_signedIn`; `plain`: `replayToPlain` then forgotten; false while offline;
-  - `Future<void> replayToPlain(FinanceStore from, DefaultApi api, {required String localId})`
-    (ruling 8).
+    forgotten, `_signedIn`; `plain`: the session signed out on the server, the vault kept held, the
+    state `ProvisionalBlocked` (ruling 8); false while offline;
+  - `final newUsersEncryptedProvider = FutureProvider<bool>` (ruling 8) and
+    `Future<void> rememberNewUsersEncrypted(Uri server)` (called when a "Start" answers `preview`);
+  - `NeedsConnection` (keys `entry.needsConnection`, `entry.tryAgain`), shown by the welcome.
 
 - [ ] **Step 1: Write the failing tests.**
-  - `session_provisional_test.dart`: `Start without network lands home on a provisional vault`;
+  - `session_provisional_test.dart`: `Start without network, on a server known to make encrypted users, lands home on a provisional vault`;
     `nothing is pushed or sealed while the user id is unknown`;
     **(Review Focus 5)** `killed and reopened offline three times: one provisional id, one vault; online, one anonymous sign-in`;
     `online on a preview server: the records reach the user's vault and sync sealed under its id`;
     `GUEST_SIGNUP closed: stays provisional and Settings says why`.
-  - `plain_replay_test.dart`: `movements go in batches of 20 with stable idempotency keys`;
-    `categories are matched by lower-cased name and missing ones created`.
-  - Plain: `session_provisional_test.dart` `online on a plain server: today's guest with the offline movements, no vault left`.
+  - `entry_test.dart`: `offline Start with nothing known about the server says it needs a connection, makes nothing, and Try again signs in once online`;
+    `offline Start after this phone saw the server make an encrypted user opens the provisional vault`;
+    `the build define alone also allows it`.
+  - Plain: `session_provisional_test.dart` `a promotion that finds a plain user sends nothing to /v1, signs that session out and keeps the vault`
+    (the fake API records no `/v1/transactions*` or `/v1/categories` call).
 - [ ] **Step 2: Run** them. Expected: FAIL.
 - [ ] **Step 3: Implement.** Background engines, the widget and capture see no account while
   provisional (`AccountMode` unset), as signed out.
@@ -809,9 +819,10 @@ Each with what it costs if it turns out wrong.
   `../../scripts/check-channels.sh`, `../../scripts/check-old-name.sh`; and `pnpm lint`,
   `pnpm vitest run --project @wambito/core` from the root. Expected: all green.
 - [ ] **Step 5: Read `apps/mobile/AGENTS.md` once** against the plan's new names (`lib/protect/`,
-  `lib/merge/`, `lib/local/{merge,adopt,provisional,plain_replay,relay,signin_approval}.dart`, the
+  `lib/merge/`, `lib/local/{merge,adopt,provisional,relay,signin_approval}.dart`, the
   holds, the Traps list: `hold`, `home.protect.<userId>`, `wambito.seen.<userId>`,
-  `session.provisional`, `session.provisionalToken`, `wambito.vault.<anonId>.mergeToken`,
+  `session.provisional`, `session.provisionalToken`, `wambito.server.<host>.newUsers`,
+  `wambito.vault.<anonId>.mergeToken`,
   `wambito.vault.<userId>.seenDevices`, `recoveryKeySavedAt`, launch host `signin`, scanner
   `prefixes`).
 - [ ] **Step 6: Commit** `test(mobile): phone-first flows against the real api`, then the whole-branch
