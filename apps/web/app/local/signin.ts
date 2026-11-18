@@ -89,6 +89,7 @@ export interface WebSignin {
   ready(): Promise<void>;
   /** Picks up the sealed DK and the session, opens DK and enrolls this browser for that user. */
   finish(): Promise<{ userId: string; keys: LocalKeys }>;
+  /** Stops the request; a no-op once `finish()` sent the pickup (its answer may set the cookie). */
   cancel(): void;
 }
 
@@ -193,10 +194,8 @@ function relay(options: SigninOptions, signal: AbortSignal, clock: PairingClock)
       send(`/v2/signin/${id}/reveal`, { method: "POST", body: { publicKey } }, (code) =>
         code === "already_set" ? "done" : "retry",
       ),
-    /** `onAnswered` runs once the pickup answered 200, before its body is read. */
-    pickup: async (id: string, onAnswered: () => void) => {
+    pickup: async (id: string) => {
       const answer = await send(`/v2/signin/${id}/pickup`, { method: "POST" }, "server");
-      if (typeof answer !== "string") onAnswered();
       return json<{ sealed: unknown; keyV: unknown; userId: unknown }>(answer);
     },
     async poll<T>(id: string, step: (state: SigninPoll) => Promise<T | undefined>): Promise<T> {
@@ -238,8 +237,11 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
   const ready = deferred<{ approverKey: Uint8Array }>();
   let running: Promise<void> | null = null;
   let finishing: Promise<{ userId: string; keys: LocalKeys }> | null = null;
-  /** The pickup answered: the session exists, so `cancel()` no longer stops the enroll. */
-  let pickedUp = false;
+  /**
+   * The pickup has left: the server may set the session cookie whatever this browser does next,
+   * so `cancel()` no longer stops it or the enroll (a keyless session otherwise).
+   */
+  let pickingUp = false;
 
   const run = async () => {
     let pinned: string | null = null;
@@ -281,9 +283,9 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
     ensureRunning();
     const { approverKey } = await ready.promise;
     try {
-      const picked = await net.pickup(id, () => {
-        pickedUp = true;
-      });
+      net.check();
+      pickingUp = true;
+      const picked = await net.pickup(id);
       const { userId, keyV } = picked;
       if (typeof userId !== "string" || userId === "") throw new SigninError("server");
       if (typeof keyV !== "number" || !Number.isInteger(keyV) || keyV < 1) {
@@ -339,8 +341,8 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
       return finishing;
     },
     cancel() {
-      // after the pickup, finishing the enroll beats a session with no keys
-      if (pickedUp) return;
+      // once the pickup left, finishing the enroll beats a session with no keys
+      if (pickingUp) return;
       abort.abort();
       const error = new SigninError("cancelled");
       number.reject(error);

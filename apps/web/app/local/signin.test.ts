@@ -521,6 +521,27 @@ describe("startSignin", () => {
     expect(handed.openedPairing[0]?.every((x) => x === 0)).toBe(true);
   });
 
+  it("cancel() while the pickup is in flight does not stop finish(): the server may have set the cookie", async () => {
+    const w = world();
+    let signin: Awaited<ReturnType<typeof startSignin>> | undefined;
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      // the cancel lands after the pickup left, before its answer
+      if (String(input).endsWith("/pickup")) signin?.cancel();
+      const response = await w.server.fetch(input, init);
+      // a real fetch drops an aborted request's answer, cookie set or not
+      if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+      return response;
+    };
+    signin = await startSignin({ ...w.options, fetch });
+    const a = await w.approve(signin.id);
+    await signin.number();
+    await w.seal(signin.id, a);
+    const { userId, keys } = await signin.finish();
+    expect(userId).toBe(w.userId);
+    expect(keys.keyring.current).toBe(1);
+    expect(w.server.wraps.filter((x) => x.kind === "device")).toHaveLength(1);
+  });
+
   it("ready() resolves once the phone sealed, before the pickup; a cancel rejects it", async () => {
     const w = world();
     const signin = await startSignin(w.options);

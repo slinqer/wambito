@@ -200,8 +200,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `pairingNumber(N.pub, A.pub)`; on `ready`, `finish()` picks up (the response sets the session
   cookie), opens with `openFromPairing(N.priv, { kind: "device", userId, keyV }, sealed, A.pub)`,
   runs `deleteStaleVaults(userId)`, then `enrollDevice({ userId }, dk, keyV, { ephemeral: !remember })`
-  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`; once the pickup answered, `cancel()`
-  no longer stops the enroll). A 201 whose `id` is not a UUID, `code` not 8 code characters,
+  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`; once the pickup was sent (its answer may
+  set the cookie), `cancel()` no longer stops it or the enroll). A 201 whose `id` is not a UUID, `code` not 8 code characters,
   `pollSecret` not base64url or `expiresAt` not a date is `server`, `N.priv` zeroed. Stops at `expiresAt` capped at
   2 minutes (`SIGNIN_TTL_MS`). `SigninError` codes `expired` (404 or the clock), `tampered` (a
   second approver key, `ready` before the reveal, a 422, a blob that does not open), `offline`,
