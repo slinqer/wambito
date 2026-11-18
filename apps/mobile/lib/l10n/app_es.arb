@@ -4404,5 +4404,45 @@
   "protectLockReason": "Confirma que eres tú para crear tu clave de recuperación",
   "@protectLockReason": {
     "description": "Settings → Protect your data: the screen lock prompt before the recovery key is made."
+  },
+  "protectCardTitle": "Protege tus datos",
+  "@protectCardTitle": {
+    "description": "Home: the nudge card that offers the recovery key."
+  },
+  "protectCardBody": "Tus datos viven solo en este teléfono. Crea una clave de recuperación para no perderlos si lo pierdes.",
+  "@protectCardBody": {
+    "description": "Home: what the protect card says."
+  },
+  "protectCardGo": "Crear mi clave",
+  "@protectCardGo": {
+    "description": "Home: the protect card's button that starts the recovery key."
+  },
+  "protectCardLater": "Ahora no",
+  "@protectCardLater": {
+    "description": "Home: the protect card's dismiss button."
+  },
+  "unprotectedSignOutTitle": "¿Cerrar sesión sin camino de vuelta?",
+  "@unprotectedSignOutTitle": {
+    "description": "Warning before a guest with no recovery key or passkey signs out."
+  },
+  "unprotectedSignOutBody": "No has guardado una clave de recuperación. Si cierras sesión, tus datos se borran de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedSignOutBody": {
+    "description": "Warning before signing out without a way back: the body."
+  },
+  "unprotectedServerTitle": "¿Cambiar de servidor sin camino de vuelta?",
+  "@unprotectedServerTitle": {
+    "description": "Warning before a guest with no recovery key or passkey changes server."
+  },
+  "unprotectedServerBody": "No has guardado una clave de recuperación. Cambiar de servidor cierra tu sesión, borra tus datos de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedServerBody": {
+    "description": "Warning before changing server without a way back: the body."
+  },
+  "unprotectedPasskeyUnknown": "No pudimos revisar tus llaves de acceso porque no hay conexión. Si ya agregaste una, con ella puedes volver.",
+  "@unprotectedPasskeyUnknown": {
+    "description": "The leaving warning's note when the passkey wraps could not be read (offline)."
+  },
+  "unprotectedProtectFirst": "Proteger mis datos primero",
+  "@unprotectedProtectFirst": {
+    "description": "The leaving warning's button that opens the recovery key."
   }
 }

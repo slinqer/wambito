@@ -34,6 +34,7 @@ import '../ui/toast.dart';
 import '../ui/transaction_row.dart';
 import 'category_look.dart';
 import 'day_groups.dart';
+import '../protect/protect_card.dart';
 import 'home_controller.dart';
 import 'home_format.dart';
 import 'home_header.dart';
@@ -542,7 +543,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             const ReviewHomeRow(),
                           // After the first movement, until a widget exists or it is put away.
                           // The account's first movement, in any month; asked only when the card could show.
-                          if (ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
+                          // "Protect your data" comes first, and the widget card waits while it shows.
+                          if (ref.watch(protectCardProvider.select((s) => s.value ?? false)))
+                            const ProtectCard(key: Key('home.protectCard'))
+                          else if (ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
                               (data.items.isNotEmpty ||
                                   ref.watch(hasTransactionsProvider).value == true))
                             const WidgetCard(key: Key('home.widgetCard')),

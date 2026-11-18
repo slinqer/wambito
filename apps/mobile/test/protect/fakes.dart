@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:wambito/crypto/records.dart' show RecordType;
+import 'package:wambito/local/backend.dart' show LocalBackend, createLocalBackend;
 import 'package:wambito/local/memory_store.dart';
 import 'package:wambito/local/store.dart';
 import 'package:wambito/local/sync.dart' show SyncResult;
@@ -40,6 +41,12 @@ class FakeVault implements VaultSession {
   late final Future<void> seeded;
   int syncs = 0;
   int reloads = 0;
+
+  @override
+  LocalBackend get backend => createLocalBackend(store: store, now: DateTime.now);
+
+  @override
+  Future<int> pendingChanges() async => 0;
 
   @override
   Future<SyncResult> sync() async {

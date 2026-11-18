@@ -973,5 +973,15 @@
   "protectEmailGo": "Aggiungi la mia email",
   "protectDone": "Fatto",
   "protectKeySaved": "La tua chiave di recupero è salvata. Tienila dove non si perde.",
-  "protectLockReason": "Conferma che sei tu per creare la tua chiave di recupero"
+  "protectLockReason": "Conferma che sei tu per creare la tua chiave di recupero",
+  "protectCardTitle": "Proteggi i tuoi dati",
+  "protectCardBody": "I tuoi dati vivono solo su questo telefono. Crea una chiave di recupero per non perderli se perdi il telefono.",
+  "protectCardGo": "Crea la mia chiave",
+  "protectCardLater": "Non ora",
+  "unprotectedSignOutTitle": "Uscire senza una via di ritorno?",
+  "unprotectedSignOutBody": "Non hai salvato una chiave di recupero. Se esci, i tuoi dati vengono cancellati da questo telefono e nessuno potrà riaprirli.",
+  "unprotectedServerTitle": "Cambiare server senza una via di ritorno?",
+  "unprotectedServerBody": "Non hai salvato una chiave di recupero. Cambiare server ti fa uscire e cancella i tuoi dati da questo telefono, e nessuno potrà riaprirli.",
+  "unprotectedPasskeyUnknown": "Non abbiamo potuto controllare le tue passkey perché non c'è connessione. Se ne hai già aggiunta una, puoi usarla per tornare.",
+  "unprotectedProtectFirst": "Proteggi prima i miei dati"
 }

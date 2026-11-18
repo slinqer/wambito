@@ -28,8 +28,11 @@ import '../home/shell_navigation.dart';
 import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
+import '../protect/leaving_warning.dart';
+import '../protect/protect_actions.dart' show protectWithRecoveryKey;
 import '../protect/protect_block.dart';
-import '../protect/protect_status.dart' show protectStatusProvider;
+import '../protect/protect_status.dart' show ProtectStatus, protectStatusProvider;
+import 'security/security_api.dart' show securitySnapshotProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
@@ -111,16 +114,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // -- sign out ------------------------------------------------------------------------------
 
+  /// Warns a guest before [leaving]; true when it may go on. A `preview` guest is asked about its
+  /// way back ([protectStatusProvider]): with a recovery key or a passkey there is no warning; with
+  /// neither, "Protect first" opens the recovery key and nothing is left. When the passkey cannot
+  /// be read (offline) the sheet says so instead of claiming there is none. A `plain` guest (or a
+  /// vault not open) gets today's [warnGuestLeaving].
+  Future<bool> _mayLeave(GuestLeaving leaving) async {
+    if (!ref.read(sessionProvider).isGuest) return true;
+    // Kept alive while the question is asked, so the passkey wraps it read are not fetched again.
+    final hold = ref.listenManual(protectStatusProvider, (_, _) {});
+    try {
+      ProtectStatus? status;
+      try {
+        status = await ref.read(protectStatusProvider.future);
+      } on Object {
+        status = null;
+      }
+      if (!mounted) return false;
+      if (status != null) {
+        if (status.protected) return true;
+        var passkeyUnknown = false;
+        try {
+          await ref.read(securitySnapshotProvider.future);
+        } on Object {
+          passkeyUnknown = true;
+        }
+        if (!mounted) return false;
+        final choice = await warnUnprotectedLeaving(
+          context,
+          leaving,
+          passkeyUnknown: passkeyUnknown,
+        );
+        if (!mounted || choice == null) return false;
+        if (choice == UnprotectedChoice.protectFirst) {
+          await protectWithRecoveryKey(context, ref);
+          return false;
+        }
+        return true;
+      }
+    } finally {
+      hold.close();
+    }
+    final choice = await warnGuestLeaving(context, leaving);
+    if (!mounted || choice == null) return false;
+    if (choice == GuestWarning.saveInstead) {
+      unawaited(context.push('/progress'));
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _signOut() async {
     final session = ref.read(sessionProvider.notifier);
-    if (ref.read(sessionProvider).isGuest) {
-      final choice = await warnGuestLeaving(context, GuestLeaving.signOut);
-      if (!mounted || choice == null) return;
-      if (choice == GuestWarning.saveInstead) {
-        unawaited(context.push('/progress'));
-        return;
-      }
-    }
+    if (!await _mayLeave(GuestLeaving.signOut) || !mounted) return;
     // A `preview` account with changes not sent yet: sync them first, or sign out anyway.
     if (!await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) return;
     if (!mounted) return;
@@ -141,14 +187,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [_ServerForm(current: ref.read(serverUrlProvider))],
     );
     if (!mounted || next == null) return;
-    if (ref.read(sessionProvider).isGuest && next != ref.read(serverUrlProvider)) {
-      final choice = await warnGuestLeaving(context, GuestLeaving.changeServer);
-      if (!mounted || choice == null) return;
-      if (choice == GuestWarning.saveInstead) {
-        unawaited(context.push('/progress'));
-        return;
-      }
-    }
+    if (next != ref.read(serverUrlProvider) && !await _mayLeave(GuestLeaving.changeServer)) return;
+    if (!mounted) return;
     // Another server signs out (and wipes the vault): a `preview` account's changes not sent yet
     // are asked about first, as at a sign-out.
     if (next != ref.read(serverUrlProvider) &&

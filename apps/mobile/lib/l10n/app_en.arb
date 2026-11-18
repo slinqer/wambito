@@ -2170,5 +2170,15 @@
   "protectEmailGo": "Add my email",
   "protectDone": "Done",
   "protectKeySaved": "Your recovery key is saved. Keep it where it will not get lost.",
-  "protectLockReason": "Confirm it's you to make your recovery key"
+  "protectLockReason": "Confirm it's you to make your recovery key",
+  "protectCardTitle": "Protect your data",
+  "protectCardBody": "Your data lives only on this phone. Make a recovery key so you do not lose it if the phone is lost.",
+  "protectCardGo": "Make my key",
+  "protectCardLater": "Not now",
+  "unprotectedSignOutTitle": "Sign out with no way back?",
+  "unprotectedSignOutBody": "You have not saved a recovery key. If you sign out, your data is deleted from this phone and nobody can open it again.",
+  "unprotectedServerTitle": "Change server with no way back?",
+  "unprotectedServerBody": "You have not saved a recovery key. Changing server signs you out and deletes your data from this phone, and nobody can open it again.",
+  "unprotectedPasskeyUnknown": "We could not check your passkeys because there is no connection. If you already added one, you can use it to come back.",
+  "unprotectedProtectFirst": "Protect my data first"
 }

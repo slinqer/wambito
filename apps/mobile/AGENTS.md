@@ -222,7 +222,18 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
   Settings (keys `protect.block`, `protect.count` "N of 2" while neither step is done, `protect.recovery`,
   `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`); a `preview`
-  guest has no `settings.saveProgress`. Tests: `test/protect/` (`fakes.dart`: `FakeVault` on a memory store).
+  guest has no `settings.saveProgress`, and no `home.saveProgress` in home's menu (ruling 21). Tests: `test/protect/`
+  (`fakes.dart`: `FakeVault` on a memory store).
+  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, before `WidgetCard`, which waits while it
+  shows; buttons `protect.cardGo` = step 1, `protect.cardLater`). `protectCardProvider` is true while
+  `protectStatusProvider` says no step is done and `protectCardDue` says so: first after 7 days since `firstOpen`
+  (written at the first evaluation) or 20 live transactions in the vault, then 14 days after the first "Not now",
+  30 after the second, every 30 after that. State (`ProtectCardState`: `firstOpen`, `lastDismissed`, `dismissals`)
+  is JSON in secure storage `home.protect.<userId>` (`ProtectCardStore`; tests use memory). `leaving_warning.dart`:
+  `warnUnprotectedLeaving` (keys `unprotected.protectFirst`, `unprotected.signOutConfirm`, `unprotected.serverConfirm`),
+  used by Settings' sign out and server change for a `preview` guest with neither step done ("Protect first" opens
+  the recovery key and leaves nothing); with a step done there is no warning; with the passkey wraps unreadable
+  (offline) the sheet adds a note instead of claiming there is no passkey. A `plain` guest keeps `warnGuestLeaving`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,
@@ -446,7 +457,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
-  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage key `wambito.widgetCard.closed`; channel
+  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed` and `home.protect.<userId>`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
   Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;

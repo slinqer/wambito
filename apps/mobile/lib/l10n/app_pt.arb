@@ -973,5 +973,15 @@
   "protectEmailGo": "Adicionar o meu email",
   "protectDone": "Feito",
   "protectKeySaved": "A tua chave de recuperação ficou guardada. Guarda-a onde não se perca.",
-  "protectLockReason": "Confirma que és tu para criar a tua chave de recuperação"
+  "protectLockReason": "Confirma que és tu para criar a tua chave de recuperação",
+  "protectCardTitle": "Protege os teus dados",
+  "protectCardBody": "Os teus dados vivem só neste telemóvel. Cria uma chave de recuperação para não os perderes se o perderes.",
+  "protectCardGo": "Criar a minha chave",
+  "protectCardLater": "Agora não",
+  "unprotectedSignOutTitle": "Terminar sessão sem caminho de volta?",
+  "unprotectedSignOutBody": "Não guardaste uma chave de recuperação. Se terminares sessão, os teus dados são apagados deste telemóvel e ninguém os poderá abrir de novo.",
+  "unprotectedServerTitle": "Mudar de servidor sem caminho de volta?",
+  "unprotectedServerBody": "Não guardaste uma chave de recuperação. Mudar de servidor termina a tua sessão e apaga os teus dados deste telemóvel, e ninguém os poderá abrir de novo.",
+  "unprotectedPasskeyUnknown": "Não conseguimos verificar as tuas passkeys porque não há ligação. Se já adicionaste uma, podes usá-la para voltar.",
+  "unprotectedProtectFirst": "Proteger primeiro os meus dados"
 }
