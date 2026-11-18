@@ -11,7 +11,7 @@ today.
 **Architecture:** Two new browser-side modules next to `app/local/pairing.ts`: `signin.ts` (the
 new browser's half of the `/v2/signin` relay, on helpers shared with pairing through a new
 `relay.ts`) and `recovery-signin.ts`. The sign-in screen gets a QR panel driven by a pure model
-(`signin-model.ts`), shown only in a build made with the switch on (`VITE_NEW_USERS_ENCRYPTED`).
+(`signin-model.ts`), on `/sign-in` in every build (the founder's answer 1).
 Everything after the sign-in reuses the vault gate: the QR and recovery paths enroll this browser
 before navigating, so `/app` finds its keys and opens. "Protect your data" lives in Settings →
 Security and reads the synced `settings.recoveryKeySavedAt` the phone delivery defines.
@@ -30,13 +30,11 @@ Task 12: the approver this browser talks to).
 
 - **Branch and PR:** this worktree's branch, one PR against `main`. Merging deploys: only on the
   founder's yes. Never touch `apps/mobile` (the phone delivery is on its own branch).
-- **The switch, on the web:** two signals, nothing else.
-  - **The account:** `GET /v1/me` `encryption` (`previewProfile()`); every vault screen already
-    renders only for `preview`. A `plain` account sees today's screens.
-  - **The build:** `VITE_NEW_USERS_ENCRYPTED=true` (read once in `app/site/config.ts` as
-    `PHONE_FIRST`, default off, same parsing as `VITE_LANDING_ONLY`). It decides only what a
-    signed-out person sees on `/sign-in` (the QR panel). `deploy/personal/up.sh` builds with it
-    from the same `.env` value the API reads, so one line turns both on.
+- **The switch, on the web:** the account decides: `GET /v1/me` `encryption` (`previewProfile()`);
+  every vault screen already renders only for `preview`, and a `plain` account sees today's
+  screens once signed in. The signed-out pages (landing doors, `/sign-in` with its QR,
+  `/create-account`) are the same in every build (founder's answers 1 and 3): before the switch
+  only a `preview` account's phone can approve the QR, and the email form sits beside it.
 - **API, exactly as built:**
   - `POST /v2/signin` `{ commitment, remember, label }` → 201 `{ id, code, pollSecret, expiresAt }`;
     429 `too_many_requests` (30 per 10 min per IP) / `too_many_signins` (5 open per IP), with
@@ -88,42 +86,40 @@ Task 12: the approver this browser talks to).
 
 ## Rulings (where the spec leaves the choice, or the code forces one)
 
-Each with what it costs if wrong. Rulings marked **(ask)** go to the founder before building.
+Each with what it costs if wrong. "Founder" marks an answer given on 2026-11-18.
 
-1. **(ask) How the web knows the switch:** the build flag `VITE_NEW_USERS_ENCRYPTED`, passed by
-   `up.sh` from the `.env`'s `NEW_USERS_ENCRYPTED`. No API route says it, and adding one would
-   change the API. *Cost:* a build made with the flag off on a server with it on shows today's
-   sign-in (email and passkey), which still works.
-2. **(ask) The web e2e keeps the API flag off** (diverges from API plan decision 17): born-encrypted
-   users would break home, insights, manage, paging, overflow-it-pt, settings, onboarding, most of
-   a11y and parts of feel, which test the `plain` app production runs until the switch day. The new
-   flows run on the allowlisted seeded account `preview-e2e`; the e2e dev server is built with
-   `VITE_NEW_USERS_ENCRYPTED=true`. Turning the API flag on in the web e2e goes with stage 5, which
-   rewrites those specs anyway. *Cost:* no web e2e of a born-encrypted email sign-up until then
-   (its pieces are covered by `vault.spec.ts` on `preview-e2e`).
-3. **(ask) The landing's doors change now, for every build:** hero "Create account" (primary) and
-   "Try the demo"; header "Sign in". "Create account" opens `/create-account` (the email code form
-   under a "Create your account" title); "Sign in" opens `/sign-in`. Before the switch both pages
-   create or open an account by email exactly as today, so nothing lies. The landing-only build on
-   Cloudflare needs no flag. *Cost:* a visible copy change before the switch day.
-4. **(ask) "Install the app" links** what exists today: the Android APK on GitHub
+1. **The QR is on `/sign-in` in every build (founder).** No build flag and no API route: the web
+   cannot tell the switch, and does not need to. *Cost:* before the switch day a `plain` person
+   sees a QR their phone cannot approve yet; the email form and the passkey are beside it.
+2. **The web e2e runs with the API flag on (founder; API plan decision 17).** The CI `e2e` job and
+   the documented local command start the stack with `NEW_USERS_ENCRYPTED=true`;
+   `docker-compose.yml` passes `NEW_USERS_ENCRYPTED: ${NEW_USERS_ENCRYPTED:-false}` (the phone
+   plan's ruling 19 line, byte for byte, so the two branches merge cleanly). The specs that test
+   the `plain` app (home, insights, manage, paging, overflow-it-pt, settings, onboarding, a11y,
+   feel's three groups, admin's target user) get their accounts from a new seed
+   `seed:e2e-plain-user <email>` (a direct insert with `encryption: 'plain'`, as `seed-admin.ts`),
+   then sign in by email as today: `signUpNewUser` keeps its name and signature and seeds first.
+   A new onboarding spec covers the born-encrypted web sign-up. *Cost:* one `docker compose exec`
+   per plain sign-up in the e2e (about a second).
+3. **The landing's doors change now, for every build (founder):** hero "Create account" (primary)
+   and "Try the demo"; header "Sign in". "Create account" opens `/create-account` (the email code
+   form under a "Create your account" title); "Sign in" opens `/sign-in`. *Cost:* none.
+4. **"Install the app" links** what exists today: the Android APK on GitHub
    (`ANDROID_APK_HREF`, `ANDROID_RELEASE_HREF`). Google Play, F-Droid and the App Store are
    constants set to `null` (`PLAY_HREF`, `FDROID_HREF`, `APP_STORE_HREF` in `landing/links.ts`) and
    their buttons show once a constant is set. *Cost:* none; one line per store when it ships.
-5. **(ask) Adding an email on the web** (Protect step 3): a small claim flow (email, then the
-   6-digit code) over `/v1/me/claim-email/send|verify`. A 409 `email_taken` does **not** merge on
-   the web: it says the merge is done from the phone ("This email already has a Wambito account.
-   Open Wambito on your phone to bring this data into it."). *Cost:* a web-only person without a
-   phone cannot merge (rare: a user without an email reached the web through the phone).
-6. **(ask) The web's guest branch is retired** (as phone ruling 4): every `preview` account, with
-   or without an email, gets Unlock (recovery key, passkey, "From another device") when its keys
-   are elsewhere; `LockedKind` `guest`, `PairingFrom` `guest` and `SecuritySection guest` go.
-   `prepareAccount({ guest })` stays (a hidden recovery wrap for an anonymous account set up here,
-   which cannot happen on the web today). *Cost:* none known; a person who never protected sees an
+5. **Adding an email on the web (founder):** a small claim flow (email, then the 6-digit code) over
+   `/v1/me/claim-email/send|verify`. A 409 `email_taken` does **not** merge on the web: "This email
+   already has a Wambito account. Open Wambito on your phone to bring this data into it."
+   *Cost:* a web-only person cannot merge (rare: a user without an email reached the web by phone).
+6. **The web's guest branch is retired** (as phone ruling 4): every `preview` account, with or
+   without an email, gets Unlock (recovery key, passkey, "From another device") when its keys are
+   elsewhere; `LockedKind` `guest`, `PairingFrom` `guest` and `SecuritySection guest` go.
+   `prepareAccount({ guest })` stays. *Cost:* none known; a person who never protected sees an
    Unlock whose only working way is "From another device".
-7. **(ask) `settings.recoveryKeySavedAt`** is the phone plan's field (phone ruling 1, its Task 3).
-   This branch adds the **same line and the same two tests** to `packages/core/src/records.ts` in
-   its own commit `feat(core): settings remember when a recovery key was saved`; whichever branch
+7. **`settings.recoveryKeySavedAt`** is the phone plan's field (phone ruling 1, its Task 3). This
+   branch adds the **same line and the same two tests** to `packages/core/src/records.ts` in its
+   own commit `feat(core): settings remember when a recovery key was saved`; whichever branch
    merges second drops that commit when it rebases. *Cost:* one trivial rebase.
 8. **The 6-digit number on the web:** the browser cannot know whether the phone scanned the QR or
    typed the code, so once it has pinned the approver key and revealed, it shows the number under
@@ -143,7 +139,7 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
     layout's loader wipes an `ephemeral` vault whose user is not the signed-in one. A reload of
     the same tab keeps the session (the cookie lives until the browser closes). *Cost:* a signed-out
     visit to the prerendered landing alone does not wipe; the next app page does.
-12. **The sign-in screen with `PHONE_FIRST`:** on a wide screen (≥ `md`) the QR panel and its box
+12. **The sign-in screen:** on a wide screen (≥ `md`) the QR panel and its box
     come first, then "Other ways to sign in" with the passkey button, "Recovery key" and the email
     form, all on the page (no hidden disclosure), so the email form keeps its labels; on a narrow
     screen (a phone, where a QR cannot be scanned by itself) the other ways come first and the QR
@@ -166,7 +162,8 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 17. **The daily seen call** (spec 9: "The web calls it once per day on load"): once per local day
     per user, on the `/app` loader, for every signed-in account, `plain` too (phone ruling 13);
     stored `wambito.seen.<userId>` = `YYYY-MM-DD` (`readStored`/`writeStored`); best effort.
-    `x-wambito-version` = `VITE_BUILD_ID` (set by `up.sh` to the short git commit), else `dev`.
+    `x-wambito-version` = `VITE_BUILD_ID` (set by `up.sh` to the short git commit), else `dev`
+    (the only `up.sh` change).
     *Cost:* one small request a day.
 18. **Admin:** the cards' "guests" read "Without email" / "With email"; the home screen adds four
     plain blocks: daily actives (90 bars, the `SignupsChart` style), cohorts (a table, week 1/4/12
@@ -176,9 +173,9 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 ## Pre-flight conflict scan (done while planning)
 
 - **`feat/phone-first-accounts-phone`:** its plan touches `packages/core/src/records.ts` and its
-  test (ruling 7 above) and `docker-compose.yml` (its ruling 19: `NEW_USERS_ENCRYPTED:
-  ${NEW_USERS_ENCRYPTED:-false}`). This plan does not touch `docker-compose.yml` (ruling 2) or
-  `apps/mobile`. No other shared file.
+  test (ruling 7) and `docker-compose.yml` (its ruling 19 line, which this plan adds identically,
+  ruling 2), and the CI `mobile-e2e` job (this plan edits only the `e2e` job). This plan never
+  touches `apps/mobile`. No other shared file.
 - **`main`:** clean at `91923a1d`; re-checked before the PR (`git fetch && git diff
   HEAD...origin/main --stat`).
 - **Same names:** the phone's `signin` link host and `wambito.vault.<userId>.seenDevices` are phone
@@ -367,51 +364,44 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 - [ ] **Step 4: Run** `pnpm vitest run apps/web/app/local`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(web): sign in with the recovery key`.
 
-### Task 5: The sign-in and create-account pages behind the build switch
+### Task 5: The sign-in and create-account pages
 
 **Files:**
 - Create: `apps/web/app/routes/create-account.tsx`, `apps/web/app/features/sign-in/RecoveryKeySignIn.tsx`,
   `apps/web/app/local/ephemeral.ts`.
-- Modify: `apps/web/app/routes.ts` (`create-account` under the app layout), `app/site/config.ts`
-  (`PHONE_FIRST`), `app/site/origin.ts` (`isPhoneFirst(raw)`), `app/features/sign-in/SignIn.tsx`
-  (`mode: "sign-in" | "create"`; the QR panel and "Other ways to sign in" when `PHONE_FIRST` and
-  `mode === "sign-in"`, layout per ruling 12), `app/features/sign-in/auth.ts` (`SignInAuth.signInWithRecoveryKey`,
+- Modify: `apps/web/app/routes.ts` (`create-account` under the app layout),
+  `app/features/sign-in/SignIn.tsx` (`mode: "sign-in" | "create"`; the QR panel and "Other ways to
+  sign in" when `mode === "sign-in"`, layout per ruling 12), `app/features/sign-in/auth.ts` (`SignInAuth.signInWithRecoveryKey`,
   `startQrSignin`), `app/features/sign-in/use-finish-sign-in.ts` (`method: "email" | "passkey" | "qr" | "recovery"`;
   only `email` may offer a passkey), `app/routes/app-layout.tsx` (the loader wipes an `ephemeral`
   vault of another user, ruling 11), `app/features/sign-in/SignIn.stories.tsx`,
-  `apps/web/playwright.config.ts` (`webServer.env.VITE_NEW_USERS_ENCRYPTED = "true"`),
-  `deploy/personal/up.sh` (`VITE_NEW_USERS_ENCRYPTED="$(cfg NEW_USERS_ENCRYPTED false)"`,
-  `VITE_BUILD_ID="$(git -C "$REPO_DIR" rev-parse --short HEAD)"`), `deploy/personal/README.md`
-  (one line), `apps/web/.env.example` if it exists (else the AGENTS line), copy, `apps/web/AGENTS.md`.
-- Test: `apps/web/app/site/origin.test.ts`, `apps/web/app/local/ephemeral.test.ts`,
+  copy, `apps/web/AGENTS.md`.
+- Test: `apps/web/app/local/ephemeral.test.ts`,
   `apps/web/app/features/sign-in/auth.test.ts`, the sign-in stories.
 
 **Interfaces:**
 - Consumes: Tasks 2–4.
 - Produces:
-  - `PHONE_FIRST: boolean` (`config.ts`);
-  - `SignIn({ auth, mode = "sign-in", phoneFirst = PHONE_FIRST })` (the prop for stories);
+  - `SignIn({ auth, mode = "sign-in", qr? })` (`qr`: the model factory, faked in stories);
   - `wipeForeignEphemeralVaults(signedInUserId: string | null): Promise<void>` in `ephemeral.ts`;
   - route `/create-account` (`redirectIfSignedIn` as `/sign-in`).
 
 - [ ] **Step 1: Write the failing tests:**
-  - `origin.test.ts`: `isPhoneFirst reads "true" only`.
   - `ephemeral.test.ts`: `a vault marked ephemeral of another user is deleted; the signed-in user's and a non-ephemeral one stay`.
   - `auth.test.ts`: `a qr or recovery sign-in never offers a passkey` (through
     `useFinishSignIn`'s decision function, extracted as `offersPasskey(method, destination)`).
   - Stories (play tests): `Sign-in/Phone first` — `the QR panel and the email form are both on the page, the box checked`;
     `"Recovery key" opens the field and a wrong key reads the recovery_key_invalid copy`;
     `Sign-in/Create account` — `title "Create your account", no QR`;
-    `Sign-in/Default` (flag off) — `no QR, as today`.
-- [ ] **Step 2: Run** the three unit files and the sign-in stories. Expected: FAIL.
-- [ ] **Step 3: Implement**; `up.sh`'s change is two variables on the existing build line.
+    `Sign-in/Phone` (narrow) — `the other ways come before the QR panel`.
+- [ ] **Step 2: Run** the two unit files and the sign-in stories. Expected: FAIL.
+- [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `pnpm vitest run apps/web` and `pnpm typecheck`; then, with the dev stack up,
   `pnpm --filter @wambito/web e2e -- e2e/sign-in.spec.ts e2e/a11y.spec.ts`. Expected: PASS (the
   email form's labels are unchanged; axe passes on the new page). If the run meets 429
   `too_many_requests` from the QR requests, give each Playwright context its own
   `x-forwarded-for` (`clientIp()`) in the shared fixture.
-- [ ] **Step 5: Commit** two: `feat(web): sign in with the phone, a recovery key, or email` and
-  `chore(deploy): build the web with the encryption switch and a build id`.
+- [ ] **Step 5: Commit** `feat(web): sign in with the phone, a recovery key, or email`.
 
 ### Task 6: The landing's doors
 
@@ -530,7 +520,8 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 **Files:**
 - Create: `app/auth/seen.ts`.
 - Modify: `app/routes/app.tsx` (loader calls `markSeenToday` without awaiting), `app/site/config.ts`
-  (`BUILD_ID`), `app/admin/HomeScreen.tsx`, `MetricCards.tsx`, new `app/admin/ActivityBlocks.tsx`,
+  (`BUILD_ID` from `VITE_BUILD_ID`, else `dev`), `deploy/personal/up.sh`
+  (`VITE_BUILD_ID="$(git -C "$REPO_DIR" rev-parse --short HEAD)"` on the build line), `app/admin/HomeScreen.tsx`, `MetricCards.tsx`, new `app/admin/ActivityBlocks.tsx`,
   `Home.stories.tsx`, `app/i18n/messages/admin.{es,en}.json`, `apps/web/AGENTS.md`.
 - Test: `app/auth/seen.test.ts`, the admin story.
 
@@ -546,9 +537,39 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 - [ ] **Step 2: Run** `pnpm vitest run apps/web/app/auth/seen.test.ts`. Expected: FAIL.
 - [ ] **Step 3: Implement**; the admin blocks per ruling 18.
 - [ ] **Step 4: Run** unit and storybook for `apps/web`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(web): count the day the app is opened, and show it in the admin panel`.
+- [ ] **Step 5: Commit** `feat(web): count the day the app is opened, and show it in the admin panel`
+  (`up.sh` in the same commit).
 
-### Task 12: e2e — the phone approves, the recovery key, the unticked box
+### Task 12: The web e2e with the API flag on (ruling 2)
+
+**Files:**
+- Create: `apps/api/src/scripts/seed-e2e-plain-user.ts`, `apps/web/e2e/encrypted-sign-up.spec.ts`.
+- Modify: `apps/api/package.json` (`seed:e2e-plain-user`), `docker-compose.yml` (the
+  `NEW_USERS_ENCRYPTED` line, ruling 2), `.github/workflows/ci.yml` (`e2e` job:
+  `NEW_USERS_ENCRYPTED: "true"` in its `env`), `apps/web/e2e/helpers.ts` (`signUpNewUser` seeds a
+  plain user first; `seedPlainUser(email)`), the specs that need it if they bypass the helper,
+  `apps/web/AGENTS.md` (Commands: `NEW_USERS_ENCRYPTED=true` on the e2e stack line; the seed),
+  `apps/api/AGENTS.md` (the seed scripts line), root `AGENTS.md` (the CI `e2e` line).
+
+**Interfaces:**
+- Produces: `pnpm --filter @wambito/api seed:e2e-plain-user <email>` — inserts a user with that
+  email, `emailVerified: true`, `encryption: 'plain'`, no onboarding, the default account and
+  categories the plain sign-up gives (reuse the code `user.create.after` runs for a plain user);
+  idempotent (an existing email is left as it is). `seedPlainUser(email: string): void` in
+  `helpers.ts` (`docker compose exec -T api …`, like `reseed()`).
+
+- [ ] **Step 1: Write the new spec** `encrypted-sign-up.spec.ts` (desktop): from the landing's
+  "Create account", an email code, the recovery key (`setUpRecoveryKey`), "Install the app"
+  (Task 8) with the Android button, "Continue", then the onboarding's welcome; `/v1/me` says
+  `preview`.
+- [ ] **Step 2: Run** the whole web e2e on a stack started with `NEW_USERS_ENCRYPTED=true`.
+  Expected: FAIL (the plain specs land in the vault gate; no seed script).
+- [ ] **Step 3: Implement** the seed, the helper, the compose and CI lines.
+- [ ] **Step 4: Run** `pnpm vitest run apps/api` (the seed has no route; nothing else moves) and the
+  whole `pnpm --filter @wambito/web e2e` on the flag-on stack. Expected: PASS.
+- [ ] **Step 5: Commit** `test(web): run the web e2e with new users born encrypted`.
+
+### Task 13: e2e — the phone approves, the recovery key, the unticked box
 
 **Files:**
 - Create: `apps/web/e2e/phone.ts` (the phone, in Node, over the API), `apps/web/e2e/signin.spec.ts`.
@@ -578,14 +599,14 @@ Each with what it costs if wrong. Rulings marked **(ask)** go to the founder bef
 - [ ] **Step 3: Run** the whole `pnpm --filter @wambito/web e2e`. Expected: PASS.
 - [ ] **Step 4: Commit** `test(web): the phone approves a web sign-in, end to end`.
 
-### Task 13: Close-out
+### Task 14: Close-out
 
 - [ ] **Step 1:** From the root: `pnpm lint && pnpm typecheck && pnpm test`, the generated-file
   checks CI runs for the web (`pnpm --filter @wambito/web tokens`, `api:types --file`, then
   `git diff --exit-code`), `scripts/check-old-name.sh`, the personal-name `git grep`. Expected: green,
   no diff.
 - [ ] **Step 2:** Read `apps/web/AGENTS.md` once against the branch: every new module, route,
-  stored key (`wambito.seen.<userId>`), meta key (`ephemeral`), flag (`VITE_NEW_USERS_ENCRYPTED`,
+  stored key (`wambito.seen.<userId>`), meta key (`ephemeral`), flags (`NEW_USERS_ENCRYPTED` on the e2e stack,
   `VITE_BUILD_ID`) and story id is named once.
 - [ ] **Step 3:** Whole-branch review (superpowers:requesting-code-review) against the spec sections
   in the header and the Review Focus list; one fix wave.
