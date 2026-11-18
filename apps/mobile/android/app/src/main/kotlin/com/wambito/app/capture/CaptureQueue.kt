@@ -49,7 +49,10 @@ class CaptureQueue(context: Context) {
      * account, and those of no known account (they could be anyone's), are dropped; theirs stay to
      * be sent. [from] is an account whose data [userId] takes over (a merge of this phone's account
      * into an email account, or that merge called off): its captures are re-tagged for [userId]
-     * instead of dropped, and its confirms stay (transaction ids survive a merge).
+     * instead of dropped, and its confirms stay. A merge gives every carried movement a new id
+     * (ruling P17), so a confirm kept from the guest names a movement the account does not have:
+     * it is dropped silently when sent (the movement stays to review); an adoption keeps the ids,
+     * so there its confirms still apply.
      */
     fun adopt(userId: String, mark: String? = null, from: String? = null): Unit = synchronized(LOCK) {
         val items = read()
