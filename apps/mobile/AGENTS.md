@@ -246,7 +246,17 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   version, no rotation: it replaces the guest's hidden recovery wrap; `rotated_elsewhere` reloads the keys and makes
   the key again; `canLeave: false` keeps `RecoverySetupPage` until saved) then `markRecoveryKeySaved` (settings record
   in one store transaction, then a sync; Settings → Security's "New recovery key" marks it too);
-  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`). `confirmSensitive(noKeyYet:)`: with no screen lock and no
+  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
+  `preview` guest's claim, `protectWithRecoveryKey(canLeave: false)` when the settings record's `recoveryKeySavedAt`
+  is null (read from the vault, never `protectStatusProvider`, which is null once the account has an email), then
+  `SessionController.offerPasskey()` (`offerPasskeyFor` when `PasskeyOffer.dueFor` says so): the only passkey offer
+  after a claim, `confirmClaim` offers nothing. The email screen runs it under `claimFinishingProvider`, which keeps
+  `/entry/email` open past the router's "no email screen once there is an email" (`sessionRedirect(finishingClaim:)`).
+  A `preview` guest's email_taken asks `askMerge`; yes is `MergeController.begin` then `sendCode(replaceGuest: true)`,
+  the code is `verifyCode(keepCapturesOf: guestUserId)`, and backing out of it ("Usar otro correo", back) is
+  `MergeController.cancel()`; no changes nothing. The preview `/progress` says what an email adds
+  (`protectEmailTitle`, `protectEmailLead`, `progressPreviewBody`) and has no passkey section. A `plain` guest's claim
+  and email_taken are today's. Tests: `test/entry/claim_preview_test.dart`. `confirmSensitive(noKeyYet:)`: with no screen lock and no
   saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
   Settings (keys `protect.block`, `protect.count` "N of 2" while neither step is done, `protect.recovery`,
   `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`); a `preview`

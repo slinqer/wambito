@@ -13,11 +13,17 @@ import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/web_text_field.dart';
+import '../vault/preview.dart' show isPreviewProvider;
 
 /// "Guarda tu progreso" (spec section 6.1.5, guests only): says honestly what a guest account is,
 /// and offers the two ways to keep it. The email claim (section 4.2) is the real one: the guest's
 /// own user receives the email, so every movement stays. A passkey (section 4.3) lets the guest
 /// back in on this phone, but loses the account with the phone, and sync, AI and MCP need an email.
+///
+/// A `preview` guest (phone-first ruling 20) sees what an email adds instead: its data is already
+/// encrypted on the server, and an email alone opens none of it, so neither "without an email you
+/// lose your data" nor the passkey section (that is "Protect your data"'s step 2, offered after the
+/// claim) is said here.
 class ProgressScreen extends ConsumerStatefulWidget {
   const ProgressScreen({super.key});
 
@@ -90,15 +96,23 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    final passkeys = ref.watch(passkeysSupportedProvider).value ?? false;
+    final preview = ref.watch(isPreviewProvider);
+    final passkeys = !preview && (ref.watch(passkeysSupportedProvider).value ?? false);
     final error = _emailError;
     // The web's sign-in language: the frame, the title, a lead, a form, the line between two ways.
     return SignInFrame(
       children: [
-        EntryTitle(l10n.progressTitle),
-        // What a guest account is, said plainly, then what saving to an email does.
-        EntryLead(l10n.progressLead, ink: true),
-        EntryLead(l10n.progressEmailBody),
+        if (preview) ...[
+          EntryTitle(l10n.protectEmailTitle),
+          // What the email adds, then that the data stays as it is and the key comes next.
+          EntryLead(l10n.protectEmailLead, ink: true),
+          EntryLead(l10n.progressPreviewBody),
+        ] else ...[
+          EntryTitle(l10n.progressTitle),
+          // What a guest account is, said plainly, then what saving to an email does.
+          EntryLead(l10n.progressLead, ink: true),
+          EntryLead(l10n.progressEmailBody),
+        ],
         SizedBox(
           width: double.infinity,
           child: Column(

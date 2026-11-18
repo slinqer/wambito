@@ -71,6 +71,9 @@ VaultRoute vaultRouteOf(Ref ref) {
 /// - signed in with a `preview` account (the [vault]): every screen but the magic link, the entry
 ///   screens and the debug ones goes to `/unlock` until its vault is open, and `/unlock` goes home
 ///   once it is; while the mode is unknown, the loading route;
+/// - while a `preview` guest's claim finishes ([finishingClaim]: its recovery key, then the passkey
+///   offer), the email screen (and "Guarda tu progreso" under it) stay although the account has an
+///   email now;
 /// - while a merge needs the person or must not be left ([merge], `mergeBlocksAppProvider`), every
 ///   such screen is `/merge` once the vault is open.
 String? sessionRedirect(
@@ -78,6 +81,7 @@ String? sessionRedirect(
   Uri location, {
   VaultRoute vault = VaultRoute.open,
   bool merge = false,
+  bool finishingClaim = false,
 }) {
   final path = location.path;
   if (path == '/auth/verify') return null;
@@ -115,7 +119,9 @@ String? sessionRedirect(
       }
       if (inWelcome) return '/';
       if (path == '/loading' || path == '/entry' || path == '/entry/recovery') return '/';
-      if ((path == '/entry/email' || path == '/progress') && !session.isGuest) return '/';
+      if ((path == '/entry/email' || path == '/progress') && !session.isGuest && !finishingClaim) {
+        return '/';
+      }
       return null;
   }
 }
@@ -148,8 +154,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     // A location no route has (an address Android hands over that is not one of the app's, such as
     // the `glance-action:/CALLBACK?...` a tap on the widget carried) is home, never "Page Not Found".
     onException: (context, state, router) => router.go('/'),
-    redirect: (context, state) =>
-        sessionRedirect(session.value, state.uri, vault: vault.value, merge: merge.value),
+    redirect: (context, state) => sessionRedirect(
+      session.value,
+      state.uri,
+      vault: vault.value,
+      merge: merge.value,
+      finishingClaim: ref.read(claimFinishingProvider),
+    ),
     routes: [
       GoRoute(
         path: '/',

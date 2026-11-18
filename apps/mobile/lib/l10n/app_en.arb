@@ -840,6 +840,7 @@
   "progressTitle": "Save your progress",
   "progressLead": "Without an email, losing the phone or deleting the app loses your data.",
   "progressEmailBody": "Add your email and your movements stay exactly as they are, in the same account. We'll send you a code to confirm it.",
+  "progressPreviewBody": "Your data stays exactly as it is, encrypted, in the same account. We'll send you a code to confirm the email; then, if you don't have one yet, you make your recovery key.",
   "progressSave": "Save with my email",
   "progressPasskeyTitle": "Or add a fingerprint",
   "progressPasskeyBody": "A fingerprint on this phone lets you in without an email, but if you lose the phone or the fingerprint, you lose the account. To use Wambito on another device or with AI assistants you need an email.",

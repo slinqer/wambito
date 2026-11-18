@@ -391,6 +391,20 @@ class SessionController extends Notifier<SessionState> {
     if (state.stored?.token == stored.token) state = SessionState.signedIn(stored);
   }
 
+  /// The passkey offer (`/entry/passkey-offer`) after a `preview` guest's claim, once its recovery
+  /// key is done (`afterClaim`, lib/protect/protect_actions.dart: the only caller, so the offer
+  /// comes once): `offerPasskeyFor` becomes the signed-in account's id when the offer is due for it
+  /// (the phone has passkeys, the account none, and this phone never had the answer). The claim
+  /// itself ([confirmClaim]) offers nothing.
+  Future<void> offerPasskey() async {
+    await ready;
+    final stored = state.stored;
+    if (stored == null || stored.guest) return;
+    final id = await ref.read(passkeyOfferProvider).dueFor(stored.token);
+    if (id == null || !ref.mounted || state.stored?.token != stored.token) return;
+    state = SessionState.signedIn(state.stored!, offerPasskeyFor: id);
+  }
+
   /// "Guardar mi progreso": mails the signed-in guest a code to claim [email].
   Future<void> claimEmail(String email) async {
     await ready;
@@ -763,6 +777,18 @@ class MergeSignIn {
 }
 
 final mergeSignInProvider = Provider<MergeSignIn>((ref) => MergeSignIn());
+
+/// Whether a `preview` guest's claim is finishing on the email screen (`afterClaim`: the recovery
+/// key, then the passkey offer): the router leaves that screen open although the account has an
+/// email now, so what comes after the claim is shown over it rather than lost to the redirect home.
+class ClaimFinishing extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  set finishing(bool value) => state = value;
+}
+
+final claimFinishingProvider = NotifierProvider<ClaimFinishing, bool>(ClaimFinishing.new);
 
 /// The app's [SignInRecoveryKey] (memory only).
 final signInRecoveryKeyProvider = Provider<SignInRecoveryKey>((ref) {

@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/session.dart' show sessionProvider, SessionController;
 import '../crypto/records.dart' show RecordType;
 import '../l10n/app_localizations.dart';
 import '../local/rotate.dart' show NewRecoveryKey;
@@ -117,6 +118,23 @@ Future<bool> protectWithRecoveryKey(
     ..invalidate(securitySnapshotProvider);
   toasts?.say(l10n.protectKeySaved);
   return true;
+}
+
+/// What follows a `preview` guest's claim of an email (phone-first spec 7.1, ruling 20): the
+/// recovery key, with no way out until it is saved, when the vault's settings record says none was
+/// saved yet (read from the record itself: `protectStatusProvider` says nothing once the account
+/// has an email), then the passkey offer ([SessionController.offerPasskey]), the only one after a
+/// claim. A key that could not be made (offline, the screen lock refused) still leads on to the
+/// offer; Settings can make it later.
+Future<void> afterClaim(BuildContext context, WidgetRef ref) async {
+  final session = ref.read(vaultSessionProvider);
+  if (session != null) {
+    final savedAt = await recoveryKeySavedAt(session.store);
+    if (!context.mounted) return;
+    if (savedAt == null) await protectWithRecoveryKey(context, ref, canLeave: false);
+    if (!context.mounted) return;
+  }
+  await ref.read(sessionProvider.notifier).offerPasskey();
 }
 
 /// Step 2: adds a passkey whose PRF wraps the data key (`SettingsPasskeys.add(prf:)`). A password

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart';
+import 'package:wambito/api/session.dart';
 import 'package:wambito/entry/code_input.dart';
+import 'package:wambito/entry/passkey_offer_screen.dart';
+import 'package:wambito/home/home_screen.dart';
+import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/home/home_controller.dart' show clockProvider;
 import 'package:wambito/progress/progress_screen.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/ui/press_button.dart';
+import 'package:wambito/vault/recovery_key_setup_view.dart';
 
 import 'fakes.dart';
 
@@ -209,6 +214,50 @@ void main() {
       container.read(routerProvider).go('/entry/email?email=ana%40correo.com&claim=1');
       await tester.pumpAndSettle();
       expect(find.text('REENVIAR EN 30 S'), findsOneWidget);
+    });
+  });
+
+  group('a plain guest adds an email', () {
+    setUp(() {
+      mockStorage(token: 'guest-token-0', guest: true);
+      auth.guests['guest-token-0'] = true;
+    });
+
+    testWidgets('a plain guest\'s claim ends as today, no recovery page', (tester) async {
+      final container = await pumpApp(tester, auth: auth, passkeys: FakePasskeys());
+      container.read(routerProvider).go('/entry/email?email=ana%40correo.com&claim=1');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('entry.code')), '123456');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('entry.submitCode')));
+      await tester.pumpAndSettle();
+
+      expect(auth.calls, contains('claimVerify guest-token-0 ana@correo.com 123456'));
+      expect(container.read(sessionProvider).stored?.guest, isFalse);
+      expect(find.byType(RecoveryKeySetupView), findsNothing);
+      expect(find.byType(PasskeyOfferScreen), findsNothing);
+      expect(container.read(sessionProvider).offerPasskeyFor, isNull);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('a plain guest\'s email_taken still offers today\'s sign-in as another account', (
+      tester,
+    ) async {
+      final container = await pumpApp(tester, auth: auth);
+      auth.failures['claimSend'] = const AuthFailure(code: 'email_taken', status: 409);
+      container.read(routerProvider).go('/entry/email?email=ana%40correo.com&claim=1');
+      await tester.pumpAndSettle();
+
+      final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+      expect(find.text(l10n.mergeOfferQuestion), findsNothing);
+      expect(find.text('Ese correo ya tiene una cuenta. Entra con él.'), findsOneWidget);
+      await tester.tap(find.text('ENTRAR CON ESE CORREO'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Dejar tu cuenta de invitado?'), findsOneWidget);
+      await tester.tap(find.text('ENTRAR DE TODOS MODOS'));
+      await tester.pumpAndSettle();
+      expect(auth.calls.last, 'sendCode ana@correo.com');
+      expect(find.byKey(const Key('entry.code')), findsOneWidget);
     });
   });
 

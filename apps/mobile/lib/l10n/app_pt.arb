@@ -212,6 +212,7 @@
   "progressTitle": "Guarda o teu progresso",
   "progressLead": "Sem email, se perderes o telemóvel ou apagares a app, perdes os teus dados.",
   "progressEmailBody": "Adiciona o teu email e os teus movimentos ficam exatamente como estão, na mesma conta. Enviamos-te um código para o confirmares.",
+  "progressPreviewBody": "Os teus dados ficam exatamente como estão, cifrados, na mesma conta. Enviamos-te um código para confirmares o email; depois, se ainda não a tens, crias a tua chave de recuperação.",
   "progressSave": "Guardar com o meu email",
   "progressPasskeyTitle": "Ou adiciona uma impressão digital",
   "progressPasskeyBody": "Uma impressão digital neste telemóvel deixa-te entrar sem email, mas se perderes o telemóvel ou a impressão digital, perdes a conta. Para usar Wambito noutro dispositivo ou com assistentes de IA precisas de um email.",

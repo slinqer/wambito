@@ -1218,6 +1218,10 @@
     "description": "The honest copy for guests (Task 14 brief), shown on Guarda tu progreso."
   },
   "progressEmailBody": "Agrega tu correo y tus movimientos se quedan tal cual, en la misma cuenta. Te mandamos un código para confirmarlo.",
+  "progressPreviewBody": "Tus datos se quedan tal cual, cifrados, en la misma cuenta. Te mandamos un código para confirmar el correo; después, si aún no la tienes, haces tu clave de recuperación.",
+  "@progressPreviewBody": {
+    "description": "Guarda tu progreso for an encrypted (preview) guest: the email keeps the data as it is, and the recovery key comes next."
+  },
   "progressSave": "Guardar con mi correo",
   "progressPasskeyTitle": "O agrega una huella",
   "progressPasskeyBody": "Una huella en este teléfono te deja entrar sin correo, pero si pierdes el teléfono o la huella, pierdes la cuenta. Para usar Wambito en otro dispositivo o con asistentes de IA necesitas un correo.",
