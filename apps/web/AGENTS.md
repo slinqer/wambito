@@ -192,7 +192,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   half of `/v2/signin`; signed out: plain `fetch` to `/api/v2/signin…`, `credentials:
   "same-origin"`, never `x-wambito-user`; the poll secret only in the closure, sent as
   `x-wambito-poll`): `startSignin({ remember, label, clock?, fetch? })` → `WebSignin { id, code, qr,
-  expiresAt, number(), finish(), cancel() }` (an ephemeral `N`, posts `{ commitment, remember,
+  expiresAt, number(), ready(), finish(), cancel() }` (`ready()`: the relay said the phone sealed, before the pickup) (an ephemeral `N`, posts `{ commitment, remember,
   label }`; `qr` is `wambito://signin?id=<id>&key=<base64url N.pub>`; polling every 1.5 s
   (`SIGNIN_POLL_MS`) from the first `number()` or `finish()` pins the first `approverKey`, reveals
   `N.pub` (409 `not_ready` looks again; `already_set` is its own lost answer), then `number()` is
@@ -334,6 +334,26 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   naming a language in it. `Capture/Step` and `Capture/MainPicture` (night) are parity stories in
   `apps/mobile/test/parity/parity.json`; `Capture/Steps` is web-only (the Flutter twin is
   `apps/mobile/lib/capture_auto/`).
+- The QR sign-in (`features/sign-in/`, web plan rulings 8–10): `signin-model.ts`
+  `createQrSignin({ start, label, clock, visible(), onVisibility(cb) })` → `{ state(), subscribe,
+  setRemember, remember(), retry(), stop() }`, pure and unit-tested with a fake `startSignin`,
+  clock and page. `QrState`: `opening` → `showing` (QR, no phone yet) → `approved` (`number()`
+  resolved: never replaced, runs to its end) → `finishing` (`ready()`) → `done { userId }`; `failed
+  { code, retryAt? }`; `paused` (hidden page whose request ran out). One request at a time, every
+  dropped one `cancel()`ed. A `showing` request is replaced at `expiresAt` while visible; hidden,
+  it stops there and opens one new request when visible again (also when a throttled timer is
+  late: an expired QR is never shown). `remember()` starts true; `setRemember` cancels the shown QR
+  at once and opens a new one after `REMEMBER_DELAY_MS` (500 ms) without another change; ignored
+  from `approved` on. `too_many` retries by itself at `retryAt` (`retry-after`, else 60 s);
+  `expired` renews by itself when visible; other codes (a non-`SigninError`, such as the enroll's
+  `KeysError`, is `server`) wait for `retry()`. `stop()`: cancel, no more requests. `QrSignIn.tsx`
+  `QrSignIn({ model, onSignedIn, timeZone })`: a `<section>` (no screen frame; the page places it)
+  with the QR (`uqr` `renderSVG` in an `<img>`, alt = the code), the code `ABCD EFGH`, the box
+  "Keep me signed in on this browser" (disabled from `approved`; unticked adds the "Nothing stays"
+  line), the quiet number line (ruling 8), "Opening your data…", the failures with "Try again"
+  (none for `too_many`, which shows the retry time in `timeZone`, nor `suspended`); `onSignedIn`
+  once on `done` (the page navigates and handles a failed finish). Stories `Sign-in/QR`, web-only,
+  not in parity.json; copy under `sign_in.qr.*`.
 - `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
   `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
   consent. An encrypted one (`previewProfile()` in the loader; `device` when `loadLocalKeys` finds

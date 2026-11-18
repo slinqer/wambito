@@ -521,6 +521,28 @@ describe("startSignin", () => {
     expect(handed.openedPairing[0]?.every((x) => x === 0)).toBe(true);
   });
 
+  it("ready() resolves once the phone sealed, before the pickup; a cancel rejects it", async () => {
+    const w = world();
+    const signin = await startSignin(w.options);
+    let isReady = false;
+    void signin.ready().then(() => {
+      isReady = true;
+    });
+    const a = await w.approve(signin.id);
+    await signin.number();
+    await ticks(3);
+    expect(isReady).toBe(false);
+    await w.seal(signin.id, a);
+    await signin.ready();
+    expect(w.server.log.some((l) => l.path.endsWith("/pickup"))).toBe(false);
+    await signin.finish();
+
+    const other = await startSignin(w.options);
+    const waiting = other.ready();
+    other.cancel();
+    expect(await signinErrorOf(waiting)).toBe("cancelled");
+  });
+
   it("a ticked sign-in deletes the ephemeral mark of a vault held here for the same user", async () => {
     const w = world();
     const unticked = await startSignin({ ...w.options, remember: false });

@@ -255,7 +255,26 @@
     "resend_in": "Reinvia tra {seconds} s",
     "resent": "Ti abbiamo mandato un nuovo codice.",
     "change_email": "Usa un'altra email",
-    "wait": "Aspetta {seconds} s"
+    "wait": "Aspetta {seconds} s",
+    "qr": {
+      "title": "Entra con il telefono",
+      "lead": "Scansionalo con Wambito sul telefono: Impostazioni → Sicurezza → Entra sul web",
+      "opening": "Preparazione del codice…",
+      "code_label": "Oppure scrivi questo codice",
+      "remember": "Resta connesso su questo browser",
+      "remember_off": "Su questo computer non resta nulla quando chiudi il browser",
+      "number": "Se il telefono mostra un numero, deve essere {number}",
+      "finishing": "Apertura dei tuoi dati…",
+      "expired_title": "Questo codice è scaduto",
+      "expired_lead": "Un codice dura 2 minuti. Chiedine un altro.",
+      "failed_title": "Non è stato possibile entrare",
+      "tampered": "Fermati: qualcuno potrebbe interferire. Non è stato condiviso nulla.",
+      "offline": "Sei offline. Riprova quando torni online.",
+      "server": "Qualcosa è andato storto da parte nostra. Riprova.",
+      "suspended": "Il tuo account è sospeso. Scrivici a privacy@wambito.com.",
+      "too_many": "Troppi codici da qui. Wambi ne chiede un altro alle {time}.",
+      "retry": "Riprova"
+    }
   },
   "verify": {
     "meta_title": "Accesso · Wambito",

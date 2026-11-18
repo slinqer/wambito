@@ -255,7 +255,26 @@
     "resend_in": "Resend in {seconds} s",
     "resent": "We sent you a new code.",
     "change_email": "Use another email",
-    "wait": "Wait {seconds} s"
+    "wait": "Wait {seconds} s",
+    "qr": {
+      "title": "Sign in with your phone",
+      "lead": "Scan it with Wambito on your phone: Settings → Security → Sign in on the web",
+      "opening": "Preparing a code…",
+      "code_label": "Or type this code",
+      "remember": "Keep me signed in on this browser",
+      "remember_off": "Nothing stays on this computer when you close the browser",
+      "number": "If your phone shows a number, it must be {number}",
+      "finishing": "Opening your data…",
+      "expired_title": "This code expired",
+      "expired_lead": "A code lasts 2 minutes. Ask for a new one.",
+      "failed_title": "Could not sign you in",
+      "tampered": "Stop: someone may be interfering. Nothing was shared.",
+      "offline": "You are offline. Try again when you are back online.",
+      "server": "Something went wrong on our side. Try again.",
+      "suspended": "Your account is suspended. Write to privacy@wambito.com.",
+      "too_many": "Too many codes from here. Wambi asks for a new one at {time}.",
+      "retry": "Try again"
+    }
   },
   "verify": {
     "meta_title": "Signing in · Wambito",

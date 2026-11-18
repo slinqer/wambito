@@ -77,6 +77,8 @@ export interface WebSignin {
   expiresAt: string;
   /** The 6 digits, once this browser pinned the approver key and revealed its own. */
   number(): Promise<string>;
+  /** Resolves once the relay says the phone sealed, before the pickup (the panel's "Opening your data…"). */
+  ready(): Promise<void>;
   /** Picks up the sealed DK and the session, opens DK and enrolls this browser for that user. */
   finish(): Promise<{ userId: string; keys: LocalKeys }>;
   cancel(): void;
@@ -334,6 +336,10 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
     number() {
       ensureRunning();
       return number.promise;
+    },
+    ready() {
+      ensureRunning();
+      return ready.promise.then(() => undefined);
     },
     finish() {
       finishing ??= finish();
