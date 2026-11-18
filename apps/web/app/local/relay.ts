@@ -71,8 +71,13 @@ export async function problemCode(response: Response): Promise<string | undefine
   }
 }
 
-/** Seconds from `retry-after`, when it is a whole number of them. */
+/**
+ * Seconds from `retry-after`, when it is a whole number of them above zero. No header is
+ * `undefined`, never 0 (`Number(null)`): a caller retrying "after 0 s" would hammer the server.
+ */
 export function retryAfter(response: Response): number | undefined {
-  const value = Number(response.headers.get("retry-after"));
-  return Number.isInteger(value) && value >= 0 ? value : undefined;
+  const header = response.headers.get("retry-after");
+  if (header === null || header.trim() === "") return undefined;
+  const value = Number(header);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
 }

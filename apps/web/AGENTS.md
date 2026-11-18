@@ -172,7 +172,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
   `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `relay.ts`: what `pairing.ts` and `signin.ts` share (`PairingClock`, which `pairing.ts`
   re-exports, `realClock`, `deferred<T>()`, `zeroPrivate(key)`, `sameBytes`, `key32(text, onBad)`, `problemCode(response)`
-  (the problem body's `code`), `retryAfter(response)` (`retry-after` in seconds)).
+  (the problem body's `code`), `retryAfter(response)` (`retry-after` in whole seconds above 0, else undefined: no header is
+  never 0)).
   `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
   request, or the approver's lookup) → `expired` and on
@@ -203,8 +204,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   runs `deleteStaleVaults(userId)`, then `enrollDevice({ userId }, dk, keyV, { ephemeral: !remember })`
   → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`; once the pickup was sent (its answer may
   set the cookie), `cancel()` no longer stops it or the enroll). A 201 whose `id` is not a UUID, `code` not 8 code characters,
-  `pollSecret` not base64url or `expiresAt` not a date is `server`, `N.priv` zeroed. Stops at `expiresAt` capped at
-  2 minutes (`SIGNIN_TTL_MS`). `SigninError` codes `expired` (404 or the clock), `tampered` (a
+  `pollSecret` not base64url or `expiresAt` not a date is `server`, `N.priv` zeroed. Stops 2 minutes (`SIGNIN_TTL_MS`) from the start on this browser's clock, never at the
+  server's `expiresAt` (another clock: one behind would end every request at once). `SigninError` codes `expired` (404 or the clock), `tampered` (a
   second approver key, `ready` before the reveal, a 422, a blob that does not open), `offline`,
   `server`, `cancelled`, `too_many` (429, `retryAfterS` from `retry-after`), `suspended` (403);
   the enroll's `KeysError`s go through. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every

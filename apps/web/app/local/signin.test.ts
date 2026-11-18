@@ -405,6 +405,28 @@ describe("startSignin", () => {
     expect(u.server.log.length).toBe(after);
   });
 
+  it("a server clock behind this browser's does not end the request: the 2 minutes run on this browser's clock", async () => {
+    // The server's expiresAt is on its own clock (four weeks behind here, as the e2e's pinned
+    // API); compared with this browser's, every new request looked expired at once.
+    const w = world();
+    w.server.onStarted = (body) => {
+      body.expiresAt = new Date(w.clock.t - 28 * 24 * 60 * 60 * 1000).toISOString();
+    };
+    const signin = await startSignin(w.options);
+    const a = await w.approve(signin.id);
+    expect(await signin.number()).toBeTypeOf("string");
+    await w.seal(signin.id, a);
+    expect((await signin.finish()).userId).toBeTypeOf("string");
+  });
+
+  it("429 with no retry-after has no retryAfterS (never 0: the caller would retry at once)", async () => {
+    const w = world();
+    w.server.onStart = () => problem(429, "too_many_signins");
+    const error = await startSignin(w.options).catch((e: unknown) => e);
+    expect((error as SigninError).code).toBe("too_many");
+    expect((error as SigninError).retryAfterS).toBeUndefined();
+  });
+
   it("429 too_many_signins is too_many with retryAfterS from retry-after; 403 on pickup is suspended", async () => {
     const w = world();
     w.server.onStart = () => problem(429, "too_many_signins", { "retry-after": "42" });

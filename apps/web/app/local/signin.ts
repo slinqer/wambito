@@ -31,14 +31,15 @@ import { deleteStaleVaults } from "./stale-vaults.ts";
  *
  * The routes are signed out: plain `fetch` to `/api/v2/signin…` with `credentials: "same-origin"`,
  * never `x-wambito-user`; the poll secret (`x-wambito-poll`) lives in this closure only, never
- * logged or stored. Polls every 1.5 s; stops at `expiresAt` capped at 2 minutes from the start
- * (`expired`) or on `cancel()` (`cancelled`). DK and `N.priv` are zeroed in a `finally` (the
- * private key where it is raw bytes, the noble fallback). `KeysError`s from the enroll go
+ * logged or stored. Polls every 1.5 s; stops 2 minutes from the start on this browser's clock
+ * (never the server's `expiresAt`, another clock) or at the relay's 404 (`expired`), or on
+ * `cancel()` (`cancelled`). DK and `N.priv` are zeroed in a `finally` (the private key where it
+ * is raw bytes, the noble fallback). `KeysError`s from the enroll go
  * through unchanged.
  */
 
 export type SigninErrorCode =
-  /** 404 from the relay (gone, expired, or picked up), or `expiresAt` passed on this browser's clock. */
+  /** 404 from the relay (gone, expired, or picked up), or 2 minutes passed on this browser's clock. */
   | "expired"
   /** A value the server relayed does not match what this browser pinned, a 422, a blob that does not open. */
   | "tampered"
@@ -130,8 +131,7 @@ const tampered = () => new SigninError("tampered");
  * a 409 → `conflict` (or `null` for "retry"), offline → `offline`, the rest `server`.
  */
 function relay(options: SigninOptions, signal: AbortSignal, clock: PairingClock) {
-  const cap = clock.now() + SIGNIN_TTL_MS;
-  let deadline = cap;
+  const deadline = clock.now() + SIGNIN_TTL_MS;
   let secret: string | null = null;
   const check = () => {
     if (signal.aborted) throw new SigninError("cancelled");
@@ -184,10 +184,11 @@ function relay(options: SigninOptions, signal: AbortSignal, clock: PairingClock)
       json<{ id: string; code: string; pollSecret: string; expiresAt: string }>(
         await send("/v2/signin", { method: "POST", body }, "server"),
       ),
-    useSecret(pollSecret: string, expiresAt: string) {
+    // Only the secret: the server's `expiresAt` is on its clock, and a browser clock ahead of it
+    // would end every request at once (and renew in a loop). The 2 minutes run on this clock; the
+    // server's own end comes back as a 404 (`expired`).
+    useSecret(pollSecret: string) {
       secret = pollSecret;
-      const at = Date.parse(expiresAt);
-      deadline = Number.isNaN(at) ? cap : Math.min(at, cap);
     },
     /** 204; `retry` on 409 `not_ready`; `done` on `already_set` (only this browser holds the secret). */
     reveal: (id: string, publicKey: string) =>
@@ -230,7 +231,7 @@ export async function startSignin(options: SigninOptions): Promise<WebSignin> {
     throw error;
   }
   // the poll secret goes into the relay's closure only; never on the returned object
-  net.useSecret(started.pollSecret, started.expiresAt);
+  net.useSecret(started.pollSecret);
   const { id } = started;
 
   const number = deferred<string>();
