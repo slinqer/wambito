@@ -115,7 +115,9 @@ void main() {
 
   /// The app as it runs on this phone, as far as a merge goes: the session, the account's mode,
   /// the account's open vault once [targetReady].
-  ProviderContainer app() {
+  ///
+  /// [realTarget]: the app's own [mergeTargetProvider] (over no open vault) instead of the test's.
+  ProviderContainer app({bool realTarget = false}) {
     final container = ProviderContainer(
       overrides: [
         authApiProvider.overrideWithValue(auth),
@@ -147,18 +149,21 @@ void main() {
             now: () => DateTime.utc(2026, 11, 18, 12),
           ),
         ),
-        mergeTargetProvider.overrideWith((ref) {
-          final account = ref.watch(currentVaultAccountProvider);
-          if (!targetReady || account == null || account.profile.id != accountId) return null;
-          return MergeTarget(
-            userId: accountId,
-            email: email,
-            store: accountStore,
-            sync: () => sync.run(accountStore),
-            pendingChanges: () => pendingOf(accountStore),
-            serverVersion: (type, id) async => (await accountStore.rawRecord(type, id))?.version,
-          );
-        }),
+        if (realTarget)
+          vaultSessionProvider.overrideWithValue(null)
+        else
+          mergeTargetProvider.overrideWith((ref) {
+            final account = ref.watch(currentVaultAccountProvider);
+            if (!targetReady || account == null || account.profile.id != accountId) return null;
+            return MergeTarget(
+              userId: accountId,
+              email: email,
+              store: accountStore,
+              sync: () => sync.run(accountStore),
+              pendingChanges: () => pendingOf(accountStore),
+              serverVersion: (type, id) async => (await accountStore.rawRecord(type, id))?.version,
+            );
+          }),
       ],
     );
     addTearDown(container.dispose);
@@ -212,8 +217,8 @@ void main() {
   });
 
   /// Up to the email sign-in: the offer said yes (begin), the code went in.
-  Future<ProviderContainer> signedInToTheAccount() async {
-    final container = app();
+  Future<ProviderContainer> signedInToTheAccount({bool realTarget = false}) async {
+    final container = app(realTarget: realTarget);
     final session = container.read(sessionProvider.notifier);
     await session.ready;
     final merge = container.read(mergeControllerProvider.notifier);
@@ -225,6 +230,21 @@ void main() {
   }
 
   int deletes() => auth.calls.where((c) => c.startsWith('deleteUser')).length;
+
+  test(
+    'a run reads the app\'s own merge target, which watches the merge, without a loop',
+    () async {
+      // The app's mergeTargetProvider watches the controller (it is null without a merge): a
+      // `ref.read` of it from the controller is riverpod's dependency loop in debug builds, and the
+      // merge never ran there (the stack e2e found it).
+      final container = await signedInToTheAccount(realTarget: true);
+      expect(container.read(mergeControllerProvider), isA<MergeWaitingUnlock>());
+      expect(container.read(mergeTargetProvider), isNull);
+      await container.read(mergeControllerProvider.notifier).run();
+      expect(container.read(mergeControllerProvider), isA<MergeWaitingUnlock>());
+      expect(deletes(), 0);
+    },
+  );
 
   test(
     'the phone\'s records reach the account\'s vault and the anonymous user is deleted only after '

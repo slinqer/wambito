@@ -271,7 +271,9 @@ class MergeController extends Notifier<MergeState> {
     final job = _job;
     if (job == null || _busy || state is MergeCurrencyStop || state is MergeDone) return;
     if (state is MergeSigningIn) return;
-    final target = ref.read(mergeTargetProvider);
+    // Through the container: the target watches this notifier, so a `ref.read` of it here is a
+    // dependency loop to riverpod's debug-mode check (it threw, and debug builds never merged).
+    final target = ref.container.read(mergeTargetProvider);
     if (target == null || target.userId == job.anonId || !_sameEmail(target.email, job.email)) {
       return;
     }
