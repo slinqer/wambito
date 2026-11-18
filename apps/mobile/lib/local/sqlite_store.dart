@@ -490,6 +490,16 @@ class SqliteStore implements FinanceStore {
 
   Future<void> setMeta(String key, Object? value) => _enqueue(() => _setMeta(_db, key, value));
 
+  /// The mark the stale-vault sweep honours (`meta.hold`); null when the vault is not held.
+  Future<VaultHold?> hold() => _enqueue(() async => VaultHold.fromJson(await _meta(_db, 'hold')));
+
+  /// Holds the vault, or clears the hold with null.
+  Future<void> setHold(VaultHold? hold) => _enqueue(
+    () => hold == null
+        ? _db.delete(metaTable, where: 'key = ?', whereArgs: ['hold'])
+        : _setMeta(_db, 'hold', hold.toJson()),
+  );
+
   /// Keeps a record that could not be opened; a later remote write of the id clears its rows.
   Future<void> quarantine(QuarantineEntry e) => _enqueue(
     () => _db.insert(quarantineTable, {

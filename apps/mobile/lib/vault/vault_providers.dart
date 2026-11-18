@@ -9,7 +9,7 @@ import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
 import '../background/background_channel.dart';
-import '../local/db.dart' show pendingChangesInVault;
+import '../local/db.dart' show pendingChangesInVault, vaultHoldOf;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
 import '../local/keys.dart' show KeysOptions, LocalKeys;
@@ -369,6 +369,7 @@ final staleVaultsProvider = Provider<Future<void> Function(String? keepUserId)>(
     forget: (id) => forget(id, keys),
     // Asked again before each delete: an account that signed in meanwhile keeps its vault.
     inUse: (id) => vaultInUse(id) || ref.read(knownAccountProvider).id == id,
+    holdOf: vaultHoldOf,
   );
 });
 

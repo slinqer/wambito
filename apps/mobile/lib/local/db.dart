@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -307,4 +308,89 @@ Future<int> pendingChangesInVault(
   } finally {
     await db.close();
   }
+}
+
+/// Why a vault is kept by the stale-vault sweep (`meta.hold`): a vault being merged into an
+/// account, adopted, or made before its account exists must not be swept away.
+enum VaultHoldKind { provisional, orphaned, merging }
+
+class VaultHold {
+  const VaultHold(this.kind, {this.target, required this.since});
+
+  final VaultHoldKind kind;
+
+  /// The new user id for `orphaned`, the email for `merging`.
+  final String? target;
+
+  /// When the hold was made (an ISO instant).
+  final String since;
+
+  Map<String, Object?> toJson() => {'kind': kind.name, 'target': target, 'since': since};
+
+  /// Null for anything that is not a hold.
+  static VaultHold? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final kind = VaultHoldKind.values.where((k) => k.name == json['kind']).firstOrNull;
+    final since = json['since'];
+    final target = json['target'];
+    if (kind == null || since is! String || (target != null && target is! String)) return null;
+    return VaultHold(kind, target: target as String?, since: since);
+  }
+}
+
+Future<T> _readOnly<T>(
+  String path,
+  DatabaseFactory? factory,
+  Future<T> Function(Database db) read,
+) async {
+  final db = await (factory ?? databaseFactory).openDatabase(
+    path,
+    options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+  );
+  try {
+    return await read(db);
+  } finally {
+    await db.close();
+  }
+}
+
+Future<VaultHold?> _holdIn(Database db) async {
+  final rows = await db.query(metaTable, where: 'key = ?', whereArgs: ['hold']);
+  if (rows.isEmpty) return null;
+  final hold = VaultHold.fromJson(jsonDecode(rows.first['value']! as String));
+  if (hold == null) throw const FormatException('unreadable vault hold');
+  return hold;
+}
+
+/// The hold of [userId]'s vault, read without opening the vault (no keys; works while the store
+/// is open elsewhere). Null without a file or a hold; throws when the file cannot be read.
+Future<VaultHold?> vaultHoldOf(String userId, {String? directory, DatabaseFactory? factory}) async {
+  final path = await _path(userId, directory);
+  if (!File(path).existsSync()) return null;
+  return _readOnly(path, factory, _holdIn);
+}
+
+final _vaultFileName = RegExp(r'^wambito-vault-([A-Za-z0-9_-]{1,128})\.db$');
+
+/// Every vault file in the folder that carries a hold. `userId` is the file's id: the anonymous
+/// id for `merging` (which also names `wambito.vault.<userId>.mergeToken`), the old id for
+/// `orphaned`, the local id for `provisional`. A file that cannot be read is skipped.
+Future<List<({String userId, VaultHold hold})>> listVaultHolds({
+  String? directory,
+  DatabaseFactory? factory,
+}) async {
+  final folder = Directory(directory ?? await defaultVaultDirectory());
+  if (!folder.existsSync()) return const [];
+  final found = <({String userId, VaultHold hold})>[];
+  for (final entry in folder.listSync()) {
+    final id = _vaultFileName.firstMatch(p.basename(entry.path))?.group(1);
+    if (id == null) continue;
+    try {
+      final hold = await vaultHoldOf(id, directory: folder.path, factory: factory);
+      if (hold != null) found.add((userId: id, hold: hold));
+    } on Object {
+      // Skipped: the next call tries again.
+    }
+  }
+  return found;
 }

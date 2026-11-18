@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../storage/secure_storage.dart';
-import 'db.dart' show vaultDirectoryName;
+import 'db.dart' show VaultHold, vaultDirectoryName;
 
 /// The Dart twin of `apps/web/app/local/stale-vaults.ts`. A vault outlives a session that ended
 /// outside the sign-out (expired, signed out everywhere, the account deleted elsewhere): it waits
@@ -22,13 +22,16 @@ import 'db.dart' show vaultDirectoryName;
 /// deletes its own vault itself. Never throws: what cannot be deleted now is left for the next time.
 /// [forget] deletes one account's file and keys (`forgetVault`); [directory] is the vault folder.
 /// [inUse] is asked again right before each account is deleted: an account that signed in while the
-/// sweep ran (its vault open or opening) is left alone.
+/// sweep ran (its vault open or opening) is left alone. [holdOf] reads a vault's `meta.hold`: a
+/// held vault (being merged, adopted, or not yet claimed) keeps its file and keys, and one whose
+/// hold cannot be read is left for the next time.
 Future<void> deleteStaleVaults(
   String? keepUserId, {
   required Future<void> Function(String userId) forget,
   FlutterSecureStorage storage = appSecureStorage,
   Future<String> Function()? directory,
   bool Function(String userId)? inUse,
+  Future<VaultHold?> Function(String userId)? holdOf,
 }) async {
   final ids = <String>{};
   try {
@@ -56,6 +59,11 @@ Future<void> deleteStaleVaults(
   for (final id in ids) {
     try {
       if (inUse?.call(id) ?? false) continue;
+    } on Object {
+      continue; // Cannot tell: left for the next time.
+    }
+    try {
+      if (holdOf != null && await holdOf(id) != null) continue;
     } on Object {
       continue; // Cannot tell: left for the next time.
     }

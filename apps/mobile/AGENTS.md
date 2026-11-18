@@ -91,7 +91,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   every key, waiting at most `vaultCloseWait` in all for the store to close). `stale_vaults.dart` =
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
-  `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault).
+  `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault;
+  `holdOf` skips a vault whose `meta.hold` is set (or unreadable), see Traps).
   `rotate.dart` = `rotate.ts` (`rotateKeys`: removing a device rotates the data key; this phone never removes
   itself and its own wrap is always posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
   a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`); `rotate.dart` imports `keys.dart`,
@@ -462,6 +463,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Traps
 
+- Vault holds: `meta.hold` in a vault file (`VaultHold`: `provisional`, `orphaned`, `merging`;
+  `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes). The
+  stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.
