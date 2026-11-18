@@ -74,6 +74,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   guest, whose recovery secret is never shown and who commits at once; `KeysError("already_set_up")`
   when the account has wraps, and from `commit()` when another setup won the race: the recovery
   wrap goes with `If-None-Match: *`, so the server keeps one data key; the losing DK is zeroed;
+  a shown key (`guest: false`) also gets its sign-in verifier between the recovery wrap and the
+  device wrap (`PUT /v2/recovery/verifier`, `putRecoveryVerifier(options, secret)`: the SHA-256 of
+  `recoveryVerifier(secret)`'s `lookup` and `auth`; made before the secret is zeroed, sent again
+  with the same bytes on a retry; a guest's hidden key never gets one); `unlockWithRecovery` puts
+  it too, best effort (a failed PUT never fails the unlock);
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
@@ -141,7 +146,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
   plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
   at once.
-  `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
+  `rotate.ts` (two steps, like `prepareAccount`; a new key's verifier is put after its wrap, by
+  `newRecoveryKey` and by `rotateKeys` with `{ fresh: true }`, never with the typed key): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
   dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
   nothing made); then `refreshKeys`, so this browser holds every version up to the account's
@@ -183,7 +189,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
   ended outside the sign-out.
-  `vault-session.ts`: a preview account's open vault, one per tab, shared by `/welcome` and
+  `vault-session.ts` (`markRecoveryKeySaved(session, now)`: one local write of
+  `settings.recoveryKeySavedAt`, then a sync): a preview account's open vault, one per tab, shared by `/welcome` and
   `/app`: `openVaultSession({ profile, keys, fresh })` opens the store, runs a full sync (must
   succeed when `fresh`; a known browser opens offline), seeds an empty account (settings record
   from the server profile, currency EUR, and the suggested categories, through the local backend),

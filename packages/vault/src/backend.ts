@@ -325,6 +325,7 @@ const FRESH_SETTINGS: SettingsRecord = {
   locale: "en",
   timezone: "UTC",
   onboardingCompletedAt: null,
+  recoveryKeySavedAt: null,
   revokedDevices: [],
 };
 

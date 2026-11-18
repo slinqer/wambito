@@ -12,10 +12,12 @@ import {
   openRecord,
   parseRecoveryKey,
   type RecordKeys,
+  recoveryVerifier,
   sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   wrapDataKey,
 } from "@wambito/crypto";
 import {
@@ -290,6 +292,39 @@ export const putJson = (body: unknown, headers: Record<string, string> = {}): Re
   body: JSON.stringify(body),
 });
 
+/** What `PUT /v2/recovery/verifier` takes: the SHA-256 of the key's `lookup` and of its `auth`. */
+export interface VerifierBody {
+  lookupHash: string;
+  authHash: string;
+}
+
+/** The verifier body of a recovery secret; the raw `lookup` and `auth` are zeroed. */
+export async function verifierBodyOf(secret: Uint8Array): Promise<VerifierBody> {
+  const raw = await recoveryVerifier(secret);
+  try {
+    return {
+      lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+      authHash: toBase64Url(await verifierHash(raw.auth)),
+    };
+  } finally {
+    raw.lookup.fill(0);
+    raw.auth.fill(0);
+  }
+}
+
+/** Stores the verifier that lets this recovery key sign in (replaces any earlier one). */
+export async function putVerifier(options: KeysOptions, body: VerifierBody): Promise<void> {
+  await api(options)("/v2/recovery/verifier", putJson(body));
+}
+
+/**
+ * Stores what lets `secret` sign in (spec 5.2): needs the account's recovery wrap on the server
+ * and replaces the earlier verifier. The caller owns `secret` and zeroes it.
+ */
+export async function putRecoveryVerifier(options: KeysOptions, secret: Uint8Array): Promise<void> {
+  await putVerifier(options, await verifierBodyOf(secret));
+}
+
 /** A device key pair and its wrap of DK, made in memory; nothing sent yet. */
 async function prepareDevice(
   userId: string,
@@ -484,9 +519,12 @@ export async function prepareAccount(
   };
   const device = await prepareDevice(userId, dataKey, FIRST_KEY_V, pair);
   const recoveryKey = guest ? null : formatRecoveryKey(secret);
+  // A shown key signs in; a guest's hidden one never does.
+  const verifier = guest ? null : await verifierBodyOf(secret);
   secret.fill(0);
 
   let recoverySent = false;
+  let verifierSent = false;
   let done: LocalKeys | null = null;
   let running: Promise<LocalKeys> | null = null;
 
@@ -501,6 +539,10 @@ export async function prepareAccount(
         throw error;
       }
       recoverySent = true;
+    }
+    if (verifier && !verifierSent) {
+      await putVerifier(options, verifier);
+      verifierSent = true;
     }
     await call(`/v2/keys/${device.id}`, putJson(device.body));
     done = await keepLocally(userId, dataKey, FIRST_KEY_V, device, new Map());
@@ -539,7 +581,11 @@ export async function unlockWithRecovery(
     const { wraps, links } = await listKeys(call);
     const { dataKey, keyV } = await openRecoveryWrap(wraps, userId, secret);
     try {
-      return await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
+      const keys = await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
+      // Best effort: a typed key that unlocks may be one whose verifier an older client never
+      // stored; a failure here never fails the unlock.
+      await putRecoveryVerifier(options, secret).catch(() => undefined);
+      return keys;
     } finally {
       dataKey.fill(0);
     }

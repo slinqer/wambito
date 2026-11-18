@@ -17,6 +17,7 @@ import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts"
 import { type LocalKeys, loadLocalKeys, prepareAccount, unlockWithRecovery } from "./keys.ts";
 import {
   forgetVault,
+  markRecoveryKeySaved,
   openVaultSession,
   VaultOpenError,
   type VaultProfile,
@@ -80,6 +81,42 @@ const vaultExists = async (userId: string) =>
 
 afterEach(async () => {
   await forgetVault();
+});
+
+describe("markRecoveryKeySaved", () => {
+  it("markRecoveryKeySaved writes the field on the settings record and queues it", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    let opened: EncryptedStore | undefined;
+    const session = await openVaultSession({
+      profile,
+      keys: await keys(),
+      fresh: true,
+      fetch: net.fetch,
+      openStore: async (userId) => {
+        opened = await createEncryptedStore(userId);
+        return opened;
+      },
+    });
+    const store = opened as EncryptedStore;
+    const [before] = await store.list("settings");
+    expect(before?.body.recoveryKeySavedAt).toBeNull();
+    await session.sync();
+    const pushedBefore = net.pushed;
+
+    await markRecoveryKeySaved(session, new Date("2026-11-18T10:30:00Z"));
+
+    const settings = await store.list("settings");
+    expect(settings).toHaveLength(1);
+    expect(settings[0]?.id).toBe(before?.id);
+    expect(settings[0]?.body).toMatchObject({
+      recoveryKeySavedAt: "2026-11-18T10:30:00.000Z",
+      currency: "EUR",
+    });
+    // queued and sent by the sync that follows the write
+    expect(net.pushed).toBe(pushedBefore + 1);
+    expect(await store.readOutbox(Number.MAX_SAFE_INTEGER)).toEqual([]);
+  });
 });
 
 describe("openVaultSession", () => {
@@ -531,6 +568,9 @@ function fakeAccount() {
         input instanceof Request ? input : new Request(new URL(String(input), "http://x"), init);
       const url = new URL(request.url);
       const method = request.method;
+      if (url.pathname === "/api/v2/recovery/verifier" && method === "PUT") {
+        return new Response(null, { status: 204 });
+      }
       if (url.pathname === "/api/v2/keys" && method === "GET") {
         return json({
           wraps: net.wraps,

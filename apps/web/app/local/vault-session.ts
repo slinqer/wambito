@@ -52,6 +52,13 @@ export interface VaultSession {
    * now holds, then runs a sync (its upgrade pass re-seals the old records).
    */
   reloadKeys(): Promise<void>;
+  /** A sync now (push the outbox, pull); resolves when it ends, whatever its outcome. */
+  sync(): Promise<void>;
+  /**
+   * Merges `patch` into the settings record: one local write, queued for the sync. Nothing when
+   * the vault has no settings yet.
+   */
+  updateSettings(patch: { recoveryKeySavedAt: string }): Promise<void>;
   close(): void;
 }
 
@@ -163,6 +170,7 @@ async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promis
       locale,
       timezone: profile.timezone,
       onboardingCompletedAt: null,
+      recoveryKeySavedAt: null,
       revokedDevices: [],
     });
     for (const { id, body } of categories) await tx.put("category", id, body);
@@ -279,6 +287,15 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         if (local) engine.useKeyring(local.keyring);
         await engine.run();
       },
+      async sync() {
+        await engine.run();
+      },
+      async updateSettings(patch) {
+        await store.transaction(async (tx) => {
+          const [settings] = await tx.list("settings");
+          if (settings) await tx.put("settings", settings.id, { ...settings.body, ...patch });
+        });
+      },
       close() {
         closing = true;
         drop();
@@ -314,6 +331,15 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
     store.close();
     throw error;
   }
+}
+
+/**
+ * The person saved a recovery key (spec 8.4): one local write of `recoveryKeySavedAt` (ISO UTC) on
+ * the settings record, then a sync, so the phone and the web both stop offering to protect.
+ */
+export async function markRecoveryKeySaved(session: VaultSession, now: Date): Promise<void> {
+  await session.updateSettings({ recoveryKeySavedAt: now.toISOString() });
+  await session.sync();
 }
 
 /**
