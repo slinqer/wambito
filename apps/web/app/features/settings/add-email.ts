@@ -6,7 +6,8 @@ import type { AuthErrorKey } from "../sign-in/auth.ts";
  * The words for a refused claim: sign-in's `errors.*` keys, and `email_taken` with its own (the web
  * never merges two accounts, web ruling 5: it says to bring this data into that account on the phone).
  */
-export type ClaimErrorKey = AuthErrorKey | "settings.add_email.taken";
+export const EMAIL_TAKEN = "settings.add_email.taken";
+export type ClaimErrorKey = AuthErrorKey | typeof EMAIL_TAKEN;
 
 /** A failed `send` or `verify`, already in the catalog's words. */
 export class ClaimError extends Error {
@@ -20,7 +21,7 @@ export class ClaimError extends Error {
 
 /** The API's codes for a claim (`apps/api/src/routes/me.ts`) → the catalog's keys. */
 const CODES: Record<string, ClaimErrorKey> = {
-  email_taken: "settings.add_email.taken",
+  email_taken: EMAIL_TAKEN,
   invalid_code: "errors.invalid_code",
   invalid_or_expired_code: "errors.invalid_or_expired_code",
   too_many_attempts: "errors.too_many_attempts",

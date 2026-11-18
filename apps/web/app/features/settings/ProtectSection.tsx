@@ -11,23 +11,13 @@ import { PASSKEYS_KEY } from "./PasskeysSection.tsx";
 import { SettingLabel, SettingsSection } from "./parts.tsx";
 import type { PasskeysApi } from "./passkeys.ts";
 import { protectStatus } from "./protect-model.ts";
-import { type Problem, problemOf, Takeover } from "./RemoveDeviceSheet.tsx";
+import { Takeover } from "./RemoveDeviceSheet.tsx";
+import { useRecoveryKeyStep } from "./recovery-key-step.ts";
 import { SECURITY_KEY, type SecurityApi, type SecuritySnapshot } from "./security.ts";
 import { passkeyRows } from "./security-model.ts";
 
 /** The react-query key of `SecurityApi.settings()` (what Protect reads of the settings record). */
 export const PROTECT_SETTINGS_KEY = ["protect-settings"] as const;
-
-type KeyStep =
-  | { step: "idle"; busy: boolean; problem: Problem | null }
-  | {
-      step: "setup";
-      recoveryKey: string;
-      commit(): Promise<void>;
-      saving: boolean;
-      /** A commit failed: the key may be saved, so it stays on screen (no Cancel) until done. */
-      failed: boolean;
-    };
 
 /**
  * "Protect your data" (spec 2026-11-15 section 5.2, Proton's recovery checklist): for an account
@@ -77,7 +67,16 @@ export function ProtectSection({
     enabled: anonymous,
   });
   const [supported] = useState(() => passkeys.supported());
-  const [key, setKey] = useState<KeyStep>({ step: "idle", busy: false, problem: null });
+  const {
+    key,
+    start: makeKey,
+    save: saveKey,
+    cancel,
+  } = useRecoveryKeyStep(security, async () => {
+    toast.show({ message: t("recovery_saved") });
+    await qc.invalidateQueries({ queryKey: PROTECT_SETTINGS_KEY });
+    void qc.invalidateQueries({ queryKey: SECURITY_KEY });
+  });
   const [adding, setAdding] = useState(false);
   const inFlight = useRef(false);
 
@@ -93,47 +92,6 @@ export function ProtectSection({
         })
       : null;
   if (!anonymous || !status) return null;
-
-  const idle = (patch: Partial<Extract<KeyStep, { step: "idle" }>> = {}) =>
-    setKey({ step: "idle", busy: false, problem: null, ...patch });
-
-  async function makeKey() {
-    if (key.step !== "idle" || key.busy) return;
-    idle({ busy: true });
-    try {
-      const prepared = await security.newRecoveryKey();
-      setKey({ step: "setup", ...prepared, saving: false, failed: false });
-    } catch (error) {
-      idle({ problem: problemOf(error) });
-    }
-  }
-
-  async function saveKey(setup: Extract<KeyStep, { step: "setup" }>) {
-    if (setup.saving) return;
-    setKey({ ...setup, saving: true });
-    try {
-      await setup.commit();
-    } catch (error) {
-      if (problemOf(error) === "rotated_elsewhere") {
-        // Refused for sure: the sync picks up the other device's keys, the list follows.
-        void security.reloadKeys().catch(() => {});
-        void qc.invalidateQueries({ queryKey: SECURITY_KEY });
-        idle({ problem: "rotated_elsewhere" });
-      } else {
-        setKey({ ...setup, saving: false, failed: true });
-      }
-      return;
-    }
-    try {
-      await security.markRecoveryKeySaved();
-    } catch {
-      // The key is saved on the server; only the checklist's mark is missing (the step stays open).
-    }
-    idle();
-    toast.show({ message: t("recovery_saved") });
-    await qc.invalidateQueries({ queryKey: PROTECT_SETTINGS_KEY });
-    void qc.invalidateQueries({ queryKey: SECURITY_KEY });
-  }
 
   async function addPasskey() {
     if (inFlight.current) return;
@@ -250,7 +208,7 @@ export function ProtectSection({
             busy={key.saving}
             problem={key.failed ? tSecurity("maybe_saved") : null}
             onContinue={() => void saveKey(key)}
-            {...(key.failed ? {} : { onCancel: () => idle() })}
+            {...(key.failed ? {} : { onCancel: cancel })}
           />
         </Takeover>
       )}

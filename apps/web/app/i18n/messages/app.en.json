@@ -739,6 +739,7 @@
       "confirm": "Confirm",
       "confirming": "Confirming…",
       "resend": "Resend code",
+      "resent": "We sent you a new code.",
       "change_email": "Use another email",
       "cancel": "Not now",
       "done": "Done: your account now has an email.",

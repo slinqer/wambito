@@ -7,7 +7,10 @@ import { useToast } from "../../ui/Toast.tsx";
 import { CODE_ERRORS, EMAIL } from "../sign-in/auth.ts";
 import { CODE_LENGTH, CodeInput, type CodeInputHandle } from "../sign-in/CodeInput.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
-import { type ClaimEmail, ClaimError, type ClaimErrorKey } from "./add-email.ts";
+import { RecoveryKeySetup } from "../vault/RecoveryKeySetup.tsx";
+import { type ClaimEmail, ClaimError, type ClaimErrorKey, EMAIL_TAKEN } from "./add-email.ts";
+import { useRecoveryKeyStep } from "./recovery-key-step.ts";
+import type { SecurityApi } from "./security.ts";
 
 type Busy = "send" | "verify" | null;
 
@@ -22,8 +25,14 @@ export function AddEmail({
   claim,
   onDone,
   onCancel,
+  security,
 }: {
   claim: ClaimEmail;
+  /**
+   * The open vault's keys. With them, an account that has not saved a recovery key sees its setup
+   * right after the email (spec section 7.1), with no way out until it is saved.
+   */
+  security?: SecurityApi | undefined;
   onDone(): void;
   /** Closes without adding; defaults to `onDone`. */
   onCancel?: () => void;
@@ -32,7 +41,14 @@ export function AddEmail({
   const tRoot = useTranslations();
   const qc = useQueryClient();
   const toast = useToast();
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [step, setStep] = useState<"email" | "code" | "key">("email");
+  const tProtect = useTranslations("settings.protect");
+  const tSecurity = useTranslations("settings.security");
+  const finish = () => {
+    toast.show({ message: t("done") });
+    onDone();
+  };
+  const recovery = useRecoveryKeyStep(security as SecurityApi, finish);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<ClaimErrorKey | null>(null);
@@ -75,20 +91,32 @@ export function AddEmail({
     }
   }
 
+  /** Whether the settings record says no recovery key was saved (a record we cannot read: assume it was). */
+  async function keyUnsaved(): Promise<boolean> {
+    if (!security) return false;
+    try {
+      return ((await security.settings())?.recoveryKeySavedAt ?? null) === null;
+    } catch {
+      return false;
+    }
+  }
+
   async function verify(candidate: string) {
     if (candidate.length !== CODE_LENGTH) return;
     const ok = await run("verify", () => claim.verify(email, candidate));
     if (ok) {
       void qc.invalidateQueries({ queryKey: queryKeys.me() });
-      toast.show({ message: t("done") });
-      onDone();
+      if (await keyUnsaved()) {
+        setStep("key");
+        void recovery.start();
+      } else finish();
     } else {
       setCode("");
       codeInput.current?.focus(0);
     }
   }
 
-  const errorText = error ? (error.startsWith("settings.") ? t("taken") : tRoot(error)) : null;
+  const errorText = error ? (error === EMAIL_TAKEN ? t("taken") : tRoot(error)) : null;
   const cancel = (
     <PressButton
       variant="ghost"
@@ -99,6 +127,40 @@ export function AddEmail({
       {t("cancel")}
     </PressButton>
   );
+
+  if (step === "key") {
+    const { key } = recovery;
+    // Nothing to cancel: the email is claimed, and the key is the way back in.
+    if (key.step === "setup") {
+      return (
+        <RecoveryKeySetup
+          recoveryKey={key.recoveryKey}
+          busy={key.saving}
+          problem={key.failed ? tSecurity("maybe_saved") : null}
+          onContinue={() => void recovery.save(key)}
+        />
+      );
+    }
+    return (
+      <SignInScreen>
+        <ScreenTitle>{tProtect("recovery_title")}</ScreenTitle>
+        <p className="text-center text-ink-muted">{tProtect("recovery_lead")}</p>
+        {key.problem && (
+          <FieldError id={errorId}>
+            {tProtect(key.problem === "rotated_elsewhere" ? "recovery_rotated" : "recovery_failed")}
+          </FieldError>
+        )}
+        <PressButton
+          className="w-full"
+          disabled={key.busy}
+          aria-busy={key.busy || undefined}
+          onClick={() => void recovery.start()}
+        >
+          {tProtect("recovery_action")}
+        </PressButton>
+      </SignInScreen>
+    );
+  }
 
   if (step === "code") {
     return (
@@ -144,9 +206,11 @@ export function AddEmail({
           <PressButton
             variant="ghost"
             disabled={busy !== null}
-            onClick={() => {
-              setError(null);
-              void run("send", () => claim.send(email));
+            onClick={async () => {
+              if (!(await run("send", () => claim.send(email)))) return;
+              setCode("");
+              toast.show({ message: t("resent") });
+              codeInput.current?.focus(0);
             }}
           >
             {t("resend")}

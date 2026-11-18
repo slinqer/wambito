@@ -338,7 +338,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `errors.*` keys; 409 `email_taken` is `settings.add_email.taken`: the web never merges, it says
   to bring the data in from the phone, ruling 5). `AddEmail({ claim, onDone, onCancel? })`: email,
   then sign-in's `CodeInput`, then `queryKeys.me()` invalidated (the profile shows the email, the
-  Protect block goes; the user id and keys do not change). `HomeStage` `claim: "ok" | "taken"`
+  Protect block goes; the user id and keys do not change). With `security` and no
+  `recoveryKeySavedAt`, the key setup follows the email with no way out (spec 7.1), sharing step 1's
+  `recovery-key-step.ts` `useRecoveryKeyStep(security, onSaved)` with `ProtectSection`). `HomeStage` `claim: "ok" | "taken"`
   fakes the routes (code 123456). Stories `Settings/Protect` and `Settings/Add email`, web-only,
   not in parity.json; copy under `settings.protect.*` and `settings.add_email.*`.
   `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,

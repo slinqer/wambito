@@ -120,7 +120,11 @@ export function Settings({
         )}
         {addingEmail && (
           <Takeover label={t("add_email.title")}>
-            <AddEmail claim={claim} onDone={() => setAddingEmail(false)} />
+            <AddEmail
+              claim={claim}
+              security={security ?? undefined}
+              onDone={() => setAddingEmail(false)}
+            />
           </Takeover>
         )}
         <SettingsSection title={t("data.title")}>
