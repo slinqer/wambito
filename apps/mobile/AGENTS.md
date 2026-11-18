@@ -209,6 +209,20 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `DueWorker` (`preview` or `unknown` ⇒ no API call (`RefreshWorker` asks the headless sync); absent = an install from before the vault ⇒ as
   before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
   screens pass `previewOpen()` (`test/support/preview_account.dart`).
+- `lib/protect/`: "Protect your data" (phone-first spec 5.2) for a `preview` account without email. `protect_status.dart`:
+  `ProtectStatus` (`recoveryKey`, `passkey`, `passkeyOffered`, `passkeyWithoutPrf`, `done`, `protected`) and
+  `protectStatusProvider` (null unless `preview`, anonymous and the vault open; read again on every vault commit);
+  step 1 is the synced settings field `recoveryKeySavedAt` (`packages/core` `records.ts` and `lib/core/records.dart`,
+  read straight from the vault with `recoveryKeySavedAt(store)`), step 2 a passkey wrap (`anyPasskeyWrap`), never the
+  passkey row. `protect_actions.dart`: `protectWithRecoveryKey` (screen lock, then `newRecoveryKey` on the same key
+  version, no rotation: it replaces the guest's hidden recovery wrap; `rotated_elsewhere` reloads the keys and makes
+  the key again; `canLeave: false` keeps `RecoverySetupPage` until saved) then `markRecoveryKeySaved` (settings record
+  in one store transaction, then a sync; Settings → Security's "New recovery key" marks it too);
+  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`). `confirmSensitive(noKeyYet:)`: with no screen lock and no
+  saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
+  Settings (keys `protect.block`, `protect.count` "N of 2" while neither step is done, `protect.recovery`,
+  `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`); a `preview`
+  guest has no `settings.saveProgress`. Tests: `test/protect/` (`fakes.dart`: `FakeVault` on a memory store).
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,

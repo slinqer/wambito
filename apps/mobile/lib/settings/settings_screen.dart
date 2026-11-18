@@ -28,6 +28,7 @@ import '../home/shell_navigation.dart';
 import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
+import '../protect/protect_block.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
@@ -80,8 +81,9 @@ final settingsEmailProvider = FutureProvider.autoDispose<String?>((ref) async {
 /// Settings (spec section 6.1.6): language, theme, sound, time zone and currency, the passkeys,
 /// "Conecta tu asistente", the import, vibration, the two local notices, hiding the amount in the
 /// widget, the voice models, the server, About, "Más en la web" and sign out.
-/// A guest also finds "Guarda tu progreso" at the top, and is warned before anything that would
-/// leave their account behind (signing out, changing server).
+/// A `plain` guest also finds "Guarda tu progreso" at the top, and a `preview` guest "Protect your
+/// data" (`ProtectBlock`) instead; a guest is warned before anything that would leave their account
+/// behind (signing out, changing server).
 /// Whether Settings shows its debug-only rows (the passkey PRF probe): debug builds only. A provider
 /// so a test can switch it.
 final debugToolsProvider = Provider<bool>((ref) => kDebugMode);
@@ -301,7 +303,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (signedInAs != null) Text(signedInAs, style: signedInStyle),
           ],
         ),
-        if (guest && !webOnly)
+        // A `preview` account without email: "Protect your data" (it draws nothing otherwise).
+        if (!webOnly) const ProtectBlock(),
+        // Its block offers adding an email, so "Guarda tu progreso" is for a `plain` guest only.
+        if (guest && !webOnly && !ref.watch(isPreviewProvider))
           SettingsSection(
             title: l10n.progressTitle,
             lead: l10n.progressLead,

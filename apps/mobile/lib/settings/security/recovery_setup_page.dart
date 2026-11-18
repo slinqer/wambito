@@ -36,6 +36,7 @@ class RecoverySetupPage<T> extends ConsumerStatefulWidget {
     required this.recoveryKey,
     required this.commit,
     this.refused,
+    this.canLeave = true,
   });
 
   final String recoveryKey;
@@ -46,17 +47,26 @@ class RecoverySetupPage<T> extends ConsumerStatefulWidget {
   /// Whether the last failure was a refusal for good (`tampered`): a retry would say the same.
   final bool Function()? refused;
 
+  /// Whether the person may leave before saving (Cancel, back). False after an email was added to
+  /// an account with no recovery key yet (phone-first ruling 20): the page stays until it is saved.
+  final bool canLeave;
+
   /// Opens the page over [context]'s screen; the outcome, or null when the person gave up.
   static Future<SetupOutcome<T>?> open<T>(
     BuildContext context, {
     required String recoveryKey,
     required Future<T> Function() commit,
     bool Function()? refused,
+    bool canLeave = true,
   }) => Navigator.of(context, rootNavigator: true).push(
     MaterialPageRoute<SetupOutcome<T>>(
       fullscreenDialog: true,
-      builder: (_) =>
-          RecoverySetupPage<T>(recoveryKey: recoveryKey, commit: commit, refused: refused),
+      builder: (_) => RecoverySetupPage<T>(
+        recoveryKey: recoveryKey,
+        commit: commit,
+        refused: refused,
+        canLeave: canLeave,
+      ),
     ),
   );
 
@@ -97,7 +107,8 @@ class _RecoverySetupPageState<T> extends ConsumerState<RecoverySetupPage<T>> {
     final l10n = AppLocalizations.of(context);
     return PopScope(
       // No way out while saving or after a failed save: the key may be the only one that works.
-      canPop: !_saving && !_failed,
+      // Nor before saving when the caller says there is none.
+      canPop: !_saving && !_failed && widget.canLeave,
       child: RecoveryKeySetupView(
         recoveryKey: widget.recoveryKey,
         positions: setupPositions,
@@ -105,7 +116,7 @@ class _RecoverySetupPageState<T> extends ConsumerState<RecoverySetupPage<T>> {
         problem: _failed && !_saving ? l10n.settingsSecurityMaybeSaved : null,
         continueLabel: _failed ? l10n.retry : null,
         onContinue: () => unawaited(_save()),
-        onCancel: _failed ? null : () => Navigator.of(context).pop(),
+        onCancel: _failed || !widget.canLeave ? null : () => Navigator.of(context).pop(),
         onShare: (name, text) async {
           await ref.read(filesChannelProvider).shareFile(name, utf8.encode(text), 'text/plain');
         },

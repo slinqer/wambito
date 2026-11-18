@@ -19,9 +19,13 @@ import 'package:wambito/local/backend.dart' show LocalBackend, createLocalBacken
 import 'package:wambito/local/memory_store.dart' show createMemoryStore;
 import 'package:wambito/local/vault_session.dart' show VaultSession;
 import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
+import 'package:wambito/protect/protect_status.dart';
+import 'package:wambito/settings/security/security_api.dart' show securityApiProvider;
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../home/fakes.dart';
 import 'harness.dart';
+import 'security/fake_security.dart' show FakeSecurity;
 
 const _honestEs = 'Sin correo, si pierdes el teléfono o borras la app, pierdes tus datos.';
 const _honestEn = 'Without an email, losing the phone or deleting the app loses your data.';
@@ -229,6 +233,37 @@ void main() {
       await tester.tap(find.byKey(const Key('settings.saveProgress')));
       await tester.pumpAndSettle();
       expect(find.text(_honestEs), findsOneWidget);
+    });
+
+    testWidgets('a plain guest still sees Guarda tu progreso and no Protect block', (tester) async {
+      await pumpSettingsApp(tester, guest: true, location: '/settings');
+      expect(find.byKey(const Key('settings.saveProgress')), findsOneWidget);
+      expect(find.byKey(const Key('protect.block')), findsNothing);
+    });
+
+    testWidgets('a preview guest sees Protect your data at the top instead of Guarda tu progreso', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: [
+          isPreviewProvider.overrideWithValue(true),
+          securityApiProvider.overrideWithValue(FakeSecurity()),
+          protectStatusProvider.overrideWith(
+            (ref) async => const ProtectStatus(
+              recoveryKey: false,
+              passkey: false,
+              passkeyOffered: true,
+              passkeyWithoutPrf: false,
+            ),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('protect.block')), findsOneWidget);
+      expect(find.byKey(const Key('protect.count')), findsOneWidget);
+      expect(find.byKey(const Key('settings.saveProgress')), findsNothing);
     });
 
     testWidgets('in English', (tester) async {

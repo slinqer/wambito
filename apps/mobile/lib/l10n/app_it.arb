@@ -957,5 +957,21 @@
   "screenLockTitle": "Conferma che sei tu",
   "screenLockLead": "Questo telefono non ha il blocco schermo. Scrivi la tua chiave di recupero attuale per continuare.",
   "screenLockSubmit": "Conferma",
-  "screenLockBusy": "Verifica…"
+  "screenLockBusy": "Verifica…",
+  "protectTitle": "Proteggi i tuoi dati",
+  "protectLead": "I tuoi dati vivono cifrati su questo telefono. Se lo perdi, così li riapri.",
+  "protectCount": "{done} di 2",
+  "protectRecoveryTitle": "Chiave di recupero",
+  "protectRecoveryLead": "Una chiave che custodisci tu. Con lei entri e apri i tuoi dati su qualsiasi telefono.",
+  "protectRecoveryGo": "Crea la mia chiave",
+  "protectPasskeyTitle": "Entra con l'impronta",
+  "protectPasskeyLead": "La custodisce il tuo gestore di password. Un tocco e sei di nuovo dentro, con i dati aperti.",
+  "protectPasskeyGo": "Aggiungi la mia impronta",
+  "protectPasskeyNoPrf": "Questa passkey ti fa entrare, ma non può aprire i tuoi dati. Aggiungi una chiave di recupero.",
+  "protectEmailTitle": "Crea il tuo account",
+  "protectEmailLead": "Con la tua email entri dal web, usi gli assistenti e torni dentro anche senza l'impronta.",
+  "protectEmailGo": "Aggiungi la mia email",
+  "protectDone": "Fatto",
+  "protectKeySaved": "La tua chiave di recupero è salvata. Tienila dove non si perde.",
+  "protectLockReason": "Conferma che sei tu per creare la tua chiave di recupero"
 }

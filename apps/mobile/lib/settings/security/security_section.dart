@@ -12,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../local/rotate.dart' show NewRecoveryKey;
+import '../../protect/protect_actions.dart' show markRecoveryKeySaved;
+import '../../protect/protect_status.dart' show protectStatusProvider;
 import '../../security/screen_lock.dart';
 import '../../theme/surfaces.dart';
 import '../../theme/text_styles.dart';
@@ -20,6 +22,7 @@ import '../../ui/css_text.dart';
 import '../../ui/lk_theme.dart';
 import '../../ui/press_button.dart';
 import '../../ui/toast.dart';
+import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import '../passkeys_section.dart' show passkeyDay;
 import '../settings_parts.dart';
 import 'approve_device_screen.dart';
@@ -131,6 +134,16 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       }
       toasts.say(l10n.settingsSecurityNewKeySaved);
       _changed();
+      // A key the person saw is saved: "Protect your data" counts it, on every phone of the account.
+      final session = ref.read(vaultSessionProvider);
+      if (session != null) {
+        unawaited(
+          markRecoveryKeySaved(
+            session,
+            DateTime.now(),
+          ).then((_) => ref.invalidate(protectStatusProvider)).catchError((Object _) {}),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

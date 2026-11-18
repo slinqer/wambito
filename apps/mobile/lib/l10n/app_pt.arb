@@ -957,5 +957,21 @@
   "screenLockTitle": "Confirma que és tu",
   "screenLockLead": "Este telemóvel não tem bloqueio de ecrã. Escreve a tua chave de recuperação atual para continuar.",
   "screenLockSubmit": "Confirmar",
-  "screenLockBusy": "A verificar…"
+  "screenLockBusy": "A verificar…",
+  "protectTitle": "Protege os teus dados",
+  "protectLead": "Os teus dados vivem cifrados neste telemóvel. Se o perderes, é assim que os voltas a abrir.",
+  "protectCount": "{done} de 2",
+  "protectRecoveryTitle": "Chave de recuperação",
+  "protectRecoveryLead": "Uma chave que guardas tu. Com ela entras e abres os teus dados em qualquer telemóvel.",
+  "protectRecoveryGo": "Criar a minha chave",
+  "protectPasskeyTitle": "Entrar com impressão digital",
+  "protectPasskeyLead": "O teu gestor de palavras-passe guarda-a. Um toque e voltas a entrar, com os teus dados abertos.",
+  "protectPasskeyGo": "Adicionar a minha impressão digital",
+  "protectPasskeyNoPrf": "Esta chave de acesso deixa-te entrar, mas não consegue abrir os teus dados. Adiciona uma chave de recuperação.",
+  "protectEmailTitle": "Criar a tua conta",
+  "protectEmailLead": "Com o teu email entras pela web, usas os assistentes e voltas a entrar mesmo sem a impressão digital.",
+  "protectEmailGo": "Adicionar o meu email",
+  "protectDone": "Feito",
+  "protectKeySaved": "A tua chave de recuperação ficou guardada. Guarda-a onde não se perca.",
+  "protectLockReason": "Confirma que és tu para criar a tua chave de recuperação"
 }

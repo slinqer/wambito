@@ -4335,5 +4335,74 @@
   "screenLockBusy": "Comprobando…",
   "@screenLockBusy": {
     "description": "Sensitive operation without a screen lock: while the key is tried."
+  },
+  "protectTitle": "Protege tus datos",
+  "@protectTitle": {
+    "description": "Settings: the block that offers ways back to the data for an account without email."
+  },
+  "protectLead": "Tus datos viven cifrados en este teléfono. Si lo pierdes, con esto vuelves a abrirlos.",
+  "@protectLead": {
+    "description": "Settings → Protect your data: what the block is for."
+  },
+  "protectCount": "{done} de 2",
+  "@protectCount": {
+    "description": "Settings → Protect your data: how many of the two ways back are done.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "protectRecoveryTitle": "Clave de recuperación",
+  "@protectRecoveryTitle": {
+    "description": "Settings → Protect your data: step 1."
+  },
+  "protectRecoveryLead": "Una clave que guardas tú. Con ella entras y abres tus datos en cualquier teléfono.",
+  "@protectRecoveryLead": {
+    "description": "Settings → Protect your data: what the recovery key does."
+  },
+  "protectRecoveryGo": "Crear mi clave",
+  "@protectRecoveryGo": {
+    "description": "Settings → Protect your data: makes and shows the recovery key."
+  },
+  "protectPasskeyTitle": "Entrar con tu huella",
+  "@protectPasskeyTitle": {
+    "description": "Settings → Protect your data: step 2."
+  },
+  "protectPasskeyLead": "Tu gestor de contraseñas la guarda. Una huella y vuelves a entrar, con tus datos abiertos.",
+  "@protectPasskeyLead": {
+    "description": "Settings → Protect your data: what the passkey does."
+  },
+  "protectPasskeyGo": "Agregar mi huella",
+  "@protectPasskeyGo": {
+    "description": "Settings → Protect your data: adds a passkey that opens the data."
+  },
+  "protectPasskeyNoPrf": "Esta llave de acceso te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
+  "@protectPasskeyNoPrf": {
+    "description": "Settings → Protect your data: a passkey was added but the password manager gave no PRF (spec 5.2, fixed sentence)."
+  },
+  "protectEmailTitle": "Crear tu cuenta",
+  "@protectEmailTitle": {
+    "description": "Settings → Protect your data: step 3, adding an email."
+  },
+  "protectEmailLead": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque pierdas la huella.",
+  "@protectEmailLead": {
+    "description": "Settings → Protect your data: what an email adds."
+  },
+  "protectEmailGo": "Agregar mi correo",
+  "@protectEmailGo": {
+    "description": "Settings → Protect your data: opens adding an email."
+  },
+  "protectDone": "Listo",
+  "@protectDone": {
+    "description": "Settings → Protect your data: a step that is done."
+  },
+  "protectKeySaved": "Tu clave de recuperación quedó guardada. Guárdala donde no se pierda.",
+  "@protectKeySaved": {
+    "description": "Settings → Protect your data: the first recovery key was saved."
+  },
+  "protectLockReason": "Confirma que eres tú para crear tu clave de recuperación",
+  "@protectLockReason": {
+    "description": "Settings → Protect your data: the screen lock prompt before the recovery key is made."
   }
 }

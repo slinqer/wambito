@@ -75,15 +75,20 @@ final screenLockProvider = Provider<ScreenLock>((ref) => LocalAuthScreenLock());
 /// The lock passed: true. The prompt closed: false. No lock on the phone: a sheet asks the current
 /// recovery key, checked by [checkRecoveryKey] (`KeysError` `bad_recovery_key` or
 /// `wrong_recovery_key` keep the sheet open with the reason); true once it opens the account.
+///
+/// [noKeyYet]: the account has no recovery key the person saw (its first one is being made, phone-first
+/// ruling 3), so with no lock there is nothing to type and it goes straight on; a lock is still asked.
 Future<bool> confirmSensitive(
   BuildContext context,
   WidgetRef ref, {
   required String reason,
   required Future<void> Function(String text) checkRecoveryKey,
+  bool noKeyYet = false,
 }) async {
   final check = await ref.read(screenLockProvider).confirm(reason);
   if (check == LockCheck.passed) return true;
   if (check == LockCheck.cancelled || !context.mounted) return false;
+  if (noKeyYet) return true;
   final l10n = AppLocalizations.of(context);
   final done = await LkSheet.show<bool>(
     context,
