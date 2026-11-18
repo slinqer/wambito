@@ -4728,5 +4728,26 @@
   "signinApproveUnconfirmedLead": "Lo envié, pero no pude ver que el computador lo recibiera. Míralo: si no inició sesión, empieza de nuevo allí.",
   "@signinApproveUnconfirmedLead": {
     "description": "Approving a web sign-in: unconfirmed pickup, what to do."
+  },
+  "signinNoticeTitle": "Se abrió una sesión en {label}",
+  "@signinNoticeTitle": {
+    "description": "The sign-in notice: a new device opened a session. The sheet's title.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "signinNoticeBody": "Si no fuiste tú, quita ese dispositivo ahora.",
+  "signinNoticeNotMe": "No fui yo",
+  "signinNoticeOk": "Entendido",
+  "signinNoticeMore": "{count, plural, =1{Y se agregó {count} dispositivo más.} other{Y se agregaron {count} dispositivos más.}}",
+  "@signinNoticeMore": {
+    "description": "The sign-in notice: how many more new devices there are besides the one named.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

@@ -2240,5 +2240,10 @@
   "signinApproveLocked": "Open your data on this phone first.",
   "signinApproveFromLink": "This came from a link: approve only if you are signing in on a computer in front of you.",
   "signinApproveUnconfirmedTitle": "Sent",
-  "signinApproveUnconfirmedLead": "I sent it, but I could not see the computer take it. Look at it: if it is not signed in, start again there."
+  "signinApproveUnconfirmedLead": "I sent it, but I could not see the computer take it. Look at it: if it is not signed in, start again there.",
+  "signinNoticeTitle": "A session was opened on {label}",
+  "signinNoticeBody": "If it wasn't you, remove that device now.",
+  "signinNoticeNotMe": "That wasn't me",
+  "signinNoticeOk": "OK",
+  "signinNoticeMore": "{count, plural, =1{{count} more device was added too.} other{{count} more devices were added too.}}"
 }

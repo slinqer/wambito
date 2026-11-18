@@ -1043,5 +1043,10 @@
   "signinApproveLocked": "Apri prima i tuoi dati su questo telefono.",
   "signinApproveFromLink": "Questo è arrivato da un link: approva solo se stai accedendo su un computer davanti a te.",
   "signinApproveUnconfirmedTitle": "Inviato",
-  "signinApproveUnconfirmedLead": "L'ho inviato, ma non ho visto il computer riceverlo. Controllalo: se non ha effettuato l'accesso, ricomincia lì."
+  "signinApproveUnconfirmedLead": "L'ho inviato, ma non ho visto il computer riceverlo. Controllalo: se non ha effettuato l'accesso, ricomincia lì.",
+  "signinNoticeTitle": "È stata aperta una sessione su {label}",
+  "signinNoticeBody": "Se non sei stato tu, rimuovi subito quel dispositivo.",
+  "signinNoticeNotMe": "Non sono stato io",
+  "signinNoticeOk": "OK",
+  "signinNoticeMore": "{count, plural, =1{È stato aggiunto anche {count} altro dispositivo.} other{Sono stati aggiunti anche altri {count} dispositivi.}}"
 }

@@ -245,6 +245,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   seen shows "Sent"; through `SecurityApi.findSigninRequest`; registered in `openSigninApprovalsProvider` while
   open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
+  `signin_notice.dart` (phone-first spec 8.3, ruling 16): `newDevices`, `SeenDevicesStore` (`wambito.vault.<userId>.seenDevices`),
+  `showSigninNotice`, and `SigninNoticeHost` (in `app.dart`'s `builder`, last of the start and resume hooks): with the vault Ready and
+  home free it says "A session was opened on {label}" for any device wrap not this phone's and not in the last look, browsers and
+  phones added by pairing alike, and the approving phone too (no special case: the first look records silently). "That wasn't me"
+  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device, or pushes `/settings` for several; "OK" and "That wasn't me"
+  record the look, closing the sheet any other way does not. A `plain` account has no `SecurityApi`, so no `/v2/keys` call.
   Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
@@ -610,6 +616,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   captures a new session takes over from another account); the merge namespace `mergeNamespace` in
   `lib/local/merge.dart` (merged ids derive from it).
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
+- `wambito.vault.<userId>.seenDevices` (secure storage) is the JSON list of device wrap ids the sign-in notice last looked at; it goes with `KeyStorage.deleteAll`. Renaming it would make every phone's next look silent.
 - `session.provisional` (secure storage, `SessionStore.provisionalKey`): the offline first run's local vault id,
   written before its vault is made (a restart reopens it, never a second); `session.provisionalToken`
   (`provisionalTokenKey`): the token of the user it is being promoted into, kept until the session is that user's;
@@ -624,7 +631,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
-  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed`, `home.protect.<userId>` and `wambito.protect.<userId>.keyAfterClaim`; channel
+  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed`, `home.protect.<userId>` and `wambito.protect.<userId>.keyAfterClaim` and `wambito.vault.<userId>.seenDevices`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
   Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;

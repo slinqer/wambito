@@ -14,6 +14,7 @@ import 'notices/notice_sync.dart';
 import 'router.dart';
 import 'settings/locale_resolution.dart';
 import 'settings/preferences.dart';
+import 'settings/security/signin_notice.dart';
 import 'theme/theme.dart';
 import 'ui/toast.dart';
 import 'vault/preview_sync.dart';
@@ -76,8 +77,11 @@ class WambitoApp extends ConsumerWidget {
       localeResolutionCallback: resolveAppLocale,
       // The web's `Celebration` and `ToastProvider`, above every screen and sheet: the toasts under
       // the party (it keeps clear of them).
-      builder: (context, child) =>
-          withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+      // The sign-in notice comes last of the start and resume hooks (after the seen ping): once the
+      // vault is Ready, over home, it says which devices signed in since the last look.
+      builder: (context, child) => SigninNoticeHost(
+        child: withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+      ),
       routerConfig: ref.watch(routerProvider),
       debugShowCheckedModeBanner: false,
     );
