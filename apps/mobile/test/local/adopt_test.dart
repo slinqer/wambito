@@ -177,6 +177,9 @@ void main() {
         homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
         autoCapturePlatformProvider.overrideWithValue(capture),
         forgetVaultProvider.overrideWithValue((id, storage) => forget(id)),
+        vaultHoldReaderProvider.overrideWithValue(
+          (id) => vaultHoldOf(id, directory: dir.path, factory: databaseFactoryFfi),
+        ),
         adoptDepsProvider.overrideWith((ref) => deps()),
       ],
     );
