@@ -158,8 +158,17 @@ void main() {
       sessionOf(c).switchTo(signedIn('tokB'));
       await until(() => c.read(knownPlainProvider));
       await until(() => !File(p.join(vaultDir.path, vaultFileName('user_a'))).existsSync());
-      final left = await const FlutterSecureStorage().readAll();
-      expect(left.keys.where((k) => k.contains('user_a')), isEmpty);
+      // The sweep deletes the file first and the keys after it: wait for those too.
+      Iterable<String> left = const [];
+      final stop = DateTime.now().add(const Duration(seconds: 5));
+      do {
+        left = (await const FlutterSecureStorage().readAll()).keys.where(
+          (k) => k.contains('user_a'),
+        );
+        if (left.isEmpty) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      } while (DateTime.now().isBefore(stop));
+      expect(left, isEmpty);
     });
   });
 
