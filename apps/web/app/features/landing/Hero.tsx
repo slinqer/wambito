@@ -9,8 +9,8 @@ import { NewTabHint } from "./NewTabHint.tsx";
 
 /**
  * The headline with "lukas" ("money", "dinheiro", "soldi") on a gold marker, taking turns with what
- * money is called elsewhere, one line about what Wambito does, one primary action and "Pruébalo sin
- * cuenta" (the demo) beside it. Without an app to open
+ * money is called elsewhere, one line about what Wambito does, one primary action, "Crear cuenta"
+ * (`/create-account`), and "Pruébalo sin cuenta" (the demo) beside it. Without an app to open
  * (landing-only, coming soon) there is no demo either, so only the primary action shows.
  */
 export function Hero() {

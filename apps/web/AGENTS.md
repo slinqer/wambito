@@ -171,7 +171,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `GET /v2/keys` shows the prepared wrap, `landed()`). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
   the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
   `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `relay.ts`: what `pairing.ts` and `signin.ts` share (`PairingClock`, which `pairing.ts`
-  re-exports, `realClock`, `deferred<T>()`, `zeroPrivate(key)`, `sameBytes`, `key32(text, onBad)`).
+  re-exports, `realClock`, `deferred<T>()`, `zeroPrivate(key)`, `sameBytes`, `key32(text, onBad)`, `problemCode(response)`
+  (the problem body's `code`), `retryAfter(response)` (`retry-after` in seconds)).
   `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
   request, or the approver's lookup) → `expired` and on
@@ -471,7 +472,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
 - e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
   seed:admin` (`dev-admin`, admin spec), `seed:e2e-plain-user <email> [lang]` (a plain user,
   not onboarded, with the starter data; `signUpNewUser` runs it through `seedPlainUser` before
-  its email sign-in, so the plain-app specs test the plain app; `encrypted-sign-up.spec.ts` covers
+  its email sign-in, so the plain-app specs test the plain app and need `docker` on the PATH; `encrypted-sign-up.spec.ts` covers
   the born-encrypted web sign-up) and `seed:e2e-preview` (`preview-e2e`,
   preview@wambito.test, the encrypted-preview account; `E2E_PREVIEW_USER_IDS` defaults to it in
   `docker-compose.yml`). `vault.spec.ts` runs `seed:e2e-preview` itself in `beforeAll`, which
