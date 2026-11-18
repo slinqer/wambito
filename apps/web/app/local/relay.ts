@@ -60,3 +60,19 @@ export function key32(text: string, onBad: () => Error): Uint8Array {
   if (bytes.length !== 32) throw onBad();
   return bytes;
 }
+
+/** The `code` of a problem body, when it has one. */
+export async function problemCode(response: Response): Promise<string | undefined> {
+  try {
+    const body = (await response.json()) as { code?: unknown };
+    return typeof body.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Seconds from `retry-after`, when it is a whole number of them. */
+export function retryAfter(response: Response): number | undefined {
+  const value = Number(response.headers.get("retry-after"));
+  return Number.isInteger(value) && value >= 0 ? value : undefined;
+}

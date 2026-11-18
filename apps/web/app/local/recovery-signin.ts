@@ -1,5 +1,6 @@
 import { recoveryVerifier, toBase64Url } from "@wambito/crypto";
 import { KeysError, type LocalKeys, parseRecoverySecret, unlockWithRecovery } from "./keys.ts";
+import { retryAfter } from "./relay.ts";
 import { deleteStaleVaults } from "./stale-vaults.ts";
 
 /**
@@ -61,12 +62,7 @@ async function postSignIn(
   if (response.status === 401) throw new KeysError("recovery_key_invalid", 401);
   if (response.status === 403) throw new KeysError("account_suspended", 403);
   if (response.status === 429) {
-    const value = Number(response.headers.get("retry-after"));
-    throw new KeysError(
-      "too_many_requests",
-      429,
-      Number.isInteger(value) && value >= 0 ? value : undefined,
-    );
+    throw new KeysError("too_many_requests", 429, retryAfter(response));
   }
   if (!response.ok) throw new KeysError("server", response.status);
   try {

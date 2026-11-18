@@ -7,7 +7,15 @@ import {
   toBase64Url,
 } from "@wambito/crypto";
 import { enrollDevice, type LocalKeys } from "./keys.ts";
-import { deferred, key32, type PairingClock, realClock, zeroPrivate } from "./relay.ts";
+import {
+  deferred,
+  key32,
+  type PairingClock,
+  problemCode,
+  realClock,
+  retryAfter,
+  zeroPrivate,
+} from "./relay.ts";
 import { deleteStaleVaults } from "./stale-vaults.ts";
 
 /**
@@ -114,21 +122,6 @@ function validStart(body: unknown): boolean {
 }
 
 const tampered = () => new SigninError("tampered");
-
-async function problemCode(response: Response): Promise<string | undefined> {
-  try {
-    const body = (await response.json()) as { code?: unknown };
-    return typeof body.code === "string" ? body.code : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Seconds from `retry-after`, when it is a whole number of them. */
-function retryAfter(response: Response): number | undefined {
-  const value = Number(response.headers.get("retry-after"));
-  return Number.isInteger(value) && value >= 0 ? value : undefined;
-}
 
 /**
  * The signed-out relay for one request: every call first checks the cancel signal and the clock

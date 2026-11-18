@@ -147,6 +147,22 @@ describe("signInWithRecoveryKey", () => {
     expect(unlock).not.toHaveBeenCalled();
   });
 
+  it("a 200 with a body that has no userId is server", async () => {
+    for (const body of [{}, { userId: 7 }, { userId: "" }]) {
+      const api = fakeFetch(() => json(body));
+      const err = await signInWithRecoveryKey(formatRecoveryKey(newRecoverySecret()), {
+        fetch: api.fetch,
+      }).catch((e) => e);
+      expect(err.code).toBe("server");
+    }
+    const garbage = fakeFetch(() => new Response("nope", { status: 200 }));
+    const err = await signInWithRecoveryKey(formatRecoveryKey(newRecoverySecret()), {
+      fetch: garbage.fetch,
+    }).catch((e) => e);
+    expect(err.code).toBe("server");
+    expect(unlock).not.toHaveBeenCalled();
+  });
+
   it("a network failure is offline", async () => {
     const fetch = (async () => {
       throw new TypeError("Failed to fetch");
