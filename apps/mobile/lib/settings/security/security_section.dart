@@ -108,18 +108,36 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      final noKeyYet = await _noKeyYet();
+      if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       final ok = await confirmSensitive(
         context,
         ref,
         reason: l10n.settingsSecurityLockChangeKeys,
         checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
       );
       if (!ok || !mounted) return;
       await ChangeKeysSheet.open(context, security: security, hasPasskeys: hasPasskeys);
       _changed();
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Whether this account has no recovery key to type for the screen lock's fallback: a guest who
+  /// never saved a shown key (ruling 3). An email account whose settings predate
+  /// `recoveryKeySavedAt` still is asked for it (D17).
+  Future<bool> _noKeyYet() async {
+    final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
+    final session = ref.read(vaultSessionProvider);
+    if (!anonymous || session == null) return false;
+    try {
+      return await recoveryKeySavedAt(session.store) == null;
+    } on Object {
+      // Unreadable: the key is asked, as for any account.
+      return false;
     }
   }
 
@@ -131,18 +149,8 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final toasts = ToastHost.of(context);
     setState(() => _busy = true);
     try {
-      // A guest who never saved a shown key has none to type (ruling 3); an email account whose
-      // settings predate `recoveryKeySavedAt` still is asked for it (D17).
-      final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
       final session = ref.read(vaultSessionProvider);
-      var noKeyYet = false;
-      if (anonymous && session != null) {
-        try {
-          noKeyYet = await recoveryKeySavedAt(session.store) == null;
-        } on Object {
-          // Unreadable: the key is asked, as for any account.
-        }
-      }
+      final noKeyYet = await _noKeyYet();
       if (!mounted) return;
       final ok = await confirmSensitive(
         context,

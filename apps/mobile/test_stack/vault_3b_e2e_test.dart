@@ -153,28 +153,10 @@ void main() {
     expect(found, hasLength(1));
     expect(found.single['amount'], -_cents);
 
-    // 4. A removes B with its recovery key (A's app closed: the rotation writes through a store of
-    // its own); B's next sync ends deviceRemoved and its vault and keys are gone.
-    final storeA = await SqliteStore.open(
-      userId,
-      directory: a.dir.path,
-      factory: databaseFactoryFfi,
-      background: true,
-    );
-    try {
-      final rotation = await rotateKeys(
-        a.options,
-        store: storeA,
-        remove: [bWrap!],
-        recovery: TypedRecovery(recoveryKey),
-      );
-      final rotated = await rotation.commit();
-      expect(rotated.dropped.map((d) => d.id), contains(bWrap));
-    } finally {
-      await storeA.close();
-    }
-    // A's next sync re-seals the vault under the new key version; B meets it and finds itself gone.
-    expect((await background()).outcome, BackgroundOutcome.changed);
+    // 4. A removes B as Settings → Security does (`SecurityApi.removeDevice`): `DELETE /v2/keys/{id}`
+    // deletes B's wrap and ends its session, with no rotation. B's next sync ends deviceRemoved and
+    // its vault and keys are gone.
+    await keys.api(a.options)('/v2/keys/${bWrap!}', method: 'DELETE');
     expect((await sessionB.sync()).problem, SyncProblemCode.deviceRemoved);
     for (var i = 0; i < 50 && !removedByAccount; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -182,8 +164,8 @@ void main() {
     expect(removedByAccount, isTrue);
     expect(await b.options.storage.deviceWrapId(userId), isNull);
 
-    // 5. A makes a new recovery key: it signs in, the old one does not (the first has the
-    // verifier of the rotation's typed key, so the old key worked until now).
+    // 5. A makes a new recovery key: it signs in, the old one does not (the old key's verifier was
+    // set up with the account, so it worked until now).
     expect((await _recoverySignIn(recoveryKey)).status, 200);
     final fresh = await newRecoveryKey(a.options);
     await fresh.commit();

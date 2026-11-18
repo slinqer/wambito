@@ -228,6 +228,29 @@ void main() {
       // the keys changed: the list is read again
       expect(security.loads, greaterThan(loads));
     });
+
+    testWidgets('a preview guest with no saved key and no lock reaches the sheet', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.changeKeys');
+      // no key to type for the lock: the sheet opens, and its new-key way is there
+      expect(find.byKey(const Key('screenLock.key')), findsNothing);
+      expect(find.byKey(const Key('security.changeKeys.newKey')), findsOneWidget);
+    });
+
+    testWidgets('an email account with no lock is still asked for the key first', (t) async {
+      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.noLock));
+      await tapKey(t, 'security.changeKeys');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+      expect(find.byKey(const Key('security.changeKeys.key')), findsNothing);
+    });
   });
 
   group('a new recovery key', () {
