@@ -105,6 +105,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+/// How long a guest waits for the protect status before the warning shows without it.
+const _statusWait = Duration(seconds: 4);
+
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Signing out or changing server is under way (the old server is told, if it answers).
   bool _busy = false;
@@ -125,19 +128,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final hold = ref.listenManual(protectStatusProvider, (_, _) {});
     try {
       ProtectStatus? status;
+      var unreadable = false;
       try {
-        status = await ref.read(protectStatusProvider.future);
+        status = await ref.read(protectStatusProvider.future).timeout(_statusWait);
+      } on TimeoutException {
+        // Offline and slow: nothing is known, so the warning shows with the passkey unknown.
+        unreadable = true;
       } on Object {
         status = null;
       }
       if (!mounted) return false;
-      if (status != null) {
-        if (status.protected) return true;
-        var passkeyUnknown = false;
-        try {
-          await ref.read(securitySnapshotProvider.future);
-        } on Object {
-          passkeyUnknown = true;
+      if (status != null || unreadable) {
+        if (status != null && status.protected) return true;
+        var passkeyUnknown = unreadable;
+        if (!unreadable) {
+          try {
+            await ref.read(securitySnapshotProvider.future).timeout(_statusWait);
+          } on Object {
+            passkeyUnknown = true;
+          }
         }
         if (!mounted) return false;
         final choice = await warnUnprotectedLeaving(

@@ -58,11 +58,14 @@ const protectCardMovements = 20;
 /// Whether the card is due: none dismissed yet, 7 days since the first open or [movements] of 20;
 /// one dismissal, 14 days since it; two or more, 30 days since the last.
 bool protectCardDue(ProtectCardState state, {required int movements, required DateTime now}) {
+  // A clock that moved back (or a stored time from a jump forward) counts as now: the wait restarts
+  // from the present instead of waiting out a date in the future.
+  DateTime upToNow(DateTime t) => t.isAfter(now) ? now : t;
   if (state.dismissals <= 0) {
-    return now.difference(state.firstOpen) >= const Duration(days: 7) ||
+    return now.difference(upToNow(state.firstOpen)) >= const Duration(days: 7) ||
         movements >= protectCardMovements;
   }
-  final last = state.lastDismissed ?? state.firstOpen;
+  final last = upToNow(state.lastDismissed ?? state.firstOpen);
   final wait = Duration(days: state.dismissals == 1 ? 14 : 30);
   return now.difference(last) >= wait;
 }
@@ -128,8 +131,14 @@ class ProtectCardController extends AsyncNotifier<bool> {
     }
     _userId = userId;
     _state = state;
-    final movements = (await session.store.list(RecordType.transaction)).length;
-    return protectCardDue(state, movements: movements, now: now);
+    // Movements only matter before the first dismissal and before a week is out: skip the listing
+    // (it runs on every vault commit) once the answer does not depend on it.
+    var due = protectCardDue(state, movements: 0, now: now);
+    if (!due && state.dismissals <= 0) {
+      final movements = (await session.store.list(RecordType.transaction)).length;
+      due = protectCardDue(state, movements: movements, now: now);
+    }
+    return due;
   }
 
   /// "Not now": gone until the next wait is out, and kept.
@@ -143,12 +152,13 @@ class ProtectCardController extends AsyncNotifier<bool> {
       dismissals: before.dismissals + 1,
     );
     _state = next;
-    state = const AsyncData(false);
+    // Kept first: a rebuild triggered by a commit meanwhile reads the dismissal, not the old state.
     try {
       await ref.read(protectCardStoreProvider).write(userId, next);
     } on Object {
       // Not kept: the card is back at the next start.
     }
+    if (ref.mounted) state = const AsyncData(false);
   }
 }
 

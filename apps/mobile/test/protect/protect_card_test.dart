@@ -44,6 +44,22 @@ void main() {
     expect(due(fifth, day(150)), isTrue);
   });
 
+  test('a clock that moved back restarts the wait from now', () {
+    final later = ProtectCardState(firstOpen: day(30));
+    // now (day 10) is before firstOpen: counts as now, so not due until 7 days after now
+    expect(due(later, day(10)), isFalse);
+    final dismissed = ProtectCardState(firstOpen: day(0), lastDismissed: day(40), dismissals: 1);
+    expect(due(dismissed, day(10)), isFalse);
+  });
+
+  test('a time corrected after a forward jump is not stuck in the future', () {
+    final dismissed = ProtectCardState(firstOpen: day(0), lastDismissed: day(400), dismissals: 1);
+    // the clock is back at day 20: the dismissal counts as day 20, due again 14 days on
+    expect(due(dismissed, day(20)), isFalse);
+    final reread = ProtectCardState(firstOpen: day(0), lastDismissed: day(20), dismissals: 1);
+    expect(due(reread, day(34)), isTrue);
+  });
+
   test('the state round-trips through JSON, and junk reads as nothing', () {
     final state = ProtectCardState(firstOpen: firstOpen, lastDismissed: day(3), dismissals: 2);
     final back = ProtectCardState.fromJson(state.toJson())!;

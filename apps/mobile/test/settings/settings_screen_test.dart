@@ -251,6 +251,19 @@ void main() {
       },
     );
 
+    testWidgets('a preview guest\'s home menu has no Guarda tu progreso (ruling 21)', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        overrides: [isPreviewProvider.overrideWithValue(true)],
+      );
+      await openAccountMenu(tester);
+      expect(find.byKey(const Key('home.settings')), findsOneWidget);
+      expect(find.byKey(const Key('home.saveProgress')), findsNothing);
+    });
+
     testWidgets('someone with an email sees no Guarda tu progreso anywhere', (tester) async {
       await pumpSettingsApp(tester);
       await openAccountMenu(tester);
