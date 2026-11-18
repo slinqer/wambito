@@ -21,6 +21,10 @@ enum BackgroundOutcome {
   /// No session, or the sync was refused with a 401.
   signedOut,
 
+  /// The sync was refused with 401 `user_deleted`: the account is gone. Only the app adopts its
+  /// vault (phone-first spec 10, Review Focus 2); the run touches nothing more.
+  userDeleted,
+
   /// The account is not a `preview` one: nothing here is for this engine.
   notPreview,
 
@@ -138,6 +142,7 @@ class _Borrowed implements VaultLease {
 
 const _ended = {
   SyncProblemCode.unauthorized,
+  SyncProblemCode.userDeleted,
   SyncProblemCode.sessionChanged,
   SyncProblemCode.deviceRemoved,
 };
@@ -258,6 +263,7 @@ Future<BackgroundReport> runBackground(
       outcome = BackgroundOutcome.changed;
     }
     if (problem == SyncProblemCode.unauthorized) outcome = BackgroundOutcome.signedOut;
+    if (problem == SyncProblemCode.userDeleted) outcome = BackgroundOutcome.userDeleted;
     // Stopped by its own deadline, a run that saved something still reports it (the app refreshes,
     // the captures are notified); one that saved nothing is retried like a busy one.
     final cut = past();

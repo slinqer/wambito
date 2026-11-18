@@ -300,6 +300,53 @@ void main() {
       expect(deleted, isEmpty);
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
     });
+
+    // Phone-first spec 10 changes nothing for a `plain` account: whatever the 401's code, today's
+    // handling (the session ends, nothing wiped, nothing adopted, no new user).
+    Future<void> rememberPlain() => const EncryptionStore().remember(
+      'tok',
+      VaultAccount(
+        owner: sessionOwnerOf('tok'),
+        profile: const VaultProfile(
+          id: 'user_p',
+          email: 'ana@wambito.test',
+          isAnonymous: false,
+          locale: 'es',
+          timezone: 'America/Bogota',
+        ),
+        mode: EncryptionMode.plain,
+      ),
+    );
+
+    test(
+      "a plain account's 401 unauthenticated signs out as today, nothing wiped or adopted",
+      () async {
+        for (final code in ['unauthenticated', 'user_deleted', 'device_removed']) {
+          FlutterSecureStorage.setMockInitialValues({
+            SessionStore.tokenKey: 'tok',
+            SessionStore.guestKey: 'false',
+            SessionStore.onboardingKey: 'done',
+            'wambito.vault.user_q.current': '1',
+          });
+          await rememberPlain();
+          _log.clear();
+          auth = FakeAuthApi()..failures['isGuest'] = AuthFailure(code: code, status: 401);
+          final container = containerWith();
+          final controller = container.read(sessionProvider.notifier);
+          await controller.ready;
+          await controller.refreshed;
+
+          expect(container.read(sessionProvider).status, SessionStatus.signedOut, reason: code);
+          expect(deleted, isEmpty, reason: code);
+          expect(_log, isNot(contains('vault wiped')), reason: code);
+          expect(auth.signInAsGuestCalls, 0, reason: code);
+          final left = await kept();
+          expect(left.containsKey(EncryptionStore.accountKey), isTrue, reason: code);
+          expect(left['wambito.vault.user_q.current'], '1', reason: code);
+          expect(left.containsKey(adoptTokenKey), isFalse, reason: code);
+        }
+      },
+    );
   });
 
   group('reinstall', () {

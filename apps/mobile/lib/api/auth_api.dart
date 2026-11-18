@@ -31,9 +31,18 @@ typedef RecoverySignedInAs = ({String token, String userId});
 /// has the welcome to do. The web decides the welcome with `onboardingCompletedAt` (apps/web/app/
 /// auth/session.ts, `requireOnboarded`); a guest has none, as the web has no guests.
 class AccountStanding {
-  const AccountStanding({required this.guest, required this.onboardingPending, this.userId});
+  const AccountStanding({
+    required this.guest,
+    required this.onboardingPending,
+    this.userId,
+    this.encrypted = false,
+  });
 
   final bool guest;
+
+  /// The account's finances are end-to-end encrypted (`encryption: preview`): they live in a vault
+  /// on the phone, never on the server in clear.
+  final bool encrypted;
 
   /// The account's id, when the answer had it.
   final String? userId;
@@ -95,7 +104,10 @@ abstract interface class AuthApi {
   Future<bool> isGuest(String token);
 
   /// Whether the user behind [token] is a guest and has the welcome to do (`GET /v1/me`).
-  Future<AccountStanding> standing(String token);
+  /// [userId], the account the phone kept for that session, goes as `x-wambito-user` (ruling 17):
+  /// a session whose user was deleted then fails with the 401 code `user_deleted` instead of
+  /// `unauthenticated` (lib/api/unauthorized.dart).
+  Future<AccountStanding> standing(String token, {String? userId});
 
   /// Marks the welcome done for the account behind [token] (`PATCH /v1/me` with
   /// `onboardingCompleted`). The API stamps it once; a later call keeps the first time.
@@ -238,14 +250,15 @@ class HttpAuthApi implements AuthApi {
   });
 
   @override
-  Future<AccountStanding> standing(String token) => _settle(() async {
-    final response = await _api.getMe(headers: _bearer(token));
+  Future<AccountStanding> standing(String token, {String? userId}) => _settle(() async {
+    final response = await _api.getMe(headers: {..._bearer(token), 'x-wambito-user': ?userId});
     final profile = response.data;
     if (profile == null) throw const AuthFailure(status: 500);
     return AccountStanding(
       guest: profile.isAnonymous,
       onboardingPending: !profile.isAnonymous && profile.onboardingCompletedAt == null,
       userId: profile.id,
+      encrypted: profile.encryption == ProfileEncryptionEnum.preview,
     );
   });
 

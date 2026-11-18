@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -8,7 +10,11 @@ import '../capture_auto/capture_platform.dart';
 import '../crypto/recovery.dart' show recoveryVerifier;
 import '../home/home_cache.dart';
 import '../home/widget_sync.dart';
+import '../local/adopt.dart';
 import '../local/keys.dart' show keysParseRecoveryKey;
+import '../local/sqlite_store.dart';
+import '../local/vault_lock.dart' show waitLease;
+import '../local/vault_session.dart' show appLeaseWait;
 import '../offline/pending_saves.dart';
 import '../storage/secure_storage.dart';
 import 'auth_api.dart';
@@ -17,6 +23,7 @@ import 'device.dart';
 import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
+import 'unauthorized.dart';
 import '../vault/encryption_mode.dart'
     show
         EncryptionMode,
@@ -189,6 +196,8 @@ class SessionController extends Notifier<SessionState> {
     // Before the first read: items kept with the old accessibility are rewritten (iOS only).
     await migrateKeychainAccessibility(appSecureStorage, backgroundReadableKeys);
     final stored = await _store.read();
+    // Read before the session is out: the start's `GET /v1/me` names it at once.
+    _keptAtStart = stored == null ? null : await _keptIdOf(stored.token);
     state = stored == null ? SessionState.signedOut : SessionState.signedIn(stored);
     if (stored == null) unawaited(_sweepSignedOut());
     return stored;
@@ -212,7 +221,8 @@ class SessionController extends Notifier<SessionState> {
   /// an account whose welcome was done elsewhere. Offline, the stored session stands.
   Future<void> _refresh(StoredSession stored) async {
     try {
-      final standing = await _auth.standing(stored.token);
+      // Naming the account kept for the session (ruling 17): a deleted one says `user_deleted`.
+      final standing = await _auth.standing(stored.token, userId: _keptAtStart);
       if (!ref.mounted || state.stored?.token != stored.token) return;
       // What the server says about the welcome wins over what was kept (another phone, or the web,
       // may have finished it).
@@ -230,10 +240,23 @@ class SessionController extends Notifier<SessionState> {
         _sendQueuedCaptures(stored.token, standing.userId);
       }
     } on AuthFailure catch (failure) {
-      // The vault stays for the account's next sign-in ([sessionExpired]).
+      // As its code says ([sessionEnded]): an expired session keeps the vault for the account's
+      // next sign-in, a removed device wipes it, a deleted account's is adopted.
       if (failure.status == 401 && state.stored?.token == stored.token) {
-        await sessionExpired(token: stored.token);
+        await sessionEnded(token: stored.token, kind: unauthorizedOf(failure.code));
       }
+    }
+  }
+
+  /// The account kept for the stored session at start ([_restore]).
+  String? _keptAtStart;
+
+  /// The account id kept for the session of [token] (null when none, or unreadable).
+  Future<String?> _keptIdOf(String token) async {
+    try {
+      return (await ref.read(encryptionStoreProvider).recall(token))?.profile.id;
+    } on Object {
+      return null;
     }
   }
 
@@ -649,6 +672,105 @@ class SessionController extends Notifier<SessionState> {
     if (state.stored?.token == stored) state = SessionState.signedOut;
   }
 
+  /// The server no longer knows the session of [token] (a 401), and [kind] (its code,
+  /// lib/api/unauthorized.dart) says why (phone-first spec 10 step 1). Nothing wipes or adopts on a
+  /// guess: only a `preview` account's explicit codes do, and a `plain` account (or one whose mode
+  /// was never learned) keeps today's handling, [sessionExpired], whatever the code.
+  /// - [Unauthorized.expired]: [sessionExpired] (the vault waits for the account's next sign-in);
+  /// - [Unauthorized.deviceRemoved]: this phone was removed (3a 6.5): the vault, the home cache and
+  ///   the widget's figures are wiped, then the phone is signed out;
+  /// - [Unauthorized.userDeleted]: [adoptOrphan] keeps the data under a new anonymous user (or, with
+  ///   no data, wipes and signs out). Offline it waits, the session as it was, for the next start or
+  ///   resume ([resumeAdoptions]).
+  Future<void> sessionEnded({String? token, required Unauthorized kind}) async {
+    if (kind == Unauthorized.expired) return sessionExpired(token: token);
+    await ready;
+    final stored = state.stored?.token;
+    if (stored == null || (token != null && token != stored)) return;
+    final userId = await _previewAccountOf(stored);
+    if (userId == null) return sessionExpired(token: stored);
+    switch (kind) {
+      case Unauthorized.deviceRemoved:
+        await _wipeAndSignOut(stored);
+      case Unauthorized.userDeleted:
+        await _adopting(() => adoptOrphan(userId, _adoptDeps()));
+      case Unauthorized.expired:
+        break;
+    }
+  }
+
+  /// The id of the `preview` account of the session [token], as the phone kept it for that session
+  /// (every answer of `GET /v1/me` keeps it); null when it is `plain` or not known. No network.
+  Future<String?> _previewAccountOf(String token) async {
+    try {
+      final kept = await ref.read(encryptionStoreProvider).recall(token);
+      return kept != null && kept.mode == EncryptionMode.preview ? kept.profile.id : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The adoption in flight: a second ask (the start's 401, the gate's, a resume) shares it.
+  Future<void>? _adoption;
+
+  Future<void> _adopting(Future<Object?> Function() run) async {
+    final running = _adoption ??= () async {
+      try {
+        await run();
+      } on Object {
+        // Nothing is lost: the vault stays held, and the next start or resume goes on.
+      }
+    }().whenComplete(() => _adoption = null);
+    await running;
+  }
+
+  /// At start and on resume (app.dart): an adoption that did not finish (a crash, no network) goes
+  /// on ([resumeAdoption]), when the phone is signed out or still in the deleted account's session.
+  Future<void> resumeAdoptions() async {
+    await ready;
+    if (!ref.mounted) return;
+    await _adopting(() => resumeAdoption(_adoptDeps()));
+  }
+
+  /// [adoptDepsProvider] with the session's part: the new user's session, the wipe's sign-out, and
+  /// which held vault may be adopted now.
+  AdoptDeps _adoptDeps() => ref
+      .read(adoptDepsProvider)
+      .withSession(
+        onAdopted: (token, {required fromUserId}) async {
+          // Before the token: a process killed right after still hands the captures over.
+          await ref.read(captureHandoverProvider).keep(token, fromUserId);
+          await _signedIn(token, guest: true, capturesFrom: fromUserId);
+        },
+        onWiped: (oldUserId) async {
+          final token = state.stored?.token;
+          if (token != null && await _accountIdOf(token) == oldUserId) {
+            await _wipeAndSignOut(token);
+          } else {
+            await _forgetKept(oldUserId, token ?? '');
+          }
+        },
+        mayResume: (oldUserId) async {
+          final token = state.stored?.token;
+          return token == null || await _accountIdOf(token) == oldUserId;
+        },
+      );
+
+  /// This phone was removed from the account, or its deleted account's vault was empty: what the
+  /// session left goes (the home cache, the saves waiting for the network, the vault, the widget's
+  /// figures, the queued captures), then the session of [token], unless a newer one came meanwhile.
+  Future<void> _wipeAndSignOut(String token) async {
+    ref.read(signInRecoveryKeyProvider).clear();
+    await clearHomeCache(ref.read(homeCacheStoreProvider));
+    await clearPendingSaves(ref.read(pendingSavesStoreProvider));
+    await _forgetVault(token: token);
+    await ref.read(widgetSyncProvider).signedOut().timeout(widgetWait, onTimeout: () {});
+    if (state.stored?.token != token) return;
+    _forgetCaptures();
+    await _store.clear();
+    if (state.stored?.token == token) state = SessionState.signedOut;
+  }
+
   /// The account was deleted on the server (or the server says the session is gone, which comes to
   /// the same for this phone): its session ends here without asking the server to end it. The home
   /// cache and the saves waiting for the network go first and are waited for, then the widget says
@@ -799,7 +921,61 @@ final signInRecoveryKeyProvider = Provider<SignInRecoveryKey>((ref) {
 
 final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 
+/// Secure storage key of the token of the user a deleted account's vault is being adopted into,
+/// kept from its sign-up until the session is that user's (outside `wambito.vault.*`: the old
+/// vault's keys go with it before the session changes). A persistent name.
+const adoptTokenKey = 'wambito.adopt.token';
+
+/// What a deleted account's adoption ([adoptOrphan]) reaches on this phone; tests put their own in.
+/// The session adds its own part ([AdoptDeps.withSession]).
+final adoptDepsProvider = Provider<AdoptDeps>(
+  (ref) => AdoptDeps(
+    auth: ref.read(authApiProvider),
+    keys: ref.read(keyStorageProvider),
+    network: (token) => ApiClient.forServer(
+      ref.read(serverUrlProvider),
+      token: token,
+      hints: ref.read(deviceHintsProvider),
+    ).dio,
+    openStore: (id) => SqliteStore.open(id, background: true),
+    lease: (id) => waitLease(id, holder: 'app', wait: appLeaseWait),
+    forgetVault: (id) => ref.read(forgetVaultProvider)(id, ref.read(keyStorageProvider)),
+    now: DateTime.now,
+    keptToken: () => appSecureStorage.read(key: adoptTokenKey),
+    keepToken: (token) => appSecureStorage.write(key: adoptTokenKey, value: token),
+    forgetToken: () => appSecureStorage.delete(key: adoptTokenKey),
+    // The app's open vault of the old account stops taking writes before the carry reads it.
+    stopWrites: (id) async {
+      final open = ref.read(vaultSessionProvider);
+      if (open != null && open.userId == id) await open.close();
+    },
+  ),
+);
+
 final sessionProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
+
+/// The adoption's start and resume hook (app.dart: after the provisional promotion, before the
+/// merge's, as the plan's lifecycle order has it): [SessionController.resumeAdoptions] once the
+/// stored session is read, and each time the app comes back.
+final adoptionResumeProvider = Provider<void>((ref) {
+  final session = ref.read(sessionProvider.notifier);
+  void resume() => unawaited(session.resumeAdoptions().catchError((Object _) {}));
+  resume();
+  final observer = _AdoptionResumeObserver(resume);
+  WidgetsBinding.instance.addObserver(observer);
+  ref.onDispose(() => WidgetsBinding.instance.removeObserver(observer));
+});
+
+class _AdoptionResumeObserver extends WidgetsBindingObserver {
+  _AdoptionResumeObserver(this._onResume);
+
+  final void Function() _onResume;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onResume();
+  }
+}
 
 /// The network for the signed-in session (rebuilt when the token changes): never the vault's local
 /// backend. The vault's keys and sync, and the account's mode, go through it.

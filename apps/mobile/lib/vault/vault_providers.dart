@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
+import '../api/unauthorized.dart';
 import '../background/background_channel.dart';
 import '../local/db.dart' show pendingChangesInVault, vaultHoldOf;
 import '../local/key_storage.dart';
@@ -195,36 +196,38 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
 
   KeysOptions options() => KeysOptions(userId: userId, dio: network(), storage: storage());
 
-  /// The session ended under the vault (a 401: it expired, or the account signed out
-  /// everywhere): the session ends here, then sign in again. The vault, its keys and its changes not
-  /// sent yet stay for this account's next sign-in ([SessionController.sessionExpired]); unlike the
-  /// web's `signInAgain`, which wipes them (spec 2026-11-12 sections 3 and 6.5: only a sign-out and
-  /// a removed device wipe the vault). The server already dropped the session, so even a guest's
-  /// goes.
-  Future<void> signInAgain() async {
+  /// The session ended under the vault (a 401), and [kind] says why
+  /// ([SessionController.sessionEnded]): it expired or the account signed out everywhere, and the
+  /// vault, its keys and its changes not sent yet stay for this account's next sign-in (unlike the
+  /// web's `signInAgain`, which wipes them: spec 2026-11-12 sections 3 and 6.5); this phone was
+  /// removed (`device_removed`), and the vault is wiped; the account was deleted (`user_deleted`),
+  /// and a new user adopts the vault. The server already dropped the session, so even a guest's goes.
+  Future<void> signInAgain([Unauthorized kind = Unauthorized.expired]) async {
     // A late 401 of a session that is gone never ends the one signed in now.
     if (!current()) return;
     final session = ref.read(sessionProvider.notifier);
     final token = ref.read(sessionProvider).stored?.token;
     try {
-      await session.sessionExpired(token: token);
+      await session.sessionEnded(token: token, kind: kind);
     } on Object {
       // Ended here all the same at the next start (the server says 401).
     }
   }
 
-  /// A 401 from `/v2/keys`: sign in again, the gate stays put.
+  /// A 401 from `/v2/keys`: the session ends as its code says ([signInAgain]), the gate stays put.
   Future<T> signInAgainOn401<T>(Future<T> Function() call) async {
     try {
       return await call();
     } on KeysError catch (error) {
-      if (error.status == 401) unawaited(signInAgain());
+      if (error.status == 401) unawaited(signInAgain(unauthorizedOf(error.code)));
       rethrow;
     }
   }
 
-  /// Who answered the last [sessionUserId]: null is no one (the session is gone).
+  /// Who answered the last [sessionUserId]: null is no one (the session is gone), and
+  /// [nobodyBecause] says why.
   var nobody = false;
+  var nobodyBecause = Unauthorized.expired;
 
   /// Who is signed in now (`GET /v1/me` on the network): null when no one; throws when it cannot
   /// tell.
@@ -233,12 +236,17 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     nobody = token == null;
     if (token == null) return null;
     try {
-      final me = (await read(networkClientProvider).api.getDefaultApi().getMe()).data;
+      // Naming the vault's account (ruling 17): a deleted one answers `user_deleted`.
+      final me = (await read(
+        networkClientProvider,
+      ).api.getDefaultApi().getMe(headers: {'x-wambito-user': userId})).data;
       if (me == null) throw const GateError('server');
       return me.id;
     } on DioException catch (error) {
-      if (error.response?.statusCode != 401) rethrow;
+      final kind = unauthorizedOfError(error);
+      if (kind == null) rethrow;
       nobody = true;
+      nobodyBecause = kind;
       return null;
     }
   }
@@ -248,7 +256,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
   void reload() {
     if (!current()) return;
     if (nobody) {
-      unawaited(signInAgain());
+      unawaited(signInAgain(nobodyBecause));
     } else {
       ref.invalidate(freshVaultAccountProvider);
     }
@@ -315,7 +323,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
             fresh: fresh,
             network: network(),
             storage: storage(),
-            onUnauthorized: () => unawaited(signInAgain()),
+            onUnauthorized: (kind) => unawaited(signInAgain(kind)),
             onSessionChanged: () {
               if (current()) gate.sessionChanged();
             },

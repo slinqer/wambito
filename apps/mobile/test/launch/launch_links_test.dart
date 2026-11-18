@@ -53,10 +53,10 @@ class _HangingProfile extends FakeAuthApi {
   final hold = Completer<void>();
 
   @override
-  Future<AccountStanding> standing(String token) async {
+  Future<AccountStanding> standing(String token, {String? userId}) async {
     calls.add('isGuest $token');
     await hold.future;
-    return super.standing(token);
+    return super.standing(token, userId: userId);
   }
 }
 

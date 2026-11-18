@@ -94,9 +94,16 @@ class FakeAuthApi implements AuthApi {
     return guests[token] ?? false;
   }
 
+  /// The `x-wambito-user` each `GET /v1/me` of [standing] named, in order (null: none).
+  final standingUsers = <String?>[];
+
+  /// Tokens whose account `GET /v1/me` says is `plain`; every other one is `preview`.
+  final plainTokens = <String>{};
+
   @override
-  Future<AccountStanding> standing(String token) async {
+  Future<AccountStanding> standing(String token, {String? userId}) async {
     calls.add('isGuest $token');
+    standingUsers.add(userId);
     _fail('isGuest');
     final guest = guests[token] ?? false;
     return AccountStanding(
@@ -104,6 +111,7 @@ class FakeAuthApi implements AuthApi {
       // Like the API's profile: a guest has no welcome to finish.
       onboardingPending: !guest && (pendingOnboarding[token] ?? false),
       userId: accounts[token] ?? account,
+      encrypted: !plainTokens.contains(token),
     );
   }
 

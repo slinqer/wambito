@@ -139,7 +139,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   widget and due effects (each best effort: one that throws skips neither the other nor the ack), then `ack` last
   (a crash leaves the queue; the next run merges). A run has a deadline (`BackgroundDeps.deadline`: 20 s on iOS,
   8 min on Android, inside the native budgets): past it the sync stops at its next fence, the effects are skipped,
-  what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. `queued_capture.dart`
+  what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. A sync refused with
+  401 `user_deleted` ends `userDeleted` (no effects, no hold, nothing adopted: only the app adopts, Review Focus 2;
+  Android's `SyncWorker` retries it like `failed`). `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
   The vault lease (`lib/local/vault_lock.dart`, `tryLease` / `waitLease`) is what lets the app and a headless engine
   share one vault file: a lock file `wambito-vault-<userId>.db-lock` in the vault folder, holder `app` or `background`,
@@ -213,11 +215,35 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
   (`forgetVault`), the kept account and mode, before the token goes; Settings asks
   `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
-  A 401 (session expired, signed out everywhere: `_refresh` at start, the gate's `signInAgain`) ends
-  the session only (`SessionController.sessionExpired`): the vault, its keys and the kept account stay
-  for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
-  them, and so does a signed-out start unless they are the account kept last (`_sweepSignedOut`).
-  Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
+  A 401 is told apart by its code (phone-first spec 10, `lib/api/unauthorized.dart`: `Unauthorized`
+  `deviceRemoved`, `userDeleted`, `expired` = `unauthenticated` or anything else; `unauthorizedOf(code)`,
+  `unauthorizedOfError(dio)`). `GET /v1/me` at start (`AuthApi.standing(token, userId:)`), in
+  `freshVaultAccountProvider` and in the gate's `sessionUserId` sends `x-wambito-user` with the account kept for
+  the session (ruling 17), so a deleted user answers `user_deleted`; the sync's 401 (`SyncProblemCode.userDeleted`,
+  `deviceRemoved` with status 401, else `unauthorized`) and `/v2/keys`'s (`KeysError` `device_removed`,
+  `user_deleted`, `unauthenticated`, status 401) carry it too, and `OpenVaultOptions.onUnauthorized(kind)` hands it
+  on. Everything ends in `SessionController.sessionEnded(token:, kind:)` (`_refresh` at start, the gate's
+  `signInAgain(kind)`): `expired` is `sessionExpired` (the session ends only: the vault, its keys and the kept
+  account stay for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
+  them, and so does a signed-out start unless they are the account kept last, `_sweepSignedOut`);
+  `deviceRemoved` wipes the vault, the home cache and the widget's figures, then signs out; `userDeleted` adopts
+  the vault into a new anonymous user (`lib/local/adopt.dart`, below). A `plain` account (or one whose mode was
+  never kept for the session) gets `sessionExpired` whatever the code. Only a sign-out, a removed device and an
+  empty deleted account's vault wipe the vault.
+  `lib/local/adopt.dart`: `adoptVaultIntoNewUser(oldVaultId, AdoptDeps)` → `AdoptStep` (`adopted`, `plainUser`,
+  `waiting`), the routine Task 11 reuses: the new user's token kept first (`AdoptDeps.keptToken/keepToken`; a kept
+  one is reused, so a crash never makes a second user), the hold's target = the new id, `plainUser` stops there,
+  `prepareAccount(guest: true)` (a hidden recovery wrap; the nudges start over), then under the old vault's lease and
+  with the app's writes into it stopped (`stopWrites` closes its open session) `carryRecords(adopt)` into the new
+  user's vault (opened on its own: nothing seeded), then the old vault forgotten; offline (or a 5xx) before the carry
+  is `waiting`. `adoptOrphan(oldUserId, deps)` → `AdoptOutcome` (`adopted`, `wiped`, `waiting`): holds the vault
+  `orphaned` first; no data (ruling 18: no live transaction, recurrence, budget or merchant) and no adoption under
+  way wipes it and signs out (`onWiped`); else the routine, then `onAdopted` (the session becomes the new user's,
+  taking the deleted user's queued captures over: `captureHandoverProvider.keep` then `_signedIn(capturesFrom:)`)
+  and the kept token goes. `resumeAdoption(deps)` (`adoptionResumeProvider`, watched in `app.dart` before the
+  merge's: at start and on resume) goes on with every `orphaned` hold of `listVaultHolds` when `mayResume` allows
+  (signed out, or still in that account's session); a vault in `unreadable` is left alone. `adoptDepsProvider`
+  (tests override it); one adoption at a time (`SessionController._adoption`). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
   What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
@@ -530,6 +556,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   captures a new session takes over from another account); the merge namespace `mergeNamespace` in
   `lib/local/merge.dart` (merged ids derive from it).
 - `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
+- `wambito.adopt.token` (secure storage, `adoptTokenKey`): the token of the new anonymous user a deleted account's
+  vault is adopted into, kept from its sign-up until the session is that user's. Outside `wambito.vault.*` on
+  purpose: the old vault's keys go before the session changes, and a sweep must never take it.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,

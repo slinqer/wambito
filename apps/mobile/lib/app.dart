@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'feedback/celebration.dart';
 import 'feedback/feedback.dart';
 import 'api/seen.dart';
+import 'api/session.dart' show adoptionResumeProvider;
 import 'home/widget_sync.dart';
 import 'capture/prewarm.dart';
 import 'launch/launch_links.dart';
@@ -50,6 +51,9 @@ class WambitoApp extends ConsumerWidget {
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
     ref.watch(vaultChangedProvider);
+    // Goes on with a deleted account's adoption at start and on resume (before the merge's, as the
+    // plan's lifecycle order has it).
+    ref.watch(adoptionResumeProvider);
     // Picks up a merge into an email account at start and on resume (before the seen ping, as the
     // plan's lifecycle order has it), and runs it once the account's vault opens.
     ref.watch(mergeResumeProvider);

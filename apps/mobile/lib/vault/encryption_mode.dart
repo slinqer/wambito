@@ -188,12 +188,17 @@ final vaultOwnerProvider = Provider<String?>((ref) {
 /// local backend), kept for the session ([EncryptionStore.remember]); null when signed out. Each
 /// answer also sweeps the vaults of every other account off this phone ([staleVaultsProvider]: the
 /// web's `deleteStaleVaults` at sign-in). No automatic retry: it is asked again when invalidated.
+/// The request names the account kept for the session (`x-wambito-user`, ruling 17), so a deleted
+/// one fails with the 401 `user_deleted`, a removed device with `device_removed` (read with
+/// `unauthorizedOfError`, lib/api/unauthorized.dart); the session's start (`_refresh`) and the gate
+/// act on them, this only reports.
 final freshVaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null, (ref) async {
   final token = ref.watch(sessionProvider.select((s) => s.stored?.token));
   if (token == null) return null;
   final store = ref.watch(encryptionStoreProvider);
   final api = ref.watch(networkClientProvider).api.getDefaultApi();
-  final me = (await api.getMe()).data;
+  final keptId = (await store.recall(token))?.profile.id;
+  final me = (await api.getMe(headers: {'x-wambito-user': ?keptId})).data;
   if (me == null) throw const GateError('server');
   final account = VaultAccount(
     owner: sessionOwnerOf(token),

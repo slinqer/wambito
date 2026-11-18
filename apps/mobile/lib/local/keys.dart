@@ -29,7 +29,8 @@ export 'recovery_verifier.dart';
 /// Codes of [KeysError] (as `KeysErrorCode` in keys.ts): `already_set_up`, `bad_recovery_key`,
 /// `wrong_recovery_key`, `offline`, `server`, `unsupported_browser`, `session_changed`,
 /// `device_removed`, `rotated_elsewhere`, `no_prf`, `no_passkey_wrap`, `unknown_passkey`,
-/// `tampered`.
+/// `tampered`; a 401 is `device_removed`, `user_deleted` or `unauthenticated` by its code, with
+/// status 401.
 
 /// The key version a new account starts at.
 const firstKeyV = 1;
@@ -164,6 +165,10 @@ KeysApi api(KeysOptions options) {
         (409, 'session_changed') => 'session_changed',
         (409, 'key_version_mismatch') => 'rotated_elsewhere',
         (422, 'unknown_passkey') => 'unknown_passkey',
+        // The session is gone; its code says why (phone-first spec 10, lib/api/unauthorized.dart).
+        (401, 'device_removed') => 'device_removed',
+        (401, 'user_deleted') => 'user_deleted',
+        (401, _) => 'unauthenticated',
         _ => 'server',
       };
       throw KeysError(mapped, status: status);

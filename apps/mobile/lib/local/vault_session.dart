@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
+import '../api/unauthorized.dart';
 import '../core/schemas.dart' show supportedLocales;
 import '../core/suggested_categories.dart';
 import '../crypto/records.dart' show RecordType;
@@ -14,6 +15,8 @@ import 'sqlite_store.dart';
 import 'store.dart' show FinanceStore;
 import 'sync.dart';
 import 'vault_lock.dart';
+
+export '../api/unauthorized.dart' show Unauthorized;
 
 /// A preview account's open vault on this phone: the Dart twin of
 /// `apps/web/app/local/vault-session.ts`. It ties the store, the keys, the local backend the
@@ -83,8 +86,10 @@ class OpenVaultOptions {
   final KeyStorage storage;
   final DateTime Function()? now;
 
-  /// The session is gone (a 401 from sync): the caller wipes the vault and goes to sign-in.
-  final void Function()? onUnauthorized;
+  /// The session is gone (a 401 from sync), and why ([Unauthorized], from its code): the caller
+  /// ends the session (`SessionController.sessionEnded`), which keeps, wipes or adopts the vault.
+  /// A `device_removed` 401 also removes the vault here, as a wrap gone does.
+  final void Function(Unauthorized kind)? onUnauthorized;
 
   /// The session now belongs to another account (409 `session_changed` from sync): the session has
   /// stopped and closed; the caller checks who is signed in.
@@ -447,7 +452,9 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           if (mine.forgotten || (opened?._closing ?? false)) return;
           switch (problem.code) {
             case SyncProblemCode.unauthorized:
-              options.onUnauthorized?.call();
+              options.onUnauthorized?.call(Unauthorized.expired);
+            case SyncProblemCode.userDeleted:
+              options.onUnauthorized?.call(Unauthorized.userDeleted);
             case SyncProblemCode.sessionChanged:
               final session = opened;
               if (session != null) {
@@ -456,6 +463,8 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
               }
             case SyncProblemCode.deviceRemoved:
               removed?.call();
+              // The server says the session went with the device: it ends too.
+              if (problem.status == 401) options.onUnauthorized?.call(Unauthorized.deviceRemoved);
             case SyncProblemCode.keyUnverified:
               unverified?.call();
             default:
@@ -479,6 +488,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     }
     final fatal =
         first.error == SyncProblemCode.unauthorized ||
+        first.error == SyncProblemCode.userDeleted ||
         first.error == SyncProblemCode.sessionChanged;
     // `busy` (a headless engine holds the lease) is reported within [appLeaseWait]: a known phone
     // opens on its local data and the sync is retried; a fresh vault, which must not seed before its

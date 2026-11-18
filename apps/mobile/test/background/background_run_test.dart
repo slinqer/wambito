@@ -12,6 +12,7 @@ import 'package:wambito/background/background_run.dart';
 import 'package:wambito/background/queued_capture.dart';
 import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/local/backend.dart';
+import 'package:wambito/local/db.dart' show vaultHoldOf;
 import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/vault_lock.dart';
@@ -457,5 +458,36 @@ void main() {
     final tx = (await store.list(RecordType.transaction)).single;
     await store.close();
     expect(tx.body['needsReview'], false);
+  });
+
+  // Review Focus 2: only the app adopts a deleted user's vault. A headless run that meets
+  // `user_deleted` ends with that outcome, draws nothing for an account that is gone, holds nothing
+  // and deletes nothing: the vault and what the run saved into it wait for the app.
+  test('a headless run that gets user_deleted ends with it and adopts nothing', () async {
+    _server.intercept = (req, real) async => (401, {'code': 'user_deleted'});
+    final m = _make();
+    final report = await runBackground(
+      m.deps,
+      m.effects,
+      captures: [_capture('k1')],
+      ack: (keys, confirms) async => m.calls.acks.add((keys: keys, confirms: confirms)),
+    );
+    expect(report.outcome, BackgroundOutcome.userDeleted);
+    expect(report.outcome.name, 'userDeleted');
+    expect(m.calls.widget, isEmpty);
+    expect(m.calls.due, isEmpty);
+    expect(m.calls.released, ['released']);
+    // Nothing was made: no anonymous user (no auth here at all), no new token, no keys asked.
+    expect(_server.requests.map((r) => r.uri.path).toSet(), {'/api/v2/sync'});
+    // The vault is as the run left it: the capture is in it, still waiting to be sent, and no
+    // hold was put on it (the app's adoption holds it).
+    expect(await _txCount(), 1);
+    expect(await vaultHoldOf(_userId, directory: _dir.path, factory: databaseFactoryFfi), isNull);
+    final store = await _openStore(_userId);
+    try {
+      expect(await store.readOutbox(10), isNotEmpty);
+    } finally {
+      await store.close();
+    }
   });
 }
