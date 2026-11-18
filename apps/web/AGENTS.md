@@ -354,7 +354,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   them (pairing stays strict): denial of service only, nothing is revealed.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
-  (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
+  (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, `ActivityBlocks`: daily actives, cohorts, installs, versions; audit, look-up; the cards say "Without email"),
   `AccountScreen` + `ActionSheet` (`/admin/users/:id`: the account and its actions; a sheet's
   fields live in the component, so a reason survives re-verification). Stories `Admin/*`,
   web-only, not in parity.json.
@@ -435,6 +435,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   person taps the button (a mail scanner opening the link spends nothing), then sends them to
   sign-in (every session was closed). Copy in `confirm_email.*` in all four languages; story
   `ConfirmEmail`, web-only, not in parity.json.
+- Daily seen call: `app/auth/seen.ts` `markSeenToday(userId, timeZone)`, called unawaited from the `/app`
+  loader (`previewProfile(onMe)`, every account), once per local day (`wambito.seen.<userId>`), stored
+  after a 204; `x-wambito-version` = `BUILD_ID` (`VITE_BUILD_ID`, set by `deploy/personal/up.sh`, else
+  `dev`).
 - Storage: only `readStored/writeStored/removeStored` in `app/lib/stored.ts` (keys
   `wambito.<name>`, `sessionArea()` for session data).
   Exception: `app/local/` talks to IndexedDB directly (`db.ts`), because the vault needs

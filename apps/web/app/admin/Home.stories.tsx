@@ -27,7 +27,32 @@ const WEEKS = Array.from({ length: 12 }, (_, i) => {
   return { weekStart: day.toISOString().slice(0, 10), withEmail: 2 + i, guests: 1 + (i % 4) };
 });
 
+/** Ninety days ending 2026-11-18, growing. */
+const DAILY = Array.from({ length: 90 }, (_, i) => ({
+  day: new Date(Date.UTC(2026, 10, 18) - (89 - i) * 86_400_000).toISOString().slice(0, 10),
+  count: 20 + i,
+}));
+
+const ACTIVITY = {
+  dailyActive: DAILY,
+  cohorts: [
+    { weekStart: "2026-10-12", size: 40, week1: 31, week4: 22, week12: null },
+    { weekStart: "2026-10-19", size: 52, week1: 40, week4: null, week12: null },
+  ],
+  installsByPlatform: [
+    { platform: "android", count: 210 },
+    { platform: "ios", count: 90 },
+    { platform: "web", count: 100 },
+    { platform: "unknown", count: 12 },
+  ],
+  versions: [
+    { platform: "android", appVersion: "1.4.0", users: 150 },
+    { platform: "web", appVersion: "04565f80", users: 80 },
+  ],
+};
+
 const METRICS = {
+  ...ACTIVITY,
   total: 412,
   withEmail: 301,
   guests: 111,
@@ -39,6 +64,10 @@ const METRICS = {
 };
 
 const EMPTY_METRICS = {
+  dailyActive: [],
+  cohorts: [],
+  installsByPlatform: [],
+  versions: [],
   total: 0,
   withEmail: 0,
   guests: 0,
@@ -168,7 +197,7 @@ export const Home: Story = {
     const card = (name: string) => canvas.getByRole("group", { name });
     await waitFor(() => expect(within(card("Cuentas")).getByText("412")).toBeVisible());
     await expect(within(card("Con correo")).getByText("301")).toBeVisible();
-    await expect(within(card("Invitados")).getByText("111")).toBeVisible();
+    await expect(within(card("Sin correo")).getByText("111")).toBeVisible();
     await expect(within(card("Activas en 30 días")).getByText("187")).toBeVisible();
     const signups = card("Altas en 7 días");
     await expect(within(signups).getByText("24")).toBeVisible();
@@ -314,5 +343,46 @@ export const LookupMiss: Story = {
       "Ninguna cuenta con ese correo o id",
     );
     await expect(input).toHaveAttribute("aria-invalid", "true");
+  },
+};
+
+/**
+ * The cards say Without email / With email, and the four activity blocks render from the metrics:
+ * daily actives, cohorts ("at least N", "—" for none yet), installs by platform and versions.
+ */
+export const HomeActivity: Story = {
+  globals: { theme: "day", locale: "en" },
+  render: render(happy()),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() => expect(canvas.getByRole("group", { name: "Without email" })).toBeVisible());
+    await expect(
+      within(canvas.getByRole("group", { name: "With email" })).getByText("301"),
+    ).toBeVisible();
+    await expect(canvas.queryByText("Guests")).toBeNull();
+
+    const daily = canvas.getByRole("table", { name: "Daily active people" });
+    await expect(within(daily).getAllByRole("row")).toHaveLength(91);
+    await expect(
+      canvas.getByRole("heading", { level: 2, name: "Daily active people" }),
+    ).toBeVisible();
+
+    const cohorts = canvas.getByRole("table", { name: "Cohorts" });
+    const rows = within(cohorts).getAllByRole("row");
+    await expect(rows).toHaveLength(3);
+    await expect(rows[1]).toHaveTextContent("40");
+    await expect(rows[1]).toHaveTextContent("at least 31");
+    await expect(rows[1]).toHaveTextContent("at least 22");
+    await expect(rows[1]).toHaveTextContent("—");
+    await expect(rows[2]).toHaveTextContent("at least 40");
+
+    const installs = canvas.getByRole("list", { name: "Installs by platform" });
+    await expect(within(installs).getByText("Android")).toBeVisible();
+    await expect(within(installs).getByText("210")).toBeVisible();
+    await expect(within(installs).getByText("Unknown")).toBeVisible();
+
+    const versions = canvas.getByRole("table", { name: "Versions" });
+    await expect(within(versions).getByText("1.4.0")).toBeVisible();
+    await expect(within(versions).getByText("04565f80")).toBeVisible();
   },
 };
