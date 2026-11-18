@@ -185,7 +185,7 @@ type Canvas = ReturnType<typeof within>;
 
 const stage = (
   args: Args,
-  extra: { guest?: boolean; mode?: "local" | "live"; passkeys?: PasskeysApi } = {},
+  extra: { anonymous?: boolean; mode?: "local" | "live"; passkeys?: PasskeysApi } = {},
 ) => {
   current ??= fakeSecurity(args.options);
   const fake = current;
@@ -196,7 +196,7 @@ const stage = (
       path="/app/settings"
       passkeys={extra.passkeys ?? storyPasskeys({ initial: PASSKEYS })}
       security={fake.security}
-      {...(extra.guest ? { guest: true } : {})}
+      {...(extra.anonymous ? { guest: true } : {})}
     />
   );
 };
@@ -262,24 +262,19 @@ export const NothingUnreadable: Story = {
 };
 
 /**
- * A guest has no recovery key (Ruling 8): its Security shows only "Approve a new device", so a
- * guest's other device (Locked's "Approve from another device") has somewhere to approve.
+ * An account made by the phone (no email) gets the whole section, like any encrypted account: its
+ * devices, "Approve a new device" and the keys.
  */
-export const GuestsOnlyApprove: Story = {
-  render: (args) => stage(args, { guest: true }),
+export const AnonymousAccount: Story = {
+  render: (args) => stage(args, { anonymous: true }),
   play: async ({ canvasElement, args }) => {
     const { security } = fakeOf(args);
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { level: 1, name: "Ajustes" });
     const area = await section(canvas);
-    await expect(
-      area.getByText("Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo."),
-    ).toBeVisible();
-    await expect(area.queryByRole("listitem")).toBeNull();
-    await expect(area.queryByRole("button", { name: "Nueva clave de recuperación" })).toBeNull();
-    await expect(area.queryByRole("button", { name: /^Quitar / })).toBeNull();
-    await expect(area.queryByText(/No pudimos leer/)).toBeNull();
-    await expect(security.load).not.toHaveBeenCalled();
+    await area.findAllByRole("listitem");
+    await expect(security.load).toHaveBeenCalled();
+    await expect(area.getByRole("button", { name: "Nueva clave de recuperación" })).toBeVisible();
     await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
     await expect(
       await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),

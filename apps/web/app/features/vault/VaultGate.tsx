@@ -104,7 +104,6 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
         onUnauthorized: signInAgain,
         onSessionChanged: () => gate?.sessionChanged(),
       }),
-    guest: profile.isAnonymous,
     userId,
     sessionUserId,
     reload: reloadApp,
@@ -147,7 +146,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   }, [session]);
   // The live sign-out: it wipes this browser's vault (the gate remembered the account).
   const signOut = useSignOut();
-  const deleteAccount = useDeleteLockedAccount();
 
   switch (state.status) {
     case "setup":
@@ -183,8 +181,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           retrying={state.retrying}
           onRetry={gate.retry}
           onSignOut={() => void signOut()}
-          onDeleteAccount={state.kind === "guest" ? deleteAccount : undefined}
-          onPair={state.kind === "guest" ? () => void gate.pair() : undefined}
         />
       );
     case "ready":
@@ -199,31 +195,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     default:
       return <VaultLoading />;
   }
-}
-
-/**
- * A guest locked out of its data (it lives in another browser) can still delete the account: the
- * live `DELETE /v1/me` (the gate is outside the local backend), then the sign-out that wipes this
- * browser's vault, then the landing. Resolves to false when the delete failed.
- */
-function useDeleteLockedAccount(): () => Promise<boolean> {
-  const api = useApi();
-  const navigate = useNavigate();
-  return async () => {
-    try {
-      const { error } = await api.DELETE("/v1/me");
-      if (error) return false;
-    } catch {
-      return false;
-    }
-    await liveSignOut().catch(() => {
-      // The account and its sessions are gone already.
-    });
-    const landing = landingLink();
-    if (landing.external) window.location.replace(landing.href);
-    else navigate(landing.href, { replace: true });
-    return true;
-  };
 }
 
 /** Every commit to the vault (the person's or the sync's) marks the cached reads stale. */

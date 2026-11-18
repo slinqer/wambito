@@ -707,7 +707,6 @@
     "security": {
       "title": "Sicurezza",
       "lead": "I tuoi dati sono cifrati. Questi dispositivi possono aprirli.",
-      "guest_lead": "I tuoi dati sono cifrati. Da qui puoi aprirli su un altro dispositivo.",
       "this_browser": "Questo browser",
       "unnamed": "Dispositivo",
       "added": "Aggiunto il {date}",
@@ -935,16 +934,7 @@
       "retry": "Riprova",
       "retrying": "Nuovo tentativo…",
       "unsupported_title": "Questo browser non può conservare la tua chiave",
-      "unsupported_lead": "Per proteggere i tuoi dati, Wambito ha bisogno di un browser che conservi la chiave in modo sicuro. Aggiorna il browser o apri Wambito in un altro.",
-      "guest_title": "Qui non si possono aprire i tuoi dati",
-      "guest_lead": "Hai iniziato come ospite in un altro browser o dispositivo, e i suoi dati si aprono solo lì. Approva questo da quel dispositivo, oppure esci.",
-      "guest_pair": "Approva da un altro dispositivo",
-      "delete_account": "Elimina questo account",
-      "delete_lead": "L'account ospite e tutto ciò che contiene vengono eliminati, anche nell'altro browser. Non si può annullare.",
-      "delete_confirm": "Sì, eliminalo",
-      "deleting": "Eliminazione…",
-      "delete_failed": "Non siamo riusciti a eliminarlo. Riprova.",
-      "delete_cancel": "Annulla"
+      "unsupported_lead": "Per proteggere i tuoi dati, Wambito ha bisogno di un browser che conservi la chiave in modo sicuro. Aggiorna il browser o apri Wambito in un altro."
     },
     "passkey_second_touch": "Tocca di nuovo la tua passkey: così aprirà anche i tuoi dati cifrati.",
     "pair": {

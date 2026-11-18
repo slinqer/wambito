@@ -707,7 +707,6 @@
     "security": {
       "title": "Security",
       "lead": "Your data is encrypted. These devices can open it.",
-      "guest_lead": "Your data is encrypted. From here you can open it on another device.",
       "this_browser": "This browser",
       "unnamed": "Device",
       "added": "Added on {date}",
@@ -935,16 +934,7 @@
       "retry": "Try again",
       "retrying": "Trying again…",
       "unsupported_title": "This browser can't keep your key",
-      "unsupported_lead": "To protect your data, Wambito needs a browser that keeps the key safely. Update your browser or open Wambito in another one.",
-      "guest_title": "Your data can't be opened here",
-      "guest_lead": "You started as a guest in another browser or device, and its data only opens there. Approve this one from that device, or sign out.",
-      "guest_pair": "Approve from another device",
-      "delete_account": "Delete this account",
-      "delete_lead": "The guest account and everything in it are deleted, in the other browser too. This can't be undone.",
-      "delete_confirm": "Yes, delete it",
-      "deleting": "Deleting…",
-      "delete_failed": "We couldn't delete it. Try again.",
-      "delete_cancel": "Cancel"
+      "unsupported_lead": "To protect your data, Wambito needs a browser that keeps the key safely. Update your browser or open Wambito in another one."
     },
     "passkey_second_touch": "Touch your passkey once more: that lets it open your encrypted data too.",
     "pair": {

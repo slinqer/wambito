@@ -26,9 +26,7 @@ import { changeKeys, codeOf, SECURITY_KEY, type SecurityApi } from "./security.t
 import { type DeviceRow, deviceRows } from "./security-model.ts";
 
 /**
- * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). A guest (no
- * recovery key, Ruling 8) gets only "Approve a new device": nothing is loaded for it. Otherwise:
- * this browser and the other devices that open the data (label, added date; "Not verified" when
+ * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). This browser and the other devices that open the data (label, added date; "Not verified" when
  * an attestation fails), each other one with "Remove" (a key rotation, `RemoveDeviceSheet`);
  * "Approve a new device" (`ApproveDevice`); "New recovery key" (confirmed by the current key or a
  * passkey touch, then `RecoveryKeySetup`); "Change keys" (a rotation that removes no device,
@@ -38,13 +36,10 @@ export function SecuritySection({
   security,
   passkeys,
   timeZone,
-  guest = false,
 }: {
   security: SecurityApi;
   passkeys: PasskeysApi;
   timeZone: string;
-  /** A guest's reduced section: only approving a new device. */
-  guest?: boolean;
 }) {
   const t = useTranslations("settings.security");
   const { locale } = useLocale();
@@ -52,12 +47,10 @@ export function SecuritySection({
   const snapshot = useQuery({
     queryKey: SECURITY_KEY,
     queryFn: () => security.load(),
-    enabled: !guest,
   });
   const passkeyList = useQuery({
     queryKey: PASSKEYS_KEY,
     queryFn: () => passkeys.list(),
-    enabled: !guest,
   });
   const [canTouch] = useState(() => passkeys.supported());
   const [removing, setRemoving] = useState<DeviceRow | null>(null);
@@ -119,21 +112,13 @@ export function SecuritySection({
             {...(security.scanSupported ? { scanSupported: security.scanSupported } : {})}
             onDone={() => {
               setApproving(false);
-              if (!guest) changed();
+              changed();
             }}
           />
         </Takeover>
       )}
     </>
   );
-
-  if (guest) {
-    return (
-      <SettingsSection title={t("title")} lead={t("guest_lead")}>
-        {approve}
-      </SettingsSection>
-    );
-  }
 
   return (
     <SettingsSection title={t("title")} lead={t("lead")}>

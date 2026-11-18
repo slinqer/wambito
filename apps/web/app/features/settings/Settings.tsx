@@ -45,7 +45,7 @@ export interface SettingsProps {
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
  * steps there, and lists nothing. A preview account (`local` mode) has import and export off
  * with a "not available yet" note; passkeys, the assistants and deleting the account work, and
- * Security lists the devices that open the data (not for a guest, who has no recovery key).
+ * Security lists the devices that open the data.
  */
 export function Settings({
   passkeys = livePasskeys,
@@ -67,10 +67,8 @@ export function Settings({
   const local = mode === "local";
   const session = useVaultSession();
   const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
-  // An encrypted account's devices and keys. A guest (Ruling 8: no recovery key) gets only
-  // "Approve a new device", so its other device has somewhere to approve a pairing.
-  const vaultKeys = local ? (securityProp ?? vaultSecurity) : null;
-  const security = me.isAnonymous ? null : vaultKeys;
+  // An encrypted account's devices and keys (every one, an anonymous account made by the phone too).
+  const security = local ? (securityProp ?? vaultSecurity) : null;
   const dataOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
 
@@ -94,13 +92,8 @@ export function Settings({
           vaultUserId={local ? me.id : undefined}
           security={security ?? undefined}
         />
-        {vaultKeys && (
-          <SecuritySection
-            security={vaultKeys}
-            passkeys={passkeys}
-            timeZone={me.timezone}
-            guest={me.isAnonymous}
-          />
+        {security && (
+          <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
         )}
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">

@@ -232,11 +232,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`, a guest's Locked). `key_unverified` (a new key version whose links do
+  notice `vault.removed`). `key_unverified` (a new key version whose links do
   not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
   stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
   its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
-  (the opening's error the same way): Unlock with the notice `vault.unverified`, a guest's Locked.
+  (the opening's error the same way): Unlock with the notice `vault.unverified`.
   The unlock there (recovery key, passkey, pairing) keeps the vault, replaces the device wrap and
   opens a new session fresh, whose first sync pushes what waited; a recovery key or passkey
   unlocks it even when the links do not reach the held key (a version made before links). `session.reloadKeys()`
@@ -258,17 +258,19 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
   passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
   unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
-  device" and a guest Locked's "Approve from another device" enter `pairing` (`gate.pair()`;
+  device" enters `pairing` (`gate.pair()`;
   `gate.startPairing()` makes the request, again for "Start again", cancelling the previous one;
   the latest call wins: an older one answering later cancels its own request;
   its `finish()` opens the vault like a recovery unlock: pending passkey wrap, full sync; a failed
-  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock or Locked);
+  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock);
   before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
   nothing runs for the old id; Locked kinds `error`, `offline`,
-  `unsupported` (no X25519: no retry) and `guest` (a guest whose account has keys elsewhere: no
-  recovery key to type, so pair from another device, sign out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
+  `unsupported` (no X25519: no retry). There is no guest branch: an account made by the phone (no
+  email, `isAnonymous`) whose keys are elsewhere gets Unlock like any encrypted account (recovery
+  key, passkey, "From another device"); only `prepareAccount({ guest })` still hides its first
+  recovery key; a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
   the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is
   `live | demo | local`: demo-only behaviour checks `=== "demo"`, live-only `=== "live"`
   (import); settings shows `settings.local_off` under import and export in `local` (the
@@ -278,7 +280,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"; `title`, `lead` (null: none)
-  and `exitLabel` for the consent page's unlock step), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
+  and `exitLabel` for the consent page's unlock step), `Locked` (retry or sign-out only); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
   `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
   number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
@@ -289,10 +291,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   shown; disabled while `approve()` runs) and "They do not match" (cancels: nothing shared));
   `vault-context.ts` `VaultSessionContext` / `useVaultSession()`: the gate provides the open
   session beside `<ApiProvider mode="local">` (null elsewhere), so Settings reaches its keys.
-  Settings → Security (`features/settings/`, mode `local`; a guest (Ruling 8, no recovery key)
-  gets only "Approve a new device", `SecuritySection guest`, nothing loaded, copy
-  `settings.security.guest_lead`, so a guest's Locked "Approve from another device" has an
-  approver):
+  Settings → Security (`features/settings/`, mode `local`; every encrypted account gets the
+  whole section, an anonymous one too):
   `security.ts` `SecurityApi` (`load()` → wraps, `ownId`, `revoked`, `verified` (attestations under
   DK from `withDataKey`), `unreadable` (`quarantineCount()`); `rotate`, `checkRecoveryKey`,
   `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `pairing`), `liveSecurity(session)`
