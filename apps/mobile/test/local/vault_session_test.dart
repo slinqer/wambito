@@ -14,6 +14,7 @@ import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/local/ids.dart';
 import 'package:wambito/local/install_marker.dart';
 import 'package:wambito/local/keys.dart';
+import 'package:wambito/local/memory_store.dart';
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/sync.dart';
 import 'package:wambito/local/vault_lock.dart';
@@ -210,6 +211,7 @@ Future<VaultSession> open(
   Future<SqliteStore> Function(String userId)? store,
   Future<LocalKeys> Function(KeysOptions options)? refresh,
   Future<VaultLease?> Function()? lease,
+  bool seed = true,
 }) {
   _opened.add(profile.id);
   return openVaultSession(
@@ -226,6 +228,7 @@ Future<VaultSession> open(
       syncDebounce: const Duration(milliseconds: 20),
       refreshKeys: refresh,
       lease: lease,
+      seed: seed,
     ),
   );
 }
@@ -403,6 +406,55 @@ void main() {
   });
 
   group('seeding', () {
+    test(
+      'openVaultSession with seed: false leaves an empty vault empty; with seed true it seeds as '
+      'before',
+      () async {
+        SqliteStore? bare;
+        final unseeded = await open(
+          profileOf(),
+          net: FakeNetwork(),
+          keys: await keys(),
+          seed: false,
+          store: (userId) async => bare = await openStore(userId),
+        );
+        expect(await bare!.list(RecordType.settings), isEmpty);
+        expect(await bare!.list(RecordType.category), isEmpty);
+        await unseeded.close();
+
+        SqliteStore? seeded;
+        final session = await open(
+          profileOf(),
+          net: FakeNetwork(),
+          keys: await keys(),
+          store: (userId) async => seeded = await openStore(userId),
+        );
+        expect(await seeded!.list(RecordType.settings), hasLength(1));
+        expect(await seeded!.list(RecordType.category), hasLength(suggestedCategories.length));
+        await session.close();
+      },
+    );
+
+    test('seedIfEmpty seeds once and never over existing settings', () async {
+      final profile = profileOf();
+      final store = createMemoryStore();
+      await seedIfEmpty(store, profile);
+      final [settings] = await store.list(RecordType.settings);
+      final categories = await store.list(RecordType.category);
+      expect(settings.id, uuidv5(uuidv5(seedNamespace, profile.id), 'settings'));
+      expect(categories, hasLength(suggestedCategories.length));
+      await seedIfEmpty(store, profile);
+      expect(await store.list(RecordType.settings), hasLength(1));
+      expect(await store.list(RecordType.category), hasLength(categories.length));
+
+      // A vault a carry filled keeps its settings and gets no suggested categories.
+      final carried = createMemoryStore();
+      await carried.put(RecordType.settings, settings.id, {...settings.body, 'currency': 'COP'});
+      await seedIfEmpty(carried, profile);
+      expect((await carried.list(RecordType.settings)).single.body['currency'], 'COP');
+      expect(await carried.list(RecordType.category), isEmpty);
+    });
+
     test('does not seed when the first sync failed (a known phone offline)', () async {
       final net = FakeNetwork()..mode = Mode.offline;
       SqliteStore? store;

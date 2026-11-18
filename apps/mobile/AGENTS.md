@@ -88,7 +88,17 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
   (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
-  every key, waiting at most `vaultCloseWait` in all for the store to close). `stale_vaults.dart` =
+  every key, waiting at most `vaultCloseWait` in all for the store to close; `seedIfEmpty` makes the first
+  settings and suggested categories after a complete first sync, skipped with `OpenVaultOptions.seed: false`
+  when a carry fills the new vault). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
+  `into.transaction`, idempotent: `adopt` copies every live record, settings re-keyed to the new user's seed id
+  with `recoveryKeySavedAt` null and no `revokedDevices`; `merge` drops a phone category or `account` that
+  matches the account's by `foldedName` (trim, lower case) and kind (not archived), renames same name other
+  kind `"<name> 2"`, keeps the account's settings, a phone budget only where the account has none for that
+  category; both re-key merchants to `merchantRecordId(intoUserId, key)` (the target's wins) and keep
+  transaction, recurrence and occurrence ids; tombstones stay behind except a deleted occurrence of a carried
+  rule, carried as a tombstone so the rule does not make it again; `currencyOf` for the currency stop).
+  `stale_vaults.dart` =
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
   `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault;

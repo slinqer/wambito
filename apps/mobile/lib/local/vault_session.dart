@@ -68,6 +68,7 @@ class OpenVaultOptions {
     this.syncDebounce = const Duration(seconds: 1),
     this.refreshKeys,
     this.lease,
+    this.seed = true,
   });
 
   final VaultProfile profile;
@@ -102,6 +103,10 @@ class OpenVaultOptions {
   /// The lease a sync run takes (vault_lock.dart). Default: the app's ([appLease], a short wait)
   /// on the real vault folder; none when a test passes its own `openStore`.
   final Future<VaultLease?> Function()? lease;
+
+  /// Seed the account's first records ([seedIfEmpty]) after a complete first sync. False when a
+  /// carry (merge.dart) fills the new vault instead.
+  final bool seed;
 }
 
 /// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
@@ -302,7 +307,7 @@ Future<void> _forgetRefreshed(
 /// the server's profile, the web's default currency EUR) and the suggested categories in the
 /// person's language. The ids are UUID v5 of the account and the record's name, and the content
 /// comes from the profile only, so two devices seeding at once write the same records.
-Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
+Future<void> seedIfEmpty(FinanceStore store, VaultProfile profile) async {
   if ((await store.list(RecordType.settings)).isNotEmpty) return;
   final locale = supportedLocales.contains(profile.locale) ? profile.locale : 'es';
   final names = SuggestionLocale.values.byName(locale);
@@ -481,7 +486,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     // Only on a complete first sync: an empty-looking vault may just be one not downloaded yet
     // (offline, or a resync whose set-aside changes still wait for their download).
     final waiting = (await store.readOutbox(_all)).any((e) => e.setAside != null);
-    if (first.ok && !waiting) await _seedIfEmpty(store, profile);
+    if (options.seed && first.ok && !waiting) await seedIfEmpty(store, profile);
 
     final session = VaultSession._(
       userId,
