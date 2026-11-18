@@ -21,7 +21,7 @@ import 'code_input.dart';
 import 'guest_dialogs.dart';
 import 'sign_in_frame.dart';
 
-/// "Entrar con mi correo": the email, then the 6-digit code (the email also carries a magic link,
+/// "Ya tengo una cuenta" (I already have an account): the email, then the 6-digit code (the email also carries a magic link,
 /// handled by VerifyLinkScreen).
 ///
 /// On opening it also asks the phone for a passkey it can offer at once (one made on the web and

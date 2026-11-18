@@ -294,6 +294,7 @@ void main() {
     });
 
     test('an anonymous account with wraps elsewhere shows Unlock, not Locked', () async {
+      // A regression guard: the gate has no notion of anonymity, so it must never lock this account out.
       final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => FakePairing());
       h.gate.start();
       await settle();

@@ -294,7 +294,7 @@ class SessionController extends Notifier<SessionState> {
     return token;
   }
 
-  /// "Probar sin correo": a new guest.
+  /// The welcome's "Empezar" (Start): a new user without email.
   Future<void> startGuest() async {
     await ready;
     final token = await _auth.signInAsGuest();

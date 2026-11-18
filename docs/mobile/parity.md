@@ -333,7 +333,7 @@ when the app's picture changes. The web shots are regenerated only when the web 
     only `ExpiredDay` stopped at, and only by day in English). The sign-in stories are as they were: the code step has
     the web's 30 second wait before "Reenviar código", counted by the app's own clock (`clockProvider`, pinned like the
     story's), so its pairs show "Reenviar en 30 s".
-  - **The email field's focus.** The app focuses it on opening (the person tapped "Entrar con mi correo", and a Stage
+  - **The email field's focus.** The app focuses it on opening (the person tapped "Ya tengo una cuenta", and a Stage
     3 test pins it); the web leaves it alone so the keyboard does not cover Wambi. The pairs put the focus down
     (`_putFocusDown`) where the story has none.
   - **"Usar passkey" is "Entrar con huella" in the pairs** (`EmailScreen.passkeyLabel`), as the detail's "Editar" is
