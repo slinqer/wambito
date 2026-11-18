@@ -82,7 +82,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
-  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK). Key links (spec
+  dataKey, keyV, { ephemeral? })` (the same enroll for pairing and the QR sign-in; `ephemeral:
+  true` sets the vault's meta `ephemeral`, false or absent writes nothing; the caller zeroes DK). Key links (spec
   2026-11-10): `listKeys(call)` → `{ wraps, links: Map<keyV, bytes> }` (an undecodable link is
   missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
   `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
@@ -167,7 +168,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when
   `GET /v2/keys` shows the prepared wrap, `landed()`). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
   the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
-  `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
+  `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `relay.ts`: what `pairing.ts` and `signin.ts` share (`PairingClock`, which `pairing.ts`
+  re-exports, `realClock`, `deferred<T>()`, `zeroPrivate(key)`, `sameBytes`, `key32(text, onBad)`).
+  `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
   request, or the approver's lookup) → `expired` and on
   `cancel()` → `cancelled`): `startPairing(options)` → `{ id, code, qr, expiresAt, number(),
@@ -184,7 +187,22 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   404). `PairingError` codes `expired` (404 or the clock), `tampered` (any relayed value that does
   not match a pin, a 422, a second approver), `bad_code` (a code that cannot be one or finds
   nothing, a QR not exactly that string), `offline`, `server`, `cancelled`; `session_changed` and
-  `rotated_elsewhere` stay `KeysError`s. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
+  `rotated_elsewhere` stay `KeysError`s. `signin.ts` (spec 2026-11-15 section 8, the browser's
+  half of `/v2/signin`; signed out: plain `fetch` to `/api/v2/signin…`, `credentials:
+  "same-origin"`, never `x-wambito-user`; the poll secret only in the closure, sent as
+  `x-wambito-poll`): `startSignin({ remember, label, clock?, fetch? })` → `WebSignin { id, code, qr,
+  expiresAt, number(), finish(), cancel() }` (an ephemeral `N`, posts `{ commitment, remember,
+  label }`; `qr` is `wambito://signin?id=<id>&key=<base64url N.pub>`; polling every 1.5 s
+  (`SIGNIN_POLL_MS`) from the first `number()` or `finish()` pins the first `approverKey`, reveals
+  `N.pub` (409 `not_ready` looks again; `already_set` is its own lost answer), then `number()` is
+  `pairingNumber(N.pub, A.pub)`; on `ready`, `finish()` picks up (the response sets the session
+  cookie), opens with `openFromPairing(N.priv, { kind: "device", userId, keyV }, sealed, A.pub)`,
+  runs `deleteStaleVaults(userId)`, then `enrollDevice({ userId }, dk, keyV, { ephemeral: !remember })`
+  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`). Stops at `expiresAt` capped at
+  2 minutes (`SIGNIN_TTL_MS`). `SigninError` codes `expired` (404 or the clock), `tampered` (a
+  second approver key, `ready` before the reveal, a 422, a blob that does not open), `offline`,
+  `server`, `cancelled`, `too_many` (429, `retryAfterS` from `retry-after`), `suspended` (403);
+  the enroll's `KeysError`s go through. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that

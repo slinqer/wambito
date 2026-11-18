@@ -360,17 +360,20 @@ async function prepareDevice(
  * key under DK, then the derived keys, the private key and the wrap's id and public key kept
  * locally. The caller owns `dataKey` and zeroes it. The end of pairing: DK came authenticated by
  * the number, and the links bring the older versions it reaches (`olderForTrustedKey`; with a vault
- * held here strictly down to its key, else `tampered`).
+ * held here strictly down to its key, else `tampered`). Also the end of a QR sign-in
+ * (`signin.ts`), where `ephemeral: true` (the box unticked) marks the vault's meta `ephemeral`, so
+ * it is wiped once the session cookie is gone; false or absent writes nothing.
  */
 export async function enrollDevice(
   options: KeysOptions,
   dataKey: Uint8Array,
   keyV: number,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   const { links } = await listKeys(call);
-  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict");
+  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict", enroll);
 }
 
 /**
@@ -388,13 +391,14 @@ async function enrollTrusted(
   links: Map<number, Uint8Array>,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
   held: HeldVault,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const older = await olderForTrustedKey(userId, { keyV, dataKey }, links, held);
   let local: LocalKeys;
   let previous: string | undefined;
   try {
     previous = await heldDeviceWrapId(userId);
-    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older);
+    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older, enroll);
   } finally {
     zeroKeys(older);
   }
@@ -430,16 +434,17 @@ async function enrollWithPair(
   keyV: number,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
   older: Map<number, Uint8Array>,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const device = await prepareDevice(userId, dataKey, keyV, pair);
   await call(`/v2/keys/${device.id}`, putJson(device.body));
-  return keepLocally(userId, dataKey, keyV, device, older);
+  return keepLocally(userId, dataKey, keyV, device, older, enroll);
 }
 
 /**
  * Keeps the derived keys of `keyV` (made current) and of every `older` version the vault does not
  * hold yet (a held version is never replaced), the device private key and its wrap's id and
- * public key. The caller owns and zeroes the data keys.
+ * public key (and meta `ephemeral` when asked). The caller owns and zeroes the data keys.
  */
 async function keepLocally(
   userId: string,
@@ -447,6 +452,7 @@ async function keepLocally(
   keyV: number,
   device: { id: string; privateKey: DevicePrivateKey; body: { publicKey: string } },
   older: Map<number, Uint8Array>,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const derived = new Map<number, RecordKeys>([[keyV, await deriveRecordKeys(dataKey, false)]]);
   for (const [v, key] of older) derived.set(v, await deriveRecordKeys(key, false));
@@ -465,6 +471,7 @@ async function keepLocally(
     await store.setMeta("devicePublicKey", device.body.publicKey);
     await store.setMeta("keyV", keyV);
     await store.setMeta("userId", userId);
+    if (enroll.ephemeral) await store.setMeta("ephemeral", true);
   } finally {
     store.close();
   }
