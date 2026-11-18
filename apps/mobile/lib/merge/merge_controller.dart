@@ -7,6 +7,7 @@
 // `meta.mergeCarried` in it says the carry committed, so it never runs twice over later edits.
 import 'dart:async';
 
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -565,6 +566,8 @@ final mergeBlocksAppProvider = Provider<bool>((ref) {
 @visibleForTesting
 void reportMergeError(Object error, StackTrace stack, String step) {
   debugPrint('merge: $step failed (${error.runtimeType})');
+  // No platform side here (a test, a headless engine): nothing the merge did wrong, only logged.
+  if (error is MissingPluginException) return;
   assert(() {
     FlutterError.reportError(
       FlutterErrorDetails(

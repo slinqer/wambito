@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show SynchronousFuture, debugPrint;
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter/widgets.dart' show FlutterError, FlutterErrorDetails;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -737,6 +738,23 @@ void main() {
     expect(printed, ['merge: resume failed (StateError)']);
     expect(reported.single.exception, isA<StateError>());
     expect(reported.single.library, 'wambito merge');
+  });
+
+  test('no platform side (MissingPluginException) is only logged', () {
+    final reported = <FlutterErrorDetails>[];
+    final printed = <String?>[];
+    final onError = FlutterError.onError;
+    final print = debugPrint;
+    FlutterError.onError = reported.add;
+    debugPrint = (message, {wrapWidth}) => printed.add(message);
+    try {
+      reportMergeError(MissingPluginException('path_provider'), StackTrace.current, 'resume');
+    } finally {
+      FlutterError.onError = onError;
+      debugPrint = print;
+    }
+    expect(printed, ['merge: resume failed (MissingPluginException)']);
+    expect(reported, isEmpty);
   });
 
   test('begin holds the anonymous vault and keeps its token before any code is sent', () async {
