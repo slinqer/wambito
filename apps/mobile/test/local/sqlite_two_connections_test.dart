@@ -6,6 +6,7 @@ import 'dart:isolate';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/crypto/records.dart' show RecordType;
+import 'package:wambito/local/db.dart' show openVault;
 import 'package:wambito/local/sqlite_store.dart';
 
 const _id1 = '01930000-0000-7000-8000-000000000001';
@@ -86,6 +87,38 @@ void main() {
     await app.transaction((tx) async {
       await tx.put(RecordType.category, _id1, _cat('Food 2'));
     });
+    await app.close();
+  });
+
+  test('a write waits for another engine that holds the file for a second and a half', () async {
+    // Under the Dart VM on Linux (the host tests on CI) the signals the VM sends its threads cut
+    // SQLite's own sleeps short, so its busy_timeout of 5 s gave up after about 60 ms. The store
+    // waits in Dart instead.
+    final path = dir.path;
+    final app = await open();
+    await app.put(RecordType.category, _id1, _cat('Food'));
+    final held = ReceivePort();
+    final heldPort = held.sendPort;
+    final holder = Isolate.run(() async {
+      sqfliteFfiInit();
+      final db = await openVault(
+        'ana',
+        directory: path,
+        factory: databaseFactoryFfi,
+        singleInstance: false,
+      );
+      await db.execute('BEGIN IMMEDIATE');
+      heldPort.send(true);
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      await db.execute('COMMIT');
+      await db.close();
+    });
+    await held.first;
+    final waited = Stopwatch()..start();
+    await app.put(RecordType.category, _id1, _cat('Food 2'));
+    expect(waited.elapsedMilliseconds, greaterThan(1000));
+    expect((await app.get(RecordType.category, _id1))?.body['name'], 'Food 2');
+    await holder;
     await app.close();
   });
 

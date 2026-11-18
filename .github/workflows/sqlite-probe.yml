@@ -25,6 +25,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
+      - name: two-connection test, 5 times
+        if: matrix.mode == 'two-conn'
+        run: for i in 1 2 3 4 5; do flutter test test/local/sqlite_two_connections_test.dart 2>&1 | grep -E "\[E\]|Expected|Actual|database is locked|All tests passed|Some tests failed" | head -6; done
       - name: matrix probe
         if: matrix.mode == 'matrix'
         run: flutter test test/probe/matrix_probe_test.dart --reporter expanded 2>&1 | sed -n '/MATRIX/,/All tests\|Some tests/p'
