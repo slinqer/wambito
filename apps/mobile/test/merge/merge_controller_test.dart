@@ -3,7 +3,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show SynchronousFuture;
+import 'package:flutter/foundation.dart' show SynchronousFuture, debugPrint;
+import 'package:flutter/widgets.dart' show FlutterError, FlutterErrorDetails;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -657,6 +658,86 @@ void main() {
       expect(deletes(), 1);
     },
   );
+
+  test(
+    'a sign-out while the merge waits for its sign-in drops the job; the held vault stays',
+    () async {
+      final container = app();
+      final session = container.read(sessionProvider.notifier);
+      await session.ready;
+      final merge = container.read(mergeControllerProvider.notifier);
+      await merge.begin(email);
+      await session.signOut(discardGuest: true);
+      await pumpEventQueue();
+
+      expect(container.read(mergeControllerProvider), isA<MergeIdle>());
+      expect(merge.guestUserId, isNull);
+      expect(container.read(mergeSignInProvider).email, isNull);
+      // The held vault is not the sign-out's to forget (the merge, or a later adoption, is).
+      expect(fileOf(anonId), isTrue);
+      expect((await kept())[mergeTokenKey(anonId)], anonToken);
+    },
+  );
+
+  test(
+    'a job whose vault is gone is dropped: no empty vault is made, nothing is carried',
+    () async {
+      final first = app();
+      await first.read(sessionProvider.notifier).ready;
+      final merge = first.read(mergeControllerProvider.notifier);
+      await merge.begin(email);
+      // The phone's vault went outside the merge (a removed device, say).
+      await databaseFactoryFfi.deleteDatabase(p.join(dir.path, vaultFileName(anonId)));
+
+      await first.read(sessionProvider.notifier).verifyCode(email, '123456', replaceGuest: true);
+      await merge.resume();
+      targetReady = true;
+      first.invalidate(mergeTargetProvider);
+      await merge.run();
+
+      expect(first.read(mergeControllerProvider), isA<MergeIdle>());
+      expect(merge.guestUserId, isNull);
+      expect(fileOf(anonId), isFalse);
+      expect(deletes(), 0);
+    },
+  );
+
+  test('the email session expiring while its vault waits to be unlocked puts the guest session '
+      'back, with its data', () async {
+    final container = await signedInToTheAccount();
+    expect(container.read(mergeControllerProvider), isA<MergeWaitingUnlock>());
+    await container.read(sessionProvider.notifier).sessionExpired();
+    // The return to the guest runs from the session's change, not waited for by it.
+    for (var i = 0; i < 100 && container.read(mergeControllerProvider) is! MergeIdle; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+
+    final session = container.read(sessionProvider);
+    expect(session.stored?.token, anonToken);
+    expect(session.isGuest, isTrue);
+    expect(container.read(mergeControllerProvider), isA<MergeIdle>());
+    expect(await vaultHoldOf(anonId, directory: dir.path, factory: databaseFactoryFfi), isNull);
+    expect(fileOf(anonId), isTrue);
+    expect(deletes(), 0);
+  });
+
+  test('a merge error nobody waits for is logged by its type and, in debug, reported', () {
+    final reported = <FlutterErrorDetails>[];
+    final printed = <String?>[];
+    final onError = FlutterError.onError;
+    final print = debugPrint;
+    FlutterError.onError = reported.add;
+    debugPrint = (message, {wrapWidth}) => printed.add(message);
+    try {
+      reportMergeError(StateError('ana@wambito.test'), StackTrace.current, 'resume');
+    } finally {
+      FlutterError.onError = onError;
+      debugPrint = print;
+    }
+    expect(printed, ['merge: resume failed (StateError)']);
+    expect(reported.single.exception, isA<StateError>());
+    expect(reported.single.library, 'wambito merge');
+  });
 
   test('begin holds the anonymous vault and keeps its token before any code is sent', () async {
     final container = app();

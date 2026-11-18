@@ -194,7 +194,53 @@ class MergeController extends Notifier<MergeState> {
   }
 
   @override
-  MergeState build() => const MergeIdle();
+  MergeState build() {
+    ref.listen(sessionProvider.select((s) => s.status), (_, next) {
+      if (next == SessionStatus.signedOut) _sessionEnded();
+    });
+    return const MergeIdle();
+  }
+
+  /// The session ended (a sign-out, an expired session). After the email sign-in and before the
+  /// carry, the guest session kept aside is the session again, with its data, as at a cancel (an
+  /// expiry must not leave the guest's vault held and out of sight). Otherwise the job goes from
+  /// memory: its held vault stays (no sign-out forgets it) and a later [resume] finds it again.
+  void _sessionEnded() {
+    final job = _job;
+    final current = state;
+    final beforeCarry =
+        current is MergeWaitingUnlock ||
+        current is MergeCurrencyStop ||
+        (current is MergeFailed && !current.carried);
+    if (job != null && beforeCarry && !_busy) {
+      unawaited(
+        cancel().then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stack) =>
+              reportMergeError(error, stack, 'return to the guest'),
+        ),
+      );
+      return;
+    }
+    _drop(job);
+  }
+
+  /// [job] is no longer this controller's (its session ended, its vault or hold is gone).
+  void _drop(_Job? job) {
+    if (job != null && !identical(_job, job)) return;
+    _job = null;
+    _follow(null);
+    if (ref.mounted && state is! MergeDone) state = const MergeIdle();
+  }
+
+  /// Whether [job]'s vault still carries its `merging` hold: false once the vault (or the hold)
+  /// went outside the merge, so nothing opens it again (opening makes an empty file); null when
+  /// the hold cannot be read (left as it is).
+  Future<bool?> _stillHeld(_Job job) async {
+    final found = await _deps.listHolds();
+    if (found.unreadable.contains(job.anonId)) return null;
+    return found.holds.any((h) => h.userId == job.anonId && h.hold.kind == VaultHoldKind.merging);
+  }
 
   /// "Bring this phone's data into it?" said yes: the signed-in `preview` account without email
   /// holds its vault (`merging`, target [email]) and keeps its token, before any code is sent. The
@@ -237,6 +283,10 @@ class MergeController extends Notifier<MergeState> {
     final account = ref.read(currentVaultAccountProvider);
     if (account == null) return;
     var job = _job;
+    if (job != null && await _stillHeld(job) == false) {
+      _drop(job);
+      job = null;
+    }
     if (job == null) {
       final found = await _deps.listHolds();
       final held = found.holds
@@ -280,6 +330,11 @@ class MergeController extends Notifier<MergeState> {
     _busy = true;
     var carried = false;
     try {
+      final held = await _stillHeld(job);
+      if (held != true) {
+        if (held == false) _drop(job);
+        return;
+      }
       final source = await _deps.openSource(job.anonId);
       final List<(RecordType, String)> kept;
       try {
@@ -503,13 +558,41 @@ final mergeBlocksAppProvider = Provider<bool>((ref) {
       (state is MergeFailed && !state.carried);
 });
 
+/// A merge step that failed where nobody waits for it (the start and resume hook): never silent.
+/// Its type is logged (never its message, which may name the person's data), and a debug build
+/// also reports it as a Flutter error so it is seen at once; a release build goes on (the next
+/// start or resume tries again).
+@visibleForTesting
+void reportMergeError(Object error, StackTrace stack, String step) {
+  debugPrint('merge: $step failed (${error.runtimeType})');
+  assert(() {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'wambito merge',
+        context: ErrorDescription('during the merge\'s $step'),
+      ),
+    );
+    return true;
+  }());
+}
+
 /// The merge's start and resume hook (app.dart, after the adoption's and before the seen ping):
 /// [MergeController.resume] when the signed-in account is known or changes and when the app comes
 /// back, then [MergeController.run]; and a run as soon as the account's vault opens.
 final mergeResumeProvider = Provider<void>((ref) {
   final merge = ref.read(mergeControllerProvider.notifier);
   void resume() {
-    unawaited(merge.resume().then((_) => merge.run()).catchError((Object _) {}));
+    unawaited(
+      merge
+          .resume()
+          .then((_) => merge.run())
+          .then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stack) => reportMergeError(error, stack, 'resume'),
+          ),
+    );
   }
 
   ref.listen(currentVaultAccountProvider.select((a) => (a?.owner, a?.profile.id, a?.mode)), (
@@ -519,7 +602,14 @@ final mergeResumeProvider = Provider<void>((ref) {
     if (next.$1 != null) resume();
   }, fireImmediately: true);
   ref.listen(mergeTargetProvider, (_, next) {
-    if (next != null) unawaited(merge.run().catchError((Object _) {}));
+    if (next != null) {
+      unawaited(
+        merge.run().then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stack) => reportMergeError(error, stack, 'run'),
+        ),
+      );
+    }
   });
   final observer = _ResumeObserver(resume);
   WidgetsBinding.instance.addObserver(observer);
