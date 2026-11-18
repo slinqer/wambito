@@ -2146,6 +2146,8 @@
   "vaultLockedRetrying": "Trying again…",
   "vaultLockedUnsupportedTitle": "This phone can't keep your key",
   "vaultLockedUnsupportedLead": "To protect your data, Wambito needs the phone to keep the key safely. Update the system or open Wambito on another device.",
+  "vaultLockedPlainServerTitle": "Your data is waiting on this phone",
+  "vaultLockedPlainServerLead": "To keep it in a new account I need a server that keeps it encrypted, and this one doesn't yet. It's safe here; try again later.",
   "vaultRemoved": "This phone was removed from your account on another device. Changes not yet synced here were lost. To open your data again, type your recovery key or use another device.",
   "vaultUnverified": "This phone couldn't verify your account's new key, so it stopped syncing. Your data here is safe. To keep going, use your passkey or type your recovery key.",
   "vaultUnsyncedChanges": "{count, plural, =1{You have 1 change not synced yet} other{You have {count} changes not synced yet}}",

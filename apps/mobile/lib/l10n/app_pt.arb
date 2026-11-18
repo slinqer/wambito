@@ -949,6 +949,8 @@
   "vaultLockedRetrying": "A tentar outra vez…",
   "vaultLockedUnsupportedTitle": "Este telemóvel não consegue guardar a tua chave",
   "vaultLockedUnsupportedLead": "Para proteger os teus dados, o Wambito precisa que o telemóvel guarde a chave de forma segura. Atualiza o sistema ou abre o Wambito noutro dispositivo.",
+  "vaultLockedPlainServerTitle": "Os teus dados esperam neste telemóvel",
+  "vaultLockedPlainServerLead": "Para os guardar numa conta nova preciso de um servidor que os mantenha cifrados, e este ainda não o faz. Estão seguros aqui; tenta outra vez mais tarde.",
   "vaultRemoved": "Este telemóvel foi removido da tua conta a partir de outro dispositivo. As alterações ainda não sincronizadas aqui perderam-se. Para voltar a abrir os teus dados, escreve a tua chave de recuperação ou usa outro dispositivo.",
   "vaultUnverified": "Este telemóvel não conseguiu verificar a chave nova da tua conta, por isso deixou de sincronizar. Os teus dados aqui estão seguros. Para continuar, usa a tua chave de acesso ou escreve a tua chave de recuperação.",
   "vaultUnsyncedChanges": "{count, plural, =0{Tens 0 alterações por sincronizar} =1{Tens 1 alteração por sincronizar} other{Tens {count} alterações por sincronizar}}",

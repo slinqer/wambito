@@ -66,6 +66,9 @@ class AdoptDeps {
     this.onAdopted,
     this.onWiped,
     this.mayResume,
+    this.hasQueuedCaptures,
+    this.listHolds,
+    this.onStep,
   });
 
   /// `POST /auth/sign-in/anonymous`, `GET /v1/me`, `DELETE /v1/me`.
@@ -114,11 +117,25 @@ class AdoptDeps {
   /// or still in that account's session. Another account's session is never replaced by it.
   final Future<bool> Function(String oldUserId)? mayResume;
 
+  /// Whether captures detected from bank notifications still wait, unsaved, for [userId]
+  /// (Android's queue): they are the person's data too, so a vault without records but with them
+  /// is adopted, never wiped. Null: none can wait.
+  final Future<bool> Function(String userId)? hasQueuedCaptures;
+
+  /// [listVaultHolds] (tests put their own in).
+  final Future<({List<({String userId, VaultHold hold})> holds, List<String> unreadable})>
+  Function()?
+  listHolds;
+
+  /// Where each [adoptOrphan]'s routine stopped (the gate says why it waits: a `plain` new user).
+  final void Function(AdoptStep step)? onStep;
+
   /// These deps with the session's part.
   AdoptDeps withSession({
     Future<void> Function(String token, {required String fromUserId})? onAdopted,
     Future<void> Function(String oldUserId)? onWiped,
     Future<bool> Function(String oldUserId)? mayResume,
+    void Function(AdoptStep step)? onStep,
   }) => AdoptDeps(
     auth: auth,
     keys: keys,
@@ -136,6 +153,9 @@ class AdoptDeps {
     onAdopted: onAdopted ?? this.onAdopted,
     onWiped: onWiped ?? this.onWiped,
     mayResume: mayResume ?? this.mayResume,
+    hasQueuedCaptures: hasQueuedCaptures,
+    listHolds: listHolds,
+    onStep: onStep ?? this.onStep,
   );
 }
 
@@ -289,12 +309,22 @@ Future<AdoptStep> _adopt(String oldVaultId, AdoptDeps deps, {required bool again
 }
 
 /// A `user_deleted` 401 (phone-first spec 10 steps 1 to 3): the vault of [oldUserId] is held
-/// `orphaned` first (the sweep keeps it); without data (ruling 18) and with no adoption under way,
+/// `orphaned` first (the sweep keeps it); without data (ruling 18: no record, and no capture still
+/// queued for it, [AdoptDeps.hasQueuedCaptures]) and with no adoption under way,
 /// it is wiped and the phone signs out ([AdoptDeps.onWiped]); else [adoptVaultIntoNewUser], then
 /// the session becomes the new user's ([AdoptDeps.onAdopted]) and the kept token goes. A vault
 /// whose hold cannot be read is left as it is (it throws): nothing is wiped on a guess.
 Future<AdoptOutcome> adoptOrphan(String oldUserId, AdoptDeps deps) async {
   final kept = await deps.keptToken();
+  // Captures waiting in the queue are data too (never dropped): with any, the vault is adopted.
+  Future<bool> queued() async {
+    try {
+      return await deps.hasQueuedCaptures?.call(oldUserId) ?? false;
+    } on Object {
+      return true; // Cannot tell: the safe side keeps them.
+    }
+  }
+
   if (await _vaultExists(oldUserId, deps)) {
     final empty = await _withStore(oldUserId, deps, (store) async {
       final hold = await store.hold();
@@ -307,17 +337,18 @@ Future<AdoptOutcome> adoptOrphan(String oldUserId, AdoptDeps deps) async {
       }
       return !await vaultHoldsData(store);
     });
-    if (empty && kept == null) {
+    if (empty && kept == null && !await queued()) {
       await deps.forgetVault(oldUserId);
       await deps.onWiped?.call(oldUserId);
       return AdoptOutcome.wiped;
     }
-  } else if (kept == null) {
-    // No vault here and no adoption under way: nothing of the person's to keep.
+  } else if (kept == null && !await queued()) {
+    // No vault here, no adoption under way, no capture waiting: nothing of the person's to keep.
     await deps.onWiped?.call(oldUserId);
     return AdoptOutcome.wiped;
   }
   final step = await adoptVaultIntoNewUser(oldUserId, deps);
+  deps.onStep?.call(step);
   if (step != AdoptStep.adopted) return AdoptOutcome.waiting;
   final token = await deps.keptToken();
   if (token == null) return AdoptOutcome.waiting;
@@ -331,7 +362,9 @@ Future<AdoptOutcome> adoptOrphan(String oldUserId, AdoptDeps deps) async {
 /// read (`unreadable`) is left alone, never adopted nor deleted (the sweep keeps it too): it waits
 /// for a build that can read it.
 Future<void> resumeAdoption(AdoptDeps deps) async {
-  final found = await listVaultHolds(directory: deps.directory, factory: deps.factory);
+  final found =
+      await (deps.listHolds ??
+          () => listVaultHolds(directory: deps.directory, factory: deps.factory))();
   for (final (:userId, :hold) in found.holds) {
     if (hold.kind != VaultHoldKind.orphaned) continue;
     if (!(await deps.mayResume?.call(userId) ?? true)) continue;

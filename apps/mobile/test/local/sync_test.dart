@@ -1302,7 +1302,8 @@ void main() {
       expect(r.problem, SyncProblemCode.userDeleted);
     });
 
-    // Regression guard (3a): a removed device's 401 is the wipe's code, never a plain sign-in.
+    // New with phone-first spec 10 (before it every 401 was `unauthorized`): a removed device's
+    // 401 is the wipe's code, never a plain sign-in.
     test('401 device_removed stops with deviceRemoved', () async {
       final r = await runWith401({'code': 'device_removed'});
       expect(r.ok, isFalse);

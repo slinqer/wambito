@@ -30,8 +30,9 @@ class LockedView extends StatelessWidget {
       LockedKind.error => (l10n.vaultLockedTitle, l10n.vaultLockedLead),
       LockedKind.offline => (l10n.vaultLockedOfflineTitle, l10n.vaultLockedOfflineLead),
       LockedKind.unsupported => (l10n.vaultLockedUnsupportedTitle, l10n.vaultLockedUnsupportedLead),
+      LockedKind.plainServer => (l10n.vaultLockedPlainServerTitle, l10n.vaultLockedPlainServerLead),
     };
-    final canRetry = kind == LockedKind.error || kind == LockedKind.offline;
+    final canRetry = kind != LockedKind.unsupported;
     return SignInFrame(
       mood: WambiMood.worried,
       children: [

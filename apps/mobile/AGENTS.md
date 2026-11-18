@@ -141,7 +141,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   8 min on Android, inside the native budgets): past it the sync stops at its next fence, the effects are skipped,
   what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. A sync refused with
   401 `user_deleted` ends `userDeleted` (no effects, no hold, nothing adopted: only the app adopts, Review Focus 2;
-  Android's `SyncWorker` retries it like `failed`). `queued_capture.dart`
+  Android's `SyncWorker` retries it like `failed`); a removed device (`deviceRemoved`) ends `signedOut`. `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
   The vault lease (`lib/local/vault_lock.dart`, `tryLease` / `waitLease`) is what lets the app and a headless engine
   share one vault file: a lock file `wambito-vault-<userId>.db-lock` in the vault folder, holder `app` or `background`,
@@ -237,13 +237,18 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   with the app's writes into it stopped (`stopWrites` closes its open session) `carryRecords(adopt)` into the new
   user's vault (opened on its own: nothing seeded), then the old vault forgotten; offline (or a 5xx) before the carry
   is `waiting`. `adoptOrphan(oldUserId, deps)` → `AdoptOutcome` (`adopted`, `wiped`, `waiting`): holds the vault
-  `orphaned` first; no data (ruling 18: no live transaction, recurrence, budget or merchant) and no adoption under
-  way wipes it and signs out (`onWiped`); else the routine, then `onAdopted` (the session becomes the new user's,
+  `orphaned` first; no data (ruling 18: no live transaction, recurrence, budget or merchant, and no capture still
+  queued for that user: `hasQueuedCaptures`, `takeQueued` on the app's `wambito/capture`, read only) and no adoption
+  under way wipes it and signs out (`onWiped`); else the routine, then `onAdopted` (the session becomes the new user's,
   taking the deleted user's queued captures over: `captureHandoverProvider.keep` then `_signedIn(capturesFrom:)`)
   and the kept token goes. `resumeAdoption(deps)` (`adoptionResumeProvider`, watched in `app.dart` before the
   merge's: at start and on resume) goes on with every `orphaned` hold of `listVaultHolds` when `mayResume` allows
   (signed out, or still in that account's session); a vault in `unreadable` is left alone. `adoptDepsProvider`
-  (tests override it); one adoption at a time (`SessionController._adoption`). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
+  (tests override it); adoptions run one after the other, never one in place of another
+  (`SessionController._adoption`). The gate never opens a vault held `orphaned` (`refuseAdopted`, before and
+  after `openVaultSession`, through `vaultHoldReaderProvider`): it asks the adoption to go on and shows Locked
+  `offline` (`adopting`), or `LockedKind.plainServer` (`vaultLockedPlainServer*`) when the adoption stopped at a
+  `plain` new user (`adoptionNeedsEncryptedServer`). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
   What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",

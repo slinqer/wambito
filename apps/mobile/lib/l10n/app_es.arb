@@ -4295,6 +4295,14 @@
   "@vaultLockedUnsupportedLead": {
     "description": "Locked: why, and what to do."
   },
+  "vaultLockedPlainServerTitle": "Tus datos esperan en este teléfono",
+  "@vaultLockedPlainServerTitle": {
+    "description": "Locked: the account was deleted for inactivity and its data waits to move to a new account, but the server makes new accounts that do not keep data encrypted."
+  },
+  "vaultLockedPlainServerLead": "Para guardarlos en una cuenta nueva necesito un servidor que los mantenga cifrados, y este todavía no lo hace. Siguen a salvo aquí; vuelve a intentarlo más tarde.",
+  "@vaultLockedPlainServerLead": {
+    "description": "Locked: why the data cannot move yet (the server keeps new accounts unencrypted), that it is safe, and to try again later. Wambi speaks."
+  },
   "vaultRemoved": "Este teléfono se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
   "@vaultRemoved": {
     "description": "Unlock: this phone was removed from the account by another device."

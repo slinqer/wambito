@@ -10,7 +10,7 @@ import '../api/passkeys.dart';
 import '../api/session.dart';
 import '../api/unauthorized.dart';
 import '../background/background_channel.dart';
-import '../local/db.dart' show pendingChangesInVault, vaultHoldOf;
+import '../local/db.dart' show VaultHold, VaultHoldKind, pendingChangesInVault, vaultHoldOf;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
 import '../local/keys.dart' show KeysOptions, LocalKeys;
@@ -57,6 +57,11 @@ final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaul
 final forgetVaultProvider = Provider<Future<void> Function(String userId, KeyStorage storage)>(
   (ref) =>
       (userId, storage) => forgetVault(userId, storage),
+);
+
+/// Reads a vault's hold from its file ([vaultHoldOf]); tests put their own folder in.
+final vaultHoldReaderProvider = Provider<Future<VaultHold?> Function(String userId)>(
+  (ref) => vaultHoldOf,
 );
 
 /// The gate of the signed-in `preview` account, started; null for `plain`, while the mode of the
@@ -262,6 +267,25 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     }
   }
 
+  /// A vault held `orphaned` is being adopted into a new user (lib/local/adopt.dart): it never opens
+  /// (a write now would be lost when the adoption forgets it), the adoption is asked to go on, and
+  /// the gate says why it waits: `plain_server` when the new user would keep data in clear, else
+  /// `adopting` (shown as offline; a retry asks again). A hold that cannot be read opens as before.
+  Future<void> refuseAdopted() async {
+    VaultHold? hold;
+    try {
+      hold = await read(vaultHoldReaderProvider)(userId);
+    } on GateError {
+      rethrow;
+    } on Object {
+      return;
+    }
+    if (hold?.kind != VaultHoldKind.orphaned) return;
+    final session = read(sessionProvider.notifier);
+    unawaited(session.resumeAdoptions().catchError((Object _) {}));
+    throw GateError(session.adoptionNeedsEncryptedServer ? 'plain_server' : 'adopting');
+  }
+
   /// The vault was just unlocked with the recovery key typed at sign-in: the person has that key,
   /// so once it opens "Protect your data"'s first step is marked done when it is not yet.
   var openedWithSignInKey = false;
@@ -316,6 +340,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         // Read and reset before anything can fail: a failed open never leaves it set for a later one.
         final markKeySaved = openedWithSignInKey;
         openedWithSignInKey = false;
+        await refuseAdopted();
         final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(
             profile: profile,
@@ -333,6 +358,13 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
           // Opened for a session that is gone meanwhile: closed again, never handed out.
           unawaited(session.close().catchError((Object _) {}));
           throw const GateError('closed');
+        }
+        try {
+          // Held while it opened (the adoption began meanwhile): closed again before any write.
+          await refuseAdopted();
+        } on Object {
+          await session.close().catchError((Object _) {});
+          rethrow;
         }
         if (markKeySaved) unawaited(_markKeySavedIfNot(session));
         if (!identical(wired, session)) {

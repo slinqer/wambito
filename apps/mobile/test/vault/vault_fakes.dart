@@ -201,11 +201,12 @@ ProviderContainer appContainer(
   SessionState session, {
   required KeyStorage storage,
   List<Override> overrides = const [],
+  FixedSession Function()? sessionController,
 }) {
   final container = ProviderContainer(
     overrides: [
       ...overrides,
-      sessionProvider.overrideWith(() => FixedSession(session)),
+      sessionProvider.overrideWith(sessionController ?? () => FixedSession(session)),
       keyStorageProvider.overrideWithValue(storage),
       staleVaultsProvider.overrideWithValue(
         (keep) => deleteStaleVaults(

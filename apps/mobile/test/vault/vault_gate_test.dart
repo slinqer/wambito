@@ -292,8 +292,13 @@ void main() {
       },
     );
 
-    test('the gate has no guest: three locked kinds, and pairing only from Unlock', () {
-      expect(LockedKind.values, [LockedKind.error, LockedKind.offline, LockedKind.unsupported]);
+    test('the gate has no guest: its locked kinds, and pairing only from Unlock', () {
+      expect(LockedKind.values, [
+        LockedKind.error,
+        LockedKind.offline,
+        LockedKind.unsupported,
+        LockedKind.plainServer,
+      ]);
       expect(PairingFrom.values, [PairingFrom.unlock]);
     });
 

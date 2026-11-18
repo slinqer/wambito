@@ -49,6 +49,16 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
                     result.success(null)
                 }
             }
+            // What still waits for an account (read only, nothing leaves the queue): a deleted
+            // account's vault with captures waiting is adopted, never wiped (lib/local/adopt.dart).
+            "takeQueued" -> {
+                val userId = call.argument<String>("userId")?.takeIf { it.isNotEmpty() }
+                if (userId == null) {
+                    result.error("bad_args", "userId is required", null)
+                } else {
+                    result.success(CaptureQueueChannel.take(activity, userId))
+                }
+            }
             // On sign-out: captures of the account that left must not be sent for the next one.
             "clearQueue" -> {
                 CaptureQueue(activity).clear()

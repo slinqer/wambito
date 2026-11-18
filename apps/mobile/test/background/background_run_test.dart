@@ -460,6 +460,15 @@ void main() {
     expect(tx.body['needsReview'], false);
   });
 
+  test('a removed device ends signedOut, so the scheduler stops instead of retrying', () async {
+    _server.intercept = (req, real) async => (401, {'code': 'device_removed'});
+    final m = _make();
+    final report = await runBackground(m.deps, m.effects);
+    expect(report.outcome, BackgroundOutcome.signedOut);
+    expect(m.calls.widget, isEmpty);
+    expect(m.calls.released, ['released']);
+  });
+
   // Review Focus 2: only the app adopts a deleted user's vault. A headless run that meets
   // `user_deleted` ends with that outcome, draws nothing for an account that is gone, holds nothing
   // and deletes nothing: the vault and what the run saved into it wait for the app.

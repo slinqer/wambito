@@ -710,18 +710,31 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
-  /// The adoption in flight: a second ask (the start's 401, the gate's, a resume) shares it.
+  /// The adoptions asked for, one after the other: a second ask (the start's 401, the gate's, a
+  /// resume) runs once the one before it ended, never in its place (a resume that listed the holds
+  /// before the 401's hold was put would otherwise swallow the 401's adoption).
   Future<void>? _adoption;
 
-  Future<void> _adopting(Future<Object?> Function() run) async {
-    final running = _adoption ??= () async {
+  /// Whether the last adoption stopped at a `plain` new user (the gate says why it waits).
+  bool get adoptionNeedsEncryptedServer => _needsEncryptedServer;
+  var _needsEncryptedServer = false;
+
+  Future<void> _adopting(Future<Object?> Function() run) {
+    final next = (_adoption ?? Future<void>.value()).then((_) async {
+      if (!ref.mounted) return;
       try {
         await run();
       } on Object {
         // Nothing is lost: the vault stays held, and the next start or resume goes on.
       }
-    }().whenComplete(() => _adoption = null);
-    await running;
+    });
+    _adoption = next;
+    unawaited(
+      next.whenComplete(() {
+        if (identical(_adoption, next)) _adoption = null;
+      }),
+    );
+    return next;
   }
 
   /// At start and on resume (app.dart): an adoption that did not finish (a crash, no network) goes
@@ -754,6 +767,7 @@ class SessionController extends Notifier<SessionState> {
           final token = state.stored?.token;
           return token == null || await _accountIdOf(token) == oldUserId;
         },
+        onStep: (step) => _needsEncryptedServer = step == AdoptStep.plainUser,
       );
 
   /// This phone was removed from the account, or its deleted account's vault was empty: what the
@@ -944,6 +958,9 @@ final adoptDepsProvider = Provider<AdoptDeps>(
     keptToken: () => appSecureStorage.read(key: adoptTokenKey),
     keepToken: (token) => appSecureStorage.write(key: adoptTokenKey, value: token),
     forgetToken: () => appSecureStorage.delete(key: adoptTokenKey),
+    // Android's queue: captures not saved yet are data, so an empty vault with some is adopted.
+    hasQueuedCaptures: (id) async =>
+        (await ref.read(autoCapturePlatformProvider).takeQueued(id)).captures.isNotEmpty,
     // The app's open vault of the old account stops taking writes before the carry reads it.
     stopWrites: (id) async {
       final open = ref.read(vaultSessionProvider);

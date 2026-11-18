@@ -65,7 +65,9 @@ import '../local/vault_session.dart' show VaultOpenError;
 /// code as [KeysError], [VaultOpenError] or [GateError].
 
 /// Why the vault is locked; `unsupported` has no retry.
-enum LockedKind { error, offline, unsupported }
+/// Why the vault cannot open. `plainServer`: the account was deleted and its data waits to move
+/// to a new account, but the server only makes new accounts that keep data in clear (adoption).
+enum LockedKind { error, offline, unsupported, plainServer }
 
 sealed class VaultGateState<S> {
   const VaultGateState();
@@ -357,7 +359,10 @@ String? gateErrorCode(Object? error) => switch (error) {
 
 LockedKind _lockedKind(Object? error) => switch (gateErrorCode(error)) {
   // `busy`: a headless engine holds the vault's lease for now; like offline, a retry opens.
-  'offline' || 'busy' => LockedKind.offline,
+  // `adopting`: a deleted account's data is moving to a new account (lib/local/adopt.dart),
+  // which needs the network; a retry asks again.
+  'offline' || 'busy' || 'adopting' => LockedKind.offline,
+  'plain_server' => LockedKind.plainServer,
   'unsupported_browser' => LockedKind.unsupported,
   _ => LockedKind.error,
 };

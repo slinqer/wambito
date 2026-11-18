@@ -949,6 +949,8 @@
   "vaultLockedRetrying": "Nuovo tentativo…",
   "vaultLockedUnsupportedTitle": "Questo telefono non può conservare la tua chiave",
   "vaultLockedUnsupportedLead": "Per proteggere i tuoi dati, Wambito ha bisogno che il telefono conservi la chiave in modo sicuro. Aggiorna il sistema o apri Wambito su un altro dispositivo.",
+  "vaultLockedPlainServerTitle": "I tuoi dati aspettano su questo telefono",
+  "vaultLockedPlainServerLead": "Per tenerli in un account nuovo mi serve un server che li mantenga cifrati, e questo non lo fa ancora. Qui sono al sicuro; riprova più tardi.",
   "vaultRemoved": "Questo telefono è stato rimosso dal tuo account da un altro dispositivo. Le modifiche non ancora sincronizzate qui sono andate perse. Per aprire di nuovo i tuoi dati, scrivi la tua chiave di recupero o usa un altro dispositivo.",
   "vaultUnverified": "Questo telefono non è riuscito a verificare la nuova chiave del tuo account, quindi ha smesso di sincronizzare. I tuoi dati qui sono al sicuro. Per continuare, usa la tua passkey o scrivi la tua chiave di recupero.",
   "vaultUnsyncedChanges": "{count, plural, =1{Hai 1 modifica non ancora sincronizzata} other{Hai {count} modifiche non ancora sincronizzate}}",
