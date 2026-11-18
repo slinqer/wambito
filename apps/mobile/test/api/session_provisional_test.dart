@@ -22,7 +22,7 @@ import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/local/adopt.dart';
-import 'package:wambito/local/db.dart' show VaultHoldKind, vaultFileName, vaultHoldOf;
+import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind, vaultFileName, vaultHoldOf;
 import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/memory_store.dart' show createMemoryStore;
 import 'package:wambito/local/provisional.dart';
@@ -470,6 +470,42 @@ void main() {
     expect((await carried.get(RecordType.category, seeded.id))?.body['name'], 'Mi mercado');
     await carried.close();
     expect((await kept()).containsKey(SessionStore.provisionalTokenKey), isFalse);
+  });
+
+  test('an adoption waiting on this phone never takes over a provisional session', () async {
+    // A deleted account's vault, held for its adoption, from before this offline first run.
+    final orphan = await open('old_1');
+    await orphan.setHold(const VaultHold(VaultHoldKind.orphaned, since: '2026-11-17T00:00:00Z'));
+    await orphan.put(RecordType.category, food, category('Comida'));
+    await orphan.close();
+    final container = await startedOffline();
+    final localId = container.read(sessionProvider).localId!;
+    auth.offline = false;
+
+    await container.read(sessionProvider.notifier).resumeAdoptions();
+
+    expect(container.read(sessionProvider).isProvisional, isTrue);
+    expect(container.read(sessionProvider).localId, localId);
+    expect(auth.made, 0);
+    expect(fileOf('old_1'), isTrue);
+    expect(fileOf(localId), isTrue);
+  });
+
+  test('a start with a session and a provisional vault still on disk keeps the provisional id and '
+      'token (the vault was never carried)', () async {
+    final first = await startedOffline();
+    final localId = first.read(sessionProvider).localId!;
+    await first.read(provisionalVaultProvider.notifier).close();
+    first.dispose();
+    await SessionStore().writeProvisionalToken('guest-token-kept');
+    await SessionStore().write('other-token', guest: true);
+
+    final again = start();
+    await again.read(sessionProvider.notifier).ready;
+
+    expect(fileOf(localId), isTrue);
+    expect(await SessionStore().readProvisional(), localId);
+    expect(await SessionStore().readProvisionalToken(), 'guest-token-kept');
   });
 
   test(

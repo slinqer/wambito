@@ -199,6 +199,9 @@ Future<bool> vaultHoldsData(FinanceStore store) async {
   return false;
 }
 
+/// Whether [userId]'s vault file is in [deps]' folder.
+Future<bool> adoptVaultExists(String userId, AdoptDeps deps) => _vaultExists(userId, deps);
+
 Future<bool> _vaultExists(String userId, AdoptDeps deps) async =>
     File(p.join(deps.directory ?? await defaultVaultDirectory(), vaultFileName(userId)))
         .existsSync();

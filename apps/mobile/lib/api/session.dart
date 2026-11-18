@@ -272,8 +272,10 @@ class SessionController extends Notifier<SessionState> {
       await _openProvisional(localId);
       return null;
     }
-    if (stored != null && localId != null) {
-      // A promotion that signed in and was killed before it tidied up (the vault is carried).
+    if (stored != null && localId != null && !await _provisionalVaultKept(localId)) {
+      // A promotion that signed in and was killed before it tidied up (the vault is carried: the
+      // adoption forgot it). A provisional vault still on disk was never carried: its id and kept
+      // token stay with it (the hold keeps it through the sweep).
       await _tidyPromotion();
     }
     // Read before the session is out: the start's `GET /v1/me` names it at once.
@@ -301,6 +303,15 @@ class SessionController extends Notifier<SessionState> {
     }
 
     unawaited(tag().then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  /// Whether the provisional vault [localId] is still on disk; true when that cannot be told.
+  Future<bool> _provisionalVaultKept(String localId) async {
+    try {
+      return await adoptVaultExists(localId, ref.read(adoptDepsProvider));
+    } on Object {
+      return true;
+    }
   }
 
   /// What a promotion leaves once the session is the new user's: the local id and the kept token.
@@ -1056,6 +1067,9 @@ class SessionController extends Notifier<SessionState> {
           }
         },
         mayResume: (oldUserId) async {
+          // A provisional session is not signed out: an adoption would replace it, and its vault
+          // would be left behind, never carried. It waits for the promotion.
+          if (state.isProvisional) return false;
           final token = state.stored?.token;
           return token == null || await _accountIdOf(token) == oldUserId;
         },
