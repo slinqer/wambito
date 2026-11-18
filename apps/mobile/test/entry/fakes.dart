@@ -219,13 +219,13 @@ class FakeAuthApi implements AuthApi {
   bool recoveryBelongsToGuest = false;
 
   @override
-  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth) async {
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth) async {
     calls.add('recoverySignIn');
     recoverySignIns.add((lookup: Uint8List.fromList(lookup), auth: Uint8List.fromList(auth)));
     _fail('recoverySignIn');
     final token = _newToken('recovery');
     guests[token] = recoveryBelongsToGuest;
-    return token;
+    return (token: token, userId: account);
   }
 
   @override

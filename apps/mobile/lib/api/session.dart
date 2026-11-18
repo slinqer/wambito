@@ -455,23 +455,21 @@ class SessionController extends Notifier<SessionState> {
     final held = ref.read(signInRecoveryKeyProvider);
     var handedOver = false;
     try {
-      final String token;
+      final RecoverySignedInAs signedIn;
       final verifier = await recoveryVerifier(secret);
       try {
-        token = await _auth.recoverySignIn(verifier.lookup, verifier.auth);
+        signedIn = await _auth.recoverySignIn(verifier.lookup, verifier.auth);
       } finally {
         verifier.lookup.fillRange(0, verifier.lookup.length, 0);
         verifier.auth.fillRange(0, verifier.auth.length, 0);
       }
-      // The account may have no email: if the server cannot say, a guest (the safe side), and the
-      // vault asks for the key, since the phone cannot tell whose it is.
+      final (:token, :userId) = signedIn;
+      // Held for the account the server named, before the session changes: the gate that the new
+      // session starts takes it.
+      held.hold(userId, secret);
+      handedOver = true;
+      // The account may have no email: if the server cannot say, a guest (the safe side).
       final standing = await _standing(token);
-      final userId = standing?.userId;
-      // Held before the session changes: the gate that the new session starts takes it.
-      if (userId != null) {
-        held.hold(userId, secret);
-        handedOver = true;
-      }
       await _signedIn(
         token,
         guest: standing?.guest ?? true,

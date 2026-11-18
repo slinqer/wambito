@@ -24,6 +24,9 @@ class AuthFailure implements Exception {
   String toString() => 'AuthFailure($status, $code)';
 }
 
+/// A recovery-key sign-in: the session's bearer token and the account it signed in to.
+typedef RecoverySignedInAs = ({String token, String userId});
+
 /// Who the account behind a token is, as `GET /v1/me` says it: a guest or not, and whether it still
 /// has the welcome to do. The web decides the welcome with `onboardingCompletedAt` (apps/web/app/
 /// auth/session.ts, `requireOnboarded`); a guest has none, as the web has no guests.
@@ -132,8 +135,9 @@ abstract interface class AuthApi {
 
   /// Signs in with the recovery key (`POST /v2/recovery/sign-in`): [lookup] (16 bytes) and [auth]
   /// (32 bytes) are what the key derives (`recoveryVerifier`), never the key itself. A key that
-  /// signs in nothing is 401 `recovery_key_invalid`; too many tries, 429 with `retryAfter`.
-  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth);
+  /// signs in nothing is 401 `recovery_key_invalid`; too many tries, 429 with `retryAfter`. The
+  /// session's token and the id of the account it signed in to (the answer's `userId`).
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth);
 
   /// Ends the session on the server (best effort).
   Future<void> signOut(String token);
@@ -405,7 +409,7 @@ class HttpAuthApi implements AuthApi {
       });
 
   @override
-  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth) => _settle(() async {
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth) => _settle(() async {
     final response = await _api.recoverySignIn(
       recoverySignIn: RecoverySignIn(
         (b) => b
@@ -413,7 +417,9 @@ class HttpAuthApi implements AuthApi {
           ..auth = _base64Url(auth),
       ),
     );
-    return _token(response);
+    final userId = response.data?.userId;
+    if (userId == null || userId.isEmpty) throw const AuthFailure(status: 500);
+    return (token: _token(response), userId: userId);
   });
 
   /// Unpadded base64url, as the API reads bytes.

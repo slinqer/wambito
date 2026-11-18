@@ -305,6 +305,9 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       startPairing: () async =>
           _GatePairing(await signInAgainOn401(() => pairing.startPairing(options()))),
       open: (localKeys, fresh) async {
+        // Read and reset before anything can fail: a failed open never leaves it set for a later one.
+        final markKeySaved = openedWithSignInKey;
+        openedWithSignInKey = false;
         final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(
             profile: profile,
@@ -323,10 +326,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
           unawaited(session.close().catchError((Object _) {}));
           throw const GateError('closed');
         }
-        if (openedWithSignInKey) {
-          openedWithSignInKey = false;
-          unawaited(_markKeySavedIfNot(session));
-        }
+        if (markKeySaved) unawaited(_markKeySavedIfNot(session));
         if (!identical(wired, session)) {
           wired = session;
           detach

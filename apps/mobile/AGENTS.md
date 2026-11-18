@@ -373,7 +373,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `PARITY_PINGFANG` to a `PingFang.ttc` (see `test/support/parity.dart`). CI skips goldens.
 - Parity (`docs/mobile/parity.md`, list `test/parity/parity.json`): `pnpm --filter @wambito/web
   parity:fixtures|parity:shots [id]`, `flutter test --update-goldens test/parity`,
-  `dart run tool/parity/compose.dart --max 2 [id]`.
+  `dart run tool/parity/compose.dart --max 2 [id]`. Known difference: the phone's signed-out email step
+  (`signin-*` masters) ends with the "Sign in with my recovery key" link; the web's story gets it with the web
+  delivery of phone-first accounts.
 - Kotlin: `cd android && JAVA_HOME=<JDK 17> ./gradlew :app:testDebugUnitTest --console=plain`.
 - iOS (macOS, Xcode): `swift test --package-path ios/WambitoNative`; unsigned build `flutter build ios
   --release --no-codesign`; `scripts/check-ios-signing.sh`, `scripts/test-check-ios-signing.sh`;

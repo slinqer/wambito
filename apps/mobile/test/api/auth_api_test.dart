@@ -455,7 +455,7 @@ void main() {
           'set-auth-token': ['recovery.tok'],
         },
       );
-      expect(await api.recoverySignIn(lookup, auth), 'recovery.tok');
+      expect(await api.recoverySignIn(lookup, auth), (token: 'recovery.tok', userId: 'u1'));
       expect(last().uri.toString(), 'https://wambito.example/api/v2/recovery/sign-in');
       expect(last().headers.containsKey('Authorization'), isFalse);
       final body = adapter.bodies.last;

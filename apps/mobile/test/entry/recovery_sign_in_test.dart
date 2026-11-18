@@ -1,6 +1,8 @@
 // Signing in with the recovery key (phone-first spec, recovery-key sign-in): the email screen's link
 // opens the recovery screen; the key typed there signs in (`POST /v2/recovery/sign-in`) and the same
 // key then opens the vault, without asking for it again.
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +27,23 @@ import '../support/preview_account.dart';
 import 'fakes.dart';
 
 final _es = lookupAppLocalizations(const Locale('es'));
+
+/// A recovery sign-in that answers from the verifiers the server keeps (lookup → account), as the
+/// API's `findVerifiedUser`: nothing kept is 401 `recovery_key_invalid`.
+class _VerifierServer extends FakeAuthApi {
+  final verifiers = <String, String>{};
+
+  @override
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth) async {
+    final owner = verifiers[toBase64Url(lookup)];
+    if (owner == null) {
+      calls.add('recoverySignIn');
+      throw const AuthFailure(code: 'recovery_key_invalid', status: 401);
+    }
+    account = owner;
+    return super.recoverySignIn(lookup, auth);
+  }
+}
 
 /// An open vault on a memory store, as far as the gate's wiring needs one.
 class _Vault extends FakeVault {
@@ -129,13 +148,26 @@ void main() {
   });
 
   testWidgets('a plain account has no verifier: the same invalid message, no session', (t) async {
-    // The server keeps no verifier for a `plain` account, so its answer is the same 401.
+    // A server that answers from the verifiers it keeps: a `plain` account never stored one (only
+    // a vault's setup or "Protect your data" does), so the key of a plain account, even one made
+    // and written down, finds nothing. The session stays signed out and no key is held.
+    final server = _VerifierServer();
+    auth = server;
     final container = await openRecovery(t);
-    auth.failures['recoverySignIn'] = const AuthFailure(code: 'recovery_key_invalid', status: 401);
-    await submit(t, someKey());
+    final plainKey = someKey();
+    await submit(t, plainKey);
+    expect(server.calls, contains('recoverySignIn'));
     expect(find.text(_es.errorRecoveryKeyInvalid), findsOneWidget);
     expect(container.read(sessionProvider).status, SessionStatus.signedOut);
     expect(await SessionStore().read(), isNull);
+    expect(container.read(signInRecoveryKeyProvider).take(server.account), isNull);
+  });
+
+  testWidgets('a suspended account says so', (t) async {
+    await openRecovery(t);
+    auth.failures['recoverySignIn'] = const AuthFailure(code: 'account_suspended', status: 403);
+    await submit(t, someKey());
+    expect(find.text(_es.errorAccountSuspended), findsOneWidget);
   });
 
   testWidgets('signed in, the recovery screen is not offered', (t) async {
