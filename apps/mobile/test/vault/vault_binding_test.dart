@@ -95,6 +95,8 @@ void main() {
       if (online) {
         // Another account signed in: A's vault is swept (the web's deleteStaleVaults).
         await until(() => !File(p.join(vaultDir.path, vaultFileName('user_a'))).existsSync());
+        // the keys go after the file
+        expect(await keysLeftOf('user_a'), isEmpty);
         expect(await storage.current('user_a'), isNull);
       } else {
         // closed, not wiped: nobody has said who B is yet
@@ -159,16 +161,7 @@ void main() {
       await until(() => c.read(knownPlainProvider));
       await until(() => !File(p.join(vaultDir.path, vaultFileName('user_a'))).existsSync());
       // The sweep deletes the file first and the keys after it: wait for those too.
-      Iterable<String> left = const [];
-      final stop = DateTime.now().add(const Duration(seconds: 5));
-      do {
-        left = (await const FlutterSecureStorage().readAll()).keys.where(
-          (k) => k.contains('user_a'),
-        );
-        if (left.isEmpty) break;
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      } while (DateTime.now().isBefore(stop));
-      expect(left, isEmpty);
+      expect(await keysLeftOf('user_a'), isEmpty);
     });
   });
 
@@ -203,4 +196,17 @@ void main() {
       expect(await storage.current('user_a'), isNull);
     });
   });
+}
+
+/// The stored keys of [userId] once the sweep is done with them: it deletes them after the vault
+/// file, so this waits (up to 5 s) for them to go and returns what is left.
+Future<List<String>> keysLeftOf(String userId) async {
+  final stop = DateTime.now().add(const Duration(seconds: 5));
+  while (true) {
+    final left = (await const FlutterSecureStorage().readAll()).keys
+        .where((k) => k.contains(userId))
+        .toList();
+    if (left.isEmpty || DateTime.now().isAfter(stop)) return left;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
