@@ -100,4 +100,28 @@ void main() {
       isNot(contains('<uses-permission android:name="android.permission.BIND_NOTIFICATION')),
     );
   });
+
+  test(
+    'the web sign-in QR: host signin once, on the exported MainActivity, never on the alias',
+    () {
+      expect(manifest.split('android:host="signin"').length - 1, 1);
+      final main = RegExp(r'<activity\s[^>]*android:name="\.MainActivity"[\s\S]*?</activity>')
+          .firstMatch(manifest)!
+          .group(0)!;
+      expect(main, contains('android:exported="true"'));
+      expect(main, contains('<data android:scheme="wambito" android:host="signin"/>'));
+      // the system camera opens it: a browsable VIEW filter of its own
+      final filter = RegExp(
+        r'<intent-filter>(?:(?!</intent-filter>)[\s\S])*android:host="signin"[\s\S]*?</intent-filter>',
+      ).firstMatch(main)!.group(0)!;
+      expect(filter, contains('android.intent.action.VIEW'));
+      expect(filter, contains('android.intent.category.BROWSABLE'));
+      // nothing else of the app's own links rides on it
+      expect(RegExp('android:host=').allMatches(filter), hasLength(1));
+      final alias = RegExp(r'<activity-alias[^>]*LaunchLinkAlias[\s\S]*?</activity-alias>')
+          .firstMatch(manifest)!
+          .group(0)!;
+      expect(alias, isNot(contains('signin')));
+    },
+  );
 }

@@ -123,7 +123,20 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   relay's `expiresAt` capped at 10 minutes from its own start, and on `cancel()`; the ephemeral private keys and the
   opened DK are zeroed; nothing secret is logged. `PairingClock` is the test seam; `pairingOpenFromPairing` and
   `pairingSealToDevice` record what the crypto handed out. `test/local/pairing_test.dart` ports `pairing.test.ts` over
-  a fake relay.
+  a fake relay. Both relays share `relay.dart` (= `relay.ts`: `RelayClient` with `send`/`get`/`post`/`poll(path,
+  step over the decoded body)`/`setDeadline`/`restart`/`check`/`cancelled`, errors made by the caller's type;
+  `sameBytes`, `key32`, `relayCodePattern`; with `backOffTooMany` a 429 waits its `retry-after`, else 5 s doubling
+  to 30 s, never asks again at once) and `relay_clock.dart` (`PairingClock`, `RealPairingClock`; `pairing.dart`
+  re-exports `PairingClock`; `relay.dart` never imports `pairing.dart`). `signin_approval.dart` is the phone's half
+  of `signin.ts` (phone-first spec 8.1): `findSigninRequest(options, code:|qr:)` (QR exactly
+  `wambito://signin?id=<uuid>&key=<43>`, `isSigninQr`; pins the commitment, a QR's key must hash to it; posts
+  nothing) → `SigninApproval` (`label`, `expiresAt`, `typed`; `approve()` posts `A.pub` (409 → `tampered`), polls
+  `GET /v2/signin/{id}` for the browser's key and checks it, returns the 6 digits only after a typed code; `seal()`
+  is a `StateError` after a typed code until `approve()` returned, checks the deadline, seals like pairing
+  (`WrapContext(device, userId, keyV)`, `pairingSealToDevice`), waits for the pickup's 404; `cancel()` zeroes `A`).
+  `SigninError` codes `bad_code`, `expired`, `tampered`, `offline`, `server`, `cancelled`. Its 2 minutes
+  (`signinTtl`) run on the phone's clock from the read, never on the server's `expiresAt`. Seam
+  `signinGenerateDeviceKeyPair`; tests `test/local/signin_approval_test.dart` over `fake_signin.dart`.
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
   Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
@@ -213,13 +226,19 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
   "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
   code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
-  `scan` → the first `wambito://pair?` QR, or null for a close or a refused permission), then the number, then
+  `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default `[pairQrPrefix]`,
+  the sign-in screen asks `[signinQrPrefix]`; the native sides know only those two), or null for a close or a
+  refused permission), then the number, then
   "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
   `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
-  `security_section.dart` (devices, Remove, Approve, "New recovery key"), `remove_device_sheet.dart` (typed key or a new one),
+  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key"),
+  `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
+  **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
+  "They match" after a typed code; through `SecurityApi.findSigninRequest`; cancels on every way out; with no open
+  vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
   Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
@@ -362,9 +381,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   totals line hides when the server sends none. The screen uses home's categories (archived too),
   loads the next page when the end is near, and after `openEditSheet` (replaceable in tests with
   `searchOpenEditProvider`) calls `refresh()`. Tests: `test/search/` (fake repository through the provider).
-- Deep links `wambito://{add,capture,due,progress,home,review}` (`lib/launch/launch_links.dart`);
+- Deep links `wambito://{add,capture,due,progress,home,review,signin}` (`lib/launch/launch_links.dart`);
   `wambito://review` and `wambito://review/<id>` (one segment, `launchReviewIdOf`) push `/review` or
-  `/review/<id>` over home, which opens that transaction in the editor.
+  `/review/<id>` over home, which opens that transaction in the editor. `wambito://signin?id=…&key=…`
+  (`LaunchAction.signin`, `launchSigninQrOf`: the exact QR) pushes `/settings/signin?qr=` over home only while
+  `securityApiProvider` is non-null (an open `preview` vault); locked, `plain` or malformed, it is dropped (ruling 14).
 
 ## Android (`android/app/src/main/kotlin/com/wambito/app/`)
 
@@ -378,8 +399,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito/*`, registered in `MainActivity.kt`; names match the Dart constants (rename both at once).
 - `scanner/`: `wambito/scanner` (`isAvailable`, `scan`): `ScannerChannel` asks the `CAMERA` permission at scan time
   only (a refusal answers null) and starts `ScannerActivity` (not exported): CameraX `Preview` + `ImageAnalysis`
-  (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first `wambito://pair?` text
-  goes back. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
+  (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first text `acceptsQr`
+  for the call's `prefixes` (`ScannerPrefix.kt`: `qrPrefixesOf` keeps only `wambito://pair?` and
+  `wambito://signin?`, the pairing one by default; `ScannerPrefixTest`) goes back, via `EXTRA_PREFIXES`. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
   and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
   `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
@@ -438,6 +460,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
     `Scanner/`: `wambito/scanner` (`isAvailable`, `scan`: `AVCaptureMetadataOutput` for `.qr`, full screen;
+    `QrPrefix.of` / `QrPrefix.accepts` in WambitoNative take the call's `prefixes` as Android does;
     `CameraAccess.state` in WambitoNative maps the permission; `NSCameraUsageDescription` in `InfoPlist.strings`);
     `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
     AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `scheduleDueList`, `cancelDue`,
@@ -611,5 +634,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Never block on a WorkManager future (`.get()`) in code a Worker runs: deadlocks in tests.
 - `test/tooling/*` reads Android files; `widget_android_test.dart` there pins Dart = Kotlin.
 - `manifest_test` counts `android:host="due"` once (only `wambito://` links).
+- Launch host `signin` is the one `wambito://` link on the exported `MainActivity` (its own BROWSABLE filter, so
+  the system camera opens a web sign-in QR); every other host stays on the not-exported `LaunchLinkAlias`.
+  `LaunchLinks.linkOf` takes `signin` from any sender (it only opens the approval), the rest from the alias only;
+  `manifest_test` counts `android:host="signin"` once. iOS `LaunchLinks.swift` takes `signin` with its query only.
 - About 55 goldens already fail on the founder's Mac: compare with the base first. Regenerated
   parity fixtures change millisecond timestamps: keep only the intended diff.

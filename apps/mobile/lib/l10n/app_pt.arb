@@ -1023,5 +1023,22 @@
   "entryTryAgain": "Tentar de novo",
   "provisionalWaiting": "Os teus dados estão neste telefone. Assim que houver internet, crio a tua conta para eles.",
   "provisionalPlainServer": "Os teus dados continuam neste telefone. Este servidor não guarda os dados cifrados, por isso espero por um que o faça.",
-  "provisionalNoGuests": "Os teus dados continuam neste telefone. Por agora este servidor não aceita contas novas sem email."
+  "provisionalNoGuests": "Os teus dados continuam neste telefone. Por agora este servidor não aceita contas novas sem email.",
+  "settingsSecuritySignin": "Entrar na web",
+  "settingsSecuritySigninLead": "Abre o Wambito num computador com este telefone: lê o código QR que ele te mostra.",
+  "signinApproveTitle": "Entrar na web",
+  "signinApproveLead": "No computador, escolhe «Entrar». Depois lê o código QR que aparece, ou escreve o seu código.",
+  "signinApproveCodeLabel": "Código do computador",
+  "signinApproveBadCode": "Esse código não corresponde a nenhum pedido. Confirma-o, ou abre um novo no computador.",
+  "signinApproveQuestion": "Entrar em {label}?",
+  "signinApproveWarning": "Lê só um código que vejas em {host}",
+  "signinApproveApprove": "Aprovar",
+  "signinApproveWaiting": "À espera do computador…",
+  "signinApproveNumberLead": "Aprova só se o número no computador for exatamente este.",
+  "signinApproveSealing": "Entrando…",
+  "signinApproveDoneLead": "Já entraste em {label}.",
+  "signinApproveMismatchLead": "O computador não recebeu nada. Se querias entrar, começa de novo lá.",
+  "signinApproveExpiredLead": "Abre um código novo no computador e lê-o outra vez.",
+  "signinApproveFailedTitle": "Não foi possível aprovar a entrada",
+  "signinApproveLocked": "Abre primeiro os teus dados neste telefone."
 }

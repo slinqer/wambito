@@ -1023,5 +1023,22 @@
   "entryTryAgain": "Riprova",
   "provisionalWaiting": "I tuoi dati sono su questo telefono. Appena c’è internet, creo il tuo account per loro.",
   "provisionalPlainServer": "I tuoi dati restano su questo telefono. Questo server non conserva i dati cifrati, quindi aspetto uno che lo faccia.",
-  "provisionalNoGuests": "I tuoi dati restano su questo telefono. Per ora questo server non accetta nuovi account senza email."
+  "provisionalNoGuests": "I tuoi dati restano su questo telefono. Per ora questo server non accetta nuovi account senza email.",
+  "settingsSecuritySignin": "Accedi sul web",
+  "settingsSecuritySigninLead": "Apri Wambito su un computer con questo telefono: scansiona il codice QR che ti mostra.",
+  "signinApproveTitle": "Accedi sul web",
+  "signinApproveLead": "Sul computer, scegli «Accedi». Poi scansiona il codice QR che compare, o scrivi il suo codice.",
+  "signinApproveCodeLabel": "Codice dal computer",
+  "signinApproveBadCode": "Quel codice non corrisponde a nessuna richiesta. Controllalo, o aprine uno nuovo sul computer.",
+  "signinApproveQuestion": "Accedere su {label}?",
+  "signinApproveWarning": "Scansiona solo un codice che vedi su {host}",
+  "signinApproveApprove": "Approva",
+  "signinApproveWaiting": "In attesa del computer…",
+  "signinApproveNumberLead": "Approva solo se il numero sul computer è esattamente questo.",
+  "signinApproveSealing": "Accesso in corso…",
+  "signinApproveDoneLead": "Hai effettuato l'accesso su {label}.",
+  "signinApproveMismatchLead": "Il computer non ha ricevuto nulla. Se volevi accedere, ricomincia lì.",
+  "signinApproveExpiredLead": "Apri un nuovo codice sul computer e scansionalo di nuovo.",
+  "signinApproveFailedTitle": "Non è stato possibile approvare l'accesso",
+  "signinApproveLocked": "Apri prima i tuoi dati su questo telefono."
 }

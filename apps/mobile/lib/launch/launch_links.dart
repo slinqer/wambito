@@ -9,7 +9,9 @@ import '../api/session.dart';
 import '../capture/capture_sheet.dart';
 import '../home/home_controller.dart';
 import '../review/review_controller.dart';
+import '../local/signin_approval.dart' show isSigninQr;
 import '../router.dart';
+import '../settings/security/security_api.dart' show securityApiProvider;
 
 /// What a `wambito://` link asks for (spec section 7.1): the widget's ＋ (`wambito://add`, the add
 /// sheet with the keypad ready) and its 🎤, also the Quick Settings tile's (`wambito://capture`,
@@ -18,8 +20,10 @@ import '../router.dart';
 /// "Guarda tu progreso", over home. `wambito://home` is a tap on the widget itself (its figures, its
 /// face, any area but the buttons): home. `wambito://review` and `wambito://review/<id>` are the
 /// detected-transaction notification's "Cambiar" and the like: the review inbox, with that
-/// transaction open in the editor when an id comes ([launchReviewIdOf]).
-enum LaunchAction { add, capture, due, progress, home, review }
+/// transaction open in the editor when an id comes ([launchReviewIdOf]). `wambito://signin?id=…&key=…`
+/// is a web sign-in's QR opened by the system camera (phone-first spec 8.1, ruling 14): the
+/// approval, only while the vault is open ([launchSigninQrOf]).
+enum LaunchAction { add, capture, due, progress, home, review, signin }
 
 /// The scheme of the links the app builds.
 const launchScheme = 'wambito';
@@ -44,6 +48,7 @@ LaunchAction? launchActionOf(String? link) {
     'due' => LaunchAction.due,
     'progress' => LaunchAction.progress,
     'home' => LaunchAction.home,
+    'signin' => LaunchAction.signin,
     _ => null,
   };
 }
@@ -53,6 +58,13 @@ String? launchReviewIdOf(String? link) {
   if (launchActionOf(link) != LaunchAction.review) return null;
   final id = Uri.parse(link!).pathSegments.where((s) => s.isNotEmpty).firstOrNull;
   return id;
+}
+
+/// The QR of a `wambito://signin?id=<uuid>&key=<key>` link, exactly as the browser shows it; null
+/// for any other link (no query, another shape).
+String? launchSigninQrOf(String? link) {
+  if (launchActionOf(link) != LaunchAction.signin) return null;
+  return isSigninQr(link!) ? link : null;
 }
 
 /// Where `wambito://` links come from: Android (MainActivity.kt) keeps them away from the router
@@ -153,6 +165,14 @@ class LaunchLinks {
     // A sheet with the person's input in it (add, edit or capture) is never thrown away for a link:
     // the link is dropped, and the sheet stays as it was (the app only comes to the front).
     if (_ref.read(sheetsWithInputProvider).any) return;
+    // A web sign-in needs this phone's data open (an encrypted account, unlocked): otherwise the
+    // link is dropped, and the person scans again once it is (ruling 14). A `plain` account has
+    // nothing to approve with.
+    final signinQr = launchSigninQrOf(link);
+    if (action == LaunchAction.signin &&
+        (signinQr == null || _ref.read(securityApiProvider) == null)) {
+      return;
+    }
     final router = _ref.read(routerProvider);
     router.go('/');
     // Home must be the page under the sheet before it opens: a sheet opened over the loading screen
@@ -188,6 +208,8 @@ class LaunchLinks {
         _ref.invalidate(reviewProvider);
         final id = launchReviewIdOf(link);
         unawaited(router.push(id == null ? '/review' : '/review/${Uri.encodeComponent(id)}'));
+      case LaunchAction.signin:
+        unawaited(router.push('/settings/signin?qr=${Uri.encodeQueryComponent(signinQr!)}'));
     }
   }
 }

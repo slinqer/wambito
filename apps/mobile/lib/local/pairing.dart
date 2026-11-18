@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -8,6 +7,10 @@ import '../crypto/crypto.dart' as crypto;
 import '../crypto/crypto.dart'
     show DeviceKeyPair, WrapContext, WrapKind, fromBase64Url, toBase64Url;
 import 'keys.dart';
+import 'relay.dart';
+import 'relay_clock.dart';
+
+export 'relay_clock.dart' show PairingClock;
 
 /// Pairing a new phone from an unlocked device: the twin of apps/web/app/local/pairing.ts (stage
 /// 1b spec section 1, steps 1-8). The server only relays: the new device's commitment to its
@@ -43,23 +46,10 @@ const pairingPoll = Duration(milliseconds: 1500);
 /// A request lives 10 minutes (spec 7.3): the most either device waits, whatever the relay says.
 const pairingTtl = Duration(minutes: 10);
 
-abstract interface class PairingClock {
-  DateTime now();
-  Future<void> sleep(Duration d);
-}
-
-class _RealClock implements PairingClock {
-  const _RealClock();
-
-  @override
-  DateTime now() => DateTime.now();
-
-  @override
-  Future<void> sleep(Duration d) => Future<void>.delayed(d);
-}
-
 /// Test seams of the web's mocks of `openFromPairing` and `sealToDevice` (to check what the
-/// approver seals and that the opened DK is zeroed). Production code never changes them.
+/// approver seals and that the opened DK is zeroed). Production code never changes them; the seal
+/// is also the web sign-in approver's (`signin_approval.dart`, ruling 15), so it is not
+/// `@visibleForTesting`.
 @visibleForTesting
 Future<Uint8List> Function(
   Uint8List privateKey,
@@ -68,7 +58,6 @@ Future<Uint8List> Function(
   Uint8List approverKey,
 )
 pairingOpenFromPairing = crypto.openFromPairing;
-@visibleForTesting
 Future<Uint8List> Function(
   Uint8List publicKey,
   WrapContext ctx,
@@ -146,7 +135,6 @@ class _State {
   final String expiresAt;
 }
 
-final _code = RegExp(r'^[0-9A-HJKMNP-TV-Z]{8}$');
 final _qr = RegExp(
   r'^wambito://pair\?id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})&key=([A-Za-z0-9_-]{43})$',
 );
@@ -160,35 +148,8 @@ String normalizePairingCode(String input) => input
 
 void _zero(Uint8List key) => key.fillRange(0, key.length, 0);
 
-bool _sameBytes(Uint8List a, Uint8List b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
-
 /// 32 bytes from base64url, or `tampered` for anything else the server relays.
-Uint8List _key32(String text) {
-  final Uint8List bytes;
-  try {
-    bytes = fromBase64Url(text);
-  } on Object {
-    throw const PairingError('tampered');
-  }
-  if (bytes.length != 32) throw const PairingError('tampered');
-  return bytes;
-}
-
-Map<String, Object?> _object(Object? data) {
-  try {
-    final json = data is String ? jsonDecode(data) : data;
-    if (json is Map) return json.cast<String, Object?>();
-  } on Object {
-    // not an object
-  }
-  throw const PairingError('server');
-}
+Uint8List _key32(String text) => key32(text, onBad: () => const PairingError('tampered'));
 
 _State _stateOf(Map<String, Object?> json) {
   final commitment = json['commitment'];
@@ -211,87 +172,14 @@ _State _stateOf(Map<String, Object?> json) {
   );
 }
 
-/// The relay for one pairing: [api] (the `x-wambito-user` header, `session_changed`) with its
-/// errors read as pairing errors: offline -> `offline`, 404 -> `expired`, 422 -> `tampered`, a 409
-/// -> the caller's code (or a retry), the rest `server`. [KeysError]s that are not about the relay
-/// (`session_changed`, `rotated_elsewhere`) go through unchanged. Every call first checks the
-/// cancel flag and the clock against the deadline (the relay's `expiresAt`, capped at 10 minutes
-/// from when this device started), and the flag again once the answer is in: a cancelled pairing
-/// never acts on what it was told.
-class _Relay {
-  _Relay(KeysOptions options, this._clock)
-    : _call = api(options),
-      _cap = _clock.now().add(pairingTtl) {
-    _deadline = _cap;
-  }
+/// The relay for one pairing (`relay.dart`): its errors are [PairingError]s, a 404 [_Gone]; the
+/// deadline is the relay's `expiresAt`, capped at 10 minutes from when this device started.
+RelayClient _relay(KeysOptions options, PairingClock clock) =>
+    RelayClient(options, clock, ttl: pairingTtl, error: PairingError.new, gone: _Gone.new);
 
-  final KeysApi _call;
-  final PairingClock _clock;
-
-  // this device's own cap: a relay cannot stretch a request past 10 minutes from its start
-  final DateTime _cap;
-  late DateTime _deadline;
-  bool cancelled = false;
-
-  void check() {
-    if (cancelled) throw const PairingError('cancelled');
-    if (!_clock.now().isBefore(_deadline)) throw const PairingError('expired');
-  }
-
-  void setDeadline(String expiresAt) {
-    final at = DateTime.tryParse(expiresAt);
-    _deadline = at == null || at.isAfter(_cap) ? _cap : at;
-  }
-
-  /// The answer's JSON, or null for a 409 when [conflict] is [_retry].
-  Future<Map<String, Object?>?> send(
-    String path, {
-    String method = 'GET',
-    Map<String, Object?>? body,
-    Object conflict = 'server',
-    bool json = true,
-  }) async {
-    check();
-    try {
-      final response = await _call(path, method: method, data: body);
-      if (cancelled) throw const PairingError('cancelled');
-      return json ? _object(response.data) : const {};
-    } on KeysError catch (error) {
-      if (cancelled) throw const PairingError('cancelled');
-      if (error.code == 'offline') throw const PairingError('offline');
-      if (error.code != 'server') rethrow;
-      if (error.status == 404) throw const _Gone();
-      if (error.status == 422) throw const PairingError('tampered');
-      if (error.status == 409) {
-        if (identical(conflict, _retry)) return null;
-        throw PairingError(conflict as String);
-      }
-      throw const PairingError('server');
-    }
-  }
-
-  Future<Map<String, Object?>> get(String path) async => (await send(path))!;
-
-  Future<Map<String, Object?>?> post(
-    String path,
-    Map<String, Object?>? body, {
-    Object conflict = 'server',
-    bool json = true,
-  }) => send(path, method: 'POST', body: body, conflict: conflict, json: json);
-
-  Future<T> poll<T>(String id, Future<T?> Function(_State state) step) async {
-    for (;;) {
-      final state = _stateOf(await get('/v2/pairing/$id'));
-      final done = await step(state);
-      if (done != null) return done;
-      check();
-      await _clock.sleep(pairingPoll);
-    }
-  }
-}
-
-/// A 409 the caller reads as "look again at the next poll".
-const _retry = Object();
+/// Polls request [id], each answer read as its [_State].
+Future<T> _poll<T>(RelayClient net, String id, Future<T?> Function(_State state) step) =>
+    net.poll('/v2/pairing/$id', (body) => step(_stateOf(body)), every: pairingPoll);
 
 /// A one-shot promise whose rejection never goes unhandled (callers still see it).
 Completer<T> _deferred<T>() {
@@ -303,8 +191,8 @@ Completer<T> _deferred<T>() {
 /// The new device (steps 1, 4, 7, 8): makes `N`, posts its commitment and returns the code and the
 /// QR. Polling starts with the first [NewDevicePairing.number] or [NewDevicePairing.finish].
 Future<NewDevicePairing> startPairing(KeysOptions options, {PairingClock? clock}) async {
-  final time = clock ?? const _RealClock();
-  final net = _Relay(options, time);
+  final time = clock ?? const RealPairingClock();
+  final net = _relay(options, time);
   final pair = await crypto.generateDeviceKeyPair();
   final newKey = toBase64Url(pair.publicKey);
   final Map<String, Object?> started;
@@ -333,7 +221,7 @@ Future<NewDevicePairing> startPairing(KeysOptions options, {PairingClock? clock}
     String? pinned;
     var revealed = false;
     try {
-      await net.poll<bool>(id, (state) async {
+      await _poll<bool>(net, id, (state) async {
         final approver = state.approverKey;
         if (approver == null) {
           if (pinned != null) throw const PairingError('tampered');
@@ -355,7 +243,7 @@ Future<NewDevicePairing> startPairing(KeysOptions options, {PairingClock? clock}
             final sent = await net.post(
               '/v2/pairing/$id/reveal',
               {'publicKey': newKey},
-              conflict: _retry,
+              conflict: relayRetry,
               json: false,
             );
             if (sent == null) return null;
@@ -448,8 +336,8 @@ Future<ApproverPairing> findPairing(
   PairingClock? clock,
 }) async {
   if ((code == null) == (qr == null)) throw ArgumentError('exactly one of code and qr');
-  final time = clock ?? const _RealClock();
-  final net = _Relay(options, time);
+  final time = clock ?? const RealPairingClock();
+  final net = _relay(options, time);
 
   final String id;
   final Uint8List commitment;
@@ -472,7 +360,7 @@ Future<ApproverPairing> findPairing(
     net.setDeadline(state.expiresAt);
   } else {
     final typed = normalizePairingCode(code!);
-    if (!_code.hasMatch(typed)) throw const PairingError('bad_code');
+    if (!relayCodePattern.hasMatch(typed)) throw const PairingError('bad_code');
     final Map<String, Object?> found;
     try {
       found = await net.get('/v2/pairing?code=${Uri.encodeQueryComponent(typed)}');
@@ -514,15 +402,15 @@ Future<ApproverPairing> findPairing(
 
   Future<({String number, Uint8List newKey})> reveal() => numbering ??= (() async {
     try {
-      final newKey = await net.poll<Uint8List>(id, (state) async {
+      final newKey = await _poll<Uint8List>(net, id, (state) async {
         if (state.approverKey != approverKey) throw const PairingError('tampered');
         final revealed = state.publicKey;
         if (revealed == null) return null;
         final key = _key32(revealed);
-        if (!_sameBytes(await crypto.pairingCommitment(key), commitment)) {
+        if (!sameBytes(await crypto.pairingCommitment(key), commitment)) {
           throw const PairingError('tampered');
         }
-        if (qrKey != null && !_sameBytes(key, qrKey)) throw const PairingError('tampered');
+        if (qrKey != null && !sameBytes(key, qrKey)) throw const PairingError('tampered');
         return key;
       });
       return (number: await crypto.pairingNumber(newKey, pair.publicKey), newKey: newKey);
@@ -553,7 +441,7 @@ Future<ApproverPairing> findPairing(
     }
     // done when the new device picked it up: the relay forgets the request (404)
     try {
-      await net.poll<bool>(id, (_) async => null);
+      await _poll<bool>(net, id, (_) async => null);
     } on _Gone {
       return;
     }

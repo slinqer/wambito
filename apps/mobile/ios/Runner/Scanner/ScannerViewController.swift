@@ -1,9 +1,11 @@
 import AVFoundation
 import UIKit
+import WambitoNative
 
 /// The camera, full screen, for one QR (`ScannerChannel`): `AVCaptureMetadataOutput` set to `.qr`
-/// (the system's own detector, no third-party code). The first text that starts with `wambito://pair?`
-/// is the answer; any other QR is ignored, as the web's scanner ignores it. Its close button answers
+/// (the system's own detector, no third-party code). The first text `QrPrefix.accepts` for the
+/// prefixes it was given (`wambito://pair?` by default) is the answer; any other QR is ignored, as
+/// the web's scanner ignores it. Its close button answers
 /// cancelled; a session that cannot start answers failed. The session stops when the screen goes away.
 final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
   enum Outcome {
@@ -12,8 +14,8 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     case failed
   }
 
-  /// The only QR the app wants: the pairing link (lib/local/pairing.dart).
-  private static let pairPrefix = "wambito://pair?"
+  /// The QRs this scan takes (`QrPrefix.of` of the call's `prefixes`).
+  private let prefixes: [String]
 
   private let onOutcome: (Outcome) -> Void
   private let session = AVCaptureSession()
@@ -24,7 +26,8 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
   /// The answer is given once, whichever way the screen ends.
   private var answered = false
 
-  init(onOutcome: @escaping (Outcome) -> Void) {
+  init(prefixes: [String] = [QrPrefix.pair], onOutcome: @escaping (Outcome) -> Void) {
+    self.prefixes = prefixes
     self.onOutcome = onOutcome
     super.init(nibName: nil, bundle: nil)
   }
@@ -121,7 +124,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     from connection: AVCaptureConnection
   ) {
     for case let code as AVMetadataMachineReadableCodeObject in metadataObjects {
-      if let text = code.stringValue, text.hasPrefix(Self.pairPrefix) {
+      if let text = code.stringValue, QrPrefix.accepts(text, prefixes: prefixes) {
         return answer(.text(text))
       }
     }

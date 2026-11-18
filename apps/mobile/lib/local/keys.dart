@@ -171,10 +171,17 @@ KeysApi api(KeysOptions options) {
         (401, _) => 'unauthenticated',
         _ => 'server',
       };
-      throw KeysError(mapped, status: status);
+      throw KeysError(mapped, status: status, retryAfter: _retryAfter(response));
     }
     return response;
   };
+}
+
+/// A 429's `retry-after` as whole seconds above zero, else null.
+int? _retryAfter(Response<Object?> response) {
+  if (response.statusCode != 429) return null;
+  final value = int.tryParse(response.headers.value('retry-after')?.trim() ?? '');
+  return value != null && value > 0 ? value : null;
 }
 
 String? _problemCode(Object? body) {

@@ -11,6 +11,8 @@ import '../../local/pairing.dart' as pair;
 import '../../local/pairing.dart' show ApproverPairing, PairingError;
 import '../../local/prf.dart' show PasskeyPrf;
 import '../../local/rotate.dart' as rot;
+import '../../local/signin_approval.dart' as signin;
+import '../../local/signin_approval.dart' show SigninApproval, SigninError;
 import '../../local/rotate.dart'
     show NewRecoveryKey, PreparedRotation, RotateRecovery, attested, revokedDevices;
 import '../../local/vault_session.dart';
@@ -70,6 +72,10 @@ abstract interface class SecurityApi {
 
   /// Approving a new device: finds the request by its typed [code] or its scanned [qr].
   Future<ApproverPairing> findPairing({String? code, String? qr});
+
+  /// Approving a web sign-in (phone-first spec 8.1): finds the browser's request by its typed
+  /// [code] or its scanned [qr]. Nothing is posted until [SigninApproval.approve].
+  Future<SigninApproval> findSigninRequest({String? code, String? qr});
 }
 
 /// The open vault's keys, against the real `/v2/keys`. [touch] is the passkey prompt for
@@ -150,6 +156,10 @@ class _LiveSecurity implements SecurityApi {
   @override
   Future<ApproverPairing> findPairing({String? code, String? qr}) =>
       pair.findPairing(_options, code: code, qr: qr);
+
+  @override
+  Future<SigninApproval> findSigninRequest({String? code, String? qr}) =>
+      signin.findSigninRequest(_options, code: code, qr: qr);
 }
 
 /// The open vault's [SecurityApi]; null while no vault is open (signed out, a `plain` account, or
@@ -175,9 +185,10 @@ final securitySnapshotProvider = FutureProvider.autoDispose<SecuritySnapshot>((r
   return security.load();
 });
 
-/// The code an error carries (`KeysError` and `PairingError`), if any.
+/// The code an error carries (`KeysError`, `PairingError` and `SigninError`), if any.
 String? codeOf(Object? error) => switch (error) {
   KeysError(:final code) => code,
   PairingError(:final code) => code,
+  SigninError(:final code) => code,
   _ => null,
 };

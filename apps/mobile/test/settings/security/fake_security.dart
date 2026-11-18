@@ -5,6 +5,7 @@ import 'package:wambito/local/keys_error.dart';
 import 'package:wambito/local/pairing.dart' show ApproverPairing;
 import 'package:wambito/local/prf.dart' show PasskeyPrf;
 import 'package:wambito/local/rotate.dart';
+import 'package:wambito/local/signin_approval.dart' show SigninApproval;
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/security_api.dart';
 
@@ -175,6 +176,17 @@ class FakeSecurity implements SecurityApi {
   Future<ApproverPairing> findPairing({String? code, String? qr}) async {
     calls.add('findPairing code=$code qr=$qr');
     return FakeApprover();
+  }
+
+  /// What [findSigninRequest] hands out; unset, it is a [StateError] (no test asked for it).
+  Future<SigninApproval> Function({String? code, String? qr})? findSignin;
+
+  @override
+  Future<SigninApproval> findSigninRequest({String? code, String? qr}) {
+    calls.add('findSigninRequest code=$code qr=$qr');
+    final find = findSignin;
+    if (find == null) return Future.error(StateError('no sign-in request'));
+    return find(code: code, qr: qr);
   }
 }
 

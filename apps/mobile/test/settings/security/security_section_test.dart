@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/approve_device_screen.dart';
+import 'package:wambito/settings/security/approve_signin_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/security_section.dart';
@@ -154,6 +155,20 @@ void main() {
     await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
     await tapKey(t, 'security.approve');
     expect(find.byType(ApproveDeviceScreen), findsOneWidget);
+  });
+
+  testWidgets('"Sign in on the web" opens the sign-in approval, which closes back', (t) async {
+    final security = FakeSecurity();
+    await pumpSection(t, security, FakeLock(LockCheck.passed));
+    final loads = security.loads;
+    await tapKey(t, 'security.signinWeb');
+    expect(find.byType(ApproveSigninScreen), findsOneWidget);
+    // nothing is looked up before a code or a scan
+    expect(security.calls.where((c) => c.startsWith('findSigninRequest')), isEmpty);
+    await tapKey(t, 'signin.cancel');
+    expect(find.byType(ApproveSigninScreen), findsNothing);
+    // a browser may have joined as a device: the list is read again
+    expect(security.loads, greaterThan(loads));
   });
 
   group('removing a device', () {

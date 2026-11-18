@@ -2,10 +2,13 @@ import Foundation
 
 /// The app's own links: `wambito://add` opens the add sheet, `capture` quick capture, `due` home with
 /// the payments due today, `progress` "Guarda tu progreso", `home` home, and `review/<id>` a detected
-/// transaction's review. Same rules as `LaunchLinks.kt` on Android.
+/// transaction's review, `signin?id=…&key=…` a web sign-in's approval (the QR the system camera
+/// opens; phone-first spec 8.1). Same rules as `LaunchLinks.kt` on Android.
 public enum LaunchLinks {
   static let scheme = "wambito"
-  private static let hosts: Set<String> = ["add", "capture", "due", "progress", "home", "review"]
+  private static let hosts: Set<String> = [
+    "add", "capture", "due", "progress", "home", "review", "signin",
+  ]
 
   /// The link [url] is, or nil when it is not one of the app's links. Anything else (another scheme,
   /// another host, a path where none belongs) is refused.
@@ -18,6 +21,9 @@ public enum LaunchLinks {
       guard url.path.hasPrefix("/"), segments.count == 1, segments[segments.startIndex] != "" else {
         return nil
       }
+    } else if host == "signin" {
+      // Its id and key in the query (Dart reads them), no path.
+      guard url.path.isEmpty, let query = url.query, !query.isEmpty else { return nil }
     } else if !url.path.isEmpty && url.path != "/" {
       return nil
     }

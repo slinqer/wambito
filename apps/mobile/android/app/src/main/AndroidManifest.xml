@@ -84,6 +84,16 @@
                 <data android:host="app.wambito.com"/>
                 <data android:path="/auth/verify"/>
             </intent-filter>
+            <!-- A web sign-in's QR (wambito://signin?id=…&key=…, phone-first spec 8.1), opened by the
+                 system camera: the approval screen, where the person still has to approve
+                 (launch/LaunchLinks.kt SIGNIN_HOST). The app's other wambito:// links stay on the
+                 not-exported alias below. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="wambito" android:host="signin"/>
+            </intent-filter>
             <!-- Flutter hands an opened link to the router (go_router reads /auth/verify?...). -->
             <meta-data android:name="flutter_deeplinking_enabled" android:value="true"/>
         </activity>

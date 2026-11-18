@@ -2220,5 +2220,22 @@
   "entryTryAgain": "Try again",
   "provisionalWaiting": "Your data is on this phone. As soon as there is internet, I make your account for it.",
   "provisionalPlainServer": "Your data stays on this phone. This server does not keep data encrypted, so I wait for one that does.",
-  "provisionalNoGuests": "Your data stays on this phone. This server takes no new accounts without email for now."
+  "provisionalNoGuests": "Your data stays on this phone. This server takes no new accounts without email for now.",
+  "settingsSecuritySignin": "Sign in on the web",
+  "settingsSecuritySigninLead": "Open Wambito on a computer with this phone: scan the QR code it shows you.",
+  "signinApproveTitle": "Sign in on the web",
+  "signinApproveLead": "On the computer, choose “Sign in”. Then scan the QR code it shows, or type its code.",
+  "signinApproveCodeLabel": "Code from the computer",
+  "signinApproveBadCode": "That code does not match any request. Check it, or open a new one on the computer.",
+  "signinApproveQuestion": "Sign in on {label}?",
+  "signinApproveWarning": "Only scan a code you see on {host}",
+  "signinApproveApprove": "Approve",
+  "signinApproveWaiting": "Waiting for the computer…",
+  "signinApproveNumberLead": "Approve only if the number on the computer is exactly this one.",
+  "signinApproveSealing": "Signing in…",
+  "signinApproveDoneLead": "You are signed in on {label}.",
+  "signinApproveMismatchLead": "The computer got nothing. If you meant to sign in, start again there.",
+  "signinApproveExpiredLead": "Open a new code on the computer and scan it again.",
+  "signinApproveFailedTitle": "This sign-in could not be approved",
+  "signinApproveLocked": "Open your data on this phone first."
 }

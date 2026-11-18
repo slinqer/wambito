@@ -22,6 +22,7 @@ import 'review/review_screen.dart';
 import 'search/search_screen.dart';
 import 'settings/about_screen.dart';
 import 'settings/home_actions.dart';
+import 'settings/security/approve_signin_screen.dart';
 import 'settings/settings_screen.dart';
 import 'vault/encryption_mode.dart';
 import 'vault/vault_gate.dart';
@@ -251,7 +252,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
-        routes: [GoRoute(path: 'about', builder: (context, state) => const AboutScreen())],
+        routes: [
+          GoRoute(path: 'about', builder: (context, state) => const AboutScreen()),
+          // Approving a web sign-in (phone-first spec 8.1): a `wambito://signin?…` link the system
+          // camera opened comes with its QR; Settings → Security opens it from its own row.
+          GoRoute(
+            path: 'signin',
+            builder: (context, state) => ApproveSigninScreen(
+              key: ValueKey(state.uri.query),
+              qr: state.uri.queryParameters['qr'],
+            ),
+          ),
+        ],
       ),
       GoRoute(path: '/loading', builder: (context, state) => const Scaffold()),
       // A `preview` account's vault: the recovery key, Unlock or Locked, until it is open.

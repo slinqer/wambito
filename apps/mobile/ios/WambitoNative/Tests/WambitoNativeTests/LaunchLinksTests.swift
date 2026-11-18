@@ -27,6 +27,15 @@ final class LaunchLinksTests: XCTestCase {
     XCTAssertNil(link("https://app.wambito.com/auth/verify"))
   }
 
+  func testAcceptsTheSigninQrWithItsQueryOnly() {
+    let qr =
+      "wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ"
+    XCTAssertEqual(link(qr), qr)
+    XCTAssertNil(link("wambito://signin"))
+    XCTAssertNil(link("wambito://signin/x?id=1"))
+    XCTAssertNil(link("https://app.wambito.com/signin?id=1"))
+  }
+
   func testTakeReturnsTheLinkOnce() {
     let pending = PendingLink()
     XCTAssertTrue(pending.keep(URL(string: "wambito://add")!))

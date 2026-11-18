@@ -4630,5 +4630,91 @@
   "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
   "@provisionalNoGuests": {
     "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
+  },
+  "settingsSecuritySignin": "Iniciar sesión en la web",
+  "@settingsSecuritySignin": {
+    "description": "Settings → Security entry that approves a web sign-in from this phone (phone-first spec 8.1)."
+  },
+  "settingsSecuritySigninLead": "Abre Wambito en un computador con este teléfono: escanea el código QR que te muestra.",
+  "@settingsSecuritySigninLead": {
+    "description": "Settings → Security: what signing in on the web does."
+  },
+  "signinApproveTitle": "Iniciar sesión en la web",
+  "@signinApproveTitle": {
+    "description": "Approving a web sign-in: the screen title."
+  },
+  "signinApproveLead": "En el computador, elige “Iniciar sesión”. Luego escanea el código QR que aparece, o escribe su código.",
+  "@signinApproveLead": {
+    "description": "Approving a web sign-in: how to start."
+  },
+  "signinApproveCodeLabel": "Código del computador",
+  "@signinApproveCodeLabel": {
+    "description": "Approving a web sign-in: the typed code's label."
+  },
+  "signinApproveBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o abre uno nuevo en el computador.",
+  "@signinApproveBadCode": {
+    "description": "Approving a web sign-in: a typed code or a QR that finds nothing."
+  },
+  "signinApproveQuestion": "¿Iniciar sesión en {label}?",
+  "@signinApproveQuestion": {
+    "description": "Approving a web sign-in: the question (spec 8.1); {label} is shown in bold.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveWarning": "Escanea solo un código que veas en {host}",
+  "@signinApproveWarning": {
+    "description": "Approving a web sign-in: the warning (spec 8.1); {host} is the server's host, shown in bold.",
+    "placeholders": {
+      "host": {
+        "type": "String",
+        "example": "app.wambito.com"
+      }
+    }
+  },
+  "signinApproveApprove": "Aprobar",
+  "@signinApproveApprove": {
+    "description": "Approving a web sign-in: the yes."
+  },
+  "signinApproveWaiting": "Esperando al computador…",
+  "@signinApproveWaiting": {
+    "description": "Approving a web sign-in: after Approve, until the browser answers."
+  },
+  "signinApproveNumberLead": "Aprueba solo si el número del computador es exactamente este.",
+  "@signinApproveNumberLead": {
+    "description": "Approving a web sign-in after a typed code: compare the number."
+  },
+  "signinApproveSealing": "Iniciando sesión…",
+  "@signinApproveSealing": {
+    "description": "Approving a web sign-in: while the data key is sealed and picked up."
+  },
+  "signinApproveDoneLead": "Ya iniciaste sesión en {label}.",
+  "@signinApproveDoneLead": {
+    "description": "Approving a web sign-in: done.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveMismatchLead": "El computador no recibió nada. Si querías iniciar sesión, empieza de nuevo allí.",
+  "@signinApproveMismatchLead": {
+    "description": "Approving a web sign-in: the numbers did not match."
+  },
+  "signinApproveExpiredLead": "Abre un código nuevo en el computador y escanéalo otra vez.",
+  "@signinApproveExpiredLead": {
+    "description": "Approving a web sign-in: the 2 minutes passed."
+  },
+  "signinApproveFailedTitle": "No se pudo iniciar sesión",
+  "@signinApproveFailedTitle": {
+    "description": "Approving a web sign-in: failed."
+  },
+  "signinApproveLocked": "Abre primero tus datos en este teléfono.",
+  "@signinApproveLocked": {
+    "description": "Approving a web sign-in with the vault no longer open."
   }
 }
