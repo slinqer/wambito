@@ -156,9 +156,10 @@ test("an assistant uses all 14 tools on an encrypted account, and the person see
   expect(
     (await ok(c, "list_transactions", { month: "2026-10", text: "panaderia-e2e" })).items,
   ).toEqual([]);
-  // A deletion on an encrypted account keeps no body on the server, so a later request cannot
-  // bring it back: restore_transactions answers not_found (a known limit, said in the report).
-  expect((await failure(c, "restore_transactions", { ids: [id] })).text).toMatch(/^not_found/);
+  // A deletion carries its sealed body to the server, so a later request restores it.
+  await ok(c, "restore_transactions", { ids: [id] });
+  const restored = await ok(c, "list_transactions", { month: "2026-10", text: "panaderia-e2e" });
+  expect(restored.items).toEqual([expect.objectContaining({ id, amount: 13 })]);
   const rule = await ok(c, "manage_recurring", {
     action: "create",
     name: "almuerzo-e2e",

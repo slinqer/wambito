@@ -76,7 +76,8 @@ class _Row {
       body = r['body']! as String,
       deleted = r['deleted'] == 1,
       version = r['version']! as int,
-      keyV = r['key_v']! as int;
+      keyV = r['key_v']! as int,
+      bodiless = r['deleted'] == 1 && r['bodiless'] == 1;
 
   final String id;
   final int seq;
@@ -85,7 +86,19 @@ class _Row {
   final int version;
   final int keyV;
 
+  /// A tombstone whose body is only a stale local copy: the server's holds none.
+  final bool bodiless;
+
   Json get json => _decode(body);
+
+  RawRecord get raw => RawRecord(
+    id: id,
+    body: json,
+    deleted: deleted,
+    version: version,
+    keyV: keyV,
+    bodiless: bodiless,
+  );
 }
 
 OutboxEntry _entryOf(Map<String, Object?> r) {
@@ -297,15 +310,7 @@ class SqliteStore implements FinanceStore {
 
   /// The record with its server version and key version (tombstones included).
   Future<RawRecord?> rawRecord(RecordType type, String id) => _enqueue(() async {
-    final row = await _row(_db, type, id);
-    if (row == null) return null;
-    return RawRecord(
-      id: id,
-      body: row.json,
-      deleted: row.deleted,
-      version: row.version,
-      keyV: row.keyV,
-    );
+    return (await _row(_db, type, id))?.raw;
   });
 
   /// The pending changes, oldest first.
@@ -318,31 +323,40 @@ class SqliteStore implements FinanceStore {
 
   /// The server accepted the change read as [seq] and gave it [version] (sealed under [keyV], when
   /// given). Records them, and clears the entry only if there was no newer local write since;
-  /// otherwise the entry stays, now based on [version].
-  Future<void> ackOutbox(String id, int version, int seq, [int? keyV]) => _enqueue(
-    () => _db.transaction((txn) async {
-      final entry = await _outboxEntry(txn, id);
-      if (entry == null) return;
-      final row = await _row(txn, entry.type, id);
-      if (row != null) {
-        await txn.update(
-          quoted(recordTable(entry.type)),
-          {'version': version, 'key_v': keyV ?? row.keyV},
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      }
-      if (entry.seq == seq) {
-        await _deleteOutbox(txn, id);
-      } else {
-        await _putOutbox(txn, entry.copyWith(baseVersion: version));
-      }
-    }),
-  );
+  /// otherwise the entry stays, now based on [version]. [bodySent]: the accepted push carried a
+  /// body, so a `bodiless` tombstone is no longer one; otherwise the flag stays.
+  Future<void> ackOutbox(String id, int version, int seq, [int? keyV, bool bodySent = false]) =>
+      _enqueue(
+        () => _db.transaction((txn) async {
+          final entry = await _outboxEntry(txn, id);
+          if (entry == null) return;
+          final row = await _row(txn, entry.type, id);
+          if (row != null) {
+            await txn.update(
+              quoted(recordTable(entry.type)),
+              {
+                'version': version,
+                'key_v': keyV ?? row.keyV,
+                // A tombstone pushed with its body: the server's copy holds it now.
+                if (row.deleted && bodySent) 'bodiless': 0,
+              },
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+          }
+          if (entry.seq == seq) {
+            await _deleteOutbox(txn, id);
+          } else {
+            await _putOutbox(txn, entry.copyWith(baseVersion: version));
+          }
+        }),
+      );
 
   /// The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
-  /// for pushed, live records sealed under a key version below [current] and with no outbox entry,
-  /// until [limit] reseal entries are pending. Returns how many it added. Notifies nobody.
+  /// for pushed records sealed under a key version below [current] and with no outbox entry, until
+  /// [limit] reseal entries are pending. Tombstones that hold a body (a remote delete with
+  /// `tombstoneBody`, or a local delete) count as records; the push sends their entry as a delete.
+  /// Returns how many it added. Notifies nobody.
   Future<int> queueReseal(int current, int limit) => _enqueue(
     () => _db.transaction((txn) async {
       final entries = (await txn.query(outboxTable)).map(_entryOf).toList();
@@ -355,7 +369,7 @@ class SqliteStore implements FinanceStore {
         final rows = await txn.query(quoted(recordTable(type)), orderBy: 'seq');
         for (final r in rows.map(_Row.new)) {
           if (room <= 0) break;
-          if (r.deleted || r.version == 0 || r.keyV >= current || pending.contains(r.id)) {
+          if (r.bodiless || r.version == 0 || r.keyV >= current || pending.contains(r.id)) {
             continue;
           }
           await _putOutbox(
@@ -364,7 +378,7 @@ class SqliteStore implements FinanceStore {
               id: r.id,
               type: type,
               baseVersion: r.version,
-              deleted: false,
+              deleted: r.deleted,
               touched: const [],
               seq: ++seq,
               reseal: true,
@@ -379,15 +393,15 @@ class SqliteStore implements FinanceStore {
     }),
   );
 
-  /// The key versions the server copies of the local records (live, pushed) are under, and those
-  /// of quarantined records (they may still be retried).
+  /// The key versions the server copies of the local records (pushed; a tombstone only when it
+  /// holds a body) are under, and those of quarantined records (they may still be retried).
   Future<Set<int>> keyVersionsInUse() => _enqueue(() async {
     final versions = <int>{};
     for (final type in RecordType.values) {
       final rows = await _db.query(
         quoted(recordTable(type)),
         columns: ['key_v'],
-        where: 'deleted = 0 AND version > 0',
+        where: 'version > 0 AND NOT (deleted = 1 AND bodiless = 1)',
       );
       for (final r in rows) {
         versions.add(r['key_v']! as int);
@@ -703,19 +717,53 @@ class _Ops implements StoreOps {
   ]) async {
     final prev = await _row(_txn, type, id);
     final remote = opts.origin == 'remote';
+    final body = remote ? opts.tombstoneBody : null;
     if (prev == null) {
-      // A tombstone of a record this phone never opened: its quarantine rows go.
-      if (remote) await _clearAbandoned(type, id);
+      if (remote) {
+        if (await _remoteBlocked(id, opts)) return;
+        if (body != null) {
+          // A tombstone of a record this phone never had, with its body: a tombstone row.
+          await _txn.insert(
+            quoted(recordTable(type)),
+            _recordValues(
+              type,
+              id,
+              body,
+              deleted: true,
+              version: opts.version ?? 0,
+              keyV: opts.keyV ?? 1,
+              seq: await _nextSeq(_txn),
+            ),
+          );
+          _wrote.value = true;
+        }
+        // Its quarantine rows go.
+        await _clearAbandoned(type, id);
+      }
       return;
     }
     if (!remote && prev.deleted) return;
     if (remote && await _remoteBlocked(id, opts)) return;
+    final version = remote ? (opts.version ?? prev.version) : prev.version;
+    final keyV = remote ? (opts.keyV ?? prev.keyV) : prev.keyV;
     await _txn.update(
       quoted(recordTable(type)),
       {
+        if (body != null)
+          ..._recordValues(
+            type,
+            id,
+            body,
+            deleted: true,
+            version: version,
+            keyV: keyV,
+            seq: prev.seq,
+          ),
         'deleted': 1,
-        'version': remote ? (opts.version ?? prev.version) : prev.version,
-        'key_v': remote ? (opts.keyV ?? prev.keyV) : prev.keyV,
+        'version': version,
+        'key_v': keyV,
+        // A remote delete without a body keeps the stale local copy, which is not the server's.
+        'bodiless': remote && body == null && (!prev.deleted || prev.bodiless) ? 1 : 0,
       },
       where: 'id = ?',
       whereArgs: [id],
@@ -733,20 +781,7 @@ class _Ops implements StoreOps {
     for (final entry in (await _txn.query(outboxTable)).map(_entryOf)) {
       if (entry.setAside == null) continue;
       final row = await _row(_txn, entry.type, entry.id);
-      out.add(
-        _Aside(
-          entry,
-          row == null
-              ? null
-              : RawRecord(
-                  id: row.id,
-                  body: row.json,
-                  deleted: row.deleted,
-                  version: row.version,
-                  keyV: row.keyV,
-                ),
-        ),
-      );
+      out.add(_Aside(entry, row?.raw));
     }
     return out;
   }

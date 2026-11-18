@@ -92,3 +92,44 @@ describe("keys and the vault", () => {
     expect(await again.getKey("k")).toBeUndefined();
   });
 });
+
+describe("the version 2 upgrade", () => {
+  it("marks every tombstone of a version 1 vault as without a server body", async () => {
+    const userId = `upgrade-${++counter}`;
+    const { RECORD_TYPES } = await import("@wambito/core");
+    const old = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = indexedDB.open(vaultName(userId), 1);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        for (const type of RECORD_TYPES) db.createObjectStore(type, { keyPath: "id" });
+        db.createObjectStore("outbox", { keyPath: "id" });
+        db.createObjectStore("meta");
+        db.createObjectStore("quarantine", { keyPath: ["type", "id", "version"] });
+        db.createObjectStore("keys");
+      };
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    const tx = old.transaction("category", "readwrite");
+    const rows = tx.objectStore("category");
+    const row = (id: string, deleted: boolean) => ({
+      id,
+      body: category(id),
+      deleted,
+      version: 2,
+      keyV: 1,
+      n: 1,
+    });
+    rows.put(row("live", false));
+    rows.put(row("dead", true));
+    await new Promise((resolve) => {
+      tx.oncomplete = resolve;
+    });
+    old.close();
+    const store = await createEncryptedStore(userId);
+    expect((await store.getRaw("category", "live"))?.deleted).toBe(false);
+    expect(await store.keyVersionsInUse()).toEqual(new Set([1])); // the live one only
+    expect(await store.queueReseal(2, 10)).toBe(1);
+    expect((await store.readOutbox(10)).map((e) => e.id)).toEqual(["live"]);
+  });
+});

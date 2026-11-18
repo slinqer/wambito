@@ -149,22 +149,20 @@ describe("records", () => {
     expect(r1b?.version).toBeGreaterThan(r2?.version ?? 0);
   });
 
-  test("deleted must match a null body", async () => {
+  test("a live record needs a body; a tombstone may hold one or not", async () => {
     const id = "55555555-5555-4555-8555-555555555555";
     const bad = await rlsError(
-      withUser(app.db, "user-a", (tx) =>
-        tx.insert(records).values({ ...record("user-a", id), deleted: true }),
-      ),
-    );
-    expect(bad).toMatch(/check constraint/);
-    const bad2 = await rlsError(
       withUser(app.db, "user-a", (tx) =>
         tx.insert(records).values({ ...record("user-a", id), body: null }),
       ),
     );
-    expect(bad2).toMatch(/check constraint/);
+    expect(bad).toMatch(/check constraint/);
     await withUser(app.db, "user-a", (tx) =>
-      tx.insert(records).values({ ...record("user-a", id), deleted: true, body: null }),
+      tx.insert(records).values({ ...record("user-a", id), deleted: true }),
+    );
+    const id2 = "55555555-5555-4555-8555-555555555556";
+    await withUser(app.db, "user-a", (tx) =>
+      tx.insert(records).values({ ...record("user-a", id2), deleted: true, body: null }),
     );
   });
 });

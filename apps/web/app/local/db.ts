@@ -19,6 +19,12 @@ export interface StoredRow {
   version: number;
   /** The key version the server copy was sealed under. */
   keyV: number;
+  /**
+   * The server's copy of this tombstone has no body, as far as this device knows. Set by a remote
+   * delete without a body, or by the version 2 upgrade; cleared by a remote delete with a body, the
+   * ack of a push that carried the body, or any put.
+   */
+  bodiless?: true;
   /** When it was first written: the order `list` returns. */
   n: number;
 }
@@ -46,9 +52,24 @@ export function committed(tx: IDBTransaction): Promise<void> {
 
 export function openVault(userId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const open = indexedDB.open(vaultName(userId), 1);
-    open.onupgradeneeded = () => {
+    const open = indexedDB.open(vaultName(userId), 2);
+    open.onupgradeneeded = (event) => {
       const db = open.result;
+      if (event.oldVersion >= 1) {
+        // Version 2: no server tombstone held a body before, so every tombstone is bodiless.
+        const tx = open.transaction as IDBTransaction;
+        for (const type of RECORD_TYPES) {
+          const cursorRequest = tx.objectStore(type).openCursor();
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor) return;
+            const row = cursor.value as StoredRow;
+            if (row.deleted) cursor.update({ ...row, bodiless: true });
+            cursor.continue();
+          };
+        }
+        return;
+      }
       for (const type of RECORD_TYPES) db.createObjectStore(type, { keyPath: "id" });
       db.createObjectStore(OUTBOX, { keyPath: "id" });
       db.createObjectStore(META);

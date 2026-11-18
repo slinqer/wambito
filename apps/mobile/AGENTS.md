@@ -62,7 +62,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `store.dart` + `memory_store.dart` (`FinanceStore`; the shared contract is `test/local/store_contract.dart`,
   run by every store), `db.dart` + `sqlite_store.dart` (`SqliteStore.open(userId)`: the vault, file
   `wambito-vault-<userId>.db` in the `vault` folder of the app support directory (Android `files/vault`), one table per record type plus `outbox`,
-  `meta`, `quarantine`; a local write updates record and outbox in one SQLite transaction, all
+  `meta`, `quarantine`; schema version 2 (`vaultSchemaVersion`; `_upgrade` in `db.dart` migrates a
+  real user's file in place, never by recreating it: v2 added `bodiless` to the records tables, set
+  on every v1 tombstone); a local write updates record and outbox in one SQLite transaction, all
   operations go through one queue; keys are not in it, they live in secure storage; tests use
   `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
   vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
@@ -349,7 +351,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
   removes B with `TypedRecovery`, a background sync re-seals under the new key version and B's next sync ends
   `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
-  `recovery_key_invalid`). `test_stack/support.dart` holds the shared phone, gate and sign-in helpers; a vault
+  `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
+  on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
+  `body: null`) is `not_found` on C). `test_stack/support.dart` holds the shared phone, gate and sign-in helpers; a vault
   session is one per process and account, so only one phone has its session open at a time. After each it checks
   with `psql` that `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
   `records.body` holds the test's word (`almuerzo`, `panaderia`) in the clear (must print 0; a byte search, as a

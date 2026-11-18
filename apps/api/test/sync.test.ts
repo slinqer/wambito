@@ -289,7 +289,6 @@ describe("/v2/sync", () => {
 
     test("deleted and body inconsistent, unknown type, not base64url", async () => {
       for (const change of [
-        create("x", { deleted: true }),
         { ...create("x"), body: null },
         create("x", { type: "secret" }),
         { ...create("x"), body: "not base64url!" },
@@ -372,6 +371,136 @@ describe("/v2/sync", () => {
       ]);
       expect(gone?.version).toBeTypeOf("number");
       expect((await push(headers, [revive]))[0]?.version).toBeTypeOf("number");
+    });
+  });
+
+  describe("a tombstone's sealed body", () => {
+    test("a delete may carry its sealed body, and a pull returns it", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const sealed = b64("the sealed body");
+      const [gone] = await push(a, [
+        { ...change, baseVersion: created?.version as number, deleted: true, body: sealed },
+      ]);
+      const { records: pulled } = await pull(a, created?.version as number);
+      expect(pulled.find((r) => r.id === change.id)).toMatchObject({
+        version: gone?.version,
+        deleted: true,
+        body: sealed,
+      });
+    });
+
+    test("a delete without a body still works", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const [gone] = await push(a, [
+        { ...change, baseVersion: created?.version as number, deleted: true, body: null },
+      ]);
+      expect(gone?.version).toBeTypeOf("number");
+      const { records: pulled } = await pull(a, created?.version as number);
+      expect(pulled.find((r) => r.id === change.id)).toMatchObject({ deleted: true, body: null });
+    });
+
+    test("a live change without a body is still refused", async () => {
+      const res = await pushRaw(a, [{ ...create("x"), body: null }]);
+      expect(res.status).toBe(422);
+      expect(((await res.json()) as { code: string }).code).toBe("validation_failed");
+    });
+
+    test("a delete's body has the live limits", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const base = { ...change, baseVersion: created?.version as number, deleted: true };
+      const small = await pushRaw(a, [{ ...base, body: Buffer.alloc(1).toString("base64url") }]);
+      expect(small.status).toBe(422);
+      const big = await pushRaw(a, [
+        { ...base, body: Buffer.alloc(64 * 1024 + 1, 1).toString("base64url") },
+      ]);
+      expect(big.status).toBe(422);
+      const bad = await pushRaw(a, [{ ...base, body: "not base64url!" }]);
+      expect(bad.status).toBe(422);
+    });
+
+    test("an update from a tombstone with a body brings the record back", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const [gone] = await push(a, [
+        {
+          ...change,
+          baseVersion: created?.version as number,
+          deleted: true,
+          body: b64("sealed"),
+        },
+      ]);
+      const liveBefore = (await pullAll(a)).filter((r) => !r.deleted).length;
+      const [back] = await push(a, [
+        { ...change, baseVersion: gone?.version as number, deleted: false, body: b64("back") },
+      ]);
+      expect(back?.version).toBeTypeOf("number");
+      const after = await pullAll(a);
+      expect(after.filter((r) => !r.deleted).length).toBe(liveBefore + 1);
+      expect(after.find((r) => r.id === change.id)).toMatchObject({
+        deleted: false,
+        body: b64("back"),
+      });
+    });
+
+    test("a replay of a delete with a body answers the stored version", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const tombstone = create("", {
+        id: change.id,
+        baseVersion: created?.version as number,
+        deleted: true,
+        body: b64("sealed"),
+      });
+      const [first] = await push(a, [tombstone]);
+      // Same baseVersion, now stale: the same bytes are a retry only for a create; here a conflict
+      // carrying the stored tombstone.
+      const [again] = await push(a, [tombstone]);
+      expect(again?.conflict).toMatchObject({
+        version: first?.version,
+        deleted: true,
+        body: b64("sealed"),
+      });
+      const [other] = await push(a, [{ ...tombstone, body: b64("different") }]);
+      expect(other?.conflict).toMatchObject({ version: first?.version, body: b64("sealed") });
+      // A create retry (baseVersion null) of an identical tombstone answers the stored version.
+      const fresh = create("", { deleted: true, body: b64("sealed") });
+      const [made] = await push(a, [fresh]);
+      expect((await push(a, [fresh]))[0]).toEqual({ id: fresh.id, version: made?.version });
+      expect((await push(a, [{ ...fresh, body: b64("different") }]))[0]?.conflict).toBeDefined();
+    });
+
+    test("a tombstone's reseal keeps its delete time, and the purge still counts from the delete", async () => {
+      const change = create("v1");
+      const [created] = await push(a, [change]);
+      const [gone] = await push(a, [
+        { ...change, baseVersion: created?.version as number, deleted: true, body: b64("old key") },
+      ]);
+      const now = new Date();
+      const deletedAt = new Date(now.getTime() - 181 * 86_400_000);
+      await t.admin.update(records).set({ updatedAt: deletedAt }).where(eq(records.id, change.id));
+      const [resealed] = await push(a, [
+        { ...change, baseVersion: gone?.version as number, deleted: true, body: b64("new key") },
+      ]);
+      expect(resealed?.version).toBeGreaterThan(gone?.version as number);
+      const [row] = await t.admin.select().from(records).where(eq(records.id, change.id));
+      expect(Buffer.from(row?.body ?? []).toString("base64url")).toBe(b64("new key"));
+      expect(row?.updatedAt.getTime()).toBe(deletedAt.getTime());
+      await purgeTombstones(t.db, now);
+      expect((await pullAll(a)).map((r) => r.id)).not.toContain(change.id);
+    });
+
+    test("the purge removes a tombstone that has a body", async () => {
+      const now = new Date("2026-11-08T12:00:00Z");
+      const old = randomUUID();
+      await t.admin.execute(sql`insert into ${records}
+        (id, user_id, type, deleted, key_v, enc_v, body, updated_at) values
+        (${old}, ${aId}, 'transaction', true, 1, 1, '\\x0102'::bytea, ${new Date(now.getTime() - 181 * 86_400_000).toISOString()}::timestamptz)`);
+      expect((await pullAll(a)).map((r) => r.id)).toContain(old);
+      await purgeTombstones(t.db, now);
+      expect((await pullAll(a)).map((r) => r.id)).not.toContain(old);
     });
   });
 

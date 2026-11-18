@@ -139,6 +139,7 @@ class RawRecord {
     required this.deleted,
     required this.version,
     required this.keyV,
+    this.bodiless = false,
   });
 
   final String id;
@@ -150,6 +151,10 @@ class RawRecord {
 
   /// The key version the server copy was sealed under.
   final int keyV;
+
+  /// A tombstone whose server copy has no body as far as this device knows (the local body is a
+  /// stale copy): a server body arriving for it replaces it. Always false for a live record.
+  final bool bodiless;
 }
 
 /// The folder the vault files live in: `vault` in the app's private support folder (Android
@@ -173,7 +178,11 @@ const _recordColumns = '''
   body TEXT NOT NULL,
   deleted INTEGER NOT NULL,
   version INTEGER NOT NULL,
-  key_v INTEGER NOT NULL''';
+  key_v INTEGER NOT NULL,
+  bodiless INTEGER NOT NULL DEFAULT 0''';
+
+/// The schema version of the file. 2 adds `bodiless` to the records tables.
+const vaultSchemaVersion = 2;
 
 Future<void> _create(Database db, int version) async {
   for (final type in RecordType.values) {
@@ -209,6 +218,25 @@ CREATE TABLE $quarantineTable (
   PRIMARY KEY (type, id, version))''');
 }
 
+/// From version 1: every records table gets `bodiless` (the server's copy of the tombstone has no
+/// body, as far as this device knows). No server tombstone held a body before, so every tombstone
+/// in the file is marked. Nothing else changes. sqflite runs this under `BEGIN EXCLUSIVE` and reads
+/// the version again inside it, so two connections never both upgrade; the column check is only
+/// defensive: a file a version 1 build reopened (its version set back to 1) has the column already.
+/// The marking still runs then, as that build's tombstones were written without the flag; it is
+/// idempotent.
+Future<void> _upgrade(Database db, int from, int to) async {
+  if (from >= 2) return;
+  for (final type in RecordType.values) {
+    final table = quoted(recordTable(type));
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (!columns.any((c) => c['name'] == 'bodiless')) {
+      await db.execute('ALTER TABLE $table ADD COLUMN bodiless INTEGER NOT NULL DEFAULT 0');
+    }
+    await db.rawUpdate('UPDATE $table SET bodiless = 1 WHERE deleted = 1');
+  }
+}
+
 /// Opens (creating it on the first run) the vault file of [userId]. [directory] and [factory] are
 /// for tests; the app leaves them out.
 ///
@@ -232,7 +260,7 @@ Future<Database> openVault(
   return (factory ?? databaseFactory).openDatabase(
     path,
     options: OpenDatabaseOptions(
-      version: 1,
+      version: vaultSchemaVersion,
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA busy_timeout = 5000');
         // Kept in the file: set on every open so a file made before it, or a connection that
@@ -240,6 +268,7 @@ Future<Database> openVault(
         await db.rawQuery('PRAGMA journal_mode = WAL');
       },
       onCreate: _create,
+      onUpgrade: _upgrade,
       singleInstance: singleInstance,
     ),
   );

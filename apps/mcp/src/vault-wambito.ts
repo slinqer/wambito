@@ -278,7 +278,8 @@ async function replay(
   userId: string,
   keyring: Keyring,
 ): Promise<void> {
-  const records = [...entry.records.values()].filter((r) => !r.deleted);
+  // Tombstones too: a pull keeps a delete's sealed body, so a restore works in a later request.
+  const records = [...entry.records.values()];
   const engine = createSyncEngine({
     store,
     userId,

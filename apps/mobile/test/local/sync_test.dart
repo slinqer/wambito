@@ -346,6 +346,29 @@ void main() {
       expect(await names(one.store), ['$a:a/#999']);
     });
 
+    test('a pulled tombstone that carries a body still deletes, and quarantines nothing', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      await serverWrite(server, await getKeys(), a, 'a', 1);
+      expect((await one.engine.run()).ok, isTrue);
+      expect(await one.store.get(_cat, a), isNotNull);
+      server.rows[a] = {
+        ...server.rows[a]!,
+        'version': ++server.counter,
+        'deleted': true,
+        'body': await sealedBy(await getKeys(), a, category('a')),
+      };
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.quarantined, 0);
+      expect(await one.store.get(_cat, a), isNull);
+      expect(
+        (await one.store.get(_cat, a, const ReadOptions(includeDeleted: true)))?.deleted,
+        isTrue,
+      );
+      expect(await one.store.quarantineCount(), 0);
+    });
+
     test('keeps a pending edit set aside across a resync that follows a failed push', () async {
       final server = FakeSync();
       final one = await device(server);
@@ -1440,6 +1463,290 @@ void main() {
       expect((await d.engine.run()).ok, isFalse);
       expect((taken, released), (2, 2));
     });
+  });
+
+  group('tombstones carry their body', () {
+    const withDeleted = ReadOptions(includeDeleted: true);
+
+    /// The changes of every push, in order.
+    List<Map<String, Object?>> posted(FakeSync server) => [
+      for (final r in server.requests)
+        if (r.method == 'POST')
+          for (final c in (r.body!['changes']! as List)) (c as Map).cast<String, Object?>(),
+    ];
+
+    Future<Object?> openAs(RecordKeys k, int keyV, String id, Object? body) => openRecord(
+      k,
+      RecordContext(userId: user, type: _cat, id: id, keyV: keyV),
+      fromBase64Url(body! as String),
+    );
+
+    /// Stores a record on the server at the next version, sealed at [keyV] with [k].
+    Future<Map<String, Object?>> serve(
+      FakeSync server,
+      RecordKeys k,
+      String id,
+      String name, {
+      bool deleted = false,
+      int keyV = 1,
+    }) async => server.rows[id] = {
+      'id': id,
+      'type': 'category',
+      'version': ++server.counter,
+      'deleted': deleted,
+      'keyV': keyV,
+      'encV': 1,
+      'body': await sealedAt(k, id, category(name), keyV),
+    };
+
+    test('a delete pushes its sealed body', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      await one.store.put(_cat, c, category('Fun'));
+      expect((await one.engine.run()).pushed, 1);
+
+      await one.store.delete(_cat, c);
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.pushed, 1);
+      final change = posted(server)[1];
+      expect(change, containsPair('id', c));
+      expect(change, containsPair('deleted', true));
+      expect(change, containsPair('keyV', 1));
+      expect(change, containsPair('baseVersion', 1));
+      expect(jsonEncode(change), isNot(contains('Fun')));
+      expect(await openAs(await getKeys(), 1, c, change['body']), category('Fun'));
+    });
+
+    test('a delete of a record downloaded without a body pushes null', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      await serve(server, await getKeys(), a, 'Food');
+      expect((await one.engine.run()).pulled, 1);
+      // A tombstone the server holds without a body (an old client's delete), applied over a
+      // pending edit: the local body is only a stale copy, never sent as the tombstone's.
+      await one.store.put(_cat, a, category('Groceries'));
+      await one.store.delete(_cat, a, const WriteOptions(origin: 'remote', version: 1, keyV: 1));
+      expect((await one.store.rawRecord(_cat, a))!.bodiless, isTrue);
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.pushed, 1);
+      final change = posted(server).single;
+      expect(change, containsPair('id', a));
+      expect(change, containsPair('deleted', true));
+      expect(change, containsPair('body', null));
+      // The server's tombstone still has no body: the local copy stays a stale one.
+      expect((await one.store.rawRecord(_cat, a))!.bodiless, isTrue);
+      expect(await one.store.keyVersionsInUse(), <int>{});
+    });
+
+    test('a pulled tombstone with a body is kept, even for an id this device never had', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      final k = await getKeys();
+      await serve(server, k, a, 'Food');
+      expect((await one.engine.run()).pulled, 1);
+
+      await serve(server, k, a, 'Food', deleted: true);
+      await serve(server, k, b, 'Rent', deleted: true);
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.quarantined, 0);
+      expect(await one.store.get(_cat, a), isNull);
+      expect(await one.store.get(_cat, b), isNull);
+      final ta = await one.store.get(_cat, a, withDeleted);
+      expect(ta!.deleted, isTrue);
+      expect(ta.body, category('Food'));
+      final tb = await one.store.get(_cat, b, withDeleted);
+      expect(tb!.deleted, isTrue);
+      expect(tb.body, category('Rent'));
+      expect(await one.store.readOutbox(10), isEmpty);
+    });
+
+    test('a pulled tombstone whose body does not open still deletes, without quarantine', () async {
+      final server = FakeSync();
+      final one = await device(server);
+      final other = await fresh();
+      await serve(server, await getKeys(), a, 'Food');
+      expect((await one.engine.run()).pulled, 1);
+
+      // Sealed under a key version this keyring lacks (a refresh does not bring it either).
+      await serve(server, other, a, 'Food', deleted: true, keyV: 5);
+      await serve(server, other, b, 'Rent', deleted: true, keyV: 5);
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.quarantined, 0);
+      expect(await one.store.get(_cat, a), isNull);
+      expect((await one.store.get(_cat, a, withDeleted))?.deleted, isTrue);
+      expect(await one.store.get(_cat, b, withDeleted), isNull);
+      expect(await one.store.quarantineCount(), 0);
+    });
+
+    test("an unsent edit meeting a server tombstone keeps the person's body", () async {
+      final server = FakeSync();
+      final one = await device(server);
+      final k = await getKeys();
+      await serve(server, k, a, 'Food');
+      expect((await one.engine.run()).pulled, 1);
+
+      // Another device deleted it; this one edited it before hearing of that.
+      await serve(server, k, a, 'Food', deleted: true);
+      await one.store.put(_cat, a, category('Groceries'));
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.serverDeleted, [a]);
+      expect(one.problems, contains(SyncProblem(SyncProblemCode.serverDeleted, ids: [a])));
+      expect(await one.store.get(_cat, a), isNull);
+      expect((await one.store.get(_cat, a, withDeleted))?.body, category('Groceries'));
+      expect((await one.store.rawRecord(_cat, a))!.bodiless, isFalse);
+      expect(await one.store.readOutbox(10), isEmpty);
+      // The server's tombstone holds a body under key version 1: that key is still needed.
+      expect(await one.store.keyVersionsInUse(), {1});
+    });
+
+    test(
+      "a set-aside edit meeting a server tombstone after a resync keeps the person's body",
+      () async {
+        final server = FakeSync();
+        final one = await device(server);
+        final k = await getKeys();
+        await serve(server, k, a, 'Food');
+        expect((await one.engine.run()).pulled, 1);
+
+        // The edit is not taken (no result), then the server asks for a resync: it is set aside,
+        // and the full download brings another device's delete.
+        server.intercept = (req, real) async =>
+            req.method == 'POST' ? (200, {'results': <Object?>[]}) : real();
+        await serve(server, k, a, 'Food', deleted: true);
+        server.purgeThrough = server.counter;
+        await one.store.put(_cat, a, category('Groceries'));
+        final r = await one.engine.run();
+        expect(r.ok, isTrue);
+        expect(r.resynced, isTrue);
+        expect(r.serverDeleted, [a]);
+        expect(await one.store.get(_cat, a), isNull);
+        expect((await one.store.get(_cat, a, withDeleted))?.body, category('Groceries'));
+        expect(await one.store.readOutbox(10), isEmpty);
+      },
+    );
+
+    test("the upgrade pass re-seals a tombstone's body under the new key", () async {
+      final server = FakeSync();
+      final k1 = await fresh();
+      final k2 = await fresh();
+      server.wraps.addAll({1: k1, 2: k2});
+      // Deleted on another device before the rotation: its body is under key version 1.
+      await serve(server, k1, b, 'Rent', deleted: true);
+      final one = await device(server, keyring: ring({1: k1, 2: k2}));
+
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      expect(r.pushed, 1);
+      final change = posted(server).single;
+      expect(change, containsPair('id', b));
+      expect(change, containsPair('deleted', true));
+      expect(change, containsPair('keyV', 2));
+      expect(change, containsPair('baseVersion', 1));
+      expect(await openAs(k2, 2, b, change['body']), category('Rent'));
+      // The old key is dropped once the reseal was acked.
+      expect(one.dropped, [1]);
+      expect(await one.store.keyVersionsInUse(), {2});
+    });
+
+    test('a tombstone\'s reseal meeting a restore on another device takes the live copy', () async {
+      final server = FakeSync();
+      final k1 = await fresh();
+      final k2 = await fresh();
+      await serve(server, k1, b, 'Rent', deleted: true);
+      final store = await openStore();
+      // This device holds the tombstone under key version 1 (pulled before the rotation).
+      final old = await device(server, k: k1, store: store);
+      expect((await old.engine.run()).pulled, 1);
+
+      // Another device restored it, under key version 2; the reseal meets that live copy.
+      await serve(server, k2, b, 'Rent again', keyV: 2);
+      expect(await store.queueReseal(2, 500), 1);
+      final one = await device(server, store: store, keyring: ring({1: k1, 2: k2}));
+      final r = await one.engine.run();
+      expect(r.ok, isTrue);
+      final got = await store.get(_cat, b);
+      expect(got?.deleted, isFalse);
+      expect(got?.body, category('Rent again'));
+      expect(server.posts, 1);
+      expect(await store.readOutbox(10), isEmpty);
+    });
+
+    test(
+      'a reseal meeting a server tombstone without a body leaves the tombstone bodiless',
+      () async {
+        final server = FakeSync();
+        final k1 = await fresh();
+        final k2 = await fresh();
+        await serve(server, k1, a, 'Food');
+        final store = await openStore();
+        // Pulled under key version 1, before the rotation.
+        final old = await device(server, k: k1, store: store);
+        expect((await old.engine.run()).pulled, 1);
+
+        // An old client deleted it, without a body; the reseal meets that tombstone.
+        server.rows[a] = {
+          'id': a,
+          'type': 'category',
+          'version': ++server.counter,
+          'deleted': true,
+          'keyV': 1,
+          'encV': 1,
+          'body': null,
+        };
+        expect(await store.queueReseal(2, 500), 1);
+        final one = await device(server, store: store, keyring: ring({1: k1, 2: k2}));
+        final r = await one.engine.run();
+        expect(r.ok, isTrue);
+        expect(r.serverDeleted, isEmpty);
+        expect(await store.get(_cat, a), isNull);
+        final raw = await store.rawRecord(_cat, a);
+        expect([raw?.deleted, raw?.bodiless], [true, true]);
+        expect(await store.keyVersionsInUse(), <int>{});
+        expect(await store.queueReseal(2, 500), 0);
+        expect(server.posts, 1);
+        expect(await store.readOutbox(10), isEmpty);
+      },
+    );
+
+    test(
+      "a server tombstone with a body replaces a bodiless or older local tombstone's body",
+      () async {
+        final server = FakeSync();
+        final one = await device(server);
+        final k = await getKeys();
+        await one.store.put(_cat, c, category('Fun'));
+        await one.store.delete(_cat, c);
+        expect((await one.engine.run()).pushed, 1);
+        expect(server.rows[c]!['version'], 1);
+
+        // Another device restored and deleted it again, with another body.
+        await serve(server, k, c, 'Games', deleted: true);
+        expect((await one.engine.run()).ok, isTrue);
+        expect((await one.store.get(_cat, c, withDeleted))?.body, category('Games'));
+
+        // A tombstone this device holds without the server's body takes it, even at the same
+        // version.
+        await one.store.put(
+          _cat,
+          a,
+          category('Food'),
+          const WriteOptions(origin: 'remote', version: 1, keyV: 1),
+        );
+        final row = await serve(server, k, a, 'Groceries', deleted: true);
+        await one.store.delete(
+          _cat,
+          a,
+          WriteOptions(origin: 'remote', version: row['version']! as int, keyV: 1),
+        );
+        expect((await one.engine.run()).ok, isTrue);
+        expect((await one.store.get(_cat, a, withDeleted))?.body, category('Groceries'));
+      },
+    );
   });
 }
 

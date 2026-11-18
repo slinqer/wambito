@@ -62,6 +62,11 @@ export interface RawRecord<T extends RecordType = RecordType> {
   deleted: boolean;
   version: number;
   keyV: number;
+  /**
+   * A tombstone whose server copy has no body as far as this device knows (the local body is a
+   * stale copy): a server body arriving for it replaces it.
+   */
+  bodiless?: true;
 }
 
 /**
@@ -94,19 +99,28 @@ export interface EncryptedStore extends FinanceStore {
   /**
    * The server accepted the change read as `seq` and gave it `version` (sealed under `keyV`, when
    * given). Records them, and clears the entry only if there was no newer local write since;
-   * otherwise the entry stays, now based on `version`.
+   * otherwise the entry stays, now based on `version`. `bodySent`: the accepted push carried a
+   * body, so a `bodiless` tombstone is no longer one; otherwise the flag stays.
    */
-  ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
+  ackOutbox(
+    id: string,
+    version: number,
+    seq: number,
+    keyV?: number,
+    bodySent?: boolean,
+  ): Promise<void>;
   /**
    * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
-   * for records the server has (version above 0, not deleted) sealed under a key version below
-   * `current` and with no outbox entry, until `limit` reseal entries are pending (those already
-   * pending count). Returns how many it added. Notifies nobody (the engine's own write).
+   * for records the server has (version above 0) sealed under a key version below `current` and
+   * with no outbox entry, until `limit` reseal entries are pending (those already pending count).
+   * Tombstones that hold a body (a remote delete with `tombstoneBody`, or a local delete) count as
+   * records; the push sends their entry as a delete. Returns how many it added. Notifies nobody
+   * (the engine's own write).
    */
   queueReseal(current: number, limit: number): Promise<number>;
   /**
-   * The key versions the server copies of the local records (not deleted, pushed) are under, and
-   * those of quarantined records (they may still be retried).
+   * The key versions the server copies of the local records (pushed; a tombstone only when it holds
+   * a body) are under, and those of quarantined records (they may still be retried).
    */
   keyVersionsInUse(): Promise<Set<number>>;
   /**

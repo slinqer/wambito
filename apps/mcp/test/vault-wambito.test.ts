@@ -194,6 +194,69 @@ test("a read tool never posts /v2/sync", async () => {
   expect(calls.filter((c) => c.path === "/v2/keys/assistant")).toHaveLength(2);
 });
 
+test("a delete whose tombstone has no body is still not_found", async () => {
+  const account = await encryptedAccount();
+  const { items } = await withFixture(account);
+  const id = items[0]?.id ?? "";
+  const row = await account.web.store.getRaw("transaction", id);
+  // An old client's delete: no body on the tombstone.
+  const res = await t.request("POST", "/v2/sync", {
+    headers: account.headers,
+    body: {
+      changes: [
+        {
+          id,
+          type: "transaction",
+          baseVersion: row?.version,
+          deleted: true,
+          keyV: 1,
+          encV: 1,
+          body: null,
+        },
+      ],
+    },
+  });
+  expect(res.status, await res.clone().text()).toBe(200);
+  const conn = await connect(account);
+  const error = await toolError(vault(conn).restoreTransaction(id));
+  expect(error.code).toBe("not_found");
+});
+
+test("an occurrence deleted on another device is not made again", async () => {
+  const account = await encryptedAccount();
+  const { food } = await withFixture(account);
+  await account.web.wambito.createRecurrence({
+    name: "Rent-e2e",
+    amount: -90000,
+    categoryId: food.id,
+    frequency: "monthly",
+    dayOfMonth: 5,
+    startDate: "2026-10-05",
+  });
+  const month = await account.web.wambito.listTransactions({ month: "2026-10", limit: 100 });
+  const occurrence = month.items.find((i) => i.name === "Rent-e2e");
+  expect(occurrence).toBeDefined();
+  const id = occurrence?.id ?? "";
+  await account.web.wambito.deleteTransactions([id]);
+  await account.web.sync();
+
+  const conn = await connect(account);
+  const calls: Call[] = [];
+  const mcp = vault(conn, network(calls));
+  const names = (await mcp.listTransactions({ month: "2026-10", limit: 100 })).items.map(
+    (i) => i.name,
+  );
+  expect(names).not.toContain("Rent-e2e");
+  // The next request is built from the cache: the tombstone is still there.
+  const again = (
+    await vault(conn, network(calls)).listTransactions({ month: "2026-10", limit: 100 })
+  ).items;
+  expect(again.map((i) => i.name)).not.toContain("Rent-e2e");
+  // Nothing was made again: no push at all, so no create for that id.
+  const pushes = calls.filter((c) => c.method === "POST" && c.path === "/v2/sync");
+  expect(pushes.filter((c) => c.body?.includes(id))).toEqual([]);
+});
+
 /** The MCP app over the real verifier: `callTool` runs one tool as one MCP request. */
 async function mcpApp(
   conn: { token: string },

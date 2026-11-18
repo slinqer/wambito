@@ -26,6 +26,7 @@ class WriteOptions {
     this.keyV,
     this.skipIfPending = false,
     this.ifSeq,
+    this.tombstoneBody,
   });
 
   /// Who is writing. `'local'` (default) is the person's own change; the encrypted store adds it
@@ -43,6 +44,29 @@ class WriteOptions {
   /// Remote writes only: apply only while the id's outbox entry is the local write numbered
   /// `ifSeq`; a newer local write makes it a no-op.
   final int? ifSeq;
+
+  /// Remote deletes only: the body the server's tombstone holds, opened. The tombstone stores it;
+  /// an id the store does not know gets a tombstone row (`version` and `keyV` from these options,
+  /// no outbox entry). `skipIfPending` and `ifSeq` apply as for any remote write. A local delete
+  /// ignores it.
+  final Json? tombstoneBody;
+
+  /// These options with the given fields replaced.
+  WriteOptions copyWith({
+    String? origin,
+    int? version,
+    int? keyV,
+    bool? skipIfPending,
+    int? ifSeq,
+    Json? tombstoneBody,
+  }) => WriteOptions(
+    origin: origin ?? this.origin,
+    version: version ?? this.version,
+    keyV: keyV ?? this.keyV,
+    skipIfPending: skipIfPending ?? this.skipIfPending,
+    ifSeq: ifSeq ?? this.ifSeq,
+    tombstoneBody: tombstoneBody ?? this.tombstoneBody,
+  );
 }
 
 /// Reads and writes, shared by the store and by the transaction handed to `transaction(fn)`.

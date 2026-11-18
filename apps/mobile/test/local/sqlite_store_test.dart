@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/core/records.dart';
 import 'package:wambito/crypto/records.dart';
+import 'package:wambito/local/db.dart' show pendingChangesInVault;
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/store.dart';
 
@@ -637,6 +638,354 @@ void main() {
       expect(rows.single['date'], '2026-11-02');
       expect(rows.single['category_id'], 'c2');
       expect(rows.single['amount'], -900);
+    });
+  });
+
+  group('a remote tombstone with a body', () {
+    WriteOptions remote(int version, int keyV, {Json? body, bool skipIfPending = false}) =>
+        WriteOptions(
+          origin: 'remote',
+          version: version,
+          keyV: keyV,
+          tombstoneBody: body,
+          skipIfPending: skipIfPending,
+        );
+
+    test('a remote delete with tombstoneBody creates a tombstone for an unknown id', () async {
+      final store = await fresh();
+      var calls = 0;
+      store.subscribe(() => calls++);
+      await store.delete(RecordType.category, 'z', remote(6, 3, body: _category('Gone')));
+      expect(await store.get(RecordType.category, 'z'), isNull);
+      final dead = await store.get(
+        RecordType.category,
+        'z',
+        const ReadOptions(includeDeleted: true),
+      );
+      expect([dead?.deleted, dead?.body['name']], [true, 'Gone']);
+      final raw = await store.rawRecord(RecordType.category, 'z');
+      expect([raw?.deleted, raw?.version, raw?.keyV, raw?.bodiless], [true, 6, 3, false]);
+      expect(await store.readOutbox(10), isEmpty);
+      expect(calls, 1);
+    });
+
+    test('a remote delete without tombstoneBody still writes nothing for an unknown id', () async {
+      final store = await fresh();
+      await store.delete(RecordType.category, 'z', remote(6, 3));
+      expect(await store.rawRecord(RecordType.category, 'z'), isNull);
+    });
+
+    test("a remote delete with tombstoneBody replaces the local tombstone's body", () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('Old'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'a', remote(2, 2, body: _category('Server')));
+      final raw = await store.rawRecord(RecordType.category, 'a');
+      expect(
+        [raw?.deleted, raw?.version, raw?.keyV, raw?.body['name'], raw?.bodiless],
+        [true, 2, 2, 'Server', false],
+      );
+      expect(await store.readOutbox(10), isEmpty);
+    });
+
+    test(
+      'a remote delete with tombstoneBody and skipIfPending leaves a pending local change alone',
+      () async {
+        final store = await fresh();
+        await store.put(RecordType.category, 'a', _category('Local'));
+        await store.delete(
+          RecordType.category,
+          'a',
+          remote(4, 1, body: _category('Server'), skipIfPending: true),
+        );
+        await store.delete(
+          RecordType.category,
+          'b',
+          remote(4, 1, body: _category('Server B'), skipIfPending: true),
+        );
+        final a = await store.rawRecord(RecordType.category, 'a');
+        expect([a?.version, a?.deleted, a?.body['name']], [0, false, 'Local']);
+        final b = await store.rawRecord(RecordType.category, 'b');
+        expect([b?.deleted, b?.version], [true, 4]);
+      },
+    );
+
+    test('a local delete ignores tombstoneBody', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('Mine'));
+      await store.delete(RecordType.category, 'a', WriteOptions(tombstoneBody: _category('Other')));
+      expect((await store.rawRecord(RecordType.category, 'a'))?.body['name'], 'Mine');
+    });
+
+    test('keyVersionsInUse counts a pushed tombstone with a body', () async {
+      final store = await fresh();
+      await store.delete(RecordType.category, 'z', remote(3, 4, body: _category('Gone')));
+      expect(await store.keyVersionsInUse(), {4});
+    });
+
+    test('keyVersionsInUse does not count a pushed tombstone without a body', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('A'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'a', remote(2, 7));
+      expect(await store.keyVersionsInUse(), <int>{});
+      expect((await store.rawRecord(RecordType.category, 'a'))?.bodiless, isTrue);
+    });
+
+    test('queueReseal queues a pushed tombstone with a body under an older key, and its entry is a delete', () async {
+      final store = await fresh();
+      await store.delete(RecordType.category, 'z', remote(3, 1, body: _category('Gone')));
+      await store.put(RecordType.category, 'y', _category('Y'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'y', remote(2, 1)); // no body: nothing to re-seal
+      expect(await store.queueReseal(2, 5), 1);
+      final entries = await store.readOutbox(10);
+      expect(entries.map((e) => [e.id, e.reseal, e.baseVersion, e.deleted]).toList(), [
+        ['z', true, 3, true],
+      ]);
+      final z = await store.get(RecordType.category, 'z', const ReadOptions(includeDeleted: true));
+      expect(z?.deleted, isTrue);
+      // Acked under the current key: it is no longer queued.
+      await store.ackOutbox('z', 4, entries.first.seq, 2);
+      expect(await store.queueReseal(2, 5), 0);
+    });
+
+    test('an acked delete of a tombstone the server held without a body counts its key', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('A'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'a', remote(2, 3)); // the server's has no body
+      expect(await store.keyVersionsInUse(), <int>{});
+      // The person's delete wins: put, then a local delete, pushed with the body.
+      await store.put(RecordType.category, 'a', _category('Mine'));
+      await store.delete(RecordType.category, 'a');
+      final entry = (await store.readOutbox(10)).single;
+      await store.ackOutbox('a', 3, entry.seq, 4, true);
+      expect(await store.keyVersionsInUse(), {4});
+    });
+
+    test('an ack keeps a tombstone bodiless unless the push carried a body', () async {
+      final store = await fresh();
+      for (final id in ['a', 'b']) {
+        await store.put(RecordType.category, id, _category('Old'), _remoteAt(1, 1));
+        // A pending edit, then the server's tombstone without a body over it.
+        await store.put(RecordType.category, id, _category('Mine'));
+        await store.delete(RecordType.category, id, remote(2, 1));
+        expect((await store.rawRecord(RecordType.category, id))?.bodiless, isTrue);
+      }
+      final entries = await store.readOutbox(10);
+      int seq(String id) => entries.firstWhere((e) => e.id == id).seq;
+      await store.ackOutbox('a', 3, seq('a'), 2);
+      await store.ackOutbox('b', 3, seq('b'), 3, false);
+      for (final id in ['a', 'b']) {
+        final raw = await store.rawRecord(RecordType.category, id);
+        expect([raw?.version, raw?.bodiless], [3, true], reason: id);
+      }
+      expect(await store.keyVersionsInUse(), <int>{});
+      expect(await store.queueReseal(5, 10), 0);
+      expect(await store.readOutbox(10), isEmpty);
+
+      // A push that carried the body: the server's tombstone holds it now.
+      await store.put(RecordType.category, 'c', _category('Old'), _remoteAt(4, 1));
+      await store.put(RecordType.category, 'c', _category('Mine'));
+      await store.delete(RecordType.category, 'c', remote(5, 1));
+      final c = (await store.readOutbox(10)).single;
+      await store.ackOutbox('c', 6, c.seq, 4, true);
+      expect((await store.rawRecord(RecordType.category, 'c'))?.bodiless, isFalse);
+      expect(await store.keyVersionsInUse(), {4});
+    });
+
+    test(
+      'a remote delete with tombstoneBody and ifSeq does nothing after a newer local write',
+      () async {
+        final store = await fresh();
+        await store.put(RecordType.category, 'a', _category('Old'), _remoteAt(1, 1));
+        await store.put(RecordType.category, 'a', _category('Local'));
+        final read = (await store.readOutbox(1)).single;
+        await store.put(RecordType.category, 'a', _category('Newer'));
+        await store.delete(
+          RecordType.category,
+          'a',
+          WriteOptions(
+            origin: 'remote',
+            version: 2,
+            keyV: 1,
+            ifSeq: read.seq,
+            tombstoneBody: _category('Server'),
+          ),
+        );
+        final raw = await store.rawRecord(RecordType.category, 'a');
+        expect([raw?.deleted, raw?.version, raw?.body['name']], [false, 1, 'Newer']);
+        expect((await store.readOutbox(1)).single.seq, greaterThan(read.seq));
+      },
+    );
+
+    test('an ack of a push that carried the body clears a bodiless tombstone\'s flag', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('A'), _remoteAt(1, 1));
+      // The person's delete meets the server's tombstone: the engine stores the server's copy
+      // (a put, then a delete without a body) and the person's entry stays, to be pushed again.
+      await store.delete(RecordType.category, 'a');
+      await store.transaction((tx) async {
+        await tx.put(RecordType.category, 'a', _category('A'), _remoteAt(3, 1));
+        await tx.delete(RecordType.category, 'a', remote(3, 1));
+      });
+      expect((await store.rawRecord(RecordType.category, 'a'))?.bodiless, isTrue);
+      final entry = (await store.readOutbox(10)).single;
+      await store.ackOutbox('a', 4, entry.seq, 2, true);
+      expect((await store.rawRecord(RecordType.category, 'a'))?.bodiless, isFalse);
+      expect(await store.keyVersionsInUse(), {2});
+    });
+
+    test('a remote delete without a body of a tombstone that holds one keeps it', () async {
+      final store = await fresh();
+      await store.delete(RecordType.category, 'z', remote(3, 1, body: _category('Gone')));
+      await store.delete(RecordType.category, 'z', remote(3, 1));
+      final raw = await store.rawRecord(RecordType.category, 'z');
+      expect([raw?.bodiless, raw?.body['name']], [false, 'Gone']);
+    });
+
+    test('a bodiless tombstone takes the server body, and a put clears the flag', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('Old'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'a', remote(2, 1));
+      await store.delete(RecordType.category, 'a', remote(2, 1, body: _category('Server')));
+      final raw = await store.rawRecord(RecordType.category, 'a');
+      expect([raw?.bodiless, raw?.body['name']], [false, 'Server']);
+      await store.put(RecordType.category, 'b', _category('B'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'b', remote(2, 1));
+      await store.put(RecordType.category, 'b', _category('Back'), _remoteAt(3, 1));
+      await store.delete(RecordType.category, 'b');
+      expect((await store.rawRecord(RecordType.category, 'b'))?.bodiless, isFalse);
+    });
+
+    test('queueReseal shares its limit between records and tombstones', () async {
+      final store = await fresh();
+      await store.put(RecordType.category, 'a', _category('A'), _remoteAt(1, 1));
+      await store.delete(RecordType.category, 'z', remote(3, 1, body: _category('Gone')));
+      expect(await store.queueReseal(2, 1), 1);
+      expect(await store.queueReseal(2, 1), 0);
+    });
+  });
+
+  group('the version 2 upgrade', () {
+    // The schema the version 1 app made: the records tables have no `bodiless` column.
+    Future<String> version1File(String userId) async {
+      final path = p.join(dir.path, vaultFileName(userId));
+      final db = await factory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) async {
+            for (final type in RecordType.values) {
+              final extra = type == RecordType.transaction
+                  ? ', date TEXT, category_id TEXT, amount INTEGER'
+                  : '';
+              await db.execute(
+                'CREATE TABLE "${type.name}" (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, '
+                'body TEXT NOT NULL, deleted INTEGER NOT NULL, version INTEGER NOT NULL, '
+                'key_v INTEGER NOT NULL$extra)',
+              );
+            }
+            await db.execute(
+              'CREATE TABLE outbox (id TEXT PRIMARY KEY, type TEXT NOT NULL, base_version INTEGER, '
+              'deleted INTEGER NOT NULL, touched TEXT NOT NULL, seq INTEGER NOT NULL, park TEXT, '
+              'abandoned INTEGER NOT NULL, set_aside TEXT, reseal INTEGER NOT NULL)',
+            );
+            await db.execute('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)');
+            await db.execute(
+              'CREATE TABLE quarantine (type TEXT NOT NULL, id TEXT NOT NULL, '
+              'version INTEGER NOT NULL, reason TEXT NOT NULL, key_v INTEGER, '
+              'PRIMARY KEY (type, id, version))',
+            );
+          },
+          singleInstance: false,
+        ),
+      );
+      Map<String, Object?> row(String id, bool deleted, int seq) => {
+        'id': id,
+        'seq': seq,
+        'body': '{"s":1,"name":"$id"}',
+        'deleted': deleted ? 1 : 0,
+        'version': 2,
+        'key_v': 1,
+      };
+      await db.insert('category', row('live', false, 1));
+      await db.insert('category', row('dead', true, 2));
+      await db.insert('category', row('kept', false, 5));
+      await db.insert('"transaction"', {
+        ...row('t', true, 3),
+        'body': '{"s":1,"amount":-500,"date":"2026-11-01","categoryId":"live"}',
+        'date': '2026-11-01',
+        'category_id': 'live',
+        'amount': -500,
+      });
+      await db.insert('outbox', {
+        'id': 'live',
+        'type': 'category',
+        'base_version': 2,
+        'deleted': 0,
+        'touched': '["name"]',
+        'seq': 4,
+        'abandoned': 0,
+        'reseal': 0,
+      });
+      await db.insert('meta', {'key': 'seq', 'value': '5'});
+      await db.close();
+      return path;
+    }
+
+    test('marks every tombstone of a version 1 file as without a server body', () async {
+      final userId = freshUser();
+      await version1File(userId);
+      expect(
+        await pendingChangesInVault(userId, directory: dir.path, factory: factory),
+        1,
+        reason: 'the read-only count works on a version 1 file',
+      );
+      final store = await openFor(userId);
+      final live = await store.rawRecord(RecordType.category, 'live');
+      expect([live?.deleted, live?.bodiless, live?.body['name']], [false, false, 'live']);
+      final dead = await store.rawRecord(RecordType.category, 'dead');
+      expect([dead?.deleted, dead?.bodiless, dead?.body['name']], [true, true, 'dead']);
+      final t = await store.rawRecord(RecordType.transaction, 't');
+      expect([t?.deleted, t?.bodiless, t?.body['amount']], [true, true, -500]);
+      // Nothing else changed: the outbox, the meta and the order of the records.
+      expect((await store.readOutbox(10)).map((e) => [e.id, e.seq, e.touched]).toList(), [
+        [
+          'live',
+          4,
+          ['name'],
+        ],
+      ]);
+      expect(await store.getMeta('seq'), 5);
+      // The live records only: a tombstone of a version 1 file has no body on the server.
+      expect(await store.keyVersionsInUse(), {1});
+      expect(await store.queueReseal(2, 10), 1);
+      expect((await store.readOutbox(10)).where((e) => e.reseal).map((e) => e.id), ['kept']);
+      await store.close();
+      expect(await pendingChangesInVault(userId, directory: dir.path, factory: factory), 1);
+      // Opened again: already version 2, the flags stay as they are.
+      final again = await openFor(userId);
+      expect((await again.rawRecord(RecordType.category, 'dead'))?.bodiless, isTrue);
+      await again.close();
+    });
+
+    test('marks the tombstones of a version 2 file a version 1 build reopened', () async {
+      final userId = freshUser();
+      final path = await version1File(userId);
+      await (await openFor(userId)).close();
+      // A version 1 build opened it again: the file says version 1, keeps `bodiless`, and that
+      // build wrote a tombstone without setting it.
+      final db = await factory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await db.setVersion(1);
+      await db.update('category', {'deleted': 1}, where: 'id = ?', whereArgs: ['kept']);
+      await db.close();
+      final store = await openFor(userId);
+      for (final id in ['dead', 'kept']) {
+        expect((await store.rawRecord(RecordType.category, id))?.bodiless, isTrue, reason: id);
+      }
+      expect((await store.rawRecord(RecordType.category, 'live'))?.bodiless, isFalse);
+      await store.close();
     });
   });
 }

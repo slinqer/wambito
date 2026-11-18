@@ -51,6 +51,7 @@ How to add to it:
 
 ### Changed
 
+- `/v2/sync`: a deleted record may carry its sealed body, kept until the 180-day purge, so it can be restored from any device and by the assistant; deleted occurrences of a recurring payment are no longer made again on another device.
 - Revoking an assistant (`DELETE /v1/me/assistants/{clientId}`, the admin disconnect and suspend, and the `invalid_grant` refusal) also deletes its `assistant` key wrap, so a disconnected assistant keeps no copy of the data key.
 - `POST /v2/keys/rotate` refuses a wrap of kind `assistant` (422 `assistant_wrap_in_rotation`) and revokes every assistant of the account in the same transaction (consent, tokens and wraps); each connects again and wraps afresh.
 - `GET /v2/keys/assistant` (`getAssistantWrap`) answers `{ wrap, links }` instead of the bare wrap: `links` is the same list `GET /v2/keys` returns, so an assistant can open records still under an older key version.

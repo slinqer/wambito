@@ -35,6 +35,13 @@ export interface WriteOptions {
    * (the one the engine merged); a newer local write makes it a no-op.
    */
   ifSeq?: number;
+  /**
+   * Remote deletes only: the body the server's tombstone holds, opened. The tombstone stores it;
+   * an id the store does not know gets a tombstone row (`version` and `keyV` from these options,
+   * no outbox entry). `skipIfPending` and `ifSeq` apply as for any remote write. A local delete
+   * ignores it.
+   */
+  tombstoneBody?: unknown;
 }
 
 /** Reads and writes, shared by the store and by the transaction handed to `transaction(fn)`. */
