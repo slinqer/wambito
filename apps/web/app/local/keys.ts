@@ -605,7 +605,7 @@ export async function unlockWithRecovery(
 }
 
 /** The recovery key typed as text, as a secret; `bad_recovery_key` when it does not parse. */
-function parseRecoverySecret(text: string): Uint8Array {
+export function parseRecoverySecret(text: string): Uint8Array {
   try {
     return parseRecoveryKey(text);
   } catch {

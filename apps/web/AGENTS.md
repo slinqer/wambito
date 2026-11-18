@@ -209,7 +209,16 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
-  ended outside the sign-out.
+  ended outside the sign-out. `recovery-signin.ts` `signInWithRecoveryKey(text, { fetch? })` →
+  `{ userId, keys }` (signed out like `signin.ts`: plain `fetch`, `credentials: "same-origin"`, no
+  `x-wambito-user`): parses the typed text once (`parseRecoverySecret`, exported from `keys.ts`),
+  derives `recoveryVerifier(secret)`, posts `{ lookup, auth }` base64url to
+  `/api/v2/recovery/sign-in` (the response sets the session cookie), then `deleteStaleVaults(userId)`
+  and `unlockWithRecovery({ userId, text })` (which also writes the verifier); the secret, `lookup`
+  and `auth` zeroed in a `finally`, never logged or stored. `KeysError`s: `bad_recovery_key`
+  (nothing sent), `recovery_key_invalid` (401), `account_suspended` (403), `too_many_requests` (429,
+  `retryAfterS`), `offline`, `server`; a failed unlock throws its own error and the caller signs
+  out.
   `vault-session.ts` (`markRecoveryKeySaved(session, now)`: one local write of
   `settings.recoveryKeySavedAt`, then a sync): a preview account's open vault, one per tab, shared by `/welcome` and
   `/app`: `openVaultSession({ profile, keys, fresh })` opens the store, runs a full sync (must
