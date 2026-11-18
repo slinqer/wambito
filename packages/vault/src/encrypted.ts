@@ -149,6 +149,8 @@ export interface EncryptedStore extends FinanceStore {
   ): Promise<void>;
   getMeta<T = unknown>(key: string): Promise<T | undefined>;
   setMeta(key: string, value: unknown): Promise<void>;
+  /** Removes a meta value; an absent one is no error. */
+  deleteMeta(key: string): Promise<void>;
   /** Keeps a record that could not be opened; a later remote write of the id clears its rows. */
   quarantine(entry: QuarantineEntry): Promise<void>;
   /** Every quarantine row (the sync retries the `unknown_key_version` ones after a refresh). */

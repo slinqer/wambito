@@ -28,7 +28,7 @@ const LOCALES = [
     perks: "Gratis para siempre · Código abierto · Sin contraseñas",
     openSourcePerk: "Código abierto",
     removedQuestions: ["¿En qué se me va la plata?", "¿Cuánto me cuesta vivir?"],
-    cta: "Empieza ahora",
+    cta: "Crear cuenta",
     demoCta: "Demo",
     soon: "Pronto",
     ways: ["App para Android", "App para iOS"],
@@ -69,7 +69,7 @@ const LOCALES = [
     perks: "Free forever · Open source · No passwords",
     openSourcePerk: "Open source",
     removedQuestions: ["Where does all my money go?", "How much does living cost me?"],
-    cta: "Get started",
+    cta: "Create account",
     demoCta: "Demo",
     soon: "Soon",
     ways: ["Android app", "iOS app"],
@@ -107,7 +107,7 @@ const LOCALES = [
     perks: "Gratis per sempre · Open source · Senza password",
     openSourcePerk: "Open source",
     removedQuestions: ["Dove se ne vanno tutti i miei soldi?", "Quanto mi costa vivere?"],
-    cta: "Inizia ora",
+    cta: "Crea un account",
     demoCta: "Demo",
     soon: "Presto",
     ways: ["App per Android", "App per iOS"],
@@ -145,7 +145,7 @@ const LOCALES = [
     perks: "Grátis para sempre · Código aberto · Sem palavras-passe",
     openSourcePerk: "Código aberto",
     removedQuestions: ["Para onde vai todo o meu dinheiro?", "Quanto me custa viver?"],
-    cta: "Começa agora",
+    cta: "Criar conta",
     demoCta: "Demo",
     soon: "Em breve",
     ways: ["App para Android", "App para iOS"],
@@ -868,11 +868,13 @@ for (const l of LOCALES) {
       );
     });
 
-    test("one primary action: get started → sign-in in this language", async ({ page }) => {
+    test("one primary action: create account → /create-account in this language", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       const hero = page.locator("#hero");
       const cta = hero.getByRole("link", { name: l.cta });
-      await expect(cta).toHaveAttribute("href", `/sign-in?lang=${l.locale}`);
+      await expect(cta).toHaveAttribute("href", `/create-account?lang=${l.locale}`);
       await expect(cta).toHaveClass(/lk-btn-primary/);
       const box = await cta.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(44);

@@ -4,6 +4,12 @@ export type KeysErrorCode =
   | "already_set_up"
   | "bad_recovery_key"
   | "wrong_recovery_key"
+  /** 401 at the recovery-key sign-in: no account has that key (the server never says which part). */
+  | "recovery_key_invalid"
+  /** 403 at the recovery-key sign-in. */
+  | "account_suspended"
+  /** 429 at the recovery-key sign-in; `retryAfterS` from `retry-after`. */
+  | "too_many_requests"
   | "offline"
   | "server"
   /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
@@ -31,6 +37,7 @@ export class KeysError extends Error {
   constructor(
     readonly code: KeysErrorCode,
     readonly status?: number,
+    readonly retryAfterS?: number,
   ) {
     super(code);
     this.name = "KeysError";

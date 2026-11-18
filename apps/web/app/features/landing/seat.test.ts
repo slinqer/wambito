@@ -3,8 +3,13 @@ import { seatHalves } from "./Landing.tsx";
 
 describe("seatHalves", () => {
   it("splits a two-word call to action at its space", () => {
-    expect(seatHalves("Empieza ahora")).toEqual(["Empieza", "ahora"]);
-    expect(seatHalves("Get started")).toEqual(["Get", "started"]);
+    expect(seatHalves("Crear cuenta")).toEqual(["Crear", "cuenta"]);
+    expect(seatHalves("Create account")).toEqual(["Create", "account"]);
+    expect(seatHalves("Criar conta")).toEqual(["Criar", "conta"]);
+  });
+
+  it("splits a longer label at its first space, the verb on its own", () => {
+    expect(seatHalves("Crea un account")).toEqual(["Crea", "un account"]);
   });
 
   it("keeps the dot with the first half, so the halves read back as the label", () => {

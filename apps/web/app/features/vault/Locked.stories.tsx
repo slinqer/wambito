@@ -51,49 +51,12 @@ export const Unsupported: Story = {
   },
 };
 
-/** A guest whose data was set up in another browser: sign out, or delete the account. */
-export const Guest: Story = {
-  args: { kind: "guest", onDeleteAccount: fn(async () => true), onPair: fn() },
-  play: async ({ canvasElement, args }) => {
-    const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole("heading", { level: 1, name: "Tus datos no se pueden abrir aquí" }),
-    ).toBeVisible();
-    // Pairing needs no recovery key: a guest can be approved from the device that has the data.
-    const pair = canvas.getByRole("button", { name: "Aprobar desde otro dispositivo" });
-    await expectTarget(pair);
-    await userEvent.click(pair);
-    await expect(args.onPair).toHaveBeenCalledTimes(1);
-    await expect(canvas.queryByRole("button", { name: "Reintentar" })).toBeNull();
-    await expect(canvas.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Eliminar esta cuenta" }));
-    await expect(canvas.getByText(/No se puede deshacer/)).toBeVisible();
-    await expect(args.onDeleteAccount).not.toHaveBeenCalled();
-    const confirm = canvas.getByRole("button", { name: "Sí, eliminarla" });
-    await expectTarget(confirm);
-    await userEvent.click(confirm);
-    await expect(args.onDeleteAccount).toHaveBeenCalledTimes(1);
-  },
-};
-
-export const GuestDeleteFailed: Story = {
-  args: { kind: "guest", onDeleteAccount: fn(async () => false) },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Eliminar esta cuenta" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Sí, eliminarla" }));
-    await expect(await canvas.findByRole("alert")).toHaveTextContent("No pudimos eliminarla");
-    await userEvent.click(canvas.getByRole("button", { name: "Cancelar" }));
-    await expect(canvas.getByRole("button", { name: "Eliminar esta cuenta" })).toBeVisible();
-  },
-};
-
 export const Offline: Story = {
-  args: { kind: "offline", onPair: fn() },
+  args: { kind: "offline" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { level: 1, name: "Sin conexión" })).toBeVisible();
-    // Only a guest is offered pairing here; others pair from Unlock.
+    // Pairing is Unlock's; Locked only retries or signs out.
     await expect(
       canvas.queryByRole("button", { name: "Aprobar desde otro dispositivo" }),
     ).toBeNull();

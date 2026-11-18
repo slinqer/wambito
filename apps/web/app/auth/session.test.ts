@@ -252,4 +252,18 @@ describe("signed-out loads", () => {
       null,
     );
   });
+
+  it("a signed-in load tells onSignedIn who it is (the ephemeral sweep); a failing one never blocks", async () => {
+    const seen: string[] = [];
+    const { requireSession } = createGuards({
+      getSession: async () => user("2026-01-01"),
+      mode: () => "live",
+      onSignedIn: async (who) => {
+        seen.push(who.id);
+        throw new Error("blocked");
+      },
+    });
+    const who = await requireSession("/app");
+    expect(seen).toEqual([who.id]);
+  });
 });

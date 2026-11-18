@@ -26,8 +26,11 @@ import {
   listWraps,
   migrateLegacyKeys,
   putJson,
+  putVerifier,
   recordKeyName,
   refreshKeys,
+  type VerifierBody,
+  verifierBodyOf,
   type WrapDto,
   withDataKey,
 } from "./keys.ts";
@@ -190,6 +193,9 @@ export async function rotateKeys(
     }
     const recoveryKey = "fresh" in options.recovery ? formatRecoveryKey(secret) : null;
     const recoverySecret = secret;
+    // A new key's verifier follows its wrap (the server deleted the old one with the old wrap);
+    // the typed key keeps the one it has.
+    const verifier = recoveryKey === null ? null : await verifierBodyOf(secret);
     const revoked = new Set([...(await revokedDevices(userId)), ...options.remove]);
     // Holds every version up to the account's current one first: `withDataKey` alone would accept
     // a verified wrap above the held current without keeping the versions in between.
@@ -296,6 +302,7 @@ export async function rotateKeys(
     }
 
     let posted = false;
+    let verifierSent = false;
     let done: RotateResult | null = null;
     let running: Promise<RotateResult> | null = null;
 
@@ -317,7 +324,13 @@ export async function rotateKeys(
         }
         posted = true;
       }
+      // Kept here before the verifier: a failed PUT never leaves this browser without the new
+      // version the server already holds. A retry keeps again (idempotent) and puts it again.
       await keepRotated(userId, prepared.keyV, prepared.keys, options.remove);
+      if (verifier && !verifierSent) {
+        await putVerifier(options, verifier);
+        verifierSent = true;
+      }
       done = { keyV: prepared.keyV, dropped: prepared.dropped };
       return done;
     }
@@ -411,6 +424,7 @@ export async function newRecoveryKey(
   const secret = newRecoverySecret();
   try {
     const recoveryKey = formatRecoveryKey(secret);
+    const verifier: VerifierBody = await verifierBodyOf(secret);
     const body = await withDataKey(options, async (dataKey, keyV) => ({
       kind: "recovery",
       keyV,
@@ -435,11 +449,19 @@ export async function newRecoveryKey(
         if (refused || !(await landed())) throw error;
       }
     }
+    let wrapSent = false;
     let sent: Promise<void> | null = null;
     return {
       recoveryKey,
       commit() {
-        sent ??= send().catch((error) => {
+        sent ??= (async () => {
+          if (!wrapSent) {
+            await send();
+            wrapSent = true;
+          }
+          // After the wrap: the server deleted the old key's verifier with the old wrap.
+          await putVerifier(options, verifier);
+        })().catch((error) => {
           sent = null;
           throw error;
         });

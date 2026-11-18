@@ -213,7 +213,7 @@ export const Guest: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await expect(canvas.getByRole("region", { name: "Guarda tu progreso" })).toBeVisible();
+    await expect(canvas.getByRole("region", { name: "Primero agrega un email" })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Permitir" })).toBeNull();
     await userEvent.click(canvas.getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(args.decide).toHaveBeenCalledWith(false, FULL.slice(1)));
@@ -227,7 +227,9 @@ export const GuestRefused: Story = {
     const canvas = within(canvasElement);
     await title(canvas);
     await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
-    await expect(await canvas.findByRole("region", { name: "Guarda tu progreso" })).toBeVisible();
+    await expect(
+      await canvas.findByRole("region", { name: "Primero agrega un email" }),
+    ).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Permitir" })).toBeNull();
     await expect(args.go).not.toHaveBeenCalled();
   },

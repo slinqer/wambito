@@ -34,7 +34,7 @@ function Card({
 }
 
 /**
- * The user counts that lead the home (spec §6): accounts, with email, guests, active in the last
+ * The user counts that lead the home (spec §6): accounts, with email, without email, active in the last
  * 30 days, and the sign-ups of the last 7 days with the 7 before them beside.
  */
 export function MetricCards({ metrics }: { metrics: AdminMetrics }) {

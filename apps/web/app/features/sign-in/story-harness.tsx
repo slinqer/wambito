@@ -4,10 +4,20 @@ import { fn } from "storybook/test";
 import { exposeStoryFetch } from "../../../.storybook/parity.ts";
 import { ApiProvider } from "../../api/ApiProvider.tsx";
 import type { PasskeyOutcome } from "../../auth/passkey.ts";
+import { realClock } from "../../local/relay.ts";
+import type { WebSignin } from "../../local/signin.ts";
 import { ToastProvider } from "../../ui/Toast.tsx";
-import type { AuthFailure, AuthResult, AuthUser, CodeHints, SignInAuth } from "./auth.ts";
+import type {
+  AuthFailure,
+  AuthResult,
+  AuthUser,
+  CodeHints,
+  RecoveryResult,
+  SignInAuth,
+} from "./auth.ts";
 import { PasskeyOffer, type PasskeyOfferApi } from "./PasskeyOffer.tsx";
-import { SignIn } from "./SignIn.tsx";
+import { type QrFactory, type QrPage, SignIn } from "./SignIn.tsx";
+import { createQrSignin, type QrSignin } from "./signin-model.ts";
 import { Verify } from "./Verify.tsx";
 
 /** The code the fake backend accepts. */
@@ -28,11 +38,39 @@ export const ONBOARDED_USER: AuthUser = {
 export const ok = <T,>(data: T): AuthResult<T> => ({ data, error: null });
 export const fail = (error: AuthFailure): AuthResult<never> => ({ data: null, error });
 
+const never = <T,>() => new Promise<T>(() => {});
+
+/** A sign-in request no phone answers: code `ABCDEFGH`. */
+export function unansweredRequest(): WebSignin {
+  return {
+    id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+    code: "ABCDEFGH",
+    qr: "wambito://signin?id=0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b&key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    expiresAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    number: never,
+    ready: never,
+    finish: never,
+    cancel: () => {},
+  };
+}
+
+/** The real QR model over a fake `startSignin` whose request no phone answers. */
+export function liveQr(page?: QrPage): QrSignin {
+  return createQrSignin({
+    start: async () => unansweredRequest(),
+    label: "Firefox on macOS",
+    clock: realClock,
+    visible: page?.visible ?? (() => true),
+    onVisibility: page?.onVisibility ?? (() => () => {}),
+  });
+}
+
 /**
  * A stand-in for Better Auth: `sendCode` always works, `verifyCode` accepts `GOOD_CODE` (and says
  * INVALID_OTP otherwise), passkeys are off unless a story turns them on, no passkey has been used
  * in this browser, the autofill request never ends (nobody picks a passkey) and no passkey offer
- * is due. Every method is a spy.
+ * is due; the recovery key is never one the server knows, and no phone answers the QR. Every
+ * method is a spy.
  */
 export function fakeAuth(overrides: Partial<SignInAuth> & { user?: AuthUser } = {}): SignInAuth {
   const { user = NEW_USER, ...rest } = overrides;
@@ -46,6 +84,10 @@ export function fakeAuth(overrides: Partial<SignInAuth> & { user?: AuthUser } = 
     signInWithPasskey: fn(async () => ok(user)),
     autofillPasskey: fn(() => new Promise<AuthResult<AuthUser>>(() => {})),
     shouldOfferPasskey: fn(async (_userId: string) => false),
+    signInWithRecoveryKey: fn(
+      async (_text: string): Promise<RecoveryResult> => ({ error: "recovery_key_invalid" }),
+    ),
+    startQrSignin: fn(async () => unansweredRequest()),
     ...rest,
   };
 }
@@ -108,6 +150,8 @@ export interface SignInStageProps {
   resendDelayMs?: number;
   /** The browser's user agent, for the screens that differ on Android; the real one by default. */
   userAgent?: string;
+  /** The QR panel's model; `liveQr` (no phone answers) by default. */
+  qr?: QrFactory;
 }
 
 /**
@@ -122,6 +166,7 @@ export function SignInStage({
   onPatchMe = () => {},
   resendDelayMs,
   userAgent,
+  qr = liveQr,
 }: SignInStageProps) {
   const [fetchImpl] = useState(() => exposeStoryFetch(profileFetch(profileUser, onPatchMe)));
   const [fallbackOffer] = useState(() => fakeOffer());
@@ -133,9 +178,14 @@ export function SignInStage({
             <Route
               path="/sign-in"
               element={
-                <SignIn auth={auth} {...(resendDelayMs !== undefined ? { resendDelayMs } : {})} />
+                <SignIn
+                  auth={auth}
+                  qr={qr}
+                  {...(resendDelayMs !== undefined ? { resendDelayMs } : {})}
+                />
               }
             />
+            <Route path="/create-account" element={<SignIn auth={auth} mode="create" qr={qr} />} />
             <Route
               path="/auth/verify"
               element={<Verify auth={auth} {...(userAgent !== undefined ? { userAgent } : {})} />}

@@ -255,7 +255,41 @@
     "resend_in": "Reenviar en {seconds} s",
     "resent": "Te mandamos un código nuevo.",
     "change_email": "Usar otro correo",
-    "wait": "Espera {seconds} s"
+    "wait": "Espera {seconds} s",
+    "qr": {
+      "title": "Entra con tu celular",
+      "lead": "Escanéalo con Wambito en tu celular: Ajustes → Seguridad → Entrar en la web",
+      "opening": "Preparando un código…",
+      "code_label": "O escribe este código",
+      "remember": "Mantener la sesión abierta en este navegador",
+      "remember_off": "No queda nada en este computador cuando cierres el navegador",
+      "number": "Si tu celular muestra un número, debe ser {number}",
+      "finishing": "Abriendo tus datos…",
+      "expired_title": "Este código caducó",
+      "expired_lead": "Un código dura 2 minutos. Pide otro.",
+      "failed_title": "No se pudo entrar",
+      "tampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+      "offline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a tenerla.",
+      "server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+      "suspended": "Tu cuenta está suspendida. Escríbenos a privacy@wambito.com.",
+      "too_many": "Demasiados códigos desde aquí. Wambi pide otro a las {time}.",
+      "retry": "Reintentar"
+    },
+    "other_ways": "Otras formas de entrar",
+    "qr_on_computer": "¿Entras en un computador? Escanéalo con tu celular.",
+    "recovery": {
+      "open": "Clave de recuperación",
+      "label": "Tu clave de recuperación",
+      "submit": "Entrar con la clave",
+      "busy": "Entrando…",
+      "too_many": "Demasiados intentos seguidos. Wambi te deja probar otra vez en un momento."
+    },
+    "create": {
+      "meta_title": "Crear cuenta · Wambito",
+      "title": "Crea tu cuenta",
+      "lead": "Sin contraseñas: te mandamos un código a tu correo.",
+      "have_account": "¿Ya tienes cuenta? <link>Entra</link>"
+    }
   },
   "verify": {
     "meta_title": "Entrando · Wambito",
@@ -670,10 +704,51 @@
       "turn_on_failed": "No pudimos activarla. Inténtalo otra vez.",
       "turn_on_no_prf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo."
     },
+    "protect": {
+      "title": "Protege tus datos",
+      "lead": "Tus datos viven cifrados en tus dispositivos. Si pierdes este sin una forma de volver, nadie puede abrirlos, ni siquiera yo. Toma un minuto.",
+      "count": "{done} de 2",
+      "done": "Hecho",
+      "steps_label": "Pasos para proteger tus datos",
+      "recovery_title": "Clave de recuperación",
+      "recovery_lead": "Con ella abres tus datos en cualquier teléfono o en la web.",
+      "recovery_action": "Guarda una clave de recuperación",
+      "recovery_saved": "Listo: tu clave de recuperación quedó guardada.",
+      "recovery_failed": "No pudimos crear la clave. Inténtalo otra vez.",
+      "recovery_rotated": "Tus claves cambiaron en otro dispositivo mientras tanto. Crea la clave otra vez.",
+      "passkey_title": "Huella",
+      "passkey_lead": "Tu huella o tu cara abren tus datos aquí y en tus otros dispositivos.",
+      "passkey_action": "Agrega una huella",
+      "passkey_adding": "Esperando tu huella…",
+      "passkey_added": "Listo: tu huella también abre tus datos.",
+      "passkey_failed": "No pudimos guardar tu huella. Inténtalo otra vez.",
+      "no_prf": "Esta huella te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
+      "link_failed": "No pudimos vincular esta huella a tus datos. Inténtalo otra vez con «Activar» en «Entrar con tu huella».",
+      "email_title": "Crea tu cuenta (agrega un email)",
+      "email_lead": "Con un email entras en la web con un código, conectas asistentes y vuelves a entrar si pierdes tu huella.",
+      "email_action": "Agrega un email"
+    },
+    "add_email": {
+      "title": "Crea tu cuenta",
+      "lead": "Escribe tu email y te mandamos un código de 6 dígitos. Tus datos y tus claves siguen siendo los mismos.",
+      "email_label": "Tu email",
+      "email_placeholder": "ana@ejemplo.com",
+      "send": "Enviar código",
+      "sending": "Enviando…",
+      "code_title": "Revisa tu email",
+      "code_lead": "Mandamos un código de 6 dígitos a <strong>{email}</strong>. Escríbelo aquí.",
+      "confirm": "Confirmar",
+      "confirming": "Confirmando…",
+      "resend": "Reenviar código",
+      "resent": "Te mandamos un código nuevo.",
+      "change_email": "Usar otro email",
+      "cancel": "Ahora no",
+      "done": "Listo: tu cuenta ya tiene email.",
+      "taken": "Este email ya tiene una cuenta de Wambito. Abre Wambito en tu teléfono para traer estos datos a ella."
+    },
     "security": {
       "title": "Seguridad",
       "lead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
-      "guest_lead": "Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo.",
       "this_browser": "Este navegador",
       "unnamed": "Dispositivo",
       "added": "Agregado el {date}",
@@ -814,8 +889,8 @@
     "wrap_failed": "Se permitió, pero su clave no se guardó, así que todavía no puede leer nada.",
     "try_again": "Reintentar",
     "guest": {
-      "title": "Guarda tu progreso",
-      "body": "Para conectar un asistente, primero guarda tu progreso con tu correo: en la app de Wambito, toca «Guarda tu progreso». Luego vuelve a conectarlo desde tu asistente."
+      "title": "Primero agrega un email",
+      "body": "Para conectar un asistente, tu cuenta necesita un email. Ve a Ajustes → «Protege tus datos» y toca «Agrega un email», en la app o aquí en la web. Luego vuelve a conectarlo desde tu asistente."
     },
     "expired": {
       "title": "Este enlace ya no sirve",
@@ -893,6 +968,16 @@
       "passkey": "Usar una llave de acceso",
       "pair": "Desde otro dispositivo"
     },
+    "install": {
+      "title": "Wambito vive en tu teléfono",
+      "lead": "Anota un gasto en dos toques, con la voz o desde una notificación del banco. Tus datos ya están cifrados: la app los abre contigo.",
+      "android": "Descargar para Android",
+      "release": "Ver la versión en GitHub",
+      "play": "Google Play",
+      "fdroid": "F-Droid",
+      "app_store": "App Store",
+      "continue": "Continuar en el navegador"
+    },
     "locked": {
       "title": "No pudimos abrir tus datos",
       "lead": "Siguen a salvo. Inténtalo de nuevo.",
@@ -901,16 +986,7 @@
       "retry": "Reintentar",
       "retrying": "Reintentando…",
       "unsupported_title": "Este navegador no puede guardar tu clave",
-      "unsupported_lead": "Para cuidar tus datos, Wambito necesita un navegador que guarde la clave de forma segura. Actualiza tu navegador o abre Wambito en otro.",
-      "guest_title": "Tus datos no se pueden abrir aquí",
-      "guest_lead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allí. Apruébalo desde ese dispositivo, o cierra sesión.",
-      "guest_pair": "Aprobar desde otro dispositivo",
-      "delete_account": "Eliminar esta cuenta",
-      "delete_lead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
-      "delete_confirm": "Sí, eliminarla",
-      "deleting": "Eliminando…",
-      "delete_failed": "No pudimos eliminarla. Inténtalo de nuevo.",
-      "delete_cancel": "Cancelar"
+      "unsupported_lead": "Para cuidar tus datos, Wambito necesita un navegador que guarde la clave de forma segura. Actualiza tu navegador o abre Wambito en otro."
     },
     "passkey_second_touch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados.",
     "pair": {

@@ -418,6 +418,10 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
       serial(async () => {
         state.meta.set(key, clone(value));
       }),
+    deleteMeta: (key) =>
+      serial(async () => {
+        state.meta.delete(key);
+      }),
     quarantine: (entry) =>
       serial(async () => {
         state.quarantine.set(quarantineKey(entry), clone(entry));

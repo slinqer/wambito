@@ -30,7 +30,7 @@
       "cards": {
         "total": "Cuentas",
         "with_email": "Con correo",
-        "guests": "Invitados",
+        "guests": "Sin correo",
         "active": "Activas en 30 días",
         "signups": "Altas en 7 días",
         "previous": "Los 7 días anteriores: {count}"
@@ -39,9 +39,45 @@
         "title": "Altas por semana",
         "subtitle": "Las últimas 12 semanas, de lunes a domingo (UTC).",
         "with_email": "Con correo",
-        "guests": "Invitados",
+        "guests": "Sin correo",
         "week": "Semana",
         "week_of": "{date}"
+      },
+      "activity": {
+        "daily": {
+          "title": "Personas activas por día",
+          "subtitle": "Personas que abrieron la app cada día, los últimos 90 días.",
+          "count": "Personas activas",
+          "day": "Día"
+        },
+        "cohorts": {
+          "title": "Cohortes",
+          "subtitle": "Cuentas por semana de alta y cuántas volvieron al menos una vez a las 1, 4 y 12 semanas.",
+          "week": "Semana de alta",
+          "size": "Cuentas",
+          "week1": "Semana 1",
+          "week4": "Semana 4",
+          "week12": "Semana 12",
+          "at_least": "al menos {count}",
+          "none": "—",
+          "empty": "Aún no hay cohortes."
+        },
+        "installs": {
+          "title": "Instalaciones por plataforma",
+          "platforms": {
+            "android": "Android",
+            "ios": "iOS",
+            "web": "Web",
+            "unknown": "Desconocida"
+          }
+        },
+        "versions": {
+          "title": "Versiones",
+          "platform": "Plataforma",
+          "version": "Versión",
+          "users": "Personas",
+          "empty": "Aún no hay versiones."
+        }
       },
       "suspended": "Cuentas suspendidas: {count}",
       "audit": {

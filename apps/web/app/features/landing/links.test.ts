@@ -14,33 +14,33 @@ import {
 const APP = "https://app.wambito.com";
 
 describe("appLinkProps", () => {
-  it("leads to sign-in in the visitor's language when the app exists", () => {
-    expect(appLinkProps("es", false)).toEqual({ to: "/sign-in?lang=es" });
-    expect(appLinkProps("en", false)).toEqual({ to: "/sign-in?lang=en" });
+  it("leads to create-account or sign-in in the visitor's language when the app exists", () => {
+    expect(appLinkProps("es", "create", false)).toEqual({ to: "/create-account?lang=es" });
+    expect(appLinkProps("en", "create", false)).toEqual({ to: "/create-account?lang=en" });
+    expect(appLinkProps("es", "sign-in", false)).toEqual({ to: "/sign-in?lang=es" });
+    expect(appLinkProps("en", "sign-in", false)).toEqual({ to: "/sign-in?lang=en" });
   });
 
-  it("leads to the GitHub repo, in a new tab, in landing-only mode without an app URL", () => {
+  it("leads to the GitHub repo, in a new tab, for both doors in landing-only mode without an app URL", () => {
     for (const locale of ["es", "en", "it", "pt"] as const) {
-      expect(appLinkProps(locale, true)).toEqual({
-        to: GITHUB_HREF,
-        target: "_blank",
-        rel: "noopener",
-      });
-      expect(appLinkProps(locale, true, undefined)).toEqual({
-        to: GITHUB_HREF,
-        target: "_blank",
-        rel: "noopener",
-      });
+      for (const door of ["create", "sign-in"] as const) {
+        const github = { to: GITHUB_HREF, target: "_blank", rel: "noopener" };
+        expect(appLinkProps(locale, door, true)).toEqual(github);
+        expect(appLinkProps(locale, door, true, undefined)).toEqual(github);
+      }
     }
   });
 
-  it("leads to the live app's sign-in, in the visitor's language, in landing-only mode with an app URL", () => {
-    expect(appLinkProps("es", true, APP)).toEqual({ to: `${APP}/sign-in?lang=es` });
-    expect(appLinkProps("en", true, APP)).toEqual({ to: `${APP}/sign-in?lang=en` });
+  it("prefixes the live app's origin in landing-only mode with an app URL", () => {
+    expect(appLinkProps("es", "create", true, APP)).toEqual({
+      to: `${APP}/create-account?lang=es`,
+    });
+    expect(appLinkProps("en", "sign-in", true, APP)).toEqual({ to: `${APP}/sign-in?lang=en` });
   });
 
-  it("ignores the app URL outside landing-only mode: the app's own sign-in route is used", () => {
-    expect(appLinkProps("es", false, APP)).toEqual({ to: "/sign-in?lang=es" });
+  it("ignores the app URL outside landing-only mode: the app's own routes are used", () => {
+    expect(appLinkProps("es", "create", false, APP)).toEqual({ to: "/create-account?lang=es" });
+    expect(appLinkProps("es", "sign-in", false, APP)).toEqual({ to: "/sign-in?lang=es" });
   });
 });
 

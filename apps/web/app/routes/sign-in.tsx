@@ -15,7 +15,10 @@ export function HydrateFallback() {
   return <div className="lk-screen min-h-dvh" />;
 }
 
-/** `/sign-in`: email code or magic link, or a passkey. */
+/**
+ * `/sign-in`: the QR for the phone to approve, then the other ways (a passkey, the recovery key,
+ * the email code or magic link); on a phone the other ways come first (web plan ruling 12).
+ */
 export default function SignInRoute() {
   return <SignIn auth={liveSignInAuth} />;
 }

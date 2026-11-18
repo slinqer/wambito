@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { KeysError } from "../../local/keys.ts";
+import { SigninError, type WebSignin } from "../../local/signin.ts";
 import {
   authErrorKey,
+  createSessionSafeAuth,
   destinationAfterSignIn,
   langFrom,
+  offersPasskey,
   passkeyErrorKey,
   retryAfterSeconds,
   signInLocale,
@@ -126,5 +130,109 @@ describe("signInLocale", () => {
     expect(signInLocale(null, "es-CO")).toBe("es");
     expect(signInLocale(null, "en-GB")).toBe("en");
     expect(signInLocale("fr", "es-ES")).toBe("es");
+  });
+});
+
+describe("offersPasskey", () => {
+  it("a qr or recovery sign-in never offers a passkey", () => {
+    expect(offersPasskey("qr", "/app")).toBe(false);
+    expect(offersPasskey("recovery", "/app")).toBe(false);
+    expect(offersPasskey("passkey", "/app")).toBe(false);
+    expect(offersPasskey("email", "/app")).toBe(true);
+    expect(offersPasskey("email", "/oauth/consent?client_id=abc")).toBe(false);
+  });
+});
+
+describe("createSessionSafeAuth", () => {
+  it("a recovery sign-in whose unlock fails after the 200 signs out; one refused before it does not", async () => {
+    const signOut = vi.fn(async () => {});
+    const auth = createSessionSafeAuth({
+      signOut,
+      startSignin: vi.fn() as never,
+      signInWithRecoveryKey: async (text, deps) => {
+        const response = await (deps?.fetch ?? fetch)("/api/v2/recovery/sign-in", {
+          method: "POST",
+        });
+        if (!response.ok) throw new KeysError("recovery_key_invalid", 401);
+        throw new KeysError(text === "unlock fails" ? "wrong_recovery_key" : "server");
+      },
+      fetch: async () => new Response(null, { status: 200 }),
+    });
+    expect(await auth.signInWithRecoveryKey("unlock fails")).toEqual({
+      error: "wrong_recovery_key",
+    });
+    expect(signOut).toHaveBeenCalledTimes(1);
+    const refused = createSessionSafeAuth({
+      signOut,
+      startSignin: vi.fn() as never,
+      signInWithRecoveryKey: async (_text, deps) => {
+        const response = await (deps?.fetch ?? fetch)("/api/v2/recovery/sign-in", {
+          method: "POST",
+        });
+        if (!response.ok) throw new KeysError("recovery_key_invalid", 401);
+        return { userId: "u-1", keys: {} as never };
+      },
+      fetch: async () => new Response(null, { status: 401 }),
+    });
+    expect(await refused.signInWithRecoveryKey("x")).toEqual({ error: "recovery_key_invalid" });
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("a refused recovery sign-in reads its code and retry-after, and leaves no sign-out", async () => {
+    const signOut = vi.fn(async () => {});
+    const auth = createSessionSafeAuth({
+      signOut,
+      startSignin: vi.fn() as never,
+      signInWithRecoveryKey: async () => {
+        throw new KeysError("too_many_requests", 429, 30);
+      },
+      fetch: async () => new Response(null, { status: 429 }),
+    });
+    expect(await auth.signInWithRecoveryKey("x")).toEqual({
+      error: "too_many_requests",
+      retryAfterS: 30,
+    });
+    await expect(
+      createSessionSafeAuth({
+        signOut,
+        startSignin: vi.fn() as never,
+        signInWithRecoveryKey: async () => ({ userId: "u-1", keys: {} as never }),
+        fetch: async () => new Response(null, { status: 200 }),
+      }).signInWithRecoveryKey("good"),
+    ).resolves.toEqual({ userId: "u-1" });
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("a qr sign-in whose finish fails after the pickup answered signs out; one that fails before does not", async () => {
+    const signOut = vi.fn(async () => {});
+    const fake = (pickupStatus: number) =>
+      createSessionSafeAuth({
+        signOut,
+        signInWithRecoveryKey: vi.fn() as never,
+        fetch: async () => new Response(null, { status: pickupStatus }),
+        startSignin: async (options) =>
+          ({
+            id: "id",
+            code: "ABCDEFGH",
+            qr: "wambito://signin?id=id&key=k",
+            expiresAt: "",
+            number: async () => "123456",
+            ready: async () => {},
+            finish: async () => {
+              const response = await (options.fetch ?? fetch)("/api/v2/signin/id/pickup", {
+                method: "POST",
+              });
+              if (!response.ok) throw new SigninError("expired");
+              throw new KeysError("server", 500);
+            },
+            cancel: () => {},
+          }) satisfies WebSignin,
+      });
+    const after = await fake(200).startQrSignin({ remember: true, label: "Web" });
+    await expect(after.finish()).rejects.toBeInstanceOf(KeysError);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    const before = await fake(404).startQrSignin({ remember: true, label: "Web" });
+    await expect(before.finish()).rejects.toBeInstanceOf(SigninError);
+    expect(signOut).toHaveBeenCalledTimes(1);
   });
 });

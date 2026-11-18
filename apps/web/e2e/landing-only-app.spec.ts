@@ -22,7 +22,7 @@ const LOCALES = [
   {
     locale: "es",
     path: "/",
-    cta: "Empieza ahora",
+    cta: "Crear cuenta",
     demoCta: "Demo",
     navCta: "Entrar",
     soon: "Pronto",
@@ -37,7 +37,7 @@ const LOCALES = [
   {
     locale: "en",
     path: "/en",
-    cta: "Get started",
+    cta: "Create account",
     demoCta: "Demo",
     navCta: "Sign in",
     soon: "Soon",
@@ -62,9 +62,13 @@ async function expectNoA11yViolations(page: Page) {
   ).toEqual([]);
 }
 
-/** A link to the live app: its sign-in, in the page's language, in the same tab. */
-async function expectAppLink(link: ReturnType<Page["locator"]>, locale: string) {
-  await expect(link).toHaveAttribute("href", `${APP}/sign-in?lang=${locale}`);
+/** A link to a door of the live app, in the page's language, in the same tab. */
+async function expectAppLink(
+  link: ReturnType<Page["locator"]>,
+  locale: string,
+  door: "sign-in" | "create-account",
+) {
+  await expect(link).toHaveAttribute("href", `${APP}/${door}?lang=${locale}`);
   await expect(link).not.toHaveAttribute("target", /.+/);
   await expect(link.locator(".sr-only")).toHaveCount(0);
   expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
@@ -88,11 +92,13 @@ for (const l of LOCALES) {
       ]);
     });
 
-    test("the hero and closing calls to action open the app's sign-in", async ({ page }) => {
+    test("the hero and closing calls to action open the app's create-account page", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       for (const section of ["#hero", "#closing"]) {
         const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-        await expectAppLink(link, l.locale);
+        await expectAppLink(link, l.locale, "create-account");
         await expect(link).toHaveClass(/lk-btn-primary/);
         await expect(link).not.toHaveClass(/is-soon/);
       }
@@ -102,7 +108,7 @@ for (const l of LOCALES) {
       await page.goto(l.path);
       const nav = page.getByRole("banner").getByRole("navigation");
       const link = nav.getByRole("link", { name: l.navCta, exact: true });
-      await expectAppLink(link, l.locale);
+      await expectAppLink(link, l.locale, "sign-in");
       await expect(link).toHaveClass(/lk-btn-secondary/);
       // The language switch, then the day/night switch.
       await expect(nav.getByRole("button")).toHaveCount(2);
@@ -143,14 +149,21 @@ for (const l of LOCALES) {
       expect(text).not.toMatch(/Luk(?:itas)|\bLuk(?:as)\b/);
     });
 
-    test("every link to sign-in leaves for the app origin; none is relative", async ({ page }) => {
+    test("every link to a door leaves for the app origin; none is relative", async ({ page }) => {
       await page.goto(l.path);
       const hrefs = await page
         .locator("a[href]")
         .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
-      const toApp = hrefs.filter((href) => /(^|\/)(sign-in|app|welcome)(\/|\?|#|$)/.test(href));
-      // Hero, header, the agent's "connect" and closing.
-      expect(toApp).toEqual(Array(4).fill(`${APP}/sign-in?lang=${l.locale}`));
+      const toApp = hrefs.filter((href) =>
+        /(^|\/)(sign-in|create-account|app|welcome)(\/|\?|#|$)/.test(href),
+      );
+      // Hero, the agent's "connect" and closing create an account; the header signs in.
+      expect(toApp.sort()).toEqual(
+        [
+          ...Array(3).fill(`${APP}/create-account?lang=${l.locale}`),
+          `${APP}/sign-in?lang=${l.locale}`,
+        ].sort(),
+      );
     });
 
     test("the closing section is honest: anyone can create an account", async ({ page }) => {
@@ -171,7 +184,11 @@ for (const l of LOCALES) {
     test("the roadmap's header opens the app too", async ({ page }) => {
       await page.goto(ROADMAP_PATH[l.locale]);
       const nav = page.getByRole("banner").getByRole("navigation");
-      await expectAppLink(nav.getByRole("link", { name: l.navCta, exact: true }), l.locale);
+      await expectAppLink(
+        nav.getByRole("link", { name: l.navCta, exact: true }),
+        l.locale,
+        "sign-in",
+      );
     });
 
     test.describe(() => {
@@ -232,7 +249,7 @@ for (const l of LOCALES) {
         await expectNoA11yViolations(page);
         for (const section of ["#hero", "#closing"]) {
           const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-          await expect(link).toHaveAttribute("href", `${APP}/sign-in?lang=${l.locale}`);
+          await expect(link).toHaveAttribute("href", `${APP}/create-account?lang=${l.locale}`);
         }
         expect(errors).toEqual([]);
       });

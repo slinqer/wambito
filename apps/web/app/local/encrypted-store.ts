@@ -478,6 +478,10 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       short([META], "readwrite", async (tx) => {
         await request(tx.objectStore(META).put(value, key));
       }),
+    deleteMeta: (key) =>
+      short([META], "readwrite", async (tx) => {
+        await request(tx.objectStore(META).delete(key));
+      }),
     quarantine: (entry) =>
       short([QUARANTINE], "readwrite", async (tx) => {
         await request(tx.objectStore(QUARANTINE).put(entry));

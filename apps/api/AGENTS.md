@@ -193,6 +193,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
   throttle; the root compose lists it in `ADMIN_USER_IDS`. CI runs it before the web e2e.
+- `src/scripts/seed-e2e-plain-user.ts` (`seed:e2e-plain-user <email> [es|en|it|pt]`): inserts a
+  plain web user (email verified, not onboarded) with `giveStarterData` (`src/services/starter-data.ts`,
+  the default account and suggested categories the user-create hook gives a plain sign-up); an
+  existing email is left alone. The web e2e (stack with `NEW_USERS_ENCRYPTED=true`) seeds its
+  plain users with it.
 
 ## Talks to
 

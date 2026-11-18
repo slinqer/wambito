@@ -31,7 +31,7 @@ const leaveTo = (url: string) => window.location.assign(url);
 export interface ConsentProps {
   /** Better Auth's oauth-provider by default; stories stand in for it. */
   api: ConsentApi;
-  /** A guest (no email yet): the API refuses them, so they are asked to save their progress. */
+  /** A guest (no email yet): the API refuses them, so they are asked to add one first. */
   guest: boolean;
   /** Follows the URL the answer returns; a full page load by default. */
   go?: (url: string) => void;
@@ -136,7 +136,8 @@ export function ConsentWrapFailed({
  * what it could do, in plain words per scope. Permitir and Cancelar post the signed query back
  * and follow where Better Auth says (the assistant, with a code or `access_denied`).
  *
- * A guest gets "Guarda tu progreso" instead of Permitir. A link that ran out (ten minutes) or was
+ * A guest gets "Primero agrega un email" (Settings → Protect your data → add an email, in the
+ * app or on the web) instead of Permitir. A link that ran out (ten minutes) or was
  * changed says to start again from the assistant. The heading takes the focus on arrival.
  */
 export function Consent({
