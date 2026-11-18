@@ -601,3 +601,20 @@ export const Phone: Story = {
     await expect(await canvas.findByRole("img", { name: "ABCDEFGH" })).toBeVisible();
   },
 };
+
+/** `/create-account` asks the browser for no passkey: it is for someone who has none yet. */
+export const CreateAccountNoAutofill: Story = {
+  name: "Create account, no passkey autofill",
+  args: {
+    initialEntry: "/create-account?lang=es",
+    auth: fakeAuth({ passkeysAvailable: () => true, passkeyUsedHere: () => true }),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 1, name: "Crea tu cuenta" })).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "Tu correo" })).toBeVisible();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await expect(args.auth.autofillPasskey).not.toHaveBeenCalled();
+    await expect(canvas.queryByRole("button", { name: "Entrar con huella" })).toBeNull();
+  },
+};

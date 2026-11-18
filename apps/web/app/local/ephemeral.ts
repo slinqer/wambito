@@ -25,6 +25,9 @@ function isEphemeral(name: string): Promise<boolean> {
       resolve(false);
       return;
     }
+    // Gone since it was listed (another sweep deleted it): never make it again, empty and at
+    // version 1, which a later `openVault` could not upgrade. Aborting ends in `onerror`.
+    open.onupgradeneeded = () => open.transaction?.abort();
     open.onerror = () => resolve(false);
     open.onblocked = () => resolve(false);
     open.onsuccess = () => {

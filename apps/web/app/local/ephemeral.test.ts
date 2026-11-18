@@ -64,4 +64,17 @@ describe("wipeForeignEphemeralVaults", () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it("a vault deleted between the listing and its read is never made again", async () => {
+    await clear();
+    await makeVault("ana", true);
+    const listed = await indexedDB.databases();
+    // another sweep (a parallel guard, another tab) deletes it first
+    await new Promise<void>((resolve) => {
+      const del = indexedDB.deleteDatabase(vaultName("ana"));
+      del.onsuccess = () => resolve();
+    });
+    await wipeForeignEphemeralVaults("bea", { databases: async () => listed });
+    expect(await names()).toEqual([]);
+  });
 });

@@ -369,7 +369,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the app layout with `redirectIfSignedIn`; web plan rulings 1, 3, 12–14): `SignIn({ auth, mode =
   "sign-in" | "create", qr? })` (`qr`: a `QrFactory(page) → QrSignin`, `liveQrFactory(auth)` by
   default, faked in stories). `sign-in` (in every build, no flag): the screen's own width decides
-  (`WIDE_PX` 768, measured on the screen root, starting from `window.innerWidth` so a computer's first render is already wide: moving the email field later ends Chrome's passkey autofill request): wide puts the QR panel first and "Other ways to sign
+  (`WIDE_PX` 768, measured on the screen root, starting from `document.documentElement.clientWidth` so a computer's first render is already wide: moving the email field later ends Chrome's passkey autofill request): wide puts the QR panel first and "Other ways to sign
   in" beside it (fingerprint button, "Recovery key", the email form), narrow puts the other ways
   first and the QR under "Signing in on a computer? Scan it with your phone"; both are keyed, so the
   model survives a change of layout. `QrArea` makes the model only once the panel is on screen

@@ -293,12 +293,13 @@ export function SignIn({
       .catch(() => {});
   }, [auth]);
   useEffect(() => {
-    if (step !== "email" || !passkeys) return;
+    // `/create-account` is for someone with no passkey yet: nothing to ask the browser for
+    if (step !== "email" || !passkeys || mode === "create") return;
     startAutofill();
     return () => {
       generation.current += 1;
     };
-  }, [step, passkeys, startAutofill]);
+  }, [step, passkeys, mode, startAutofill]);
 
   function changeEmail() {
     focusEmailOnShow.current = true;
@@ -502,12 +503,13 @@ export function SignIn({
 
 /**
  * Whether the screen `el` is a computer's (`WIDE_PX` or wider), measured before paint. It starts
- * from the window's width (the screen spans it), so the first render is already right: moving the
- * email field in the page later would end the browser's passkey autofill request.
+ * from the page's width (`clientWidth`: the screen spans it), so the first render is already
+ * right: moving the email field later would end the browser's passkey autofill request.
  */
 function useWideScreen(el: HTMLElement | null): boolean {
   const [wide, setWide] = useState(
-    () => typeof window !== "undefined" && window.innerWidth >= WIDE_PX,
+    // the page's width without the scrollbar: what the screen root measures below
+    () => typeof document !== "undefined" && document.documentElement.clientWidth >= WIDE_PX,
   );
   useLayoutEffect(() => {
     if (!el) return;
