@@ -124,3 +124,20 @@ describe("settings revokedDevices", () => {
     expect(parseRecord("settings", { ...settings, revokedDevices: ["nope"] }).ok).toBe(false);
   });
 });
+
+describe("settings recoveryKeySavedAt", () => {
+  const settings = { s: 1, currency: "COP", locale: "es", timezone: "America/Bogota" };
+
+  test("settings without recoveryKeySavedAt parses to null", () => {
+    expect(parseRecord("settings", settings)).toMatchObject({
+      ok: true,
+      value: { recoveryKeySavedAt: null },
+    });
+  });
+
+  test("a timestamp is kept", () => {
+    expect(
+      parseRecord("settings", { ...settings, recoveryKeySavedAt: "2026-11-18T10:00:00.000Z" }),
+    ).toMatchObject({ ok: true, value: { recoveryKeySavedAt: "2026-11-18T10:00:00.000Z" } });
+  });
+});
