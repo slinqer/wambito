@@ -464,11 +464,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   shoots `/demo/insights` per language and theme into `public/landing/insights-*.webp` (the screen
   without the donut's ring) and `donut-*.webp` (the ring alone, which CSS sweeps in over it), and
   writes the ring's place to `app/features/landing/app-screen.gen.ts`. Generated: never edit them.
-- e2e: `E2E_NOW=2026-10-21T15:00:00Z docker compose up -d --build` (value from
-  `e2e/helpers.ts`), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
+- e2e: `E2E_NOW=2026-10-21T15:00:00Z NEW_USERS_ENCRYPTED=true docker compose up -d --build`
+  (the clock from `e2e/helpers.ts`; every new user born encrypted, as CI runs it), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
   `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).
 - e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
-  seed:admin` (`dev-admin`, admin spec) and `seed:e2e-preview` (`preview-e2e`,
+  seed:admin` (`dev-admin`, admin spec), `seed:e2e-plain-user <email> [lang]` (a plain user,
+  not onboarded, with the starter data; `signUpNewUser` runs it through `seedPlainUser` before
+  its email sign-in, so the plain-app specs test the plain app; `encrypted-sign-up.spec.ts` covers
+  the born-encrypted web sign-up) and `seed:e2e-preview` (`preview-e2e`,
   preview@wambito.test, the encrypted-preview account; `E2E_PREVIEW_USER_IDS` defaults to it in
   `docker-compose.yml`). `vault.spec.ts` runs `seed:e2e-preview` itself in `beforeAll`, which
   deletes and recreates the user (no records, key wraps or finance rows), so it needs the stack up

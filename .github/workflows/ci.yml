@@ -81,6 +81,9 @@ jobs:
     env:
       # The suite's "now" (apps/web/e2e/helpers.ts): the API's clock is pinned to it.
       E2E_NOW: "2026-10-21T15:00:00Z"
+      # Every new user is born encrypted, as after the switch; the plain-app specs seed plain users
+      # (`seed:e2e-plain-user`, through `signUpNewUser` in apps/web/e2e/helpers.ts).
+      NEW_USERS_ENCRYPTED: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

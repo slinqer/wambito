@@ -3,17 +3,14 @@ import { cimd } from "@better-auth/cimd";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { passkey } from "@better-auth/passkey";
-import { defaultCurrencyFor, isValidTimeZone, SUGGESTED_CATEGORIES } from "@wambito/core";
+import { defaultCurrencyFor, isValidTimeZone } from "@wambito/core";
 import {
-  accounts,
-  categories,
   emailThrottle,
   oauthRefreshToken,
   passkey as passkeyTable,
   schema,
   user as userTable,
   verification,
-  withUser,
 } from "@wambito/db";
 import { eq, sql } from "@wambito/db/orm";
 import { APIError, betterAuth } from "better-auth";
@@ -35,6 +32,7 @@ import {
   type SessionLifetime,
   SHORT_SESSION_SECONDS,
 } from "./services/sessions.ts";
+import { giveStarterData } from "./services/starter-data.ts";
 
 /** The session lifetimes (services/sessions.ts), in seconds. */
 export { LONG_SESSION_SECONDS, SESSION_SECONDS, SHORT_SESSION_SECONDS };
@@ -630,24 +628,7 @@ export function createAuth(deps: AppDeps) {
             )
               return;
             const { locale } = guestDefaults(headers);
-            await withUser(deps.db, created.id, async (tx) => {
-              await tx.insert(accounts).values({
-                userId: created.id,
-                name: "Main",
-                currency,
-                isDefault: true,
-              });
-              await tx.insert(categories).values(
-                SUGGESTED_CATEGORIES.map((suggestion, sortOrder) => ({
-                  userId: created.id,
-                  name: suggestion.names[locale],
-                  kind: suggestion.kind,
-                  icon: suggestion.glyph,
-                  color: suggestion.tint,
-                  sortOrder,
-                })),
-              );
-            });
+            await giveStarterData(deps.db, created.id, { currency, locale });
           },
         },
       },
