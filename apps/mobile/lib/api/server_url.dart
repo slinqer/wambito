@@ -66,12 +66,26 @@ Future<void> rememberNewUsersEncrypted(Uri server) async {
   }
 }
 
-/// [server] made a `plain` user after all (a provisional promotion found one): what was kept goes,
-/// so the next offline "Start" asks for the network again. Best effort.
-Future<void> forgetNewUsersEncrypted(Uri server) async {
+/// What is kept under [newUsersKeyOf] once [server] made a `plain` user (a provisional promotion
+/// found one): `plain <build> <day>`, so an offline "Start" asks for the network again, and the
+/// promotion probes that server (making an anonymous user each time) at most once a day per build.
+String _plainMark(String build, String day) => 'plain $build $day';
+
+/// [server] made a `plain` user on [day] (`yyyy-mm-dd`, local) for [build]. Best effort.
+Future<void> rememberNewUsersPlain(Uri server, {required String build, required String day}) async {
   try {
-    await appSecureStorage.delete(key: newUsersKeyOf(server));
+    await appSecureStorage.write(key: newUsersKeyOf(server), value: _plainMark(build, day));
   } on Object {
-    // Kept: the next promotion finds the plain user again and says so.
+    // The next promotion probes again.
+  }
+}
+
+/// Whether [server] was already found making `plain` users by this [build] on [day]: then the
+/// promotion does not probe it again (it would only make another empty user). Unreadable: false.
+Future<bool> newUsersPlainProbed(Uri server, {required String build, required String day}) async {
+  try {
+    return await appSecureStorage.read(key: newUsersKeyOf(server)) == _plainMark(build, day);
+  } on Object {
+    return false;
   }
 }

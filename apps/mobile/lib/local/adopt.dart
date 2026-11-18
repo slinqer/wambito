@@ -137,30 +137,27 @@ class AdoptDeps {
     required Future<void> Function(String token) keepToken,
     required Future<void> Function() forgetToken,
     Future<void> Function(String userId)? stopWrites,
-  }) => AdoptDeps(
-    auth: auth,
-    keys: keys,
-    network: network,
-    openStore: openStore,
-    lease: lease,
-    forgetVault: forgetVault,
-    now: now,
+  }) => _copy(
     keptToken: keptToken,
     keepToken: keepToken,
     forgetToken: forgetToken,
-    directory: directory,
-    factory: factory,
-    stopWrites: stopWrites ?? this.stopWrites,
-    onAdopted: onAdopted,
-    onWiped: onWiped,
-    mayResume: mayResume,
-    hasQueuedCaptures: hasQueuedCaptures,
-    listHolds: listHolds,
-    onStep: onStep,
+    stopWrites: stopWrites,
   );
 
   /// These deps with the session's part.
   AdoptDeps withSession({
+    Future<void> Function(String token, {required String fromUserId})? onAdopted,
+    Future<void> Function(String oldUserId)? onWiped,
+    Future<bool> Function(String oldUserId)? mayResume,
+    void Function(AdoptStep step)? onStep,
+  }) => _copy(onAdopted: onAdopted, onWiped: onWiped, mayResume: mayResume, onStep: onStep);
+
+  /// These deps, with what is given in place of their own.
+  AdoptDeps _copy({
+    Future<String?> Function()? keptToken,
+    Future<void> Function(String token)? keepToken,
+    Future<void> Function()? forgetToken,
+    Future<void> Function(String userId)? stopWrites,
     Future<void> Function(String token, {required String fromUserId})? onAdopted,
     Future<void> Function(String oldUserId)? onWiped,
     Future<bool> Function(String oldUserId)? mayResume,
@@ -173,12 +170,12 @@ class AdoptDeps {
     lease: lease,
     forgetVault: forgetVault,
     now: now,
-    keptToken: keptToken,
-    keepToken: keepToken,
-    forgetToken: forgetToken,
+    keptToken: keptToken ?? this.keptToken,
+    keepToken: keepToken ?? this.keepToken,
+    forgetToken: forgetToken ?? this.forgetToken,
     directory: directory,
     factory: factory,
-    stopWrites: stopWrites,
+    stopWrites: stopWrites ?? this.stopWrites,
     onAdopted: onAdopted ?? this.onAdopted,
     onWiped: onWiped ?? this.onWiped,
     mayResume: mayResume ?? this.mayResume,

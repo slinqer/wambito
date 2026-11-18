@@ -96,6 +96,28 @@ class _NoNetwork implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// The promotion's network (`/v2/keys` with the new user's bearer): every request recorded, then
+/// answered by [FakeKeys].
+class _Recording implements HttpClientAdapter {
+  _Recording(this.inner);
+
+  final FakeKeys inner;
+  final paths = <String>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    paths.add('${options.method} ${options.uri.path}');
+    return inner.fetch(options, requestStream, cancelFuture);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
@@ -104,6 +126,7 @@ void main() {
   late _Auth auth;
   late FakeKeys keysServer;
   late FakeAutoCapturePlatform capture;
+  late _Recording promotionNet;
 
   Future<SqliteStore> open(String id) =>
       SqliteStore.open(id, directory: dir.path, factory: databaseFactoryFfi, background: true);
@@ -123,7 +146,7 @@ void main() {
   AdoptDeps deps() => AdoptDeps(
     auth: auth,
     keys: keyStorage(),
-    network: (token) => keysServer.dio(),
+    network: (token) => Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = promotionNet,
     openStore: open,
     lease: (id) async => _NoLease(),
     forgetVault: forget,
@@ -140,6 +163,7 @@ void main() {
     dir = Directory.systemTemp.createTempSync('wambito-provisional-session');
     auth = _Auth();
     keysServer = FakeKeys();
+    promotionNet = _Recording(keysServer);
     capture = FakeAutoCapturePlatform();
     FlutterSecureStorage.setMockInitialValues({});
   });
@@ -297,6 +321,9 @@ void main() {
       auth.offline = false;
       expect(await container.read(sessionProvider.notifier).promoteProvisional(), isTrue);
       const newId = 'new_1';
+      // The promotion's network made the user's keys, and sent nothing to `/v1`.
+      expect(promotionNet.paths, anyElement(contains('/v2/keys/')));
+      expect(promotionNet.paths.where((path) => path.contains('/v1/')), isEmpty);
       expect(container.read(sessionProvider).stored?.token, 'guest-token-1');
       expect(fileOf(localId), isFalse);
       // The token was kept before anything was carried, then dropped once the session was its.
@@ -371,20 +398,20 @@ void main() {
     expect(session.status, SessionStatus.provisional);
     expect(session.localId, localId);
     expect(session.provisionalBlock, ProvisionalBlock.plainServer);
-    // That anonymous session is signed out on the server; its token is not kept.
-    expect(auth.calls, contains('signOut guest-token-1'));
+    // That empty anonymous user is deleted on the server; its token is not kept.
+    expect(auth.calls, contains('deleteUser guest-token-1'));
     expect((await kept()).containsKey(SessionStore.provisionalTokenKey), isFalse);
-    // The server makes plain users after all: an offline Start needs the network again.
-    expect((await kept()).containsKey(newUsersKeyOf(server)), isFalse);
-    // Nothing went to `/v1` (nor any key was made), and the vault is kept, held, with its data.
-    expect(keysServer.calls.where((c) => c.path.contains('/v1/')), isEmpty);
-    expect(keysServer.calls, isEmpty);
+    // The server makes plain users after all: an offline Start needs the network again, and
+    // this build does not probe it again today.
+    expect((await kept())[newUsersKeyOf(server)], 'plain unknown 2026-11-18');
+    // Nothing of the promotion reached the network: no `/v1` call, no key made.
+    expect(promotionNet.paths, isEmpty);
+    // The vault is kept, held, with its data, and opens again for the person.
     expect(
       (await vaultHoldOf(localId, directory: dir.path, factory: databaseFactoryFfi))?.kind,
       VaultHoldKind.provisional,
     );
     expect(fileOf('new_1'), isFalse);
-    // The app's vault opens again for the person.
     await until(() => container.read(provisionalVaultProvider) != null);
     expect(
       (await container.read(provisionalVaultProvider)!.store.list(RecordType.transaction))
@@ -392,13 +419,89 @@ void main() {
           .id,
       tx,
     );
-    final client = container.read(apiClientProvider);
-    final network = _NoNetwork();
-    client.dio.httpClientAdapter = network;
-    await client.dio.get<Object?>('/v1/transactions');
-    expect(network.paths.where((path) => path.contains('/v1/transactions')), isEmpty);
-    expect(network.paths.where((path) => path.contains('/v1/categories')), isEmpty);
+
+    // Tried again by the same build the same day: no other user is made.
+    expect(await container.read(sessionProvider.notifier).promoteProvisional(), isFalse);
+    expect(auth.made, 1);
+    expect(container.read(sessionProvider).provisionalBlock, ProvisionalBlock.plainServer);
   });
+
+  test('killed after the carry forgot the vault, before the sign-in: the restart only signs in, and '
+      'the person\'s settings and a renamed seeded category survive', () async {
+    final first = await startedOffline();
+    final localId = first.read(sessionProvider).localId!;
+    final store = first.read(provisionalVaultProvider)!.store;
+    final settings = (await store.list(RecordType.settings)).single;
+    await store.put(RecordType.settings, settings.id, {...settings.body, 'currency': 'COP'});
+    final seeded = (await store.list(RecordType.category)).first;
+    await store.put(RecordType.category, seeded.id, {...seeded.body, 'name': 'Mi mercado'});
+    await first.read(provisionalVaultProvider.notifier).close();
+
+    // The routine runs to its end (the vault carried, then forgotten), and the process dies before
+    // the session is the new user's.
+    auth.offline = false;
+    final sessions = SessionStore();
+    final step = await adoptVaultIntoNewUser(
+      localId,
+      deps().withTokens(
+        keptToken: sessions.readProvisionalToken,
+        keepToken: sessions.writeProvisionalToken,
+        forgetToken: sessions.clearProvisionalToken,
+      ),
+    );
+    expect(step, AdoptStep.adopted);
+    expect(fileOf(localId), isFalse);
+    first.dispose();
+
+    final again = start();
+    final session = again.read(sessionProvider.notifier);
+    await session.ready;
+    // No fresh vault is made for the local id.
+    expect(fileOf(localId), isFalse);
+    expect(again.read(provisionalVaultProvider), isNull);
+    expect(await session.promoteProvisional(), isTrue);
+    expect(auth.made, 1);
+    expect(again.read(sessionProvider).stored?.token, 'guest-token-1');
+    expect(fileOf(localId), isFalse);
+
+    final carried = await open('new_1');
+    final carriedSettings = (await carried.list(RecordType.settings)).single;
+    expect(carriedSettings.body['currency'], 'COP');
+    expect((await carried.get(RecordType.category, seeded.id))?.body['name'], 'Mi mercado');
+    await carried.close();
+    expect((await kept()).containsKey(SessionStore.provisionalTokenKey), isFalse);
+  });
+
+  test(
+    'killed right after the new user\'s token was kept: the restart reuses it, one user',
+    () async {
+      final first = await startedOffline();
+      final localId = first.read(sessionProvider).localId!;
+      await first
+          .read(provisionalVaultProvider)!
+          .store
+          .put(RecordType.category, food, category('Comida'));
+      await first.read(provisionalVaultProvider.notifier).close();
+      first.dispose();
+      // The sign-up answered and its token was kept; then the process died.
+      auth.offline = false;
+      final token = await auth.signInAsGuest();
+      await SessionStore().writeProvisionalToken(token);
+      expect(auth.made, 1);
+
+      final again = start();
+      final session = again.read(sessionProvider.notifier);
+      await session.ready;
+      expect(again.read(sessionProvider).localId, localId);
+      expect(await session.promoteProvisional(), isTrue);
+      expect(auth.made, 1);
+      expect(again.read(sessionProvider).stored?.token, token);
+      final carried = await open('new_1');
+      expect((await carried.list(RecordType.category)).map((r) => r.id), contains(food));
+      await carried.close();
+      expect(fileOf(localId), isFalse);
+    },
+  );
 
   testWidgets(
     'GUEST_SIGNUP closed: stays provisional with provisionalBlock noGuests and Settings says why',

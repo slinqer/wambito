@@ -93,7 +93,7 @@ class SessionStore {
   /// The token of the anonymous user the provisional vault is being promoted into, kept from its
   /// sign-up (`AdoptDeps.keepToken`) until the session is that user's: a restart reuses it instead
   /// of making a second user. A persistent name.
-  static const provisionalTokenKey = 'session.provisionalToken';
+  static const provisionalTokenKey = provisionalTokenStorageKey;
 
   final FlutterSecureStorage _storage;
 
@@ -508,6 +508,19 @@ class SessionController extends Notifier<SessionState> {
           // Right before the carry reads it: the app's vault closes and stays closed.
           stopWrites: (_) => vault.stop(),
         );
+    final server = ref.read(serverUrlProvider);
+    final build = ref.read(deviceHintsProvider).appVersion ?? 'unknown';
+    final now = deps.now();
+    final day =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    // A server found making `plain` users today, by this build: not probed again (each probe makes
+    // an anonymous user). A promotion whose user is already made goes on.
+    if (await _store.readProvisionalToken() == null &&
+        await newUsersPlainProbed(server, build: build, day: day)) {
+      _block(localId, ProvisionalBlock.plainServer);
+      return false;
+    }
     AdoptStep step;
     try {
       step = await adoptVaultIntoNewUser(localId, deps);
@@ -528,22 +541,32 @@ class SessionController extends Notifier<SessionState> {
         return false;
       case AdoptStep.plainUser:
         // Nothing is ever carried into a `plain` user: that session goes, the vault stays held.
+        // That user is empty (nothing was carried): it is deleted (`DELETE /v1/me`), else at least
+        // its session ends.
         final token = await deps.keptToken();
         if (token != null) {
           try {
-            await _auth.signOut(token).timeout(signOutWait);
+            await deps.auth.deleteUser(token).timeout(signOutWait);
           } on Object {
-            // An empty anonymous user; the inactivity cleanup takes it.
+            try {
+              await _auth.signOut(token).timeout(signOutWait);
+            } on Object {
+              // An empty anonymous user; the inactivity cleanup takes it.
+            }
           }
         }
         await deps.forgetToken();
-        await forgetNewUsersEncrypted(ref.read(serverUrlProvider));
+        // Kept with the build and the day: the next starts do not probe this server again today.
+        await rememberNewUsersPlain(server, build: build, day: day);
         _resumeProvisional(localId, vault);
         _block(localId, ProvisionalBlock.plainServer);
         return false;
       case AdoptStep.adopted:
         final token = await deps.keptToken();
-        if (token == null || !ref.mounted) return false;
+        if (token == null || !ref.mounted || state.localId != localId) {
+          _resumeProvisional(localId, vault);
+          return false;
+        }
         await vault.close();
         await _takeOver(token, fromUserId: localId);
         await _tidyPromotion();

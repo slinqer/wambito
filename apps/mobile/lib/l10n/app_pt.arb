@@ -1021,7 +1021,7 @@
   "mergeRetry": "Tentar de novo",
   "entryNeedsConnection": "Para começar preciso de internet, só desta vez. Liga-te e tentamos de novo.",
   "entryTryAgain": "Tentar de novo",
-  "provisionalWaiting": "Os teus dados estão neste telemóvel. Assim que houver internet, crio a tua conta para eles.",
-  "provisionalPlainServer": "Os teus dados continuam neste telemóvel. Este servidor não guarda os dados cifrados, por isso espero por um que o faça.",
-  "provisionalNoGuests": "Os teus dados continuam neste telemóvel. Por agora este servidor não aceita contas novas sem email."
+  "provisionalWaiting": "Os teus dados estão neste telefone. Assim que houver internet, crio a tua conta para eles.",
+  "provisionalPlainServer": "Os teus dados continuam neste telefone. Este servidor não guarda os dados cifrados, por isso espero por um que o faça.",
+  "provisionalNoGuests": "Os teus dados continuam neste telefone. Por agora este servidor não aceita contas novas sem email."
 }

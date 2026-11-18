@@ -197,8 +197,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `ProvisionalBlock.plainServer` / `noGuests`). `promoteProvisional` (app.dart's first hook: start, resume, every
   minute) is `adoptVaultIntoNewUser(localId, …)` with its token under `session.provisionalToken` and the app's vault
   stopped before the carry: `adopted` signs the new anonymous user in (captures re-tagged from the local id);
-  `plainUser` signs that session out on the server, forgets the kept `newUsers`, keeps the vault held and is tried
-  again only at the next start; a 403 is `noGuests`. Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
+  `plainUser` deletes that empty user (`DELETE /v1/me`, else a sign-out), keeps `newUsers` = `plain <build> <day>`
+  (no new probe that day by that build), keeps the vault held and is tried again only at the next start; a 403 is
+  `noGuests`. A kill after the carry forgot the vault but before the sign-in: `openProvisionalVault` never remakes a
+  missing file while `session.provisionalToken` is kept (`ProvisionalVaultGone`), and the next promotion only signs in. Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
   (`lib/entry/recovery_sign_in_screen.dart`, route `/entry/recovery`, signed out only; keys `recovery.input`,
   `recovery.submit`): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
   (`keysParseRecoveryKey`; one that does not parse is `bad_recovery_key`, nothing sent), posts only `recoveryVerifier`'s
@@ -583,7 +585,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   written before its vault is made (a restart reopens it, never a second); `session.provisionalToken`
   (`provisionalTokenKey`): the token of the user it is being promoted into, kept until the session is that user's;
   `wambito.server.<host>.newUsers` (`newUsersKeyOf`): `encrypted` once this phone saw that server make a `preview`
-  anonymous user. Persistent names.
+  anonymous user, `plain <build> <yyyy-mm-dd>` once a promotion found a `plain` one; per host, so every port of a
+  host shares it. Persistent names.
 - `wambito.adopt.token` (secure storage, `adoptTokenKey`): the token of the new anonymous user a deleted account's
   vault is adopted into, kept from its sign-up until the session is that user's. Outside `wambito.vault.*` on
   purpose: the old vault's keys go before the session changes, and a sweep must never take it.

@@ -5,19 +5,32 @@
 // session promotes it (`SessionController.promoteProvisional`): `adoptVaultIntoNewUser` (Task 10)
 // makes the anonymous user and carries the records into that user's vault.
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart' show DatabaseFactory;
 
 import '../api/device.dart';
 import 'backend.dart';
 import 'backend_interceptor.dart';
-import 'db.dart' show VaultHold, VaultHoldKind;
+import '../storage/secure_storage.dart';
+import 'db.dart' show VaultHold, VaultHoldKind, defaultVaultDirectory, vaultFileName;
 import 'ids.dart';
 import 'sqlite_store.dart';
 import 'store.dart' show FinanceStore;
 import 'vault_session.dart' show VaultProfile, seedIfEmpty;
+
+/// Secure storage key of the token a provisional vault is being promoted into
+/// (`SessionStore.provisionalTokenKey`). A persistent name.
+const provisionalTokenStorageKey = 'session.provisionalToken';
+
+/// The vault was carried into its user and forgotten, and only the session's last steps were left
+/// (a kill there): it is never made again, or a fresh seed would be carried over the person's data.
+class ProvisionalVaultGone implements Exception {
+  const ProvisionalVaultGone();
+}
 
 /// A new provisional vault id: `local-` and a UUID v7, which the vault file pattern
 /// (`wambito-vault-<id>.db`, `[A-Za-z0-9_-]{1,128}`) takes as it is.
@@ -68,14 +81,25 @@ String _language(String tag) => tag.split(RegExp('[-_]')).first.toLowerCase();
 
 /// Opens (or reopens) the provisional vault [localId]: held `provisional` (once: a reopen keeps the
 /// first hold), and seeded from [hints] (the settings and the suggested categories; a reopen seeds
-/// nothing, `seedIfEmpty`). [directory] and [factory] are for tests.
+/// nothing, `seedIfEmpty`). A missing file is never made while a promotion's token is kept
+/// ([promotionUnderWay], default: [provisionalTokenStorageKey] in secure storage): the promotion
+/// forgot it after carrying it, so it throws [ProvisionalVaultGone]. [directory] and [factory] are
+/// for tests.
 Future<LocalOnlyVault> openProvisionalVault(
   String localId,
   DeviceHints hints, {
   String? directory,
   DatabaseFactory? factory,
   DateTime Function() now = DateTime.now,
+  Future<bool> Function()? promotionUnderWay,
 }) async {
+  final folder = directory ?? await defaultVaultDirectory();
+  if (!File(p.join(folder, vaultFileName(localId))).existsSync()) {
+    final underWay =
+        await (promotionUnderWay ??
+            () async => await appSecureStorage.read(key: provisionalTokenStorageKey) != null)();
+    if (underWay) throw const ProvisionalVaultGone();
+  }
   final store = await SqliteStore.open(localId, directory: directory, factory: factory);
   try {
     if (await store.hold() == null) {
