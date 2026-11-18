@@ -7,7 +7,8 @@
  *   VITE_SITE_URL=https://wambito.com pnpm --filter @wambito/web build:landing
  *
  * VITE_APP_URL (the live app's origin) is optional. Without it the calls to action say "coming
- * soon" and lead to GitHub. With it they say "Empieza ahora" / "Entrar" and open the app's sign-in:
+ * soon" and lead to GitHub. With it the hero's and the closing's "Crear cuenta" open the app's
+ * `/create-account`, and the header's "Entrar" its `/sign-in`:
  *
  *   VITE_SITE_URL=https://wambito.com VITE_APP_URL=https://app.wambito.com \
  *     pnpm --filter @wambito/web build:landing

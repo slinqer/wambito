@@ -5,6 +5,7 @@ import {
   onboardWithSample,
   pinClock,
   readSignInMail,
+  seedPlainUser,
   sessionUser,
   signUpNewUser,
   skipPasskeyOffer,
@@ -120,6 +121,8 @@ test("deleting the account signs out to the landing; the same email then starts 
   await expect(page).toHaveURL(/\/$/);
   expect(await sessionUser(page)).toBeNull();
 
+  // The stack makes new users encrypted: the same email starts afresh as a plain user again.
+  seedPlainUser(email);
   await page.goto("/sign-in?lang=es");
   await page.getByRole("textbox", { name: "Tu correo" }).fill(email);
   await page.getByRole("button", { name: "Enviar código" }).click();

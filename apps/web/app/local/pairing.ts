@@ -1,5 +1,4 @@
 import {
-  type DevicePrivateKey,
   fromBase64Url,
   generateDeviceKeyPair,
   openFromPairing,
@@ -16,6 +15,16 @@ import {
   type LocalKeys,
   withDataKey,
 } from "./keys.ts";
+import {
+  deferred,
+  type PairingClock,
+  realClock,
+  key32 as relayedKey,
+  sameBytes,
+  zeroPrivate,
+} from "./relay.ts";
+
+export type { PairingClock } from "./relay.ts";
 
 /**
  * Pairing a new browser from an unlocked device (stage 1b spec section 1, steps 1–8). The server
@@ -58,31 +67,10 @@ export const PAIRING_POLL_MS = 1500;
 /** A request lives 10 minutes (spec 7.3): the most either device waits, whatever the relay says. */
 export const PAIRING_TTL_MS = 10 * 60 * 1000;
 
-export interface PairingClock {
-  now(): number;
-  /** Waits `ms`; may resolve early when `signal` aborts. */
-  sleep(ms: number, signal: AbortSignal): Promise<void>;
-}
-
 export interface PairingOptions extends KeysOptions {
   /** Defaults to `Date.now` and `setTimeout`; tests pass a fake one. */
   clock?: PairingClock;
 }
-
-const realClock: PairingClock = {
-  now: () => Date.now(),
-  sleep: (ms, signal) =>
-    new Promise((resolve) => {
-      if (signal.aborted) return resolve();
-      const timer = setTimeout(done, ms);
-      function done() {
-        clearTimeout(timer);
-        signal.removeEventListener("abort", done);
-        resolve();
-      }
-      signal.addEventListener("abort", done);
-    }),
-};
 
 export interface NewDevicePairing {
   id: string;
@@ -122,43 +110,12 @@ const CODE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
 const QR =
   /^wambito:\/\/pair\?id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})&key=([A-Za-z0-9_-]{43})$/;
 
+/** 32 bytes from base64url, or `tampered` for anything else the server relays. */
+const key32 = (text: string) => relayedKey(text, () => new PairingError("tampered"));
+
 /** The server's reading of a typed code: upper case, no dashes or spaces, I/L as 1, O as 0. */
 export function normalizePairingCode(input: string): string {
   return input.toUpperCase().replace(/[-\s]/g, "").replace(/[IL]/g, "1").replace(/O/g, "0");
-}
-
-const noop = () => {};
-
-/** A one-shot promise whose rejection never goes unhandled (callers still see it). */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  promise.catch(noop);
-  return { promise, resolve, reject };
-}
-
-/** Raw private bytes exist only on the noble fallback: zero them; a `CryptoKey` has none. */
-function zeroPrivate(key: DevicePrivateKey) {
-  if (!(key instanceof CryptoKey)) key.raw.fill(0);
-}
-
-const sameBytes = (a: Uint8Array, b: Uint8Array) =>
-  a.length === b.length && a.every((x, i) => x === b[i]);
-
-/** 32 bytes from base64url, or `tampered` for anything else the server relays. */
-function key32(text: string): Uint8Array {
-  let bytes: Uint8Array;
-  try {
-    bytes = fromBase64Url(text);
-  } catch {
-    throw new PairingError("tampered");
-  }
-  if (bytes.length !== 32) throw new PairingError("tampered");
-  return bytes;
 }
 
 /**

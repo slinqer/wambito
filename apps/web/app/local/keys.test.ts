@@ -8,11 +8,13 @@ import {
   openFromDevice,
   openRecord,
   parseRecoveryKey,
+  recoveryVerifier,
   sealKeyLink,
   sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
@@ -93,7 +95,11 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
   const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
   /** Ids of the `DELETE /v2/keys/{id}` calls, in order; `failDeletes`: answered with a 503. */
   const deletes: string[] = [];
-  const state = { failDeletes: false };
+  const state = { failDeletes: false, failVerifier: false };
+  /** `put:<kind>` for every wrap PUT and `verifier` for every verifier PUT, in order. */
+  const events: string[] = [];
+  /** The body of every `PUT /v2/recovery/verifier`. */
+  const verifiers: Array<{ lookupHash: string; authHash: string }> = [];
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const json = (body: unknown, status = 200) =>
@@ -101,6 +107,14 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
         status,
         headers: { "content-type": "application/json" },
       });
+    if (url.pathname === "/api/v2/recovery/verifier" && init?.method === "PUT") {
+      events.push("verifier");
+      if (state.failVerifier) return json({ code: "unavailable" }, 503);
+      if (!wraps.some((w) => w.kind === "recovery"))
+        return json({ code: "recovery_required" }, 409);
+      verifiers.push(JSON.parse(String(init.body)));
+      return new Response(null, { status: 204 });
+    }
     if (url.pathname === "/api/v2/keys" && (init?.method ?? "GET") === "GET")
       return json({
         wraps,
@@ -121,6 +135,7 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
       const body = JSON.parse(String(init.body));
       const ifNoneMatch = new Headers(init.headers).get("if-none-match");
       puts.push({ id, kind: body.kind, ifNoneMatch });
+      events.push(`put:${body.kind}`);
       if (ifNoneMatch === "*" && wraps.some((w) => w.id !== id)) {
         return json({ code: "already_set_up" }, 409);
       }
@@ -155,7 +170,16 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
     }
     return new Response(null, { status: 404 });
   };
-  return { fetch: fetch as typeof globalThis.fetch, wraps, links, puts, deletes, state };
+  return {
+    fetch: fetch as typeof globalThis.fetch,
+    wraps,
+    links,
+    puts,
+    deletes,
+    state,
+    events,
+    verifiers,
+  };
 }
 
 let counter = 0;
@@ -211,6 +235,49 @@ describe("prepareAccount then commit", () => {
     ).toEqual(dk);
     expect(await store.getKey("dk")).toBeUndefined();
     store.close();
+  });
+
+  it("prepareAccount puts the verifier of the shown key after the recovery wrap and before the device wrap", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    expect(api.events).toEqual(["put:recovery", "verifier", "put:device"]);
+    const raw = await recoveryVerifier(parseRecoveryKey(recoveryKey as string));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+  });
+
+  it("a guest's commit sends no verifier", async () => {
+    const api = fakeKeys();
+    await setUpAccount({ userId: newUser(), guest: true, fetch: api.fetch });
+    expect(api.events).toEqual(["put:recovery", "put:device"]);
+    expect(api.verifiers).toEqual([]);
+  });
+
+  it("a retried commit sends the same verifier", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    api.state.failVerifier = true;
+    const prepared = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    await expect(prepared.commit()).rejects.toBeInstanceOf(KeysError);
+    expect(api.wraps.map((w) => w.kind)).toEqual(["recovery"]);
+    api.state.failVerifier = false;
+    await prepared.commit();
+    api.state.failVerifier = true;
+    // a second success sends nothing more
+    await prepared.commit();
+    const raw = await recoveryVerifier(parseRecoveryKey(prepared.recoveryKey as string));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+    expect(api.events).toEqual(["put:recovery", "verifier", "verifier", "put:device"]);
   });
 
   it("gives a guest keys and wraps but no recovery key", async () => {
@@ -408,6 +475,29 @@ describe("unlockWithRecovery", () => {
     expect(
       await openRecord(currentKeys(await loadLocalKeys(userId)), CTX(userId, REC), sealed),
     ).toEqual({ s: 1 });
+  });
+
+  it("unlockWithRecovery puts the verifier and still unlocks when that PUT fails", async () => {
+    const { api, userId, recoveryKey } = await accountWithKey();
+    api.events.length = 0;
+    api.verifiers.length = 0;
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const raw = await recoveryVerifier(parseRecoveryKey(recoveryKey));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+
+    await forgetDevice(userId);
+    api.verifiers.length = 0;
+    api.state.failVerifier = true;
+    const keys = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(keys.keyring.current).toBe(1);
+    expect(api.events.filter((e) => e === "verifier")).toHaveLength(2);
+    expect(api.verifiers).toEqual([]);
+    expect(await loadLocalKeys(userId)).not.toBeNull();
   });
 
   it("rejects a malformed key with bad_recovery_key before any request", async () => {

@@ -92,6 +92,8 @@ async function addMovement(page: Page, name: string, digits: string[]) {
 async function firstBrowser(opened: Opened): Promise<string> {
   await signInExisting(opened.page, EMAIL);
   const key = await setUpRecoveryKey(opened.page);
+  // A setup made in this browser offers the phone app first.
+  await opened.page.getByRole("button", { name: "Continuar en el navegador" }).click();
   await opened.page.getByRole("button", { name: "Entrar directo" }).click();
   await expect(opened.page).toHaveURL(/\/app$/);
   await addMovement(opened.page, NAME, ["4", "2"]);
@@ -183,6 +185,8 @@ test("a recovery key, a second browser, an offline edit and a clean sign-out", a
   const first = await open();
   await signInExisting(first.page, EMAIL);
   const key = await setUpRecoveryKey(first.page);
+  // A setup made in this browser offers the phone app first.
+  await first.page.getByRole("button", { name: "Continuar en el navegador" }).click();
   await first.page.getByRole("button", { name: "Entrar directo" }).click();
   await expect(first.page).toHaveURL(/\/app$/);
   expect(await vaultDatabases(first.page)).toEqual([`wambito-vault-${USER_ID}`]);

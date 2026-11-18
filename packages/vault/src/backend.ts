@@ -326,6 +326,7 @@ const FRESH_SETTINGS: SettingsRecord = {
   timezone: "UTC",
   onboardingCompletedAt: null,
   revokedDevices: [],
+  recoveryKeySavedAt: null,
 };
 
 /** What one request works with: its transaction and the account's clock. */

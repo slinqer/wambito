@@ -37,3 +37,9 @@ export const LANDING_ORIGIN = resolveLandingOrigin(import.meta.env.VITE_LANDING_
 
 /** Where a link to the landing page `path` goes in this build; see `landingTarget`. */
 export const landingLink = (path = "/") => landingTarget(LANDING_ORIGIN, path);
+
+/**
+ * The build's id (`VITE_BUILD_ID`, the short git commit, set by `deploy/personal/up.sh`), else
+ * `dev`. Sent as `x-wambito-version` on the daily seen call.
+ */
+export const BUILD_ID: string = import.meta.env.VITE_BUILD_ID || "dev";

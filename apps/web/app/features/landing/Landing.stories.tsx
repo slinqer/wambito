@@ -38,10 +38,10 @@ export const Page: Story = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Tus lukas, por fin claras.",
     );
-    const ctas = canvas.getAllByRole("link", { name: "Empieza ahora" });
+    const ctas = canvas.getAllByRole("link", { name: "Crear cuenta" });
     await expect(ctas.map((link) => link.getAttribute("href"))).toEqual([
-      "/sign-in?lang=es",
-      "/sign-in?lang=es",
+      "/create-account?lang=es",
+      "/create-account?lang=es",
     ]);
     await expect(canvas.getByRole("link", { name: "Entrar" })).toHaveAttribute(
       "href",
@@ -62,9 +62,9 @@ export const PageDayEnglish: Story = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Your money, finally clear.",
     );
-    await expect(canvas.getAllByRole("link", { name: "Get started" })[0]).toHaveAttribute(
+    await expect(canvas.getAllByRole("link", { name: "Create account" })[0]).toHaveAttribute(
       "href",
-      "/sign-in?lang=en",
+      "/create-account?lang=en",
     );
   },
 };
@@ -94,7 +94,7 @@ export const HeroSection: Story = {
       "href",
       "/demo?lang=es",
     );
-    const cta = canvas.getByRole("link", { name: "Empieza ahora" });
+    const cta = canvas.getByRole("link", { name: "Crear cuenta" });
     await expectEdge(cta, 6);
     await expectTarget(cta);
     await userEvent.tab();
@@ -255,7 +255,7 @@ export const AgentDemoSection: Story = {
     );
     await expect(canvas.getByRole("link", { name: /Conecta tu agente/ })).toHaveAttribute(
       "href",
-      "/sign-in?lang=es",
+      "/create-account?lang=es",
     );
     const logos = [...canvasElement.querySelectorAll("[data-logo]")].map((logo) =>
       logo.getAttribute("data-logo"),
@@ -597,13 +597,13 @@ export const ScrollReveal: Story = {
 };
 
 /**
- * Hover halo: with a mouse over "Empieza ahora", the light follows the pointer inside the button and
+ * Hover halo: with a mouse over "Crear cuenta", the light follows the pointer inside the button and
  * the halo around it leans toward that side.
  */
 export const ButtonHalo: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const [cta] = canvas.getAllByRole("link", { name: "Empieza ahora" });
+    const [cta] = canvas.getAllByRole("link", { name: "Crear cuenta" });
     if (!cta) throw new Error("no primary action");
     const box = cta.getBoundingClientRect();
     cta.dispatchEvent(

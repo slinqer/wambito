@@ -79,7 +79,7 @@ test("the admin confirms with a passkey, finds a user by email and suspends them
   for (const card of [
     "Cuentas",
     "Con correo",
-    "Invitados",
+    "Sin correo",
     "Activas en 30 días",
     "Altas en 7 días",
   ])

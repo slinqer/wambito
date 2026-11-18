@@ -30,7 +30,7 @@
       "cards": {
         "total": "Accounts",
         "with_email": "With email",
-        "guests": "Guests",
+        "guests": "Without email",
         "active": "Active in 30 days",
         "signups": "Sign-ups in 7 days",
         "previous": "The previous 7 days: {count}"
@@ -39,9 +39,45 @@
         "title": "Sign-ups per week",
         "subtitle": "The last 12 weeks, Monday to Sunday (UTC).",
         "with_email": "With email",
-        "guests": "Guests",
+        "guests": "Without email",
         "week": "Week",
         "week_of": "{date}"
+      },
+      "activity": {
+        "daily": {
+          "title": "Daily active people",
+          "subtitle": "People who opened the app each day, the last 90 days.",
+          "count": "Active people",
+          "day": "Day"
+        },
+        "cohorts": {
+          "title": "Cohorts",
+          "subtitle": "Accounts by sign-up week and how many were back at least once after 1, 4 and 12 weeks.",
+          "week": "Sign-up week",
+          "size": "Accounts",
+          "week1": "Week 1",
+          "week4": "Week 4",
+          "week12": "Week 12",
+          "at_least": "at least {count}",
+          "none": "—",
+          "empty": "No cohorts yet."
+        },
+        "installs": {
+          "title": "Installs by platform",
+          "platforms": {
+            "android": "Android",
+            "ios": "iOS",
+            "web": "Web",
+            "unknown": "Unknown"
+          }
+        },
+        "versions": {
+          "title": "Versions",
+          "platform": "Platform",
+          "version": "Version",
+          "users": "People",
+          "empty": "No versions yet."
+        }
       },
       "suspended": "Suspended accounts: {count}",
       "audit": {

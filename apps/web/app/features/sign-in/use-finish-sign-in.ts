@@ -10,31 +10,36 @@ import { deleteStaleVaults } from "../../local/stale-vaults.ts";
 import {
   type AuthUser,
   destinationAfterSignIn,
-  isAssistantConsent,
+  offersPasskey,
   type SignInAuth,
+  type SignInMethod,
 } from "./auth.ts";
 
 type Profile = paths["/v1/me"]["get"]["responses"][200]["content"]["application/json"];
 
 export interface FinishSignIn {
-  /** Who signed in, from the sign-in response (used when the profile can't be read). */
-  user: AuthUser;
+  /**
+   * Who signed in, from the sign-in response (used when the profile can't be read). A QR or
+   * recovery-key sign-in knows only the id.
+   */
+  user: Pick<AuthUser, "id" | "onboardingCompletedAt">;
   /** `?next=` as given; only a same-origin path is honoured. */
   next: string | null;
   /** `?lang=` from the landing: the language a new user's profile starts in. */
   lang: Locale | null;
   /**
-   * How they signed in. After an email sign-in (code or magic link) Wambito may offer a passkey;
-   * someone who just used one needs no offer. Email unless said otherwise.
+   * How they signed in. Only after an email sign-in (code or magic link) may Wambito offer a
+   * passkey (`offersPasskey`): someone who just used one needs no offer, and a QR or recovery-key
+   * sign-in (web plan ruling 13) never gets one. Email unless said otherwise.
    */
-  method?: "email" | "passkey";
+  method?: SignInMethod;
 }
 
 /** The passkey offer's screen: it takes the page the person was heading to as `?next=`. */
 export const PASSKEY_OFFER_PATH = "/passkey-offer";
 
 /**
- * What happens right after any sign-in (code, magic link, passkey): forget the previous person's
+ * What happens right after any sign-in (code, magic link, passkey, QR, recovery key): forget the previous person's
  * cached data and any vault of someone else left in this browser, give a new user the language of
  * the page they came from (`PATCH /v1/me`), switch the app to the profile's language, and go to onboarding, `next` or the app. After an email
  * sign-in that is due the passkey offer, it goes first and then leads on to that page.
@@ -68,8 +73,7 @@ export function useFinishSignIn(auth: Pick<SignInAuth, "shouldOfferPasskey">) {
       // Asking is a nicety too: a failure just means no offer. Not on the way to an assistant's
       // consent, whose link expires in minutes; the offer comes at the next sign-in.
       const offer =
-        method === "email" &&
-        !isAssistantConsent(destination) &&
+        offersPasskey(method, destination) &&
         (await auth.shouldOfferPasskey(user.id).catch(() => false));
       if (offer) {
         const search = new URLSearchParams({ next: destination });

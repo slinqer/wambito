@@ -19,20 +19,56 @@ export const ANDROID_APK_HREF = `${GITHUB_HREF}/releases/download/mobile-v${ANDR
 /** The release page: the 32-bit APK, the checksums and the signing certificate. */
 export const ANDROID_RELEASE_HREF = `${GITHUB_HREF}/releases/tag/mobile-v${ANDROID_VERSION}`;
 
+/** Google Play listing; null until the app is published there (the install offer hides its button). */
+export const PLAY_HREF: string | null = null;
+
+/** F-Droid listing; null until the app is published there. */
+export const FDROID_HREF: string | null = null;
+
+/** App Store listing; null until the app is published there. */
+export const APP_STORE_HREF: string | null = null;
+
+/** Where each way to get the phone app lives; a button shows only for a non-null link. */
+export interface StoreLinks {
+  apk: string | null;
+  release: string | null;
+  play: string | null;
+  fdroid: string | null;
+  appStore: string | null;
+}
+
+export const STORE_LINKS: StoreLinks = {
+  apk: ANDROID_APK_HREF,
+  release: ANDROID_RELEASE_HREF,
+  play: PLAY_HREF,
+  fdroid: FDROID_HREF,
+  appStore: APP_STORE_HREF,
+};
+
+/** The account creation page (the email code form): the landing's "Crear cuenta" door. */
+export const CREATE_ACCOUNT_PATH = "/create-account";
+
+/** The sign-in page (the QR beside the other ways): the header's "Entrar" door. */
+export const SIGN_IN_PATH = "/sign-in";
+
+/** Which door of the app a landing link opens. */
+export type Door = "sign-in" | "create";
+
 /**
- * Where "Empieza ahora" and "Entrar" go: sign-in, told which language the visitor came from
- * (spread onto a `PressLink`). In the landing-only release the app lives on another origin:
- * with `VITE_APP_URL` they open its sign-in there; without it there is no app to open yet, so
- * they lead to the GitHub repo in a new tab.
+ * Where "Crear cuenta" (`create`) and "Entrar" (`sign-in`) go, told which language the visitor
+ * came from (spread onto a `PressLink`). In the landing-only release the app lives on another
+ * origin: with `VITE_APP_URL` they open that door there; without it there is no app to open yet,
+ * so both lead to the GitHub repo in a new tab.
  */
 export function appLinkProps(
   locale: Locale,
+  door: Door,
   landingOnly: boolean = LANDING_ONLY,
   appOrigin: string | undefined = APP_ORIGIN,
 ): { to: string; target?: "_blank"; rel?: string } {
-  const signIn = `/sign-in?lang=${locale}`;
-  if (!landingOnly) return { to: signIn };
-  if (appOrigin) return { to: `${appOrigin}${signIn}` };
+  const path = `${door === "create" ? CREATE_ACCOUNT_PATH : SIGN_IN_PATH}?lang=${locale}`;
+  if (!landingOnly) return { to: path };
+  if (appOrigin) return { to: `${appOrigin}${path}` };
   return { to: GITHUB_HREF, target: "_blank", rel: "noopener" };
 }
 

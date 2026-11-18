@@ -123,6 +123,15 @@ export function encryptedStoreContract(
       expect(await store.getMeta("latest")).toBe(42);
     });
 
+    it("deletes a meta value", async () => {
+      const store = await make();
+      await store.setMeta("ephemeral", true);
+      await store.deleteMeta("ephemeral");
+      expect(await store.getMeta("ephemeral")).toBeUndefined();
+      // deleting an absent value is no error
+      await store.deleteMeta("ephemeral");
+    });
+
     it("counts quarantined records, one per version, and never overwrites", async () => {
       const store = await make();
       await store.quarantine({ id: "a", type: "category", version: 1, reason: "bad" });

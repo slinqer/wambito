@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, request } from "@playwright/test";
+import { expect, type Page, request, test } from "@playwright/test";
 
 /**
  * Helpers for app flows against the dev stack (`docker compose up`: API, Postgres, Mailpit):
@@ -199,9 +199,15 @@ export async function skipPasskeyOffer(page: Page, { lang = "es" as Lang } = {})
   await expect(page).not.toHaveURL(/\/passkey-offer/);
 }
 
-/** Signs a brand-new user in through the sign-in page; returns their email. Lands on /welcome. */
+/**
+ * Signs a brand-new plain user in through the sign-in page; returns their email. Lands on
+ * /welcome. The e2e stack runs with NEW_USERS_ENCRYPTED on, so a real sign-up would be born
+ * encrypted: the user is seeded plain first (`seedPlainUser`, its categories named in `lang`), and
+ * the email sign-in then finds it.
+ */
 export async function signUpNewUser(page: Page, { lang = "es" as Lang } = {}) {
   const email = freshEmail();
+  seedPlainUser(email, lang);
   await page.goto(`/sign-in?lang=${lang}`);
   const words = SIGN_IN_WORDS[lang];
   await page.getByRole("textbox", { name: words.email }).fill(email);
@@ -319,6 +325,29 @@ export async function setUpRecoveryKey(page: Page): Promise<string> {
   }
   await page.getByRole("button", { name: "Continuar" }).click();
   return key;
+}
+
+/** The time `seedPlainUser` adds to the running test's timeout. */
+const SEED_SLACK_MS = 15_000;
+
+/**
+ * Inserts a plain user with this email, as a plain web sign-up leaves it before onboarding (email
+ * verified, the default account and the suggested categories, named in `lang`), in the API
+ * container (`seed:e2e-plain-user`). An existing email is left as it is.
+ */
+export function seedPlainUser(email: string, lang: Lang = "es"): void {
+  // A few seconds in the container (tsx starting up): the test gets them on top of its timeout.
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + SEED_SLACK_MS);
+  execFileSync(
+    "docker",
+    [
+      ...["compose", "exec", "-T", "api", "pnpm", "--silent", "--filter", "@wambito/api"],
+      ...["seed:e2e-plain-user", email, lang],
+    ],
+    // Its stderr is kept for the error a failed seed throws.
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
 }
 
 /** Makes the preview account again: no records, key wraps, passkeys or finance rows. */

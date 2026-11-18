@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "use-intl";
 import { PressButton } from "../ui/PressButton.tsx";
+import { ActivityBlocks } from "./ActivityBlocks.tsx";
 import { type AuditEntry, AuditList } from "./AuditList.tsx";
 import { LookupBox } from "./LookupBox.tsx";
 import { type AdminMetrics, MetricCards } from "./MetricCards.tsx";
@@ -20,8 +21,8 @@ interface Audit {
 }
 
 /**
- * `/admin` (spec §6), in this order: the user counts, the weekly sign-ups chart, the suspended
- * count, the 50 latest audit rows (with "Load more") and the look-up box. Every call goes through
+ * `/admin` (spec §6), in this order: the user counts, the weekly sign-ups chart, the activity
+ * blocks (daily actives, cohorts, installs, versions), the suspended count, the 50 latest audit rows (with "Load more") and the look-up box. Every call goes through
  * `adminFetch`, so a stale passkey verification parks it until the admin confirms again.
  */
 export function HomeScreen() {
@@ -98,6 +99,7 @@ export function HomeScreen() {
           <>
             <MetricCards metrics={metrics.data} />
             <SignupsChart weekly={metrics.data.weekly} />
+            <ActivityBlocks metrics={metrics.data} />
             <p className="m-0 font-bold text-ink">
               {t("suspended", { count: metrics.data.suspended })}
             </p>

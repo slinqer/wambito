@@ -2,7 +2,8 @@
 
 React Router 8 (framework mode, SPA + prerender): the public landing, roadmap, privacy policy and
 account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the signed-in app
-(`/app/*`), sign-in, onboarding (`/welcome`), OAuth consent for assistants, and a fake-backend demo
+(`/app/*`), sign-in (`/sign-in`: the QR for the phone, a recovery key, a passkey or email;
+`/create-account`), onboarding (`/welcome`), OAuth consent for assistants, and a fake-backend demo
 (`/demo/*`).
 
 ## Entry points
@@ -22,7 +23,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `quarantine`, `keys`; `deleteVault`), `encrypted-store.ts` (`createEncryptedStore(userId)`: a
   `FinanceStore` over `db.ts`; local writes update the record and the outbox in one IndexedDB
   transaction, `origin: "remote"` writes (sync) take `{ version, keyV }` and add no outbox entry;
-  also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta`,
+  also the sync helpers `readOutbox`, `ackOutbox` (records the pushed `keyV` too), `getMeta/setMeta/deleteMeta`,
   `quarantine`, `wipeRecords`, `getKey/putKey/deleteKey/keyNames`, `parkOutbox`, `abandonOutbox`,
   `adoptServerCopy`, `restoreSetAside`, `queueReseal(current, limit)` (outbox entries `reseal: true`
   for pushed records under an older `keyV`), `keyVersionsInUse()` (quarantined rows' `keyV`
@@ -74,10 +75,17 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   guest, whose recovery secret is never shown and who commits at once; `KeysError("already_set_up")`
   when the account has wraps, and from `commit()` when another setup won the race: the recovery
   wrap goes with `If-None-Match: *`, so the server keeps one data key; the losing DK is zeroed;
+  a shown key (`guest: false`) also gets its sign-in verifier between the recovery wrap and the
+  device wrap (`PUT /v2/recovery/verifier`, `putRecoveryVerifier(options, secret)`: the SHA-256 of
+  `recoveryVerifier(secret)`'s `lookup` and `auth`; made before the secret is zeroed, sent again
+  with the same bytes on a retry; a guest's hidden key never gets one); `unlockWithRecovery` puts
+  it too, best effort (a failed PUT never fails the unlock);
   `KeysError("unsupported_browser")` before anything is sent when WebCrypto lacks X25519, whose
   noble fallback would keep a raw private key: the web never stores one), `unlockWithRecovery({ userId, text })` (`bad_recovery_key` /
   `wrong_recovery_key`; enrolls this device, the caller then runs a full sync), `enrollDevice(options,
-  dataKey, keyV)` (the same enroll for pairing; the caller zeroes DK). Key links (spec
+  dataKey, keyV, { ephemeral? })` (the same enroll for pairing and the QR sign-in; `ephemeral:
+  true` sets the vault's meta `ephemeral`, `false` deletes it (a vault the person asked to keep is
+  never swept), absent leaves it; the caller zeroes DK). Key links (spec
   2026-11-10): `listKeys(call)` → `{ wraps, links: Map<keyV, bytes> }` (an undecodable link is
   missing; `listWraps` wraps it); `chainDown(userId, top, links, floor, strict)` → the data keys
   `top.keyV - 1` down to `floor` (strict: a missing or failing link is `tampered`; else it stops
@@ -141,7 +149,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
   plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
   at once.
-  `rotate.ts` (two steps, like `prepareAccount`): `rotateKeys({ userId, remove, recovery: { text }
+  `rotate.ts` (two steps, like `prepareAccount`; a new key's verifier is put after its wrap, by
+  `newRecoveryKey` and by `rotateKeys` with `{ fresh: true }`, never with the typed key): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
   dropped } }`: the typed key must open the current recovery wrap first (`wrong_recovery_key`,
   nothing made); then `refreshKeys`, so this browser holds every version up to the account's
@@ -161,7 +170,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the recovery wrap; retry-safe, the same id; a PUT whose answer was lost counts as saved when
   `GET /v2/keys` shows the prepared wrap, `landed()`). Also exported for Settings: `checkRecoveryKey({ userId, text })` (resolves when
   the typed key opens the current recovery wrap; `bad_` / `wrong_recovery_key`; nothing sent),
-  `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
+  `attested(userId, dk, wrap)` and `revokedDevices(userId)`. `relay.ts`: what `pairing.ts` and `signin.ts` share (`PairingClock`, which `pairing.ts`
+  re-exports, `realClock`, `deferred<T>()`, `zeroPrivate(key)`, `sameBytes`, `key32(text, onBad)`, `problemCode(response)`
+  (the problem body's `code`), `retryAfter(response)` (`retry-after` in whole seconds above 0, else undefined: no header is
+  never 0)).
+  `pairing.ts` (stage 1b spec section 1, both roles; injected `clock`
   `{ now, sleep }` for tests, polls every 1.5 s, both stop at `expiresAt` capped at 10 minutes from this device's start (the
   request, or the approver's lookup) → `expired` and on
   `cancel()` → `cancelled`): `startPairing(options)` → `{ id, code, qr, expiresAt, number(),
@@ -178,12 +191,40 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   404). `PairingError` codes `expired` (404 or the clock), `tampered` (any relayed value that does
   not match a pin, a 422, a second approver), `bad_code` (a code that cannot be one or finds
   nothing, a QR not exactly that string), `offline`, `server`, `cancelled`; `session_changed` and
-  `rotated_elsewhere` stay `KeysError`s. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
+  `rotated_elsewhere` stay `KeysError`s. `signin.ts` (spec 2026-11-15 section 8, the browser's
+  half of `/v2/signin`; signed out: plain `fetch` to `/api/v2/signin…`, `credentials:
+  "same-origin"`, never `x-wambito-user`; the poll secret only in the closure, sent as
+  `x-wambito-poll`): `startSignin({ remember, label, clock?, fetch? })` → `WebSignin { id, code, qr,
+  expiresAt, number(), ready(), finish(), cancel() }` (`ready()`: the relay said the phone sealed, before the pickup) (an ephemeral `N`, posts `{ commitment, remember,
+  label }`; `qr` is `wambito://signin?id=<id>&key=<base64url N.pub>`; polling every 1.5 s
+  (`SIGNIN_POLL_MS`) from the first `number()` or `finish()` pins the first `approverKey`, reveals
+  `N.pub` (409 `not_ready` looks again; `already_set` is its own lost answer), then `number()` is
+  `pairingNumber(N.pub, A.pub)`; on `ready`, `finish()` picks up (the response sets the session
+  cookie), opens with `openFromPairing(N.priv, { kind: "device", userId, keyV }, sealed, A.pub)`,
+  runs `deleteStaleVaults(userId)`, then `enrollDevice({ userId }, dk, keyV, { ephemeral: !remember })`
+  → `{ userId, keys }`; DK and `N.priv` zeroed in a `finally`; once the pickup was sent (its answer may
+  set the cookie), `cancel()` no longer stops it or the enroll). A 201 whose `id` is not a UUID, `code` not 8 code characters,
+  `pollSecret` not base64url or `expiresAt` not a date is `server`, `N.priv` zeroed. Stops 2 minutes (`SIGNIN_TTL_MS`) from the start on this browser's clock, never at the
+  server's `expiresAt` (another clock: one behind would end every request at once). `SigninError` codes `expired` (404 or the clock), `tampered` (a
+  second approver key, `ready` before the reveal, a 422, a blob that does not open), `offline`,
+  `server`, `cancelled`, `too_many` (429, `retryAfterS` from `retry-after`), `suspended` (403);
+  the enroll's `KeysError`s go through. `stale-vaults.ts` `deleteStaleVaults(keepUserId)`: deletes every
   `wambito-vault-*` database but the signed-in person's (all when null; `indexedDB.databases()`,
   nothing where the browser lacks it), on sign-in (`useFinishSignIn`) and on every signed-out load
   of the live guards (`GuardDeps.onSignedOut` in `auth/session.ts`): a vault outlives a session that
-  ended outside the sign-out.
-  `vault-session.ts`: a preview account's open vault, one per tab, shared by `/welcome` and
+  ended outside the sign-out (signed-in loads sweep other users' `ephemeral` vaults,
+  `local/ephemeral.ts`). `recovery-signin.ts` `signInWithRecoveryKey(text, { fetch? })` →
+  `{ userId, keys }` (signed out like `signin.ts`: plain `fetch`, `credentials: "same-origin"`, no
+  `x-wambito-user`): parses the typed text once (`parseRecoverySecret`, exported from `keys.ts`),
+  derives `recoveryVerifier(secret)`, posts `{ lookup, auth }` base64url to
+  `/api/v2/recovery/sign-in` (the response sets the session cookie), then `deleteStaleVaults(userId)`
+  and `unlockWithRecovery({ userId, text })` (which also writes the verifier); the secret, `lookup`
+  and `auth` zeroed in a `finally`, never logged or stored. `KeysError`s: `bad_recovery_key`
+  (nothing sent), `recovery_key_invalid` (401), `account_suspended` (403), `too_many_requests` (429,
+  `retryAfterS`), `offline`, `server`; a failed unlock throws its own error and the caller signs
+  out.
+  `vault-session.ts` (`markRecoveryKeySaved(session, now)`: one local write of
+  `settings.recoveryKeySavedAt`, then a sync): a preview account's open vault, one per tab, shared by `/welcome` and
   `/app`: `openVaultSession({ profile, keys, fresh })` opens the store, runs a full sync (must
   succeed when `fresh`; a known browser opens offline), seeds an empty account (settings record
   from the server profile, currency EUR, and the suggested categories, through the local backend),
@@ -193,11 +234,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`, a guest's Locked). `key_unverified` (a new key version whose links do
+  notice `vault.removed`). `key_unverified` (a new key version whose links do
   not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
   stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
   its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
-  (the opening's error the same way): Unlock with the notice `vault.unverified`, a guest's Locked.
+  (the opening's error the same way): Unlock with the notice `vault.unverified`.
   The unlock there (recovery key, passkey, pairing) keeps the vault, replaces the device wrap and
   opens a new session fresh, whose first sync pushes what waited; a recovery key or passkey
   unlocks it even when the links do not reach the held key (a version made before links). `session.reloadKeys()`
@@ -214,22 +255,27 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
-  ready, else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
+  ready; a setup committed in this browser goes through `install` first (`InstallApp`: Wambi, the
+  Android APK and release links, a store button only for a non-null `PLAY_HREF`/`FDROID_HREF`/`APP_STORE_HREF`
+  in `landing/links.ts` `STORE_LINKS`; `gate.installDone()` opens the vault; never after an unlock, a
+  pairing or a known browser; story `Vault/Install app`, copy `vault.install.*`), else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
   from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
   passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
   unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
-  device" and a guest Locked's "Approve from another device" enter `pairing` (`gate.pair()`;
+  device" enters `pairing` (`gate.pair()`;
   `gate.startPairing()` makes the request, again for "Start again", cancelling the previous one;
   the latest call wins: an older one answering later cancels its own request;
   its `finish()` opens the vault like a recovery unlock: pending passkey wrap, full sync; a failed
-  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock or Locked);
+  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock);
   before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
   nothing runs for the old id; Locked kinds `error`, `offline`,
-  `unsupported` (no X25519: no retry) and `guest` (a guest whose account has keys elsewhere: no
-  recovery key to type, so pair from another device, sign out or delete the account); a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
+  `unsupported` (no X25519: no retry). There is no guest branch: an account made by the phone (no
+  email, `isAnonymous`) whose keys are elsewhere gets Unlock like any encrypted account (recovery
+  key, passkey, "From another device"); only `prepareAccount({ guest })` still hides its first
+  recovery key; a 401 from `/v2/keys` signs in again) and then `<ApiProvider mode="local">`;
   the onboarding flag is the vault's (`LocalOnboardingRoute`), not the server's. `ApiMode` is
   `live | demo | local`: demo-only behaviour checks `=== "demo"`, live-only `=== "live"`
   (import); settings shows `settings.local_off` under import and export in `local` (the
@@ -239,7 +285,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
   null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
   where `passkeysSupported()` is false; `onPair` "From another device"; `title`, `lead` (null: none)
-  and `exitLabel` for the consent page's unlock step), `Locked` (retry, guest delete, guest `onPair`); all three have `onSignOut` (the gate passes `useSignOut`,
+  and `exitLabel` for the consent page's unlock step), `Locked` (retry or sign-out only); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
   `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
   number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
@@ -250,13 +296,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   shown; disabled while `approve()` runs) and "They do not match" (cancels: nothing shared));
   `vault-context.ts` `VaultSessionContext` / `useVaultSession()`: the gate provides the open
   session beside `<ApiProvider mode="local">` (null elsewhere), so Settings reaches its keys.
-  Settings → Security (`features/settings/`, mode `local`; a guest (Ruling 8, no recovery key)
-  gets only "Approve a new device", `SecuritySection guest`, nothing loaded, copy
-  `settings.security.guest_lead`, so a guest's Locked "Approve from another device" has an
-  approver):
+  Settings → Security (`features/settings/`, mode `local`; every encrypted account gets the
+  whole section, an anonymous one too):
   `security.ts` `SecurityApi` (`load()` → wraps, `ownId`, `revoked`, `verified` (attestations under
   DK from `withDataKey`), `unreadable` (`quarantineCount()`); `rotate`, `checkRecoveryKey`,
-  `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `pairing`), `liveSecurity(session)`
+  `newRecoveryKey`, `reloadKeys`, `evaluatePrf`, `addPasskeyWrap`, `settings()` (the settings
+  record's `recoveryKeySavedAt`), `markRecoveryKeySaved()`, `pairing`), `liveSecurity(session)`
   the default, `Settings`' `security` prop (and `HomeStage`'s) for stories; react-query key
   `SECURITY_KEY`; `security-model.ts` (`deviceRows`: this browser marked and never removable,
   revoked ids left out, "Not verified" when the attestation fails; `passkeyRows`: joined to passkey
@@ -279,6 +324,28 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
   then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
   `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.
+  "Protect your data" (spec 2026-11-15 section 5.2; `ProtectSection.tsx`, above the passkeys,
+  only for a `local` account whose profile `isAnonymous`): `protect-model.ts` `protectStatus({
+  anonymous, recoveryKeySavedAt, passkeyWrap, passkeyWithoutWrap, passkeysSupported })` (null with
+  an email; "N of 2" (`show`) until step 1 or 2 is done (`protected`), then a quiet list with
+  "Done"). Step 1 "Save a recovery key" asks nothing (web ruling 16): `newRecoveryKey()`,
+  `RecoveryKeySetup`, `commit()` (a failed commit keeps the setup, as in Security), then
+  `markRecoveryKeySaved()` and `protectSettingsKey(userId)` (`security.ts`, per user) refetched. Step 2 (only where
+  `passkeys.supported()`): `PasskeysApi.add({ userId, explainSecondTouch, keep })`, `keep` =
+  `SecurityApi.addPasskeyWrap`; done only when a passkey wrap exists, never the passkey row; a
+  passkey without one shows `settings.protect.no_prf`, or `settings.protect.link_failed` when its
+  PRF came but the wrap could not be saved (`keep` threw; `addPasskey` swallows it). Step 3 "Create account (add an email)":
+  opens `AddEmail` in a `Takeover` from `Settings` (its `onAddEmail` prop, and `HomeStage`'s,
+  replaces the opening for stories). `add-email.ts` `claimEmail(api)` → `{ send(email), verify(email,
+  code) }` over `/v1/me/claim-email/send|verify`, rejecting with `ClaimError.key` (sign-in's
+  `errors.*` keys; 409 `email_taken` is `settings.add_email.taken`: the web never merges, it says
+  to bring the data in from the phone, ruling 5). `AddEmail({ claim, onDone, onCancel? })`: email,
+  then sign-in's `CodeInput`, then `queryKeys.me()` invalidated (the profile shows the email, the
+  Protect block goes; the user id and keys do not change). With `security` and no
+  `recoveryKeySavedAt`, the key setup follows the email with no way out (spec 7.1), sharing step 1's
+  `recovery-key-step.ts` `useRecoveryKeyStep(security, onSaved)` with `ProtectSection`). `HomeStage` `claim: "ok" | "taken"`
+  fakes the routes (code 123456). Stories `Settings/Protect` and `Settings/Add email`, web-only,
+  not in parity.json; copy under `settings.protect.*` and `settings.add_email.*`.
   `uqr` is in `vitest.config.ts` `optimizeDeps.include` like every dependency a story imports; pure UI,
   callbacks as props; stories `Vault/*`, web-only, not in parity.json; copy under `vault.*`. A
   recurrence's occurrences have ids `uuidv5(ruleId, "<month>:<rev>")`; editing or archiving a rule
@@ -290,7 +357,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   them (pairing stays strict): denial of service only, nothing is revealed.
   `app/feedback/` sounds, vibration, `Celebration`; `app/theme/`; `app/site/` origins/build env;
   `app/admin/` the admin panel (`/admin/*`, layout `routes/admin.tsx`): `useAdmin`/`adminFetch`
-  (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, audit, look-up),
+  (a 401 `admin_verification_required` waits for the passkey, then retries), `AdminGate` (the layout's gate), `VerifyScreen`, `HomeScreen` (metrics, `ActivityBlocks`: daily actives, cohorts, installs, versions; audit, look-up; the cards say "Without email"),
   `AccountScreen` + `ActionSheet` (`/admin/users/:id`: the account and its actions; a sheet's
   fields live in the component, so a reason survives re-verification). Stories `Admin/*`,
   web-only, not in parity.json.
@@ -306,6 +373,56 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   naming a language in it. `Capture/Step` and `Capture/MainPicture` (night) are parity stories in
   `apps/mobile/test/parity/parity.json`; `Capture/Steps` is web-only (the Flutter twin is
   `apps/mobile/lib/capture_auto/`).
+- The QR sign-in (`features/sign-in/`, web plan rulings 8–10): `signin-model.ts`
+  `createQrSignin({ start, label, clock, visible(), onVisibility(cb) })` → `{ state(), subscribe,
+  setRemember, remember(), retry(), stop() }`, pure and unit-tested with a fake `startSignin`,
+  clock and page. `QrState`: `opening` → `showing` (QR, no phone yet) → `approved` (`number()`
+  resolved: never replaced, runs to its end) → `finishing` (`ready()`) → `done { userId }`; `failed
+  { code, retryAt? }`; `paused` (hidden page whose request ran out). One request at a time, every
+  dropped one `cancel()`ed. A `showing` request is replaced at its end on this browser's clock (`SIGNIN_TTL_MS` from its opening, never the server's `expiresAt`: a fast client clock would renew in a loop) while visible; hidden,
+  it stops there and opens one new request when visible again (also when a throttled timer is
+  late: an expired QR is never shown). `remember()` starts true; `setRemember` cancels the shown QR
+  at once and opens a new one after `REMEMBER_DELAY_MS` (500 ms) without another change (`paused` if hidden by then); ignored
+  from `approved` on. `too_many` retries by itself at `retryAt` (`retry-after`, else 60 s);
+  `expired` renews by itself when visible; other codes (a non-`SigninError`, such as the enroll's
+  `KeysError`, is `server`) wait for `retry()`. `stop()`: cancel, no more requests. `QrSignIn.tsx`
+  `QrSignIn({ model, onSignedIn, timeZone })`: a `<section>` (no screen frame; the page places it)
+  with the QR (`uqr` `renderSVG` in an `<img>`, alt = the code), the code `ABCD EFGH`, the box
+  "Keep me signed in on this browser" (disabled from `approved`; unticked adds the "Nothing stays"
+  line), the quiet number line (ruling 8), "Opening your data…", the failures with "Try again"
+  (none for `too_many`, which shows the retry time in `timeZone`, nor `suspended`); `onSignedIn`
+  once on `done` (the page navigates and handles a failed finish). Stories `Sign-in/QR`, web-only,
+  not in parity.json; copy under `sign_in.qr.*`.
+- `/sign-in` and `/create-account` (`routes/sign-in.tsx`, `routes/create-account.tsx`, both under
+  the app layout with `redirectIfSignedIn`; web plan rulings 1, 3, 12–14): `SignIn({ auth, mode =
+  "sign-in" | "create", qr? })` (`qr`: a `QrFactory(page) → QrSignin`, `liveQrFactory(auth)` by
+  default, faked in stories). `sign-in` (in every build, no flag): the screen's own width decides
+  (`WIDE_PX` 768, measured on the screen root, starting from `document.documentElement.clientWidth` so a computer's first render is already wide: moving the email field later ends Chrome's passkey autofill request): wide puts the QR panel first and "Other ways to sign
+  in" beside it (fingerprint button, "Recovery key", the email form), narrow puts the other ways
+  first and the QR under "Signing in on a computer? Scan it with your phone"; both are keyed, so the
+  model survives a change of layout. `QrArea` makes the model only once the panel is on screen
+  (`IntersectionObserver`), and its `visible()` is "tab shown and panel on screen", so an off-screen
+  QR is not renewed; it is stopped only on unmount, and while it is `finishing`/`done` the other
+  ways (and leaving the email step) wait. `RecoveryKeySignIn` (a button with `aria-expanded` that
+  opens the field; copy `sign_in.recovery.*`, errors from `vault.unlock.error_*` and
+  `errors.recovery_key_invalid` / `account_suspended`; a 429 waits out `retryAfterS`). `create`:
+  the email code form under "Create your account" (`sign_in.create.*`) with "Already have an
+  account? Sign in" (`/sign-in` with the same query); no QR, recovery or fingerprint button.
+  `auth.ts`: `SignInAuth.signInWithRecoveryKey(text) → RecoveryResult` (`{ userId }` or `{ error,
+  retryAfterS? }`) and `startQrSignin` (= `startSignin`), both from `createSessionSafeAuth`, which
+  watches the `fetch` for the 200 that sets the cookie (`/v2/recovery/sign-in`, the pickup) and,
+  when the unlock or the enroll fails after it, signs out (`liveSignOut`, then
+  `deleteStaleVaults(null)`) before the error reaches the screen: never a session without keys.
+  `useFinishSignIn({ method: "email" | "passkey" | "qr" | "recovery" })`: only `email` may offer a
+  passkey (`offersPasskey(method, destination)` in `auth.ts`); a QR or recovery sign-in passes only
+  the user id. `local/ephemeral.ts` `wipeForeignEphemeralVaults(signedInUserId)`: deletes every
+  vault whose meta `ephemeral` is true but the signed-in user's (all when null), opening each
+  database without a version (never upgrading it); never throws. It runs on every signed-in load of
+  the live guards (`GuardDeps.onSignedIn` in `auth/session.ts`), not in a layout loader: a loader on
+  `app-layout.tsx` would replace every child's `HydrateFallback` and add a session request. Stories
+  in `Sign-in/SignIn`: `Phone first`, `Recovery key`, `Recovery key signs in`, `Create account`,
+  `Phone` (web-only; the parity stories there now show the recovery button and the QR below the
+  email form on a phone).
 - `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
   `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
   consent. An encrypted one (`previewProfile()` in the loader; `device` when `loadLocalKeys` finds
@@ -321,6 +438,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   person taps the button (a mail scanner opening the link spends nothing), then sends them to
   sign-in (every session was closed). Copy in `confirm_email.*` in all four languages; story
   `ConfirmEmail`, web-only, not in parity.json.
+- Daily seen call: `app/auth/seen.ts` `markSeenToday(userId, timeZone)`, called unawaited from the `/app`
+  loader (`previewProfile(onMe)`, every account), once per local day (`wambito.seen.<userId>`), stored
+  after a 204; `x-wambito-version` = `BUILD_ID` (`VITE_BUILD_ID`, set by `deploy/personal/up.sh`, else
+  `dev`).
 - Storage: only `readStored/writeStored/removeStored` in `app/lib/stored.ts` (keys
   `wambito.<name>`, `sessionArea()` for session data).
   Exception: `app/local/` talks to IndexedDB directly (`db.ts`), because the vault needs
@@ -346,17 +467,26 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   shoots `/demo/insights` per language and theme into `public/landing/insights-*.webp` (the screen
   without the donut's ring) and `donut-*.webp` (the ring alone, which CSS sweeps in over it), and
   writes the ring's place to `app/features/landing/app-screen.gen.ts`. Generated: never edit them.
-- e2e: `E2E_NOW=2026-10-21T15:00:00Z docker compose up -d --build` (value from
-  `e2e/helpers.ts`), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
+- e2e: `E2E_NOW=2026-10-21T15:00:00Z NEW_USERS_ENCRYPTED=true docker compose up -d --build`
+  (the clock from `e2e/helpers.ts`; every new user born encrypted, as CI runs it), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
   `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).
 - e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
-  seed:admin` (`dev-admin`, admin spec) and `seed:e2e-preview` (`preview-e2e`,
+  seed:admin` (`dev-admin`, admin spec), `seed:e2e-plain-user <email> [lang]` (a plain user,
+  not onboarded, with the starter data; `signUpNewUser` runs it through `seedPlainUser` before
+  its email sign-in, so the plain-app specs test the plain app and need `docker` on the PATH; `encrypted-sign-up.spec.ts` covers
+  the born-encrypted web sign-up) and `seed:e2e-preview` (`preview-e2e`,
   preview@wambito.test, the encrypted-preview account; `E2E_PREVIEW_USER_IDS` defaults to it in
   `docker-compose.yml`). `vault.spec.ts` runs `seed:e2e-preview` itself in `beforeAll`, which
   deletes and recreates the user (no records, key wraps or finance rows), so it needs the stack up
   and `docker` on the PATH; it runs on the desktop project only (one shared account; the file is skipped on the phone and
   its `beforeAll` returns there). CI seeds it
   too.
+- `e2e/signin.spec.ts` (serial, desktop only): the QR sign-in the phone approves, the recovery-key
+  sign-in and the unticked box (no cookie expiry, no `wambito-vault-*` once the cookie is gone).
+  Node plays the phone: `e2e/phone.ts` `approveSignin({ request, userId, code, recoveryKey })`
+  (the real `@wambito/crypto` over the API, with the session of the browser where the account was
+  born). Its account is a fresh web sign-up (born encrypted with `NEW_USERS_ENCRYPTED=true`), not
+  `preview-e2e`, so it never meets `vault.spec.ts`'s reseeds.
 - e2e trap: `pinClock`'s clock keeps running across a page load, while a new page's animation
   clock starts at zero, so a sheet (Motion) stays off-screen after a `goto` in a long-lived
   context for as long as the context had lived; long tests move with in-app links instead.
@@ -367,6 +497,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (`build:landing`): landing + 404 for the Worker. `VITE_APP_URL` points the CTA at the app origin;
   `VITE_SITE_URL` sets canonical/sitemap (default `https://wambito.test`). The VPS builds with
   `WAMBITO_BUILD_DIR=build-personal`.
+- The landing's doors (`features/landing/links.ts`): `appLinkProps(locale, door, landingOnly?,
+  appOrigin?)` with `door` `"create"` (`/create-account?lang=`: the hero's and the closing's
+  primary "Crear cuenta" / "Create account" and the agent's "connect" button) or `"sign-in"`
+  (`/sign-in?lang=`: the header's "Entrar"); "Demo" stays beside the hero's primary. The same in
+  every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
+  (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
 
 ## Traps
 
