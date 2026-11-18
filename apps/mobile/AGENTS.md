@@ -26,7 +26,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `test/parity/capture_how_parity_test.dart`.
   `capture_platform.dart` wraps the `wambito/capture` channel (`autoCapturePlatformProvider`; no channel ⇒ `status()` null ⇒ the section
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
-  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue). A `preview` account has
+  (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue); a merge passes
+  `from` (`sendQueued(userId, from:)`, Kotlin `CaptureQueue.adopt(userId, mark, from)`): the captures tagged `from`
+  are re-tagged and its confirms kept, never dropped (`verifyCode(keepCapturesOf:)`, `returnToGuest`).
+  `CaptureHandover` (`captureHandoverProvider`) keeps `{owner, from}` in secure storage `wambito.capture.handover`
+  before the new token is written, so every hand-over of that session (a restart's, `previewSyncProvider`'s) passes
+  `from` until one went through. A `preview` account has
   the same switches: `previewSyncProvider` hands the queue over with `sendQueued` (never `clearQueue`), and Android's
   `SendCapturesWorker` / `ConfirmCaptureWorker` run `captureMain` (no `CaptureApi`, no network constraint). Only a
   `done`/`changed` run changes the queue (Dart's `ackQueued`); any other outcome or `timeout` keeps it and retries up to
@@ -35,7 +40,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Tests fake it with
   `test/capture_auto/fakes.dart`.
 - API: `lib/api/client.dart` (Dio, `WambitoApi`); headers from `lib/api/device.dart`
-  (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app); server defaults to `https://app.wambito.com`,
+  (`x-wambito-timezone`, `-locale`, `-client`: `ios` on an iPhone, `android` elsewhere, the API's word for the app; `-version`: `wambito/device` `appVersion`, sent only if it matches `^[A-Za-z0-9.+_-]{1,64}$`); `lib/api/seen.dart` (`SeenPing`, watched in `app.dart`) posts `/v2/me/seen` once per local day and account on start and resume, keeping the day only after a 2xx; a headless run never calls it; server defaults to `https://app.wambito.com`,
   override `--dart-define=WAMBITO_SERVER=…` (`lib/api/server_address.dart`) or in Settings.
 - Android side of `wambito/device` (`MainActivity.kt`): `timeZone`, `openUrl`, `appVersion`, `excludeFromBackup`, and the widget card's `widgetInstalled`, `widgetPinSupported`, `pinWidget` (`lib/home/widget_pin.dart`; they use the manifest's receivers, `widget/WidgetPinning.kt`, tested by `WidgetPinningTest`).
 - Storage: secure storage for session and settings; widget snapshot JSON under
@@ -88,10 +93,24 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   over the fake `/v2` in `test/local/fake_sync.dart`) and `vault_session.dart` = `vault-session.ts`
   (`openVaultSession`: store, keys, local backend and sync in one session per account, exactly one
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
-  every key, waiting at most `vaultCloseWait` in all for the store to close). `stale_vaults.dart` =
+  every key, waiting at most `vaultCloseWait` in all for the store to close; `seedIfEmpty` makes the first
+  settings and suggested categories after a complete first sync, skipped with `OpenVaultOptions.seed: false`
+  when a carry fills the new vault). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
+  `into.transaction`, idempotent: `adopt` copies every live record, settings re-keyed to the new user's seed id
+  with `recoveryKeySavedAt` null and no `revokedDevices`; `merge` drops a phone category or `account` that
+  matches the account's by `foldedName` (trim, lower case) and kind (not archived), renames same name other
+  kind `"<name> 2"`, keeps the account's settings, a phone budget only where the account has none for that
+  category; both re-key merchants to `merchantRecordId(intoUserId, key)` (the target's wins). `adopt` keeps every other
+  id; `merge` gives each carried record `mergedId(targetUserId, oldId)` (`uuidv5(mergeNamespace, '<target>:<old>')`,
+  ruling P17: the server's record ids are global and the guest already owns the old ones) and rewrites `categoryId`,
+  `accountId`, `recurrenceId` through the same map; an occurrence of a carried rule is re-derived as
+  `uuidv5(newRuleId, '<month>:<rev>')`, as the backend derives it; `mergedIdsOf` lists those ids; tombstones stay behind except a deleted occurrence of a carried
+  rule, carried as a tombstone so the rule does not make it again; `currencyOf` for the currency stop).
+  `stale_vaults.dart` =
   `stale-vaults.ts` (`deleteStaleVaults(keep)`: every other account's vault file under `vault/`, its
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
-  `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault).
+  `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault;
+  `holdOf` skips a vault whose `meta.hold` is set (or unreadable), see Traps).
   `rotate.dart` = `rotate.ts` (`rotateKeys`: removing a device rotates the data key; this phone never removes
   itself and its own wrap is always posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
   a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`); `rotate.dart` imports `keys.dart`,
@@ -104,7 +123,22 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   relay's `expiresAt` capped at 10 minutes from its own start, and on `cancel()`; the ephemeral private keys and the
   opened DK are zeroed; nothing secret is logged. `PairingClock` is the test seam; `pairingOpenFromPairing` and
   `pairingSealToDevice` record what the crypto handed out. `test/local/pairing_test.dart` ports `pairing.test.ts` over
-  a fake relay.
+  a fake relay. Both relays share `relay.dart` (= `relay.ts`: `RelayClient` with `send`/`get`/`post`/`poll(path,
+  step over the decoded body)`/`setDeadline`/`restart`/`check`/`cancelled`, errors made by the caller's type;
+  `sameBytes`, `key32`, `relayCodePattern`; with `backOffTooMany` a 429 waits its `retry-after`, else 5 s doubling
+  to 30 s, never asks again at once; a wait that would reach the deadline is `expired` at once) and `relay_clock.dart` (`PairingClock`, `RealPairingClock`; `pairing.dart`
+  re-exports `PairingClock`; `relay.dart` never imports `pairing.dart`). `signin_approval.dart` is the phone's half
+  of `signin.ts` (phone-first spec 8.1): `findSigninRequest(options, code:|qr:)` (QR exactly
+  `wambito://signin?id=<uuid>&key=<43>`, `isSigninQr`; pins the commitment, a QR's key must hash to it; posts
+  nothing; `fromLink:` a QR that came in a link) → `SigninApproval` (`label`, `expiresAt`, `typed`, `fromLink`,
+  `comparesNumber` = typed or from a link; `approve()` posts `A.pub` (409 → `tampered`), polls `GET /v2/signin/{id}`
+  for the browser's key and checks it, returns the 6 digits when `comparesNumber` (null only for the in-app
+  scanner's QR); `seal()` is a `StateError` then until `approve()` returned, checks the deadline, seals like
+  pairing (`WrapContext(device, userId, keyV)`, `sealForApprover` over the `pairingSealToDevice` seam), waits for
+  the pickup's 404 (after the seal is out, anything else is `unconfirmed`); `cancel()` zeroes `A`). `SigninError`
+  codes `bad_code`, `expired`, `tampered`, `offline`, `server`, `cancelled`, `unconfirmed`. Its 2 minutes
+  (`signinTtl`) run on the phone's clock from the read, never on the server's `expiresAt`. Seam
+  `signinGenerateDeviceKeyPair`; tests `test/local/signin_approval_test.dart` over `fake_signin.dart`.
   `db.dart` `pendingChangesInVault` counts a kept vault's unsent changes from its file (Unlock and
   Locked sign out through the unsynced sheet without "Sync and sign out"). `install_marker.dart`: `clearKeysAfterReinstall` runs first in `bootstrap()` and deletes
   every `wambito.vault.*` / `wambito.encryption.*` item and the kept `wambito.account` when
@@ -120,7 +154,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   widget and due effects (each best effort: one that throws skips neither the other nor the ack), then `ack` last
   (a crash leaves the queue; the next run merges). A run has a deadline (`BackgroundDeps.deadline`: 20 s on iOS,
   8 min on Android, inside the native budgets): past it the sync stops at its next fence, the effects are skipped,
-  what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. `queued_capture.dart`
+  what was saved is acked and the lease released; `cutAtDeadline` cancels the network at it. A sync refused with
+  401 `user_deleted` ends `userDeleted` (no effects, no hold, nothing adopted: only the app adopts, Review Focus 2;
+  Android's `SyncWorker` retries it like `failed`); a removed device (`deviceRemoved`) ends `signedOut`. `queued_capture.dart`
   reads Kotlin's items; `AutoCapturePlatform.takeQueued/ackQueued` are on `wambito/capture`. Tests: `test/background/`.
   The vault lease (`lib/local/vault_lock.dart`, `tryLease` / `waitLease`) is what lets the app and a headless engine
   share one vault file: a lock file `wambito-vault-<userId>.db-lock` in the vault folder, holder `app` or `background`,
@@ -154,22 +190,67 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   stays false, so its finance calls wait for the server's answer). The router reads
   `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
-  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (guest: the same button, and
-  delete the account), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
+  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
+  sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
   groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
   a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
-  stops polling); Checking, Opening and Committing show a loading line. The other side of a pairing is
+  stops polling); Checking, Opening and Committing show a loading line. The gate has no guest branch (phone-first
+  accounts): every `preview` account with wraps elsewhere, with or without email, gets Unlock (`LockedKind` is
+  `error`, `offline`, `unsupported`; `PairingFrom` only `unlock`), while `prepareAccount(guest: isAnonymous)` still
+  sets an account without email up with no key shown. The welcome (`lib/entry/entry_screen.dart`) is Wambi,
+  "Start" (`entry.start`, `POST /auth/sign-in/anonymous`) and "I already have an account" (`entry.haveAccount`, a
+  link to `/entry/email`). Offline, "Start" (`SessionController.startGuest`, ruling 8) opens a provisional vault
+  only when new users are known to be encrypted (`newUsersEncryptedProvider` in `lib/api/server_url.dart`: the
+  build define `WAMBITO_NEW_USERS_ENCRYPTED`, `newUsersEncryptedByBuild` in `server_address.dart`, or
+  `wambito.server.<host>.newUsers` = `encrypted`, written when `GET /v1/me` first says an anonymous user is
+  `preview`); else `NeedsConnection` (`lib/entry/needs_connection.dart`, keys `entry.needsConnection`,
+  `entry.tryAgain`) and nothing is made. Provisional (`SessionState.provisional(localId)`, `SessionStatus.provisional`,
+  no token: the jobs, the widget and capture see it signed out; no sign-in, the entry routes go home) the screens'
+  `/v1` is the vault of `lib/local/provisional.dart` (`openProvisionalVault`: id `local-<uuidv7>`, held
+  `provisional`, seeded from the hints; no keys, no sync; `provisionalVaultProvider`, a `FinanceGuard` after it), and
+  Settings shows only the preferences and a line (`settings.provisional`: `provisionalWaiting`, or
+  `ProvisionalBlock.plainServer` / `noGuests`). `promoteProvisional` (app.dart's first hook: start, resume, every
+  minute) is `adoptVaultIntoNewUser(localId, …)` with its token under `session.provisionalToken` and the app's vault
+  stopped before the carry: `adopted` signs the new anonymous user in (captures re-tagged from the local id);
+  `plainUser` deletes that empty user (`DELETE /v1/me`, else a sign-out), keeps `newUsers` = `plain <build> <day>`
+  (no new probe that day by that build), keeps the vault held and is tried again only at the next start; a 403 is
+  `noGuests`. A kill after the carry forgot the vault but before the sign-in: `openProvisionalVault` never remakes a
+  missing file while `session.provisionalToken` is kept (`ProvisionalVaultGone`), and the next promotion only signs in. Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
+  (`lib/entry/recovery_sign_in_screen.dart`, route `/entry/recovery`, signed out only; keys `recovery.input`,
+  `recovery.submit`): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
+  (`keysParseRecoveryKey`; one that does not parse is `bad_recovery_key`, nothing sent), posts only `recoveryVerifier`'s
+  `lookup`/`auth` (`AuthApi.recoverySignIn`, zeroed once sent; 401 `recovery_key_invalid`, 429 `retryAfter`), then
+  holds the parsed 16 bytes in `signInRecoveryKeyProvider` (`SignInRecoveryKey`: memory only, one take, zeroed by a
+  failed sign-in, a sign-out or an expiry; never a `String`). The gate takes it at every check
+  (`VaultGateDeps.takeSignInRecoverySecret`) and tries it once through `keys.unlockWithRecoverySecret` on an account
+  with wraps and no keys here, before Unlock, zeroing it either way; a failure shows `Unlock(error: …)`. Opened that
+  way, the vault marks `recoveryKeySavedAt` when it was null. The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
   "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
   code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
-  `scan` → the first `wambito://pair?` QR, or null for a close or a refused permission), then the number, then
+  `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default `[pairQrPrefix]`,
+  the sign-in screen asks `[signinQrPrefix]`; the native sides know only those two), or null for a close or a
+  refused permission), then the number, then
   "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
-  `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only; a guest only gets "Approve a new device"):
+  `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
-  `security_section.dart` (devices, Remove, Approve, "New recovery key"), `remove_device_sheet.dart` (typed key or a new one),
+  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key"),
+  `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
+  **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
+  "They match" after a typed code or for a link-opened QR (ruling P18: any app can send the link, so it is
+  unauthenticated intent; it also shows `signin.fromLink`); the host line is the trust signal, the label is quoted
+  and muted; Approve is off for `signinApproveDelay` (1 s) after a request appears; a seal whose pickup cannot be
+  seen shows "Sent"; through `SecurityApi.findSigninRequest`; registered in `openSigninApprovalsProvider` while
+  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
+  `signin_notice.dart` (phone-first spec 8.3, ruling 16): `newDevices`, `SeenDevicesStore` (`wambito.vault.<userId>.seenDevices`),
+  `showSigninNotice`, and `SigninNoticeHost` (in `app.dart`'s `builder`, last of the start and resume hooks): with the vault Ready and
+  home free it says "A session was opened on {label}" for any device wrap not this phone's and not in the last look, browsers and
+  phones added by pairing alike, and the approving phone too (no special case: the first look records silently). "That wasn't me"
+  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device, or pushes `/settings` for several; "OK" and "That wasn't me"
+  record the look, closing the sheet any other way does not. A `plain` account has no `SecurityApi`, so no `/v2/keys` call.
   Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
@@ -180,11 +261,44 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
   (`forgetVault`), the kept account and mode, before the token goes; Settings asks
   `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
-  A 401 (session expired, signed out everywhere: `_refresh` at start, the gate's `signInAgain`) ends
-  the session only (`SessionController.sessionExpired`): the vault, its keys and the kept account stay
-  for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
-  them, and so does a signed-out start unless they are the account kept last (`_sweepSignedOut`).
-  Only a sign-out and a removed device (`device_removed`) wipe the vault. A 423 `vault_locked` save
+  A 401 is told apart by its code (phone-first spec 10, `lib/api/unauthorized.dart`: `Unauthorized`
+  `deviceRemoved`, `userDeleted`, `expired` = `unauthenticated` or anything else; `unauthorizedOf(code)`,
+  `unauthorizedOfError(dio)`). `GET /v1/me` at start (`AuthApi.standing(token, userId:)`), in
+  `freshVaultAccountProvider` and in the gate's `sessionUserId` sends `x-wambito-user` with the account kept for
+  the session (ruling 17), so a deleted user answers `user_deleted`; the sync's 401 (`SyncProblemCode.userDeleted`,
+  `deviceRemoved` with status 401, else `unauthorized`) and `/v2/keys`'s (`KeysError` `device_removed`,
+  `user_deleted`, `unauthenticated`, status 401) carry it too, and `OpenVaultOptions.onUnauthorized(kind)` hands it
+  on. Everything ends in `SessionController.sessionEnded(token:, kind:)` (`_refresh` at start, the gate's
+  `signInAgain(kind)`): `expired` is `sessionExpired` (the session ends only: the vault, its keys and the kept
+  account stay for the same account's next sign-in, which pushes the outbox; another account's sign-in sweeps
+  them, and so does a signed-out start unless they are the account kept last, `_sweepSignedOut`);
+  `deviceRemoved` wipes the vault, the home cache and the widget's figures, then signs out; `userDeleted` adopts
+  the vault into a new anonymous user (`lib/local/adopt.dart`, below). A `plain` account (or one whose mode was
+  never kept for the session) gets `sessionExpired` whatever the code. Only a sign-out, a removed device and an
+  empty deleted account's vault wipe the vault.
+  `lib/local/adopt.dart`: `adoptVaultIntoNewUser(oldVaultId, AdoptDeps)` → `AdoptStep` (`adopted`, `plainUser`,
+  `waiting`), the routine Task 11 reuses: the new user's token kept first (`AdoptDeps.keptToken/keepToken`; a kept
+  one is reused, so a crash never makes a second user), the hold's target = the new id, `plainUser` stops there,
+  `prepareAccount(guest: true)` (a hidden recovery wrap; the nudges start over), then under the old vault's lease and
+  with the app's writes into it stopped (`stopWrites` closes its open session) `carryRecords(adopt)` into the new
+  user's vault (opened on its own: nothing seeded), then the old vault forgotten; offline (or a 5xx) before the carry
+  is `waiting`. `adoptOrphan(oldUserId, deps)` → `AdoptOutcome` (`adopted`, `wiped`, `waiting`): holds the vault
+  `orphaned` first; no data (ruling 18: no live transaction, recurrence, budget or merchant, and no capture still
+  queued for that user: `hasQueuedCaptures` = `AutoCapturePlatform.hasQueued` over `takeQueued` on the app's
+  `wambito/capture`, read only; a `PlatformException` counts as captures, no Android side as none) and no adoption
+  under way wipes it and signs out (`onWiped`); else the routine, then `onAdopted` (the session becomes the new user's,
+  taking the deleted user's queued captures over: `captureHandoverProvider.keep` then `_signedIn(capturesFrom:)`)
+  and the kept token goes. `resumeAdoption(deps)` (`adoptionResumeProvider`, watched in `app.dart` before the
+  merge's: at start and on resume) goes on with every `orphaned` hold of `listVaultHolds` when `mayResume` allows
+  (signed out, or still in that account's session); a vault in `unreadable` is left alone. `adoptDepsProvider`
+  (tests override it); adoptions run one after the other, never one in place of another
+  (`SessionController._adoption`), and a 401's adoption queued behind another runs only while the session is
+  still that dead token. `onAdopted` waits for `sendQueued(newUserId, from: oldUserId)` itself, so the queue is
+  never left tagged to the deleted user. The gate never opens a vault held `orphaned` (`refuseAdopted`, before and
+  after `openVaultSession`, through `vaultHoldReaderProvider`): it asks the adoption to go on and shows Locked
+  `offline` (`adopting`), or `LockedKind.plainServer` (`vaultLockedPlainServer*`) when the adoption stopped at a
+  `plain` new user (`adoptionNeedsEncryptedServer`, kept in `adoptionNeedsEncryptedServerProvider`, whose change makes
+  a Locked gate check again by itself). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
   What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
@@ -204,6 +318,72 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `DueWorker` (`preview` or `unknown` ⇒ no API call (`RefreshWorker` asks the headless sync); absent = an install from before the vault ⇒ as
   before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
   screens pass `previewOpen()` (`test/support/preview_account.dart`).
+- `lib/protect/`: "Protect your data" (phone-first spec 5.2) for a `preview` account without email. `protect_status.dart`:
+  `ProtectStatus` (`recoveryKey`, `passkey`, `passkeyOffered`, `passkeyWithoutPrf`, `done`, `protected`) and
+  `protectStatusProvider` (null unless `preview`, anonymous and the vault open; read again on every vault commit);
+  step 1 is the synced settings field `recoveryKeySavedAt` (`packages/core` `records.ts` and `lib/core/records.dart`,
+  read straight from the vault with `recoveryKeySavedAt(store)`), step 2 a passkey wrap (`anyPasskeyWrap`), never the
+  passkey row. `protect_actions.dart`: `protectWithRecoveryKey` (screen lock, then `newRecoveryKey` on the same key
+  version, no rotation: it replaces the guest's hidden recovery wrap; `rotated_elsewhere` reloads the keys and makes
+  the key again; `canLeave: false` keeps `RecoverySetupPage` until saved) then `markRecoveryKeySaved` (settings record
+  in one store transaction, then a sync; Settings → Security's "New recovery key" marks it too);
+  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
+  `preview` guest's claim, `protectWithRecoveryKey(canLeave: false)` when the settings record's `recoveryKeySavedAt`
+  is null (read from the vault, never `protectStatusProvider`, which is null once the account has an email), then
+  `SessionController.offerPasskey()` (`offerPasskeyFor` when `PasskeyOffer.dueFor` says so): the only passkey offer
+  after a claim, `confirmClaim` offers nothing. The key is owed (`KeyAfterClaimMarks`, secure storage
+  `wambito.protect.<userId>.keyAfterClaim`, written just before `confirmClaim`, cleared once the key is saved): a key
+  that could not be made (lock refused, offline) stops there, no offer; a kill on its page, or that, brings the page
+  back when the vault opens with home there (`resumeKeyAfterClaim`, from `HomeScreen`). For a `preview` account with
+  its vault open the offer page makes the passkey with `protectWithPasskey` (PRF wrap; no PRF toasts
+  `protectPasskeyNoPrf`); otherwise `registerPasskey`. The email screen runs it under `claimFinishingProvider`, which keeps
+  `/entry/email` open past the router's "no email screen once there is an email" (`sessionRedirect(finishingClaim:)`).
+  A `preview` guest's email_taken asks `askMerge`; yes is `MergeController.begin` then `sendCode(replaceGuest: true)`,
+  the code is `verifyCode(keepCapturesOf: guestUserId)`, and backing out of it ("Usar otro correo", back) is
+  `MergeController.cancel()`; no changes nothing. The preview `/progress` says what an email adds
+  (`protectEmailTitle`, `protectEmailLead`, `progressPreviewBody`) and has no passkey section. A `plain` guest's claim
+  and email_taken are today's. Tests: `test/entry/claim_preview_test.dart`. `confirmSensitive(noKeyYet:)`: with no screen lock and no
+  saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
+  Settings (keys `protect.block`, `protect.count` "N of 2" while neither step is done, `protect.recovery`,
+  `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`); a `preview`
+  guest has no `settings.saveProgress`, and no `home.saveProgress` in home's menu (ruling 21). Tests: `test/protect/`
+  (`fakes.dart`: `FakeVault` on a memory store).
+  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, before `WidgetCard`, which waits while it
+  shows; buttons `protect.cardGo` = step 1, `protect.cardLater`). `protectCardProvider` is true while
+  `protectStatusProvider` says no step is done and `protectCardDue` says so: first after 7 days since `firstOpen`
+  (written at the first evaluation) or 20 live transactions in the vault, then 14 days after the first "Not now",
+  30 after the second, every 30 after that. State (`ProtectCardState`: `firstOpen`, `lastDismissed`, `dismissals`)
+  is JSON in secure storage `home.protect.<userId>` (`ProtectCardStore`; tests use memory). `leaving_warning.dart`:
+  `warnUnprotectedLeaving` (keys `unprotected.protectFirst`, `unprotected.signOutConfirm`, `unprotected.serverConfirm`),
+  used by Settings' sign out and server change for a `preview` guest with neither step done ("Protect first" opens
+  the recovery key and leaves nothing); with a step done there is no warning; with the passkey wraps unreadable
+  (offline) the sheet adds a note instead of claiming there is no passkey. A `plain` guest keeps `warnGuestLeaving`.
+- `lib/merge/`: merging this phone's anonymous `preview` account into an existing email account (phone-first spec
+  7.2). `merge_offer.dart` `askMerge(context, email)` (the question and "this phone's recovery key stops working",
+  `merge.yes`); `merge_controller.dart` `MergeController` (`mergeControllerProvider`, states `MergeIdle`,
+  `MergeSigningIn`, `MergeWaitingUnlock`, `MergeCurrencyStop(phone, account)`, `MergeUploading(pending)`, `MergeDone`,
+  `MergeFailed(code, carried)`): `begin(email)` keeps the anonymous token (`wambito.vault.<anonId>.mergeToken`) and
+  holds its vault `merging` (target = the email) before any code is sent; the caller then signs in with
+  `replaceGuest: true`. `run()` (once the account's vault is Ready, `mergeTargetProvider`, read through `ref.container`: it watches
+  the controller, so a `ref.read` is riverpod's debug-mode dependency loop): currency check
+  (`currencyOf`; a difference stops before any write), `carryRecords(mode: merge)` under the old vault's lease, then
+  `meta.mergeCarried` in the old vault (never carried twice: one of `mergedIdsOf`'s ids already in the account's vault
+  also counts as carried, so a crash before the mark never reruns it), sync until `pendingChanges() == 0`, every carried record with a
+  server version (`VaultSession.serverVersion`; one refused for good, `id_taken` or given up, is `MergeFailed('refused')`
+  and nothing is deleted), then `AuthApi.deleteUser` (`DELETE /v1/me` with the kept token; 401 = done),
+  `forgetVault(anonId)` and the token key. The email sign-in finds the merge through `mergeSignInProvider` and keeps the
+  guest's queued captures (`MergeController.guestUserId`).
+  The old vault is read on its own connection (`SqliteStore.open(id, background: true)`, no keys). `cancel()`
+  (ruling 10): after the sign-in `SessionController.returnToGuest(token, guestUserId:)` (the guest session written
+  first, then the email account's vault forgotten by the id learned for that session, then its server sign-out, not
+  waited for), then the hold goes; refused once carried. `keepAccountOnly()` marks `meta.mergeDiscard` in the old vault,
+  then deletes the anonymous user and its vault and carries nothing (a later run finishes it the same way). `mergeResumeProvider` (watched
+  in `app.dart` before the seen ping) resumes from `listVaultHolds` at start, on account changes and on resume (a
+  hold whose file is unreadable, or without its token, is left alone); still in the phone's own session the hold
+  stays (the email's link may come). `mergeBlocksAppProvider` keeps the router on `/merge` (`MergeScreen`:
+  progress, the currency stop with `merge.cancel` and `merge.keepAccount` + `merge.keepAccountConfirm`) while it
+  waits for the account's vault, at the currency stop and after a failure before the carry; Unlock shows
+  `unlock.mergeWaiting` and its sign-out calls the merge off. Tests: `test/merge/`.
 - `lib/search/`: `/search` (`SearchScreen`, twin of `apps/web/app/features/search/`), opened by the
   magnifier in home's header (`home.search`). `searchControllerProvider` (`search_controller.dart`)
   holds the filters and results: text debounced 300 ms, kind, categories and status searched at once,
@@ -213,9 +393,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   totals line hides when the server sends none. The screen uses home's categories (archived too),
   loads the next page when the end is near, and after `openEditSheet` (replaceable in tests with
   `searchOpenEditProvider`) calls `refresh()`. Tests: `test/search/` (fake repository through the provider).
-- Deep links `wambito://{add,capture,due,progress,home,review}` (`lib/launch/launch_links.dart`);
+- Deep links `wambito://{add,capture,due,progress,home,review,signin}` (`lib/launch/launch_links.dart`);
   `wambito://review` and `wambito://review/<id>` (one segment, `launchReviewIdOf`) push `/review` or
-  `/review/<id>` over home, which opens that transaction in the editor.
+  `/review/<id>` over home, which opens that transaction in the editor. `wambito://signin?id=…&key=…`
+  (`LaunchAction.signin`, `launchSigninQrOf`: the exact QR) pushes `/settings/signin?qr=` over home only while
+  `securityApiProvider` is non-null (an open `preview` vault) and no approval screen is open
+  (`openSigninApprovalsProvider`); locked, `plain`, malformed or during an approval, it is dropped (rulings 14, P18).
 
 ## Android (`android/app/src/main/kotlin/com/wambito/app/`)
 
@@ -229,8 +412,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito/*`, registered in `MainActivity.kt`; names match the Dart constants (rename both at once).
 - `scanner/`: `wambito/scanner` (`isAvailable`, `scan`): `ScannerChannel` asks the `CAMERA` permission at scan time
   only (a refusal answers null) and starts `ScannerActivity` (not exported): CameraX `Preview` + `ImageAnalysis`
-  (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first `wambito://pair?` text
-  goes back. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
+  (keep-only-latest) feeding `decodeQr` (ZXing core on the Y plane, `QrDecodeTest`); the first text `acceptsQr`
+  for the call's `prefixes` (`ScannerPrefix.kt`: `qrPrefixesOf` keeps only `wambito://pair?` and
+  `wambito://signin?`, the pairing one by default; `ScannerPrefixTest`) goes back, via `EXTRA_PREFIXES`. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
   and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
   `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
@@ -289,6 +473,7 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
     `wambito://` links and the Universal Links of `app.wambito.com`); `Files/`: `wambito/files`
     (`pick`, `save`, `share`, `clearShared`: CSV import and export, share sheet);
     `Scanner/`: `wambito/scanner` (`isAvailable`, `scan`: `AVCaptureMetadataOutput` for `.qr`, full screen;
+    `QrPrefix.of` / `QrPrefix.accepts` in WambitoNative take the call's `prefixes` as Android does;
     `CameraAccess.state` in WambitoNative maps the permission; `NSCameraUsageDescription` in `InfoPlist.strings`);
     `Passkeys/`: `wambito/passkeys` (`isSupported`, `get`, `getAvailable`, `create`:
     AuthenticationServices); `Notices/`: `wambito/notices` (`scheduleDue`, `scheduleDueList`, `cancelDue`,
@@ -334,7 +519,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `PARITY_PINGFANG` to a `PingFang.ttc` (see `test/support/parity.dart`). CI skips goldens.
 - Parity (`docs/mobile/parity.md`, list `test/parity/parity.json`): `pnpm --filter @wambito/web
   parity:fixtures|parity:shots [id]`, `flutter test --update-goldens test/parity`,
-  `dart run tool/parity/compose.dart --max 2 [id]`.
+  `dart run tool/parity/compose.dart --max 2 [id]`. Known difference: the phone's signed-out email step
+  (`signin-*` masters) ends with the "Sign in with my recovery key" link; the web's story gets it with the web
+  delivery of phone-first accounts.
 - Kotlin: `cd android && JAVA_HOME=<JDK 17> ./gradlew :app:testDebugUnitTest --console=plain`.
 - iOS (macOS, Xcode): `swift test --package-path ios/WambitoNative`; unsigned build `flutter build ios
   --release --no-codesign`; `scripts/check-ios-signing.sh`, `scripts/test-check-ios-signing.sh`;
@@ -342,10 +529,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   CI's `ios` job runs the signing guard, `swift test` and the unsigned build. On a device: set
   `Signing.xcconfig`, then `xcodebuild … -destination id=<device> -allowProvisioningUpdates build`.
 - Integration tests (emulator + root dev stack): `scripts/run-integration-tests.sh`.
-- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env; docker compose up -d`,
-  and `docker compose up -d --build api` after the API code changed: a stale image 404s the newer routes):
-  `scripts/run-vault-e2e.sh` runs two stack tests one after the other (they share the account), each after
-  `seed:e2e-preview` in the api container: `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
+- The vault against the real API (no emulator; root dev stack up with `cp -n .env.example .env;
+  NEW_USERS_ENCRYPTED=true docker compose up -d`, and `--build api` after the API code changed: a stale image
+  404s the newer routes): `scripts/run-vault-e2e.sh` first checks that a new guest's `/v1/me` says `preview`
+  (else it stops: "start the stack with NEW_USERS_ENCRYPTED=true"), then runs three stack tests one after the
+  other. The first two share the seeded account, each after `seed:e2e-preview` in the api container:
+  `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
   code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
   `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
@@ -353,12 +542,23 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
-  `body: null`) is `not_found` on C). `test_stack/support.dart` holds the shared phone, gate and sign-in helpers; a vault
-  session is one per process and account, so only one phone has its session open at a time. After each it checks
-  with `psql` that `preview-e2e` has records (> 0), no rows in `transactions` / `categories`, and that no
-  `records.body` holds the test's word (`almuerzo`, `panaderia`) in the clear (must print 0; a byte search, as a
-  sealed body is not UTF-8). Each test signs in with an email code and the API allows 5 per address in 10 minutes
-  (in memory): after a third run, `docker compose restart api`. CI's `mobile-build` fails when a release APK
+  `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
+  (`phone-first-<run>@wambito.test`, new each run): a guest (`startGuest`) protects (`newRecoveryKey`, its
+  verifier signs in) and claims an email; a guest of its own merges into an email account through
+  `MergeController` in a `ProviderContainer` over the stack (the held vault survives the sweep, no id the guest
+  owns is pushed, the carried deleted occurrence goes as a new tombstone, the guest's token then gets 401);
+  phone C signs in with A's recovery key typed loosely; A approves a web QR for `WebSignin` (the browser's
+  stand-in), which opens A's data key with `openFromPairing`. Its tests 3 and 4 reuse test 1's phone A (fewer
+  email codes): run the whole file. It writes its users' ids to `WAMBITO_E2E_REPORT`. `test_stack/support.dart`
+  holds the shared phone (`Phone(token, dir, account:, storage:)`), gate, sign-in, `startGuest`,
+  `signUpWithEmail`, `authApi()` (each auth request from its own `x-forwarded-for`: Better Auth allows 3
+  sign-ins per address in 10 seconds) and `WebSignin`; a vault session is one per process and account, so only
+  one phone has its session open at a time. After each it checks with `psql` that the accounts have records
+  (> 0), no rows in `transactions` / `categories`, and that no `records.body` holds the test's words
+  (`almuerzo`, `panaderia`, `cafeteria`, `mercado`) in the clear (must print 0; a byte search, as a sealed body
+  is not UTF-8); after the third, that the merged guest's `user` row is gone. The first two sign in with an email
+  code and the API allows 5 per address in 10 minutes (in memory): after a third run, `docker compose restart
+  api`. CI's `mobile-build` fails when a release APK
   lists `libsqlite3.so` (sqflite uses the system SQLite; the ffi dev dependency must stay out). `test_stack/` is outside `test/`, so `flutter test`
   never runs it; CI's `mobile-e2e` job does.
 - Store listing images (emulator + root dev stack; `docs/mobile/play.md`): `tool/store_shots/run.sh`, then
@@ -421,12 +621,34 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 
 ## Traps
 
+- Vault holds: `meta.hold` in a vault file (`VaultHold`: `provisional`, `orphaned`, `merging`;
+  `SqliteStore.hold()/setHold()`, read-only `vaultHoldOf`, `listVaultHolds` for resumes: returns `(holds:, unreadable:)`, a vault file whose hold cannot be read is listed in `unreadable`, never dropped; `hold()` throws on a malformed hold). The
+  stale-vault sweep skips a held vault, file and keys; clear the hold when the work is done.
+- `wambito.vault.<anonId>.mergeToken` (secure storage): the anonymous session's token while its vault is merged
+  into an email account (swept with that vault's keys); and meta keys `mergeCarried` (the carry committed) and
+  `mergeDiscard` (only the account's data kept) in that vault; `wambito.capture.handover` (secure storage, the
+  captures a new session takes over from another account); the merge namespace `mergeNamespace` in
+  `lib/local/merge.dart` (merged ids derive from it).
+- `recoveryKeySavedAt` on the synced `settings` record (`packages/core` and `lib/core/records.dart`; the web reads
+  it too) says step 1 of "Protect your data" is done; renaming it re-nags every account on every device. The
+  scanner channel's argument `prefixes` (`wambito/scanner` `scan`) is read by Kotlin and Swift: rename all three.
+- `wambito.seen.<userId>` (secure storage) is the last local day the app pinged `/v2/me/seen` for that account.
+- `wambito.vault.<userId>.seenDevices` (secure storage) is the JSON list of device wrap ids the sign-in notice last looked at; it goes with `KeyStorage.deleteAll`. Renaming it would make every phone's next look silent.
+- `session.provisional` (secure storage, `SessionStore.provisionalKey`): the offline first run's local vault id,
+  written before its vault is made (a restart reopens it, never a second); `session.provisionalToken`
+  (`provisionalTokenKey`): the token of the user it is being promoted into, kept until the session is that user's;
+  `wambito.server.<host>.newUsers` (`newUsersKeyOf`): `encrypted` once this phone saw that server make a `preview`
+  anonymous user, `plain <build> <yyyy-mm-dd>` once a promotion found a `plain` one; per host, so every port of a
+  host shares it. Persistent names.
+- `wambito.adopt.token` (secure storage, `adoptTokenKey`): the token of the new anonymous user a deleted account's
+  vault is adopted into, kept from its sign-up until the session is that user's. Outside `wambito.vault.*` on
+  purpose: the old vault's keys go before the session changes, and a sweep must never take it.
 - See root `AGENTS.md`: money slang, the signing key's alias, secrets (the keystore too). Here
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
   `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
-  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage key `wambito.widgetCard.closed`; channel
+  at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed`, `home.protect.<userId>` and `wambito.protect.<userId>.keyAfterClaim` and `wambito.vault.<userId>.seenDevices`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:
   Dart entry points `syncMain` / `captureMain`; channels `wambito/background` and `wambito/scanner`;
@@ -442,5 +664,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
 - Never block on a WorkManager future (`.get()`) in code a Worker runs: deadlocks in tests.
 - `test/tooling/*` reads Android files; `widget_android_test.dart` there pins Dart = Kotlin.
 - `manifest_test` counts `android:host="due"` once (only `wambito://` links).
+- Launch host `signin` is the one `wambito://` link on the exported `MainActivity` (its own BROWSABLE filter, so
+  the system camera opens a web sign-in QR); every other host stays on the not-exported `LaunchLinkAlias`.
+  `LaunchLinks.linkOf` takes `signin` from any sender (it only opens the approval), the rest from the alias only;
+  `manifest_test` counts `android:host="signin"` once. iOS `LaunchLinks.swift` takes `signin` with its query only.
 - About 55 goldens already fail on the founder's Mac: compare with the base first. Regenerated
   parity fixtures change millisecond timestamps: keep only the intended diff.

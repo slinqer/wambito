@@ -123,7 +123,7 @@ class PairNewDeviceView extends StatefulWidget {
   /// Asks for a request (again on "Start again"; the gate cancels the previous one).
   final Future<GatePairing<Object?>> Function() start;
 
-  /// Back to where the person came from (Unlock, or a guest's Locked); the gate cancels the request.
+  /// Back to Unlock, where the person came from; the gate cancels the request.
   final VoidCallback onBack;
 
   /// The account's time zone (`VaultProfile.timezone`), for the expiry.

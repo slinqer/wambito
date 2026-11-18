@@ -338,6 +338,7 @@ Json _freshSettings(String timezone) => {
   'timezone': timezone,
   'onboardingCompletedAt': null,
   'revokedDevices': <Object?>[],
+  'recoveryKeySavedAt': null,
 };
 
 /// What one request works with: its transaction and the account's clock.

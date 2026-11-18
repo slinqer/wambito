@@ -44,13 +44,15 @@ class FakeScanner implements QrScanner {
   String? text;
   final Object? error;
   int scans = 0;
+  final prefixes = <List<String>>[];
 
   @override
   Future<bool> isAvailable() async => available;
 
   @override
-  Future<String?> scan() async {
+  Future<String?> scan({List<String> prefixes = const [pairQrPrefix]}) async {
     scans += 1;
+    this.prefixes.add(prefixes);
     if (error != null) throw error!;
     return text;
   }

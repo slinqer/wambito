@@ -173,7 +173,7 @@ void main() {
       expect(env.accounts.deletes, 1);
       expect(env.app.stored, isNull);
       expect(env.app.container.read(sessionProvider).status, SessionStatus.signedOut);
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
       expect(find.text('¿Eliminar tu cuenta?'), findsNothing);
     });
 
@@ -259,7 +259,7 @@ void main() {
       expect(env.app.stored, isNull);
       expect(widgetSignedOut(env.widgets), isTrue);
       expect(env.platform.callsNamed('cancelDue'), isNotEmpty);
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
     });
   });
 
@@ -336,7 +336,7 @@ void main() {
       await _confirm(t);
       expect(env.accounts.deletes, 2);
       expect(env.app.stored, isNull);
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
     });
 
     testWidgets(
@@ -345,7 +345,7 @@ void main() {
         final env = await failing(t, const HomeFailure(401));
         // Signed out, and nothing else of the phone was cleared as for a delete.
         expect(env.app.stored, isNull);
-        expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+        expect(find.byKey(const Key('entry.start')), findsOneWidget);
         expect(find.text('¿Eliminar tu cuenta?'), findsNothing);
         expect(env.app.models.installed, isTrue);
         expect(env.app.settings.values.containsKey('onboarding.draft.user-1'), isTrue);
@@ -374,7 +374,7 @@ void main() {
         expect(widgetSignedOut(env.widgets), isTrue);
         expect(env.app.models.installed, isFalse);
         expect(env.app.settings.values.containsKey('onboarding.draft.user-1'), isFalse);
-        expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+        expect(find.byKey(const Key('entry.start')), findsOneWidget);
         expect(find.textContaining('NO se eliminó'), findsNothing);
       },
     );

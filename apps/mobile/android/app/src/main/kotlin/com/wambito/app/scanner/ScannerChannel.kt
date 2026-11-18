@@ -13,8 +13,10 @@ import io.flutter.plugin.common.MethodChannel
  * only ever opened by `scan`, and its permission only asked there.
  *
  *  * `isAvailable` → true when the phone has a back camera (the one the scanner opens).
- *  * `scan` → the text of the first `wambito://pair?` QR read ([ScannerActivity], full screen), or
- *    null when the person closed it or refused the camera permission (no error, no crash). Errors:
+ *  * `scan` → the text of the first QR read ([ScannerActivity], full screen) that starts with one
+ *    of its `prefixes` argument ([qrPrefixesOf]: only `wambito://pair?` and `wambito://signin?`,
+ *    the pairing one when none is given), or null when the person closed it or refused the camera
+ *    permission (no error, no crash). Errors:
  *    `failed` (the camera could not start), `busy` (a scan is already open).
  *
  * One scan at a time: Android has one result slot per request code.
@@ -26,6 +28,9 @@ class ScannerChannel(
 
     private val channel = MethodChannel(messenger, NAME)
     private var pending: MethodChannel.Result? = null
+
+    /** The prefixes the pending scan asked for. */
+    private var prefixes: List<String> = listOf(PAIR_QR_PREFIX)
 
     /** True while the permission prompt is up, so a second call is `busy` too. */
     private var asking = false
@@ -39,17 +44,18 @@ class ScannerChannel(
             "isAvailable" -> result.success(
                 activity.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA),
             )
-            "scan" -> scan(result)
+            "scan" -> scan(qrPrefixesOf(call.argument<Any?>("prefixes")), result)
             else -> result.notImplemented()
         }
     }
 
-    private fun scan(result: MethodChannel.Result) {
+    private fun scan(asked: List<String>, result: MethodChannel.Result) {
         if (pending != null) {
             result.error("busy", "A scan is already open", null)
             return
         }
         pending = result
+        prefixes = asked
         if (activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             open()
         } else {
@@ -60,7 +66,9 @@ class ScannerChannel(
 
     private fun open() {
         asking = false
-        activity.startActivityForResult(Intent(activity, ScannerActivity::class.java), SCAN)
+        val intent = Intent(activity, ScannerActivity::class.java)
+            .putExtra(ScannerActivity.EXTRA_PREFIXES, prefixes.toTypedArray())
+        activity.startActivityForResult(intent, SCAN)
     }
 
     /** From MainActivity.onRequestPermissionsResult. A refusal answers null. */

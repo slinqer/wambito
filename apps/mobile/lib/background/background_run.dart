@@ -18,8 +18,12 @@ enum BackgroundOutcome {
   /// Captures or confirms were saved, or the sync brought changes: the app (if alive) refreshes.
   changed,
 
-  /// No session, or the sync was refused with a 401.
+  /// No session, the sync was refused with a 401, or this phone was removed from the account.
   signedOut,
+
+  /// The sync was refused with 401 `user_deleted`: the account is gone. Only the app adopts its
+  /// vault (phone-first spec 10, Review Focus 2); the run touches nothing more.
+  userDeleted,
 
   /// The account is not a `preview` one: nothing here is for this engine.
   notPreview,
@@ -138,6 +142,7 @@ class _Borrowed implements VaultLease {
 
 const _ended = {
   SyncProblemCode.unauthorized,
+  SyncProblemCode.userDeleted,
   SyncProblemCode.sessionChanged,
   SyncProblemCode.deviceRemoved,
 };
@@ -258,17 +263,18 @@ Future<BackgroundReport> runBackground(
       outcome = BackgroundOutcome.changed;
     }
     if (problem == SyncProblemCode.unauthorized) outcome = BackgroundOutcome.signedOut;
+    if (problem == SyncProblemCode.userDeleted) outcome = BackgroundOutcome.userDeleted;
     // Stopped by its own deadline, a run that saved something still reports it (the app refreshes,
     // the captures are notified); one that saved nothing is retried like a busy one.
     final cut = past();
     if (problem == SyncProblemCode.busy && !(cut && outcome == BackgroundOutcome.changed)) {
       outcome = BackgroundOutcome.busy;
     }
-    if (problem == SyncProblemCode.sessionChanged ||
-        problem == SyncProblemCode.deviceRemoved ||
-        problem == SyncProblemCode.keyUnverified) {
+    if (problem == SyncProblemCode.sessionChanged || problem == SyncProblemCode.keyUnverified) {
       outcome = BackgroundOutcome.failed;
     }
+    // A removed device has no session left here (the app wipes it): like a 401, nothing to retry.
+    if (problem == SyncProblemCode.deviceRemoved) outcome = BackgroundOutcome.signedOut;
 
     // The widget and the due list are this account's only while its session stands, and are
     // skipped past the deadline (the next run or the app draws them). Each is best effort: one that

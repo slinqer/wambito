@@ -1280,6 +1280,50 @@ void main() {
       expect(await store.readOutbox(10), isEmpty);
     });
 
+    // The three 401 codes (phone-first spec 10): each stops the run; only the code says which.
+    Future<SyncResult> runWith401(Object? body) async {
+      final server = FakeSync();
+      final one = await device(server);
+      server.intercept = (req, real) async => status(401, body);
+      await one.store.put(_cat, a, category('kept'));
+      final r = await one.engine.run();
+      // Nothing lost: the change waits in the outbox, unparked.
+      final outbox = await one.store.readOutbox(10);
+      expect(outbox.single.id, a);
+      expect(outbox.single.park, isNull);
+      expect(one.problems.map((p) => p.status), contains(401));
+      return r;
+    }
+
+    test('401 user_deleted stops with userDeleted', () async {
+      final r = await runWith401({'code': 'user_deleted'});
+      expect(r.ok, isFalse);
+      expect(r.error, SyncProblemCode.userDeleted);
+      expect(r.problem, SyncProblemCode.userDeleted);
+    });
+
+    // New with phone-first spec 10 (before it every 401 was `unauthorized`): a removed device's
+    // 401 is the wipe's code, never a plain sign-in.
+    test('401 device_removed stops with deviceRemoved', () async {
+      final r = await runWith401({'code': 'device_removed'});
+      expect(r.ok, isFalse);
+      expect(r.error, SyncProblemCode.deviceRemoved);
+      expect(r.problem, SyncProblemCode.deviceRemoved);
+    });
+
+    // Regression guard: today's 401.
+    test('401 unauthenticated stays unauthorized', () async {
+      for (final body in [
+        {'code': 'unauthenticated'},
+        null,
+      ]) {
+        final r = await runWith401(body);
+        expect(r.ok, isFalse);
+        expect(r.error, SyncProblemCode.unauthorized);
+        expect(r.problem, isNull);
+      }
+    });
+
     test('device_removed stops the engine and reports it', () async {
       final server = FakeSync();
       final k1 = await fresh();

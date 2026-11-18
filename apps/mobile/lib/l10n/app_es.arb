@@ -25,21 +25,17 @@
   "@wambiWaves": {
     "description": "Screen-reader label of the waving Wambi."
   },
-  "entryGuest": "Probar sin correo",
-  "@entryGuest": {
-    "description": "First run: start as a guest, with no email."
+  "entryStart": "Empezar",
+  "@entryStart": {
+    "description": "First run: the primary button; creates the account in the background, nothing is asked."
   },
-  "entryGuestHint": "Puedes agregar tu correo después.",
-  "@entryGuestHint": {
-    "description": "Under the guest choice."
+  "entryStartBusy": "Preparando tu cuenta…",
+  "@entryStartBusy": {
+    "description": "While the account behind \"Start\" is created."
   },
-  "entryGuestBusy": "Preparando tu cuenta…",
-  "@entryGuestBusy": {
-    "description": "While the guest account is created."
-  },
-  "entryEmail": "Entrar con mi correo",
-  "@entryEmail": {
-    "description": "First run: sign in with an email code or magic link."
+  "entryHaveAccount": "Ya tengo una cuenta",
+  "@entryHaveAccount": {
+    "description": "First run: a link to the sign-in (email, passkey); no account is created."
   },
   "emailPasskey": "Usar passkey",
   "@emailPasskey": {
@@ -1222,6 +1218,10 @@
     "description": "The honest copy for guests (Task 14 brief), shown on Guarda tu progreso."
   },
   "progressEmailBody": "Agrega tu correo y tus movimientos se quedan tal cual, en la misma cuenta. Te mandamos un código para confirmarlo.",
+  "progressPreviewBody": "Tus datos se quedan tal cual, cifrados, en la misma cuenta. Te mandamos un código para confirmar el correo; después, si aún no la tienes, haces tu clave de recuperación.",
+  "@progressPreviewBody": {
+    "description": "Guarda tu progreso for an encrypted (preview) guest: the email keeps the data as it is, and the recovery key comes next."
+  },
   "progressSave": "Guardar con mi correo",
   "progressPasskeyTitle": "O agrega una huella",
   "progressPasskeyBody": "Una huella en este teléfono te deja entrar sin correo, pero si pierdes el teléfono o la huella, pierdes la cuenta. Para usar Wambito en otro dispositivo o con asistentes de IA necesitas un correo.",
@@ -2328,7 +2328,6 @@
     "description": "Settings section for an encrypted account's devices and recovery key."
   },
   "settingsSecurityLead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
-  "settingsSecurityGuestLead": "Tus datos están cifrados. Desde aquí puedes abrirlos en otro dispositivo.",
   "settingsSecurityThisPhone": "Este teléfono",
   "settingsSecurityUnnamed": "Dispositivo",
   "settingsSecurityAdded": "Agregado el {date}",
@@ -4296,33 +4295,13 @@
   "@vaultLockedUnsupportedLead": {
     "description": "Locked: why, and what to do."
   },
-  "vaultLockedGuestTitle": "Tus datos no se pueden abrir aquí",
-  "@vaultLockedGuestTitle": {
-    "description": "Locked: a guest whose data lives on another device."
+  "vaultLockedPlainServerTitle": "Tus datos esperan en este teléfono",
+  "@vaultLockedPlainServerTitle": {
+    "description": "Locked: the account was deleted for inactivity and its data waits to move to a new account, but the server makes new accounts that do not keep data encrypted."
   },
-  "vaultLockedGuestLead": "Empezaste como invitado en otro navegador o dispositivo, y sus datos solo se abren allí. Apruébalo desde ese dispositivo, o cierra sesión.",
-  "@vaultLockedGuestLead": {
-    "description": "Locked: a guest whose data lives on another device, what to do."
-  },
-  "vaultLockedDeleteAccount": "Eliminar esta cuenta",
-  "@vaultLockedDeleteAccount": {
-    "description": "Locked, guest: asks to delete the account."
-  },
-  "vaultLockedDeleteLead": "Se borra la cuenta de invitado y todo lo que tiene, también en el otro navegador. No se puede deshacer.",
-  "@vaultLockedDeleteLead": {
-    "description": "Locked, guest: what deleting means."
-  },
-  "vaultLockedDeleteConfirm": "Sí, eliminarla",
-  "@vaultLockedDeleteConfirm": {
-    "description": "Locked, guest: confirms deleting."
-  },
-  "vaultLockedDeleting": "Eliminando…",
-  "@vaultLockedDeleting": {
-    "description": "Locked, guest: while deleting."
-  },
-  "vaultLockedDeleteFailed": "No pudimos eliminarla. Inténtalo de nuevo.",
-  "@vaultLockedDeleteFailed": {
-    "description": "Locked, guest: deleting failed."
+  "vaultLockedPlainServerLead": "Para guardarlos en una cuenta nueva necesito un servidor que los mantenga cifrados, y este todavía no lo hace. Siguen a salvo aquí; vuelve a intentarlo más tarde.",
+  "@vaultLockedPlainServerLead": {
+    "description": "Locked: why the data cannot move yet (the server keeps new accounts unencrypted), that it is safe, and to try again later. Wambi speaks."
   },
   "vaultRemoved": "Este teléfono se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
   "@vaultRemoved": {
@@ -4368,5 +4347,416 @@
   "screenLockBusy": "Comprobando…",
   "@screenLockBusy": {
     "description": "Sensitive operation without a screen lock: while the key is tried."
+  },
+  "protectTitle": "Protege tus datos",
+  "@protectTitle": {
+    "description": "Settings: the block that offers ways back to the data for an account without email."
+  },
+  "protectLead": "Tus datos viven cifrados en este teléfono. Si lo pierdes, con esto vuelves a abrirlos.",
+  "@protectLead": {
+    "description": "Settings → Protect your data: what the block is for."
+  },
+  "protectCount": "{done} de 2",
+  "@protectCount": {
+    "description": "Settings → Protect your data: how many of the two ways back are done.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "protectRecoveryTitle": "Clave de recuperación",
+  "@protectRecoveryTitle": {
+    "description": "Settings → Protect your data: step 1."
+  },
+  "protectRecoveryLead": "Una clave que guardas tú. Con ella entras y abres tus datos en cualquier teléfono.",
+  "@protectRecoveryLead": {
+    "description": "Settings → Protect your data: what the recovery key does."
+  },
+  "protectRecoveryGo": "Crear mi clave",
+  "@protectRecoveryGo": {
+    "description": "Settings → Protect your data: makes and shows the recovery key."
+  },
+  "protectPasskeyTitle": "Entrar con tu huella",
+  "@protectPasskeyTitle": {
+    "description": "Settings → Protect your data: step 2."
+  },
+  "protectPasskeyLead": "Tu gestor de contraseñas la guarda. Una huella y vuelves a entrar, con tus datos abiertos.",
+  "@protectPasskeyLead": {
+    "description": "Settings → Protect your data: what the passkey does."
+  },
+  "protectPasskeyGo": "Agregar mi huella",
+  "@protectPasskeyGo": {
+    "description": "Settings → Protect your data: adds a passkey that opens the data."
+  },
+  "protectPasskeyNoPrf": "Esta llave de acceso te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
+  "@protectPasskeyNoPrf": {
+    "description": "Settings → Protect your data: a passkey was added but the password manager gave no PRF (spec 5.2, fixed sentence)."
+  },
+  "protectEmailTitle": "Crear tu cuenta",
+  "@protectEmailTitle": {
+    "description": "Settings → Protect your data: step 3, adding an email."
+  },
+  "protectEmailLead": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque pierdas la huella.",
+  "@protectEmailLead": {
+    "description": "Settings → Protect your data: what an email adds."
+  },
+  "protectEmailGo": "Agregar mi correo",
+  "@protectEmailGo": {
+    "description": "Settings → Protect your data: opens adding an email."
+  },
+  "protectDone": "Listo",
+  "@protectDone": {
+    "description": "Settings → Protect your data: a step that is done."
+  },
+  "protectKeySaved": "Tu clave de recuperación quedó guardada. Guárdala donde no se pierda.",
+  "@protectKeySaved": {
+    "description": "Settings → Protect your data: the first recovery key was saved."
+  },
+  "protectLockReason": "Confirma que eres tú para crear tu clave de recuperación",
+  "@protectLockReason": {
+    "description": "Settings → Protect your data: the screen lock prompt before the recovery key is made."
+  },
+  "protectCardTitle": "Protege tus datos",
+  "@protectCardTitle": {
+    "description": "Home: the nudge card that offers the recovery key."
+  },
+  "protectCardBody": "Tus datos viven solo en este teléfono. Crea una clave de recuperación para no perderlos si lo pierdes.",
+  "@protectCardBody": {
+    "description": "Home: what the protect card says."
+  },
+  "protectCardGo": "Crear mi clave",
+  "@protectCardGo": {
+    "description": "Home: the protect card's button that starts the recovery key."
+  },
+  "protectCardLater": "Ahora no",
+  "@protectCardLater": {
+    "description": "Home: the protect card's dismiss button."
+  },
+  "unprotectedSignOutTitle": "¿Cerrar sesión sin camino de vuelta?",
+  "@unprotectedSignOutTitle": {
+    "description": "Warning before a guest with no recovery key or passkey signs out."
+  },
+  "unprotectedSignOutBody": "No has guardado una clave de recuperación. Si cierras sesión, tus datos se borran de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedSignOutBody": {
+    "description": "Warning before signing out without a way back: the body."
+  },
+  "unprotectedServerTitle": "¿Cambiar de servidor sin camino de vuelta?",
+  "@unprotectedServerTitle": {
+    "description": "Warning before a guest with no recovery key or passkey changes server."
+  },
+  "unprotectedServerBody": "No has guardado una clave de recuperación. Cambiar de servidor cierra tu sesión, borra tus datos de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedServerBody": {
+    "description": "Warning before changing server without a way back: the body."
+  },
+  "unprotectedPasskeyUnknown": "No pudimos revisar tus llaves de acceso porque no hay conexión. Si ya agregaste una, con ella puedes volver.",
+  "@unprotectedPasskeyUnknown": {
+    "description": "The leaving warning's note when the passkey wraps could not be read (offline)."
+  },
+  "unprotectedProtectFirst": "Proteger mis datos primero",
+  "@unprotectedProtectFirst": {
+    "description": "The leaving warning's button that opens the recovery key."
+  },
+  "entryUseRecoveryKey": "Entrar con mi clave de recuperación",
+  "@entryUseRecoveryKey": {
+    "description": "Email screen: a link to sign in with the recovery key instead (opens the recovery-key sign-in)."
+  },
+  "recoverySignInTitle": "Entra con tu clave de recuperación",
+  "@recoverySignInTitle": {
+    "description": "Recovery-key sign-in: the title."
+  },
+  "recoverySignInLead": "Escríbela como la guardaste; mayúsculas, espacios y guiones dan igual. Con ella entras y abres tus datos en este teléfono.",
+  "@recoverySignInLead": {
+    "description": "Recovery-key sign-in: the lead."
+  },
+  "recoverySignInSubmit": "Entrar",
+  "@recoverySignInSubmit": {
+    "description": "Recovery-key sign-in: the submit button."
+  },
+  "recoverySignInBusy": "Entrando…",
+  "@recoverySignInBusy": {
+    "description": "Recovery-key sign-in: while signing in."
+  },
+  "recoverySignInUseEmail": "Usar mi correo",
+  "@recoverySignInUseEmail": {
+    "description": "Recovery-key sign-in: back to the email sign-in."
+  },
+  "errorRecoveryKeyInvalid": "Esa clave no abre ninguna cuenta. Revísala e inténtalo de nuevo.",
+  "@errorRecoveryKeyInvalid": {
+    "description": "Recovery-key sign-in: the key signs in to no account (the server's answer is the same whatever the reason)."
+  },
+  "recoverySignInWait": "{minutes, plural, =1{Demasiados intentos. Espera 1 minuto e inténtalo otra vez.} other{Demasiados intentos. Espera {minutes} minutos e inténtalo otra vez.}}",
+  "@recoverySignInWait": {
+    "description": "Recovery-key sign-in: too many tries (429); the minutes the server says to wait.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeOfferQuestion": "Este correo ya tiene una cuenta de Wambito. ¿Traemos a ella los datos de este teléfono?",
+  "@mergeOfferQuestion": {
+    "description": "Merge offer (phone-first spec 7.2): the claimed email already has an account."
+  },
+  "mergeOfferBody": "Entras a {email} con el código que te mandamos y abres sus datos; luego los de este teléfono se suman a ellos.",
+  "@mergeOfferBody": {
+    "description": "Merge offer: what happens next.",
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "ana@correo.com"
+      }
+    }
+  },
+  "mergeOfferKeyNote": "La clave de recuperación de este teléfono deja de servir: desde entonces tus datos los abre la de la cuenta.",
+  "@mergeOfferKeyNote": {
+    "description": "Merge offer: shown before the sign-in (spec 7.2)."
+  },
+  "mergeOfferYes": "Traer mis datos",
+  "@mergeOfferYes": {
+    "description": "Merge offer: the yes button."
+  },
+  "unlockMergeWaiting": "Abre esta cuenta para traer a ella los datos de este teléfono.",
+  "@unlockMergeWaiting": {
+    "description": "Unlock, while a merge waits for the account's data."
+  },
+  "mergeWorking": "Trayendo los datos de este teléfono…",
+  "@mergeWorking": {
+    "description": "Merge: while the phone's data is brought into the account."
+  },
+  "mergeUploadingTitle": "Enviando tus datos a la cuenta",
+  "@mergeUploadingTitle": {
+    "description": "Merge: the data is in the account and is being sent."
+  },
+  "mergeUploadingLead": "{count, plural, =0{Ya casi.} =1{Falta 1 cambio por enviar.} other{Faltan {count} cambios por enviar.}}",
+  "@mergeUploadingLead": {
+    "description": "Merge: changes still to send.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeUploadingNote": "Sin conexión, sigue sola cuando vuelva. Mientras, puedes usar Wambito.",
+  "@mergeUploadingNote": {
+    "description": "Merge: the upload goes on by itself."
+  },
+  "mergeKeepUsing": "Seguir usando Wambito",
+  "@mergeKeepUsing": {
+    "description": "Merge: leave the screen while the upload goes on."
+  },
+  "mergeDoneTitle": "¡Listo! Los datos de este teléfono ya están en tu cuenta.",
+  "@mergeDoneTitle": {
+    "description": "Merge: done."
+  },
+  "mergeDoneGo": "Ir al inicio",
+  "@mergeDoneGo": {
+    "description": "Merge: done, go home."
+  },
+  "mergeCurrencyTitle": "Las monedas no coinciden",
+  "@mergeCurrencyTitle": {
+    "description": "Merge currency stop: the title."
+  },
+  "mergeCurrencyStop": "Tu cuenta usa {account} y este teléfono {phone}.",
+  "@mergeCurrencyStop": {
+    "description": "Merge currency stop (spec 7.2): the account's currency, then the phone's.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "example": "COP"
+      },
+      "phone": {
+        "type": "String",
+        "example": "USD"
+      }
+    }
+  },
+  "mergeCurrencyLead": "No podemos juntar movimientos en monedas distintas. Elige qué hacemos.",
+  "@mergeCurrencyLead": {
+    "description": "Merge currency stop: why, and the choice."
+  },
+  "mergeCancel": "Cancelar y seguir como estaba",
+  "@mergeCancel": {
+    "description": "Merge: cancel; back to this phone's session without email, with its data (ruling 10)."
+  },
+  "mergeKeepAccount": "Quedarme solo con los datos de la cuenta",
+  "@mergeKeepAccount": {
+    "description": "Merge currency stop: keep only the account's data."
+  },
+  "mergeKeepAccountTitle": "¿Borrar los datos de este teléfono?",
+  "@mergeKeepAccountTitle": {
+    "description": "Merge: the confirm before discarding the phone's data."
+  },
+  "mergeKeepAccountBody": "Lo que anotaste en este teléfono sin correo se borra para siempre y te quedas con los datos de la cuenta.",
+  "@mergeKeepAccountBody": {
+    "description": "Merge: what discarding the phone's data means."
+  },
+  "mergeKeepAccountConfirm": "Borrar y seguir",
+  "@mergeKeepAccountConfirm": {
+    "description": "Merge: confirm discarding the phone's data."
+  },
+  "mergeFailedTitle": "No pudimos terminar de traer tus datos",
+  "@mergeFailedTitle": {
+    "description": "Merge: a step failed."
+  },
+  "mergeFailedLead": "Tus datos siguen guardados en este teléfono. Inténtalo otra vez.",
+  "@mergeFailedLead": {
+    "description": "Merge: a step failed; nothing is lost."
+  },
+  "mergeFailedPlain": "Esa cuenta todavía no guarda datos cifrados, así que no podemos traer a ella los de este teléfono.",
+  "@mergeFailedPlain": {
+    "description": "Merge: the email account keeps no encrypted data yet."
+  },
+  "mergeRetry": "Intentar de nuevo",
+  "@mergeRetry": {
+    "description": "Merge: try the failed step again."
+  },
+  "entryNeedsConnection": "Para empezar necesito internet una vez. Conéctate y lo intentamos de nuevo.",
+  "@entryNeedsConnection": {
+    "description": "First run: \"Start\" found no network, and this server is not known to make encrypted users, so nothing was made (Wambi speaks)."
+  },
+  "entryTryAgain": "Intentar de nuevo",
+  "@entryTryAgain": {
+    "description": "First run, under entryNeedsConnection: tries \"Start\" again."
+  },
+  "provisionalWaiting": "Tus datos están en este teléfono. En cuanto haya internet, les creo tu cuenta.",
+  "@provisionalWaiting": {
+    "description": "Settings, on an offline first run: the data waits on the phone for the network to make the account."
+  },
+  "provisionalPlainServer": "Tus datos siguen en este teléfono. Este servidor no guarda los datos cifrados, así que espero a uno que sí lo haga.",
+  "@provisionalPlainServer": {
+    "description": "Settings, on an offline first run whose server made a plain (unencrypted) user: nothing was sent; it waits for a server that keeps data encrypted."
+  },
+  "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
+  "@provisionalNoGuests": {
+    "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
+  },
+  "settingsSecuritySignin": "Iniciar sesión en la web",
+  "@settingsSecuritySignin": {
+    "description": "Settings → Security entry that approves a web sign-in from this phone (phone-first spec 8.1)."
+  },
+  "settingsSecuritySigninLead": "Abre Wambito en un computador con este teléfono: escanea el código QR que te muestra.",
+  "@settingsSecuritySigninLead": {
+    "description": "Settings → Security: what signing in on the web does."
+  },
+  "signinApproveTitle": "Iniciar sesión en la web",
+  "@signinApproveTitle": {
+    "description": "Approving a web sign-in: the screen title."
+  },
+  "signinApproveLead": "En el computador, elige “Iniciar sesión”. Luego escanea el código QR que aparece, o escribe su código.",
+  "@signinApproveLead": {
+    "description": "Approving a web sign-in: how to start."
+  },
+  "signinApproveCodeLabel": "Código del computador",
+  "@signinApproveCodeLabel": {
+    "description": "Approving a web sign-in: the typed code's label."
+  },
+  "signinApproveBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o abre uno nuevo en el computador.",
+  "@signinApproveBadCode": {
+    "description": "Approving a web sign-in: a typed code or a QR that finds nothing."
+  },
+  "signinApproveQuestion": "¿Iniciar sesión en «{label}»?",
+  "@signinApproveQuestion": {
+    "description": "Approving a web sign-in: the question (spec 8.1); {label} is the browser's own name, quoted and muted (it is attacker-chosen), below the host line.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveWarning": "Escanea solo un código que veas en {host}",
+  "@signinApproveWarning": {
+    "description": "Approving a web sign-in: the warning (spec 8.1); {host} is the server's host, shown in bold.",
+    "placeholders": {
+      "host": {
+        "type": "String",
+        "example": "app.wambito.com"
+      }
+    }
+  },
+  "signinApproveApprove": "Aprobar",
+  "@signinApproveApprove": {
+    "description": "Approving a web sign-in: the yes."
+  },
+  "signinApproveWaiting": "Esperando al computador…",
+  "@signinApproveWaiting": {
+    "description": "Approving a web sign-in: after Approve, until the browser answers."
+  },
+  "signinApproveNumberLead": "Aprueba solo si el número del computador es exactamente este.",
+  "@signinApproveNumberLead": {
+    "description": "Approving a web sign-in after a typed code: compare the number."
+  },
+  "signinApproveSealing": "Iniciando sesión…",
+  "@signinApproveSealing": {
+    "description": "Approving a web sign-in: while the data key is sealed and picked up."
+  },
+  "signinApproveDoneLead": "Ya iniciaste sesión en {label}.",
+  "@signinApproveDoneLead": {
+    "description": "Approving a web sign-in: done.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveMismatchLead": "El computador no recibió nada. Si querías iniciar sesión, empieza de nuevo allí.",
+  "@signinApproveMismatchLead": {
+    "description": "Approving a web sign-in: the numbers did not match."
+  },
+  "signinApproveExpiredLead": "Abre un código nuevo en el computador y escanéalo otra vez.",
+  "@signinApproveExpiredLead": {
+    "description": "Approving a web sign-in: the 2 minutes passed."
+  },
+  "signinApproveFailedTitle": "No se pudo iniciar sesión",
+  "@signinApproveFailedTitle": {
+    "description": "Approving a web sign-in: failed."
+  },
+  "signinApproveLocked": "Abre primero tus datos en este teléfono.",
+  "@signinApproveLocked": {
+    "description": "Approving a web sign-in with the vault no longer open."
+  },
+  "signinApproveFromLink": "Esto llegó por un enlace: aprueba solo si estás iniciando sesión en un computador que tienes enfrente.",
+  "@signinApproveFromLink": {
+    "description": "Approving a web sign-in opened from a wambito://signin link (not the in-app scanner): the extra warning."
+  },
+  "signinApproveUnconfirmedTitle": "Enviado",
+  "@signinApproveUnconfirmedTitle": {
+    "description": "Approving a web sign-in: the seal went out but the browser's pickup could not be seen."
+  },
+  "signinApproveUnconfirmedLead": "Lo envié, pero no pude ver que el computador lo recibiera. Míralo: si no inició sesión, empieza de nuevo allí.",
+  "@signinApproveUnconfirmedLead": {
+    "description": "Approving a web sign-in: unconfirmed pickup, what to do."
+  },
+  "signinNoticeTitle": "Se abrió una sesión en {label}",
+  "@signinNoticeTitle": {
+    "description": "The sign-in notice: a new device opened a session. The sheet's title.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "signinNoticeBody": "Si no fuiste tú, quita ese dispositivo ahora.",
+  "@signinNoticeBody": {
+    "description": "The sign-in notice: what to do if the person did not open the session."
+  },
+  "signinNoticeNotMe": "No fui yo",
+  "@signinNoticeNotMe": {
+    "description": "The sign-in notice: button that goes to the device's removal."
+  },
+  "signinNoticeOk": "Entendido",
+  "@signinNoticeOk": {
+    "description": "The sign-in notice: button that records the look."
+  },
+  "signinNoticeMore": "{count, plural, =1{Y se agregó {count} dispositivo más.} other{Y se agregaron {count} dispositivos más.}}",
+  "@signinNoticeMore": {
+    "description": "The sign-in notice: how many more new devices there are besides the one named.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

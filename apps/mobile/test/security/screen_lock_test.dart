@@ -26,17 +26,24 @@ class _FakeLock implements ScreenLock {
 }
 
 class _Ask extends ConsumerWidget {
-  const _Ask({required this.check, required this.result});
+  const _Ask({required this.check, required this.result, this.noKeyYet = false});
 
   final Future<void> Function(String text) check;
   final List<bool> result;
+  final bool noKeyYet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => PressButton.text(
     'Ask',
     onPressed: () async {
       result.add(
-        await confirmSensitive(context, ref, reason: 'Remove this device', checkRecoveryKey: check),
+        await confirmSensitive(
+          context,
+          ref,
+          reason: 'Remove this device',
+          checkRecoveryKey: check,
+          noKeyYet: noKeyYet,
+        ),
       );
     },
   );
@@ -46,6 +53,7 @@ Future<(_FakeLock, List<bool>, List<String>)> _open(
   WidgetTester t,
   LockCheck answer, {
   Future<void> Function(String text)? check,
+  bool noKeyYet = false,
 }) async {
   t.view
     ..physicalSize = const Size(824, 1830)
@@ -60,6 +68,7 @@ Future<(_FakeLock, List<bool>, List<String>)> _open(
       child: uiApp(
         _Ask(
           result: result,
+          noKeyYet: noKeyYet,
           check:
               check ??
               (text) async {
@@ -139,6 +148,19 @@ void main() {
     await t.tap(find.text('CANCEL'));
     await t.pumpAndSettle();
     expect(result, [false]);
+  });
+
+  testWidgets('noKeyYet without a lock skips the sheet; with a lock it still asks the lock', (
+    t,
+  ) async {
+    final (_, result, tried) = await _open(t, LockCheck.noLock, noKeyYet: true);
+    expect(result, [true]);
+    expect(tried, isEmpty);
+    expect(find.byKey(const Key('screenLock.key')), findsNothing);
+
+    final (lock, locked, _) = await _open(t, LockCheck.cancelled, noKeyYet: true);
+    expect(lock.reasons, ['Remove this device']);
+    expect(locked, [false]);
   });
 
   group('LocalAuthScreenLock', () {

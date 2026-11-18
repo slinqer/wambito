@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,10 +11,14 @@ import 'package:wambito/api/session.dart';
 import 'package:wambito/capture_auto/capture_platform.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/widget_snapshot.dart';
+import 'package:wambito/crypto/crypto.dart';
+import 'package:wambito/local/keys.dart';
+import 'package:wambito/vault/vault_gate.dart';
 
 import '../capture_auto/fakes.dart';
 import '../entry/fakes.dart';
 import '../home/fakes.dart';
+import '../local/fake_keys.dart';
 
 /// What happened, in order, across the widget's store and the session's.
 final _log = <String>[];
@@ -651,6 +656,147 @@ void main() {
 
       expect(container.read(sessionProvider).status, SessionStatus.signedOut);
       expect(widgetSignedOut(widget), isTrue);
+    });
+
+    group('signInWithRecoveryKey (Review Focus 3)', () {
+      /// Every secret the session parsed, to check that it is zeroed.
+      final parsed = <Uint8List>[];
+
+      setUp(() {
+        parsed.clear();
+        keysParseRecoveryKey = (text) {
+          final secret = parseRecoveryKey(text);
+          parsed.add(secret);
+          return secret;
+        };
+      });
+      tearDown(() => keysParseRecoveryKey = parseRecoveryKey);
+
+      /// An account set up on another phone (its recovery wrap and verifier on the fake
+      /// `/v2/keys`), this phone holding nothing of it: its recovery key.
+      Future<({FakeKeys api, KeysOptions options, String key})> accountElsewhere() async {
+        final api = FakeKeys();
+        final userId = newUser();
+        auth.account = userId;
+        final options = KeysOptions(userId: userId, dio: api.dio(), storage: memoryKeyStorage());
+        final prepared = await prepareAccount(options, guest: false);
+        await prepared.commit();
+        await forgetDevice(userId, options.storage);
+        return (api: api, options: options, key: prepared.recoveryKey!);
+      }
+
+      /// The app's gate for that account, which must never ask for the key.
+      VaultGate<LocalKeys, String> gateFor(ProviderContainer container, KeysOptions options) =>
+          VaultGate(
+            VaultGateDeps(
+              loadLocalKeys: () => loadLocalKeys(options.userId, options.storage),
+              prepareAccount: () async => throw const KeysError('already_set_up'),
+              unlockWithRecovery: (_) async => throw StateError('the gate asked for the key'),
+              takeSignInRecoverySecret: () =>
+                  container.read(signInRecoveryKeyProvider).take(options.userId),
+              unlockWithRecoverySecret: (secret) => unlockWithRecoverySecret(options, secret),
+              open: (keys, fresh) async => 'open',
+            ),
+          );
+
+      Future<void> settled(VaultGate<LocalKeys, String> gate) async {
+        for (var i = 0; i < 500 && (gate.state is Checking || gate.state is Opening); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      }
+
+      test(
+        'a key typed in lower case with spaces and dashes signs in, and the gate unlocks with it '
+        'without asking',
+        () async {
+          final a = await accountElsewhere();
+          final typed = '  ${a.key.toLowerCase().replaceAll('-', ' - ')}\n';
+          final container = containerWith();
+          final controller = await ready(container);
+
+          await controller.signInWithRecoveryKey(typed);
+
+          // What was sent is what the server keeps the hashes of.
+          final sent = auth.recoverySignIns.single;
+          expect(sent.lookup, hasLength(16));
+          expect(sent.auth, hasLength(32));
+          expect(toBase64Url(await verifierHash(sent.lookup)), a.api.verifier!.lookupHash);
+          expect(toBase64Url(await verifierHash(sent.auth)), a.api.verifier!.authHash);
+          final state = container.read(sessionProvider);
+          expect(state.status, SessionStatus.signedIn);
+          expect(state.stored?.token, 'recovery-token-1');
+          expect(state.stored?.guest, isFalse);
+
+          final gate = gateFor(container, a.options)..start();
+          await settled(gate);
+          expect(gate.state, const Ready('open'));
+          expect(await loadLocalKeys(a.options.userId, a.options.storage), isNotNull);
+        },
+      );
+
+      test('a key that does not parse sends nothing', () async {
+        final container = containerWith();
+        final controller = await ready(container);
+        for (final text in ['', 'hello', 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23']) {
+          await expectLater(
+            controller.signInWithRecoveryKey(text),
+            throwsA(
+              isA<AuthFailure>()
+                  .having((f) => f.code, 'code', 'bad_recovery_key')
+                  .having((f) => f.status, 'status', 400),
+            ),
+          );
+        }
+        expect(auth.calls, isNot(contains('recoverySignIn')));
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      });
+
+      test(
+        'the held secret is taken once and is all zeros after the unlock, and after a failed one',
+        () async {
+          final a = await accountElsewhere();
+          final container = containerWith();
+          final controller = await ready(container);
+          final held = container.read(signInRecoveryKeyProvider);
+
+          // Taken once: a second take has nothing.
+          await controller.signInWithRecoveryKey(a.key);
+          final secret = held.take(a.options.userId);
+          expect(secret, isNotNull);
+          expect(zeroed(secret!), isFalse);
+          expect(held.take(a.options.userId), isNull);
+          held.hold(a.options.userId, secret);
+
+          // All zeros after the unlock.
+          final gate = gateFor(container, a.options)..start();
+          await settled(gate);
+          expect(gate.state, const Ready('open'));
+          expect(zeroed(secret), isTrue);
+          expect(parsed.every(zeroed), isTrue);
+
+          // And after a failed one: a key that signs in but opens nothing here.
+          await forgetDevice(a.options.userId, a.options.storage);
+          await controller.signInWithRecoveryKey(formatRecoveryKey(newRecoverySecret()));
+          final other = parsed.last;
+          expect(zeroed(other), isFalse);
+          final failing = gateFor(container, a.options)..start();
+          await settled(failing);
+          expect(failing.state, const Unlock(error: 'wrong_recovery_key'));
+          expect(zeroed(other), isTrue);
+
+          // And at once after a failed sign-in, with nothing held.
+          auth.failures['recoverySignIn'] = const AuthFailure(
+            code: 'recovery_key_invalid',
+            status: 401,
+          );
+          await expectLater(
+            controller.signInWithRecoveryKey(a.key),
+            throwsA(isA<AuthFailure>().having((f) => f.code, 'code', 'recovery_key_invalid')),
+          );
+          expect(zeroed(parsed.last), isTrue);
+          expect(held.take(a.options.userId), isNull);
+        },
+      );
     });
   });
 

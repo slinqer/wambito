@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/gen/wambito_api.dart';
+import '../api/server_url.dart'
+    show newUsersEncryptedProvider, rememberNewUsersEncrypted, serverUrlProvider;
 import '../api/session.dart';
 import '../home/home_cache.dart' show homeCacheStoreProvider, sessionOwnerOf;
 import '../local/vault_session.dart' show VaultProfile;
@@ -188,12 +190,17 @@ final vaultOwnerProvider = Provider<String?>((ref) {
 /// local backend), kept for the session ([EncryptionStore.remember]); null when signed out. Each
 /// answer also sweeps the vaults of every other account off this phone ([staleVaultsProvider]: the
 /// web's `deleteStaleVaults` at sign-in). No automatic retry: it is asked again when invalidated.
+/// The request names the account kept for the session (`x-wambito-user`, ruling 17), so a deleted
+/// one fails with the 401 `user_deleted`, a removed device with `device_removed` (read with
+/// `unauthorizedOfError`, lib/api/unauthorized.dart); the session's start (`_refresh`) and the gate
+/// act on them, this only reports.
 final freshVaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) => null, (ref) async {
   final token = ref.watch(sessionProvider.select((s) => s.stored?.token));
   if (token == null) return null;
   final store = ref.watch(encryptionStoreProvider);
   final api = ref.watch(networkClientProvider).api.getDefaultApi();
-  final me = (await api.getMe()).data;
+  final keptId = (await store.recall(token))?.profile.id;
+  final me = (await api.getMe(headers: {'x-wambito-user': ?keptId})).data;
   if (me == null) throw const GateError('server');
   final account = VaultAccount(
     owner: sessionOwnerOf(token),
@@ -211,6 +218,12 @@ final freshVaultAccountProvider = FutureProvider<VaultAccount?>(retry: (_, _) =>
   // A session that has meanwhile ended (or changed) keeps nothing and sweeps nothing.
   if (!ref.mounted) return account;
   await store.remember(token, account);
+  // An anonymous `preview` user: this server makes encrypted new users, so an offline "Start" on
+  // it may open a provisional vault from now on (ruling 8).
+  if (ref.mounted && account.mode == EncryptionMode.preview && me.isAnonymous) {
+    await rememberNewUsersEncrypted(ref.read(serverUrlProvider));
+    if (ref.mounted) ref.invalidate(newUsersEncryptedProvider);
+  }
   if (ref.mounted) {
     final sweep = ref.read(staleVaultsProvider);
     unawaited(sweep(me.id).catchError((Object _) {}));

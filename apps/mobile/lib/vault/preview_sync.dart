@@ -88,13 +88,20 @@ final previewSyncProvider = Provider<void>((ref) {
     if (now.mode == EncryptionMode.preview && before != EncryptionMode.preview) {
       // Read now, not after the native write: the container may be gone by then.
       final capture = ref.read(autoCapturePlatformProvider);
+      final handover = ref.read(captureHandoverProvider);
+      final token = ref.read(sessionProvider).stored?.token;
       final userId = now.userId;
       // After the mode is written: the jobs already know the account when the queue is handed over.
       unawaited(
         written.then<void>(
           (_) => userId == null
               ? null
-              : capture.sendQueued(userId).then<void>((_) {}, onError: (Object _) {}),
+              : _handOver(
+                  capture,
+                  handover,
+                  token,
+                  userId,
+                ).then<void>((_) {}, onError: (Object _) {}),
         ),
       );
     } else {
@@ -134,3 +141,15 @@ final previewSyncProvider = Provider<void>((ref) {
   ref.listen(vaultOwnerProvider, (_, _) => check());
   ref.listen(currentVaultAccountProvider, (_, _) => check());
 });
+
+/// Hands the queue over to [userId], passing the account a merge takes captures from, if any.
+Future<void> _handOver(
+  AutoCapturePlatform capture,
+  CaptureHandover handover,
+  String? token,
+  String userId,
+) async {
+  final from = token == null ? null : await handover.fromFor(token);
+  await capture.sendQueued(userId, from: from);
+  if (from != null && token != null) await handover.done(token);
+}

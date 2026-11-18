@@ -11,7 +11,7 @@ import '../api/session.dart';
 import '../entry/sign_in_frame.dart';
 import '../files/files_channel.dart';
 import '../l10n/app_localizations.dart';
-import '../settings/account_deletion.dart';
+import '../merge/merge_controller.dart';
 import 'encryption_mode.dart';
 import 'locked_view.dart';
 import 'pair_new_device_view.dart';
@@ -45,8 +45,10 @@ class VaultScreen extends ConsumerWidget {
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     // The vault is not open, yet it may be kept with changes not sent (a key version that did not
     // verify, a failed open): they are counted from its file and asked about, as at Settings'
-    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). A guest is not
-    // warned otherwise: a sign-out from here loses only what this sheet counts.
+    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). An account without
+    // email is not warned otherwise: a sign-out from here loses only what this sheet counts, and a
+    // held vault (an adoption or a merge waiting) loses nothing: the sign-out keeps it for its own
+    // flow (SessionController._forgetVault).
     final count = ref.read(unsentChangesProvider);
     if (!await confirmUnsentSignOut(context, count: count)) return;
     try {
@@ -56,20 +58,12 @@ class VaultScreen extends ConsumerWidget {
     }
   }
 
-  Future<bool> _deleteAccount(WidgetRef ref) async {
-    try {
-      await ref.read(accountDeletionProvider).delete();
-      return true;
-    } on Object {
-      return false;
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gate = ref.watch(vaultGateProvider);
     final state = ref.watch(vaultGateStateProvider);
     void signOut() => unawaited(_signOut(context, ref));
+    final merging = ref.watch(mergeControllerProvider) is MergeWaitingUnlock;
     if (gate == null || state == null) {
       // No gate: the mode of the account is not known yet, or could not be learned (an offline
       // first start with nothing kept). A `plain` account never stays here (the router).
@@ -97,16 +91,24 @@ class VaultScreen extends ConsumerWidget {
           await ref.read(filesChannelProvider).shareFile(name, utf8.encode(text), 'text/plain');
         },
       ),
-      Unlock(:final notice) => UnlockView(
+      Unlock(:final notice, :final error) => UnlockView(
         // A new passkey, a recovery key typed again: a new notice is a new screen.
-        key: ValueKey(notice),
+        key: ValueKey((notice, error)),
         notice: notice,
+        error: error,
         onUnlock: gate.unlock,
         onPasskey: (ref.watch(unlockPasskeyOfferedProvider).value ?? false)
             ? gate.unlockWithPasskey
             : null,
         onPair: () => unawaited(gate.pair()),
-        onSignOut: signOut,
+        merging: merging,
+        // While a merge waits, leaving calls it off: back to this phone's own session and data
+        // (ruling 10), never a held vault left behind.
+        onSignOut: merging
+            ? () => unawaited(
+                ref.read(mergeControllerProvider.notifier).cancel().catchError((Object _) {}),
+              )
+            : signOut,
       ),
       Pairing() => PairNewDeviceView(
         // The gate owns the request: it cancels one when a new one starts and when this is left.
@@ -119,8 +121,6 @@ class VaultScreen extends ConsumerWidget {
         retrying: retrying,
         onRetry: gate.retry,
         onSignOut: signOut,
-        onDeleteAccount: kind == LockedKind.guest ? () => _deleteAccount(ref) : null,
-        onPair: kind == LockedKind.guest ? () => unawaited(gate.pair()) : null,
       ),
       _ => const VaultLoading(),
     };

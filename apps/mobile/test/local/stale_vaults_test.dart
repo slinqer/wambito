@@ -5,7 +5,10 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:wambito/local/db.dart' show vaultFileName;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:wambito/local/db.dart'
+    show VaultHold, VaultHoldKind, listVaultHolds, vaultFileName, vaultHoldOf;
+import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/stale_vaults.dart';
 import 'package:wambito/local/vault_lock.dart' show vaultLockFileName;
@@ -128,5 +131,107 @@ void main() {
     // What the forget could not delete stays; the kept mode and account still go.
     expect(await names(), contains('wambito.vault.ana.current'));
     expect(await names(), isNot(contains('wambito.account')));
+  });
+
+  group('holds', () {
+    Future<void> hold(String id, VaultHold h) async {
+      final store = await SqliteStore.open(id, directory: dir.path, factory: databaseFactoryFfi);
+      await store.setHold(h);
+      await store.close();
+    }
+
+    setUp(() {
+      sqfliteFfiInit();
+      // Real vault files for these (the setUp above wrote placeholders).
+      for (final id in ['ana', 'bea', 'dan']) {
+        File(p.join(dir.path, vaultFileName(id))).deleteSync();
+      }
+    });
+
+    Future<VaultHold?> holdOf(String id) async {
+      final all = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
+      for (final h in all.holds) {
+        if (h.userId == id) return h.hold;
+      }
+      return null;
+    }
+
+    test('a held vault and its wambito.vault.<id>.* keys survive the sweep', () async {
+      await hold('bea', const VaultHold(VaultHoldKind.merging, target: 'e@x.test', since: 's'));
+      await deleteStaleVaults(
+        'ana',
+        forget: forget,
+        directory: () async => dir.path,
+        holdOf: holdOf,
+      );
+      expect(forgotten, isNot(contains('bea')));
+      expect(files(), contains(vaultFileName('bea')));
+      expect(await names(), containsAll(['wambito.vault.bea.current', 'wambito.encryption.bea']));
+    });
+
+    test('an unheld one goes', () async {
+      final store = await SqliteStore.open('bea', directory: dir.path, factory: databaseFactoryFfi);
+      await store.close();
+      await deleteStaleVaults(
+        'ana',
+        forget: forget,
+        directory: () async => dir.path,
+        holdOf: holdOf,
+      );
+      expect(forgotten, contains('bea'));
+    });
+
+    test('a vault whose hold cannot be read is left for the next time', () async {
+      await deleteStaleVaults(
+        'ana',
+        forget: forget,
+        directory: () async => dir.path,
+        holdOf: (id) async => id == 'bea' ? throw StateError('unreadable') : null,
+      );
+      expect(forgotten, isNot(contains('bea')));
+      expect(await names(), contains('wambito.vault.bea.current'));
+      expect(forgotten, contains('cid'));
+    });
+
+    test(
+      'listVaultHolds finds each held vault with its id and kind and skips unheld ones',
+      () async {
+        await hold('bea', const VaultHold(VaultHoldKind.orphaned, target: 'new', since: 's'));
+        await hold('dan', const VaultHold(VaultHoldKind.provisional, since: 't'));
+        final unheld = await SqliteStore.open(
+          'ana',
+          directory: dir.path,
+          factory: databaseFactoryFfi,
+        );
+        await unheld.close();
+        final all = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
+        final byId = {for (final h in all.holds) h.userId: h.hold};
+        expect(all.unreadable, isEmpty);
+        expect(byId.keys.toSet(), {'bea', 'dan'});
+        expect([byId['bea']?.kind, byId['bea']?.target], [VaultHoldKind.orphaned, 'new']);
+        expect(byId['dan']?.kind, VaultHoldKind.provisional);
+      },
+    );
+
+    test('the real vaultHoldOf throws on a corrupt file, so the sweep keeps it', () async {
+      File(p.join(dir.path, vaultFileName('bea'))).writeAsStringSync('not a database');
+      await hold('dan', const VaultHold(VaultHoldKind.provisional, since: 't'));
+      // A malformed hold in a real vault.
+      final bad = await SqliteStore.open('ana', directory: dir.path, factory: databaseFactoryFfi);
+      await bad.setMeta('hold', {'kind': 'nope'});
+      await bad.close();
+      await deleteStaleVaults(
+        'zed',
+        forget: forget,
+        directory: () async => dir.path,
+        holdOf: (id) => vaultHoldOf(id, directory: dir.path, factory: databaseFactoryFfi),
+      );
+      expect(forgotten, isNot(containsAll(['bea'])));
+      expect(forgotten, isNot(contains('ana')));
+      expect(forgotten, isNot(contains('dan')));
+      final listed = await listVaultHolds(directory: dir.path, factory: databaseFactoryFfi);
+      expect(listed.unreadable..sort(), ['ana', 'bea']);
+      expect(listed.holds.map((h) => h.userId), ['dan']);
+    });
   });
 }

@@ -15,6 +15,8 @@ import 'package:wambito/home/home_screen.dart';
 import 'package:wambito/progress/progress_screen.dart';
 import 'package:wambito/launch/launch_links.dart';
 import 'package:wambito/router.dart';
+import 'package:wambito/settings/security/approve_signin_screen.dart';
+import 'package:wambito/settings/security/security_api.dart' show securityApiProvider;
 
 import '../capture/fakes.dart';
 import '../entry/fakes.dart' show FakeAuthApi;
@@ -22,6 +24,7 @@ import '../home/fakes.dart';
 import '../home/fixtures.dart';
 import '../review/fakes.dart' show detected;
 import '../settings/harness.dart';
+import '../settings/security/fake_security.dart';
 
 import 'package:wambito/ui/lk_icons.dart';
 
@@ -53,10 +56,10 @@ class _HangingProfile extends FakeAuthApi {
   final hold = Completer<void>();
 
   @override
-  Future<AccountStanding> standing(String token) async {
+  Future<AccountStanding> standing(String token, {String? userId}) async {
     calls.add('isGuest $token');
     await hold.future;
-    return super.standing(token);
+    return super.standing(token, userId: userId);
   }
 }
 
@@ -69,6 +72,9 @@ class _KeptSession extends SessionStore {
   @override
   Future<StoredSession?> read() async => session;
 }
+
+const _key = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
+const _signinQr = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=$_key';
 
 void main() {
   group('reading a link', () {
@@ -94,6 +100,23 @@ void main() {
       expect(launchReviewIdOf('wambito://review'), isNull);
       expect(launchActionOf('wambito://review/a/b'), isNull);
       expect(launchActionOf('wambito://due/abc'), isNull);
+    });
+
+    test('wambito://signin with the QR\'s id and key, nothing else', () {
+      expect(launchActionOf(_signinQr), LaunchAction.signin);
+      expect(launchSigninQrOf(_signinQr), _signinQr);
+      expect(launchActionOf('wambito://signin'), LaunchAction.signin);
+      for (final other in [
+        'wambito://signin',
+        'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ab',
+        '$_signinQr&x=1',
+        'wambito://signin/x?id=1',
+        'wambito://pair?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=$_key',
+        'https://app.wambito.com/signin?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=$_key',
+        null,
+      ]) {
+        expect(launchSigninQrOf(other), isNull, reason: other);
+      }
     });
 
     test('a link in another scheme is not a launch link', () {
@@ -564,6 +587,137 @@ void main() {
       );
       expect(env.router.state.uri.path, '/welcome');
       expect(find.byType(AddSheet), findsNothing);
+    });
+  });
+
+  group('a web sign-in QR the system camera opened', () {
+    testWidgets(
+      'wambito://signin?id=…&key=… opens the approval when the vault is open and is dropped otherwise',
+      (tester) async {
+        // open: the approval, with the QR looked up at once
+        final security = FakeSecurity()
+          ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
+        final links = FakeLaunchLinks();
+        final env = await pumpSettingsApp(
+          tester,
+          location: '/settings',
+          overrides: [
+            launchLinkSourceProvider.overrideWithValue(links),
+            securityApiProvider.overrideWithValue(security),
+          ],
+        );
+        links.open(_signinQr);
+        await tester.pumpAndSettle();
+        expect(env.router.state.uri.path, '/settings/signin');
+        expect(find.byType(ApproveSigninScreen), findsOneWidget);
+        // a QR from a link is unauthenticated intent: the screen asks for the number
+        expect(security.calls, contains('findSigninRequest code=null qr=$_signinQr fromLink'));
+        // Back is home.
+        env.router.pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(HomeScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets('a link during an open approval is ignored', (tester) async {
+      final security = FakeSecurity()
+        ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(security),
+        ],
+      );
+      links.open(_signinQr);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      // another request arrives while the first one is on screen: dropped, the screen stays
+      const other = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ff&key=$_key';
+      links.open(other);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      expect(env.router.state.uri.queryParameters['qr'], _signinQr);
+      expect(security.calls.where((c) => c.contains('0123456789ff')), isEmpty);
+    });
+
+    testWidgets('two links back to back open one approval: the second is dropped', (tester) async {
+      final security = FakeSecurity()
+        ..findSignin = ({code, qr, fromLink = false}) => Completer<Never>().future;
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(security),
+        ],
+      );
+      const other = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ff&key=$_key';
+      // Both arrive before the first approval screen is up.
+      links
+        ..open(_signinQr)
+        ..open(other);
+      await tester.pumpAndSettle();
+      expect(find.byType(ApproveSigninScreen), findsOneWidget);
+      expect(env.router.state.uri.queryParameters['qr'], _signinQr);
+      expect(security.calls.where((c) => c.contains('0123456789ff')), isEmpty);
+      // Once that one is gone, a later link opens again.
+      env.router.pop();
+      await tester.pumpAndSettle();
+      links.open(other);
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.queryParameters['qr'], other);
+    });
+
+    testWidgets('a locked vault drops it, and so does a link that is not a QR', (tester) async {
+      final security = FakeSecurity();
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(null),
+        ],
+      );
+      links.open(_signinQr);
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.path, '/settings');
+      expect(find.byType(ApproveSigninScreen), findsNothing);
+      expect(security.calls, isEmpty);
+    });
+
+    testWidgets('a malformed sign-in link is dropped with the vault open', (tester) async {
+      final security = FakeSecurity();
+      final links = FakeLaunchLinks();
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [
+          launchLinkSourceProvider.overrideWithValue(links),
+          securityApiProvider.overrideWithValue(security),
+        ],
+      );
+      links.open('wambito://signin?id=nope');
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.path, '/settings');
+      expect(security.calls, isEmpty);
+    });
+
+    testWidgets('a plain account ignores a signin link', (tester) async {
+      // the harness's account is `plain`: no vault, no approval
+      final links = FakeLaunchLinks(_signinQr);
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [launchLinkSourceProvider.overrideWithValue(links)],
+      );
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.path, '/settings');
+      expect(find.byType(ApproveSigninScreen), findsNothing);
     });
   });
 }

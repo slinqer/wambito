@@ -1,10 +1,11 @@
 // Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
-// (`preview`) account. A guest (no recovery key) gets only "Approve a new device": nothing is loaded
-// for it. Otherwise: this phone and the other devices that open the data (name, added date, "Not
-// verified" when an attestation fails), each other one with "Remove" (a key rotation,
-// `RemoveDeviceSheet`); "Approve a new device"; "New recovery key"; and how many records could not be
-// read, when any. The sensitive steps (removing a device, making a new key, showing it) ask the
-// phone's screen lock first (spec 7.7, D17), which replaces the web's passkey touch.
+// (`preview`) account, with or without email (the same section for both): this phone and the other
+// devices that open the data (name, added date, "Not verified" when an attestation fails), each
+// other one with "Remove" (a key rotation, `RemoveDeviceSheet`); "Approve a new device"; "Sign in
+// on the web" (approving a browser's QR or code, `ApproveSigninScreen`, phone-first spec 8.1); "New
+// recovery key"; and how many records could not be read, when any. The sensitive steps (removing a
+// device, making a new key, showing it) ask the phone's screen lock first (spec 7.7, D17), which
+// replaces the web's passkey touch.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../local/rotate.dart' show NewRecoveryKey;
+import '../../protect/protect_actions.dart' show markRecoveryKeySaved;
+import '../../protect/protect_status.dart' show protectStatusProvider, recoveryKeySavedAt;
+import '../../vault/encryption_mode.dart' show currentVaultAccountProvider;
 import '../../security/screen_lock.dart';
 import '../../theme/surfaces.dart';
 import '../../theme/text_styles.dart';
@@ -20,22 +24,21 @@ import '../../ui/css_text.dart';
 import '../../ui/lk_theme.dart';
 import '../../ui/press_button.dart';
 import '../../ui/toast.dart';
+import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import '../passkeys_section.dart' show passkeyDay;
 import '../settings_parts.dart';
 import 'approve_device_screen.dart';
+import 'approve_signin_screen.dart';
 import 'recovery_setup_page.dart';
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
 import 'security_model.dart';
 
 class SecuritySection extends ConsumerStatefulWidget {
-  const SecuritySection({super.key, required this.timeZone, required this.guest});
+  const SecuritySection({super.key, required this.timeZone});
 
   /// The profile's zone: a device is dated in it.
   final String timeZone;
-
-  /// A guest's reduced section: only approving a new device.
-  final bool guest;
 
   @override
   ConsumerState<SecuritySection> createState() => _SecuritySectionState();
@@ -57,7 +60,18 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         ),
       ),
     );
-    if (!widget.guest) _changed();
+    _changed();
+  }
+
+  /// "Sign in on the web": a browser joins as a device, so the list is read again after.
+  Future<void> _signinWeb() async {
+    await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (route) => ApproveSigninScreen(onDone: () => Navigator.of(route).pop()),
+      ),
+    );
+    _changed();
   }
 
   Future<void> _remove(SecurityApi security, DeviceRow row, bool hasPasskeys) async {
@@ -93,11 +107,25 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final toasts = ToastHost.of(context);
     setState(() => _busy = true);
     try {
+      // A guest who never saved a shown key has none to type (ruling 3); an email account whose
+      // settings predate `recoveryKeySavedAt` still is asked for it (D17).
+      final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
+      final session = ref.read(vaultSessionProvider);
+      var noKeyYet = false;
+      if (anonymous && session != null) {
+        try {
+          noKeyYet = await recoveryKeySavedAt(session.store) == null;
+        } on Object {
+          // Unreadable: the key is asked, as for any account.
+        }
+      }
+      if (!mounted) return;
       final ok = await confirmSensitive(
         context,
         ref,
         reason: l10n.settingsSecurityLockNewKey,
         checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
       );
       if (!ok || !mounted) return;
       final NewRecoveryKey prepared;
@@ -134,6 +162,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       }
       toasts.say(l10n.settingsSecurityNewKeySaved);
       _changed();
+      // A key the person saw is saved: "Protect your data" counts it, on every phone of the account.
+      if (session != null) {
+        unawaited(
+          markRecoveryKeySaved(
+            session,
+            DateTime.now(),
+          ).then((_) => ref.invalidate(protectStatusProvider)).catchError((Object _) {}),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -219,14 +256,19 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         ),
       ],
     );
-    if (widget.guest) {
-      return SettingsSection(
-        key: const Key('settings.card.security'),
-        title: l10n.settingsSecurityTitle,
-        lead: l10n.settingsSecurityGuestLead,
-        children: [approve],
-      );
-    }
+    final signinWeb = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: WambitoTokens.space2,
+      children: [
+        SettingLabel(label: l10n.settingsSecuritySignin, hint: l10n.settingsSecuritySigninLead),
+        PressButton.text(
+          l10n.settingsSecuritySignin,
+          key: const Key('security.signinWeb'),
+          tone: PressTone.secondary,
+          onPressed: () => unawaited(_signinWeb()),
+        ),
+      ],
+    );
     final snapshot = ref.watch(securitySnapshotProvider);
     final data = snapshot.value;
     final rows = data == null
@@ -260,6 +302,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
           ],
         ),
         approve,
+        signinWeb,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: WambitoTokens.space2,

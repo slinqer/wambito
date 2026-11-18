@@ -4,11 +4,15 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 /// at another one with `--dart-define=WAMBITO_SERVER=http://10.0.2.2:3000` (the dev stack, seen
 /// from the emulator).
 final defaultServerUrl = Uri.parse(
-  const String.fromEnvironment(
-    'WAMBITO_SERVER',
-    defaultValue: 'https://app.wambito.com',
-  ),
+  const String.fromEnvironment('WAMBITO_SERVER', defaultValue: 'https://app.wambito.com'),
 );
+
+/// Whether the server this build talks to makes every new user encrypted (`preview`): builds made
+/// from the switch day on say so with `--dart-define=WAMBITO_NEW_USERS_ENCRYPTED=true` (default
+/// false). Only then, or once this phone saw the server make an encrypted user
+/// (`newUsersEncryptedProvider`, lib/api/server_url.dart), does "Start" work without the network,
+/// on a provisional vault (ruling 8): a `plain` user never gets a movement made offline.
+const bool newUsersEncryptedByBuild = bool.fromEnvironment('WAMBITO_NEW_USERS_ENCRYPTED');
 
 /// The hosts that may use plain `http`, in debug builds only: the phone's own `localhost` and the
 /// emulator's name for the computer it runs on. A release build refuses plain `http` outright (it

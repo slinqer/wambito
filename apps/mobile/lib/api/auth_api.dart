@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,13 +24,25 @@ class AuthFailure implements Exception {
   String toString() => 'AuthFailure($status, $code)';
 }
 
+/// A recovery-key sign-in: the session's bearer token and the account it signed in to.
+typedef RecoverySignedInAs = ({String token, String userId});
+
 /// Who the account behind a token is, as `GET /v1/me` says it: a guest or not, and whether it still
 /// has the welcome to do. The web decides the welcome with `onboardingCompletedAt` (apps/web/app/
 /// auth/session.ts, `requireOnboarded`); a guest has none, as the web has no guests.
 class AccountStanding {
-  const AccountStanding({required this.guest, required this.onboardingPending, this.userId});
+  const AccountStanding({
+    required this.guest,
+    required this.onboardingPending,
+    this.userId,
+    this.encrypted = false,
+  });
 
   final bool guest;
+
+  /// The account's finances are end-to-end encrypted (`encryption: preview`): they live in a vault
+  /// on the phone, never on the server in clear.
+  final bool encrypted;
 
   /// The account's id, when the answer had it.
   final String? userId;
@@ -91,7 +104,10 @@ abstract interface class AuthApi {
   Future<bool> isGuest(String token);
 
   /// Whether the user behind [token] is a guest and has the welcome to do (`GET /v1/me`).
-  Future<AccountStanding> standing(String token);
+  /// [userId], the account the phone kept for that session, goes as `x-wambito-user` (ruling 17):
+  /// a session whose user was deleted then fails with the 401 code `user_deleted` instead of
+  /// `unauthenticated` (lib/api/unauthorized.dart).
+  Future<AccountStanding> standing(String token, {String? userId});
 
   /// Marks the welcome done for the account behind [token] (`PATCH /v1/me` with
   /// `onboardingCompleted`). The API stamps it once; a later call keeps the first time.
@@ -129,8 +145,19 @@ abstract interface class AuthApi {
   /// Adds the phone's new passkey ([responseJson]) to the user behind [token].
   Future<void> passkeyRegister(String token, PasskeyChallenge challenge, String responseJson);
 
+  /// Signs in with the recovery key (`POST /v2/recovery/sign-in`): [lookup] (16 bytes) and [auth]
+  /// (32 bytes) are what the key derives (`recoveryVerifier`), never the key itself. A key that
+  /// signs in nothing is 401 `recovery_key_invalid`; too many tries, 429 with `retryAfter`. The
+  /// session's token and the id of the account it signed in to (the answer's `userId`).
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth);
+
   /// Ends the session on the server (best effort).
   Future<void> signOut(String token);
+
+  /// Deletes the user behind [token] and everything it has on the server (`DELETE /v1/me` with
+  /// that bearer): a merge's last step, for the phone's anonymous user. A 401 counts as done (the
+  /// user, or its session, is already gone).
+  Future<void> deleteUser(String token);
 }
 
 /// [AuthApi] over HTTP, with the request shapes of the web app's sign-in (Better Auth's routes
@@ -223,14 +250,15 @@ class HttpAuthApi implements AuthApi {
   });
 
   @override
-  Future<AccountStanding> standing(String token) => _settle(() async {
-    final response = await _api.getMe(headers: _bearer(token));
+  Future<AccountStanding> standing(String token, {String? userId}) => _settle(() async {
+    final response = await _api.getMe(headers: {..._bearer(token), 'x-wambito-user': ?userId});
     final profile = response.data;
     if (profile == null) throw const AuthFailure(status: 500);
     return AccountStanding(
       guest: profile.isAnonymous,
       onboardingPending: !profile.isAnonymous && profile.onboardingCompletedAt == null,
       userId: profile.id,
+      encrypted: profile.encryption == ProfileEncryptionEnum.preview,
     );
   });
 
@@ -399,6 +427,23 @@ class HttpAuthApi implements AuthApi {
       });
 
   @override
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth) => _settle(() async {
+    final response = await _api.recoverySignIn(
+      recoverySignIn: RecoverySignIn(
+        (b) => b
+          ..lookup = _base64Url(lookup)
+          ..auth = _base64Url(auth),
+      ),
+    );
+    final userId = response.data?.userId;
+    if (userId == null || userId.isEmpty) throw const AuthFailure(status: 500);
+    return (token: _token(response), userId: userId);
+  });
+
+  /// Unpadded base64url, as the API reads bytes.
+  static String _base64Url(Uint8List bytes) => base64Url.encode(bytes).replaceAll('=', '');
+
+  @override
   Future<void> signOut(String token) => _settle(() async {
     await dio.post<Object?>(
       '/auth/sign-out',
@@ -406,6 +451,15 @@ class HttpAuthApi implements AuthApi {
       options: Options(headers: _bearer(token)),
     );
   });
+
+  @override
+  Future<void> deleteUser(String token) async {
+    try {
+      await _settle(() => _api.deleteMe(headers: _bearer(token)));
+    } on AuthFailure catch (failure) {
+      if (failure.status != 401) rethrow;
+    }
+  }
 }
 
 /// The auth server at the configured URL, with the phone's hints.

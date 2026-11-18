@@ -1,12 +1,22 @@
 import 'dart:async';
+import 'dart:io' show HttpException, SocketException, TlsException;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../capture_auto/capture_platform.dart';
+import '../crypto/recovery.dart' show recoveryVerifier;
 import '../home/home_cache.dart';
 import '../home/widget_sync.dart';
+import '../local/adopt.dart';
+import '../local/keys.dart' show keysParseRecoveryKey;
+import '../local/provisional.dart';
+import '../local/sqlite_store.dart';
+import '../local/vault_lock.dart' show waitLease;
+import '../local/vault_session.dart' show appLeaseWait;
 import '../offline/pending_saves.dart';
 import '../storage/secure_storage.dart';
 import 'auth_api.dart';
@@ -15,9 +25,11 @@ import 'device.dart';
 import 'server_url.dart';
 import 'passkey_offer.dart';
 import 'passkeys.dart';
+import 'unauthorized.dart';
 import '../vault/encryption_mode.dart'
     show
         EncryptionMode,
+        EncryptionStore,
         VaultAccount,
         encryptionStoreProvider,
         freshVaultAccountProvider,
@@ -27,7 +39,13 @@ import '../vault/encryption_mode.dart'
         vaultOwnerProvider;
 import '../vault/finance_guard.dart';
 import '../vault/vault_providers.dart'
-    show forgetVaultProvider, keyStorageProvider, staleVaultsProvider, vaultSessionProvider;
+    show
+        adoptionNeedsEncryptedServerProvider,
+        forgetVaultProvider,
+        keyStorageProvider,
+        staleVaultsProvider,
+        vaultHoldReaderProvider,
+        vaultSessionProvider;
 
 export 'auth_api.dart' show authApiProvider;
 export 'passkeys.dart' show passkeysProvider, passkeysSupportedProvider;
@@ -67,6 +85,16 @@ class SessionStore {
   static const tokenKey = 'session.token';
   static const guestKey = 'session.guest';
   static const onboardingKey = 'session.onboarding';
+
+  /// The local id of the provisional vault of an offline first run (`local-<uuidv7>`), kept before
+  /// the vault is made so a restart reopens the same one; gone once the vault is promoted. A
+  /// persistent name.
+  static const provisionalKey = 'session.provisional';
+
+  /// The token of the anonymous user the provisional vault is being promoted into, kept from its
+  /// sign-up (`AdoptDeps.keepToken`) until the session is that user's: a restart reuses it instead
+  /// of making a second user. A persistent name.
+  static const provisionalTokenKey = provisionalTokenStorageKey;
 
   final FlutterSecureStorage _storage;
 
@@ -116,19 +144,63 @@ class SessionStore {
     await _storage.delete(key: guestKey);
     await _storage.delete(key: onboardingKey);
   }
+
+  /// The provisional vault's local id ([provisionalKey]); null when none (or unreadable).
+  Future<String?> readProvisional() => _readOrNull(provisionalKey);
+
+  Future<void> writeProvisional(String localId) =>
+      _storage.write(key: provisionalKey, value: localId);
+
+  Future<void> clearProvisional() => _storage.delete(key: provisionalKey);
+
+  /// The promotion's kept token ([provisionalTokenKey]).
+  Future<String?> readProvisionalToken() => _readOrNull(provisionalTokenKey);
+
+  Future<void> writeProvisionalToken(String token) =>
+      _storage.write(key: provisionalTokenKey, value: token);
+
+  Future<void> clearProvisionalToken() => _storage.delete(key: provisionalTokenKey);
+
+  Future<String?> _readOrNull(String key) async {
+    try {
+      final value = await _storage.read(key: key);
+      return value == null || value.isEmpty ? null : value;
+    } on PlatformException {
+      return null;
+    }
+  }
 }
 
-enum SessionStatus { loading, signedOut, signedIn }
+/// [SessionStatus.provisional]: an offline first run on a vault whose user does not exist yet
+/// (lib/local/provisional.dart). The phone has no session: background jobs, the widget and capture
+/// see it as signed out, and nobody signs in until it is promoted.
+enum SessionStatus { loading, signedOut, signedIn, provisional }
 
-/// Where the person stands: still reading the store, signed out, or signed in with [stored].
+/// Why a provisional vault cannot be promoted yet ([SessionState.provisionalBlock]; Settings says
+/// it): the server made a `plain` user (it keeps data in clear, ruling 8), or it takes no new
+/// accounts without email (`GUEST_SIGNUP` closed, ruling 23).
+enum ProvisionalBlock { plainServer, noGuests }
+
+/// Where the person stands: still reading the store, signed out, signed in with [stored], or on a
+/// provisional vault ([localId]).
 class SessionState {
-  const SessionState._(this.status, this.stored, [this.offerPasskeyFor]);
+  const SessionState._(
+    this.status,
+    this.stored, [
+    this.offerPasskeyFor,
+    this.localId,
+    this.provisionalBlock,
+  ]);
 
   static const loading = SessionState._(SessionStatus.loading, null);
   static const signedOut = SessionState._(SessionStatus.signedOut, null);
 
   const SessionState.signedIn(StoredSession session, {String? offerPasskeyFor})
     : this._(SessionStatus.signedIn, session, offerPasskeyFor);
+
+  /// An offline first run on the provisional vault [localId] ([block]: why it waits, if known).
+  const SessionState.provisional(String localId, {ProvisionalBlock? block})
+    : this._(SessionStatus.provisional, null, null, localId, block);
 
   final SessionStatus status;
   final StoredSession? stored;
@@ -137,6 +209,14 @@ class SessionState {
   /// id of the account to offer a passkey to, until it answers ([SessionController.answerPasskeyOffer]).
   /// Never a guest's: a guest has "Guarda tu progreso".
   final String? offerPasskeyFor;
+
+  /// The provisional vault's local id while [SessionStatus.provisional]; else null.
+  final String? localId;
+
+  /// Why the provisional vault waits (null: only for the network).
+  final ProvisionalBlock? provisionalBlock;
+
+  bool get isProvisional => status == SessionStatus.provisional;
 
   bool get isGuest => stored?.guest ?? false;
 
@@ -186,9 +266,62 @@ class SessionController extends Notifier<SessionState> {
     // Before the first read: items kept with the old accessibility are rewritten (iOS only).
     await migrateKeychainAccessibility(appSecureStorage, backgroundReadableKeys);
     final stored = await _store.read();
+    final localId = await _store.readProvisional();
+    if (stored == null && localId != null) {
+      // An offline first run, killed before its promotion: the same vault again.
+      await _openProvisional(localId);
+      return null;
+    }
+    if (stored != null && localId != null && !await _provisionalVaultKept(localId)) {
+      // A promotion that signed in and was killed before it tidied up (the vault is carried: the
+      // adoption forgot it). A provisional vault still on disk was never carried: its id and kept
+      // token stay with it (the hold keeps it through the sweep).
+      await _tidyPromotion();
+    }
+    // Read before the session is out: the start's `GET /v1/me` names it at once.
+    _keptAtStart = stored == null ? null : await _keptIdOf(stored.token);
     state = stored == null ? SessionState.signedOut : SessionState.signedIn(stored);
     if (stored == null) unawaited(_sweepSignedOut());
     return stored;
+  }
+
+  /// The provisional vault [localId] opens (a failure leaves its `/v1` calls failing as offline,
+  /// the vault kept) and the session is provisional; the bank-notification captures queued from
+  /// now on are tagged for it, so the promotion hands them to the new user.
+  Future<void> _openProvisional(String localId, {ProvisionalBlock? block}) async {
+    try {
+      await ref.read(provisionalVaultProvider.notifier).open(localId);
+    } on Object {
+      // Kept on disk (held); the next start opens it.
+    }
+    if (!ref.mounted) return;
+    state = SessionState.provisional(localId, block: block);
+    final platform = ref.read(autoCapturePlatformProvider);
+    Future<void> tag() async {
+      if (await platform.status() == null) return;
+      await platform.sendQueued(localId);
+    }
+
+    unawaited(tag().then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  /// Whether the provisional vault [localId] is still on disk; true when that cannot be told.
+  Future<bool> _provisionalVaultKept(String localId) async {
+    try {
+      return await adoptVaultExists(localId, ref.read(adoptDepsProvider));
+    } on Object {
+      return true;
+    }
+  }
+
+  /// What a promotion leaves once the session is the new user's: the local id and the kept token.
+  Future<void> _tidyPromotion() async {
+    try {
+      await _store.clearProvisional();
+      await _store.clearProvisionalToken();
+    } on Object {
+      // Tidied at the next start.
+    }
   }
 
   /// A signed-out start: the vaults of sessions that ended without a sign-out go (the web's
@@ -209,7 +342,8 @@ class SessionController extends Notifier<SessionState> {
   /// an account whose welcome was done elsewhere. Offline, the stored session stands.
   Future<void> _refresh(StoredSession stored) async {
     try {
-      final standing = await _auth.standing(stored.token);
+      // Naming the account kept for the session (ruling 17): a deleted one says `user_deleted`.
+      final standing = await _auth.standing(stored.token, userId: _keptAtStart);
       if (!ref.mounted || state.stored?.token != stored.token) return;
       // What the server says about the welcome wins over what was kept (another phone, or the web,
       // may have finished it).
@@ -227,10 +361,23 @@ class SessionController extends Notifier<SessionState> {
         _sendQueuedCaptures(stored.token, standing.userId);
       }
     } on AuthFailure catch (failure) {
-      // The vault stays for the account's next sign-in ([sessionExpired]).
+      // As its code says ([sessionEnded]): an expired session keeps the vault for the account's
+      // next sign-in, a removed device wipes it, a deleted account's is adopted.
       if (failure.status == 401 && state.stored?.token == stored.token) {
-        await sessionExpired(token: stored.token);
+        await sessionEnded(token: stored.token, kind: unauthorizedOf(failure.code));
       }
+    }
+  }
+
+  /// The account kept for the stored session at start ([_restore]).
+  String? _keptAtStart;
+
+  /// The account id kept for the session of [token] (null when none, or unreadable).
+  Future<String?> _keptIdOf(String token) async {
+    try {
+      return (await ref.read(encryptionStoreProvider).recall(token))?.profile.id;
+    } on Object {
+      return null;
     }
   }
 
@@ -241,11 +388,14 @@ class SessionController extends Notifier<SessionState> {
     bool onboardingKnown = true,
     String? offerPasskeyFor,
     String? userId,
+    String? capturesFrom,
   }) async {
     // Another token is another session (a guest replaced by an email account, say): what the old
     // one left on this phone goes with it. The same token (a claim, a corrected flag) keeps it.
     final previous = state.stored?.token;
     if (previous != null && previous != token) await _forgetWidget();
+    // Another account's adoption no longer waits here: the gate's reason goes with it.
+    if (previous != token) _resetAdoptionWait();
     await _store.write(
       token,
       guest: guest,
@@ -264,7 +414,7 @@ class SessionController extends Notifier<SessionState> {
       offerPasskeyFor: guest ? null : offerPasskeyFor,
     );
     ref.read(widgetSyncProvider).signedIn();
-    _sendQueuedCaptures(token, userId);
+    _sendQueuedCaptures(token, userId, from: capturesFrom);
   }
 
   /// Tells Android whose the queue of detected captures is now, so it drops another account's and
@@ -272,19 +422,29 @@ class SessionController extends Notifier<SessionState> {
   /// Asks the server for the account id only when [userId] is not known and there is an Android
   /// side. Not waited for, and a failure (offline) only leaves the queue for the next sign-in or
   /// start: nothing is sent to an account that could not be told.
-  void _sendQueuedCaptures(String token, String? userId) {
+  ///
+  /// [from]: the account whose data this one takes over (a merge, or its cancel): its captures are
+  /// re-tagged instead of dropped; [CaptureHandover] keeps it (written before the token) for this
+  /// session's later hand-overs, a restart's included, until one went through.
+  void _sendQueuedCaptures(String token, String? userId, {String? from}) {
     final platform = ref.read(autoCapturePlatformProvider);
+    final handover = ref.read(captureHandoverProvider);
     Future<void> send() async {
       if (await platform.status() == null) return;
       final id = userId ?? await _auth.accountId(token);
       if (!ref.mounted || state.stored?.token != token) return;
-      await platform.sendQueued(id);
+      final carried = from ?? await handover.fromFor(token);
+      await platform.sendQueued(id, from: carried);
+      if (carried != null) await handover.done(token);
     }
 
     unawaited(send().then<void>((_) {}, onError: (Object _) {}));
   }
 
   void _guardGuest(bool replaceGuest) {
+    // No sign-in while provisional: a person with an account waits for the promotion, then adds
+    // the email (the merge).
+    if (state.isProvisional) throw StateError('No sign-in while provisional');
     if (state.isGuest && !replaceGuest) throw const GuestInTheWay();
   }
 
@@ -294,11 +454,150 @@ class SessionController extends Notifier<SessionState> {
     return token;
   }
 
-  /// "Probar sin correo": a new guest.
+  /// The welcome's "Empezar" (Start): a new user without email. Without network it throws (the
+  /// welcome says it needs a connection) and makes nothing, unless new users of this server are
+  /// known to be encrypted ([newUsersEncryptedProvider], ruling 8): then the session becomes
+  /// provisional on a vault of this phone ([SessionState.provisional]), promoted once the network
+  /// answers ([promoteProvisional]).
   Future<void> startGuest() async {
     await ready;
-    final token = await _auth.signInAsGuest();
+    if (state.isProvisional) return;
+    final String token;
+    try {
+      token = await _auth.signInAsGuest();
+    } on Object catch (error) {
+      if (!isOfflineError(error) || !await _newUsersEncrypted()) rethrow;
+      // The id is kept before the vault is made: a restart reopens this one, never a second.
+      final localId = await _store.readProvisional() ?? newProvisionalId();
+      await _store.writeProvisional(localId);
+      await _openProvisional(localId);
+      return;
+    }
     await _signedIn(token, guest: true);
+  }
+
+  Future<bool> _newUsersEncrypted() async {
+    try {
+      return await ref.read(newUsersEncryptedProvider.future);
+    } on Object {
+      return false;
+    }
+  }
+
+  /// The promotion running now (one at a time).
+  Future<bool>? _promotion;
+
+  /// The provisional vault becomes a user's (phone-first spec 4, ruling 8), through the shared
+  /// adoption ([adoptVaultIntoNewUser], its token kept under [SessionStore.provisionalTokenKey]):
+  /// - `adopted`: the session is the new anonymous user's, the records in its vault (pushed sealed
+  ///   under its id by the vault's sync), the queued captures its own; true;
+  /// - `plainUser`: the server keeps data in clear; nothing went to `/v1`, that session is signed
+  ///   out on the server, the vault stays held and [ProvisionalBlock.plainServer]; false;
+  /// - `waiting` (no network): false, nothing changed;
+  /// - the server takes no new accounts without email (a 403): [ProvisionalBlock.noGuests]; false.
+  /// Not provisional: false at once.
+  Future<bool> promoteProvisional() async {
+    await ready;
+    final localId = state.localId;
+    if (!state.isProvisional || localId == null || !ref.mounted) return false;
+    final running = _promotion;
+    if (running != null) return running;
+    final next = _promote(localId);
+    _promotion = next;
+    try {
+      return await next;
+    } finally {
+      if (identical(_promotion, next)) _promotion = null;
+    }
+  }
+
+  Future<bool> _promote(String localId) async {
+    final vault = ref.read(provisionalVaultProvider.notifier);
+    final deps = ref
+        .read(adoptDepsProvider)
+        .withTokens(
+          keptToken: _store.readProvisionalToken,
+          keepToken: _store.writeProvisionalToken,
+          forgetToken: _store.clearProvisionalToken,
+          // Right before the carry reads it: the app's vault closes and stays closed.
+          stopWrites: (_) => vault.stop(),
+        );
+    final server = ref.read(serverUrlProvider);
+    final build = ref.read(deviceHintsProvider).appVersion ?? 'unknown';
+    final now = deps.now();
+    final day =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    // A server found making `plain` users today, by this build: not probed again (each probe makes
+    // an anonymous user). A promotion whose user is already made goes on.
+    if (await _store.readProvisionalToken() == null &&
+        await newUsersPlainProbed(server, build: build, day: day)) {
+      _block(localId, ProvisionalBlock.plainServer);
+      return false;
+    }
+    AdoptStep step;
+    try {
+      step = await adoptVaultIntoNewUser(localId, deps);
+    } on AuthFailure catch (failure) {
+      _resumeProvisional(localId, vault);
+      if (failure.status == 403 || failure.code == 'guest_signup_disabled') {
+        _block(localId, ProvisionalBlock.noGuests);
+      }
+      return false;
+    } on Object {
+      // Nothing is lost: the vault stays held, and the next try goes on.
+      _resumeProvisional(localId, vault);
+      return false;
+    }
+    switch (step) {
+      case AdoptStep.waiting:
+        _resumeProvisional(localId, vault);
+        return false;
+      case AdoptStep.plainUser:
+        // Nothing is ever carried into a `plain` user: that session goes, the vault stays held.
+        // That user is empty (nothing was carried): it is deleted (`DELETE /v1/me`), else at least
+        // its session ends.
+        final token = await deps.keptToken();
+        if (token != null) {
+          try {
+            await deps.auth.deleteUser(token).timeout(signOutWait);
+          } on Object {
+            try {
+              await _auth.signOut(token).timeout(signOutWait);
+            } on Object {
+              // An empty anonymous user; the inactivity cleanup takes it.
+            }
+          }
+        }
+        await deps.forgetToken();
+        // Kept with the build and the day: the next starts do not probe this server again today.
+        await rememberNewUsersPlain(server, build: build, day: day);
+        _resumeProvisional(localId, vault);
+        _block(localId, ProvisionalBlock.plainServer);
+        return false;
+      case AdoptStep.adopted:
+        final token = await deps.keptToken();
+        if (token == null || !ref.mounted || state.localId != localId) {
+          _resumeProvisional(localId, vault);
+          return false;
+        }
+        await vault.close();
+        await _takeOver(token, fromUserId: localId);
+        await _tidyPromotion();
+        vault.resume();
+        return true;
+    }
+  }
+
+  void _resumeProvisional(String localId, ProvisionalVault vault) {
+    vault.resume();
+    if (!ref.mounted || state.localId != localId) return;
+    unawaited(vault.open(localId).then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  void _block(String localId, ProvisionalBlock block) {
+    if (!ref.mounted || state.localId != localId) return;
+    state = SessionState.provisional(localId, block: block);
   }
 
   /// Emails a sign-in code and magic link. Throws [GuestInTheWay] for a guest unless
@@ -310,10 +609,27 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Signs in with the emailed code (typed, or from the magic link). Guarded like [sendCode].
-  Future<void> verifyCode(String email, String code, {bool replaceGuest = false}) async {
+  /// [keepCapturesOf]: a merge's sign-in (phone-first spec 7.2) passes the guest's account id, so
+  /// the bank-notification captures and "Bien" confirms queued for it go to the new account instead
+  /// of being dropped.
+  Future<void> verifyCode(
+    String email,
+    String code, {
+    bool replaceGuest = false,
+    String? keepCapturesOf,
+  }) async {
     await ready;
     _guardGuest(replaceGuest);
+    // A merge waiting for this email's sign-in (the code, or its link) carries the guest's captures.
+    final merging = ref.read(mergeSignInProvider);
+    final mergeEmail = merging.email;
+    keepCapturesOf ??=
+        mergeEmail != null && mergeEmail.trim().toLowerCase() == email.trim().toLowerCase()
+        ? merging.guestUserId
+        : null;
     final token = await _auth.verifyCode(email, code);
+    // Before the token: a process killed right after still hands the guest's captures over.
+    if (keepCapturesOf != null) await ref.read(captureHandoverProvider).keep(token, keepCapturesOf);
     // The code is spent: the session is on the phone before anything else is asked, so a slow or
     // dropped connection can never leave a spent code and no session.
     await _store.write(token, guest: false);
@@ -328,6 +644,7 @@ class SessionController extends Notifier<SessionState> {
       onboardingKnown: standing != null,
       offerPasskeyFor: offer,
       userId: standing?.userId,
+      capturesFrom: keepCapturesOf,
     );
   }
 
@@ -360,6 +677,20 @@ class SessionController extends Notifier<SessionState> {
     if (id == null || stored == null) return;
     await ref.read(passkeyOfferProvider).decide(id);
     if (state.stored?.token == stored.token) state = SessionState.signedIn(stored);
+  }
+
+  /// The passkey offer (`/entry/passkey-offer`) after a `preview` guest's claim, once its recovery
+  /// key is done (`afterClaim`, lib/protect/protect_actions.dart: the only caller, so the offer
+  /// comes once): `offerPasskeyFor` becomes the signed-in account's id when the offer is due for it
+  /// (the phone has passkeys, the account none, and this phone never had the answer). The claim
+  /// itself ([confirmClaim]) offers nothing.
+  Future<void> offerPasskey() async {
+    await ready;
+    final stored = state.stored;
+    if (stored == null || stored.guest) return;
+    final id = await ref.read(passkeyOfferProvider).dueFor(stored.token);
+    if (id == null || !ref.mounted || state.stored?.token != stored.token) return;
+    state = SessionState.signedIn(state.stored!, offerPasskeyFor: id);
   }
 
   /// "Guardar mi progreso": mails the signed-in guest a code to claim [email].
@@ -434,6 +765,56 @@ class SessionController extends Notifier<SessionState> {
     await _signedIn(token, guest: guest, onboardingPending: pending, userId: userId);
   }
 
+  /// "Use my recovery key": signs in with the typed key (`POST /v2/recovery/sign-in`), then holds
+  /// it, as its 16 parsed bytes, for the vault gate, which opens the account's data with it without
+  /// asking again (ruling 6). The text is parsed as Unlock parses it (lower case, spaces, dashes, O
+  /// for 0): one that does not parse is `AuthFailure(code: 'bad_recovery_key', status: 400)` and
+  /// nothing is sent. Only what the key derives (`lookup`, `auth`) leaves the phone, and it is
+  /// zeroed once sent; the secret is zeroed on any failure, and is never kept as text nor written.
+  /// Guarded like [sendCode].
+  Future<void> signInWithRecoveryKey(String text) async {
+    await ready;
+    _guardGuest(false);
+    final Uint8List secret;
+    try {
+      secret = keysParseRecoveryKey(text);
+    } on Object {
+      throw const AuthFailure(code: 'bad_recovery_key', status: 400);
+    }
+    final held = ref.read(signInRecoveryKeyProvider);
+    var handedOver = false;
+    try {
+      final RecoverySignedInAs signedIn;
+      final verifier = await recoveryVerifier(secret);
+      try {
+        signedIn = await _auth.recoverySignIn(verifier.lookup, verifier.auth);
+      } finally {
+        verifier.lookup.fillRange(0, verifier.lookup.length, 0);
+        verifier.auth.fillRange(0, verifier.auth.length, 0);
+      }
+      final (:token, :userId) = signedIn;
+      // Held for the account the server named, before the session changes: the gate that the new
+      // session starts takes it.
+      held.hold(userId, secret);
+      handedOver = true;
+      // The account may have no email: if the server cannot say, a guest (the safe side).
+      final standing = await _standing(token);
+      await _signedIn(
+        token,
+        guest: standing?.guest ?? true,
+        onboardingPending: standing?.onboardingPending ?? false,
+        onboardingKnown: standing != null,
+        userId: userId,
+      );
+    } on Object {
+      if (handedOver) held.clear();
+      handedOver = false;
+      rethrow;
+    } finally {
+      if (!handedOver) secret.fillRange(0, secret.length, 0);
+    }
+  }
+
   /// Adds a passkey on this phone to the signed-in user, a guest included (spec section 4.3).
   Future<void> registerPasskey() async {
     await ready;
@@ -448,6 +829,8 @@ class SessionController extends Notifier<SessionState> {
   /// warned (Settings does) or the server itself has dropped the session (a 401).
   Future<void> signOut({bool discardGuest = false}) async {
     await ready;
+    // A provisional vault has no session to end, and nothing else holds its data.
+    if (state.isProvisional) return;
     if (state.isGuest && !discardGuest) throw const GuestInTheWay();
     final token = state.stored?.token;
     if (token != null) {
@@ -460,11 +843,85 @@ class SessionController extends Notifier<SessionState> {
         // whatever went wrong there, the session is forgotten here all the same.
       }
     }
+    ref.read(signInRecoveryKeyProvider).clear();
+    _resetAdoptionWait();
     await _forgetVault();
     await _forgetWidget();
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// [adoptionNeedsEncryptedServerProvider] back to false (the next adoption's step sets it again).
+  void _resetAdoptionWait() {
+    if (ref.mounted) ref.read(adoptionNeedsEncryptedServerProvider).value = false;
+  }
+
+  /// A merge into an email account (phone-first spec 7.2) is called off after its sign-in (ruling
+  /// 10): the anonymous session kept aside ([guestToken], account [guestUserId]) is the session again
+  /// first, with its vault and keys as they were; then the email account's vault is forgotten by its
+  /// id (only an id learned for that session, never the account kept last, which may be the guest);
+  /// then that session is signed out on the server, best effort and not waited for. A process killed
+  /// anywhere in between restarts in the guest's session with its data. The captures queued for the
+  /// email account meanwhile are re-tagged for the guest.
+  Future<void> returnToGuest(String guestToken, {String? guestUserId}) async {
+    await ready;
+    final token = state.stored?.token;
+    if (token == null || token == guestToken) {
+      await _signedIn(guestToken, guest: true, userId: guestUserId);
+      return;
+    }
+    final accountId = await _accountIdOf(token);
+    ref.read(signInRecoveryKeyProvider).clear();
+    if (accountId != null && accountId != guestUserId) {
+      await ref.read(captureHandoverProvider).keep(guestToken, accountId);
+    }
+    await _signedIn(
+      guestToken,
+      guest: true,
+      userId: guestUserId,
+      capturesFrom: accountId == guestUserId ? null : accountId,
+    );
+    if (accountId != null && accountId != guestUserId) {
+      final keys = ref.read(keyStorageProvider);
+      try {
+        await ref.read(forgetVaultProvider)(accountId, keys);
+      } on Object {
+        try {
+          await keys.deleteAll(accountId);
+        } on Object {
+          // Swept at a later sign-in (the account is not the guest's).
+        }
+      }
+      await _forgetKept(accountId, token);
+    }
+    unawaited(_auth.signOut(token).timeout(signOutWait).then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  /// The account of the session [token], as learned for it (the known account, else what was kept
+  /// for that session); null when neither says.
+  Future<String?> _accountIdOf(String token) async {
+    final known = ref.read(knownAccountProvider);
+    if (known.owner == sessionOwnerOf(token) && known.id != null) return known.id;
+    try {
+      return (await ref.read(encryptionStoreProvider).recall(token))?.profile.id;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// Forgets the mode kept for [userId], and the kept account when it is still [token]'s.
+  Future<void> _forgetKept(String userId, String token) async {
+    final store = ref.read(encryptionStoreProvider);
+    try {
+      if (await store.recall(token) != null) {
+        await store.forget(userId);
+      } else {
+        await appSecureStorage.delete(key: EncryptionStore.modeKey(userId));
+      }
+    } on Object {
+      // Personal but not secret; the next sweep takes it.
+    }
   }
 
   /// The server no longer knows the session (it expired, or the account signed out everywhere): it
@@ -480,11 +937,166 @@ class SessionController extends Notifier<SessionState> {
     await ready;
     final stored = state.stored?.token;
     if (stored == null || (token != null && token != stored)) return;
+    ref.read(signInRecoveryKeyProvider).clear();
     await _forgetWidget();
     // A sign-in meanwhile (another token) is not undone.
     if (state.stored?.token != stored) return;
     await _store.clear();
     if (state.stored?.token == stored) state = SessionState.signedOut;
+  }
+
+  /// The server no longer knows the session of [token] (a 401), and [kind] (its code,
+  /// lib/api/unauthorized.dart) says why (phone-first spec 10 step 1). Nothing wipes or adopts on a
+  /// guess: only a `preview` account's explicit codes do, and a `plain` account (or one whose mode
+  /// was never learned) keeps today's handling, [sessionExpired], whatever the code.
+  /// - [Unauthorized.expired]: [sessionExpired] (the vault waits for the account's next sign-in);
+  /// - [Unauthorized.deviceRemoved]: this phone was removed (3a 6.5): the vault, the home cache and
+  ///   the widget's figures are wiped, then the phone is signed out;
+  /// - [Unauthorized.userDeleted]: [adoptOrphan] keeps the data under a new anonymous user (or, with
+  ///   no data, wipes and signs out). Offline it waits, the session as it was, for the next start or
+  ///   resume ([resumeAdoptions]).
+  Future<void> sessionEnded({String? token, required Unauthorized kind}) async {
+    if (kind == Unauthorized.expired) return sessionExpired(token: token);
+    await ready;
+    final stored = state.stored?.token;
+    if (stored == null || (token != null && token != stored)) return;
+    final userId = await _previewAccountOf(stored);
+    if (userId == null) return sessionExpired(token: stored);
+    switch (kind) {
+      case Unauthorized.deviceRemoved:
+        await _wipeAndSignOut(stored);
+      case Unauthorized.userDeleted:
+        await _adopting(() async {
+          // Queued behind another ask for the same 401 (the start's and the gate's): once the
+          // session moved on (that one adopted, or another account signed in), nothing is left
+          // to do, and a second new user must never take the session.
+          if (state.stored?.token != stored) return null;
+          return adoptOrphan(userId, _adoptDeps());
+        });
+      case Unauthorized.expired:
+        break;
+    }
+  }
+
+  /// The id of the `preview` account of the session [token], as the phone kept it for that session
+  /// (every answer of `GET /v1/me` keeps it); null when it is `plain` or not known. No network.
+  Future<String?> _previewAccountOf(String token) async {
+    try {
+      final kept = await ref.read(encryptionStoreProvider).recall(token);
+      return kept != null && kept.mode == EncryptionMode.preview ? kept.profile.id : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The adoptions asked for, one after the other: a second ask (the start's 401, the gate's, a
+  /// resume) runs once the one before it ended, never in its place (a resume that listed the holds
+  /// before the 401's hold was put would otherwise swallow the 401's adoption).
+  Future<void>? _adoption;
+
+  /// Whether the last adoption stopped at a `plain` new user (the gate says why it waits).
+  bool get adoptionNeedsEncryptedServer => ref.read(adoptionNeedsEncryptedServerProvider).value;
+
+  /// Where an adoption's routine stopped ([AdoptDeps.onStep]): when that changes whether it waits
+  /// for a server that keeps data encrypted, the gate waiting on the vault checks again at once
+  /// (its recheck refuses the vault again, now saying why), with no tap on retry.
+  void adoptionStepped(AdoptStep step) {
+    if (!ref.mounted) return;
+    // A change notifies the gate's wiring (vault_providers.dart), which rechecks.
+    ref.read(adoptionNeedsEncryptedServerProvider).value = step == AdoptStep.plainUser;
+  }
+
+  Future<void> _adopting(Future<Object?> Function() run) {
+    final next = (_adoption ?? Future<void>.value()).then((_) async {
+      if (!ref.mounted) return;
+      try {
+        await run();
+      } on Object {
+        // Nothing is lost: the vault stays held, and the next start or resume goes on.
+      }
+    });
+    _adoption = next;
+    unawaited(
+      next.whenComplete(() {
+        if (identical(_adoption, next)) _adoption = null;
+      }),
+    );
+    return next;
+  }
+
+  /// At start and on resume (app.dart): an adoption that did not finish (a crash, no network) goes
+  /// on ([resumeAdoption]), when the phone is signed out or still in the deleted account's session.
+  Future<void> resumeAdoptions() async {
+    await ready;
+    if (!ref.mounted) return;
+    await _adopting(() => resumeAdoption(_adoptDeps()));
+  }
+
+  /// The id of [token]'s account (`GET /v1/me`); null when the server could not say.
+  Future<String?> _accountOrNull(String token) async {
+    try {
+      return await _auth.accountId(token);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The session becomes the new anonymous user's ([token]), which takes over [fromUserId]'s data:
+  /// a deleted account's, or the provisional vault's local id.
+  Future<void> _takeOver(String token, {required String fromUserId}) async {
+    // Before the token: a process killed right after still hands the captures over.
+    final handover = ref.read(captureHandoverProvider);
+    await handover.keep(token, fromUserId);
+    final userId = await _accountOrNull(token);
+    await _signedIn(token, guest: true, userId: userId, capturesFrom: fromUserId);
+    // Waited for here (the sign-in's own hand-over is not): the queue is the new user's
+    // before anything else looks at it, never left tagged to the old owner.
+    if (userId == null) return;
+    try {
+      await ref.read(autoCapturePlatformProvider).sendQueued(userId, from: fromUserId);
+      await handover.done(token);
+    } on Object {
+      // The kept hand-over re-tags at the next start.
+    }
+  }
+
+  /// [adoptDepsProvider] with the session's part: the new user's session, the wipe's sign-out, and
+  /// which held vault may be adopted now.
+  AdoptDeps _adoptDeps() => ref
+      .read(adoptDepsProvider)
+      .withSession(
+        onAdopted: _takeOver,
+        onWiped: (oldUserId) async {
+          final token = state.stored?.token;
+          if (token != null && await _accountIdOf(token) == oldUserId) {
+            await _wipeAndSignOut(token);
+          } else {
+            await _forgetKept(oldUserId, token ?? '');
+          }
+        },
+        mayResume: (oldUserId) async {
+          // A provisional session is not signed out: an adoption would replace it, and its vault
+          // would be left behind, never carried. It waits for the promotion.
+          if (state.isProvisional) return false;
+          final token = state.stored?.token;
+          return token == null || await _accountIdOf(token) == oldUserId;
+        },
+        onStep: adoptionStepped,
+      );
+
+  /// This phone was removed from the account, or its deleted account's vault was empty: what the
+  /// session left goes (the home cache, the saves waiting for the network, the vault, the widget's
+  /// figures, the queued captures), then the session of [token], unless a newer one came meanwhile.
+  Future<void> _wipeAndSignOut(String token) async {
+    ref.read(signInRecoveryKeyProvider).clear();
+    await clearHomeCache(ref.read(homeCacheStoreProvider));
+    await clearPendingSaves(ref.read(pendingSavesStoreProvider));
+    await _forgetVault(token: token);
+    await ref.read(widgetSyncProvider).signedOut().timeout(widgetWait, onTimeout: () {});
+    if (state.stored?.token != token) return;
+    _forgetCaptures();
+    await _store.clear();
+    if (state.stored?.token == token) state = SessionState.signedOut;
   }
 
   /// The account was deleted on the server (or the server says the session is gone, which comes to
@@ -495,6 +1107,7 @@ class SessionController extends Notifier<SessionState> {
   /// the next start.
   Future<void> accountDeleted() async {
     await ready;
+    ref.read(signInRecoveryKeyProvider).clear();
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
     await _forgetVault();
@@ -528,6 +1141,11 @@ class SessionController extends Notifier<SessionState> {
     } on Object {
       return;
     }
+    // A held vault (an adoption waiting, a merge, a provisional vault) may be the only copy of its
+    // data: only its own flow forgets it (the adoption, the merge's end, the promotion), never a
+    // sign-out or a server change. Its file, its keys and what was kept of it stay for the
+    // hold-aware sweep and the resumes; a hold that cannot be read keeps them too.
+    if (await _isHeld(userId)) return;
     final keys = ref.read(keyStorageProvider);
     try {
       await ref.read(forgetVaultProvider)(userId, keys);
@@ -540,6 +1158,16 @@ class SessionController extends Notifier<SessionState> {
       }
     }
     await store.forget(userId);
+  }
+
+  /// Whether [userId]'s vault carries a hold ([vaultHoldReaderProvider]); true when it cannot be
+  /// read (the safe side).
+  Future<bool> _isHeld(String userId) async {
+    try {
+      return await ref.read(vaultHoldReaderProvider)(userId) != null;
+    } on Object {
+      return true;
+    }
   }
 
   /// The captures detected from notifications and still waiting to be sent belong to the account
@@ -569,9 +1197,176 @@ class SessionController extends Notifier<SessionState> {
   }
 }
 
+/// The recovery key typed at sign-in, held in memory for the vault gate (ruling 6): the parsed
+/// 16-byte secret, never text, never written. One take: [take] hands it over once, to the gate of
+/// the account it signed in to, which zeroes it after its one try; another account's take gets
+/// nothing and the secret is zeroed. A new [hold] or [clear] (a sign-out) zeroes the one held.
+class SignInRecoveryKey {
+  String? _userId;
+  Uint8List? _secret;
+
+  void hold(String userId, Uint8List secret) {
+    if (!identical(_secret, secret)) clear();
+    _userId = userId;
+    _secret = secret;
+  }
+
+  /// The held secret when it is [userId]'s, else null; nothing is held afterwards either way. The
+  /// caller owns what it gets and zeroes it.
+  Uint8List? take(String userId) {
+    final secret = _secret;
+    final owner = _userId;
+    _secret = null;
+    _userId = null;
+    if (secret == null) return null;
+    if (owner == userId) return secret;
+    secret.fillRange(0, secret.length, 0);
+    return null;
+  }
+
+  /// Zeroes and drops a held secret.
+  void clear() {
+    final secret = _secret;
+    _secret = null;
+    _userId = null;
+    secret?.fillRange(0, secret.length, 0);
+  }
+}
+
+/// A merge into an email account waiting for its sign-in (phone-first spec 7.2), set by the merge
+/// (`lib/merge/merge_controller.dart`): an email sign-in to [email] takes over [guestUserId]'s
+/// queued captures (`verifyCode`'s `keepCapturesOf`).
+class MergeSignIn {
+  String? email;
+  String? guestUserId;
+}
+
+final mergeSignInProvider = Provider<MergeSignIn>((ref) => MergeSignIn());
+
+/// Whether a `preview` guest's claim is finishing on the email screen (`afterClaim`: the recovery
+/// key, then the passkey offer): the router leaves that screen open although the account has an
+/// email now, so what comes after the claim is shown over it rather than lost to the redirect home.
+class ClaimFinishing extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  set finishing(bool value) => state = value;
+}
+
+final claimFinishingProvider = NotifierProvider<ClaimFinishing, bool>(ClaimFinishing.new);
+
+/// The app's [SignInRecoveryKey] (memory only).
+final signInRecoveryKeyProvider = Provider<SignInRecoveryKey>((ref) {
+  final held = SignInRecoveryKey();
+  ref.onDispose(held.clear);
+  return held;
+});
+
 final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 
+/// Secure storage key of the token of the user a deleted account's vault is being adopted into,
+/// kept from its sign-up until the session is that user's (outside `wambito.vault.*`: the old
+/// vault's keys go with it before the session changes). A persistent name.
+const adoptTokenKey = 'wambito.adopt.token';
+
+/// What a deleted account's adoption ([adoptOrphan]) reaches on this phone; tests put their own in.
+/// The session adds its own part ([AdoptDeps.withSession]).
+final adoptDepsProvider = Provider<AdoptDeps>(
+  (ref) => AdoptDeps(
+    auth: ref.read(authApiProvider),
+    keys: ref.read(keyStorageProvider),
+    network: (token) => ApiClient.forServer(
+      ref.read(serverUrlProvider),
+      token: token,
+      hints: ref.read(deviceHintsProvider),
+    ).dio,
+    openStore: (id) => SqliteStore.open(id, background: true),
+    lease: (id) => waitLease(id, holder: 'app', wait: appLeaseWait),
+    forgetVault: (id) => ref.read(forgetVaultProvider)(id, ref.read(keyStorageProvider)),
+    now: DateTime.now,
+    keptToken: () => appSecureStorage.read(key: adoptTokenKey),
+    keepToken: (token) => appSecureStorage.write(key: adoptTokenKey, value: token),
+    forgetToken: () => appSecureStorage.delete(key: adoptTokenKey),
+    // Android's queue: captures not saved yet are data, so an empty vault with some is adopted.
+    hasQueuedCaptures: (id) => ref.read(autoCapturePlatformProvider).hasQueued(id),
+    // The app's open vault of the old account stops taking writes before the carry reads it.
+    stopWrites: (id) async {
+      final open = ref.read(vaultSessionProvider);
+      if (open != null && open.userId == id) await open.close();
+    },
+  ),
+);
+
 final sessionProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
+
+/// The adoption's start and resume hook (app.dart: registered after the provisional promotion's,
+/// before the merge's, in the plan's lifecycle order; none of them waits for another): [SessionController.resumeAdoptions] once the
+/// stored session is read, and each time the app comes back.
+final adoptionResumeProvider = Provider<void>((ref) {
+  final session = ref.read(sessionProvider.notifier);
+  void resume() => unawaited(session.resumeAdoptions().catchError((Object _) {}));
+  resume();
+  final observer = _AdoptionResumeObserver(resume);
+  WidgetsBinding.instance.addObserver(observer);
+  ref.onDispose(() => WidgetsBinding.instance.removeObserver(observer));
+});
+
+class _AdoptionResumeObserver extends WidgetsBindingObserver {
+  _AdoptionResumeObserver(this._onResume);
+
+  final void Function() _onResume;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onResume();
+  }
+}
+
+/// Whether [error] only means there was no network: an [AuthFailure] without a response, or a lost
+/// connection or a timeout outside Dio.
+bool isOfflineError(Object error) => switch (error) {
+  AuthFailure(:final status) => status == 0,
+  SocketException() || TimeoutException() || HttpException() || TlsException() => true,
+  _ => false,
+};
+
+/// How often a provisional vault's promotion is tried while the app is open (null: only at start
+/// and on resume; tests).
+final provisionalPromotionEveryProvider = Provider<Duration?>((ref) => const Duration(minutes: 1));
+
+/// The provisional promotion's hook (app.dart: registered first, before the adoption's and the
+/// merge's, in the plan's lifecycle order; none of them waits for another): [SessionController.promoteProvisional] at start, on resume
+/// and every [provisionalPromotionEveryProvider] while provisional. A server found to make `plain`
+/// users is asked again only at the next start (each try there makes an anonymous user).
+final provisionalPromotionProvider = Provider<void>((ref) {
+  final session = ref.read(sessionProvider.notifier);
+  void promote({bool start = false}) {
+    if (!start && ref.read(sessionProvider).provisionalBlock == ProvisionalBlock.plainServer) {
+      return;
+    }
+    unawaited(session.promoteProvisional().then<void>((_) {}, onError: (Object _) {}));
+  }
+
+  promote(start: true);
+  final observer = _AdoptionResumeObserver(promote);
+  WidgetsBinding.instance.addObserver(observer);
+  Timer? timer;
+  void schedule() {
+    timer?.cancel();
+    timer = null;
+    final every = ref.read(provisionalPromotionEveryProvider);
+    if (every != null && ref.read(sessionProvider).isProvisional) {
+      timer = Timer.periodic(every, (_) => promote());
+    }
+  }
+
+  ref.listen(sessionProvider.select((s) => s.isProvisional), (_, _) => schedule());
+  schedule();
+  ref.onDispose(() {
+    timer?.cancel();
+    WidgetsBinding.instance.removeObserver(observer);
+  });
+});
 
 /// The network for the signed-in session (rebuilt when the token changes): never the vault's local
 /// backend. The vault's keys and sync, and the account's mode, go through it.
@@ -592,6 +1387,18 @@ final networkClientProvider = Provider<ApiClient>(
 /// nothing of a `preview` account's finances goes to the server in clear, even before its vault
 /// opens. The vault is always the signed-in session's ([vaultSessionProvider] is bound to it).
 final apiClientProvider = Provider<ApiClient>((ref) {
+  // An offline first run: its provisional vault answers, and no finance call goes past it (there is
+  // no user to send it to, and nothing of it may leave the phone before the promotion).
+  if (ref.watch(sessionProvider.select((s) => s.isProvisional))) {
+    final local = ref.watch(provisionalVaultProvider);
+    final client = ApiClient.forServer(
+      ref.watch(serverUrlProvider),
+      hints: ref.watch(deviceHintsProvider),
+    );
+    if (local != null) client.dio.interceptors.add(local.interceptor);
+    client.dio.interceptors.add(FinanceGuard(() async => FinanceVerdict.unknown));
+    return client;
+  }
   final vault = ref.watch(vaultSessionProvider);
   final owner = ref.watch(vaultOwnerProvider);
   final plain = ref.watch(knownPlainProvider);

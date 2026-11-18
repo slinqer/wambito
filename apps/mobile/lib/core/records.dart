@@ -97,6 +97,8 @@ final _settings = ObjectSchema({
   'onboardingCompletedAt': _nullableDefaultNull(_timestamp),
   // Wrap ids of the devices removed from the vault; every rotation leaves them out.
   'revokedDevices': fDefaultWith(fArray(_uuid), () => <Object?>[]),
+  // When a recovery key the person saw was saved (null: none shown yet).
+  'recoveryKeySavedAt': _nullableDefaultNull(_timestamp),
 }, loose: true);
 
 final _account = ObjectSchema({

@@ -77,7 +77,7 @@ void main() {
   testWidgets('add an expense with the keypad, then edit its amount', (tester) async {
     await SessionStore().clear();
     await tester.pumpWidget(await app.bootstrap());
-    await _tap(tester, 'entry.guest');
+    await _tap(tester, 'entry.start');
     await _pumpUntil(tester, find.byType(HomeScreen));
     await _pumpUntil(tester, find.byKey(const Key('home.add')));
 

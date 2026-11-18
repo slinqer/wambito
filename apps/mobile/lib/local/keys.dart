@@ -29,7 +29,8 @@ export 'recovery_verifier.dart';
 /// Codes of [KeysError] (as `KeysErrorCode` in keys.ts): `already_set_up`, `bad_recovery_key`,
 /// `wrong_recovery_key`, `offline`, `server`, `unsupported_browser`, `session_changed`,
 /// `device_removed`, `rotated_elsewhere`, `no_prf`, `no_passkey_wrap`, `unknown_passkey`,
-/// `tampered`.
+/// `tampered`; a 401 is `device_removed`, `user_deleted` or `unauthenticated` by its code, with
+/// status 401.
 
 /// The key version a new account starts at.
 const firstKeyV = 1;
@@ -164,12 +165,23 @@ KeysApi api(KeysOptions options) {
         (409, 'session_changed') => 'session_changed',
         (409, 'key_version_mismatch') => 'rotated_elsewhere',
         (422, 'unknown_passkey') => 'unknown_passkey',
+        // The session is gone; its code says why (phone-first spec 10, lib/api/unauthorized.dart).
+        (401, 'device_removed') => 'device_removed',
+        (401, 'user_deleted') => 'user_deleted',
+        (401, _) => 'unauthenticated',
         _ => 'server',
       };
-      throw KeysError(mapped, status: status);
+      throw KeysError(mapped, status: status, retryAfter: _retryAfter(response));
     }
     return response;
   };
+}
+
+/// A 429's `retry-after` as whole seconds above zero, else null.
+int? _retryAfter(Response<Object?> response) {
+  if (response.statusCode != 429) return null;
+  final value = int.tryParse(response.headers.value('retry-after')?.trim() ?? '');
+  return value != null && value > 0 ? value : null;
 }
 
 String? _problemCode(Object? body) {
@@ -769,7 +781,6 @@ Future<VerifierHashes> Function(Uint8List secret) keysVerifierHashes = verifierH
 /// that parses but opens nothing. Parsing accepts lower case, spaces and dashes, O for 0 and I or L
 /// for 1.
 Future<LocalKeys> unlockWithRecovery(KeysOptions options, String text) async {
-  final userId = options.userId;
   final Uint8List secret;
   try {
     secret = keysParseRecoveryKey(text);
@@ -777,50 +788,58 @@ Future<LocalKeys> unlockWithRecovery(KeysOptions options, String text) async {
     throw const KeysError('bad_recovery_key');
   }
   try {
-    final pair = await generateDeviceKeyPair();
-    final call = api(options);
-    Uint8List? dataKey;
-    try {
-      final (:wraps, :links) = await listKeys(call);
-      final wrap = wraps.where((w) => w.kind == 'recovery').firstOrNull;
-      if (wrap == null) throw const KeysError('wrong_recovery_key');
-      try {
-        dataKey = await unwrapDataKey(
-          secret,
-          WrapContext(kind: WrapKind.recovery, userId: userId, keyV: wrap.keyV),
-          fromBase64Url(wrap.wrapped),
-        );
-      } on Object {
-        throw const KeysError('wrong_recovery_key');
-      }
-      final local = await _enrollTrusted(
-        options,
-        call,
-        dataKey,
-        wrap.keyV,
-        links,
-        pair,
-        HeldVault.secret,
-      );
-      // Best effort (D16): accounts made before the verifier existed get one at their next
-      // recovery unlock; a failure never fails the unlock.
-      VerifierHashes? hashes;
-      try {
-        hashes = await keysVerifierHashes(secret);
-        await putRecoveryVerifier(options, hashes);
-      } on Object {
-        // the next unlock tries again
-      } finally {
-        _zero(hashes?.lookupHash);
-        _zero(hashes?.authHash);
-      }
-      return local;
-    } finally {
-      _zero(dataKey);
-      _zero(pair.privateKey);
-    }
+    return await unlockWithRecoverySecret(options, secret);
   } finally {
     _zero(secret);
+  }
+}
+
+/// [unlockWithRecovery] once the key is parsed: the 16-byte recovery [secret], which the caller owns
+/// and zeroes (the recovery-key sign-in hands its typed key to the vault gate this way, so it is
+/// never kept as text). `wrong_recovery_key` when it opens nothing.
+Future<LocalKeys> unlockWithRecoverySecret(KeysOptions options, Uint8List secret) async {
+  final userId = options.userId;
+  final pair = await generateDeviceKeyPair();
+  final call = api(options);
+  Uint8List? dataKey;
+  try {
+    final (:wraps, :links) = await listKeys(call);
+    final wrap = wraps.where((w) => w.kind == 'recovery').firstOrNull;
+    if (wrap == null) throw const KeysError('wrong_recovery_key');
+    try {
+      dataKey = await unwrapDataKey(
+        secret,
+        WrapContext(kind: WrapKind.recovery, userId: userId, keyV: wrap.keyV),
+        fromBase64Url(wrap.wrapped),
+      );
+    } on Object {
+      throw const KeysError('wrong_recovery_key');
+    }
+    final local = await _enrollTrusted(
+      options,
+      call,
+      dataKey,
+      wrap.keyV,
+      links,
+      pair,
+      HeldVault.secret,
+    );
+    // Best effort (D16): accounts made before the verifier existed get one at their next
+    // recovery unlock; a failure never fails the unlock.
+    VerifierHashes? hashes;
+    try {
+      hashes = await keysVerifierHashes(secret);
+      await putRecoveryVerifier(options, hashes);
+    } on Object {
+      // the next unlock tries again
+    } finally {
+      _zero(hashes?.lookupHash);
+      _zero(hashes?.authHash);
+    }
+    return local;
+  } finally {
+    _zero(dataKey);
+    _zero(pair.privateKey);
   }
 }
 

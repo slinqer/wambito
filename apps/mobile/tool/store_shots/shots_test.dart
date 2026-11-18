@@ -285,7 +285,7 @@ void main() {
     final data = _dataFor(_locale);
     await SessionStore().clear();
     await tester.pumpWidget(await app.bootstrap());
-    await _tap(tester, 'entry.guest');
+    await _tap(tester, 'entry.start');
     // Whatever stands between a new guest and home: the welcome, the notices question.
     final end = DateTime.now().add(const Duration(seconds: 60));
     while (find.byKey(const Key('home.add')).hitTestable().evaluate().isEmpty) {

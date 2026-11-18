@@ -187,9 +187,9 @@ void main() {
   });
 
   group('never to a guest', () {
-    testWidgets('a guest who starts has Guarda tu progreso, not the offer', (tester) async {
+    testWidgets('a guest who starts (Start) has Guarda tu progreso, not the offer', (tester) async {
       await open(tester);
-      await tester.tap(find.byKey(const Key('entry.guest')));
+      await tester.tap(find.byKey(const Key('entry.start')));
       await tester.pumpAndSettle();
 
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -240,7 +240,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(offerTitle), findsNothing);
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
     });
   });
 

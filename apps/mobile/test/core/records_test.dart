@@ -190,4 +190,23 @@ void main() {
       );
     });
   });
+
+  group('settings recoveryKeySavedAt', () {
+    final settings = valid['settings']!;
+
+    test('settings without recoveryKeySavedAt parses to null', () {
+      final r = parseRecord(RecordType.settings, settings);
+      expect(r.ok, true);
+      expect(r.value!.containsKey('recoveryKeySavedAt'), true);
+      expect(r.value!['recoveryKeySavedAt'], isNull);
+    });
+
+    test('a timestamp is kept', () {
+      final r = parseRecord(RecordType.settings, {
+        ...settings,
+        'recoveryKeySavedAt': '2026-11-18T10:00:00.000Z',
+      });
+      expect(r.value!['recoveryKeySavedAt'], '2026-11-18T10:00:00.000Z');
+    });
+  });
 }

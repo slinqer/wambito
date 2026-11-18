@@ -352,16 +352,19 @@ jobs:
           cache: true
       - run: flutter pub get --enforce-lockfile
       # The dev stack as in the e2e job, on the real clock: Postgres, Mailpit and the API (which
-      # applies the migrations on start).
+      # applies the migrations on start), with new users encrypted (ruling 19: the phone-first
+      # flows need them; the web e2e jobs keep the default).
       - name: Start the dev stack
         working-directory: .
         run: |
           cp .env.example .env
-          docker compose up -d --build
+          NEW_USERS_ENCRYPTED=true docker compose up -d --build
           timeout 120 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
           timeout 60 sh -c 'until curl -sf http://localhost:8025/api/v1/info >/dev/null; do sleep 1; done'
-      # Resets the preview account (seed:e2e-preview), runs each of the two tests, then counts the
-      # records whose body holds that test's word in the clear: it must print 0.
+      # Checks that a new guest is preview, resets the preview account (seed:e2e-preview) before
+      # each of the two vault tests, runs the phone-first test on users of its own, then counts the
+      # records whose body holds each test's words in the clear (it must print 0) and checks the
+      # merged guest's user row is gone.
       - run: scripts/run-vault-e2e.sh
       - if: failure()
         working-directory: .

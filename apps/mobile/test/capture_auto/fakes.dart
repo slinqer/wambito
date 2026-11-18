@@ -50,7 +50,8 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
   Future<void> clearQueue() async => calls.add('clearQueue');
 
   @override
-  Future<void> sendQueued(String userId) async => calls.add('sendQueued $userId');
+  Future<void> sendQueued(String userId, {String? from}) async =>
+      calls.add(from == null ? 'sendQueued $userId' : 'sendQueued $userId from $from');
 
   /// The `before` of each [keepOnlyNotifications], in order.
   final keepBefore = <DateTime>[];
@@ -73,6 +74,17 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
   Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId) async {
     calls.add('takeQueued $userId');
     return (captures: [...queuedCaptures], confirms: [...queuedConfirms]);
+  }
+
+  /// What [hasQueued] throws when set (Android could not read the queue).
+  Object? hasQueuedError;
+
+  @override
+  Future<bool> hasQueued(String userId) async {
+    calls.add('hasQueued $userId');
+    final error = hasQueuedError;
+    if (error != null) throw error;
+    return queuedCaptures.isNotEmpty;
   }
 
   @override

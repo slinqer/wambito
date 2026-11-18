@@ -15,6 +15,7 @@ import 'package:wambito/home/widget_pin.dart';
 import 'package:wambito/app.dart' show withAppHosts;
 import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/offline/pending_saves.dart';
+import 'package:wambito/protect/protect_status.dart' show protectStatusProvider;
 import 'package:wambito/review/review_repository.dart';
 import 'package:wambito/theme/theme.dart';
 
@@ -86,6 +87,9 @@ Future<HomeHarness> pumpHome(
       // A widget is already on the home screen, so the card that offers one stays out of the way.
       if (!overrides.any((o) => o.origin == widgetPinProvider))
         widgetPinProvider.overrideWithValue(FakeWidgetPin()),
+      // A plain account: no "Protect your data" card, and no session to ask about the account.
+      if (!overrides.any((o) => o.origin == protectStatusProvider))
+        protectStatusProvider.overrideWith((ref) async => null),
       homeRepositoryProvider.overrideWithValue(repo),
       if (!overrides.any((o) => '${o.origin}'.contains('reviewRepository')))
         reviewRepositoryProvider.overrideWithValue(FakeReviewRepository(repo)),

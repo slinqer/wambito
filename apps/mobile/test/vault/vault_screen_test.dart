@@ -4,13 +4,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/merge/merge_controller.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/files/files_channel.dart';
 import 'package:wambito/local/keys.dart' show LocalKeys;
 import 'package:wambito/local/pairing.dart' show PairingError;
 import 'package:wambito/local/vault_session.dart';
-import 'package:wambito/settings/account_deletion.dart';
 import 'package:wambito/ui/press_button.dart';
 import 'package:wambito/vault/pair_new_device_view.dart' show PairingQr;
 import 'package:wambito/vault/vault_gate.dart';
@@ -119,27 +120,14 @@ class FakeFiles implements FilesChannel {
   Future<void> clearShared() async {}
 }
 
-class FakeDeletion implements AccountDeletion {
-  int deletes = 0;
-  bool fails = false;
-
-  @override
-  Future<void> delete() async {
-    deletes += 1;
-    if (fails) throw StateError('offline');
-  }
-}
-
 const key = 'ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-345';
 
 void main() {
   late FakeFiles files;
-  late FakeDeletion deletion;
   late FixedSession session;
 
   setUp(() {
     files = FakeFiles();
-    deletion = FakeDeletion();
   });
 
   Future<FakeGate> pumpScreen(
@@ -150,6 +138,7 @@ void main() {
     Locale locale = const Locale('es'),
     int unsent = 0,
     void Function(FakeGate gate)? prepare,
+    List<Override> extra = const [],
   }) async {
     final gate = FakeGate(state);
     prepare?.call(gate);
@@ -165,10 +154,10 @@ void main() {
           vaultGateStateProvider.overrideWithValue(state),
           unlockPasskeyOfferedProvider.overrideWithValue(AsyncData(passkeyOffered)),
           filesChannelProvider.overrideWithValue(files),
-          accountDeletionProvider.overrideWithValue(deletion),
           sessionProvider.overrideWith(() => session),
           unsentChangesProvider.overrideWithValue(() async => unsent),
           pairingTimeZoneProvider.overrideWithValue('America/Bogota'),
+          ...extra,
         ],
         child: uiApp(
           locale: locale,
@@ -313,6 +302,27 @@ void main() {
   });
 
   group('unlock', () {
+    testWidgets('while a merge waits, Unlock says why and signing out calls the merge off', (
+      tester,
+    ) async {
+      final merge = _WaitingMerge();
+      await pumpScreen(
+        tester,
+        const Unlock(),
+        extra: [mergeControllerProvider.overrideWith(() => merge)],
+      );
+      expect(find.byKey(const Key('unlock.mergeWaiting')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.signOut')));
+      await tester.pumpAndSettle();
+      expect(merge.cancels, 1);
+      expect(session.signOuts, isEmpty);
+    });
+
+    testWidgets('without a merge, Unlock has no merge line', (tester) async {
+      await pumpScreen(tester, const Unlock());
+      expect(find.byKey(const Key('unlock.mergeWaiting')), findsNothing);
+    });
+
     testWidgets('asks for the recovery key, and submit waits for text', (tester) async {
       await pumpScreen(tester, const Unlock());
       expect(find.text('Abre tus datos aquí'), findsOneWidget);
@@ -406,14 +416,15 @@ void main() {
       expect(find.text('ADD THIS PHONE FROM ANOTHER DEVICE'), findsOneWidget);
     });
 
-    testWidgets("a guest's Locked offers it too; a plain Locked does not", (tester) async {
-      final gate = await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      await tester.tap(find.byKey(const Key('vault.pair')));
-      await tester.pump();
-      expect(gate.pairs, 1);
-      await pumpScreen(tester, const Locked(LockedKind.error, false));
-      expect(find.byKey(const Key('vault.pair')), findsNothing);
-    });
+    for (final kind in LockedKind.values) {
+      testWidgets('Locked ($kind) offers neither pairing nor deleting the account: pairing starts '
+          'from Unlock', (tester) async {
+        await pumpScreen(tester, Locked(kind, false));
+        expect(find.byKey(const Key('vault.pair')), findsNothing);
+        expect(find.byKey(const Key('vault.deleteAccount')), findsNothing);
+        expect(find.byKey(const Key('vault.signOut')), findsOneWidget);
+      });
+    }
 
     testWidgets('shows the QR, the 8-character code under it and when it expires', (tester) async {
       final gate = await pumpScreen(tester, const Pairing(PairingFrom.unlock));
@@ -512,28 +523,6 @@ void main() {
       expect(find.byKey(const Key('vault.signOut')), findsOneWidget);
     });
 
-    testWidgets('a guest can delete the account in two taps', (tester) async {
-      await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      expect(find.text('Tus datos no se pueden abrir aquí'), findsOneWidget);
-      expect(find.byKey(const Key('vault.retry')), findsNothing);
-      await tester.tap(find.byKey(const Key('vault.deleteAccount')));
-      await tester.pumpAndSettle();
-      expect(deletion.deletes, 0);
-      await tester.tap(find.byKey(const Key('vault.deleteConfirm')));
-      await tester.pumpAndSettle();
-      expect(deletion.deletes, 1);
-    });
-
-    testWidgets('a delete that fails says so and can be tried again', (tester) async {
-      deletion.fails = true;
-      await pumpScreen(tester, const Locked(LockedKind.guest, false));
-      await tester.tap(find.byKey(const Key('vault.deleteAccount')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('vault.deleteConfirm')));
-      await tester.pumpAndSettle();
-      expect(find.text('No pudimos eliminarla. Inténtalo de nuevo.'), findsOneWidget);
-    });
-
     for (final state in <VaultGateState<VaultSession>>[
       const Unlock(notice: 'unverified'),
       const Locked(LockedKind.error, false),
@@ -563,4 +552,14 @@ void main() {
       expect(session.signOuts, ['t']);
     });
   });
+}
+
+class _WaitingMerge extends MergeController {
+  var cancels = 0;
+
+  @override
+  MergeState build() => const MergeWaitingUnlock();
+
+  @override
+  Future<void> cancel() async => cancels += 1;
 }

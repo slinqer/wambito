@@ -5,7 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/core/records.dart';
 import 'package:wambito/crypto/records.dart';
-import 'package:wambito/local/db.dart' show pendingChangesInVault;
+import 'package:wambito/local/db.dart'
+    show VaultHold, VaultHoldKind, pendingChangesInVault, vaultHoldOf;
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/store.dart';
 
@@ -42,6 +43,37 @@ void main() {
   Future<SqliteStore> fresh() => openFor(freshUser());
 
   runStoreContract('sqlite', fresh);
+
+  group('a vault hold', () {
+    test('a hold round-trips and clears', () async {
+      final store = await fresh();
+      expect(await store.hold(), isNull);
+      await store.setHold(const VaultHold(VaultHoldKind.merging, target: 'a@b.test', since: 's'));
+      final read = await store.hold();
+      expect([read?.kind, read?.target, read?.since], [VaultHoldKind.merging, 'a@b.test', 's']);
+      await store.setHold(null);
+      expect(await store.hold(), isNull);
+      await store.close();
+    });
+
+    test('a malformed hold throws instead of reading as not held', () async {
+      final store = await fresh();
+      await store.setMeta('hold', {'kind': 'nope'});
+      await expectLater(store.hold(), throwsA(isA<FormatException>()));
+      await store.close();
+    });
+
+    test('vaultHoldOf reads it while the store is open elsewhere', () async {
+      final userId = freshUser();
+      final store = await openFor(userId);
+      expect(await vaultHoldOf(userId, directory: dir.path, factory: factory), isNull);
+      await store.setHold(const VaultHold(VaultHoldKind.provisional, since: 's'));
+      final read = await vaultHoldOf(userId, directory: dir.path, factory: factory);
+      expect([read?.kind, read?.target], [VaultHoldKind.provisional, null]);
+      expect(await vaultHoldOf('nobody', directory: dir.path, factory: factory), isNull);
+      await store.close();
+    });
+  });
 
   group('the outbox', () {
     test('readOutbox with a limit of zero or less reads nothing', () async {

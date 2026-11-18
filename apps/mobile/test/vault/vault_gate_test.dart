@@ -1,5 +1,6 @@
-// Port of apps/web/app/features/vault/vault-gate.test.ts, plus a guest that crashed half-way
-// through its setup.
+// Port of apps/web/app/features/vault/vault-gate.test.ts, plus an anonymous account that crashed
+// half-way through its setup. An anonymous account is one whose prepared setup has no key to show;
+// the gate has no guest branch (every `preview` account, with or without email, gets Unlock).
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -44,7 +45,6 @@ Harness gateWith({
   Future<GatePrepared<String>> Function()? prepareAccount,
   Future<String> Function(String text)? unlockWithRecovery,
   Future<String> Function(String keys, bool fresh)? open,
-  bool guest = false,
   String? userId,
   Future<String?> Function()? sessionUserId,
   void Function()? reload,
@@ -54,6 +54,8 @@ Harness gateWith({
   Future<PasskeyPrf?> Function(List<String>? credentialIds)? evaluatePrf,
   Future<List<String>> Function()? accountPasskeyIds,
   Future<GatePairing<String>> Function()? startPairing,
+  Uint8List? Function()? takeSignInRecoverySecret,
+  Future<String> Function(Uint8List secret)? unlockWithRecoverySecret,
 }) {
   final h = Harness();
   h.gate = Gate(
@@ -75,7 +77,6 @@ Harness gateWith({
         h.opened.add((keys, fresh));
         return (open ?? (k, _) async => k)(keys, fresh);
       },
-      guest: guest,
       userId: userId,
       sessionUserId: sessionUserId,
       reload: reload,
@@ -85,6 +86,8 @@ Harness gateWith({
       evaluatePrf: evaluatePrf,
       accountPasskeyIds: accountPasskeyIds,
       startPairing: startPairing,
+      takeSignInRecoverySecret: takeSignInRecoverySecret,
+      unlockWithRecoverySecret: unlockWithRecoverySecret,
     ),
   );
   h.gate.subscribe(() => h.seen.add(h.gate.state.status));
@@ -152,7 +155,7 @@ void main() {
       expect(h.gate.state, const Ready('new'));
     });
 
-    test('a guest commits at once: there is no key to show', () async {
+    test('an anonymous account commits at once: there is no key to show', () async {
       var commits = 0;
       final h = gateWith(
         prepareAccount: () async => GatePrepared(
@@ -289,35 +292,43 @@ void main() {
       },
     );
 
-    test(
-      'a guest whose account has keys elsewhere is locked out here: no recovery key to type',
-      () async {
-        final h = gateWith(guest: true, prepareAccount: alreadySetUp);
-        h.gate.start();
-        await settle();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
-        h.gate.retry();
-        await settle();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
-        expect(h.unlocked, isEmpty);
-      },
-    );
+    test('the gate has no guest: its locked kinds, and pairing only from Unlock', () {
+      expect(LockedKind.values, [
+        LockedKind.error,
+        LockedKind.offline,
+        LockedKind.unsupported,
+        LockedKind.plainServer,
+      ]);
+      expect(PairingFrom.values, [PairingFrom.unlock]);
+    });
 
-    test('a guest that loses the setup race is locked out too', () async {
+    test('an anonymous account with wraps elsewhere shows Unlock, not Locked', () async {
+      // A regression guard: the gate has no notion of anonymity, so it must never lock this account out.
+      final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => FakePairing());
+      h.gate.start();
+      await settle();
+      expect(h.gate.state, const Unlock());
+      // Its way back to its data is pairing, from Unlock, and back returns there.
+      await h.gate.pair();
+      expect(h.gate.state, const Pairing(PairingFrom.unlock));
+      h.gate.leavePairing();
+      expect(h.gate.state, const Unlock());
+    });
+
+    test('an anonymous account that loses the setup race shows Unlock', () async {
       final h = gateWith(
-        guest: true,
         prepareAccount: () async =>
             GatePrepared(recoveryKey: null, commit: () async => throw fail('already_set_up')),
       );
       h.gate.start();
       await settle();
-      expect(h.gate.state, const Locked(LockedKind.guest, false));
+      expect(h.gate.state, const Unlock());
     });
 
-    test('a guest that crashed between the recovery PUT and the device PUT is locked out, on the '
-        'retry and on the next start', () async {
+    test('an anonymous account that crashed between the recovery PUT and the device PUT shows '
+        'Unlock, on the retry and on the next start', () async {
       // The recovery wrap reached the server, the device wrap did not: the account has a wrap
-      // nobody here can open, and a guest has no recovery key to type.
+      // nobody here can open, so Unlock (pairing, or a recovery key if one was saved).
       var recoveryOnServer = false;
       Future<GatePrepared<String>> prepare() async {
         if (recoveryOnServer) throw fail('already_set_up');
@@ -332,20 +343,20 @@ void main() {
         );
       }
 
-      final h = gateWith(guest: true, prepareAccount: prepare);
+      final h = gateWith(prepareAccount: prepare);
       h.gate.start();
       await settle();
       expect(h.gate.state, const Locked(LockedKind.offline, false));
       h.gate.retry();
       await settle();
-      expect(h.gate.state, const Locked(LockedKind.guest, false));
+      expect(h.gate.state, const Unlock());
       expect(h.opened, isEmpty);
 
       // The app was killed in between: the next start finds the account set up.
-      final next = gateWith(guest: true, prepareAccount: prepare);
+      final next = gateWith(prepareAccount: prepare);
       next.gate.start();
       await settle();
-      expect(next.gate.state, const Locked(LockedKind.guest, false));
+      expect(next.gate.state, const Unlock());
       expect(next.opened, isEmpty);
     });
 
@@ -860,21 +871,6 @@ void main() {
         expect(h.gate.state, const Ready('second'));
       });
 
-      test('a guest locked out pairs from Locked, and back returns to Locked', () async {
-        final h = gateWith(
-          prepareAccount: alreadySetUp,
-          guest: true,
-          startPairing: () async => FakePairing(),
-        );
-        h.gate.start();
-        await settle();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
-        await h.gate.pair();
-        expect(h.gate.state, const Pairing(PairingFrom.guest));
-        h.gate.leavePairing();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
-      });
-
       test('a pairing that fails stays on the pairing screen, which shows why', () async {
         final pairing = FakePairing();
         final h = gateWith(prepareAccount: alreadySetUp, startPairing: () async => pairing);
@@ -934,7 +930,7 @@ void main() {
         expect(pairing.cancels, 1);
       });
 
-      test("pair() does nothing outside Unlock and a guest's Locked", () async {
+      test('pair() does nothing outside Unlock', () async {
         final h = gateWith(
           loadLocalKeys: () async => 'kept',
           startPairing: () async => FakePairing(),
@@ -994,12 +990,16 @@ void main() {
         expect(h.gate.state, const Unlock(notice: Unlock.removed));
       });
 
-      test('a removed guest is locked out: it has no recovery key to type', () async {
-        final h = gateWith(loadLocalKeys: () async => 'kept', guest: true);
+      test('a removed anonymous phone shows Unlock(removed)', () async {
+        // An anonymous account's phone, set up with no key shown, then removed from the account.
+        final h = gateWith(
+          prepareAccount: () async => GatePrepared(recoveryKey: null, commit: () async => 'anon'),
+        );
         h.gate.start();
         await settle();
+        expect(h.gate.state, const Ready('anon'));
         h.gate.removed();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
+        expect(h.gate.state, const Unlock(notice: Unlock.removed));
       });
 
       test('a browser removed while closed opens to Unlock with the removed notice', () async {
@@ -1011,17 +1011,6 @@ void main() {
         await settle();
         expect(h.gate.state, const Unlock(notice: Unlock.removed));
         expect(h.prepares, 0);
-      });
-
-      test('a guest removed while closed is Locked guest', () async {
-        final h = gateWith(
-          loadLocalKeys: () async => 'kept',
-          open: (_, _) async => throw fail('device_removed'),
-          guest: true,
-        );
-        h.gate.start();
-        await settle();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
       });
 
       test('removed() outside the open app does nothing', () async {
@@ -1044,26 +1033,13 @@ void main() {
         expect(h.opened, hasLength(1));
       });
 
-      test('an unverified guest goes to its Locked', () async {
-        final h = gateWith(loadLocalKeys: () async => 'kept', guest: true);
-        h.gate.start();
-        await settle();
-        h.gate.unverified();
-        expect(h.gate.state, const Locked(LockedKind.guest, false));
-      });
-
-      test('an opening that fails with key_unverified shows Unlock with the notice; a guest its '
-          'Locked', () async {
+      test('an opening that fails with key_unverified shows Unlock with the notice', () async {
         Future<String> open(String _, bool _) async => throw fail('key_unverified');
         final h = gateWith(loadLocalKeys: () async => 'kept', open: open);
         h.gate.start();
         await settle();
         expect(h.gate.state, const Unlock(notice: Unlock.unverified));
         expect(h.prepares, 0);
-        final guest = gateWith(loadLocalKeys: () async => 'kept', open: open, guest: true);
-        guest.gate.start();
-        await settle();
-        expect(guest.gate.state, const Locked(LockedKind.guest, false));
       });
 
       test('the recovery key from unverified unlocks the kept vault and opens it fresh', () async {
@@ -1084,6 +1060,72 @@ void main() {
         await settle();
         h.gate.unverified();
         expect(h.gate.state, const Unlock());
+      });
+    });
+
+    group('the recovery key held from the sign-in', () {
+      Uint8List held() => Uint8List.fromList(List.filled(16, 7));
+
+      test('a held recovery key opens a known account\'s wrap on a new phone', () async {
+        final secret = held();
+        var takes = 0;
+        final tried = <List<int>>[];
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInRecoverySecret: () {
+            takes += 1;
+            return takes == 1 ? secret : null;
+          },
+          unlockWithRecoverySecret: (s) async {
+            tried.add(List.of(s));
+            return 'from-key';
+          },
+        );
+        h.gate.start();
+        await settle();
+        expect(tried, [List.filled(16, 7)]);
+        expect(h.seen, isNot(contains('unlock')));
+        expect(h.unlocked, isEmpty);
+        expect(h.lastOpen, ('from-key', true));
+        expect(h.gate.state, const Ready('from-key'));
+        // Tried once, then zeroed.
+        expect(takes, 1);
+        expect(zeroed(secret), isTrue);
+      });
+
+      test('a held key that opens nothing shows Unlock with wrong_recovery_key', () async {
+        final secret = held();
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInRecoverySecret: () => secret,
+          unlockWithRecoverySecret: (_) async => throw fail('wrong_recovery_key'),
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Unlock(error: 'wrong_recovery_key'));
+        expect(h.opened, isEmpty);
+        expect(zeroed(secret), isTrue);
+        // Typing the key on Unlock still works.
+        expect(await h.gate.unlock('right'), isNull);
+        expect(h.gate.state, const Ready('unlocked'));
+      });
+
+      test('a phone that already holds the keys opens them and zeroes the held key', () async {
+        final secret = held();
+        var tries = 0;
+        final h = gateWith(
+          loadLocalKeys: () async => 'kept',
+          takeSignInRecoverySecret: () => secret,
+          unlockWithRecoverySecret: (_) async {
+            tries += 1;
+            return 'from-key';
+          },
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Ready('kept'));
+        expect(tries, 0);
+        expect(zeroed(secret), isTrue);
       });
     });
   });

@@ -34,7 +34,8 @@ import 'vault_lock.dart' show VaultLease;
 ///   deletes, without a body, and is never quarantined.
 /// - A change that keeps failing is parked (1 min back-off, doubling, at most 6 hours) and never
 ///   stops the pull; on its fifth failure it is abandoned (`dropped`). A whole batch refused with
-///   413/422 is bisected; any other 4xx but 401 parks the batch. Offline, 401, 429 and 5xx stop.
+///   413/422 is bisected; any other 4xx but 401 parks the batch. Offline, 401, 429 and 5xx stop; a
+///   401's code says which stop (`device_removed`, `user_deleted`, else `unauthorized`).
 /// - Every call sends `x-wambito-user`. `409 session_changed` stops the run and the triggers.
 /// - `410 resync_required`: the pending changes are set aside in the wipe's own commit, the full
 ///   download runs with `base=0`, then the set-aside changes are written again (touched fields
@@ -105,8 +106,13 @@ enum SyncProblemCode {
   /// The signed-in account is not the vault's (409 `session_changed`): the engine stops.
   sessionChanged('session_changed'),
 
-  /// This phone's device wrap is gone (removed from the account): the engine stops.
+  /// This phone's device wrap is gone (removed from the account), or the server says so of the
+  /// session (401 `device_removed`): the engine stops.
   deviceRemoved('device_removed'),
+
+  /// The account was deleted (401 `user_deleted`, phone-first spec 10): the engine stops. Only the
+  /// app acts on it (it adopts the vault into a new user); a headless run ends with it.
+  userDeleted('user_deleted'),
 
   /// A newer key version's links do not lead back to the held key (`tampered`): the engine stops.
   keyUnverified('key_unverified'),
@@ -192,7 +198,7 @@ class SyncResult {
   SyncProblemCode? error;
 
   /// [SyncProblemCode.deviceRemoved]: this phone was removed from the account, the session deletes
-  /// the vault. [SyncProblemCode.keyUnverified]: a new key version did not verify, the session
+  /// the vault. [SyncProblemCode.userDeleted]: the account was deleted, the app adopts the vault. [SyncProblemCode.keyUnverified]: a new key version did not verify, the session
   /// keeps the vault and asks to unlock again.
   SyncProblemCode? problem;
 
@@ -424,7 +430,14 @@ class _Engine implements SyncEngine {
       throw const _Stop(SyncProblemCode.sessionChanged, 409);
     }
     if (status == 410) throw const _ResyncRequired();
-    if (status == 401) throw const _Stop(SyncProblemCode.unauthorized, 401);
+    if (status == 401) {
+      // Only the explicit codes: anything else is a session that expired (phone-first spec 10).
+      throw switch (_problemCode(body)) {
+        'device_removed' => const _Stop(SyncProblemCode.deviceRemoved, 401),
+        'user_deleted' => const _Stop(SyncProblemCode.userDeleted, 401),
+        _ => const _Stop(SyncProblemCode.unauthorized, 401),
+      };
+    }
     if (status == 429 || status >= 500) throw _Stop(SyncProblemCode.server, status);
     if (status < 200 || status > 299) throw _Stop(SyncProblemCode.rejected, status);
     return body;
@@ -1010,6 +1023,7 @@ class _Engine implements SyncEngine {
         ..ok = false
         ..error = stop.code;
       if (stop.code == SyncProblemCode.deviceRemoved ||
+          stop.code == SyncProblemCode.userDeleted ||
           stop.code == SyncProblemCode.keyUnverified) {
         result.problem = stop.code;
       }
@@ -1228,8 +1242,10 @@ class _Triggers {
           failures = 0;
         } else if (result.error == SyncProblemCode.sessionChanged ||
             result.error == SyncProblemCode.deviceRemoved ||
+            result.error == SyncProblemCode.userDeleted ||
             result.error == SyncProblemCode.keyUnverified) {
-          // Someone else's session, this phone removed, or a key it cannot verify: never again.
+          // Someone else's session, this phone removed, the account deleted, or a key it cannot
+          // verify: never again.
           stop();
         } else if (result.error != SyncProblemCode.closed) {
           failures += 1;
@@ -1304,7 +1320,9 @@ _Stop _keysStop(Object error) {
   if (error is _Stop) return error;
   if (error is KeysError) {
     return switch (error.code) {
-      'device_removed' => const _Stop(SyncProblemCode.deviceRemoved),
+      'device_removed' => _Stop(SyncProblemCode.deviceRemoved, error.status),
+      'user_deleted' => const _Stop(SyncProblemCode.userDeleted, 401),
+      'unauthenticated' => const _Stop(SyncProblemCode.unauthorized, 401),
       'tampered' => const _Stop(SyncProblemCode.keyUnverified),
       'session_changed' => const _Stop(SyncProblemCode.sessionChanged, 409),
       'offline' => const _Stop(SyncProblemCode.offline),

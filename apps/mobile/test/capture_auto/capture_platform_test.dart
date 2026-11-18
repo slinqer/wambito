@@ -66,6 +66,12 @@ void main() {
     expect(calls.single.arguments, {'userId': 'user-1'});
   });
 
+  test('sendQueued names the account a merge takes the captures from', () async {
+    const platform = ChannelAutoCapturePlatform();
+    await platform.sendQueued('user-1', from: 'anon-1');
+    expect(calls.single.arguments, {'userId': 'user-1', 'from': 'anon-1'});
+  });
+
   test('without an Android side the status is null and nothing throws', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       channel,

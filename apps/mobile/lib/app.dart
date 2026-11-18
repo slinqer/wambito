@@ -3,14 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'feedback/celebration.dart';
 import 'feedback/feedback.dart';
+import 'api/seen.dart';
+import 'api/session.dart' show adoptionResumeProvider, provisionalPromotionProvider;
 import 'home/widget_sync.dart';
 import 'capture/prewarm.dart';
 import 'launch/launch_links.dart';
 import 'l10n/app_localizations.dart';
+import 'merge/merge_controller.dart';
 import 'notices/notice_sync.dart';
 import 'router.dart';
 import 'settings/locale_resolution.dart';
 import 'settings/preferences.dart';
+import 'settings/security/signin_notice.dart';
 import 'theme/theme.dart';
 import 'ui/toast.dart';
 import 'vault/preview_sync.dart';
@@ -48,6 +52,21 @@ class WambitoApp extends ConsumerWidget {
     // none of them may send or fetch finance data for it.
     ref.watch(previewSyncProvider);
     ref.watch(vaultChangedProvider);
+    // The start and resume hooks below are registered in the plan's lifecycle order, and each one's
+    // start fires in that order; none waits for the one before it (each runs its own async work,
+    // and their resumes come from their own lifecycle observers). Whatever must be ordered between
+    // them is guarded where it meets (the adoption's mayResume, the merge's hold checks).
+    // Promotes an offline first run's provisional vault once the network answers: at start, on
+    // resume and every minute (registered first).
+    ref.watch(provisionalPromotionProvider);
+    // Goes on with a deleted account's adoption at start and on resume (registered before the
+    // merge's; not waited for by it).
+    ref.watch(adoptionResumeProvider);
+    // Picks up a merge into an email account at start and on resume (registered before the seen
+    // ping), and runs it once the account's vault opens.
+    ref.watch(mergeResumeProvider);
+    // Tells the server, once a local day, that the app was opened (every account, headless runs never).
+    ref.watch(seenSyncProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       theme: dayTheme,
@@ -62,8 +81,12 @@ class WambitoApp extends ConsumerWidget {
       localeResolutionCallback: resolveAppLocale,
       // The web's `Celebration` and `ToastProvider`, above every screen and sheet: the toasts under
       // the party (it keeps clear of them).
-      builder: (context, child) =>
-          withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+      // The sign-in notice is registered last of the start and resume hooks (after the seen ping;
+      // not sequenced after it): once the vault is Ready, over home, it says which devices signed
+      // in since the last look.
+      builder: (context, child) => SigninNoticeHost(
+        child: withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+      ),
       routerConfig: ref.watch(routerProvider),
       debugShowCheckedModeBanner: false,
     );

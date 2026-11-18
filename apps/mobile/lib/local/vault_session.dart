@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
+import '../api/unauthorized.dart';
 import '../core/schemas.dart' show supportedLocales;
 import '../core/suggested_categories.dart';
 import '../crypto/records.dart' show RecordType;
@@ -14,6 +15,8 @@ import 'sqlite_store.dart';
 import 'store.dart' show FinanceStore;
 import 'sync.dart';
 import 'vault_lock.dart';
+
+export '../api/unauthorized.dart' show Unauthorized;
 
 /// A preview account's open vault on this phone: the Dart twin of
 /// `apps/web/app/local/vault-session.ts`. It ties the store, the keys, the local backend the
@@ -68,6 +71,7 @@ class OpenVaultOptions {
     this.syncDebounce = const Duration(seconds: 1),
     this.refreshKeys,
     this.lease,
+    this.seed = true,
   });
 
   final VaultProfile profile;
@@ -82,8 +86,10 @@ class OpenVaultOptions {
   final KeyStorage storage;
   final DateTime Function()? now;
 
-  /// The session is gone (a 401 from sync): the caller wipes the vault and goes to sign-in.
-  final void Function()? onUnauthorized;
+  /// The session is gone (a 401 from sync), and why ([Unauthorized], from its code): the caller
+  /// ends the session (`SessionController.sessionEnded`), which keeps, wipes or adopts the vault.
+  /// A `device_removed` 401 also removes the vault here, as a wrap gone does.
+  final void Function(Unauthorized kind)? onUnauthorized;
 
   /// The session now belongs to another account (409 `session_changed` from sync): the session has
   /// stopped and closed; the caller checks who is signed in.
@@ -102,6 +108,10 @@ class OpenVaultOptions {
   /// The lease a sync run takes (vault_lock.dart). Default: the app's ([appLease], a short wait)
   /// on the real vault folder; none when a test passes its own `openStore`.
   final Future<VaultLease?> Function()? lease;
+
+  /// Seed the account's first records ([seedIfEmpty]) after a complete first sync. False when a
+  /// carry (merge.dart) fills the new vault instead.
+  final bool seed;
 }
 
 /// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
@@ -196,6 +206,10 @@ class VaultSession {
   /// sign-out sheet's "You have N changes not synced yet".
   Future<int> pendingChanges() async =>
       (await _store.readOutbox(_all)).where((e) => !e.reseal && !e.abandoned).length;
+
+  /// The server's version of a record (0 until the server took it); null without the record.
+  Future<int?> serverVersion(RecordType type, String id) async =>
+      (await _store.rawRecord(type, id))?.version;
 
   /// Stops the sync and closes the store; completes once the file is released.
   Future<void> close() {
@@ -302,7 +316,7 @@ Future<void> _forgetRefreshed(
 /// the server's profile, the web's default currency EUR) and the suggested categories in the
 /// person's language. The ids are UUID v5 of the account and the record's name, and the content
 /// comes from the profile only, so two devices seeding at once write the same records.
-Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
+Future<void> seedIfEmpty(FinanceStore store, VaultProfile profile) async {
   if ((await store.list(RecordType.settings)).isNotEmpty) return;
   final locale = supportedLocales.contains(profile.locale) ? profile.locale : 'es';
   final names = SuggestionLocale.values.byName(locale);
@@ -333,6 +347,7 @@ Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
       'timezone': profile.timezone,
       'onboardingCompletedAt': null,
       'revokedDevices': <Object?>[],
+      'recoveryKeySavedAt': null,
     });
     for (final (:id, :body) in categories) {
       await tx.put(RecordType.category, id, body);
@@ -437,7 +452,9 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
           if (mine.forgotten || (opened?._closing ?? false)) return;
           switch (problem.code) {
             case SyncProblemCode.unauthorized:
-              options.onUnauthorized?.call();
+              options.onUnauthorized?.call(Unauthorized.expired);
+            case SyncProblemCode.userDeleted:
+              options.onUnauthorized?.call(Unauthorized.userDeleted);
             case SyncProblemCode.sessionChanged:
               final session = opened;
               if (session != null) {
@@ -446,6 +463,8 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
               }
             case SyncProblemCode.deviceRemoved:
               removed?.call();
+              // The server says the session went with the device: it ends too.
+              if (problem.status == 401) options.onUnauthorized?.call(Unauthorized.deviceRemoved);
             case SyncProblemCode.keyUnverified:
               unverified?.call();
             default:
@@ -469,6 +488,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     }
     final fatal =
         first.error == SyncProblemCode.unauthorized ||
+        first.error == SyncProblemCode.userDeleted ||
         first.error == SyncProblemCode.sessionChanged;
     // `busy` (a headless engine holds the lease) is reported within [appLeaseWait]: a known phone
     // opens on its local data and the sync is retried; a fresh vault, which must not seed before its
@@ -480,7 +500,7 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
     // Only on a complete first sync: an empty-looking vault may just be one not downloaded yet
     // (offline, or a resync whose set-aside changes still wait for their download).
     final waiting = (await store.readOutbox(_all)).any((e) => e.setAside != null);
-    if (first.ok && !waiting) await _seedIfEmpty(store, profile);
+    if (options.seed && first.ok && !waiting) await seedIfEmpty(store, profile);
 
     final session = VaultSession._(
       userId,

@@ -115,13 +115,18 @@ void main() {
     final aliasSchemes = RegExp(r'android:scheme="([^"]+)"').allMatches(alias).map((m) => m[1]);
     expect(aliasSchemes.toSet(), {'wambito'});
     expect(alias, isNot(contains('BROWSABLE')));
-    // The exported launcher activity takes no wambito:// link: other apps can start it.
+    // The exported launcher activity takes no wambito:// link, since other apps can start it, but
+    // the web sign-in's QR (phone-first ruling 14): the system camera opens it, and it only opens
+    // the approval, where the person still has to approve.
     final main = RegExp(
       r'<activity\s((?:(?!</activity>).)*)</activity>',
       dotAll: true,
     ).firstMatch(_manifest)!.group(1)!;
     expect(main, contains('android:name=".MainActivity"'));
-    expect(main, isNot(contains('android:scheme="wambito"')));
+    final wambito = RegExp(r'<data android:scheme="wambito"[^>]*>')
+        .allMatches(main)
+        .map((m) => m[0]);
+    expect(wambito, ['<data android:scheme="wambito" android:host="signin"/>']);
   });
 
   test('the app is Wambito on the phone', () {

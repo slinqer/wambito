@@ -33,8 +33,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * The camera, full screen, for one QR (`wambito/scanner` `scan`, [ScannerChannel]). CameraX shows the
  * preview and hands every frame's luminance plane to [decodeQr] (ZXing core), keeping only the
- * latest frame while one is being read. The first `wambito://pair?` text it reads goes back as
- * [RESULT_OK] with [EXTRA_TEXT]; any other QR is ignored, as the web's scanner ignores it. The close
+ * latest frame while one is being read. The first text it reads that [acceptsQr] for the
+ * [EXTRA_PREFIXES] it was started with (the pairing QR when none) goes back as [RESULT_OK] with
+ * [EXTRA_TEXT]; any other QR is ignored, as the web's scanner ignores it. The close
  * button and Back answer [RESULT_CANCELED]; a camera that cannot start answers [RESULT_FAILED].
  * The stream stops when the activity does.
  *
@@ -46,9 +47,11 @@ class ScannerActivity : ComponentActivity() {
     private var provider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private val answered = AtomicBoolean(false)
+    private var prefixes: List<String> = listOf(PAIR_QR_PREFIX)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        prefixes = qrPrefixesOf(intent.getStringArrayExtra(EXTRA_PREFIXES)?.toList())
         analysisExecutor = Executors.newSingleThreadExecutor()
         val preview = TextureView(this)
         val density = resources.displayMetrics.density
@@ -237,7 +240,7 @@ class ScannerActivity : ComponentActivity() {
             val buffer = plane.buffer
             val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
             val text = decodeQr(bytes, image.width, image.height, plane.rowStride)
-            if (text != null && text.startsWith(PAIR_PREFIX)) answer(RESULT_OK, text)
+            if (text != null && acceptsQr(text, prefixes)) answer(RESULT_OK, text)
         } catch (_: Exception) {
             // A frame that cannot be read: the next one.
         } finally {
@@ -269,10 +272,10 @@ class ScannerActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TEXT = "text"
 
+        /** The QR prefixes this scan takes (`ScannerChannel`, [qrPrefixesOf]). */
+        const val EXTRA_PREFIXES = "prefixes"
+
         /** The camera could not start (no back camera, in use by another app). */
         const val RESULT_FAILED = Activity.RESULT_FIRST_USER
-
-        /** The only QR the app wants: the pairing link (lib/local/pairing.dart). */
-        const val PAIR_PREFIX = "wambito://pair?"
     }
 }

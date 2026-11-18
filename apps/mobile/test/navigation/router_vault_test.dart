@@ -43,6 +43,21 @@ void main() {
       expect(go('/debug/prf', vault: VaultRoute.locked), isNull);
     });
 
+    test('a merge that needs the person keeps every screen on /merge once the vault is open', () {
+      for (final path in ['/', '/settings', '/unlock', '/progress']) {
+        expect(sessionRedirect(_in, Uri.parse(path), merge: true), '/merge', reason: path);
+      }
+      expect(sessionRedirect(_in, Uri.parse('/merge'), merge: true), isNull);
+      // Locked, the account's vault must be opened first; the magic link is never moved.
+      expect(
+        sessionRedirect(_in, Uri.parse('/'), vault: VaultRoute.locked, merge: true),
+        '/unlock',
+      );
+      expect(sessionRedirect(_in, Uri.parse('/auth/verify'), merge: true), isNull);
+      // Nothing waits: /merge is a screen like any other.
+      expect(go('/merge'), isNull);
+    });
+
     test('once the vault is open, /unlock leaves for home', () {
       expect(go('/unlock'), '/');
       expect(go('/'), isNull);
@@ -70,37 +85,38 @@ void main() {
       server = FakeServer({'tok': (id: 'user_p', mode: 'preview')});
     });
 
-    Future<ProviderContainer> pump(WidgetTester tester, {List<Override> extra = const []}) => pumpApp(
-      tester,
-      auth: FakeAuthApi(),
-      // The account's mode is the fake server's to say here.
-      plain: false,
-      overrides: [
-        ...extra,
-        networkClientProvider.overrideWith(
-          (ref) => ApiClient.forServer(
-            Uri.parse('http://x'),
-            token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
-          )..dio.httpClientAdapter = server,
-        ),
-        keyStorageProvider.overrideWithValue(KeyStorage()),
-        openVaultSessionProvider.overrideWithValue(
-          (o) => openVaultSession(
-            OpenVaultOptions(
-              profile: o.profile,
-              keys: o.keys,
-              fresh: o.fresh,
-              network: o.network,
-              storage: o.storage,
-              onUnauthorized: o.onUnauthorized,
-              onSessionChanged: o.onSessionChanged,
-              openStore: openTestStore,
-              deleteStore: deleteTestStore,
+    Future<ProviderContainer> pump(WidgetTester tester, {List<Override> extra = const []}) =>
+        pumpApp(
+          tester,
+          auth: FakeAuthApi(),
+          // The account's mode is the fake server's to say here.
+          plain: false,
+          overrides: [
+            ...extra,
+            networkClientProvider.overrideWith(
+              (ref) => ApiClient.forServer(
+                Uri.parse('http://x'),
+                token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
+              )..dio.httpClientAdapter = server,
             ),
-          ),
-        ),
-      ],
-    );
+            keyStorageProvider.overrideWithValue(KeyStorage()),
+            openVaultSessionProvider.overrideWithValue(
+              (o) => openVaultSession(
+                OpenVaultOptions(
+                  profile: o.profile,
+                  keys: o.keys,
+                  fresh: o.fresh,
+                  network: o.network,
+                  storage: o.storage,
+                  onUnauthorized: o.onUnauthorized,
+                  onSessionChanged: o.onSessionChanged,
+                  openStore: openTestStore,
+                  deleteStore: deleteTestStore,
+                ),
+              ),
+            ),
+          ],
+        );
 
     String where(ProviderContainer c) =>
         c.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
@@ -181,35 +197,35 @@ void main() {
       List<Override> extra = const [],
       FakeCacheStore? cache,
     }) => pumpApp(
-          tester,
-          auth: FakeAuthApi(),
-          plain: false,
-          homeCache: cache,
-          overrides: [
-            ...extra,
-            networkClientProvider.overrideWith(
-              (ref) => ApiClient.forServer(
-                Uri.parse('http://x'),
-                token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
-              )..dio.httpClientAdapter = server,
+      tester,
+      auth: FakeAuthApi(),
+      plain: false,
+      homeCache: cache,
+      overrides: [
+        ...extra,
+        networkClientProvider.overrideWith(
+          (ref) => ApiClient.forServer(
+            Uri.parse('http://x'),
+            token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
+          )..dio.httpClientAdapter = server,
+        ),
+        keyStorageProvider.overrideWithValue(KeyStorage()),
+        staleVaultsProvider.overrideWithValue((_) async {}),
+        openVaultSessionProvider.overrideWithValue(
+          (o) => openVaultSession(
+            OpenVaultOptions(
+              profile: o.profile,
+              keys: o.keys,
+              fresh: o.fresh,
+              network: o.network,
+              storage: o.storage,
+              openStore: openTestStore,
+              deleteStore: deleteTestStore,
             ),
-            keyStorageProvider.overrideWithValue(KeyStorage()),
-            staleVaultsProvider.overrideWithValue((_) async {}),
-            openVaultSessionProvider.overrideWithValue(
-              (o) => openVaultSession(
-                OpenVaultOptions(
-                  profile: o.profile,
-                  keys: o.keys,
-                  fresh: o.fresh,
-                  network: o.network,
-                  storage: o.storage,
-                  openStore: openTestStore,
-                  deleteStore: deleteTestStore,
-                ),
-              ),
-            ),
-          ],
-        );
+          ),
+        ),
+      ],
+    );
 
     String where(ProviderContainer c) =>
         c.read(routerProvider).routerDelegate.currentConfiguration.uri.path;

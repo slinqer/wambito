@@ -8,14 +8,17 @@ import WambitoNative
 /// asked there.
 ///
 ///  * `isAvailable` -> true when the phone has a camera.
-///  * `scan` -> the text of the first `wambito://pair?` QR read (`ScannerViewController`, full
-///    screen), or nil when the person closed it or refused the camera permission (no error). Failures:
+///  * `scan` -> the text of the first QR read (`ScannerViewController`, full screen) that starts
+///    with one of its `prefixes` argument (`QrPrefix.of`: only `wambito://pair?` and
+///    `wambito://signin?`, the pairing one when none is given), or nil when the person closed it or refused the camera permission (no error). Failures:
 ///    `busy` (a scan is already open), `failed` (the camera could not start, or nothing to present on).
 ///
 /// One scan at a time, and every path answers the call exactly once.
 final class ScannerChannel: NSObject {
   private let channel: FlutterMethodChannel
   private var pending: FlutterResult?
+  /// The prefixes the pending scan asked for.
+  private var prefixes = [QrPrefix.pair]
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "wambito/scanner", binaryMessenger: messenger)
@@ -26,18 +29,20 @@ final class ScannerChannel: NSObject {
       case "isAvailable":
         result(AVCaptureDevice.default(for: .video) != nil)
       case "scan":
-        self.scan(result)
+        let arguments = call.arguments as? [String: Any]
+        self.scan(QrPrefix.of(arguments?["prefixes"]), result)
       default:
         result(FlutterMethodNotImplemented)
       }
     }
   }
 
-  private func scan(_ result: @escaping FlutterResult) {
+  private func scan(_ asked: [String], _ result: @escaping FlutterResult) {
     guard pending == nil else {
       return result(FlutterError(code: "busy", message: "A scan is already open", details: nil))
     }
     pending = result
+    prefixes = asked
     switch CameraAccess.state(AVCaptureDevice.authorizationStatus(for: .video).rawValue) {
     case "granted":
       present()
@@ -57,7 +62,7 @@ final class ScannerChannel: NSObject {
     guard let top = Self.topViewController() else {
       return fail("failed", "Nothing to show the camera on")
     }
-    let scanner = ScannerViewController { [weak self] outcome in
+    let scanner = ScannerViewController(prefixes: prefixes) { [weak self] outcome in
       switch outcome {
       case .text(let text): self?.finish(text)
       case .cancelled: self?.finish(nil)

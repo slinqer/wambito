@@ -159,6 +159,14 @@ void main() {
     }
   });
 
+  test('app_pt.arb says telemóvel for the phone, as the base and the web\'s pt do', () {
+    final pt = arbs['pt']!;
+    final word = RegExp(r'(?<![\p{L}])telefones?(?![\p{L}])', unicode: true, caseSensitive: false);
+    for (final key in _messageKeys(pt)) {
+      expect(pt[key] as String, isNot(matches(word)), reason: 'pt "$key"');
+    }
+  });
+
   test('Italian and Portuguese do not use the Colombian slang', () {
     final slang = RegExp(r'(?<![\p{L}])(lukas?|lucas|palos?)(?![\p{L}])', unicode: true);
     for (final language in ['it', 'pt']) {

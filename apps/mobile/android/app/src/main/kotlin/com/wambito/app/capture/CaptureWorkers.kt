@@ -101,11 +101,12 @@ object CaptureScheduler {
 
     /**
      * After a sign-in of [userId] (`sendQueued` on the channel): the queue becomes theirs, dropping
-     * what was captured for another account or for none, and what is left is sent.
+     * what was captured for another account or for none (but [from]'s, re-tagged: a merge), and what
+     * is left is sent.
      */
-    fun sendQueued(context: Context, userId: String) {
+    fun sendQueued(context: Context, userId: String, from: String? = null) {
         val queue = CaptureQueue(context)
-        queue.adopt(userId, CaptureHooks.of(context).session.mark())
+        queue.adopt(userId, CaptureHooks.of(context).session.mark(), from)
         if (queue.all().isNotEmpty()) enqueueSend(context)
     }
 

@@ -97,6 +97,29 @@ class CaptureQueueTest {
     }
 
     @Test
+    fun `adopting from the account it takes over re-tags its captures and keeps its confirms`() {
+        val queue = CaptureQueue(context)
+        queue.add(sampleCapture("Nobody's"))
+        queue.adopt("anon")
+        val phone = queue.add(sampleCapture("Phone's"))
+        queue.addConfirm("tx-1")
+        queue.adopt("other")
+        queue.adopt("anon")
+        val again = queue.add(sampleCapture("Phone's again"))
+        queue.addConfirm("tx-2")
+
+        queue.adopt("email", from = "anon")
+
+        assertEquals(listOf(again.copy(userId = "email")), queue.all())
+        assertEquals(listOf("tx-2"), queue.confirms())
+        assertEquals("email", queue.owner())
+        // A later plain adopt of the same account keeps them.
+        queue.adopt("email")
+        assertEquals(listOf(again.key), queue.all().map { it.key })
+        assertTrue(phone.key !in queue.all().map { it.key })
+    }
+
+    @Test
     fun `adopting the same account again keeps its captures`() {
         val queue = CaptureQueue(context)
         queue.adopt("user-a")

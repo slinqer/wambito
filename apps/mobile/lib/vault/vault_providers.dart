@@ -2,14 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import '../api/auth_api.dart';
 import '../api/passkeys.dart';
 import '../api/session.dart';
+import '../api/unauthorized.dart';
 import '../background/background_channel.dart';
-import '../local/db.dart' show pendingChangesInVault;
+import '../local/db.dart' show VaultHold, VaultHoldKind, pendingChangesInVault, vaultHoldOf;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
 import '../local/keys.dart' show KeysOptions, LocalKeys;
@@ -18,6 +20,8 @@ import '../local/pairing.dart' as pairing;
 import '../local/prf.dart' as prf;
 import '../local/stale_vaults.dart';
 import '../local/vault_session.dart';
+import '../protect/protect_actions.dart' show markRecoveryKeySaved;
+import '../protect/protect_status.dart' show recoveryKeySavedAt;
 import 'encryption_mode.dart';
 import 'vault_gate.dart';
 
@@ -54,6 +58,20 @@ final openVaultSessionProvider = Provider<Future<VaultSession> Function(OpenVaul
 final forgetVaultProvider = Provider<Future<void> Function(String userId, KeyStorage storage)>(
   (ref) =>
       (userId, storage) => forgetVault(userId, storage),
+);
+
+/// Whether the last adoption of a deleted account's vault stopped at a `plain` new user
+/// (`SessionController.adoptionStepped`): a change makes the waiting gate check again, so it says
+/// why at once.
+final adoptionNeedsEncryptedServerProvider = Provider<ValueNotifier<bool>>((ref) {
+  final notifier = ValueNotifier(false);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
+/// Reads a vault's hold from its file ([vaultHoldOf]); tests put their own folder in.
+final vaultHoldReaderProvider = Provider<Future<VaultHold?> Function(String userId)>(
+  (ref) => vaultHoldOf,
 );
 
 /// The gate of the signed-in `preview` account, started; null for `plain`, while the mode of the
@@ -193,36 +211,38 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
 
   KeysOptions options() => KeysOptions(userId: userId, dio: network(), storage: storage());
 
-  /// The session ended under the vault (a 401: it expired, or the account signed out
-  /// everywhere): the session ends here, then sign in again. The vault, its keys and its changes not
-  /// sent yet stay for this account's next sign-in ([SessionController.sessionExpired]); unlike the
-  /// web's `signInAgain`, which wipes them (spec 2026-11-12 sections 3 and 6.5: only a sign-out and
-  /// a removed device wipe the vault). The server already dropped the session, so even a guest's
-  /// goes.
-  Future<void> signInAgain() async {
+  /// The session ended under the vault (a 401), and [kind] says why
+  /// ([SessionController.sessionEnded]): it expired or the account signed out everywhere, and the
+  /// vault, its keys and its changes not sent yet stay for this account's next sign-in (unlike the
+  /// web's `signInAgain`, which wipes them: spec 2026-11-12 sections 3 and 6.5); this phone was
+  /// removed (`device_removed`), and the vault is wiped; the account was deleted (`user_deleted`),
+  /// and a new user adopts the vault. The server already dropped the session, so even a guest's goes.
+  Future<void> signInAgain([Unauthorized kind = Unauthorized.expired]) async {
     // A late 401 of a session that is gone never ends the one signed in now.
     if (!current()) return;
     final session = ref.read(sessionProvider.notifier);
     final token = ref.read(sessionProvider).stored?.token;
     try {
-      await session.sessionExpired(token: token);
+      await session.sessionEnded(token: token, kind: kind);
     } on Object {
       // Ended here all the same at the next start (the server says 401).
     }
   }
 
-  /// A 401 from `/v2/keys`: sign in again, the gate stays put.
+  /// A 401 from `/v2/keys`: the session ends as its code says ([signInAgain]), the gate stays put.
   Future<T> signInAgainOn401<T>(Future<T> Function() call) async {
     try {
       return await call();
     } on KeysError catch (error) {
-      if (error.status == 401) unawaited(signInAgain());
+      if (error.status == 401) unawaited(signInAgain(unauthorizedOf(error.code)));
       rethrow;
     }
   }
 
-  /// Who answered the last [sessionUserId]: null is no one (the session is gone).
+  /// Who answered the last [sessionUserId]: null is no one (the session is gone), and
+  /// [nobodyBecause] says why.
   var nobody = false;
+  var nobodyBecause = Unauthorized.expired;
 
   /// Who is signed in now (`GET /v1/me` on the network): null when no one; throws when it cannot
   /// tell.
@@ -231,12 +251,17 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     nobody = token == null;
     if (token == null) return null;
     try {
-      final me = (await read(networkClientProvider).api.getDefaultApi().getMe()).data;
+      // Naming the vault's account (ruling 17): a deleted one answers `user_deleted`.
+      final me = (await read(
+        networkClientProvider,
+      ).api.getDefaultApi().getMe(headers: {'x-wambito-user': userId})).data;
       if (me == null) throw const GateError('server');
       return me.id;
     } on DioException catch (error) {
-      if (error.response?.statusCode != 401) rethrow;
+      final kind = unauthorizedOfError(error);
+      if (kind == null) rethrow;
       nobody = true;
+      nobodyBecause = kind;
       return null;
     }
   }
@@ -246,16 +271,50 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
   void reload() {
     if (!current()) return;
     if (nobody) {
-      unawaited(signInAgain());
+      unawaited(signInAgain(nobodyBecause));
     } else {
       ref.invalidate(freshVaultAccountProvider);
     }
   }
 
+  /// A vault held `orphaned` (or `provisional`, an offline first run's) is being adopted into a new
+  /// user (lib/local/adopt.dart): it never opens (a write now would be lost when the adoption
+  /// forgets it), the adoption is asked to go on, and
+  /// the gate says why it waits: `plain_server` when the new user would keep data in clear, else
+  /// `adopting` (shown as offline; a retry asks again). A hold that cannot be read opens as before.
+  Future<void> refuseAdopted() async {
+    VaultHold? hold;
+    try {
+      hold = await read(vaultHoldReaderProvider)(userId);
+    } on GateError {
+      rethrow;
+    } on Object {
+      return;
+    }
+    // A `provisional` hold is an offline first run's vault being promoted: no write may land in
+    // it after the carry read it, so it never opens as an account's vault either.
+    if (hold?.kind != VaultHoldKind.orphaned && hold?.kind != VaultHoldKind.provisional) return;
+    final session = read(sessionProvider.notifier);
+    unawaited(session.resumeAdoptions().catchError((Object _) {}));
+    throw GateError(session.adoptionNeedsEncryptedServer ? 'plain_server' : 'adopting');
+  }
+
+  /// The vault was just unlocked with the recovery key typed at sign-in: the person has that key,
+  /// so once it opens "Protect your data"'s first step is marked done when it is not yet.
+  var openedWithSignInKey = false;
+
   /// The session the gate's listeners are on, so a reused one is not wired twice, and their
   /// unsubscribes.
   VaultSession? wired;
   final detach = <void Function()>[];
+
+  // The adoption's stop changed (a `plain` new user, or no longer): a Locked gate checks again.
+  void adoptionChanged() {
+    if (!gate.disposed) gate.retry();
+  }
+
+  final adoptionWait = ref.read(adoptionNeedsEncryptedServerProvider)..addListener(adoptionChanged);
+  detach.add(() => adoptionWait.removeListener(adoptionChanged));
 
   // Another session signed in (or none): the gate keeps nothing, tells nothing, and its vault
   // session closes; the vault file and the keys stay (a sign-out deletes them, Task 14).
@@ -281,6 +340,16 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       },
       unlockWithRecovery: (text) =>
           signInAgainOn401(() => keys.unlockWithRecovery(options(), text)),
+      // The key typed at sign-in, this account's only, and never for a gate no longer current.
+      takeSignInRecoverySecret: () =>
+          current() ? ref.read(signInRecoveryKeyProvider).take(userId) : null,
+      unlockWithRecoverySecret: (secret) async {
+        final local = await signInAgainOn401(
+          () => keys.unlockWithRecoverySecret(options(), secret),
+        );
+        openedWithSignInKey = true;
+        return local;
+      },
       unlockWithPasskey: (passkey) =>
           signInAgainOn401(() => keys.unlockWithPasskey(options(), passkey)),
       addPasskeyWrap: (passkey) => keys.addPasskeyWrap(options(), passkey),
@@ -289,6 +358,10 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       startPairing: () async =>
           _GatePairing(await signInAgainOn401(() => pairing.startPairing(options()))),
       open: (localKeys, fresh) async {
+        // Read and reset before anything can fail: a failed open never leaves it set for a later one.
+        final markKeySaved = openedWithSignInKey;
+        openedWithSignInKey = false;
+        await refuseAdopted();
         final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(
             profile: profile,
@@ -296,7 +369,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
             fresh: fresh,
             network: network(),
             storage: storage(),
-            onUnauthorized: () => unawaited(signInAgain()),
+            onUnauthorized: (kind) => unawaited(signInAgain(kind)),
             onSessionChanged: () {
               if (current()) gate.sessionChanged();
             },
@@ -307,6 +380,14 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
           unawaited(session.close().catchError((Object _) {}));
           throw const GateError('closed');
         }
+        try {
+          // Held while it opened (the adoption began meanwhile): closed again before any write.
+          await refuseAdopted();
+        } on Object {
+          await session.close().catchError((Object _) {});
+          rethrow;
+        }
+        if (markKeySaved) unawaited(_markKeySavedIfNot(session));
         if (!identical(wired, session)) {
           wired = session;
           detach
@@ -318,13 +399,24 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         }
         return session;
       },
-      guest: profile.isAnonymous,
       userId: userId,
       sessionUserId: sessionUserId,
       reload: reload,
     ),
   );
   return gate;
+}
+
+/// Marks `recoveryKeySavedAt` in the settings record when it is still null: the vault was opened
+/// with the recovery key the person typed to sign in, so they have it. Best effort: a failure only
+/// leaves the step to do.
+Future<void> _markKeySavedIfNot(VaultSession session) async {
+  try {
+    if (await recoveryKeySavedAt(session.store) != null) return;
+    await markRecoveryKeySaved(session, DateTime.now());
+  } on Object {
+    // The step stays to do; Settings shows it.
+  }
 }
 
 /// Deletes the vault (file, keys, kept mode and account) of every account on this phone but
@@ -338,6 +430,7 @@ final staleVaultsProvider = Provider<Future<void> Function(String? keepUserId)>(
     forget: (id) => forget(id, keys),
     // Asked again before each delete: an account that signed in meanwhile keeps its vault.
     inUse: (id) => vaultInUse(id) || ref.read(knownAccountProvider).id == id,
+    holdOf: vaultHoldOf,
   );
 });
 

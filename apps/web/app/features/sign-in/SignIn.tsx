@@ -31,6 +31,7 @@ import {
   signInLocale,
 } from "./auth.ts";
 import { CODE_LENGTH, CodeInput, type CodeInputHandle } from "./CodeInput.tsx";
+import { oneAtATime } from "./one-at-a-time.ts";
 import { QrSignIn } from "./QrSignIn.tsx";
 import { RecoveryKeySignIn } from "./RecoveryKeySignIn.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "./SignInScreen.tsx";
@@ -257,6 +258,8 @@ export function SignIn({
 
   async function passkey() {
     if (otherBusy) return;
+    // the explicit request ends the open conditional one
+    autofill.forget();
     const result = await run("passkey", () => auth.signInWithPasskey(), passkeyErrorKey);
     if (!result || !("data" in result)) {
       // The explicit request replaced the conditional one: ask for the autofill again.
@@ -271,8 +274,10 @@ export function SignIn({
   // The conditional passkey request (WebAuthn conditional mediation): while the email field is
   // there, the browser may offer this site's passkeys in the keyboard or autofill. Picking one
   // signs in. Anything else it comes back with is no news: a newer request taking over, nothing
-  // picked, no support. `generation` drops the answers of requests that were replaced.
+  // picked, no support. `generation` drops the answers of requests that were replaced; a request
+  // still open is reused (`oneAtATime`), since a second one would replace its challenge.
   const generation = useRef(0);
+  const [autofill] = useState(() => oneAtATime(() => auth.autofillPasskey()));
   const onAutofillResult = useRef<(user: AuthUser) => void>(() => {});
   useEffect(() => {
     onAutofillResult.current = (user) => {
@@ -285,13 +290,13 @@ export function SignIn({
   const startAutofill = useCallback(() => {
     generation.current += 1;
     const mine = generation.current;
-    void auth
-      .autofillPasskey()
+    void autofill
+      .run()
       .then((result) => {
         if (mine === generation.current && !result.error) onAutofillResult.current(result.data);
       })
       .catch(() => {});
-  }, [auth]);
+  }, [autofill]);
   useEffect(() => {
     // `/create-account` is for someone with no passkey yet: nothing to ask the browser for
     if (step !== "email" || !passkeys || mode === "create") return;

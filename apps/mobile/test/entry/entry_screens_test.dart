@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart';
+import 'package:wambito/api/session.dart';
 import 'package:wambito/entry/code_input.dart';
+import 'package:wambito/entry/passkey_offer_screen.dart';
+import 'package:wambito/home/home_screen.dart';
+import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/home/home_controller.dart' show clockProvider;
 import 'package:wambito/progress/progress_screen.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/ui/press_button.dart';
+import 'package:wambito/vault/recovery_key_setup_view.dart';
 
 import 'fakes.dart';
 
@@ -105,7 +110,7 @@ void main() {
       tester,
     ) async {
       await pumpApp(tester, auth: auth);
-      await tester.tap(find.byKey(const Key('entry.withEmail')));
+      await tester.tap(find.byKey(const Key('entry.haveAccount')));
       await tester.pumpAndSettle();
       await toCodeStep(tester);
       expect(find.text('Revisa tu correo'), findsOneWidget);
@@ -117,8 +122,8 @@ void main() {
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      // The first screen, with "Probar sin correo" where it always was.
-      expect(find.byKey(const Key('entry.guest')), findsOneWidget);
+      // The first screen, with "Start" where it always is.
+      expect(find.byKey(const Key('entry.start')), findsOneWidget);
     });
   });
 
@@ -212,6 +217,50 @@ void main() {
     });
   });
 
+  group('a plain guest adds an email', () {
+    setUp(() {
+      mockStorage(token: 'guest-token-0', guest: true);
+      auth.guests['guest-token-0'] = true;
+    });
+
+    testWidgets('a plain guest\'s claim ends as today, no recovery page', (tester) async {
+      final container = await pumpApp(tester, auth: auth, passkeys: FakePasskeys());
+      container.read(routerProvider).go('/entry/email?email=ana%40correo.com&claim=1');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('entry.code')), '123456');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('entry.submitCode')));
+      await tester.pumpAndSettle();
+
+      expect(auth.calls, contains('claimVerify guest-token-0 ana@correo.com 123456'));
+      expect(container.read(sessionProvider).stored?.guest, isFalse);
+      expect(find.byType(RecoveryKeySetupView), findsNothing);
+      expect(find.byType(PasskeyOfferScreen), findsNothing);
+      expect(container.read(sessionProvider).offerPasskeyFor, isNull);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('a plain guest\'s email_taken still offers today\'s sign-in as another account', (
+      tester,
+    ) async {
+      final container = await pumpApp(tester, auth: auth);
+      auth.failures['claimSend'] = const AuthFailure(code: 'email_taken', status: 409);
+      container.read(routerProvider).go('/entry/email?email=ana%40correo.com&claim=1');
+      await tester.pumpAndSettle();
+
+      final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+      expect(find.text(l10n.mergeOfferQuestion), findsNothing);
+      expect(find.text('Ese correo ya tiene una cuenta. Entra con él.'), findsOneWidget);
+      await tester.tap(find.text('ENTRAR CON ESE CORREO'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Dejar tu cuenta de invitado?'), findsOneWidget);
+      await tester.tap(find.text('ENTRAR DE TODOS MODOS'));
+      await tester.pumpAndSettle();
+      expect(auth.calls.last, 'sendCode ana@correo.com');
+      expect(find.byKey(const Key('entry.code')), findsOneWidget);
+    });
+  });
+
   group('the email step', () {
     testWidgets('a passkey that fails says so under its button, and the email is not marked', (
       tester,
@@ -266,21 +315,22 @@ void main() {
   });
 
   group('the first screen', () {
-    testWidgets('keeps "Probar sin correo" first, in the secondary style, and the email primary', (
-      tester,
-    ) async {
-      await pumpApp(tester, auth: auth);
+    testWidgets(
+      'keeps "Start" first, in the primary style, and "I already have an account" a link',
+      (tester) async {
+        await pumpApp(tester, auth: auth);
 
-      final guest = tester.widget<PressButton>(find.byKey(const Key('entry.guest')));
-      final email = tester.widget<PressButton>(find.byKey(const Key('entry.withEmail')));
-      expect(guest.tone, PressTone.secondary);
-      expect(email.tone, PressTone.primary);
-      expect(
-        tester.getTopLeft(find.byKey(const Key('entry.guest'))).dy,
-        lessThan(tester.getTopLeft(find.byKey(const Key('entry.withEmail'))).dy),
-      );
-      expect(find.text('Puedes agregar tu correo después.'), findsOneWidget);
-    });
+        final start = tester.widget<PressButton>(find.byKey(const Key('entry.start')));
+        final haveAccount = tester.widget<PressButton>(find.byKey(const Key('entry.haveAccount')));
+        expect(start.tone, PressTone.primary);
+        expect(haveAccount.tone, PressTone.ghost);
+        expect(haveAccount.link, isTrue);
+        expect(
+          tester.getTopLeft(find.byKey(const Key('entry.start'))).dy,
+          lessThan(tester.getTopLeft(find.byKey(const Key('entry.haveAccount'))).dy),
+        );
+      },
+    );
 
     testWidgets('the day/night switch changes the theme before anyone has signed in', (
       tester,
@@ -320,7 +370,7 @@ void main() {
       await small(tester);
       await pumpApp(tester, auth: auth, passkeys: FakePasskeys());
       expect(tester.takeException(), isNull);
-      await reachable(tester, find.byKey(const Key('entry.withEmail')));
+      await reachable(tester, find.byKey(const Key('entry.haveAccount')));
       // The passkey is not here; the email step has it.
       expect(find.byKey(const Key('entry.passkey')), findsNothing);
     });

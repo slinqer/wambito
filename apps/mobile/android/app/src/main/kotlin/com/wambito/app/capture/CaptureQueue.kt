@@ -47,16 +47,28 @@ class CaptureQueue(context: Context) {
     /**
      * [userId] signed in, under the session [mark]: the queue is now theirs. Captures of another
      * account, and those of no known account (they could be anyone's), are dropped; theirs stay to
-     * be sent.
+     * be sent. [from] is an account whose data [userId] takes over (a merge of this phone's account
+     * into an email account, or that merge called off): its captures are re-tagged for [userId]
+     * instead of dropped, and its confirms stay. A merge gives every carried movement a new id
+     * (ruling P17), so a confirm kept from the guest names a movement the account does not have:
+     * it is dropped silently when sent (the movement stays to review); an adoption keeps the ids,
+     * so there its confirms still apply.
      */
-    fun adopt(userId: String, mark: String? = null): Unit = synchronized(LOCK) {
+    fun adopt(userId: String, mark: String? = null, from: String? = null): Unit = synchronized(LOCK) {
         val items = read()
-        val mine = items.filter { it.userId == userId }
+        val kept = items.mapNotNull {
+            when {
+                it.userId == userId -> it
+                from != null && it.userId == from -> it.copy(userId = userId)
+                else -> null
+            }
+        }
+        val owner = owner()
         val edit = preferences.edit().putString(OWNER, userId)
-        // The confirms of the account before are not for this one.
-        if (owner() != userId) edit.remove(CONFIRMS)
+        // The confirms of the account before are not for this one, unless this one takes it over.
+        if (owner != userId && (from == null || owner != from)) edit.remove(CONFIRMS)
         if (mark == null) edit.remove(OWNER_MARK) else edit.putString(OWNER_MARK, mark)
-        if (mine.size != items.size) edit.putString(ITEMS, encodeAll(mine))
+        if (kept != items) edit.putString(ITEMS, encodeAll(kept))
         edit.commit()
     }
 

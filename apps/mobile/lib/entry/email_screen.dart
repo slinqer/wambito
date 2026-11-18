@@ -9,19 +9,24 @@ import '../api/session.dart';
 import '../home/home_controller.dart' show clockProvider;
 import '../home/wambi_face.dart';
 import '../l10n/app_localizations.dart';
+import '../merge/merge_controller.dart' show mergeControllerProvider;
+import '../merge/merge_offer.dart';
+import '../protect/protect_actions.dart' show afterClaim, keyAfterClaimMarksProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/web_text_field.dart';
+import '../vault/preview.dart' show isPreviewProvider;
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'auth_errors.dart';
 import 'code_formatter.dart';
 import 'code_input.dart';
 import 'guest_dialogs.dart';
 import 'sign_in_frame.dart';
 
-/// "Entrar con mi correo": the email, then the 6-digit code (the email also carries a magic link,
+/// "Ya tengo una cuenta" (I already have an account): the email, then the 6-digit code (the email also carries a magic link,
 /// handled by VerifyLinkScreen).
 ///
 /// On opening it also asks the phone for a passkey it can offer at once (one made on the web and
@@ -29,8 +34,15 @@ import 'sign_in_frame.dart';
 /// it completes; with none, nothing shows and the email field is ready. "Usar passkey" does the
 /// same on demand, with the provider's own picker.
 ///
+/// Signed out, "Sign in with my recovery key" opens the recovery-key sign-in (`/entry/recovery`).
+///
 /// For a signed-in guest, nothing is sent before the person decides: save their progress to the
 /// email (the claim, spec section 4.2), or, after a warning, sign in as another account.
+///
+/// A `preview` guest (phone-first spec 7): after the claim, the recovery key with no way out until
+/// it is saved, then the passkey offer (`afterClaim`); an email that has an account already offers
+/// the merge (`askMerge`), whose yes holds this phone's vault (`MergeController.begin`) and sends
+/// that email's code; backing out of that code calls the merge off.
 class EmailScreen extends ConsumerStatefulWidget {
   const EmailScreen({super.key, this.initialEmail, this.claim = false, this.passkeyLabel});
 
@@ -68,6 +80,9 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
 
   /// The person was warned and chose to leave the guest account behind.
   bool _replaceGuest = false;
+
+  /// The code step signs in to the email account a merge brings this phone's data into.
+  bool _merging = false;
   bool _busy = false;
 
   /// Checking the code (rather than sending one).
@@ -261,12 +276,64 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
       () => _session.claimEmail(email),
       (failure) => authErrorFor(failure, AuthAction.send),
     );
-    if (sent && mounted) _toCode(email, _Mode.claim, again: again);
+    if (!mounted) return;
+    if (sent) {
+      _toCode(email, _Mode.claim, again: again);
+    } else if (_error == AuthError.emailTaken && _previewGuest) {
+      await _offerMerge(email);
+    }
+  }
+
+  /// A `preview` guest: its data lives encrypted on this phone, and its claim is followed by the
+  /// recovery key and a merge offer (phone-first spec 7). A `plain` guest's flow is today's.
+  bool get _previewGuest => ref.read(sessionProvider).isGuest && ref.read(isPreviewProvider);
+
+  /// email_taken for a `preview` guest: "Bring this phone's data into it?". Yes holds this phone's
+  /// vault for the merge before anything is sent, then sends the email's code (the guest's session
+  /// is replaced only once the code is used); no leaves everything as it was.
+  Future<void> _offerMerge(String email) async {
+    if (!await askMerge(context, email) || !mounted) return;
+    final merge = ref.read(mergeControllerProvider.notifier);
+    var begun = false;
+    final sent = await _run(() async {
+      await merge.begin(email);
+      begun = true;
+      await _session.sendCode(email, replaceGuest: true);
+    }, (failure) => authErrorFor(failure, AuthAction.send));
+    if (!sent) {
+      // No code went out: the merge never started for the person, so its hold goes.
+      if (begun) await _cancelMerge();
+      return;
+    }
+    if (!mounted) return;
+    _merging = true;
+    _replaceGuest = true;
+    _toCode(email, _Mode.signIn, again: false);
+  }
+
+  /// Calls a begun merge off (before its sign-in only the hold goes): without it the hold would
+  /// keep this phone's vault, and the merge would wait, for good.
+  Future<void> _cancelMerge() async {
+    _merging = false;
+    try {
+      await ref.read(mergeControllerProvider.notifier).cancel();
+    } on Object catch (error) {
+      // The hold stays (the next start's resume picks the merge up again, waiting for the email's
+      // sign-in; only a cancel or a later begin clears it): the person is told it did not go.
+      if (mounted) {
+        setState(() {
+          _error = unexpectedErrorFor(error);
+          _errorIsPasskey = false;
+        });
+      }
+    }
   }
 
   /// After email_taken: that email has its own account; signing in to it leaves the guest behind.
+  /// A `preview` guest is offered the merge instead, which brings this phone's data along.
   Future<void> _signInInstead() async {
     final email = normalizeEmail(_email.text);
+    if (_previewGuest) return _offerMerge(email);
     if (!await confirmLeavingGuest(context, email) || !mounted) return;
     _replaceGuest = true;
     await _sendSignIn(email);
@@ -305,32 +372,71 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
     final code = _code.text.trim();
     if (code.isEmpty) return;
     setState(() => _verifying = true);
-    final ok = await _run(
-      () => _mode == _Mode.claim
-          ? _session.confirmClaim(_sentTo, code)
-          : _session.verifyCode(_sentTo, code, replaceGuest: _replaceGuest),
-      (failure) {
-        final error = authErrorFor(failure, AuthAction.signIn);
-        if (isCodeError(error)) _code.clear();
-        return error;
-      },
-    );
-    if (!mounted) return;
-    setState(() => _verifying = false);
-    if (ok) context.go('/');
+    final claim = _mode == _Mode.claim;
+    // A `preview` guest's claim goes on here after the email is set: the router keeps this screen
+    // while its recovery key and passkey offer come (`claimFinishingProvider`).
+    final finishing = claim && _previewGuest;
+    final claimFinishing = ref.read(claimFinishingProvider.notifier);
+    final keepCapturesOf = _merging ? ref.read(mergeControllerProvider.notifier).guestUserId : null;
+    // The recovery key this claim asks for is owed from now on, so a process killed on its page
+    // shows it again when the vault next opens (`KeyAfterClaimMarks`).
+    final userId = ref.read(vaultSessionProvider)?.userId;
+    if (finishing && userId != null) {
+      try {
+        await ref.read(keyAfterClaimMarksProvider).owe(userId);
+      } on Object {
+        // The claim's own key page still comes; only a kill on it would not bring it back.
+      }
+      if (!mounted) return;
+    }
+    if (finishing) claimFinishing.finishing = true;
+    try {
+      final ok = await _run(
+        () => claim
+            ? _session.confirmClaim(_sentTo, code)
+            : _session.verifyCode(
+                _sentTo,
+                code,
+                replaceGuest: _replaceGuest,
+                keepCapturesOf: keepCapturesOf,
+              ),
+        (failure) {
+          final error = authErrorFor(failure, AuthAction.signIn);
+          if (isCodeError(error)) _code.clear();
+          return error;
+        },
+      );
+      if (!mounted) return;
+      setState(() => _verifying = false);
+      if (!ok) return;
+      // Signed in to the merge's account: the merge goes on from its open vault (lib/merge).
+      _merging = false;
+      if (finishing) {
+        await afterClaim(context, ref);
+        claimFinishing.finishing = false;
+        if (!mounted) return;
+      }
+      context.go('/');
+    } finally {
+      if (finishing) claimFinishing.finishing = false;
+    }
   }
 
   void _resend() =>
       _mode == _Mode.claim ? _claim(_sentTo, again: true) : _sendSignIn(_sentTo, again: true);
 
-  void _changeEmail() => setState(() {
-    // A new email gets its own question (and warning) for a guest.
-    _replaceGuest = false;
-    _stage = _Stage.email;
-    _error = null;
-    _errorIsPasskey = false;
-    _resent = false;
-  });
+  void _changeEmail() {
+    setState(() {
+      // A new email gets its own question (and warning) for a guest.
+      _replaceGuest = false;
+      _stage = _Stage.email;
+      _error = null;
+      _errorIsPasskey = false;
+      _resent = false;
+    });
+    // Out of a merge's code: the merge is called off, and the guest stays as it was.
+    if (_merging) unawaited(_cancelMerge());
+  }
 
   /// The web's `w-full`.
   Widget _full(Widget child) => SizedBox(width: double.infinity, child: child);
@@ -422,6 +528,17 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
         ),
       ),
       EntryNote(l10n.signInFirstTime),
+      // Signed out only: a guest's session would be replaced (the route is signed-out only too).
+      if (ref.watch(sessionProvider).status == SessionStatus.signedOut)
+        _full(
+          PressButton.text(
+            l10n.entryUseRecoveryKey,
+            key: const Key('entry.useRecoveryKey'),
+            tone: PressTone.ghost,
+            link: true,
+            onPressed: _busy || _passkeyActive ? null : () => context.push('/entry/recovery'),
+          ),
+        ),
     ];
   }
 
