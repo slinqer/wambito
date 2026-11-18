@@ -34,6 +34,8 @@ Future<void> settleAll() async {
 Future<void> swipeLeft(WidgetTester tester, Finder row) async {
   await tester.timedDrag(row, const Offset(-300, 0), const Duration(milliseconds: 300));
   await tester.pumpAndSettle();
+  await tester.tap(find.text('BORRAR'));
+  await tester.pumpAndSettle();
 }
 
 Future<void> typeAmount(WidgetTester tester, String digits) async {

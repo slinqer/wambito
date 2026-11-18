@@ -22,6 +22,13 @@ Future<void> swipe(WidgetTester tester, Finder row, double dx, {int ms = 300}) a
   await tester.pumpAndSettle();
 }
 
+/// A delete: swipe [row] left, then tap Borrar (a swipe alone only opens it).
+Future<void> swipeDelete(WidgetTester tester, Finder row) async {
+  await swipe(tester, row, -250);
+  await tester.tap(find.text('BORRAR'));
+  await tester.pumpAndSettle();
+}
+
 /// Takes home off the screen, and lets Riverpod drop its state, so no timer outlives the test (two
 /// homes were shown in turn).
 Future<void> leave(WidgetTester tester) async {
@@ -185,12 +192,7 @@ void main() {
       final gate = Completer<void>();
       repo.holdSummary = gate;
 
-      await tester.timedDrag(
-        find.text('Café'),
-        const Offset(-250, 0),
-        const Duration(milliseconds: 300),
-      );
-      await tester.pumpAndSettle();
+      await swipeDelete(tester, find.text('Café'));
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       expect(find.text('Eliminado: Café'), findsOneWidget);
       expect(find.text('Deshacer'), findsOneWidget);
@@ -207,7 +209,7 @@ void main() {
       await pumpHome(tester, repo);
       final top = tester.getTopLeft(find.text('Café')).dy;
 
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsNothing);
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       expect(find.text('Eliminado: Café'), findsOneWidget);
@@ -229,7 +231,7 @@ void main() {
     testWidgets('after 8 s Deshacer is gone', (tester) async {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Deshacer'), findsOneWidget);
       await tester.pump(const Duration(seconds: 7));
       expect(find.text('Deshacer'), findsOneWidget);
@@ -243,7 +245,7 @@ void main() {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
       repo.failures['delete'] = const HomeFailure(500);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsOneWidget);
       expect(find.text('Algo salió mal. Inténtalo de nuevo en un momento.'), findsOneWidget);
       expect(find.text('Deshacer'), findsNothing);
@@ -354,11 +356,12 @@ void main() {
       expect(find.text('Café'), findsNothing);
     });
 
-    testWidgets('a flick deletes even after a short distance', (tester) async {
+    testWidgets('a flick left only opens Borrar, it deletes nothing', (tester) async {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
       await swipe(tester, find.text('Café'), -60, ms: 40);
-      expect(repo.deleted.map((t) => t.id), ['coffee']);
+      expect(find.text('BORRAR'), findsOneWidget);
+      expect(repo.deleted, isEmpty);
     });
 
     testWidgets('a swipe that is too small closes again', (tester) async {
@@ -377,7 +380,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsNothing);
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       await tester.tap(find.text('Deshacer'));
@@ -627,7 +630,7 @@ void main() {
         await tester.tap(findIcon(LkIconName.chevronLeft));
         await tester.pumpAndSettle();
         expect(find.text('Septiembre'), findsOneWidget);
-        await swipe(tester, find.text('Zapatos'), -250);
+        await swipeDelete(tester, find.text('Zapatos'));
         expect(find.text('Eliminado: Zapatos'), findsOneWidget);
 
         // The toast outlives the month: go on to August, and press Deshacer there.

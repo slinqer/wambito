@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:wambito/api/gen/wambito_api.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_repository.dart';
+import 'package:wambito/home/widget_pin.dart';
 import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/offline/pending_saves.dart';
 
@@ -252,4 +253,26 @@ class FakePendingSavesStore implements PendingSavesStore {
 
   @override
   Future<void> clear() async => value = null;
+}
+
+/// The launcher in memory. By default a widget is already on the home screen, so no test sees the
+/// card unless it asks for one.
+class FakeWidgetPin extends WidgetPin {
+  FakeWidgetPin({this.isInstalled = true, this.isSupported = true});
+
+  bool isInstalled;
+  bool isSupported;
+  int pins = 0;
+
+  @override
+  Future<bool> installed() async => isInstalled;
+
+  @override
+  Future<bool> supported() async => isSupported;
+
+  @override
+  Future<bool> pin() async {
+    pins++;
+    return isSupported;
+  }
 }

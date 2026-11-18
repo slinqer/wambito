@@ -5,15 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../api/auth_api.dart';
 import '../api/session.dart';
 import '../l10n/app_localizations.dart';
-import '../theme/tokens.g.dart';
-import '../ui/lk_icons.dart';
 import '../ui/press_button.dart';
 import 'auth_errors.dart';
 import 'sign_in_frame.dart';
 
-/// First run (spec section 6.1): Wambi on the web's sign-in frame, and three ways in: "Probar sin correo" (a guest),
-/// "Entrar con mi correo" (a code or magic link) and "Entrar con huella" (a passkey), the last only
-/// when the phone supports passkeys.
+/// First run (spec section 6.1): Wambi on the web's sign-in frame, and two ways in: "Probar sin correo" (a guest)
+/// and "Entrar con mi correo" (a code or magic link). The passkey lives on the email step: a brand-new
+/// person has none yet.
 class EntryScreen extends ConsumerStatefulWidget {
   const EntryScreen({super.key});
 
@@ -21,7 +19,7 @@ class EntryScreen extends ConsumerStatefulWidget {
   ConsumerState<EntryScreen> createState() => _EntryScreenState();
 }
 
-enum _Busy { none, guest, passkey }
+enum _Busy { none, guest }
 
 class _EntryScreenState extends ConsumerState<EntryScreen> {
   _Busy _busy = _Busy.none;
@@ -44,9 +42,7 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
       // Never an unhandled error with a busy button: a message, and the buttons work again.
       if (mounted) {
         setState(() {
-          _error = busy == _Busy.passkey
-              ? unexpectedPasskeyErrorFor(error)
-              : unexpectedErrorFor(error);
+          _error = unexpectedErrorFor(error);
         });
       }
     } finally {
@@ -60,20 +56,12 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
     (failure) => authErrorFor(failure, AuthAction.signIn),
   );
 
-  // Signed out here, so no guest stands in the way.
-  void _passkey() => _run(
-    _Busy.passkey,
-    () => ref.read(sessionProvider.notifier).signInWithPasskey(),
-    passkeyErrorFor,
-  );
-
   /// The web's `w-full`.
   Widget _full(Widget child) => SizedBox(width: double.infinity, child: child);
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final passkeys = ref.watch(passkeysSupportedProvider).value ?? false;
     final busy = _busy != _Busy.none;
     final error = _error;
 
@@ -92,35 +80,10 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
         ),
         EntryNote(l10n.entryGuestHint),
         _full(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: WambitoTokens.space3,
-            children: [
-              PressButton.text(
-                l10n.entryEmail,
-                key: const Key('entry.withEmail'),
-                onPressed: busy ? null : () => context.push('/entry/email'),
-              ),
-              if (passkeys)
-                PressButton(
-                  key: const Key('entry.passkey'),
-                  tone: PressTone.secondary,
-                  onPressed: busy ? null : _passkey,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: WambitoTokens.space2,
-                    children: [
-                      const FingerprintIcon(),
-                      Flexible(
-                        child: Text(
-                          (_busy == _Busy.passkey ? l10n.entryPasskeyBusy : l10n.entryPasskey)
-                              .toUpperCase(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+          PressButton.text(
+            l10n.entryEmail,
+            key: const Key('entry.withEmail'),
+            onPressed: busy ? null : () => context.push('/entry/email'),
           ),
         ),
         if (error != null) FieldError(error.message(l10n), textAlign: TextAlign.center),

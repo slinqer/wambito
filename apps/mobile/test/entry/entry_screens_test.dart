@@ -320,7 +320,9 @@ void main() {
       await small(tester);
       await pumpApp(tester, auth: auth, passkeys: FakePasskeys());
       expect(tester.takeException(), isNull);
-      await reachable(tester, find.byKey(const Key('entry.passkey')));
+      await reachable(tester, find.byKey(const Key('entry.withEmail')));
+      // The passkey is not here; the email step has it.
+      expect(find.byKey(const Key('entry.passkey')), findsNothing);
     });
 
     testWidgets('the email step, with a passkey and an error', (tester) async {

@@ -10,6 +10,7 @@ import 'package:wambito/feedback/feedback.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_repository.dart';
+import 'package:wambito/home/widget_pin.dart';
 import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/recurring/recurring_repository.dart';
 import 'package:wambito/review/review_repository.dart';
@@ -158,6 +159,8 @@ Future<SettingsEnv> pumpSettingsApp(
       FakeRecurringRepository(homeRepo ?? FakeHomeRepository()),
     ),
     widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+    // A widget is already on the home screen unless a test says otherwise.
+    widgetPinProvider.overrideWithValue(FakeWidgetPin()),
     homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
     assistantsRepositoryProvider.overrideWithValue(FakeAssistantsRepository()),
     widgetSnapshotWriterProvider.overrideWithValue(

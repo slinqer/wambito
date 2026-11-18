@@ -41,14 +41,6 @@
   "@entryEmail": {
     "description": "First run: sign in with an email code or magic link."
   },
-  "entryPasskey": "Entrar con huella",
-  "@entryPasskey": {
-    "description": "First run: sign in with a passkey. Shown only when the phone supports passkeys."
-  },
-  "entryPasskeyBusy": "Esperando tu huella…",
-  "@entryPasskeyBusy": {
-    "description": "While the phone's passkey prompt is open."
-  },
   "emailPasskey": "Usar passkey",
   "@emailPasskey": {
     "description": "Email screen: sign in with a passkey stored on the phone (made on the web too). Shown only when the phone supports passkeys."
@@ -1291,6 +1283,17 @@
   "settingsWidget": "Widget",
   "settingsHideAmount": "Ocultar el monto en el widget",
   "settingsHideAmountHint": "Muestra •••• en vez de lo que te queda.",
+  "widgetCardTitle": "Anota sin abrir la app",
+  "widgetCardBody": "Pon a Wambi en tu pantalla de inicio: un toque y anotas el gasto, o díselo en voz alta.",
+  "widgetCardAdd": "Añadir widget",
+  "widgetCardClose": "Ahora no",
+  "widgetStepsTitle": "Así añades el widget",
+  "widgetStep1": "Mantén presionado un espacio vacío de tu pantalla de inicio.",
+  "widgetStep2": "Toca «Widgets».",
+  "widgetStep3": "Busca Wambito y arrástralo a tu pantalla.",
+  "widgetStepsDone": "Entendido",
+  "settingsAddWidget": "Añadir widget",
+  "settingsAddWidgetHint": "Anota desde tu pantalla de inicio",
   "settingsVoice": "Voz",
   "settingsDeleteVoice": "Borrar los modelos de voz",
   "settingsDeleteVoiceHint": "Libera espacio en el teléfono. La próxima vez que dictes, te pedimos descargarlos otra vez.",

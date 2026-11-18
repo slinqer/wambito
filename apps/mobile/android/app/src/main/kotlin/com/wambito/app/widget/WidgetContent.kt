@@ -2,6 +2,7 @@ package com.wambito.app.widget
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,21 +45,36 @@ import es.antonborri.home_widget.HomeWidgetGlanceState
 import java.time.Instant
 import java.time.ZoneId
 
-/** The two widgets: small (2×1) and medium (4×2). */
-enum class WidgetSize { SMALL, MEDIUM }
+/**
+ * The layouts, by the box they get. Every one of them has both buttons, 🎤 and ＋, as a 4×1 once
+ * lost the 🎤: SMALL (under 220 dp wide, 2×1), ROW (wide and short, 4×1) and MEDIUM (4×2).
+ */
+enum class WidgetSize { SMALL, ROW, MEDIUM }
 
-/** The smallest box the medium layout fits: a little under 4×2's 250×110 dp, for launchers that round down. */
+/**
+ * The smallest box the medium layout fits: a little under 4×2's 250×110 dp (a 4×2 is about 110 dp
+ * tall, so the height stays at 100), for launchers that round down.
+ */
 private val mediumBox = DpSize(220.dp, 100.dp)
+
+/** The smallest box the row layout fits: as wide as the medium one, but 4×1 short. */
+private val rowBox = DpSize(220.dp, 40.dp)
 
 /**
  * Both widgets draw the layout that fits the box they really have, not the one they were added
  * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened.
  */
-val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), mediumBox))
+val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), DpSize(150.dp, 40.dp), rowBox, mediumBox))
 
-/** The layout for a box of [size]. */
-fun widgetSizeFor(size: DpSize): WidgetSize =
-    if (size.width >= mediumBox.width && size.height >= mediumBox.height) WidgetSize.MEDIUM else WidgetSize.SMALL
+/** The layout for a box of [size]: medium when it is wide and tall, row when only wide, else small. */
+fun widgetSizeFor(size: DpSize): WidgetSize = when {
+    size.width >= mediumBox.width && size.height >= mediumBox.height -> WidgetSize.MEDIUM
+    size.width >= rowBox.width -> WidgetSize.ROW
+    else -> WidgetSize.SMALL
+}
+
+/** Whether the small layout has room for the amount: from 150 dp wide; below it, only the buttons. */
+fun smallShowsAmount(size: DpSize): Boolean = size.width >= 150.dp
 
 /**
  * The colours the widget uses, from the app's tokens (lib/theme/tokens.g.dart, generated from
@@ -109,14 +125,21 @@ private fun openApp(): Action = linkAction(LaunchLinks.HOME)
 private fun linkAction(link: android.net.Uri): Action =
     actionStartActivity(LaunchLinks.intent(LocalContext.current, link))
 
-/** A round button: ＋ (filled) or 🎤 (outlined in brand, as on home). */
+/** A round button of [size]: ＋ (filled) or 🎤 (outlined in brand, as on home). */
 @Composable
-private fun RoundButton(icon: Int, label: String, filled: Boolean, theme: WidgetTheme, action: Action) {
+private fun RoundButton(
+    icon: Int,
+    label: String,
+    filled: Boolean,
+    theme: WidgetTheme,
+    action: Action,
+    size: Dp = 44.dp,
+) {
     val brand = WidgetPalette.color("brand", theme)
     Box(
         modifier = GlanceModifier
-            .size(44.dp)
-            .cornerRadius(22.dp)
+            .size(size)
+            .cornerRadius(size / 2)
             .background(if (filled) brand else WidgetPalette.color("stroke", theme))
             .semantics { contentDescription = label }
             .clickable(action),
@@ -125,7 +148,7 @@ private fun RoundButton(icon: Int, label: String, filled: Boolean, theme: Widget
         Image(
             provider = ImageProvider(icon),
             contentDescription = null,
-            modifier = GlanceModifier.size(24.dp),
+            modifier = GlanceModifier.size(size * 0.55f),
             colorFilter = ColorFilter.tint(if (filled) WidgetPalette.color("onBrand", theme) else brand),
         )
     }
@@ -195,37 +218,111 @@ private fun Stale(model: WidgetModel.Figures) {
     )
 }
 
-/** Small (2×1): "Te quedan" and ＋. */
+/** The ＋ and 🎤 pair, side by side, [size] dp each and [gap] apart. */
 @Composable
-fun SmallWidgetContent(model: WidgetModel) {
-    if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
-    model as WidgetModel.Figures
+private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
+    RoundButton(
+        icon = R.drawable.ic_widget_add,
+        label = model.addLabel,
+        filled = true,
+        theme = model.theme,
+        action = linkAction(LaunchLinks.ADD),
+        size = size,
+    )
+    Spacer(GlanceModifier.width(gap))
+    RoundButton(
+        icon = R.drawable.ic_widget_mic,
+        label = model.captureLabel,
+        filled = false,
+        theme = model.theme,
+        action = linkAction(LaunchLinks.CAPTURE),
+        size = size,
+    )
+}
+
+/**
+ * The amount alone on one line, ellipsized: for the boxes too short for a label above it. With
+ * [staleInDescription] (no room for the stale line) the stale text is read aloud with the amount.
+ */
+@Composable
+private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription: Boolean, modifier: GlanceModifier) {
+    val stale = model.stale.takeIf { staleInDescription }
+    val description = if (stale == null) {
+        model.amountDescription
+    } else {
+        listOf(model.amountDescription ?: model.amount, stale).joinToString(", ")
+    }
+    Text(
+        text = model.amount,
+        maxLines = 1,
+        modifier = description?.let { modifier.semantics { contentDescription = it } } ?: modifier,
+        style = TextStyle(
+            color = WidgetPalette.color("ink", model.theme),
+            fontSize = size.sp,
+            fontWeight = FontWeight.Bold,
+        ),
+    )
+}
+
+/**
+ * The shared one-line layout of small and row: the amount (when [showAmount]) with the stale line
+ * under it (when [staleLine]), then ＋ and 🎤. Without the amount the buttons are centred.
+ */
+@Composable
+private fun LineWidgetContent(
+    model: WidgetModel.Figures,
+    showAmount: Boolean,
+    staleLine: Boolean,
+    padding: Dp,
+    amountSize: Int,
+    buttonSize: Dp,
+    gap: Dp,
+) {
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(WidgetPalette.color("surface", model.theme))
             .cornerRadius(20.dp)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = padding, vertical = 2.dp)
             .clickable(openApp()),
+        horizontalAlignment = if (showAmount) Alignment.Start else Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = GlanceModifier.defaultWeight()) {
-            // Two lines for the label: "Gastado este mes" does not fit two cells on one.
-            Figure(model, amountSize = 20, labelLines = 2)
-            Stale(model)
+        if (showAmount) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                AmountLine(model, amountSize, staleInDescription = !staleLine, modifier = GlanceModifier)
+                if (staleLine) Stale(model)
+            }
+            Spacer(GlanceModifier.width(gap))
         }
-        Spacer(GlanceModifier.width(8.dp))
-        RoundButton(
-            icon = R.drawable.ic_widget_add,
-            label = model.addLabel,
-            filled = true,
-            theme = model.theme,
-            action = linkAction(LaunchLinks.ADD),
-        )
+        ButtonsRow(model, size = buttonSize, gap = gap)
     }
 }
 
-/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ and 🎤. */
+/**
+ * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 at 36 dp;
+ * no label, no room. Under 150 dp wide ([showAmount] false) only the two buttons.
+ */
+@Composable
+fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
+    if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
+    LineWidgetContent(
+        model as WidgetModel.Figures, showAmount, staleLine = false,
+        padding = 8.dp, amountSize = 14, buttonSize = 36.dp, gap = 4.dp,
+    )
+}
+
+/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 at 40 dp. */
+@Composable
+fun RowWidgetContent(model: WidgetModel) {
+    if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
+    LineWidgetContent(
+        model as WidgetModel.Figures, showAmount = true, staleLine = true,
+        padding = 14.dp, amountSize = 20, buttonSize = 40.dp, gap = 8.dp,
+    )
+}
+
+/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ and 🎤 (40 dp, so they fit 100 dp). */
 @Composable
 fun MediumWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = true)
@@ -237,7 +334,7 @@ fun MediumWidgetContent(model: WidgetModel) {
             .fillMaxSize()
             .background(WidgetPalette.color("surface", theme))
             .cornerRadius(20.dp)
-            .padding(12.dp)
+            .padding(8.dp)
             .clickable(openApp()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -284,14 +381,16 @@ fun MediumWidgetContent(model: WidgetModel) {
                 filled = true,
                 theme = theme,
                 action = linkAction(LaunchLinks.ADD),
+                size = 40.dp,
             )
-            Spacer(GlanceModifier.height(8.dp))
+            Spacer(GlanceModifier.height(4.dp))
             RoundButton(
                 icon = R.drawable.ic_widget_mic,
                 label = model.captureLabel,
                 filled = false,
                 theme = theme,
                 action = linkAction(LaunchLinks.CAPTURE),
+                size = 40.dp,
             )
         }
     }
@@ -301,7 +400,8 @@ fun MediumWidgetContent(model: WidgetModel) {
 @Composable
 fun SizedWidgetContent(model: WidgetModel) {
     when (widgetSizeFor(LocalSize.current)) {
-        WidgetSize.SMALL -> SmallWidgetContent(model)
+        WidgetSize.SMALL -> SmallWidgetContent(model, showAmount = smallShowsAmount(LocalSize.current))
+        WidgetSize.ROW -> RowWidgetContent(model)
         WidgetSize.MEDIUM -> MediumWidgetContent(model)
     }
 }
