@@ -16,7 +16,7 @@ import { NewTabHint } from "./NewTabHint.tsx";
 export function Hero() {
   const t = useTranslations("landing.hero");
   const { locale } = useLocale();
-  const app = appLinkProps(locale);
+  const app = appLinkProps(locale, "create");
   const demo = demoLinkProps(locale);
   return (
     <section id="hero" className="lk-landing-hero" aria-labelledby="hero-title">

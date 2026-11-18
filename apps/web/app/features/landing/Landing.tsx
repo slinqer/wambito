@@ -20,7 +20,7 @@ import "./landing.css";
 /**
  * A button label in two halves around Wambi, which read back as the label with a space between
  * them: after " ·" when there is one ("Muy pronto ·" / "Síguelo en GitHub"), else at the first
- * space ("Empieza" / "ahora").
+ * space ("Crear" / "cuenta").
  */
 export function seatHalves(label: string): [string, string] {
   const dot = label.indexOf(" · ");
@@ -32,15 +32,15 @@ export function seatHalves(label: string): [string, string] {
 
 /**
  * The last nudge: a big title, where Wambito comes from (or, before the app opens, that it is being
- * built in the open), and one big "Empieza ahora" with Wambi sitting in its middle, resting, eyes
- * closed (`docs/brand/wambi-resting.webp`): the label splits around him, "EMPIEZA · AHORA", and his
+ * built in the open), and one big "Crear cuenta" with Wambi sitting in its middle, resting, eyes
+ * closed (`docs/brand/wambi-resting.webp`): the label splits around him, "CREAR CUENTA", and his
  * legs hang in the gap. He is a picture on top of the button that lets the pointer through: the
  * whole button stays pressable under him, and its name is the label as it reads.
  */
 function Closing() {
   const t = useTranslations("landing");
   const { locale } = useLocale();
-  const app = appLinkProps(locale);
+  const app = appLinkProps(locale, "create");
   // Honest about where the app is: not open yet, or open to everyone.
   const closingBody = COMING_SOON ? "closing.body_soon" : "closing.body";
   const [before, after] = seatHalves(t(COMING_SOON ? "hero.cta_soon" : "hero.cta"));

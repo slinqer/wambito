@@ -456,6 +456,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (`build:landing`): landing + 404 for the Worker. `VITE_APP_URL` points the CTA at the app origin;
   `VITE_SITE_URL` sets canonical/sitemap (default `https://wambito.test`). The VPS builds with
   `WAMBITO_BUILD_DIR=build-personal`.
+- The landing's doors (`features/landing/links.ts`): `appLinkProps(locale, door, landingOnly?,
+  appOrigin?)` with `door` `"create"` (`/create-account?lang=`: the hero's and the closing's
+  primary "Crear cuenta" / "Create account" and the agent's "connect" button) or `"sign-in"`
+  (`/sign-in?lang=`: the header's "Entrar"); "Demo" stays beside the hero's primary. The same in
+  every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
+  (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
 
 ## Traps
 

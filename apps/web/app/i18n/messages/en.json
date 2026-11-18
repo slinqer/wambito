@@ -141,7 +141,7 @@
     "hero": {
       "headline": "Your <mark>money</mark>, finally clear.",
       "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
-      "cta": "Get started",
+      "cta": "Create account",
       "cta_soon": "Coming soon · Follow on GitHub",
       "cta_demo": "Demo"
     },

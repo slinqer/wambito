@@ -13,7 +13,7 @@ const ORIGIN = process.env.VITE_SITE_URL ?? "https://landing-only.example.test";
 const GITHUB = "https://github.com/slinqer/wambito";
 const CLIENT = fileURLToPath(new URL("../build/client/", import.meta.url));
 /** Anything that would lead to the app: sign-in, the app itself, the welcome flow, the demo. */
-const APP_PATH = /(^|\/)(sign-in|app|welcome|demo)(\/|\?|#|$)/;
+const APP_PATH = /(^|\/)(sign-in|create-account|app|welcome|demo)(\/|\?|#|$)/;
 
 const LOCALES = [
   {
@@ -28,7 +28,7 @@ const LOCALES = [
     closingBody:
       "Wambito está en construcción, en abierto. Mira cómo avanza en GitHub y prueba la app en cuanto abra.",
     oldClosing: /Crea tu cuenta/,
-    oldCtas: ["Empieza ahora", "Entrar", "Empezar"],
+    oldCtas: ["Empieza ahora", "Crear cuenta", "Entrar", "Empezar"],
     demoCta: "Demo",
     banned: [/\bjueg(o|a)\b/i],
     toggleToDay: "Cambiar a modo día",
@@ -45,7 +45,7 @@ const LOCALES = [
     closingBody:
       "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens.",
     oldClosing: /Create your account/,
-    oldCtas: ["Get started", "Sign in", "Start"],
+    oldCtas: ["Get started", "Create account", "Sign in", "Start"],
     demoCta: "Demo",
     banned: [/\bgames?\b/i],
     toggleToDay: "Switch to day mode",
@@ -309,7 +309,7 @@ for (const l of LOCALES) {
       expect(hrefs.length).toBeGreaterThan(5);
       expect(hrefs.filter((href) => APP_PATH.test(new URL(href, "http://x").pathname))).toEqual([]);
       const html = await (await request.get(l.path)).text();
-      expect(html).not.toMatch(/href="[^"]*\/(sign-in|app|welcome|demo)(["/?#])/);
+      expect(html).not.toMatch(/href="[^"]*\/(sign-in|create-account|app|welcome|demo)(["/?#])/);
     });
 
     test("the closing section tells the truth about the app, and keeps Wambi's spot", async ({
@@ -469,7 +469,7 @@ for (const l of LOCALES) {
       expect(hrefs.length).toBeGreaterThan(4);
       expect(hrefs.filter((href) => APP_PATH.test(new URL(href, "http://x").pathname))).toEqual([]);
       const html = await (await request.get(r.path)).text();
-      expect(html).not.toMatch(/href="[^"]*\/(sign-in|app|welcome|demo)(["/?#])/);
+      expect(html).not.toMatch(/href="[^"]*\/(sign-in|create-account|app|welcome|demo)(["/?#])/);
       const text = await page.locator("body").evaluate((body) => body.textContent ?? "");
       expect(text).toContain("Wambito");
       expect(text).not.toMatch(/Luk(?:itas)|\bLuk(?:as)\b/);

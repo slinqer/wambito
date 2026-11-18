@@ -18,7 +18,7 @@ export function SiteHeader({ page }: { page: SitePage }) {
   const t = useTranslations("landing.nav");
   const name = useTranslations("app")("name");
   const { locale } = useLocale();
-  const app = appLinkProps(locale);
+  const app = appLinkProps(locale, "sign-in");
   const home = page === "landing" ? "" : LANDING_PATH[locale];
   return (
     <header className="lk-landing-wrap">

@@ -8,7 +8,7 @@ export type PressLinkProps = {
 
 /**
  * A link that looks and presses like `PressButton` (`lk-btn`): for actions that go somewhere,
- * such as "Empieza ahora" → `/sign-in`. Same solid edge, focus ring and 44px minimum.
+ * such as "Crear cuenta" → `/create-account`. Same solid edge, focus ring and 44px minimum.
  */
 export function PressLink({
   variant = "primary",

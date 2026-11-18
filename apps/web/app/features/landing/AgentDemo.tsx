@@ -200,7 +200,7 @@ const ANSWERS: Record<Example, () => ReactNode> = {
 export function AgentDemo({ pace = 1 }: { pace?: number }) {
   const t = useTranslations("landing.agent");
   const { locale } = useLocale();
-  const app = appLinkProps(locale);
+  const app = appLinkProps(locale, "create");
   const { ref, index, phase } = useRotatingPlay(EXAMPLES.length, STEPS, HOLD, { pace });
   const example = EXAMPLES[index] ?? "uber";
   const Answer = ANSWERS[example];
