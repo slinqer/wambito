@@ -478,6 +478,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   and `docker` on the PATH; it runs on the desktop project only (one shared account; the file is skipped on the phone and
   its `beforeAll` returns there). CI seeds it
   too.
+- `e2e/signin.spec.ts` (serial, desktop only): the QR sign-in the phone approves, the recovery-key
+  sign-in and the unticked box (no cookie expiry, no `wambito-vault-*` once the cookie is gone).
+  Node plays the phone: `e2e/phone.ts` `approveSignin({ request, userId, code, recoveryKey })`
+  (the real `@wambito/crypto` over the API, with the session of the browser where the account was
+  born). Its account is a fresh web sign-up (born encrypted with `NEW_USERS_ENCRYPTED=true`), not
+  `preview-e2e`, so it never meets `vault.spec.ts`'s reseeds.
 - e2e trap: `pinClock`'s clock keeps running across a page load, while a new page's animation
   clock starts at zero, so a sheet (Motion) stays off-screen after a `goto` in a long-lived
   context for as long as the context had lived; long tests move with in-app links instead.
