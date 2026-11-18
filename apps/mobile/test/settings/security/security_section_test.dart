@@ -101,7 +101,7 @@ void main() {
     expect(find.textContaining('Could not read'), findsNothing);
   });
 
-  testWidgets('a preview guest sees devices, Remove and New recovery key', (t) async {
+  testWidgets('a preview guest sees devices, Remove, New recovery key and Change keys', (t) async {
     // Settings as a guest (no email) on an encrypted account: the full section, as with an email.
     final security = FakeSecurity();
     final env = await pumpSettingsApp(
@@ -127,6 +127,7 @@ void main() {
     expect(find.text('Firefox on Linux'), findsOneWidget);
     expect(find.byKey(const Key('security.remove.$laptopId')), findsOneWidget);
     expect(find.byKey(const Key('security.newKey')), findsOneWidget);
+    expect(find.byKey(const Key('security.changeKeys')), findsOneWidget);
     expect(find.byKey(const Key('security.approve')), findsOneWidget);
   });
 
@@ -139,7 +140,7 @@ void main() {
     },
   );
 
-  for (final key in ['security.newKey', 'security.remove.$laptopId']) {
+  for (final key in ['security.newKey', 'security.remove.$laptopId', 'security.changeKeys']) {
     testWidgets('a double tap on $key asks the lock once', (t) async {
       final lock = _SlowLock();
       await pumpSection(t, FakeSecurity(), lock);
@@ -182,14 +183,50 @@ void main() {
       expect(find.byKey(const Key('security.remove.key')), findsNothing);
     });
 
-    testWidgets('with the lock passed the choice sheet opens', (t) async {
+    testWidgets('with the lock passed the sheet opens; Remove deletes the wrap only', (t) async {
       final security = FakeSecurity();
       await pumpSection(t, security, FakeLock(LockCheck.passed));
       await tapKey(t, 'security.remove.$laptopId');
-      expect(find.byKey(const Key('security.remove.key')), findsOneWidget);
-      expect(find.byKey(const Key('security.remove.newKey')), findsOneWidget);
-      // asking is not removing: nothing was prepared
+      expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
+      expect(find.byKey(const Key('security.remove.key')), findsNothing);
+      // asking is not removing
       expect(security.calls, isEmpty);
+      final loads = security.loads;
+      await tapKey(t, 'security.remove.confirm');
+      expect(security.calls, ['removeDevice $laptopId']);
+      expect(find.text('Firefox on Linux no longer has access.'), findsOneWidget);
+      // a plain removal suggests nothing
+      expect(find.byKey(const Key('security.remove.changeKeys')), findsNothing);
+      // the list is read again
+      expect(security.loads, greaterThan(loads));
+    });
+  });
+
+  group('changing the keys', () {
+    testWidgets('a cancelled screen lock does nothing', (t) async {
+      final security = FakeSecurity();
+      final lock = FakeLock(LockCheck.cancelled);
+      await pumpSection(t, security, lock);
+      await tapKey(t, 'security.changeKeys');
+      expect(lock.reasons, ["Confirm it's you to change your keys"]);
+      expect(security.calls, isEmpty);
+      expect(find.byKey(const Key('security.changeKeys.key')), findsNothing);
+    });
+
+    testWidgets('with the lock passed it rotates with nothing removed', (t) async {
+      final security = FakeSecurity();
+      await pumpSection(t, security, FakeLock(LockCheck.passed));
+      await tapKey(t, 'security.changeKeys');
+      await t.enterText(find.byKey(const Key('security.changeKeys.key')), recoveryKeyText);
+      await t.pump();
+      await tapKey(t, 'security.changeKeys.confirm');
+      expect(security.calls, ['rotate remove= typed:$recoveryKeyText', 'commit', 'reloadKeys']);
+      expect(find.text('Your keys changed.'), findsOneWidget);
+      final loads = security.loads;
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      // the keys changed: the list is read again
+      expect(security.loads, greaterThan(loads));
     });
   });
 

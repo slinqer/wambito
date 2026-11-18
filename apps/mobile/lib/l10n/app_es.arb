@@ -2370,7 +2370,7 @@
   },
   "settingsSecurityUnreadableLead": "Se guardaron con una clave que este teléfono no tiene. Siguen a salvo tal como están.",
   "settingsSecurityMaybeSaved": "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.",
-  "settingsSecurityRemoveTitle": "¿Quitar {name}?",
+  "settingsSecurityRemoveTitle": "Quitar {name}",
   "@settingsSecurityRemoveTitle": {
     "description": "Remove-device sheet title.",
     "placeholders": {
@@ -2379,23 +2379,33 @@
       }
     }
   },
-  "settingsSecurityRemoveBody": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar. Los asistentes conectados se desconectan y hay que conectarlos otra vez.",
+  "settingsSecurityRemoveBody": "Este dispositivo dejará de entrar a tu cuenta y no recibirá nada nuevo.",
   "settingsSecurityKeyLabel": "Clave de recuperación",
-  "settingsSecurityRemoveConfirm": "Sí, quitarlo",
   "settingsSecurityRemoving": "Quitando…",
   "settingsSecurityOrNew": "¿No la tienes? Crea una clave de recuperación nueva",
   "settingsSecurityRotatedElsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
   "settingsSecurityTampered": "Detente: las claves nuevas no coinciden con las que tiene este teléfono, así que aquí no se cambió nada. Puede que alguien esté interfiriendo. No lo intentes de nuevo.",
   "settingsSecurityRemoveFailed": "No pudimos quitarlo. Inténtalo otra vez.",
-  "settingsSecurityDoneTitle": "Listo",
-  "settingsSecurityDoneLead": "{name} ya no puede abrir tus datos y se cerró su sesión.",
-  "@settingsSecurityDoneLead": {
-    "description": "Remove-device sheet, after removing.",
+  "settingsSecurityRemovedDone": "{name} ya no tiene acceso.",
+  "@settingsSecurityRemovedDone": {
+    "description": "Toast (or the done step from the sign-in notice) after a device was removed.",
     "placeholders": {
       "name": {
         "type": "String"
       }
     }
+  },
+  "settingsSecurityChangeKeys": "Cambiar llaves",
+  "@settingsSecurityChangeKeys": {
+    "description": "Settings → Security: the action, sheet title and button that rotate the encryption keys without removing a device."
+  },
+  "settingsSecurityChangeKeysBody": "Crea claves de cifrado nuevas para tus datos. Tus dispositivos siguen funcionando; los asistentes conectados se desconectan. Escribe tu clave de recuperación para confirmar.",
+  "settingsSecurityChanging": "Cambiando…",
+  "settingsSecurityChangeKeysDone": "Tus claves cambiaron.",
+  "settingsSecurityChangeKeysFailed": "No pudimos cambiar tus claves. Inténtalo otra vez.",
+  "settingsSecurityChangeKeysSuggest": "Si alguien más tuvo tu llave, cámbiala: lo que guardes desde ahora no lo podrá leer.",
+  "@settingsSecurityChangeKeysSuggest": {
+    "description": "Done step of a removal that came from the sign-in notice's \"That wasn't me\": suggests changing the keys."
   },
   "settingsSecurityDroppedLead": "También quedaron fuera:",
   "settingsSecurityDroppedItem": "{name} ({reason, select, removed {quitado ahora} revoked {quitado antes} other {sin verificar}})",
@@ -2447,6 +2457,10 @@
   "settingsSecurityLockNewKey": "Confirma que eres tú para crear una clave de recuperación nueva",
   "@settingsSecurityLockNewKey": {
     "description": "Reason shown by the phone's lock before a new recovery key."
+  },
+  "settingsSecurityLockChangeKeys": "Confirma que eres tú para cambiar tus claves",
+  "@settingsSecurityLockChangeKeys": {
+    "description": "Reason shown by the phone's lock before changing the keys."
   },
   "categoriesKindLabel": "Tipo",
   "@categoriesKindLabel": {

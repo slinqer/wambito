@@ -118,6 +118,15 @@ class FakeSecurity implements SecurityApi {
     );
   }
 
+  Object? removeFailure;
+
+  @override
+  Future<void> removeDevice(String id) async {
+    calls.add('removeDevice $id');
+    final failure = removeFailure;
+    if (failure != null) throw failure;
+  }
+
   @override
   Future<void> checkRecoveryKey(String text) async {
     calls.add('check $text');

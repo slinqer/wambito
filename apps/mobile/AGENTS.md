@@ -111,8 +111,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
   `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault;
   `holdOf` skips a vault whose `meta.hold` is set (or unreadable), see Traps).
-  `rotate.dart` = `rotate.ts` (`rotateKeys`: removing a device rotates the data key; this phone never removes
-  itself and its own wrap is always posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
+  `rotate.dart` = `rotate.ts` (`rotateKeys`: rotates the data key, which only "Change keys" does now (`remove: []`;
+  removing a device deletes its wrap and keeps the keys); this phone never removes itself and its own wrap is always
+  posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
   a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`); `rotate.dart` imports `keys.dart`,
   not the other way;
   `recovery_verifier.dart` holds the verifier hashes (pure crypto) and `keys.dart` `putRecoveryVerifier` sends them.
@@ -236,22 +237,28 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
-  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key"),
+  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key",
+  "Change keys" `security.changeKeys`),
   `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
   **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
   "They match" after a typed code or for a link-opened QR (ruling P18: any app can send the link, so it is
   unauthenticated intent; it also shows `signin.fromLink`); the host line is the trust signal, the label is quoted
   and muted; Approve is off for `signinApproveDelay` (1 s) after a request appears; a seal whose pickup cannot be
   seen shows "Sent"; through `SecurityApi.findSigninRequest`; registered in `openSigninApprovalsProvider` while
-  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
+  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (confirm only: `SecurityApi.removeDevice`
+  = `DELETE /v2/keys/{id}`, a 404 counts as removed, `offline`/`failed` keep the sheet; a toast "{name} no longer has access",
+  or, with `suggestChangeKeys`, a done step suggesting "Change keys"), `change_keys_sheet.dart` (`ChangeKeysSheet.open`: the
+  web's "Change keys", `rotate(remove: [])` with the typed key or a new one through `RecoverySetupPage`),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
   `signin_notice.dart` (phone-first spec 8.3, ruling 16): `newDevices`, `SeenDevicesStore` (`wambito.vault.<userId>.seenDevices`),
   `showSigninNotice`, and `SigninNoticeHost` (in `app.dart`'s `builder`, last of the start and resume hooks): with the vault Ready and
   home free it says "A session was opened on {label}" for any device wrap not this phone's and not in the last look, browsers and
   phones added by pairing alike, and the approving phone too (no special case: the first look records silently). "That wasn't me"
-  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device, or pushes `/settings` for several; "OK" and "That wasn't me"
+  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device (`suggestChangeKeys`: its done step opens
+  `ChangeKeysSheet`), or pushes `/settings` for several; "OK" and "That wasn't me"
   record the look, closing the sheet any other way does not. A `plain` account has no `SecurityApi`, so no `/v2/keys` call.
-  Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
+  Remove, "Change keys" and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes;
+  "Change keys" from a removal's done step rides on that removal's lock); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
   "Opens your data" per passkey, offers "Turn on" (`evaluatePrf` + `addPasskeyWrap`) and adds a new passkey with its wrap

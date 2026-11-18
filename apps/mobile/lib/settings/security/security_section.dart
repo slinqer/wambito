@@ -1,10 +1,11 @@
 // Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
 // (`preview`) account, with or without email (the same section for both): this phone and the other
 // devices that open the data (name, added date, "Not verified" when an attestation fails), each
-// other one with "Remove" (a key rotation, `RemoveDeviceSheet`); "Approve a new device"; "Sign in
-// on the web" (approving a browser's QR or code, `ApproveSigninScreen`, phone-first spec 8.1); "New
-// recovery key"; and how many records could not be read, when any. The sensitive steps (removing a
-// device, making a new key, showing it) ask the phone's screen lock first (spec 7.7, D17), which
+// other one with "Remove" (its wrap is deleted, the keys stay: `RemoveDeviceSheet`); "Approve a new
+// device"; "Sign in on the web" (approving a browser's QR or code, `ApproveSigninScreen`, phone-first
+// spec 8.1); "New recovery key"; "Change keys" (a rotation that removes no device, `ChangeKeysSheet`);
+// and how many records could not be read, when any. The sensitive steps (removing a device, making
+// a new key, showing it, changing the keys) ask the phone's screen lock first (spec 7.7, D17), which
 // replaces the web's passkey touch.
 import 'dart:async';
 
@@ -29,6 +30,7 @@ import '../passkeys_section.dart' show passkeyDay;
 import '../settings_parts.dart';
 import 'approve_device_screen.dart';
 import 'approve_signin_screen.dart';
+import 'change_keys_sheet.dart';
 import 'recovery_setup_page.dart';
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
@@ -94,6 +96,28 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         hasPasskeys: hasPasskeys,
         onChanged: _changed,
       );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// "Change keys" (the web's twin): the screen lock confirms, then the sheet rotates with nothing
+  /// removed (the typed recovery key, or a new one shown first). The keys are read again after,
+  /// whatever happened (a refusal may mean another device changed them).
+  Future<void> _changeKeys(SecurityApi security, bool hasPasskeys) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final l10n = AppLocalizations.of(context);
+      final ok = await confirmSensitive(
+        context,
+        ref,
+        reason: l10n.settingsSecurityLockChangeKeys,
+        checkRecoveryKey: security.checkRecoveryKey,
+      );
+      if (!ok || !mounted) return;
+      await ChangeKeysSheet.open(context, security: security, hasPasskeys: hasPasskeys);
+      _changed();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -316,6 +340,22 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
               key: const Key('security.newKey'),
               tone: PressTone.secondary,
               onPressed: _busy ? null : () => unawaited(_newKey(security)),
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: WambitoTokens.space2,
+          children: [
+            SettingLabel(
+              label: l10n.settingsSecurityChangeKeys,
+              hint: l10n.settingsSecurityChangeKeysBody,
+            ),
+            PressButton.text(
+              l10n.settingsSecurityChangeKeys,
+              key: const Key('security.changeKeys'),
+              tone: PressTone.secondary,
+              onPressed: _busy ? null : () => unawaited(_changeKeys(security, hasPasskeys)),
             ),
           ],
         ),

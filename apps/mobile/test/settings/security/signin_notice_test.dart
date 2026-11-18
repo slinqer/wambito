@@ -1,5 +1,6 @@
 // The sign-in notice (phone-first spec 8.3, ruling 16): what counts as a new device, the first
-// silent look, "OK", and "That wasn't me" (one device: its removal sheet; several: Settings).
+// silent look, "OK", and "That wasn't me" (one device: its removal sheet, then the suggestion to
+// change the keys; several: Settings).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -186,10 +187,35 @@ void main() {
     await _look(t);
     await t.tap(find.byKey(const Key('signinNotice.notMe')));
     await t.pumpAndSettle();
-    expect(find.text('Remove Firefox on Linux?'), findsOneWidget);
-    expect(find.byKey(const Key('security.remove.key')), findsOneWidget);
+    expect(find.text('Remove Firefox on Linux'), findsOneWidget);
+    expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
     // it was seen: the same device is not said again
     expect(store.ids, {ownId, laptopId});
+  });
+
+  testWidgets("That wasn't me removes the device, then suggests Change keys, which opens it", (
+    t,
+  ) async {
+    final store = _Store({ownId});
+    final security = FakeSecurity(_snapshot([_laptop]));
+    await _pump(t, security, store);
+    await _look(t);
+    await t.tap(find.byKey(const Key('signinNotice.notMe')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('security.remove.confirm')));
+    await t.pumpAndSettle();
+    // removed without a rotation, and the done step says what is left to do
+    expect(security.calls, ['removeDevice $laptopId']);
+    final handle = t.ensureSemantics();
+    expect(
+      find.bySemanticsLabel(RegExp('If someone else had your key, change it')),
+      findsOneWidget,
+    );
+    handle.dispose();
+    await t.tap(find.byKey(const Key('security.remove.changeKeys')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('security.changeKeys.key')), findsOneWidget);
+    expect(find.byKey(const Key('security.changeKeys.newKey')), findsOneWidget);
   });
 
   testWidgets('with two it opens Settings → Security', (t) async {
