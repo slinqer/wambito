@@ -104,6 +104,8 @@ export const settingsRecord = z
     onboardingCompletedAt: timestamp.nullable().default(null),
     /** Wrap ids of the devices removed from the vault; every rotation leaves them out. */
     revokedDevices: z.array(z.uuid()).default([]),
+    /** When a recovery key the person saw was saved (null: none shown yet). */
+    recoveryKeySavedAt: timestamp.nullable().default(null),
   })
   .loose();
 

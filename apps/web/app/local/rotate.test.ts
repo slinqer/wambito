@@ -223,6 +223,7 @@ async function account(revokedDevices: string[] = []) {
     timezone: "Europe/Madrid",
     onboardingCompletedAt: null,
     revokedDevices,
+    recoveryKeySavedAt: null,
   });
   store.close();
   clearHanded();

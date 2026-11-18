@@ -333,6 +333,7 @@ Future<void> _seedIfEmpty(SqliteStore store, VaultProfile profile) async {
       'timezone': profile.timezone,
       'onboardingCompletedAt': null,
       'revokedDevices': <Object?>[],
+      'recoveryKeySavedAt': null,
     });
     for (final (:id, :body) in categories) {
       await tx.put(RecordType.category, id, body);
