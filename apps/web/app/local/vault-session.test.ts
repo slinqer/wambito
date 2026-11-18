@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import { type LocalKeys, loadLocalKeys, prepareAccount, unlockWithRecovery } from "./keys.ts";
 import {
+  forgetOwnDeviceWrap,
   forgetVault,
   markRecoveryKeySaved,
   openVaultSession,
@@ -793,5 +794,49 @@ describe("a new key version this browser cannot verify", () => {
     );
     reopened.close();
     again.close();
+  });
+});
+
+describe("forgetOwnDeviceWrap", () => {
+  const withWrapId = async (userId: string, id: string | undefined) => {
+    const store = await createEncryptedStore(userId);
+    await store.setMeta("deviceWrapId", id);
+    store.close();
+  };
+
+  it("sends DELETE for the own wrap before the session ends", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    await openVaultSession({ profile, keys: await keys(), fresh: true, fetch: net.fetch });
+    await withWrapId(profile.id, "wrap_own");
+    await forgetOwnDeviceWrap({ fetch: net.fetch });
+    expect(net.live).toEqual(["DELETE /api/v2/keys/wrap_own"]);
+  });
+
+  it("does nothing without an active vault or without a deviceWrapId", async () => {
+    const net = fakeNetwork();
+    await forgetOwnDeviceWrap({ fetch: net.fetch });
+    const profile = profileOf();
+    await openVaultSession({ profile, keys: await keys(), fresh: true, fetch: net.fetch });
+    await withWrapId(profile.id, undefined);
+    await forgetOwnDeviceWrap({ fetch: net.fetch });
+    expect(net.live).toEqual([]);
+  });
+
+  it("a hanging or failing DELETE resolves within the timeout", async () => {
+    const net = fakeNetwork();
+    const profile = profileOf();
+    await openVaultSession({ profile, keys: await keys(), fresh: true, fetch: net.fetch });
+    await withWrapId(profile.id, "wrap_own");
+    const hanging = (() => new Promise<Response>(() => {})) as typeof globalThis.fetch;
+    const started = Date.now();
+    await expect(forgetOwnDeviceWrap({ fetch: hanging, timeoutMs: 50 })).resolves.toBeUndefined();
+    expect(Date.now() - started).toBeLessThan(1000);
+    const failing = (async () => json({ code: "boom" }, 500)) as typeof globalThis.fetch;
+    await expect(forgetOwnDeviceWrap({ fetch: failing })).resolves.toBeUndefined();
+    const offline = (async () => {
+      throw new TypeError("offline");
+    }) as typeof globalThis.fetch;
+    await expect(forgetOwnDeviceWrap({ fetch: offline })).resolves.toBeUndefined();
   });
 });

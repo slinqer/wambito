@@ -8,7 +8,7 @@ import {
 } from "@wambito/vault";
 import { isLocale, type Locale } from "../i18n/format.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
+import { api, forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
 
 /**
  * A preview account's open vault in this tab (stage 2a): the encrypted store, the local backend the
@@ -352,4 +352,42 @@ export async function forgetVault(): Promise<void> {
   active = null;
   current.session?.close();
   await forgetDevice(current.userId);
+}
+
+/**
+ * Right before sign-out: deletes this browser's own device wrap on the server (`DELETE
+ * /v2/keys/{id}`; for the caller's own wrap the session is not ended), so Settings > Devices does
+ * not keep a row for a browser that no longer holds the vault. Only with an open preview vault
+ * whose meta has `deviceWrapId`. Best effort and bounded by `timeoutMs` (default 3 s): it never
+ * rejects, and the sign-out goes on whatever happened.
+ */
+export async function forgetOwnDeviceWrap(
+  options: { timeoutMs?: number; fetch?: typeof globalThis.fetch } = {},
+): Promise<void> {
+  const current = active;
+  if (!current?.session) return;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve();
+    }, options.timeoutMs ?? 3000);
+  });
+  const attempt = (async () => {
+    const store = await createEncryptedStore(current.userId);
+    let id: string | undefined;
+    try {
+      id = await store.getMeta<string>("deviceWrapId");
+    } finally {
+      store.close();
+    }
+    if (!id) return;
+    await api({ userId: current.userId, fetch: options.fetch })(
+      `/v2/keys/${encodeURIComponent(id)}`,
+      { method: "DELETE", signal: controller.signal },
+    );
+  })().catch(() => undefined);
+  await Promise.race([attempt, timeout]);
+  clearTimeout(timer);
 }

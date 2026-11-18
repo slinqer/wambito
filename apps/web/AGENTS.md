@@ -246,6 +246,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` and `/v1/me/assistants*`
   (list, revoke) sent to the API; `LOCAL_UNAVAILABLE` (export, imports) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
+  `forgetOwnDeviceWrap()` runs first in `liveSignOut`: `DELETE /v2/keys/{meta deviceWrapId}` (best effort, 3 s, never rejects)
+  so Settings > Devices keeps no row for a signed-out browser.
   If the store closes under it (another tab), the session stops its sync, drops itself and calls
   `onClosed`; the gate then checks again (`gate.closed()`: reopen with kept keys, else Unlock).
   The local backend also serves `POST /v1/transactions/review` (all or nothing, 404 on an unknown
