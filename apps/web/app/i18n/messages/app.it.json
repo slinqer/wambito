@@ -889,8 +889,8 @@
     "wrap_failed": "È stato consentito, ma la sua chiave non è stata salvata, quindi per ora non può leggere nulla.",
     "try_again": "Riprova",
     "guest": {
-      "title": "Salva i tuoi progressi",
-      "body": "Per collegare un assistente, prima salva i tuoi progressi con la tua email: nell'app di Wambito, tocca «Salva i tuoi progressi». Poi collegalo di nuovo dal tuo assistente."
+      "title": "Prima aggiungi un'email",
+      "body": "Per collegare un assistente, il tuo account ha bisogno di un'email. Vai su Impostazioni → «Proteggi i tuoi dati» e tocca «Aggiungi un'email», nell'app o qui sul web. Poi collegalo di nuovo dal tuo assistente."
     },
     "expired": {
       "title": "Questo link non funziona più",

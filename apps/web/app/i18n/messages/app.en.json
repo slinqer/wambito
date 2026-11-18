@@ -889,8 +889,8 @@
     "wrap_failed": "It was allowed but its key wasn't saved, so it can't read anything yet.",
     "try_again": "Try again",
     "guest": {
-      "title": "Save your progress",
-      "body": "To connect an assistant, first save your progress with your email: in the Wambito app, tap “Save your progress”. Then connect it again from your assistant."
+      "title": "Add an email first",
+      "body": "To connect an assistant, your account needs an email. Go to Settings → “Protect your data” and tap “Add an email”, in the app or here on the web. Then connect it again from your assistant."
     },
     "expired": {
       "title": "This link no longer works",

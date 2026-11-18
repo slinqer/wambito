@@ -889,8 +889,8 @@
     "wrap_failed": "Foi permitido, mas a chave dele não foi guardada, por isso ainda não consegue ler nada.",
     "try_again": "Tentar de novo",
     "guest": {
-      "title": "Guarda o teu progresso",
-      "body": "Para ligar um assistente, guarda primeiro o teu progresso com o teu email: na app do Wambito, toca em «Guarda o teu progresso». Depois volta a ligá-lo a partir do teu assistente."
+      "title": "Primeiro adiciona um email",
+      "body": "Para ligar um assistente, a tua conta precisa de um email. Vai a Definições → «Protege os teus dados» e toca em «Adiciona um email», na app ou aqui na web. Depois volta a ligá-lo a partir do teu assistente."
     },
     "expired": {
       "title": "Esta ligação já não funciona",

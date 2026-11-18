@@ -889,8 +889,8 @@
     "wrap_failed": "Se permitió, pero su clave no se guardó, así que todavía no puede leer nada.",
     "try_again": "Reintentar",
     "guest": {
-      "title": "Guarda tu progreso",
-      "body": "Para conectar un asistente, primero guarda tu progreso con tu correo: en la app de Wambito, toca «Guarda tu progreso». Luego vuelve a conectarlo desde tu asistente."
+      "title": "Primero agrega un email",
+      "body": "Para conectar un asistente, tu cuenta necesita un email. Ve a Ajustes → «Protege tus datos» y toca «Agrega un email», en la app o aquí en la web. Luego vuelve a conectarlo desde tu asistente."
     },
     "expired": {
       "title": "Este enlace ya no sirve",
