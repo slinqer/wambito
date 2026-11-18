@@ -4444,5 +4444,42 @@
   "unprotectedProtectFirst": "Proteger mis datos primero",
   "@unprotectedProtectFirst": {
     "description": "The leaving warning's button that opens the recovery key."
+  },
+  "entryUseRecoveryKey": "Entrar con mi clave de recuperación",
+  "@entryUseRecoveryKey": {
+    "description": "Email screen: a link to sign in with the recovery key instead (opens the recovery-key sign-in)."
+  },
+  "recoverySignInTitle": "Entra con tu clave de recuperación",
+  "@recoverySignInTitle": {
+    "description": "Recovery-key sign-in: the title."
+  },
+  "recoverySignInLead": "Escríbela como la guardaste; mayúsculas, espacios y guiones dan igual. Con ella entras y abres tus datos en este teléfono.",
+  "@recoverySignInLead": {
+    "description": "Recovery-key sign-in: the lead."
+  },
+  "recoverySignInSubmit": "Entrar",
+  "@recoverySignInSubmit": {
+    "description": "Recovery-key sign-in: the submit button."
+  },
+  "recoverySignInBusy": "Entrando…",
+  "@recoverySignInBusy": {
+    "description": "Recovery-key sign-in: while signing in."
+  },
+  "recoverySignInUseEmail": "Usar mi correo",
+  "@recoverySignInUseEmail": {
+    "description": "Recovery-key sign-in: back to the email sign-in."
+  },
+  "errorRecoveryKeyInvalid": "Esa clave no abre ninguna cuenta. Revísala e inténtalo de nuevo.",
+  "@errorRecoveryKeyInvalid": {
+    "description": "Recovery-key sign-in: the key signs in to no account (the server's answer is the same whatever the reason)."
+  },
+  "recoverySignInWait": "{minutes, plural, =1{Demasiados intentos. Espera 1 minuto e inténtalo otra vez.} other{Demasiados intentos. Espera {minutes} minutos e inténtalo otra vez.}}",
+  "@recoverySignInWait": {
+    "description": "Recovery-key sign-in: too many tries (429); the minutes the server says to wait.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
   }
 }

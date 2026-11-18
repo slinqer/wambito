@@ -442,4 +442,57 @@ void main() {
       await expectLater(api.passkeySignInOptions(), throwsA(isA<AuthFailure>()));
     });
   });
+
+  group('recovery key sign-in', () {
+    final lookup = Uint8List.fromList(List.generate(16, (i) => i));
+    final auth = Uint8List.fromList(List.generate(32, (i) => 255 - i));
+
+    test('recoverySignIn posts base64url lookup and auth and returns set-auth-token', () async {
+      adapter.replies['POST /api/v2/recovery/sign-in'] = const _Reply(
+        200,
+        {'userId': 'u1'},
+        {
+          'set-auth-token': ['recovery.tok'],
+        },
+      );
+      expect(await api.recoverySignIn(lookup, auth), 'recovery.tok');
+      expect(last().uri.toString(), 'https://wambito.example/api/v2/recovery/sign-in');
+      expect(last().headers.containsKey('Authorization'), isFalse);
+      final body = adapter.bodies.last;
+      final sent = (body is String ? jsonDecode(body) : body) as Map;
+      expect(sent['lookup'], base64Url.encode(lookup).replaceAll('=', ''));
+      expect(sent['auth'], base64Url.encode(auth).replaceAll('=', ''));
+    });
+
+    test('401 recovery_key_invalid and 429 retry-after come back as AuthFailure', () async {
+      adapter.replies['POST /api/v2/recovery/sign-in'] = const _Reply(401, {
+        'type': 'about:blank',
+        'status': 401,
+        'code': 'recovery_key_invalid',
+      });
+      await expectLater(
+        api.recoverySignIn(lookup, auth),
+        throwsA(
+          isA<AuthFailure>()
+              .having((f) => f.code, 'code', 'recovery_key_invalid')
+              .having((f) => f.status, 'status', 401),
+        ),
+      );
+      adapter.replies['POST /api/v2/recovery/sign-in'] = const _Reply(
+        429,
+        {'type': 'about:blank', 'status': 429, 'code': 'too_many_requests'},
+        {
+          'retry-after': ['600'],
+        },
+      );
+      await expectLater(
+        api.recoverySignIn(lookup, auth),
+        throwsA(
+          isA<AuthFailure>()
+              .having((f) => f.status, 'status', 429)
+              .having((f) => f.retryAfter, 'retryAfter', 600),
+        ),
+      );
+    });
+  });
 }

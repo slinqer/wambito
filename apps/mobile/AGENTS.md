@@ -163,7 +163,16 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `error`, `offline`, `unsupported`; `PairingFrom` only `unlock`), while `prepareAccount(guest: isAnonymous)` still
   sets an account without email up with no key shown. The welcome (`lib/entry/entry_screen.dart`) is Wambi,
   "Start" (`entry.start`, `POST /auth/sign-in/anonymous`) and "I already have an account" (`entry.haveAccount`, a
-  link to `/entry/email`). The other side of a pairing is
+  link to `/entry/email`). Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
+  (`lib/entry/recovery_sign_in_screen.dart`, route `/entry/recovery`, signed out only; keys `recovery.input`,
+  `recovery.submit`): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
+  (`keysParseRecoveryKey`; one that does not parse is `bad_recovery_key`, nothing sent), posts only `recoveryVerifier`'s
+  `lookup`/`auth` (`AuthApi.recoverySignIn`, zeroed once sent; 401 `recovery_key_invalid`, 429 `retryAfter`), then
+  holds the parsed 16 bytes in `signInRecoveryKeyProvider` (`SignInRecoveryKey`: memory only, one take, zeroed by a
+  failed sign-in, a sign-out or an expiry; never a `String`). The gate takes it at every check
+  (`VaultGateDeps.takeSignInRecoverySecret`) and tries it once through `keys.unlockWithRecoverySecret` on an account
+  with wraps and no keys here, before Unlock, zeroing it either way; a failure shows `Unlock(error: …)`. Opened that
+  way, the vault marks `recoveryKeySavedAt` when it was null. The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
   "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
   code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,

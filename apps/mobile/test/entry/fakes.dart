@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -210,6 +211,22 @@ class FakeAuthApi implements AuthApi {
 
   /// When a passkey registered through [passkeyRegister] counts as made.
   DateTime? registeredAt;
+
+  /// What `POST /v2/recovery/sign-in` received, copied (the session zeroes its own bytes).
+  final recoverySignIns = <({Uint8List lookup, Uint8List auth})>[];
+
+  /// Whether the account the recovery key signs in to is one without an email.
+  bool recoveryBelongsToGuest = false;
+
+  @override
+  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth) async {
+    calls.add('recoverySignIn');
+    recoverySignIns.add((lookup: Uint8List.fromList(lookup), auth: Uint8List.fromList(auth)));
+    _fail('recoverySignIn');
+    final token = _newToken('recovery');
+    guests[token] = recoveryBelongsToGuest;
+    return token;
+  }
 
   @override
   Future<void> signOut(String token) async {

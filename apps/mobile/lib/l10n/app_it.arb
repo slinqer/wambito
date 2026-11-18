@@ -983,5 +983,13 @@
   "unprotectedServerTitle": "Cambiare server senza una via di ritorno?",
   "unprotectedServerBody": "Non hai salvato una chiave di recupero. Cambiare server ti fa uscire e cancella i tuoi dati da questo telefono, e nessuno potrà riaprirli.",
   "unprotectedPasskeyUnknown": "Non abbiamo potuto controllare le tue passkey perché non c'è connessione. Se ne hai già aggiunta una, puoi usarla per tornare.",
-  "unprotectedProtectFirst": "Proteggi prima i miei dati"
+  "unprotectedProtectFirst": "Proteggi prima i miei dati",
+  "entryUseRecoveryKey": "Entra con la mia chiave di recupero",
+  "recoverySignInTitle": "Entra con la tua chiave di recupero",
+  "recoverySignInLead": "Scrivila come l'hai salvata; maiuscole, spazi e trattini non contano. Con lei entri e apri i tuoi dati su questo telefono.",
+  "recoverySignInSubmit": "Entra",
+  "recoverySignInBusy": "Entro…",
+  "recoverySignInUseEmail": "Usa la mia email",
+  "errorRecoveryKeyInvalid": "Questa chiave non apre nessun account. Controllala e riprova.",
+  "recoverySignInWait": "{minutes, plural, =1{Troppi tentativi. Aspetta 1 minuto e riprova.} other{Troppi tentativi. Aspetta {minutes} minuti e riprova.}}"
 }

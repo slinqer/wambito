@@ -983,5 +983,13 @@
   "unprotectedServerTitle": "Mudar de servidor sem caminho de volta?",
   "unprotectedServerBody": "Não guardaste uma chave de recuperação. Mudar de servidor termina a tua sessão e apaga os teus dados deste telemóvel, e ninguém os poderá abrir de novo.",
   "unprotectedPasskeyUnknown": "Não conseguimos verificar as tuas passkeys porque não há ligação. Se já adicionaste uma, podes usá-la para voltar.",
-  "unprotectedProtectFirst": "Proteger primeiro os meus dados"
+  "unprotectedProtectFirst": "Proteger primeiro os meus dados",
+  "entryUseRecoveryKey": "Entrar com a minha chave de recuperação",
+  "recoverySignInTitle": "Entra com a tua chave de recuperação",
+  "recoverySignInLead": "Escreve-a como a guardaste; maiúsculas, espaços e hífenes não importam. Com ela entras e abres os teus dados neste telemóvel.",
+  "recoverySignInSubmit": "Entrar",
+  "recoverySignInBusy": "A entrar…",
+  "recoverySignInUseEmail": "Usar o meu email",
+  "errorRecoveryKeyInvalid": "Essa chave não abre nenhuma conta. Verifica-a e tenta outra vez.",
+  "recoverySignInWait": "{minutes, plural, =0{Demasiadas tentativas. Tenta outra vez.} =1{Demasiadas tentativas. Espera 1 minuto e tenta outra vez.} other{Demasiadas tentativas. Espera {minutes} minutos e tenta outra vez.}}"
 }

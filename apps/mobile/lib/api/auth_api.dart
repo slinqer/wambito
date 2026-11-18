@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -128,6 +129,11 @@ abstract interface class AuthApi {
 
   /// Adds the phone's new passkey ([responseJson]) to the user behind [token].
   Future<void> passkeyRegister(String token, PasskeyChallenge challenge, String responseJson);
+
+  /// Signs in with the recovery key (`POST /v2/recovery/sign-in`): [lookup] (16 bytes) and [auth]
+  /// (32 bytes) are what the key derives (`recoveryVerifier`), never the key itself. A key that
+  /// signs in nothing is 401 `recovery_key_invalid`; too many tries, 429 with `retryAfter`.
+  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth);
 
   /// Ends the session on the server (best effort).
   Future<void> signOut(String token);
@@ -397,6 +403,21 @@ class HttpAuthApi implements AuthApi {
           token: token,
         );
       });
+
+  @override
+  Future<String> recoverySignIn(Uint8List lookup, Uint8List auth) => _settle(() async {
+    final response = await _api.recoverySignIn(
+      recoverySignIn: RecoverySignIn(
+        (b) => b
+          ..lookup = _base64Url(lookup)
+          ..auth = _base64Url(auth),
+      ),
+    );
+    return _token(response);
+  });
+
+  /// Unpadded base64url, as the API reads bytes.
+  static String _base64Url(Uint8List bytes) => base64Url.encode(bytes).replaceAll('=', '');
 
   @override
   Future<void> signOut(String token) => _settle(() async {

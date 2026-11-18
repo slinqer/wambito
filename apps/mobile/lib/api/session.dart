@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../capture_auto/capture_platform.dart';
+import '../crypto/recovery.dart' show recoveryVerifier;
 import '../home/home_cache.dart';
 import '../home/widget_sync.dart';
+import '../local/keys.dart' show keysParseRecoveryKey;
 import '../offline/pending_saves.dart';
 import '../storage/secure_storage.dart';
 import 'auth_api.dart';
@@ -434,6 +436,58 @@ class SessionController extends Notifier<SessionState> {
     await _signedIn(token, guest: guest, onboardingPending: pending, userId: userId);
   }
 
+  /// "Use my recovery key": signs in with the typed key (`POST /v2/recovery/sign-in`), then holds
+  /// it, as its 16 parsed bytes, for the vault gate, which opens the account's data with it without
+  /// asking again (ruling 6). The text is parsed as Unlock parses it (lower case, spaces, dashes, O
+  /// for 0): one that does not parse is `AuthFailure(code: 'bad_recovery_key', status: 400)` and
+  /// nothing is sent. Only what the key derives (`lookup`, `auth`) leaves the phone, and it is
+  /// zeroed once sent; the secret is zeroed on any failure, and is never kept as text nor written.
+  /// Guarded like [sendCode].
+  Future<void> signInWithRecoveryKey(String text) async {
+    await ready;
+    _guardGuest(false);
+    final Uint8List secret;
+    try {
+      secret = keysParseRecoveryKey(text);
+    } on Object {
+      throw const AuthFailure(code: 'bad_recovery_key', status: 400);
+    }
+    final held = ref.read(signInRecoveryKeyProvider);
+    var handedOver = false;
+    try {
+      final String token;
+      final verifier = await recoveryVerifier(secret);
+      try {
+        token = await _auth.recoverySignIn(verifier.lookup, verifier.auth);
+      } finally {
+        verifier.lookup.fillRange(0, verifier.lookup.length, 0);
+        verifier.auth.fillRange(0, verifier.auth.length, 0);
+      }
+      // The account may have no email: if the server cannot say, a guest (the safe side), and the
+      // vault asks for the key, since the phone cannot tell whose it is.
+      final standing = await _standing(token);
+      final userId = standing?.userId;
+      // Held before the session changes: the gate that the new session starts takes it.
+      if (userId != null) {
+        held.hold(userId, secret);
+        handedOver = true;
+      }
+      await _signedIn(
+        token,
+        guest: standing?.guest ?? true,
+        onboardingPending: standing?.onboardingPending ?? false,
+        onboardingKnown: standing != null,
+        userId: userId,
+      );
+    } on Object {
+      if (handedOver) held.clear();
+      handedOver = false;
+      rethrow;
+    } finally {
+      if (!handedOver) secret.fillRange(0, secret.length, 0);
+    }
+  }
+
   /// Adds a passkey on this phone to the signed-in user, a guest included (spec section 4.3).
   Future<void> registerPasskey() async {
     await ready;
@@ -460,6 +514,7 @@ class SessionController extends Notifier<SessionState> {
         // whatever went wrong there, the session is forgotten here all the same.
       }
     }
+    ref.read(signInRecoveryKeyProvider).clear();
     await _forgetVault();
     await _forgetWidget();
     _forgetCaptures();
@@ -480,6 +535,7 @@ class SessionController extends Notifier<SessionState> {
     await ready;
     final stored = state.stored?.token;
     if (stored == null || (token != null && token != stored)) return;
+    ref.read(signInRecoveryKeyProvider).clear();
     await _forgetWidget();
     // A sign-in meanwhile (another token) is not undone.
     if (state.stored?.token != stored) return;
@@ -495,6 +551,7 @@ class SessionController extends Notifier<SessionState> {
   /// the next start.
   Future<void> accountDeleted() async {
     await ready;
+    ref.read(signInRecoveryKeyProvider).clear();
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
     await _forgetVault();
@@ -568,6 +625,49 @@ class SessionController extends Notifier<SessionState> {
     await ref.read(widgetSyncProvider).signedOut().timeout(widgetWait, onTimeout: () {});
   }
 }
+
+/// The recovery key typed at sign-in, held in memory for the vault gate (ruling 6): the parsed
+/// 16-byte secret, never text, never written. One take: [take] hands it over once, to the gate of
+/// the account it signed in to, which zeroes it after its one try; another account's take gets
+/// nothing and the secret is zeroed. A new [hold] or [clear] (a sign-out) zeroes the one held.
+class SignInRecoveryKey {
+  String? _userId;
+  Uint8List? _secret;
+
+  void hold(String userId, Uint8List secret) {
+    if (!identical(_secret, secret)) clear();
+    _userId = userId;
+    _secret = secret;
+  }
+
+  /// The held secret when it is [userId]'s, else null; nothing is held afterwards either way. The
+  /// caller owns what it gets and zeroes it.
+  Uint8List? take(String userId) {
+    final secret = _secret;
+    final owner = _userId;
+    _secret = null;
+    _userId = null;
+    if (secret == null) return null;
+    if (owner == userId) return secret;
+    secret.fillRange(0, secret.length, 0);
+    return null;
+  }
+
+  /// Zeroes and drops a held secret.
+  void clear() {
+    final secret = _secret;
+    _secret = null;
+    _userId = null;
+    secret?.fillRange(0, secret.length, 0);
+  }
+}
+
+/// The app's [SignInRecoveryKey] (memory only).
+final signInRecoveryKeyProvider = Provider<SignInRecoveryKey>((ref) {
+  final held = SignInRecoveryKey();
+  ref.onDispose(held.clear);
+  return held;
+});
 
 final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 

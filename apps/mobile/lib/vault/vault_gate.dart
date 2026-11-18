@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import '../local/keys_error.dart';
 import '../local/prf.dart';
@@ -16,7 +17,8 @@ import '../local/vault_session.dart' show VaultOpenError;
 ///        └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
 ///                                │     └─ "Add this phone from another device" ─▶ pairing
 ///                                │                                  └─ finish() ─▶ opening
-///                                └─ the sign-in's passkey PRF opens a wrap ─▶ opening
+///                                ├─ the sign-in's passkey PRF opens a wrap ─▶ opening
+///                                └─ the sign-in's recovery key opens its wrap ─▶ opening
 ///
 /// Every account with wraps elsewhere gets Unlock, with or without email (an anonymous one, which
 /// may have saved no recovery key, opens through pairing there). There is no guest branch.
@@ -34,6 +36,12 @@ import '../local/vault_session.dart' show VaultOpenError;
 /// wrap for that credential. Unlock's "Use a passkey" touches a passkey for its PRF
 /// ([VaultGateDeps.evaluatePrf]); one without a wrap is kept the same way. A known phone zeroes
 /// the stash. Every PRF is zeroed once used.
+///
+/// Recovery-key sign-in: the key typed to sign in, held as its parsed bytes
+/// ([VaultGateDeps.takeSignInRecoverySecret]), is taken at every check and tried once on an account
+/// with wraps and no keys here, before Unlock; it is zeroed after that attempt, and at once when it
+/// is not needed (keys on this phone, another session, an account without wraps). When it opens
+/// nothing, Unlock shows with its code ([Unlock.error]).
 ///
 /// A phone removed from the account by another device ([removed], from the session's `onRemoved`:
 /// its vault is already deleted) shows Unlock with the `removed` notice.
@@ -118,7 +126,7 @@ final class Committing<S> extends VaultGateState<S> {
 }
 
 final class Unlock<S> extends VaultGateState<S> {
-  const Unlock({this.notice});
+  const Unlock({this.notice, this.error});
 
   /// This phone was removed from the account (its vault is gone).
   static const removed = 'removed';
@@ -129,17 +137,22 @@ final class Unlock<S> extends VaultGateState<S> {
   /// [removed], [unverified] or null.
   final String? notice;
 
+  /// Why the recovery key held from the sign-in did not open the data (one of [unlockErrors]), shown
+  /// as the field's error; null otherwise.
+  final String? error;
+
   @override
   String get status => 'unlock';
 
   @override
-  bool operator ==(Object other) => other is Unlock && other.notice == notice;
+  bool operator ==(Object other) =>
+      other is Unlock && other.notice == notice && other.error == error;
 
   @override
-  int get hashCode => Object.hash(status, notice);
+  int get hashCode => Object.hash(status, notice, error);
 
   @override
-  String toString() => 'Unlock(notice: $notice)';
+  String toString() => 'Unlock(notice: $notice, error: $error)';
 }
 
 /// Where the person came from to pair: Unlock.
@@ -270,6 +283,8 @@ class VaultGateDeps<K, S> {
     this.evaluatePrf,
     this.accountPasskeyIds,
     this.startPairing,
+    this.takeSignInRecoverySecret,
+    this.unlockWithRecoverySecret,
   });
 
   /// The keys this phone kept, or null.
@@ -312,6 +327,14 @@ class VaultGateDeps<K, S> {
 
   /// Asks the relay for a pairing request; another unlocked device approves it.
   final Future<GatePairing<K>> Function()? startPairing;
+
+  /// The recovery key typed at sign-in (its 16 parsed bytes), once, when it is this account's; else
+  /// null. The gate owns what it gets and zeroes it after its one try.
+  final Uint8List? Function()? takeSignInRecoverySecret;
+
+  /// Opens the recovery wrap with that secret; throws `wrong_recovery_key` when it opens nothing.
+  /// The caller (the gate) zeroes the secret.
+  final Future<K> Function(Uint8List secret)? unlockWithRecoverySecret;
 }
 
 /// The codes Unlock shows; anything else is `server`.
@@ -348,6 +371,8 @@ String _unlockError(Object? error) {
 }
 
 void _zero(PasskeyPrf passkey) => passkey.prf.fillRange(0, passkey.prf.length, 0);
+
+void _zeroBytes(Uint8List? bytes) => bytes?.fillRange(0, bytes.length, 0);
 
 /// The result of trying a passkey: the keys, or why not.
 typedef _Tried<K> = ({K? keys, Object? error});
@@ -560,14 +585,18 @@ class VaultGate<K, S> {
       return;
     }
     final stashed = _deps.takeSignInPrf?.call();
+    // Taken here whatever happens next, so a secret never outlives this check.
+    final recoverySecret = _deps.takeSignInRecoverySecret?.call();
     if (keys != null) {
       if (stashed != null) _zero(stashed);
+      _zeroBytes(recoverySecret);
       return _open(keys, false);
     }
     if (stashed != null) _keepPending(stashed);
     // Never make keys for an account that is no longer the signed-in one (nor keep its PRF).
     if (!await _sameSession()) {
       _keepPending(null);
+      _zeroBytes(recoverySecret);
       return;
     }
     final GatePrepared<K> prepared;
@@ -575,6 +604,10 @@ class VaultGate<K, S> {
       prepared = await _deps.prepareAccount();
     } on Object catch (error) {
       final code = gateErrorCode(error);
+      if (code == 'already_set_up' && recoverySecret != null) {
+        return _tryRecoverySecret(recoverySecret);
+      }
+      _zeroBytes(recoverySecret);
       if (code == 'already_set_up') {
         final passkey = _pendingPasskey;
         if (passkey != null) {
@@ -594,10 +627,38 @@ class VaultGate<K, S> {
       }
       return;
     }
+    // An account without wraps: no recovery wrap for the held key to open.
+    _zeroBytes(recoverySecret);
     _prepared = prepared;
     final recoveryKey = prepared.recoveryKey;
     if (recoveryKey == null) return _commit();
     _set(Setup(recoveryKey));
+  }
+
+  /// The recovery key typed at sign-in, tried once on the account's recovery wrap and zeroed after
+  /// the attempt, whatever its outcome: it opens like Unlock's recovery key, and a failure shows
+  /// Unlock with its code (the person types the key there, or uses another way).
+  Future<void> _tryRecoverySecret(Uint8List secret) async {
+    final unlock = _deps.unlockWithRecoverySecret;
+    final K keys;
+    try {
+      if (unlock == null) throw const GateError('wrong_recovery_key');
+      keys = await unlock(secret);
+    } on Object catch (error) {
+      _zeroBytes(secret);
+      switch (gateErrorCode(error)) {
+        case 'session_changed':
+          return _changed(error, _check);
+        case 'unsupported_browser':
+          return _lock(error, _check);
+      }
+      _prepared = null;
+      _set(Unlock(error: _unlockError(error)));
+      return;
+    }
+    _zeroBytes(secret);
+    await _wrapPending();
+    await _open(keys, true);
   }
 
   Future<void> _commit() async {

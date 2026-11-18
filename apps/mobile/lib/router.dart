@@ -7,6 +7,7 @@ import 'api/session.dart';
 import 'entry/email_screen.dart';
 import 'entry/passkey_offer_page.dart';
 import 'entry/entry_screen.dart';
+import 'entry/recovery_sign_in_screen.dart';
 import 'entry/verify_link_screen.dart';
 import 'budgets/category_detail_screen.dart';
 import 'debug/prf_probe_screen.dart';
@@ -57,8 +58,8 @@ VaultRoute vaultRouteOf(Ref ref) {
 /// Where the session sends a [location], or null to stay:
 /// - the magic link (`/auth/verify`) always opens: it decides for itself, guests included;
 /// - while the stored session is read, a blank screen;
-/// - signed out, only the entry screens;
-/// - signed in, never the first-run screen, and the email screen and "Guarda tu progreso" only for
+/// - signed out, only the entry screens (the recovery-key sign-in too);
+/// - signed in, never the first-run screen nor the recovery-key sign-in, and the email screen and "Guarda tu progreso" only for
 ///   a guest (to save their progress, or to sign in as another account after a warning);
 /// - signed in with the welcome to do (an account with no `onboardingCompletedAt`), the welcome from
 ///   every other screen, as the web's `requireOnboarded`; and nothing else but the welcome, which
@@ -75,7 +76,9 @@ String? sessionRedirect(SessionState session, Uri location, {VaultRoute vault = 
     case SessionStatus.loading:
       return path == '/loading' ? null : '/loading';
     case SessionStatus.signedOut:
-      return path == '/entry' || path == '/entry/email' ? null : '/entry';
+      return path == '/entry' || path == '/entry/email' || path == '/entry/recovery'
+          ? null
+          : '/entry';
     case SessionStatus.signedIn:
       final vaultOnly =
           !(path == '/entry' || path.startsWith('/entry/') || path.startsWith('/debug/'));
@@ -101,7 +104,7 @@ String? sessionRedirect(SessionState session, Uri location, {VaultRoute vault = 
         return inWelcome ? null : '/welcome';
       }
       if (inWelcome) return '/';
-      if (path == '/loading' || path == '/entry') return '/';
+      if (path == '/loading' || path == '/entry' || path == '/entry/recovery') return '/';
       if ((path == '/entry/email' || path == '/progress') && !session.isGuest) return '/';
       return null;
   }
@@ -213,6 +216,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           claim: state.uri.queryParameters['claim'] == '1',
         ),
       ),
+      // The recovery-key sign-in: signed out only.
+      GoRoute(path: '/entry/recovery', builder: (context, state) => const RecoverySignInScreen()),
       GoRoute(path: _offerPath, builder: (context, state) => const PasskeyOfferPage()),
       // The passkey PRF probe: debug builds only.
       if (kDebugMode)

@@ -29,6 +29,7 @@ class UnlockView extends StatefulWidget {
   const UnlockView({
     super.key,
     this.notice,
+    this.error,
     required this.onUnlock,
     this.onPasskey,
     this.onPair,
@@ -37,6 +38,9 @@ class UnlockView extends StatefulWidget {
 
   /// [Unlock.removed] or [Unlock.unverified]: why the phone is asked again.
   final String? notice;
+
+  /// The error to show at first (the recovery key from the sign-in did not open the data).
+  final String? error;
 
   /// Tries the typed text (any case, spaces or dashes). Resolves to the error code, or null.
   final Future<String?> Function(String text) onUnlock;
@@ -66,6 +70,7 @@ class _UnlockViewState extends State<UnlockView> {
   @override
   void initState() {
     super.initState();
+    _error = widget.error;
     _text.addListener(() {
       if (mounted) setState(() {});
     });

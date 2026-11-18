@@ -18,6 +18,8 @@ import '../local/pairing.dart' as pairing;
 import '../local/prf.dart' as prf;
 import '../local/stale_vaults.dart';
 import '../local/vault_session.dart';
+import '../protect/protect_actions.dart' show markRecoveryKeySaved;
+import '../protect/protect_status.dart' show recoveryKeySavedAt;
 import 'encryption_mode.dart';
 import 'vault_gate.dart';
 
@@ -252,6 +254,10 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     }
   }
 
+  /// The vault was just unlocked with the recovery key typed at sign-in: the person has that key,
+  /// so once it opens "Protect your data"'s first step is marked done when it is not yet.
+  var openedWithSignInKey = false;
+
   /// The session the gate's listeners are on, so a reused one is not wired twice, and their
   /// unsubscribes.
   VaultSession? wired;
@@ -281,6 +287,16 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       },
       unlockWithRecovery: (text) =>
           signInAgainOn401(() => keys.unlockWithRecovery(options(), text)),
+      // The key typed at sign-in, this account's only, and never for a gate no longer current.
+      takeSignInRecoverySecret: () =>
+          current() ? ref.read(signInRecoveryKeyProvider).take(userId) : null,
+      unlockWithRecoverySecret: (secret) async {
+        final local = await signInAgainOn401(
+          () => keys.unlockWithRecoverySecret(options(), secret),
+        );
+        openedWithSignInKey = true;
+        return local;
+      },
       unlockWithPasskey: (passkey) =>
           signInAgainOn401(() => keys.unlockWithPasskey(options(), passkey)),
       addPasskeyWrap: (passkey) => keys.addPasskeyWrap(options(), passkey),
@@ -307,6 +323,10 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
           unawaited(session.close().catchError((Object _) {}));
           throw const GateError('closed');
         }
+        if (openedWithSignInKey) {
+          openedWithSignInKey = false;
+          unawaited(_markKeySavedIfNot(session));
+        }
         if (!identical(wired, session)) {
           wired = session;
           detach
@@ -324,6 +344,18 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
     ),
   );
   return gate;
+}
+
+/// Marks `recoveryKeySavedAt` in the settings record when it is still null: the vault was opened
+/// with the recovery key the person typed to sign in, so they have it. Best effort: a failure only
+/// leaves the step to do.
+Future<void> _markKeySavedIfNot(VaultSession session) async {
+  try {
+    if (await recoveryKeySavedAt(session.store) != null) return;
+    await markRecoveryKeySaved(session, DateTime.now());
+  } on Object {
+    // The step stays to do; Settings shows it.
+  }
 }
 
 /// Deletes the vault (file, keys, kept mode and account) of every account on this phone but

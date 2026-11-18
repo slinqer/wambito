@@ -54,6 +54,8 @@ Harness gateWith({
   Future<PasskeyPrf?> Function(List<String>? credentialIds)? evaluatePrf,
   Future<List<String>> Function()? accountPasskeyIds,
   Future<GatePairing<String>> Function()? startPairing,
+  Uint8List? Function()? takeSignInRecoverySecret,
+  Future<String> Function(Uint8List secret)? unlockWithRecoverySecret,
 }) {
   final h = Harness();
   h.gate = Gate(
@@ -84,6 +86,8 @@ Harness gateWith({
       evaluatePrf: evaluatePrf,
       accountPasskeyIds: accountPasskeyIds,
       startPairing: startPairing,
+      takeSignInRecoverySecret: takeSignInRecoverySecret,
+      unlockWithRecoverySecret: unlockWithRecoverySecret,
     ),
   );
   h.gate.subscribe(() => h.seen.add(h.gate.state.status));
@@ -1051,6 +1055,72 @@ void main() {
         await settle();
         h.gate.unverified();
         expect(h.gate.state, const Unlock());
+      });
+    });
+
+    group('the recovery key held from the sign-in', () {
+      Uint8List held() => Uint8List.fromList(List.filled(16, 7));
+
+      test('a held recovery key opens a known account\'s wrap on a new phone', () async {
+        final secret = held();
+        var takes = 0;
+        final tried = <List<int>>[];
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInRecoverySecret: () {
+            takes += 1;
+            return takes == 1 ? secret : null;
+          },
+          unlockWithRecoverySecret: (s) async {
+            tried.add(List.of(s));
+            return 'from-key';
+          },
+        );
+        h.gate.start();
+        await settle();
+        expect(tried, [List.filled(16, 7)]);
+        expect(h.seen, isNot(contains('unlock')));
+        expect(h.unlocked, isEmpty);
+        expect(h.lastOpen, ('from-key', true));
+        expect(h.gate.state, const Ready('from-key'));
+        // Tried once, then zeroed.
+        expect(takes, 1);
+        expect(zeroed(secret), isTrue);
+      });
+
+      test('a held key that opens nothing shows Unlock with wrong_recovery_key', () async {
+        final secret = held();
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          takeSignInRecoverySecret: () => secret,
+          unlockWithRecoverySecret: (_) async => throw fail('wrong_recovery_key'),
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Unlock(error: 'wrong_recovery_key'));
+        expect(h.opened, isEmpty);
+        expect(zeroed(secret), isTrue);
+        // Typing the key on Unlock still works.
+        expect(await h.gate.unlock('right'), isNull);
+        expect(h.gate.state, const Ready('unlocked'));
+      });
+
+      test('a phone that already holds the keys opens them and zeroes the held key', () async {
+        final secret = held();
+        var tries = 0;
+        final h = gateWith(
+          loadLocalKeys: () async => 'kept',
+          takeSignInRecoverySecret: () => secret,
+          unlockWithRecoverySecret: (_) async {
+            tries += 1;
+            return 'from-key';
+          },
+        );
+        h.gate.start();
+        await settle();
+        expect(h.gate.state, const Ready('kept'));
+        expect(tries, 0);
+        expect(zeroed(secret), isTrue);
       });
     });
   });

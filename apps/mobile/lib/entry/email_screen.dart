@@ -29,6 +29,8 @@ import 'sign_in_frame.dart';
 /// it completes; with none, nothing shows and the email field is ready. "Usar passkey" does the
 /// same on demand, with the provider's own picker.
 ///
+/// Signed out, "Sign in with my recovery key" opens the recovery-key sign-in (`/entry/recovery`).
+///
 /// For a signed-in guest, nothing is sent before the person decides: save their progress to the
 /// email (the claim, spec section 4.2), or, after a warning, sign in as another account.
 class EmailScreen extends ConsumerStatefulWidget {
@@ -422,6 +424,17 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
         ),
       ),
       EntryNote(l10n.signInFirstTime),
+      // Signed out only: a guest's session would be replaced (the route is signed-out only too).
+      if (ref.watch(sessionProvider).status == SessionStatus.signedOut)
+        _full(
+          PressButton.text(
+            l10n.entryUseRecoveryKey,
+            key: const Key('entry.useRecoveryKey'),
+            tone: PressTone.ghost,
+            link: true,
+            onPressed: _busy || _passkeyActive ? null : () => context.push('/entry/recovery'),
+          ),
+        ),
     ];
   }
 

@@ -2180,5 +2180,13 @@
   "unprotectedServerTitle": "Change server with no way back?",
   "unprotectedServerBody": "You have not saved a recovery key. Changing server signs you out and deletes your data from this phone, and nobody can open it again.",
   "unprotectedPasskeyUnknown": "We could not check your passkeys because there is no connection. If you already added one, you can use it to come back.",
-  "unprotectedProtectFirst": "Protect my data first"
+  "unprotectedProtectFirst": "Protect my data first",
+  "entryUseRecoveryKey": "Sign in with my recovery key",
+  "recoverySignInTitle": "Sign in with your recovery key",
+  "recoverySignInLead": "Type it the way you saved it; capitals, spaces and dashes don't matter. It signs you in and opens your data on this phone.",
+  "recoverySignInSubmit": "Sign in",
+  "recoverySignInBusy": "Signing in…",
+  "recoverySignInUseEmail": "Use my email",
+  "errorRecoveryKeyInvalid": "That key does not open any account. Check it and try again.",
+  "recoverySignInWait": "{minutes, plural, =1{Too many tries. Wait 1 minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}"
 }
