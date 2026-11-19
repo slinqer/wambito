@@ -287,10 +287,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   but step `keys`: `start` and a new key (nothing was committed); else `noLocalVault`, whose
   "Start again here" runs start, cancel, resetAll, start. A retry: a failed commit commits the same
   keys; anything else cancel, resetAll, from `start` (`taken_over`: `start` first, "Continue here").
+  `resetAll` runs only after a cancel that went through (204): a cancel answered `not_migrating` or
+  a `start` answered `not_migratable` (a finish whose answer was lost, another tab of this browser
+  that finished) re-reads `GET /v1/me` (`accountState`): encrypted reloads into the vault, anything
+  else is the `server` failure, whose retry reloads.
   `session_changed` reloads. Live deps `local/migration.ts` `liveMigrationDeps({ userId, migration })`:
   `/v2/migration/*` with `x-wambito-user` (`MigrationError` codes `count_mismatch`,
-  `migration_in_progress`, `session_changed`, `offline`, else `server`; a cancel answered
-  `not_migrating` is no error), `write` = one store transaction (`put` all, then `delete` the deleted
+  `migration_in_progress`, `session_changed`, `not_migrating`, `not_migratable`, `offline`, else
+  `server`; its `reload` closes its store connection first), `write` = one store transaction (`put` all, then `delete` the deleted
   ones: tombstones with body), `sync` = its own `createSyncEngine` run until `readOutbox(1)` is
   empty (progress from each push's results; a 409 `migration_in_progress` push is `taken_over`; a
   run that leaves entries parked fails, never loops). It never opens the vault session nor the local

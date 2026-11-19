@@ -29,7 +29,11 @@ import type { UnlockError } from "../vault/Unlock.tsx";
  * Failures: the plaintext stays on the server until a `finish` succeeds, so every failure is
  * honest and offers a retry. A failed commit commits the same prepared keys again; any other retry
  * runs `cancel`, `resetAll`, then the flow from `start` with the same keys (`taken_over` takes the
- * move back for this tab first, with `start`). The flow never opens the vault session nor the
+ * move back for this tab first, with `start`). `resetAll` runs only after a `cancel` that went
+ * through: a `cancel` answered `not_migrating` or a `start` answered `not_migratable` (a finish
+ * whose answer was lost, another tab of this browser that finished) re-reads the account instead;
+ * an encrypted one reloads into the vault (never wiped), anything else is the server failure,
+ * whose retry reloads. The flow never opens the vault session nor the
  * local backend (its first open seeds starter categories, its reads make recurring payments):
  * only `continue()` after done reloads, and the vault gate opens the keys kept here.
  */
@@ -58,7 +62,10 @@ export interface MigrationDeps<K> {
   resume(): Promise<{ step: MigrationStep | null; keySavedAt: string | null }>;
   /** Notes the step (and, when given, when the person confirmed the recovery key). */
   remember(step: MigrationStep | null, keySavedAt?: string | null): Promise<void>;
-  /** `POST /v2/migration/start`: binds the move to this session (takes it over when migrating). */
+  /**
+   * `POST /v2/migration/start`: binds the move to this session (takes it over when migrating).
+   * `{ code: "not_migratable" }` when the account cannot move (already encrypted, say).
+   */
   start(): Promise<void>;
   /** `GET /v2/migration/source`, as records (`recordsFromSource`). */
   source(): Promise<MigrationRecord[]>;
@@ -68,8 +75,13 @@ export interface MigrationDeps<K> {
   sync(keys: K, onProgress: (done: number) => void): Promise<void>;
   /** `POST /v2/migration/finish`; `{ code: "count_mismatch" }` when the copy does not match. */
   finish(counts: MigrationCounts): Promise<void>;
-  /** `POST /v2/migration/cancel`: the server's records go, the plaintext and the wraps stay. */
+  /**
+   * `POST /v2/migration/cancel`: the server's records go, the plaintext and the wraps stay.
+   * `{ code: "not_migrating" }` when no move runs (finished, or never started).
+   */
   cancel(): Promise<void>;
+  /** `GET /v1/me` now: `encrypted` once a `finish` went through (whatever this page saw). */
+  accountState(): Promise<"encrypted" | "migrating" | "plain">;
   /** Empties this browser's vault (records, outbox, cursors); keys and meta stay. */
   resetAll(): Promise<void>;
   /** Loads the page again: the loaders see the account as it is now. */
@@ -141,6 +153,9 @@ const withKeySaved = (records: MigrationRecord[], at: string | null): MigrationR
           : r,
       );
 
+/** Thrown once the flow stopped on purpose (a reload, a failure already shown). */
+const SETTLED = Symbol("settled");
+
 export function createMigrationFlow<K>(deps: MigrationDeps<K>): MigrationFlow {
   let state: MigrationState = { status: "checking" };
   const listeners = new Set<() => void>();
@@ -158,6 +173,8 @@ export function createMigrationFlow<K>(deps: MigrationDeps<K>): MigrationFlow {
 
   /** Shows the failure; its retry runs `step`. Another account signed in: reload for them. */
   const fail = (error: unknown, step: () => Promise<void>) => {
+    // Already handled: reloading, or the failure is on screen with its own retry.
+    if (error === SETTLED) return;
     if (codeOf(error) === "session_changed") {
       set({ status: "checking" });
       deps.reload();
@@ -204,15 +221,47 @@ export function createMigrationFlow<K>(deps: MigrationDeps<K>): MigrationFlow {
     }
   }
 
+  /**
+   * The server says no move runs (`not_migrating`, `not_migratable`): this page's view is stale.
+   * Never `resetAll` here: the vault may be the encrypted account's only local copy now.
+   */
+  async function settle(): Promise<never> {
+    const now = await deps.accountState();
+    if (now === "encrypted") {
+      set({ status: "checking" });
+      deps.reload();
+    } else {
+      again = async () => deps.reload();
+      set({ status: "failed", problem: "server", retrying: false });
+    }
+    throw SETTLED;
+  }
+
+  /** `start`, unless the server says the account cannot move any more. */
+  async function startMove(): Promise<void> {
+    try {
+      await deps.start();
+    } catch (error) {
+      if (codeOf(error) === "not_migratable") await settle();
+      throw error;
+    }
+  }
+
   /** Takes the move over for this tab, then starts the copy over. */
   async function takeBack(): Promise<void> {
-    await deps.start();
+    await startMove();
     await fromScratch();
   }
 
   /** The retry: the server's and this browser's records go, then the flow runs from `start`. */
   async function fromScratch(): Promise<void> {
-    await deps.cancel();
+    try {
+      await deps.cancel();
+    } catch (error) {
+      if (codeOf(error) === "not_migrating") await settle();
+      throw error;
+    }
+    // Only after a cancel that went through: the server holds no records of this move now.
     await deps.resetAll();
     await fromStart();
   }
@@ -220,7 +269,7 @@ export function createMigrationFlow<K>(deps: MigrationDeps<K>): MigrationFlow {
   /** Step 1 onwards: start, the keys (when this browser holds none), then the copy. */
   async function fromStart(): Promise<void> {
     set({ status: "checking" });
-    await deps.start();
+    await startMove();
     if (keys) return copy(keys);
     await deps.remember("keys");
     try {
@@ -297,7 +346,7 @@ export function createMigrationFlow<K>(deps: MigrationDeps<K>): MigrationFlow {
   async function resumeFinish(): Promise<void> {
     if (!keys) return fromStart();
     const current = keys;
-    await deps.start();
+    await startMove();
     const records = withKeySaved(await deps.source(), keySavedAt);
     set({ status: "finishing" });
     await deps.sync(current, () => {});

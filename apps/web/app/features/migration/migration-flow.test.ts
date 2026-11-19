@@ -42,6 +42,8 @@ const COUNTS: MigrationCounts = {
 function worldOf() {
   return {
     migrating: false,
+    /** The move finished on the server: `GET /v1/me` has no `migration` and answers preview. */
+    encrypted: false,
     keys: null as Keys | null,
     step: null as MigrationStep | null,
     keySavedAt: null as string | null,
@@ -86,6 +88,7 @@ function flowWith(world: World, overrides: Partial<MigrationDeps<Keys>> = {}) {
     }),
     start: vi.fn(async () => {
       log("start");
+      if (world.encrypted) throw fail("not_migratable");
       world.migrating = true;
     }),
     source: vi.fn(async () => {
@@ -103,14 +106,20 @@ function flowWith(world: World, overrides: Partial<MigrationDeps<Keys>> = {}) {
     finish: vi.fn(async () => {
       log("finish");
       world.migrating = false;
+      world.encrypted = true;
     }),
     cancel: vi.fn(async () => {
       log("cancel");
+      if (!world.migrating) throw fail("not_migrating");
       world.migrating = false;
       world.pushed = 0;
     }),
     resetAll: vi.fn(async () => {
       log("resetAll");
+    }),
+    accountState: vi.fn(async () => {
+      log("accountState");
+      return world.encrypted ? ("encrypted" as const) : ("plain" as const);
     }),
     reload: vi.fn(() => {
       log("reload");
@@ -472,8 +481,76 @@ describe("migration flow", () => {
     expect(page.deps.reload).not.toHaveBeenCalled();
     page.flow.continue();
     expect(ok.calls.indexOf("reload")).toBeGreaterThan(ok.calls.indexOf("finish"));
-    // The flow's dependencies have no way to open the vault: only the reload after done.
-    expect(Object.keys(page.deps)).not.toContain("open");
+    // That no dependency opens the vault session is `local/migration.test.ts`'s to show (its
+    // `vault-session.ts` mock throws on any open).
+  });
+
+  it("a finish whose answer was lost: the retry reloads into the vault, never resetAll", async () => {
+    const world = worldOf();
+    const { flow, deps } = await toKeys(world, {
+      finish: vi.fn(async () => {
+        world.calls.push("finish");
+        // The server finished; the answer never arrived.
+        world.migrating = false;
+        world.encrypted = true;
+        throw fail("offline");
+      }),
+    });
+    await flow.confirmKey();
+    await settle();
+    expect(flow.getState()).toEqual({ status: "failed", problem: "offline", retrying: false });
+
+    world.calls = [];
+    flow.retry();
+    await settle();
+    expect(world.calls).toEqual(["cancel", "accountState", "reload"]);
+    expect(world.calls).not.toContain("resetAll");
+    expect(deps.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("a second tab's retry after the first tab finished never calls resetAll", async () => {
+    const world = worldOf();
+    world.keys = { k: "kept" };
+    const first = await toKeys(world);
+    expect(first.flow.getState()).toEqual({ status: "done" });
+
+    // The second tab of the same browser had failed mid-copy, before the first one finished.
+    world.calls = [];
+    const second = flowWith(world, { migration: "in_progress" });
+    second.flow.start();
+    await settle();
+    expect(world.calls).toEqual(["loadLocalKeys", "start", "accountState", "reload"]);
+    expect(second.deps.resetAll).not.toHaveBeenCalled();
+    expect(second.deps.cancel).not.toHaveBeenCalled();
+  });
+
+  it("a cancel with nothing to cancel on a plain account: the server failure, no resetAll", async () => {
+    const world = worldOf();
+    let offline = true;
+    const page = flowWith(world, {
+      start: vi.fn(async () => {
+        world.calls.push("start");
+        if (offline) throw fail("offline");
+        world.migrating = true;
+      }),
+    });
+    page.flow.start();
+    await settle();
+    await page.flow.begin();
+    await settle();
+    expect(page.flow.getState()).toMatchObject({ status: "failed", problem: "offline" });
+
+    offline = false;
+    world.calls = [];
+    page.flow.retry();
+    await settle();
+    expect(world.calls).toEqual(["cancel", "accountState"]);
+    expect(page.flow.getState()).toEqual({ status: "failed", problem: "server", retrying: false });
+    // Its retry loads the page again, so the loaders see the account as it is.
+    page.flow.retry();
+    await settle();
+    expect(world.calls).toEqual(["cancel", "accountState", "reload"]);
+    expect(page.deps.resetAll).not.toHaveBeenCalled();
   });
 
   it("a server error is honest and keeps the plaintext", async () => {

@@ -36,7 +36,13 @@ export class MigrationError extends Error {
 }
 
 /** The API's codes the flow tells apart; anything else is `server`. */
-const KNOWN = new Set(["count_mismatch", "migration_in_progress", "session_changed"]);
+const KNOWN = new Set([
+  "count_mismatch",
+  "migration_in_progress",
+  "session_changed",
+  "not_migrating",
+  "not_migratable",
+]);
 
 const STEP = "migrationStep";
 const KEY_SAVED_AT = "migrationKeySavedAt";
@@ -95,7 +101,6 @@ export function liveMigrationDeps(
     if (response.status === 401) options.onUnauthorized?.();
     const code = await problemCode(response);
     if (code && KNOWN.has(code)) throw new MigrationError(code, response.status);
-    if (code === "not_migrating") throw new MigrationError(code, response.status);
     throw new MigrationError("server", response.status);
   }
 
@@ -204,18 +209,27 @@ export function liveMigrationDeps(
       await post("/v2/migration/finish", { counts });
     },
     async cancel() {
-      try {
-        await post("/v2/migration/cancel");
-      } catch (error) {
-        // Nothing to cancel: the move never started, or was cancelled elsewhere.
-        if (error instanceof MigrationError && error.code === "not_migrating") return;
-        throw error;
-      }
+      // `not_migrating` (finished, or never started) goes to the flow, which re-reads the account.
+      await post("/v2/migration/cancel");
+    },
+    async accountState() {
+      const me = (await (await call("/v1/me")).json()) as {
+        encryption?: string;
+        migration?: string;
+      };
+      if (me.migration === "in_progress") return "migrating";
+      if (!me.migration && me.encryption === "preview") return "encrypted";
+      return "plain";
     },
     async resetAll() {
       await (await store()).resetAll();
     },
-    reload: options.reload ?? (() => window.location.reload()),
+    reload() {
+      // This connection would block another tab's delete of the vault until the page goes.
+      void opening?.then((s) => s.close());
+      opening = null;
+      (options.reload ?? (() => window.location.reload()))();
+    },
     now: options.now ?? (() => new Date()),
     close() {
       void opening?.then((s) => s.close());

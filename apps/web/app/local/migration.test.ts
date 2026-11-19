@@ -258,7 +258,7 @@ describe("live migration deps", () => {
     deps.close();
   });
 
-  it("a cancel of a move that is not running any more is no error", async () => {
+  it("a cancel of a move that is not running any more says so (the flow re-reads the account)", async () => {
     const userId = userOf();
     const net = fakeApi();
     const deps = liveMigrationDeps({
@@ -272,7 +272,24 @@ describe("live migration deps", () => {
       }) as typeof globalThis.fetch,
       reload: vi.fn(),
     });
-    await expect(deps.cancel()).resolves.toBeUndefined();
+    await expect(deps.cancel()).rejects.toMatchObject({ code: "not_migrating" });
+    deps.close();
+  });
+
+  it("reads whether the account is encrypted now from GET /v1/me", async () => {
+    const userId = userOf();
+    let me: Record<string, unknown> = { id: userId, encryption: "preview" };
+    const deps = liveMigrationDeps({
+      userId,
+      migration: "in_progress",
+      fetch: (async () => json(me)) as typeof globalThis.fetch,
+      reload: vi.fn(),
+    });
+    await expect(deps.accountState()).resolves.toBe("encrypted");
+    me = { id: userId, encryption: "preview", migration: "in_progress" };
+    await expect(deps.accountState()).resolves.toBe("migrating");
+    me = { id: userId, encryption: "plain", migration: "available" };
+    await expect(deps.accountState()).resolves.toBe("plain");
     deps.close();
   });
 });
