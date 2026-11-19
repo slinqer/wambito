@@ -8,8 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/security/screen_lock.dart';
-import 'package:wambito/settings/security/approve_device_screen.dart';
-import 'package:wambito/settings/security/approve_signin_screen.dart';
+import 'package:wambito/settings/security/connect_device_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/security_section.dart';
@@ -128,17 +127,20 @@ void main() {
     expect(find.byKey(const Key('security.remove.$laptopId')), findsOneWidget);
     expect(find.byKey(const Key('security.newKey')), findsOneWidget);
     expect(find.byKey(const Key('security.changeKeys')), findsOneWidget);
-    expect(find.byKey(const Key('security.approve')), findsOneWidget);
+    expect(find.byKey(const Key('security.connect')), findsOneWidget);
   });
 
-  testWidgets(
-    'the entry is named as the new phone says: Settings → Security → Approve a new device',
-    (t) async {
-      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
-      expect(find.text('Security'), findsWidgets);
-      expect(find.text('APPROVE A NEW DEVICE'), findsOneWidget);
-    },
-  );
+  testWidgets('one entry connects another device, instead of Approve and Sign in on the web', (
+    t,
+  ) async {
+    await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
+    expect(find.text('CONNECT ANOTHER DEVICE'), findsOneWidget);
+    expect(find.byKey(const Key('security.connect')), findsOneWidget);
+    expect(find.byKey(const Key('security.approve')), findsNothing);
+    expect(find.byKey(const Key('security.signinWeb')), findsNothing);
+    expect(find.text('APPROVE A NEW DEVICE'), findsNothing);
+    expect(find.text('SIGN IN ON THE WEB'), findsNothing);
+  });
 
   for (final key in ['security.newKey', 'security.remove.$laptopId', 'security.changeKeys']) {
     testWidgets('a double tap on $key asks the lock once', (t) async {
@@ -152,23 +154,17 @@ void main() {
     });
   }
 
-  testWidgets('"Approve a new device" opens the approver screen', (t) async {
-    await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
-    await tapKey(t, 'security.approve');
-    expect(find.byType(ApproveDeviceScreen), findsOneWidget);
-  });
-
-  testWidgets('"Sign in on the web" opens the sign-in approval, which closes back', (t) async {
+  testWidgets('"Connect another device" opens its screen, which closes back', (t) async {
     final security = FakeSecurity();
     await pumpSection(t, security, FakeLock(LockCheck.passed));
     final loads = security.loads;
-    await tapKey(t, 'security.signinWeb');
-    expect(find.byType(ApproveSigninScreen), findsOneWidget);
+    await tapKey(t, 'security.connect');
+    expect(find.byType(ConnectDeviceScreen), findsOneWidget);
     // nothing is looked up before a code or a scan
-    expect(security.calls.where((c) => c.startsWith('findSigninRequest')), isEmpty);
-    await tapKey(t, 'signin.cancel');
-    expect(find.byType(ApproveSigninScreen), findsNothing);
-    // a browser may have joined as a device: the list is read again
+    expect(security.calls.where((c) => c.startsWith('find')), isEmpty);
+    await tapKey(t, 'connect.cancel');
+    expect(find.byType(ConnectDeviceScreen), findsNothing);
+    // a browser or a phone may have joined as a device: the list is read again
     expect(security.loads, greaterThan(loads));
   });
 

@@ -2351,11 +2351,19 @@
       }
     }
   },
-  "settingsSecurityApprove": "Aprobar un dispositivo nuevo",
-  "@settingsSecurityApprove": {
-    "description": "Settings → Security entry that approves a new device; the new device's own screen names this path."
+  "settingsSecurityConnect": "Conectar otro dispositivo",
+  "@settingsSecurityConnect": {
+    "description": "Settings → Security entry that connects another device: approves a web sign-in or a new device, by its QR or its code."
   },
-  "settingsSecurityApproveLead": "Abre tus datos en un celular o navegador nuevo, sin tu clave de recuperación.",
+  "settingsSecurityConnectLead": "Escanea el código QR que te muestra tu computador u otro celular, o escribe su código.",
+  "connectDeviceCodeLabel": "Código del otro dispositivo",
+  "@connectDeviceCodeLabel": {
+    "description": "Connect another device: the code field label (a web sign-in's or a new device's code)."
+  },
+  "connectDeviceBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el otro dispositivo.",
+  "@connectDeviceBadCode": {
+    "description": "Connect another device: the typed code matches no web sign-in and no device to approve."
+  },
   "settingsSecurityRecoveryTitle": "Clave de recuperación",
   "settingsSecurityRecoveryLead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
   "settingsSecurityNewRecovery": "Nueva clave de recuperación",
@@ -4169,14 +4177,6 @@
   "@vaultApproveTitle": {
     "description": "Approve a device: the screen title (Settings \u2192 Security)."
   },
-  "vaultApproveLead": "En el dispositivo nuevo, elige «Desde otro dispositivo». Luego escribe el código que muestra, o escanea su QR.",
-  "@vaultApproveLead": {
-    "description": "Approve a device: what to do first."
-  },
-  "vaultApproveCodeLabel": "Código del dispositivo nuevo",
-  "@vaultApproveCodeLabel": {
-    "description": "Approve a device: the code field label."
-  },
   "vaultApprovePlaceholder": "XXXX XXXX",
   "@vaultApprovePlaceholder": {
     "description": "Approve a device: the code field placeholder."
@@ -4196,10 +4196,6 @@
   "vaultApproveCameraFailed": "No pudimos usar la cámara. Escribe el código.",
   "@vaultApproveCameraFailed": {
     "description": "Approve a device: the camera could not be used."
-  },
-  "vaultApproveErrorBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el dispositivo nuevo.",
-  "@vaultApproveErrorBadCode": {
-    "description": "Approve a device: the code matches no request."
   },
   "vaultApproveWaiting": "Esperando al dispositivo nuevo…",
   "@vaultApproveWaiting": {
@@ -4644,14 +4640,6 @@
   "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
   "@provisionalNoGuests": {
     "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
-  },
-  "settingsSecuritySignin": "Iniciar sesión en la web",
-  "@settingsSecuritySignin": {
-    "description": "Settings → Security entry that approves a web sign-in from this phone (phone-first spec 8.1)."
-  },
-  "settingsSecuritySigninLead": "Abre Wambito en un computador con este teléfono: escanea el código QR que te muestra.",
-  "@settingsSecuritySigninLead": {
-    "description": "Settings → Security: what signing in on the web does."
   },
   "signinApproveTitle": "Iniciar sesión en la web",
   "@signinApproveTitle": {

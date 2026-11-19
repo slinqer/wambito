@@ -231,20 +231,28 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`VaultGateDeps.takeSignInRecoverySecret`) and tries it once through `keys.unlockWithRecoverySecret` on an account
   with wraps and no keys here, before Unlock, zeroing it either way; a failure shows `Unlock(error: …)`. Opened that
   way, the vault marks `recoveryKeySavedAt` when it was null. The other side of a pairing is
-  `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
-  "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
-  code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
-  `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default `[pairQrPrefix]`,
-  the sign-in screen asks `[signinQrPrefix]`; the native sides know only those two), or null for a close or a
-  refused permission), then the number, then
-  "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
+  `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen({pairing, onStartAgain, onDone})`, twin of
+  `ApproveDevice.tsx`, titled "Approve a new device"): the confirmation only. Its entry is
+  `connect_device_screen.dart` (`ConnectDeviceScreen`, Settings → Security → "Connect another device", below), which
+  takes the code or a Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`;
+  `isAvailable`, `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default
+  `[pairQrPrefix]`; "Connect another device" asks both, the link-opened sign-in screen `[signinQrPrefix]`; the native
+  sides know only those two), or null for a close or a refused permission) and hands the found `ApproverPairing`
+  here; then the number, then "They match"; "Start again" goes back to the entry. It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
   `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
-  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key",
+  `security_section.dart` (devices, Remove, "Connect another device" `security.connect`, "New recovery key",
   "Change keys" `security.changeKeys`),
-  `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
+  `connect_device_screen.dart` (`ConnectDeviceScreen`: one entry for a web sign-in and a device to approve; one scan
+  takes `wambito://pair?` and `wambito://signin?` and goes by the prefix; a typed code is looked up with
+  `findSigninRequest` first (it posts nothing) and, on `bad_code` only, with `findPairing`; neither shows
+  `connectDeviceBadCode`, offline and the rest are said under the field; then it shows `ApproveSigninScreen(found:)`
+  or `ApproveDeviceScreen(pairing:)`, whose "Start again" comes back; registered in `openSigninApprovalsProvider`
+  while open; a request found after it went away is cancelled),
+  `approve_signin_screen.dart` (`ApproveSigninScreen({qr, found, onStartAgain})`, also at `/settings/signin?qr=` for
+  a link (with its own code field and Scan for "Start again"), or handed a found request by "Connect another device": "Sign in on
   **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
   "They match" after a typed code or for a link-opened QR (ruling P18: any app can send the link, so it is
   unauthenticated intent; it also shows `signin.fromLink`); the host line is the trust signal, the label is quoted

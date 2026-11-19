@@ -1,9 +1,9 @@
 // Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
 // (`preview`) account, with or without email (the same section for both): this phone and the other
 // devices that open the data (name, added date, "Not verified" when an attestation fails), each
-// other one with "Remove" (its wrap is deleted, the keys stay: `RemoveDeviceSheet`); "Approve a new
-// device"; "Sign in on the web" (approving a browser's QR or code, `ApproveSigninScreen`, phone-first
-// spec 8.1); "New recovery key"; "Change keys" (a rotation that removes no device, `ChangeKeysSheet`);
+// other one with "Remove" (its wrap is deleted, the keys stay: `RemoveDeviceSheet`); "Connect
+// another device" (`ConnectDeviceScreen`: a browser's sign-in, phone-first spec 8.1, or a new device
+// to approve, by its QR or its code); "New recovery key"; "Change keys" (a rotation that removes no device, `ChangeKeysSheet`);
 // and how many records could not be read, when any. The sensitive steps (removing a device, making
 // a new key, showing it, changing the keys) ask the phone's screen lock first (spec 7.7, D17), which
 // replaces the web's passkey touch.
@@ -28,9 +28,8 @@ import '../../ui/toast.dart';
 import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import '../passkeys_section.dart' show passkeyDay;
 import '../settings_parts.dart';
-import 'approve_device_screen.dart';
-import 'approve_signin_screen.dart';
 import 'change_keys_sheet.dart';
+import 'connect_device_screen.dart';
 import 'recovery_setup_page.dart';
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
@@ -67,26 +66,13 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
 
   void _changed() => ref.invalidate(securitySnapshotProvider);
 
-  Future<void> _approve(SecurityApi security) async {
+  /// "Connect another device": a browser or a phone joins as a device, so the list is read again
+  /// after.
+  Future<void> _connect() async {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (route) => ApproveDeviceScreen(
-          options: security.pairing,
-          findPairing: (options, {code, qr}) => security.findPairing(code: code, qr: qr),
-          onDone: () => Navigator.of(route).pop(),
-        ),
-      ),
-    );
-    _changed();
-  }
-
-  /// "Sign in on the web": a browser joins as a device, so the list is read again after.
-  Future<void> _signinWeb() async {
-    await Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (route) => ApproveSigninScreen(onDone: () => Navigator.of(route).pop()),
+        builder: (route) => ConnectDeviceScreen(onDone: () => Navigator.of(route).pop()),
       ),
     );
     _changed();
@@ -281,29 +267,16 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (security == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    final approve = Column(
+    final connect = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: WambitoTokens.space2,
       children: [
-        SettingLabel(label: l10n.settingsSecurityApprove, hint: l10n.settingsSecurityApproveLead),
+        SettingLabel(label: l10n.settingsSecurityConnect, hint: l10n.settingsSecurityConnectLead),
         PressButton.text(
-          l10n.settingsSecurityApprove,
-          key: const Key('security.approve'),
+          l10n.settingsSecurityConnect,
+          key: const Key('security.connect'),
           tone: PressTone.secondary,
-          onPressed: () => unawaited(_approve(security)),
-        ),
-      ],
-    );
-    final signinWeb = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: WambitoTokens.space2,
-      children: [
-        SettingLabel(label: l10n.settingsSecuritySignin, hint: l10n.settingsSecuritySigninLead),
-        PressButton.text(
-          l10n.settingsSecuritySignin,
-          key: const Key('security.signinWeb'),
-          tone: PressTone.secondary,
-          onPressed: () => unawaited(_signinWeb()),
+          onPressed: () => unawaited(_connect()),
         ),
       ],
     );
@@ -339,8 +312,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
             ],
           ],
         ),
-        approve,
-        signinWeb,
+        connect,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: WambitoTokens.space2,

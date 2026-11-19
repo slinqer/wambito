@@ -1,6 +1,8 @@
 // Approving a web sign-in from this phone (phone-first spec 8.1 steps 2-6): the web shows a QR and
-// a code; the person scans the QR (the phone's own camera, `wambito/scanner` asked for
-// `wambito://signin?` only) or types the code, sees "Sign in on **{label}**?" with the warning
+// a code; the person scans the QR or types the code in "Connect another device"
+// (connect_device_screen.dart, which hands the request found here as [ApproveSigninScreen.found]),
+// or a `wambito://signin` link opens this screen with its QR (and its own code field and scanner,
+// `wambito://signin?` only, for "Start again"), then sees "Sign in on **{label}**?" with the warning
 // "Only scan a code you see on **{host}**" (the host of the server this phone talks to), and
 // approves or cancels. After a typed code both screens show the same 6-digit number and "They
 // match" seals the data key; after a QR the key in it already authenticates the browser, so
@@ -124,10 +126,18 @@ PairingProblem? _problemOf(Object error) => switch (codeOf(error)) {
 };
 
 class ApproveSigninScreen extends ConsumerStatefulWidget {
-  const ApproveSigninScreen({super.key, this.qr, this.onDone});
+  const ApproveSigninScreen({super.key, this.qr, this.found, this.onStartAgain, this.onDone})
+    : assert(qr == null || found == null, 'a link or a request found, not both');
 
   /// A scanned QR to look up at once (a `wambito://signin?…` link the system camera opened).
   final String? qr;
+
+  /// A request already found ("Connect another device"): the screen starts at its question, with
+  /// the same wait before Approve. The screen owns it from now on.
+  final SigninApproval? found;
+
+  /// "Start again" after a failure; by default the screen's own code field.
+  final VoidCallback? onStartAgain;
 
   /// Closes the screen; by default it pops its route.
   final VoidCallback? onDone;
@@ -152,6 +162,8 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
     super.initState();
     _registry = ref.read(openSigninApprovalsProvider)..open(this);
     unawaited(_checkScanner());
+    final found = widget.found;
+    if (found != null) _ask(found);
     final qr = widget.qr;
     if (qr != null) {
       _view = const _Enter(busy: true);
@@ -230,8 +242,13 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
       found.cancel();
       return;
     }
+    setState(() => _ask(found));
+  }
+
+  /// Shows [found]'s question; Approve comes on after [signinApproveDelay].
+  void _ask(SigninApproval found) {
     _current = found;
-    setState(() => _view = _Ask(found));
+    _view = _Ask(found);
     _delay?.cancel();
     _delay = Timer(signinApproveDelay, () {
       final view = _view;
@@ -296,6 +313,12 @@ class _ApproveSigninScreenState extends ConsumerState<ApproveSigninScreen> {
   }
 
   void _startAgain() {
+    final onStartAgain = widget.onStartAgain;
+    if (onStartAgain != null) {
+      _release();
+      onStartAgain();
+      return;
+    }
     _code.clear();
     setState(() => _view = const _Enter());
   }
