@@ -63,7 +63,7 @@ export interface MigrationSource {
     createdAt: Instant;
     updatedAt?: Instant;
   }>;
-  /** Live rows and the soft-deleted ones still inside the restore window. */
+  /** Live rows and every soft-deleted one, whatever its age (dismissed months among them). */
   transactions: Array<{
     id: string;
     accountId?: string;

@@ -263,6 +263,40 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   or deleted id; no merchant memory). The server refuses a preview account's `/v1` finance routes
   (426 `update_required`, `errors.update_required`: reload): only `GET`/`PATCH /v1/me` (locale on sign-in), `DELETE /v1/me` and the
   assistants go live.
+  Any 426 is `ApiProblem("update_required")` whatever its body (`api/errors.ts`
+  `problemFromResponse`).
+  Switch day (E2E stage 5, spec `docs/superpowers/specs/2026-11-19-e2e-stage-5-switch-design.md`
+  section 3): `auth/encryption.ts` `accountGate(onMe?)` → `{ vault, migration }` from `GET /v1/me`
+  (`migrationOf(me)`: `available` | `in_progress` | null). A profile with `migration` (a migrating
+  account answers `preview` too) is the flow's, never `VaultGate`'s: `/app` (no `requireOnboarded`)
+  and `/welcome` (even onboarded) render `features/migration/MigrationScreen.tsx` `MigrationGate`;
+  `/oauth/consent` sends `in_progress` to `/app` (an assistant connected then is revoked by
+  `finish`), `available` consents as plain. `previewProfile()` is `accountGate().vault`. The flow:
+  `migration-flow.ts` `createMigrationFlow(deps)` (pure, unit-tested with a fake world of reloads;
+  states `checking`, `intro`, `keys {recoveryKey, busy}` (the `RecoveryKeySetup` screen), `unlock`
+  (the account already has keys: `Unlock` with `migration.unlock_lead`), `copying {done, total}`,
+  `finishing`, `done`, `failed {problem: count_mismatch | offline | server | taken_over, retrying}`,
+  `noLocalVault {busy}`): intro → `start` → keys (`prepareAccount({ guest: false })`, skipped when
+  `loadLocalKeys` finds keys; `already_set_up` → unlock) → commit → `resetAll`, `source`
+  (`recordsFromSource`; the settings record gets `recoveryKeySavedAt` = when the key was confirmed)
+  → `write` → `sync` → `finish(countsOf(records))` → done, whose "Continue" reloads (the gate then
+  opens the kept keys; `seedIfEmpty` is a no-op). Resume: vault meta `migrationStep` (`keys` before
+  the key is made, `copying` once kept, `finishing` once the outbox is empty; deleted at done) and
+  `migrationKeySavedAt`; an `in_progress` load with keys here runs `start` (takes the move over for
+  this tab), then at `finishing` source, sync, finish, else cancel, `resetAll`, from `start`; no keys
+  but step `keys`: `start` and a new key (nothing was committed); else `noLocalVault`, whose
+  "Start again here" runs start, cancel, resetAll, start. A retry: a failed commit commits the same
+  keys; anything else cancel, resetAll, from `start` (`taken_over`: `start` first, "Continue here").
+  `session_changed` reloads. Live deps `local/migration.ts` `liveMigrationDeps({ userId, migration })`:
+  `/v2/migration/*` with `x-wambito-user` (`MigrationError` codes `count_mismatch`,
+  `migration_in_progress`, `session_changed`, `offline`, else `server`; a cancel answered
+  `not_migrating` is no error), `write` = one store transaction (`put` all, then `delete` the deleted
+  ones: tombstones with body), `sync` = its own `createSyncEngine` run until `readOutbox(1)` is
+  empty (progress from each push's results; a 409 `migration_in_progress` push is `taken_over`; a
+  run that leaves entries parked fails, never loops). It never opens the vault session nor the local
+  backend (`seedIfEmpty` would add starter categories, `materialize` recurring payments); the source
+  and sync bodies are never logged. Stories `Migration/Screen`, copy `migration.*` (+ `errors.*` for
+  the migration codes).
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
   (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
@@ -439,7 +473,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   email form on a phone).
 - `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
   `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
-  consent. An encrypted one (`previewProfile()` in the loader; `device` when `loadLocalKeys` finds
+  consent. An encrypted one (`accountGate().vault` in the loader; `device` when `loadLocalKeys` finds
   its vault here) shows `consent.encrypted_note`, and "Allow" takes DK through `withDataKeyFrom`:
   this browser's device wrap with no touch, else the unlock step (`ConsentUnlock`: a passkey's PRF
   or the recovery key, nothing kept); `allowAssistant` then makes `S` and the `assistant` wrap,
@@ -453,7 +487,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   sign-in (every session was closed). Copy in `confirm_email.*` in all four languages; story
   `ConfirmEmail`, web-only, not in parity.json.
 - Daily seen call: `app/auth/seen.ts` `markSeenToday(userId, timeZone)`, called unawaited from the `/app`
-  loader (`previewProfile(onMe)`, every account), once per local day (`wambito.seen.<userId>`), stored
+  loader (`accountGate(onMe)`, every account), once per local day (`wambito.seen.<userId>`), stored
   after a 204; `x-wambito-version` = `BUILD_ID` (`VITE_BUILD_ID`, set by `deploy/personal/up.sh`, else
   `dev`).
 - Storage: only `readStored/writeStored/removeStored` in `app/lib/stored.ts` (keys

@@ -1,7 +1,8 @@
 import { redirect, type ShouldRevalidateFunctionArgs } from "react-router";
 import { createTranslator } from "use-intl/core";
-import { previewProfile } from "../auth/encryption.ts";
+import { accountGate } from "../auth/encryption.ts";
 import { requireSession } from "../auth/session.ts";
+import { MigrationGate } from "../features/migration/MigrationScreen.tsx";
 import { Welcome } from "../features/onboarding/Welcome.tsx";
 import { LocalOnboardingRoute, VaultGate } from "../features/vault/VaultGate.tsx";
 import { CATALOGS } from "../i18n/catalog.ts";
@@ -16,15 +17,16 @@ export const meta = () => {
 /**
  * Signed in, and only until onboarding is done: afterwards `/welcome` goes to the app. A failed
  * session check (no connection, a server error) throws to the error boundary. A preview account
- * opens its vault first and is checked against the vault's flag (`LocalOnboardingRoute`).
+ * opens its vault first and is checked against the vault's flag (`LocalOnboardingRoute`). An
+ * account whose move to end-to-end encryption is open or running runs that flow first.
  */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   const user = await requireSession(new URL(request.url).pathname);
-  const vault = await previewProfile();
+  const { vault, migration } = await accountGate();
   // A plain account has no vault: a passkey PRF kept at sign-in is not needed.
   if (!vault) clearSignInPrf();
-  if (!vault && user.onboardingCompletedAt != null) throw redirect("/app");
-  return { vault };
+  if (!vault && !migration && user.onboardingCompletedAt != null) throw redirect("/app");
+  return { vault, migration };
 }
 
 /** Moving between steps changes only the URL's step: the session was checked on the way in. */
@@ -47,6 +49,9 @@ export default function WelcomeRoute({ loaderData }: Route.ComponentProps) {
   const welcome = (
     <Welcome languages={typeof navigator === "undefined" ? [] : navigator.languages} />
   );
+  if (loaderData.migration) {
+    return <MigrationGate key={loaderData.migration.profile.id} gate={loaderData.migration} />;
+  }
   if (!loaderData.vault) return welcome;
   return (
     <VaultGate key={loaderData.vault.id} profile={loaderData.vault}>

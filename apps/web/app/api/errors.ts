@@ -39,12 +39,15 @@ export async function problemFromResponse(response: Response): Promise<ApiProble
     body = undefined;
   }
   const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  // 426: this build predates the account's move to end-to-end encryption, whatever the body says.
   const code =
-    typeof fields.code === "string" && fields.code
-      ? fields.code
-      : response.status >= 500
-        ? "internal_error"
-        : "http_error";
+    response.status === 426
+      ? "update_required"
+      : typeof fields.code === "string" && fields.code
+        ? fields.code
+        : response.status >= 500
+          ? "internal_error"
+          : "http_error";
   return new ApiProblem({
     status: response.status,
     code,

@@ -230,7 +230,12 @@
     "already_set_up": "Esta conta já tem as suas chaves. Abre-a com a tua chave de recuperação.",
     "session_changed": "Outra conta iniciou sessão neste navegador. Recarrega a página.",
     "assistant_keys_missing": "Neste momento não é possível ligar assistentes. Tenta mais tarde.",
-    "assistant_wrap_in_rotation": "Mudar as tuas chaves desliga os teus assistentes. Volta a ligá-los depois."
+    "assistant_wrap_in_rotation": "Mudar as tuas chaves desliga os teus assistentes. Volta a ligá-los depois.",
+    "keys_missing": "Primeiro guarda a tua chave de recuperação.",
+    "not_migrating": "A tua conta não está a meio de uma mudança. Recarrega a página.",
+    "count_mismatch": "Algo não bateu certo e não apagámos nada. Tenta outra vez.",
+    "migration_in_progress": "A tua conta está a ser cifrada noutro separador ou dispositivo. Espera que termine.",
+    "not_migratable": "Esta conta ainda não pode ser cifrada."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -1037,5 +1042,29 @@
     },
     "removed": "Este browser foi removido da tua conta a partir de outro dispositivo. As alterações ainda não sincronizadas aqui perderam-se. Para voltar a abrir os teus dados, escreve a tua chave de recuperação ou usa outro dispositivo.",
     "unverified": "Este browser não conseguiu verificar a chave nova da tua conta, por isso deixou de sincronizar. Os teus dados aqui estão seguros. Para continuar, usa a tua chave de acesso ou escreve a tua chave de recuperação."
+  },
+  "migration": {
+    "intro_title": "Protege os teus dados",
+    "intro_body": "Vamos cifrar a tua conta: a partir de agora só tu poderás ler os teus movimentos. Demora um minuto e não se perde nada.",
+    "intro_start": "Começar",
+    "checking": "Um momento…",
+    "copying": "A cifrar os teus dados… {done} de {total}",
+    "copying_label": "Progresso da cifragem",
+    "finishing": "A confirmar que não falta nada…",
+    "done_title": "Pronto: a tua conta está cifrada.",
+    "done_lead": "Os teus movimentos estão como os deixaste, e agora só tu os podes ler.",
+    "continue": "Continuar",
+    "failed_title": "Os teus dados continuam em segurança",
+    "count_mismatch": "Algo não bateu certo e não apagámos nada. Tenta outra vez.",
+    "taken_over": "Esta mudança continua noutro separador ou dispositivo.",
+    "offline": "Estás sem ligação. Nada mudou: tenta outra vez quando voltar.",
+    "server": "Algo correu mal e não apagámos nada. Tenta outra vez.",
+    "retry": "Tentar outra vez",
+    "retrying": "A tentar outra vez…",
+    "continue_here": "Continuar aqui",
+    "no_local_title": "Esta mudança começou noutro sítio",
+    "no_local_body": "Começaste-a noutro navegador ou dispositivo. Podes terminá-la lá, ou recomeçar aqui: não se perde nada.",
+    "restart": "Recomeçar aqui",
+    "unlock_lead": "A tua conta já tem uma chave de recuperação. Escreve-a para continuar neste navegador."
   }
 }

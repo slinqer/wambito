@@ -230,7 +230,12 @@
     "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero.",
     "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina.",
     "assistant_keys_missing": "Al momento non è possibile collegare assistenti. Riprova più tardi.",
-    "assistant_wrap_in_rotation": "Cambiare le chiavi scollega i tuoi assistenti. Ricollegali dopo."
+    "assistant_wrap_in_rotation": "Cambiare le chiavi scollega i tuoi assistenti. Ricollegali dopo.",
+    "keys_missing": "Prima salva la tua chiave di recupero.",
+    "not_migrating": "Il tuo account non è a metà di un passaggio. Ricarica la pagina.",
+    "count_mismatch": "Qualcosa non tornava e non abbiamo cancellato niente. Riprova.",
+    "migration_in_progress": "Il tuo account si sta cifrando in un'altra scheda o dispositivo. Aspetta che finisca.",
+    "not_migratable": "Questo account non può ancora essere cifrato."
   },
   "sign_in": {
     "meta_title": "Accedi · Wambito",
@@ -1037,5 +1042,29 @@
     },
     "removed": "Questo browser è stato rimosso dal tuo account da un altro dispositivo. Le modifiche non ancora sincronizzate qui sono andate perse. Per aprire di nuovo i tuoi dati, scrivi la tua chiave di recupero o usa un altro dispositivo.",
     "unverified": "Questo browser non è riuscito a verificare la nuova chiave del tuo account, quindi ha smesso di sincronizzare. I tuoi dati qui sono al sicuro. Per continuare, usa la tua passkey o scrivi la tua chiave di recupero."
+  },
+  "migration": {
+    "intro_title": "Proteggi i tuoi dati",
+    "intro_body": "Stiamo per cifrare il tuo account: da ora solo tu potrai leggere i tuoi movimenti. Ci vuole un minuto e non si perde niente.",
+    "intro_start": "Inizia",
+    "checking": "Un momento…",
+    "copying": "Cifratura dei tuoi dati… {done} di {total}",
+    "copying_label": "Avanzamento della cifratura",
+    "finishing": "Controlliamo che non manchi niente…",
+    "done_title": "Fatto: il tuo account è cifrato.",
+    "done_lead": "I tuoi movimenti sono come li hai lasciati, e ora solo tu puoi leggerli.",
+    "continue": "Continua",
+    "failed_title": "I tuoi dati sono ancora al sicuro",
+    "count_mismatch": "Qualcosa non tornava e non abbiamo cancellato niente. Riprova.",
+    "taken_over": "Questo passaggio è ancora in corso in un'altra scheda o dispositivo.",
+    "offline": "Sei offline. Non è cambiato niente: riprova quando torna la connessione.",
+    "server": "Qualcosa è andato storto e non abbiamo cancellato niente. Riprova.",
+    "retry": "Riprova",
+    "retrying": "Nuovo tentativo…",
+    "continue_here": "Continua qui",
+    "no_local_title": "Questo passaggio è iniziato altrove",
+    "no_local_body": "L'hai iniziato in un altro browser o dispositivo. Puoi finirlo lì, o ricominciare qui: non si perde niente.",
+    "restart": "Ricomincia qui",
+    "unlock_lead": "Il tuo account ha già una chiave di recupero. Scrivila per continuare in questo browser."
   }
 }

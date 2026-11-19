@@ -230,7 +230,12 @@
     "already_set_up": "This account already has its keys. Open it with your recovery key.",
     "session_changed": "Another account signed in on this browser. Reload the page.",
     "assistant_keys_missing": "Assistants can't be connected right now. Try again later.",
-    "assistant_wrap_in_rotation": "Changing your keys disconnects your assistants. Connect them again afterwards."
+    "assistant_wrap_in_rotation": "Changing your keys disconnects your assistants. Connect them again afterwards.",
+    "keys_missing": "Save your recovery key first.",
+    "not_migrating": "Your account is not in the middle of a move. Reload the page.",
+    "count_mismatch": "Something did not add up and we deleted nothing. Try again.",
+    "migration_in_progress": "Your account is being encrypted in another tab or device. Wait for it to finish.",
+    "not_migratable": "This account cannot be encrypted yet."
   },
   "sign_in": {
     "meta_title": "Sign in · Wambito",
@@ -1037,5 +1042,29 @@
     },
     "removed": "This browser was removed from your account on another device. Changes not yet synced here were lost. To open your data again, type your recovery key or use another device.",
     "unverified": "This browser couldn't verify your account's new key, so it stopped syncing. Your data here is safe. To keep going, use your passkey or type your recovery key."
+  },
+  "migration": {
+    "intro_title": "Protect your data",
+    "intro_body": "We are going to encrypt your account: from now on only you can read your transactions. It takes a minute and nothing is lost.",
+    "intro_start": "Start",
+    "checking": "One moment…",
+    "copying": "Encrypting your data… {done} of {total}",
+    "copying_label": "Encryption progress",
+    "finishing": "Checking that nothing is missing…",
+    "done_title": "Done: your account is encrypted.",
+    "done_lead": "Your transactions are as you left them, and now only you can read them.",
+    "continue": "Continue",
+    "failed_title": "Your data is still safe",
+    "count_mismatch": "Something did not add up and we deleted nothing. Try again.",
+    "taken_over": "This move is still running in another tab or device.",
+    "offline": "You are offline. Nothing changed: try again once you are back.",
+    "server": "Something went wrong and we deleted nothing. Try again.",
+    "retry": "Try again",
+    "retrying": "Trying again…",
+    "continue_here": "Continue here",
+    "no_local_title": "This move started somewhere else",
+    "no_local_body": "You started it in another browser or device. You can finish it there, or start again here: nothing is lost.",
+    "restart": "Start again here",
+    "unlock_lead": "Your account already has a recovery key. Type it to go on in this browser."
   }
 }
