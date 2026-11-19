@@ -564,11 +564,22 @@ function fakeAccount() {
     pushed: [] as { id: string; keyV: number }[],
     rows: new Map<string, { version: number; keyV: number }>(),
     counter: 0,
+    /** Every `/v2/keys` call, as `METHOD /path`, and the body of every wrap PUT. */
+    keyCalls: [] as string[],
+    putBodies: [] as unknown[],
+    /** When set, every `/v2/keys` call fails as if the network were down. */
+    keysOffline: false,
+    /** When set, a wrap PUT answers 503. */
+    failPuts: false,
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request =
         input instanceof Request ? input : new Request(new URL(String(input), "http://x"), init);
       const url = new URL(request.url);
       const method = request.method;
+      if (url.pathname.startsWith("/api/v2/keys")) {
+        if (net.keysOffline) throw new TypeError("offline");
+        net.keyCalls.push(`${method} ${url.pathname}`);
+      }
       if (url.pathname === "/api/v2/recovery/verifier" && method === "PUT") {
         return new Response(null, { status: 204 });
       }
@@ -580,8 +591,10 @@ function fakeAccount() {
       }
       const match = /^\/api\/v2\/keys\/([0-9a-f-]{36})$/.exec(url.pathname);
       if (match && method === "PUT") {
+        if (net.failPuts) return json({ code: "unavailable" }, 503);
         const id = match[1] as string;
         const body = (await request.json()) as AccountWrap;
+        net.putBodies.push(body);
         const wrap: AccountWrap = {
           id,
           kind: body.kind,
@@ -627,6 +640,123 @@ function fakeAccount() {
   };
   return net;
 }
+
+describe("a kept vault opened under a new session", () => {
+  /**
+   * An account set up in this browser (its device wrap PUT under the session `s1`), whose vault
+   * opened once under `s1` and closed: the person then signs in again, the vault kept.
+   */
+  async function keptVault() {
+    const net = fakeAccount();
+    const profile = profileOf();
+    const prepared = await prepareAccount({ userId: profile.id, guest: false, fetch: net.fetch });
+    const local = await prepared.commit();
+    net.keyCalls = [];
+    const first = await openVaultSession({
+      profile,
+      keys: local,
+      fresh: true,
+      fetch: net.fetch,
+      sessionId: async () => "s1",
+    });
+    const firstOpen = [...net.keyCalls];
+    first.close();
+    net.keyCalls = [];
+    net.putBodies = [];
+    const reopen = (sessionId: string) =>
+      openVaultSession({
+        profile,
+        keys: local,
+        fresh: false,
+        fetch: net.fetch,
+        sessionId: async () => sessionId,
+      });
+    return { net, profile, firstOpen, reopen };
+  }
+
+  it("a fresh open needs no call: its device wrap was just PUT under this session", async () => {
+    const { net, firstOpen, reopen } = await keptVault();
+    expect(firstOpen).toEqual([]);
+    const again = await reopen("s1");
+    expect(net.keyCalls).toEqual([]);
+    again.close();
+  });
+
+  it("puts its own device wrap back unchanged, once per session", async () => {
+    const { net, reopen } = await keptVault();
+    const own = { ...(net.wraps.find((w) => w.kind === "device") as AccountWrap) };
+    const session = await reopen("s2");
+    expect(net.keyCalls).toEqual(["GET /api/v2/keys", `PUT /api/v2/keys/${own.id}`]);
+    expect(net.putBodies).toEqual([
+      {
+        kind: own.kind,
+        ref: own.ref,
+        keyV: own.keyV,
+        wrapped: own.wrapped,
+        publicKey: own.publicKey,
+        attestation: own.attestation,
+        label: own.label,
+      },
+    ]);
+    expect(net.wraps.find((w) => w.kind === "device")).toEqual(own);
+    session.close();
+    net.keyCalls = [];
+    const again = await reopen("s2");
+    expect(net.keyCalls).toEqual([]);
+    again.close();
+  });
+
+  it("the session it was bound to: nothing", async () => {
+    const { net, reopen } = await keptVault();
+    const session = await reopen("s1");
+    expect(net.keyCalls).toEqual([]);
+    session.close();
+  });
+
+  it("its device wrap gone (removed meanwhile): fails with device_removed and wipes", async () => {
+    const { net, profile, reopen } = await keptVault();
+    net.wraps = net.wraps.filter((w) => w.kind !== "device");
+    const failed = await reopen("s2").catch((e) => e);
+    expect(failed).toBeInstanceOf(VaultOpenError);
+    expect(failed.code).toBe("device_removed");
+    expect(net.putBodies).toEqual([]);
+    expect(await vaultExists(profile.id)).toBe(false);
+  });
+
+  it("offline or a failure: opens on its data, puts nothing, and tries at the next open", async () => {
+    const { net, profile, reopen } = await keptVault();
+    const own = net.wraps.find((w) => w.kind === "device") as AccountWrap;
+    net.keysOffline = true;
+    const offline = await reopen("s2");
+    offline.close();
+    net.keysOffline = false;
+    net.failPuts = true;
+    const failed = await reopen("s2");
+    failed.close();
+    expect(net.putBodies).toEqual([]);
+    expect(await vaultExists(profile.id)).toBe(true);
+    net.failPuts = false;
+    net.keyCalls = [];
+    const bound = await reopen("s2");
+    expect(net.keyCalls).toEqual(["GET /api/v2/keys", `PUT /api/v2/keys/${own.id}`]);
+    bound.close();
+  });
+
+  it("no session id (it could not be read): opens without a call", async () => {
+    const { net, profile } = await keptVault();
+    const session = await openVaultSession({
+      profile,
+      keys: (await loadLocalKeys(profile.id)) as LocalKeys,
+      fresh: false,
+      fetch: net.fetch,
+      sessionId: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    expect(net.keyCalls).toEqual([]);
+    session.close();
+  });
+});
 
 describe("a new key version this browser cannot verify", () => {
   /**

@@ -75,6 +75,15 @@ async function accountPasskeyIds(): Promise<string[]> {
   return data.map((passkey) => passkey.credentialID);
 }
 
+/**
+ * The id of the session signed in now (Better Auth's `get-session`): a kept vault links its device
+ * wrap to it, so a removal ends this session. Null when it cannot tell.
+ */
+async function liveSessionId(): Promise<string | null> {
+  const { data } = await authClient.getSession();
+  return data?.session?.id ?? null;
+}
+
 /** Another account signed in under this page: load the app again, for them (never the old vault). */
 function reloadApp() {
   window.location.assign("/app");
@@ -103,6 +112,7 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
         fresh,
         onUnauthorized: signInAgain,
         onSessionChanged: () => gate?.sessionChanged(),
+        sessionId: liveSessionId,
       }),
     userId,
     sessionUserId,

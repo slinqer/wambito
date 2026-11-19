@@ -10,6 +10,7 @@ import { isLocale, type Locale } from "../i18n/format.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
 import {
   api,
+  bindDeviceWrap,
   forgetDevice,
   heldDeviceWrapId,
   type LocalKeys,
@@ -108,6 +109,11 @@ export interface OpenVaultOptions {
   onSessionChanged?: () => void;
   /** The store; tests pass their own. */
   openStore?: (userId: string) => Promise<EncryptedStore>;
+  /**
+   * The id of the session the vault opens under. A kept vault opening under a session its device
+   * wrap is not linked to yet links it first (`bindWrap`); without it, nothing is linked.
+   */
+  sessionId?: () => Promise<string | null | undefined>;
 }
 
 interface Active {
@@ -202,6 +208,36 @@ export function openVaultSession(options: OpenVaultOptions): Promise<VaultSessio
   return opening;
 }
 
+/**
+ * Links this browser's device wrap to the session the vault opens under, once per session (its id,
+ * kept as meta `boundSession`). A removal ends the session the wrap is linked to: a browser that
+ * kept its vault through an ended session and signed in again must move the link, or a removal
+ * would end only the dead session. A fresh open needs no call (the unlock or setup just PUT the
+ * wrap under this session). True when the wrap is gone: the open then goes as a removed device's
+ * does. Any failure (offline, a server error, a 401, no session id) is silent: the next open tries
+ * again.
+ */
+async function bindWrap(
+  options: OpenVaultOptions,
+  store: EncryptedStore,
+  network: typeof globalThis.fetch,
+): Promise<boolean> {
+  if (!options.sessionId) return false;
+  try {
+    const id = await options.sessionId();
+    if (!id || (await store.getMeta<string>("boundSession")) === id) return false;
+    if (!options.fresh) {
+      const found = await bindDeviceWrap({ userId: options.profile.id, fetch: network });
+      if (found === "missing") return true;
+      if (found === "unknown") return false;
+    }
+    await store.setMeta("boundSession", id);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function open(options: OpenVaultOptions): Promise<VaultSession> {
   const { profile, keys, fresh } = options;
   const network = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -241,6 +277,12 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         if (problem.code === "key_unverified") unverified?.();
       },
     });
+    // Removed while its wrap was linked to a session that had ended: never syncs.
+    if (await bindWrap(options, store, network)) {
+      store.close();
+      await forgetDevice(profile.id);
+      throw new VaultOpenError("device_removed");
+    }
     const first = await engine.run();
     if (first.problem === "device_removed") {
       store.close();
