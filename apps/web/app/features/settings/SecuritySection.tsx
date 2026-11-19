@@ -28,7 +28,7 @@ import { type DeviceRow, deviceRows } from "./security-model.ts";
 /**
  * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). This browser and the other devices that open the data (label, added date; "Not verified" when
  * an attestation fails), each other one with "Remove" (one tap, `RemoveDeviceSheet`: the wrap goes, the keys stay);
- * "Approve a new device" (`ApproveDevice`); "New recovery key" (confirmed by the current key or a
+ * "Connect another device" (`ApproveDevice`: it approves a new device); "New recovery key" (confirmed by the current key or a
  * passkey touch, then `RecoveryKeySetup`); "Change keys" (a rotation that removes no device,
  * typed recovery key; it disconnects assistants); and how many records could not be read, when any.
  */
@@ -100,13 +100,13 @@ export function SecuritySection({
   const approve = (
     <>
       <div className="flex flex-col gap-(--space-2)">
-        <SettingLabel label={t("approve")} hint={t("approve_lead")} />
+        <SettingLabel label={t("connect")} hint={t("connect_lead")} />
         <PressButton variant="secondary" className="self-start" onClick={() => setApproving(true)}>
-          {t("approve")}
+          {t("connect")}
         </PressButton>
       </div>
       {approving && (
-        <Takeover label={t("approve")}>
+        <Takeover label={t("connect")}>
           <ApproveDevice
             keys={security.pairing}
             {...(security.findPairing ? { findPairing: security.findPairing } : {})}

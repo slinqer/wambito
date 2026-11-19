@@ -251,9 +251,7 @@ export const Overview: Story = {
     await expect(forged?.getByText("Sin verificar")).toBeVisible();
     await expect(forged?.getByRole("button", { name: "Quitar Safari on iOS" })).toBeVisible();
     await expect(security.queryByText("Edge on Windows")).toBeNull();
-    await expect(
-      security.getByRole("button", { name: "Aprobar un dispositivo nuevo" }),
-    ).toBeVisible();
+    await expect(security.getByRole("button", { name: "Conectar otro dispositivo" })).toBeVisible();
     await expect(
       security.getByRole("button", { name: "Nueva clave de recuperación" }),
     ).toBeVisible();
@@ -274,7 +272,7 @@ export const NothingUnreadable: Story = {
 
 /**
  * An account made by the phone (no email) gets the whole section, like any encrypted account: its
- * devices, "Approve a new device" and the keys.
+ * devices, "Connect another device" and the keys.
  */
 export const AnonymousAccount: Story = {
   render: (args) => stage(args, { anonymous: true }),
@@ -286,9 +284,9 @@ export const AnonymousAccount: Story = {
     await area.findAllByRole("listitem");
     await expect(security.load).toHaveBeenCalled();
     await expect(area.getByRole("button", { name: "Nueva clave de recuperación" })).toBeVisible();
-    await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
+    await userEvent.click(area.getByRole("button", { name: "Conectar otro dispositivo" }));
     await expect(
-      await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),
+      await screen.findByRole("dialog", { name: "Conectar otro dispositivo" }),
     ).toBeVisible();
   },
 };
@@ -422,21 +420,24 @@ export const NewRecoveryKeyCancelledTouch: Story = {
   },
 };
 
-/** "Aprobar un dispositivo nuevo" opens the approval screen over Settings; Cancel closes it. */
+/**
+ * "Conectar otro dispositivo" opens the device approval over Settings (its heading is still
+ * "Aprobar un dispositivo nuevo"); Cancel closes it.
+ */
 export const ApproveANewDevice: Story = {
   render: (args) => stage(args),
   play: async ({ canvasElement }) => {
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
+    await userEvent.click(area.getByRole("button", { name: "Conectar otro dispositivo" }));
     const takeover = within(
-      await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),
+      await screen.findByRole("dialog", { name: "Conectar otro dispositivo" }),
     );
     await expect(
       takeover.getByRole("heading", { level: 1, name: "Aprobar un dispositivo nuevo" }),
     ).toBeVisible();
     await userEvent.click(takeover.getByRole("button", { name: "Cancelar" }));
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Aprobar un dispositivo nuevo" })).toBeNull(),
+      expect(screen.queryByRole("dialog", { name: "Conectar otro dispositivo" })).toBeNull(),
     );
   },
 };

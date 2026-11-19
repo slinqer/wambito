@@ -268,10 +268,10 @@ test("a second browser unlocks by pairing", async ({ browser }) => {
   await expect(shown).toBeVisible();
   const code = (await shown.innerText()).trim();
 
-  // -- the first approves: Settings → Security → "Approve a new device", the code ---------------
+  // -- the first approves: Settings → Security → "Connect another device", the code -------------
   await openSecurity(first.page);
-  await first.page.getByRole("button", { name: "Aprobar un dispositivo nuevo" }).click();
-  const approve = first.page.getByRole("dialog", { name: "Aprobar un dispositivo nuevo" });
+  await first.page.getByRole("button", { name: "Conectar otro dispositivo" }).click();
+  const approve = first.page.getByRole("dialog", { name: "Conectar otro dispositivo" });
   await approve.getByRole("textbox", { name: "Código del dispositivo nuevo" }).fill(code);
   await approve.getByRole("button", { name: "Continuar" }).click();
 
