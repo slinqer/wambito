@@ -170,25 +170,76 @@ Then a backup by hand, so the newest dump is from just before the move: `./backu
 
 ### Step 4. The founder's migration (founder)
 
+Before you start, leave the phone app and the assistant idle until step 4.5: no edit in the phone
+app, no question to the assistant. A `/v1` edit that lands at the moment the move starts can be
+lost (its row is copied before the edit). Bank-notification captures may still arrive: the phone
+keeps them queued while the account is migrating (the server answers its background requests with
+a retryable 403, and the new release also keeps them on a 426), and they go to the vault once the
+new release is opened in step 4.5.
+
 1. Open app.wambito.com and sign in. "Protect your data" runs before the app:
    - save the recovery key in the password manager and type the check characters;
    - wait for the copy and "Checking that nothing is missing";
    - "Done": the app opens on the encrypted account.
 
    On "Something did not add up" or any failure: "Try again" (nothing was deleted). A closed tab
-   resumes where it was. If it keeps failing, leave the account as it is and call the builder.
+   resumes where it was. If it keeps failing, roll back (below) and call the builder.
 2. Check the figures: the same month's summary and budgets as before, the recurring payments, the
    merchant memory (a capture suggests the usual category), a deleted transaction restores.
 3. On the VPS, aggregates only: `select encryption, count(*) from "user" group by 1;` shows the
    founder's account as `encrypted`.
 4. Add a passkey on the web: Settings → Security (one with PRF opens the data without the recovery
    key).
-5. The phone: install the new release and sign in with the email. On its Unlock screen choose
+5. The phone: install the new release (over the old one, so its queue of captures stays) and open
+   it. It learns the account is encrypted and moves every capture still queued into the vault once
+   the vault opens. Sign in with the email if it asks. On its Unlock screen choose
    "Add this phone from another device" and approve it on the web (Settings → Security → "Connect
    another device"), or type the recovery key.
 6. The assistant: the old connection was revoked by the move. In the assistant (Claude, ChatGPT),
    remove the Wambito connector and add it again (`https://app.wambito.com/mcp`), then approve on
    Wambito's consent page; it makes the assistant's key.
+
+### Roll back: the account back to plain (founder, with the builder)
+
+When `finish` keeps failing, the account stays `migrating`: the web shows only the flow, the old
+phone app and the assistant get refusals, and turning `MIGRATION_OPEN` off does not change that.
+The plaintext is intact the whole time. Only `POST /v2/migration/cancel`, from the session the move
+is bound to, makes the account `plain` again. The flow's failure screens offer "Try again" (or
+"Continue here", or "Start again") and "Sign out", never a way back to plain, and signing out does
+not cancel. So
+the way back is the browser console of the founder's signed-in tab on app.wambito.com.
+
+1. **Founder**, on the VPS from `deploy/personal`: stop new migrations. Set `MIGRATION_OPEN=false`
+   in `.env`, then `docker compose up -d api`. `NEW_USERS_ENCRYPTED` may stay on.
+2. **Founder**, in the tab where you are signed in to app.wambito.com (the flow's screen), open the
+   developer tools' console (Cmd+Option+J in Chrome, Cmd+Option+K in Firefox, or Safari's Develop
+   menu) and paste:
+
+   ```js
+   const me = await (await fetch("/api/v1/me")).json();
+   const h = { "x-wambito-user": me.id };
+   const started = await fetch("/api/v2/migration/start", { method: "POST", headers: h });
+   const cancelled = await fetch("/api/v2/migration/cancel", { method: "POST", headers: h });
+   console.log(me.migration, started.status, cancelled.status);
+   // expected: in_progress 200 204
+   ```
+
+   The requests are same-origin, so the browser sends the session cookie by itself; nothing secret
+   is typed or printed. `start` binds the move to this tab's session (it works with the gate
+   closed, since the account is already migrating), and `cancel` deletes the account's records and
+   their purge mark, keeps its key wraps and the recovery verifier, and sets `plain`. Anything else:
+   stop, and paste only the three printed values to the builder.
+3. Reload the page: the plain app opens with every movement, category, budget and recurring
+   payment as before. Check one month's summary.
+4. What stays: the saved recovery key keeps working for the next attempt (the flow asks for it at
+   "Unlock"), and this browser still holds the vault of the attempt; signing out wipes it. The
+   phone's queued captures go to the plain account again as soon as the server takes them.
+5. **Builder**, aggregates only: `select encryption, count(*) from "user" group by 1;` shows the
+   founder's account as `plain`, and the plaintext counts per type match those noted before step 4.
+
+Last resort, only if the account is not `plain` with its plaintext after this: restore the
+backup taken in step 3 (`deploy/personal/restore.sh`, `deploy/personal/README.md`). It loses
+whatever was written after it.
 
 ### Step 5. The test accounts (founder)
 
