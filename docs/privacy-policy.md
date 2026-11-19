@@ -2,7 +2,7 @@
 
 > Draft, kept in line with the live policy at `/privacy` (`legal.privacy` in
 > `apps/web/app/i18n/messages/*.json`). True from the switch day (E2E stage 5,
-> `docs/deploy/switch-day.md`); `TODO-DATE` is that day, filled in on the day.
+> `docs/deploy/switch-day.md`); its dates are filled in on that day.
 
 Wambito keeps the data you give it so it can show you your budget. Your finances are end-to-end
 encrypted: they are encrypted on your device, with a key only you and your devices hold, and the
@@ -12,7 +12,7 @@ server keeps them only as ciphertext it cannot read.
   restore included), categories, budgets, recurring payments, the category you gave each merchant,
   your settings (currency among them), and what you import.
 - **What the server still sees (metadata):** your email; the public part of your passkeys; how many
-  records of each type you have, their size in coarse buckets and when they change; the profile
+  records of each type you have, their size in coarse buckets, when they change and which are deleted; the profile
   columns: time zone, language, whether onboarding is done; the platform and version of your app
   and the last day you opened it (active days are counted per day without a user id); the names of
   the devices you link; the permissions of the AI assistants you connect; for each session, the kind
@@ -28,18 +28,17 @@ server keeps them only as ciphertext it cannot read.
   plaintext. Revoking it cuts it at once. The assistant's company handles what it reads under its
   own policy.
 - **Guests (no email):** stored encrypted like everyone else; deleted after 12 months unused, or 24
-  months when protected with a saved recovery key or a passkey.
+  months when protected with a recovery key or a passkey.
 - **What we don't do:** we don't sell your data, show ads, run trackers or analytics, or share it
   with third parties, except the services we need to run: the server, the backups and the email
   provider that delivers your sign-in codes.
 - **Imports:** from a Budge export we keep only your transactions and category names, encrypted on
   your device. Budge's user id and account balances are discarded.
 - **Backups:** a daily backup on the server and an age-encrypted copy in Cloudflare R2, none older
-  than 14 days. Accounts created before end-to-end encryption moved to it on TODO-DATE; backups
+  than 14 days. Accounts created before end-to-end encryption moved to it on SWITCH_DATE; backups
   from before that day still hold those finances in a form we could read, and the last of them
-  deletes itself on TODO-DATE+14. After that date no plaintext copy of anyone's finances exists.
-- **Your rights (Ley 1581):** you can see and correct your data in the app and delete your account
-  at any time; we delete your account and all your records right away, and backups that include
-  them delete themselves within 14 days. Only your devices can open your finances, so a request to
-  us covers everything else we hold. Downloading your finances from Settings is not available yet
-  for encrypted accounts (the export is to be rebuilt on the client).
+  deletes itself on SWITCH_DATE_PLUS_14. After that date no plaintext copy of anyone's finances exists.
+- **Your rights (Ley 1581):** you can download all your data from Settings (your device makes the
+  file, since only your devices can open your finances) and delete your account at any time. We
+  delete your account and all your records right away; backups that include them delete themselves
+  within 14 days. A request to us covers everything else we hold.

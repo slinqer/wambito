@@ -21,7 +21,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 | `deploy/personal` | the VPS / home install: compose, Caddy, backups, auto-deploy | `deploy/personal/AGENTS.md` |
 | `deploy/landing` | Cloudflare Worker for the landing | `deploy/landing/AGENTS.md` |
 | `docs` | design system, deploy, mobile, admin panel guide (`docs/admin.md`), history | `docs/AGENTS.md` |
-| `scripts` | repo guards (`scripts/check-old-name.sh`) | here |
+| `scripts` | repo guards (`scripts/check-old-name.sh`); `scripts/check-switch-dates.sh` (the switch day's policy dates, run by hand from `docs/deploy/switch-day.md`, not in CI) | here |
 | `docker-compose.yml` | root dev stack: postgres, mailpit, api | here |
 
 ## Dev stack and commands (repo root)

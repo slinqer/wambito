@@ -28,7 +28,7 @@ The app still talks about money the Colombian way: in Colombia we call money **l
 
 ## End-to-end encryption
 
-🚧 **Built, switching on soon.** Each phone or browser will encrypt your movements with a key only you hold; the server keeps only encrypted records, and an assistant gets a key only while you keep it connected. Every account moves over on one switch day, before the public release. How it works, with pictures: [`docs/encryption.md`](docs/encryption.md).
+🔒 **On for every account.** Each phone or browser encrypts your movements with a key only you hold; the server keeps only encrypted records, and an assistant gets a key only while you keep it connected. Every account moved over on one switch day, before the public release. How it works, with pictures: [`docs/encryption.md`](docs/encryption.md).
 
 ## Status
 

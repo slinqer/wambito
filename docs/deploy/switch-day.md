@@ -16,16 +16,35 @@ Rules for every step:
 
 ## 0. Before the day (builder)
 
-1. The stage 5 code is merged and deployed (`/health` shows the commit). Production still has
-   `NEW_USERS_ENCRYPTED` and `MIGRATION_OPEN` off, so nothing has changed for anyone.
+This branch is **not merged before the day**: merging deploys, and the policy and landing copy say
+what is true only from the founder's migration on. The day starts by dating the copy in this
+branch and merging it (section 2, "The day starts").
+
+1. The encrypted import and export stage (importing a Budge CSV and downloading your data, made on
+   the device, for encrypted accounts) is merged and deployed. The policy, the FAQ and the store
+   listings in this branch say both work.
 2. `deploy/personal/docker-compose.yml` passes `NEW_USERS_ENCRYPTED`, `MIGRATION_OPEN` and
    `MIGRATION_OPEN_USER_IDS` to the `api` service, and `deploy/personal/.env.example` documents
    them. The `api` service lists its variables one by one, so a `.env` line it does not list has no
    effect. Done: all three are passed, off by default, and `test-compose-files.sh` checks each one.
    The direct-mode file adds no `api` variables of its own.
-3. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
+3. **Founder:** the MCP's key pair is set on the VPS, or the founder's assistant cannot connect
+   again after the move (step 4.6). Check by name only, never printing a value, from
+   `deploy/personal`:
+
+   ```sh
+   docker compose exec -T api node -e 'console.log("MCP_WK_PUBLIC_KEY set:", Boolean(process.env.MCP_WK_PUBLIC_KEY))'
+   docker compose exec -T mcp node -e 'console.log("MCP_WK_PRIVATE_KEY set:", Boolean(process.env.MCP_WK_PRIVATE_KEY))'
+   # expected: true, true
+   ```
+
+   If either is false, make the pair once with `deploy/personal/gen-mcp-keys.sh`
+   (`deploy/personal/AGENTS.md`, "The MCP's key pair"), put both lines in `.env`, and
+   `docker compose up -d api mcp`.
+4. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
    the founder installs it in step 4.
-4. The rehearsal below passed.
+5. The rehearsal below passed, on this branch.
+6. The founder picks the day.
 
 ## 1. The rehearsal (builder runs it, the founder decrypts)
 
@@ -103,6 +122,30 @@ If anything did not match, stop: the day waits for a fix and a new rehearsal.
 
 ## 2. The switch, in production
 
+### The day starts: date the copy, then merge (builder, with the founder)
+
+1. In this branch, list the date markers the policy still holds:
+
+   ```sh
+   scripts/check-switch-dates.sh   # prints each file:line left, exits 1 while any is left
+   ```
+
+   They are in `apps/web/app/i18n/messages/{es,en,it,pt}.json` (`legal.privacy.version`,
+   `legal.privacy.sections.storage.body`, `legal.delete_account.version`) and in
+   `docs/privacy-policy.md`.
+2. Replace the marker ending in `_PLUS_14` **first**, with today plus 14 days (the last dump holding
+   plaintext ages out then), then the other one with today (the day of step 4). Replacing the short
+   one first would leave `_PLUS_14` glued to a date. The words around them carry the article, so
+   write the bare date: es `21 de noviembre de 2026`, en `21 November 2026`, it `21 novembre 2026`,
+   pt `21 de novembro de 2026`.
+3. `scripts/check-switch-dates.sh` prints `none left` and exits 0. Run the i18n tests
+   (`cd apps/web && pnpm exec vitest run --project unit app/i18n`), commit
+   `docs: date the privacy policy for the switch day`, and merge. Merging deploys the API and the
+   web (`deploy/personal/auto-deploy.sh`, once CI passes) and the landing (CI). Wait until
+   `/health` on app.wambito.com shows the merge commit.
+4. If step 4 slips past the dated day, date the copy again in a new PR: the policy's dates are the
+   day of the founder's migration and that day plus 14.
+
 ### Step 3. Flags (founder)
 
 On the VPS, in `deploy/personal/.env`:
@@ -110,15 +153,17 @@ On the VPS, in `deploy/personal/.env`:
 ```sh
 NEW_USERS_ENCRYPTED=true
 MIGRATION_OPEN=true
-# and delete the E2E_PREVIEW_USER_IDS line if there is one
 ```
+
+Delete the `E2E_PREVIEW_USER_IDS` line too if there is one (the production compose does not pass
+it to the API, so it has no effect; it simply goes).
 
 Apply it from `deploy/personal` with `docker compose up -d api` (a plain `restart` does not re-read
 `.env`). Check what the API got (no secret in it):
 
 ```sh
-docker compose exec -T api node -e 'const e = process.env; console.log(e.NEW_USERS_ENCRYPTED, e.MIGRATION_OPEN, e.E2E_PREVIEW_USER_IDS ?? "(unset)")'
-# expected: true true (unset)
+docker compose exec -T api node -e 'const e = process.env; console.log(e.NEW_USERS_ENCRYPTED, e.MIGRATION_OPEN)'
+# expected: true true
 ```
 
 Then a backup by hand, so the newest dump is from just before the move: `./backup.sh`.
@@ -138,38 +183,43 @@ Then a backup by hand, so the newest dump is from just before the move: `./backu
    founder's account as `encrypted`.
 4. Add a passkey on the web: Settings → Security (one with PRF opens the data without the recovery
    key).
-5. The phone: install the new release, sign in with the email, then open the data with "Connect
-   another device" (approve it from the web, Settings → Security) or with the recovery key.
+5. The phone: install the new release and sign in with the email. On its Unlock screen choose
+   "Add this phone from another device" and approve it on the web (Settings → Security → "Connect
+   another device"), or type the recovery key.
 6. The assistant: the old connection was revoked by the move. In the assistant (Claude, ChatGPT),
    remove the Wambito connector and add it again (`https://app.wambito.com/mcp`), then approve on
    Wambito's consent page; it makes the assistant's key.
 
 ### Step 5. The test accounts (founder)
 
-1. List the accounts on the VPS, ids only:
+1. Tell the accounts that stay. In the admin panel (`docs/admin.md`), look up your own email (you
+   know it; it never goes into the repo, a PR or a log): that row is your account, now `encrypted`,
+   and its id is the one to keep. Then check whom the panel belongs to, ids only:
+
+   ```sh
+   docker compose exec -T api node -e 'console.log(process.env.ADMIN_USER_IDS)'
+   ```
+
+   - It is your account's id: one account stays, and **11** are deleted.
+   - It is another id: that admin account is a separate one. It stays too, and migrates as in step 4
+     (sign in with it, "Protect your data"). Then two accounts stay and **10** are deleted.
+2. List every account on the VPS, ids only:
 
    ```sh
    docker compose exec -T postgres psql -U wambito -d wambito \
      -c 'select id, is_anonymous, encryption, created_at from "user" order by created_at'
    ```
 
-   Expected: 12 rows, the founder's (now `encrypted`) and 11 test accounts (4 with an email, 7
-   guests). If there is any other row, someone else signed up: do not delete it.
-2. In the admin panel (`docs/admin.md`), look each test account up (by email, or by id for a
-   guest) and delete it with the reason `switch-day test data`. The panel cannot delete the
-   founder's own account, which stays.
-3. Check: `select encryption, count(*) from "user" group by 1;` shows no `plain` account.
+   Expected: 12 rows (on 2026-11-19: 5 with an email, yours among them, and 7 guests). Every row
+   that is not an id kept in 1 is a test account. If there are more rows than that, someone else
+   signed up: do not delete those.
+3. In the admin panel, look each test account up (by email for those with one, by id for a guest)
+   and delete it with the reason `switch-day test data`. The panel cannot delete its own admin
+   account in any case.
+4. Check: `select encryption, count(*) from "user" group by 1;` shows no `plain` account.
 
-### The copy, on the day (founder or builder)
+### Stores, the same day (founder)
 
-- The policy's dates: replace every `TODO-DATE` in `apps/web/app/i18n/messages/{es,en,it,pt}.json`
-  (`legal.privacy.version`, `legal.privacy.sections.storage.body`, `legal.delete_account.version`)
-  and in `docs/privacy-policy.md`. `TODO-DATE` is the day of step 4; `TODO-DATE+14` is that day plus
-  14 days (the last dump holding plaintext ages out then). The words around them already carry the
-  article, so write the bare date: es `21 de noviembre de 2026`, en `21 November 2026`, it
-  `21 novembre 2026`, pt `21 de novembro de 2026`. Then `git grep -n TODO-DATE` prints nothing.
-  Commit `docs: date the privacy policy for the switch day`; merging deploys the web and the
-  landing.
 - Google Play: paste each language's `apps/mobile/fastlane/metadata/android/<locale>/full_description.txt`
   into the store listing (F-Droid reads them from the repo), and update the **Data safety** form
   with the answers in `docs/mobile/play.md` ("Data safety"):
@@ -178,6 +228,8 @@ Then a backup by hand, so the newest dump is from just before the move: `./backu
     so the developer cannot read it; check Play's current help on end-to-end encrypted data first;
   - "Device or other IDs" goes (no IP address is stored); "App activity → App interactions" is
     declared (the active-day count).
+- `README.md` and `docs/encryption.md` already say encryption is on for every account (they merge
+  with this branch, on the day).
 
 ## 3. Later: dropping the old tables (builder, a PR after a week without problems)
 
