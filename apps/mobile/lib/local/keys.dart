@@ -493,6 +493,47 @@ Future<LocalKeys> refreshKeys(KeysOptions options) async {
   return local;
 }
 
+/// What [bindDeviceWrap] found.
+enum WrapBinding {
+  /// This phone's device wrap is listed and was PUT back: the server links it to this session.
+  bound,
+
+  /// This phone's device wrap is gone (or sealed to another key): it was removed.
+  missing,
+}
+
+/// Links this phone's device wrap to the session the call runs under. A device wrap remembers the
+/// session that first PUT it, and a removal ends only that session: a phone that kept its vault
+/// through an expired session and signed in again would otherwise keep its new session after a
+/// removal. Lists the keys (`GET /v2/keys`); when the wrap whose id this phone kept is listed with
+/// this phone's public key, PUTs it back unchanged (`PUT /v2/keys/{id}`, the row's fields as
+/// listed), which moves the link to this session; else [WrapBinding.missing] (also with no wrap id
+/// kept). Network and server failures throw [KeysError]s; nothing is written on this phone.
+Future<WrapBinding> bindDeviceWrap(KeysOptions options) async {
+  final userId = options.userId;
+  final wrapId = await options.storage.deviceWrapId(userId);
+  final publicKey = await options.storage.devicePublicKey(userId);
+  if (wrapId == null || publicKey == null) return WrapBinding.missing;
+  final call = api(options);
+  final listed = await listKeys(call);
+  final wrap = listed.wraps.where((w) => w.kind == 'device' && w.id == wrapId).firstOrNull;
+  if (wrap == null || wrap.publicKey != publicKey) return WrapBinding.missing;
+  await call(
+    '/v2/keys/${Uri.encodeComponent(wrap.id)}',
+    method: 'PUT',
+    data: {
+      'kind': wrap.kind,
+      'ref': wrap.ref,
+      'keyV': wrap.keyV,
+      'wrapped': wrap.wrapped,
+      'publicKey': wrap.publicKey,
+      'attestation': wrap.attestation,
+      'label': wrap.label,
+    },
+  );
+  return WrapBinding.bound;
+}
+
 /// Forgets one old key version's data key, once no local record uses it.
 Future<void> dropKeyVersion(String userId, int keyV, KeyStorage storage) =>
     storage.deleteDataKey(userId, keyV);

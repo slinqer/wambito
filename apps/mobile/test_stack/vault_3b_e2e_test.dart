@@ -32,7 +32,8 @@ import 'support.dart';
 ///
 /// The restore tests run after it, in order, on the same account and phone A (one sign-in for the
 /// file): a new phone C pairs with A, then a delete on A is restored on C, and an old client's
-/// delete (no body on the tombstone) is `not_found` on C.
+/// delete (no body on the tombstone) is `not_found` on C. The last test signs a phone D in again
+/// with its vault kept, and checks that a removal still cuts off its new session.
 ///
 /// Plain `flutter test` with sqflite_common_ffi; no emulator.
 const _merchant = 'panaderia e2e';
@@ -333,5 +334,39 @@ void main() {
     });
     final after = await serverRow(id);
     expect([after['deleted'], after['body'], after['version']], [true, null, tombstone['version']]);
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('a phone back on a new session with its vault kept is cut off by a removal', () async {
+    // 1. D signs in (session 1), pairs with A and opens its vault: its wrap is PUT under session 1.
+    final (token: token1, profile: _) = await signIn();
+    final dir = Directory('${root.path}/d')..createSync();
+    final d1 = Phone(token1, dir);
+    final pairing = await startPairing(d1.options);
+    final approver = await findPairing(_a.options, code: pairing.code);
+    expect(await approver.number(), await pairing.number());
+    final finishing = pairing.finish();
+    await approver.approve();
+    await finishing;
+    final dWrap = await d1.options.storage.deviceWrapId(userId);
+    expect(dWrap, isNotNull);
+    await on(d1, (session) async => expect((await session.sync()).problem, isNull));
+
+    // 2. D signs in again (session 2), its vault and keys kept (as after a session that expired),
+    // and opens: it lists the keys and PUTs its own wrap back, which links it to session 2.
+    final (token: token2, profile: _) = await signIn();
+    final d2 = Phone(token2, dir, storage: d1.storage);
+    final session = await _open(d2, _profile);
+    expect(await d2.options.storage.deviceWrapId(userId), dWrap);
+    expect((await session.sync()).problem, isNull);
+
+    // 3. A removes D (`DELETE /v2/keys/{id}`): the server ends the session D's wrap is linked to
+    // now, so D's next call on session 2 is refused.
+    await keys.api(_a.options)('/v2/keys/${dWrap!}', method: 'DELETE');
+    final refused = await d2.network.get<Object?>(
+      '/v1/me',
+      options: Options(validateStatus: (_) => true),
+    );
+    expect(refused.statusCode, 401);
+    await session.close();
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

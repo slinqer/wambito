@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:wambito/api/session.dart';
 import 'package:wambito/crypto/crypto.dart';
+import 'package:wambito/home/home_cache.dart' show sessionOwnerOf;
 import 'package:wambito/local/key_storage.dart';
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/vault_session.dart';
@@ -61,6 +62,15 @@ void main() {
       return e.response?.statusCode;
     }
   }
+
+  test('the vault opens under the signed-in session: its owner (a hash of the token) goes with '
+      'it, so a kept vault links its device wrap to a new session', () async {
+    lastOpenOptions = null;
+    final server = FakeServer({'tokA': _a});
+    await readyA(server);
+    expect(lastOpenOptions?.sessionOwner, sessionOwnerOf('tokA'));
+    expect(lastOpenOptions?.sessionOwner, isNot('tokA'));
+  });
 
   for (final online in [true, false]) {
     test('preview A ready, then the token switched to B (${online ? 'online' : 'offline'}): '

@@ -14,6 +14,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/api/auth_api.dart';
 import 'package:wambito/api/client.dart';
 import 'package:wambito/api/device.dart';
+import 'package:wambito/home/home_cache.dart' show sessionOwnerOf;
 import 'package:wambito/crypto/crypto.dart'
     show
         DeviceKeyPair,
@@ -172,6 +173,8 @@ class Phone {
               fresh: fresh,
               network: network,
               storage: options.storage,
+              // As the app's gate: a kept vault under a new session links its wrap to it.
+              sessionOwner: sessionOwnerOf(token),
               syncDebounce: const Duration(milliseconds: 100),
               openStore: (id) =>
                   SqliteStore.open(id, directory: dir.path, factory: databaseFactoryFfi),

@@ -72,6 +72,7 @@ class OpenVaultOptions {
     this.refreshKeys,
     this.lease,
     this.seed = true,
+    this.sessionOwner,
   });
 
   final VaultProfile profile;
@@ -112,6 +113,11 @@ class OpenVaultOptions {
   /// Seed the account's first records ([seedIfEmpty]) after a complete first sync. False when a
   /// carry (merge.dart) fills the new vault instead.
   final bool seed;
+
+  /// The session the vault opens under, as a hash of its token (`sessionOwnerOf`). A kept vault
+  /// opening under a session its device wrap is not linked to yet links it first ([_bindWrap]);
+  /// null skips that.
+  final String? sessionOwner;
 }
 
 /// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
@@ -355,6 +361,38 @@ Future<void> seedIfEmpty(FinanceStore store, VaultProfile profile) async {
   });
 }
 
+/// Links this phone's device wrap to the session the vault opens under, once per session
+/// ([OpenVaultOptions.sessionOwner], kept as `boundSession`). A removal ends the session the wrap
+/// is linked to: a phone that kept its vault through an expired session and signed in again must
+/// move the link, or a removal would end only the dead session. A fresh open needs no call (the
+/// unlock or setup just PUT the wrap under this session). True when the wrap is gone: the open
+/// then goes as a removed device's does. A held vault is never wiped by it, and any failure
+/// (offline, a server error, a 401) is silent: the next open tries again.
+Future<bool> _bindWrap(OpenVaultOptions options, SqliteStore store) async {
+  final owner = options.sessionOwner;
+  if (owner == null) return false;
+  final userId = options.profile.id;
+  final storage = options.storage;
+  try {
+    if (await storage.boundSession(userId) == owner) return false;
+    if (options.fresh) {
+      await storage.setBoundSession(userId, owner);
+      return false;
+    }
+    final found = await bindDeviceWrap(
+      KeysOptions(userId: userId, dio: options.network, storage: storage),
+    );
+    if (found == WrapBinding.bound) {
+      await storage.setBoundSession(userId, owner);
+      return false;
+    }
+    // A held vault (a merge, say) may be the only copy of its data: only its own flow forgets it.
+    return await store.hold() == null;
+  } on Object {
+    return false;
+  }
+}
+
 /// Opens (or reuses) the account's vault session: the store, a full sync (required when `fresh`;
 /// a known phone opens on its local data when offline), the first records if the account has
 /// none, then the sync's triggers.
@@ -473,8 +511,8 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
         },
       ),
     );
-    final first = await engine.run();
-    if (first.problem == SyncProblemCode.deviceRemoved) {
+    // This phone was removed: the vault and its keys go, the gate says so.
+    Future<Never> removedOnOpen() async {
       await _closeStore(userId, store);
       if (_mayWipe(mine)) {
         await deleteStore(userId);
@@ -482,6 +520,11 @@ Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
       }
       throw const VaultOpenError(SyncProblemCode.deviceRemoved);
     }
+
+    // Removed while its wrap was linked to a session that had ended: never syncs.
+    if (await _bindWrap(options, store)) await removedOnOpen();
+    final first = await engine.run();
+    if (first.problem == SyncProblemCode.deviceRemoved) await removedOnOpen();
     // Never opened on a key version that did not verify; the vault stays (the catch closes it).
     if (first.problem == SyncProblemCode.keyUnverified) {
       throw const VaultOpenError(SyncProblemCode.keyUnverified);

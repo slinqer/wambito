@@ -195,6 +195,9 @@ Future<SqliteStore> openTestStore(String userId) =>
 Future<void> deleteTestStore(String userId) =>
     deleteVault(userId, directory: vaultDir.path, factory: databaseFactoryFfi);
 
+/// What the gate last asked the vault session to open with.
+OpenVaultOptions? lastOpenOptions;
+
 /// The app's providers over [server], signed in as [session], with the vault in [vaultDir].
 ProviderContainer appContainer(
   FakeServer server,
@@ -221,8 +224,9 @@ ProviderContainer appContainer(
           token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
         )..dio.httpClientAdapter = server,
       ),
-      openVaultSessionProvider.overrideWithValue(
-        (o) => openVaultSession(
+      openVaultSessionProvider.overrideWithValue((o) {
+        lastOpenOptions = o;
+        return openVaultSession(
           OpenVaultOptions(
             profile: o.profile,
             keys: o.keys,
@@ -234,8 +238,8 @@ ProviderContainer appContainer(
             openStore: openTestStore,
             deleteStore: deleteTestStore,
           ),
-        ),
-      ),
+        );
+      }),
     ],
   );
   return container;
