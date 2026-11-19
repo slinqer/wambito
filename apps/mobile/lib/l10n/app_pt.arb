@@ -904,7 +904,7 @@
   "vaultUnlockPasskey": "Usar uma chave de acesso",
   "vaultUnlockPair": "Adicionar este telemóvel a partir de outro dispositivo",
   "vaultPairTitle": "Abre os teus dados a partir de outro dispositivo",
-  "vaultPairLead": "Num dispositivo onde o Wambito já está aberto, vai a Definições → Segurança → Aprovar um dispositivo novo, e lê este código ou escreve-o.",
+  "vaultPairLead": "Num dispositivo onde o Wambito já está aberto, vai a Definições → Segurança → Ligar outro dispositivo, e lê este código ou escreve-o.",
   "vaultPairStarting": "A preparar um código…",
   "vaultPairCodeLabel": "Código",
   "vaultPairExpires": "Este código serve até às {time}.",

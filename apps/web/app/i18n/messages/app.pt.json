@@ -258,7 +258,7 @@
     "wait": "Espera {seconds} s",
     "qr": {
       "title": "Entra com o telemóvel",
-      "lead": "Lê-o com o Wambito no telemóvel: Definições → Segurança → Entrar na web",
+      "lead": "Lê-o com o Wambito no telemóvel: Definições → Segurança → Ligar outro dispositivo",
       "opening": "A preparar um código…",
       "code_label": "Ou escreve este código",
       "remember": "Manter a sessão iniciada neste browser",
@@ -986,7 +986,7 @@
     "passkey_second_touch": "Toca na tua chave de acesso mais uma vez: assim também abrirá os teus dados cifrados.",
     "pair": {
       "title": "Abre os teus dados a partir de outro dispositivo",
-      "lead": "Num dispositivo onde o Wambito já está aberto, vai a Definições → Segurança → Aprovar um dispositivo novo, e lê este código ou escreve-o.",
+      "lead": "Num dispositivo onde o Wambito já está aberto, vai a Definições → Segurança → Ligar outro dispositivo, e lê este código ou escreve-o.",
       "starting": "A preparar um código…",
       "code_label": "Código",
       "expires": "Este código serve até às {time}.",

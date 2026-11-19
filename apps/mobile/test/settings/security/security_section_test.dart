@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/connect_device_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
@@ -140,6 +141,13 @@ void main() {
     expect(find.byKey(const Key('security.signinWeb')), findsNothing);
     expect(find.text('APPROVE A NEW DEVICE'), findsNothing);
     expect(find.text('SIGN IN ON THE WEB'), findsNothing);
+  });
+
+  test('the new device names this entry, in every language', () {
+    for (final locale in AppLocalizations.supportedLocales) {
+      final l10n = lookupAppLocalizations(locale);
+      expect(l10n.vaultPairLead, contains('→ ${l10n.settingsSecurityConnect},'), reason: '$locale');
+    }
   });
 
   for (final key in ['security.newKey', 'security.remove.$laptopId', 'security.changeKeys']) {

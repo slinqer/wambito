@@ -80,7 +80,7 @@ export const Showing: Story = {
       await expect(decodeURIComponent(qr.getAttribute("src") ?? "")).toContain("<svg");
       await expect(
         canvas.getByText(
-          "Escanéalo con Wambito en tu celular: Ajustes → Seguridad → Entrar en la web",
+          "Escanéalo con Wambito en tu celular: Ajustes → Seguridad → Conectar otro dispositivo",
         ),
       ).toBeVisible();
       await expect(

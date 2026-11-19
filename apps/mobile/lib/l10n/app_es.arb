@@ -4103,7 +4103,7 @@
   "@vaultPairTitle": {
     "description": "Pairing: the title."
   },
-  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Aprobar un dispositivo nuevo, y escanea este código o escríbelo.",
+  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Conectar otro dispositivo, y escanea este código o escríbelo.",
   "@vaultPairLead": {
     "description": "Pairing: what to do on the other device."
   },

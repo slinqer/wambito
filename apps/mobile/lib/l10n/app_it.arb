@@ -904,7 +904,7 @@
   "vaultUnlockPasskey": "Usa una passkey",
   "vaultUnlockPair": "Aggiungi questo telefono da un altro dispositivo",
   "vaultPairTitle": "Apri i tuoi dati da un altro dispositivo",
-  "vaultPairLead": "Su un dispositivo dove Wambito è già aperto, vai in Impostazioni → Sicurezza → Approva un nuovo dispositivo, e scansiona questo codice o scrivilo.",
+  "vaultPairLead": "Su un dispositivo dove Wambito è già aperto, vai in Impostazioni → Sicurezza → Collega un altro dispositivo, e scansiona questo codice o scrivilo.",
   "vaultPairStarting": "Preparazione del codice…",
   "vaultPairCodeLabel": "Codice",
   "vaultPairExpires": "Questo codice vale fino alle {time}.",

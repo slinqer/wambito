@@ -258,7 +258,7 @@
     "wait": "Wait {seconds} s",
     "qr": {
       "title": "Sign in with your phone",
-      "lead": "Scan it with Wambito on your phone: Settings → Security → Sign in on the web",
+      "lead": "Scan it with Wambito on your phone: Settings → Security → Connect another device",
       "opening": "Preparing a code…",
       "code_label": "Or type this code",
       "remember": "Keep me signed in on this browser",
@@ -986,7 +986,7 @@
     "passkey_second_touch": "Touch your passkey once more: that lets it open your encrypted data too.",
     "pair": {
       "title": "Open your data from another device",
-      "lead": "On a device where Wambito is already open, go to Settings → Security → Approve a new device, and scan this code or type it.",
+      "lead": "On a device where Wambito is already open, go to Settings → Security → Connect another device, and scan this code or type it.",
       "starting": "Preparing a code…",
       "code_label": "Code",
       "expires": "This code works until {time}.",

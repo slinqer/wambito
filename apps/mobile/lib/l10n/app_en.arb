@@ -2101,7 +2101,7 @@
   "vaultUnlockPasskey": "Use a passkey",
   "vaultUnlockPair": "Add this phone from another device",
   "vaultPairTitle": "Open your data from another device",
-  "vaultPairLead": "On a device where Wambito is already open, go to Settings → Security → Approve a new device, and scan this code or type it.",
+  "vaultPairLead": "On a device where Wambito is already open, go to Settings → Security → Connect another device, and scan this code or type it.",
   "vaultPairStarting": "Preparing a code…",
   "vaultPairCodeLabel": "Code",
   "vaultPairExpires": "This code works until {time}.",

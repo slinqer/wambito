@@ -258,7 +258,7 @@
     "wait": "Espera {seconds} s",
     "qr": {
       "title": "Entra con tu celular",
-      "lead": "Escanéalo con Wambito en tu celular: Ajustes → Seguridad → Entrar en la web",
+      "lead": "Escanéalo con Wambito en tu celular: Ajustes → Seguridad → Conectar otro dispositivo",
       "opening": "Preparando un código…",
       "code_label": "O escribe este código",
       "remember": "Mantener la sesión abierta en este navegador",
@@ -986,7 +986,7 @@
     "passkey_second_touch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados.",
     "pair": {
       "title": "Abre tus datos desde otro dispositivo",
-      "lead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Aprobar un dispositivo nuevo, y escanea este código o escríbelo.",
+      "lead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Conectar otro dispositivo, y escanea este código o escríbelo.",
       "starting": "Preparando un código…",
       "code_label": "Código",
       "expires": "Este código sirve hasta las {time}.",
