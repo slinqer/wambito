@@ -108,6 +108,10 @@ describe("the roadmap's statuses", () => {
     expect(roadmapItem("connect_ai").status).toBe("done");
   });
 
+  it("has end-to-end encryption done since the switch day", () => {
+    expect(roadmapItem("e2e_encryption").status).toBe("done");
+  });
+
   it("builds the store listings and plans the iPhone app next", () => {
     expect(roadmapItem("stores").status).toBe("building");
     expect(roadmapItem("bank_alerts").status).toBe("building");

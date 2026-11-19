@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · What's next",
-      "description": "What we have planned for Wambito: your AI connected, the iPhone app, end-to-end encryption and more. No dates, and it may change."
+      "description": "What we have planned for Wambito: your AI connected, the iPhone app and more. No dates, and it may change."
     },
     "title": "What's next",
     "intro": "This is what we have planned. It may change over time.",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "End-to-end encryption",
-        "body": "Your data is encrypted on your device: not even the server will be able to read it."
+        "body": "Your data is encrypted on your device: not even the server can read it."
       },
       "bank_alerts": {
         "title": "Automatic capture of your bank's notifications",

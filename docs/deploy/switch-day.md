@@ -21,9 +21,8 @@ Rules for every step:
 2. `deploy/personal/docker-compose.yml` passes `NEW_USERS_ENCRYPTED`, `MIGRATION_OPEN` and
    `MIGRATION_OPEN_USER_IDS` to the `api` service, and `deploy/personal/.env.example` documents
    them. The `api` service lists its variables one by one, so a `.env` line it does not list has no
-   effect. When this runbook was written, `MIGRATION_OPEN*` were passed but `NEW_USERS_ENCRYPTED`
-   was not: add it (`NEW_USERS_ENCRYPTED: ${NEW_USERS_ENCRYPTED:-false}`) before the day, or step 3
-   leaves new users born plain.
+   effect. Done: all three are passed, off by default, and `test-compose-files.sh` checks each one.
+   The direct-mode file adds no `api` variables of its own.
 3. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
    the founder installs it in step 4.
 4. The rehearsal below passed.

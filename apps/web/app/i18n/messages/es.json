@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · Lo que viene",
-      "description": "Lo que tenemos planeado para Wambito: tu IA conectada, la app para iPhone, el cifrado de punta a punta y más. Sin fechas, y puede cambiar."
+      "description": "Lo que tenemos planeado para Wambito: tu IA conectada, la app para iPhone y más. Sin fechas, y puede cambiar."
     },
     "title": "Lo que viene",
     "intro": "Esto es lo que tenemos planeado. Puede cambiar con el tiempo.",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "Cifrado de punta a punta",
-        "body": "Tus datos se cifran en tu dispositivo: ni el servidor podrá leerlos."
+        "body": "Tus datos se cifran en tu dispositivo: ni el servidor puede leerlos."
       },
       "bank_alerts": {
         "title": "Captura automática de las notificaciones de tu banco",

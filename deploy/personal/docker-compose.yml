@@ -92,6 +92,9 @@ services:
       # allowlist (comma-separated IPs or CIDRs) is off when empty.
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       ADMIN_ALLOWED_IPS: ${ADMIN_ALLOWED_IPS:-}
+      # The switch: true makes every user created from now on end-to-end encrypted (existing users
+      # stay as they are). Off unless set.
+      NEW_USERS_ENCRYPTED: ${NEW_USERS_ENCRYPTED:-false}
       # The switch day's migration (the web moves a plain account to end-to-end encryption): off
       # unless MIGRATION_OPEN is true; MIGRATION_OPEN_USER_IDS opens it for those ids only.
       MIGRATION_OPEN: ${MIGRATION_OPEN:-false}

@@ -10,12 +10,12 @@ Wambito é o teu orçamento, e vais gostar de cuidar dele: regista uma despesa e
 </ul>
 
 <b>Sem email e sem palavras-passe</b>
-Experimenta sem email, como convidado, e adiciona o teu email depois sem perderes o que registaste. Com email entras com um código de 6 dígitos ou uma ligação e, se quiseres, com uma passkey (a tua impressão digital ou o bloqueio do telemóvel; requer Android 14 ou mais recente). Sem email, se perderes o telemóvel ou apagares a app, perdes os teus dados, e uma conta sem email é apagada passados 60 dias sem abrir Wambito: a app avisa ao fim de 45.
+Experimenta sem email, como convidado, e adiciona o teu email depois sem perderes o que registaste. Com email entras com um código de 6 dígitos ou uma ligação e, se quiseres, com uma passkey (a tua impressão digital ou o bloqueio do telemóvel; requer Android 14 ou mais recente). Sem email, os teus dados ficam encriptados no servidor e só este telemóvel os abre: cria uma chave de recuperação ou adiciona uma passkey (o Wambito lembra-te no ecrã inicial) para os recuperares se perderes o telemóvel ou apagares a app; sem nenhuma das duas, perdem-se. Uma conta sem email é apagada passados 12 meses sem abrir Wambito, ou 24 se tiver chave de recuperação ou passkey.
 
 <b>Privacidade</b>
 As tuas finanças são encriptadas de ponta a ponta: são encriptadas no telemóvel antes de saírem dele, e o servidor só guarda texto encriptado que não consegue ler. Sem anúncios, sem análises nem relatórios automáticos de falhas, sem Google Play Services nem Firebase. O ditado (em espanhol e inglês, e em beta em português e italiano) funciona no teu telemóvel, sem internet, com os modelos de voz livres Vosk (Apache-2.0): o que dizes não sai de lá. O modelo da tua língua descarrega-se uma só vez (entre 30 e 50 MB) e podes apagá-lo nas Definições. Pede apenas as permissões que usa: internet, microfone (para o ditado), vibração, avisos, e o que o widget precisa para se atualizar (saber se há rede e reagendar-se quando o telemóvel reinicia).
 
-Os avisos são apenas dois, ambos locais e que podes desligar: «Vence hoje…» às 9:00 com os pagamentos recorrentes do dia, e um aviso se passarem 45 dias sem abrir a app e a tua conta não tiver email.
+Há apenas um aviso, local e que podes desligar: «Vence hoje…» às 9:00 com os pagamentos recorrentes do dia.
 
 <b>Precisa de um servidor de Wambito</b>
 A app guarda os teus dados num servidor de Wambito. Por defeito usa o do autor (app.wambito.com), que por agora é uma instalação pessoal e pode limitar quem adiciona um email. Podes indicar o teu nas Definições: o servidor também é software livre.
