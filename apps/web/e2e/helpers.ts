@@ -358,3 +358,31 @@ export function reseed() {
     { stdio: "inherit" },
   );
 }
+
+/**
+ * Makes the plain account the migration e2e moves to encrypted again (`migrate-e2e`,
+ * migrate@wambito.test, `seed:e2e-migrate` in the API container): deleted and recreated with
+ * every kind of row (an archived category, budget months, a yearly and a monthly recurrence with a
+ * dismissed month, a deleted transaction, a capture and its merchant rule), in COP.
+ */
+export function seedMigrateUser(): void {
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + SEED_SLACK_MS);
+  execFileSync(
+    "docker",
+    [
+      ...["compose", "exec", "-T", "api", "pnpm", "--silent", "--filter", "@wambito/api"],
+      "seed:e2e-migrate",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+}
+
+/** Runs one SQL statement in the dev stack's database (as its owner); its rows, tab-separated. */
+export function psql(sql: string): string {
+  return execFileSync(
+    "docker",
+    ["compose", "exec", "-T", "postgres", "psql", "-U", "wambito", "-d", "wambito", "-tAc", sql],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  ).trim();
+}

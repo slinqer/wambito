@@ -532,7 +532,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   deletes and recreates the user (no records, key wraps or finance rows), so it needs the stack up
   and `docker` on the PATH; it runs on the desktop project only (one shared account; the file is skipped on the phone and
   its `beforeAll` returns there). CI seeds it
-  too.
+  too. `seed:e2e-migrate` (`migrate-e2e`, migrate@wambito.test, `plain`, onboarded, in COP; the
+  compose's `MIGRATION_OPEN_USER_IDS` default opens the migration to it) deletes and recreates the
+  user with every kind of row (an archived category with transactions, budget months, a yearly
+  and a monthly recurrence with a dismissed month, a deleted transaction, a capture and its
+  merchant rule). `migration.spec.ts` (serial, desktop only) runs it before each test through
+  `seedMigrateUser()`, migrates through the flow, compares the plain API's answers with the
+  vault's (`vaultFetch`: the tab's open session, from `/app/local/vault-session.ts`, the module
+  the app loaded from the dev server) and checks the database with `psql(sql)` (`helpers.ts`,
+  `docker compose exec -T postgres psql`): no row of the account left in the eight plaintext tables.
 - `e2e/signin.spec.ts` (serial, desktop only): the QR sign-in the phone approves, the recovery-key
   sign-in and the unticked box (no cookie expiry, no `wambito-vault-*` once the cookie is gone).
   Node plays the phone: `e2e/phone.ts` `approveSignin({ request, userId, code, recoveryKey })`
