@@ -184,8 +184,7 @@
       },
       "import": {
         "title": "Bring your history",
-        "body": "Import your transactions from other apps: Budge today, Buddy and others soon.",
-        "demo_file": "budge.csv",
+        "body": "You don't have to start from scratch: bring your transactions from other apps.",
         "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}",
         "soon": "Soon"
       }

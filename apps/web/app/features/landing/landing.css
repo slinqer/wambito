@@ -1056,17 +1056,6 @@
   .lk-landing-budget .lk-rowtop {
     font-size: 14px;
   }
-  .lk-landing-file {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    background: var(--surface-row);
-    border: 2px solid var(--stroke);
-    font-size: 14px;
-    font-weight: 800;
-  }
   .lk-landing-arrow {
     width: 28px;
     height: 28px;
@@ -1077,22 +1066,16 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  /* Import: the file on top, the arrow pointing down, then the count, one under the other. */
+  /* Import: the apps on top, the arrow pointing down, then the count, one under the other. */
   .lk-landing-cards.is-how .lk-landing-import {
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-3);
   }
   .lk-landing-import .lk-landing-arrow {
     rotate: 90deg;
   }
-  /* Under the import: where else a history will come from, marked as coming soon. */
+  /* The apps a history comes from: Budge today, the others tagged as coming soon. */
   .lk-landing-sources {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-  }
-  .lk-landing-sources ul {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -1105,27 +1088,32 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: var(--radius-pill);
-    border: 2px dashed var(--control-edge);
-    color: var(--ink-muted);
-    font-size: 13px;
+    background: var(--surface-row);
+    border: 2px solid var(--stroke);
+    font-size: 14px;
     font-weight: 800;
   }
+  .lk-landing-sources li.is-soon {
+    background: none;
+    border-style: dashed;
+    border-color: var(--control-edge);
+    color: var(--ink-muted);
+  }
   .lk-landing-sources img {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
   }
   /* App icons (Budge, Buddy) keep their rounded-square look at this size. */
-  .lk-landing-sources img[src$=".png"],
-  .lk-landing-file img {
-    border-radius: 4px;
-  }
-  .lk-landing-file img {
-    width: 20px;
-    height: 20px;
+  .lk-landing-sources img[src$=".png"] {
     border-radius: 5px;
+  }
+  .lk-landing-sources .lk-landing-soon {
+    font-size: 9px;
+    padding: 1px 6px;
+    margin-inline-start: 2px;
   }
   .lk-landing-imported {
     font-family: var(--font-display);
@@ -1737,15 +1725,12 @@
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-screen-bars {
     animation: lk-landing-wipe 1400ms cubic-bezier(0.25, 0.7, 0.3, 1) 300ms both;
   }
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-file {
-    animation: lk-landing-push 900ms ease-in-out;
-  }
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-arrow {
     animation: lk-landing-nudge 900ms ease-in-out 120ms;
   }
-  /* The import is stacked (file, arrow down, count): the file and the arrow move down. */
-  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-file {
-    animation-name: lk-landing-push-down;
+  /* The import is stacked (apps, arrow down, count): the apps and the arrow move down. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-sources {
+    animation: lk-landing-push-down 900ms ease-in-out;
   }
   .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-arrow {
     animation-name: lk-landing-nudge-down;
@@ -1822,11 +1807,6 @@
   }
   to {
     --lk-wipe: 100%;
-  }
-}
-@keyframes lk-landing-push {
-  50% {
-    translate: 8px 0;
   }
 }
 @keyframes lk-landing-nudge {

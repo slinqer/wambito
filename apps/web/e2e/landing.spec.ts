@@ -1157,22 +1157,24 @@ test.describe("landing with JavaScript", () => {
   test.use({ javaScriptEnabled: true });
 
   for (const width of [375, 1280]) {
-    test(`bring your history at ${width}px: the file, an arrow down, then the count, one after the other`, async ({
+    test(`bring your history at ${width}px: the apps, an arrow down, then the count, one after the other`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
-      const card = page.locator("#how li", { has: page.locator(".lk-landing-file") });
+      const card = page.locator("#how .lk-landing-cards > li", {
+        has: page.locator(".lk-landing-sources"),
+      });
       const [file, arrow, count] = [
-        card.locator(".lk-landing-file"),
+        card.locator(".lk-landing-sources"),
         card.locator(".lk-landing-arrow"),
         card.locator(".lk-landing-imported"),
       ];
       await card.scrollIntoViewIfNeeded();
-      // The count waits for the file and the arrow before it shows up and runs.
+      // The count waits for the apps and the arrow before it shows up and runs.
       await expect(count).toHaveAttribute("data-state", "waiting");
       await expect(count).toHaveAttribute("data-state", "done", { timeout: 6000 });
-      // Stacked and centred: the file on top, the arrow below it, pointing down, the count under it.
+      // Stacked and centred: the apps on top, the arrow below them, pointing down, the count under it.
       const [a, b, c] = [
         await file.boundingBox(),
         await arrow.boundingBox(),

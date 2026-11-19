@@ -184,8 +184,7 @@
       },
       "import": {
         "title": "Trae tu historial",
-        "body": "Importa tus movimientos desde otras apps: hoy desde Budge, y pronto desde Buddy y otras.",
-        "demo_file": "budge.csv",
+        "body": "No tienes que empezar de cero: trae tus movimientos desde otras apps.",
         "demo_rows": "{count, plural, one {# movimiento listo} other {# movimientos listos}}",
         "soon": "Pronto"
       }

@@ -75,31 +75,30 @@ function ImportedCount({ total, play, pace }: { total: number; play: boolean; pa
   );
 }
 
-/** Where else a history will come from; `logo` is the source's mark in public/landing/logos/. */
-const COMING_SOURCES = [
-  { name: "Buddy", logo: "buddy.png" },
-  { name: "Excel", logo: "microsoft-excel.svg" },
-  { name: "Google Sheets", logo: "google-sheets.svg" },
+/**
+ * The apps a history comes from, `logo` being the mark in public/landing/logos/: Budge imports
+ * today, the others are marked as coming soon. Brand names stay as they are in every language;
+ * the marks stay their owners' trademarks and only say where a file comes from.
+ */
+const SOURCES = [
+  { name: "Budge", logo: "budge.png", soon: false },
+  { name: "Buddy", logo: "buddy.png", soon: true },
+  { name: "Excel", logo: "microsoft-excel.svg", soon: true },
+  { name: "Sheets", logo: "google-sheets.svg", soon: true },
 ] as const;
 
-/**
- * Where else a history will come from, marked as coming soon (only Budge imports today). Brand
- * names stay as they are in every language; the marks stay their owners' trademarks and only say
- * where a history can come from.
- */
-function ComingSources({ soon }: { soon: string }) {
+/** The apps in a row, each with its mark; the ones still to come carry the "Soon" tag. */
+function Sources({ soon }: { soon: string }) {
   return (
-    <div className="lk-landing-sources">
-      <span className="lk-landing-soon">{soon}</span>
-      <ul>
-        {COMING_SOURCES.map((source) => (
-          <li key={source.name}>
-            <img src={`/landing/logos/${source.logo}`} alt="" width={16} height={16} />
-            {source.name}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="lk-landing-sources">
+      {SOURCES.map((source) => (
+        <li key={source.name} className={source.soon ? "is-soon" : undefined}>
+          <img src={`/landing/logos/${source.logo}`} alt="" width={18} height={18} />
+          {source.name}
+          {source.soon && <span className="lk-landing-soon">{soon}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -187,7 +186,7 @@ function Feature({
 /**
  * What Wambito does, as a grid of five cards (three then two, centred, on desktop; two on tablets,
  * the last centred; one on phones), each with its name, one line and a small illustration that fills the card's foot:
- * importing your history first (Budge today; where people start), then where the money goes and
+ * importing your history first (the apps it comes from, Budge today and the rest soon, all pointing down to the transactions ready; where people start), then where the money goes and
  * budgets that warn you (the app's real screens, in phones), subscriptions with their due dates and what they cost a month,
  * end-to-end encryption (an expense on the phone, noise on the server), under a big title (signing in without a password is in the FAQ). Automatic capture has
  * its own section above (`AutomaticCapture.tsx`). `pace` scales the timing (stories only).
@@ -208,16 +207,12 @@ export function HowItWorks({ pace = 1 }: { pace?: number }) {
           title={t("import.title")}
           body={t("import.body")}
           demo={(play) => (
-            <div className="lk-landing-demo-row lk-landing-import flex-wrap">
-              <span className="lk-landing-file">
-                <img src="/landing/logos/budge.png" alt="" width={20} height={20} />
-                {t("import.demo_file")}
-              </span>
+            <div className="lk-landing-demo-row lk-landing-import">
+              <Sources soon={t("import.soon")} />
               <svg className="lk-landing-arrow" viewBox="0 0 24 24">
                 <path d="M4 12h15M13 6l6 6-6 6" />
               </svg>
               <ImportedCount total={DEMO.importedRows} play={play} pace={pace} />
-              <ComingSources soon={t("import.soon")} />
             </div>
           )}
         />
