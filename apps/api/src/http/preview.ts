@@ -33,8 +33,25 @@ export const updateRequired = () =>
   );
 
 /**
+ * 403 `encrypted_account`: what a preview account's `/v1` finance routes answered before 426. The
+ * installed Android release (v1.0.3 and earlier) keeps a queued capture on a 403 and drops it on
+ * any other 4xx, so its background capture and review requests keep this answer.
+ */
+export const encryptedAccount = () =>
+  new ApiError(
+    403,
+    "encrypted_account",
+    "This account keeps its finances end-to-end encrypted; use /v2/sync",
+  );
+
+/** The phone's background capture jobs: `POST /v1/captures` and `POST /v1/transactions/review`. */
+const BACKGROUND_CAPTURE_PATHS = [/^\/v1\/captures$/, /^\/v1\/transactions\/review$/];
+
+/**
  * A preview account uses `/v2` only: its `/v1` finance routes answer 426 `update_required`,
- * whether the request comes from a session or an assistant's token (after `requireUser`).
+ * whether the request comes from a session or an assistant's token (after `requireUser`). A
+ * background request (`x-wambito-background: 1`) to a capture path answers the retryable 403
+ * `encrypted_account` instead, so an old phone keeps its queued captures until it updates.
  */
 export function previewOnlyV2(deps: Pick<AppDeps, "config" | "db">) {
   return createMiddleware<AppEnv>(async (c, next) => {
@@ -42,7 +59,13 @@ export function previewOnlyV2(deps: Pick<AppDeps, "config" | "db">) {
     if (FINANCE_PATHS.some((p) => p.test(path))) {
       const userId = c.get("userId");
       const encryption = await accountEncryption(deps.db, userId);
-      if (isPreviewAccount(deps.config, { id: userId, encryption })) throw updateRequired();
+      if (isPreviewAccount(deps.config, { id: userId, encryption })) {
+        const background = c.req.header("x-wambito-background") === "1";
+        if (background && BACKGROUND_CAPTURE_PATHS.some((p) => p.test(path))) {
+          throw encryptedAccount();
+        }
+        throw updateRequired();
+      }
     }
     await next();
   });

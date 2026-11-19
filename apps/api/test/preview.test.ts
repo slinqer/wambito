@@ -135,6 +135,29 @@ describe.each(STATES)("a %s account's /v1", (state) => {
     await expectUpdateRequired(res);
   });
 
+  // The installed Android release retries a 403 on a capture but drops it on any other 4xx: its
+  // background capture and review requests keep the old retryable 403 `encrypted_account`.
+  test.each([
+    ["POST", "/v1/captures"],
+    ["POST", "/v1/transactions/review"],
+  ])("a background %s %s keeps the retryable 403 encrypted_account", async (method, path) => {
+    const { headers } = await personIn(state, `v1-background-${state}-${path.length}@wambito.test`);
+    const res = await t.request(method, path, {
+      headers: { ...headers, "x-wambito-background": "1" },
+      body: {},
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "encrypted_account", status: 403 });
+  });
+
+  test("a background request to another finance route is still 426", async () => {
+    const { headers } = await personIn(state, `v1-background-other-${state}@wambito.test`);
+    const res = await t.request("GET", "/v1/summary", {
+      headers: { ...headers, "x-wambito-background": "1" },
+    });
+    await expectUpdateRequired(res);
+  });
+
   test("PATCH /v1/me with a currency is 426: the currency lives in the records", async () => {
     const { headers } = await personIn(state, `v1-currency-${state}@wambito.test`);
     const res = await t.request("PATCH", "/v1/me", { headers, body: { currency: "COP" } });

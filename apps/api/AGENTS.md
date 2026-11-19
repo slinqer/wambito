@@ -196,7 +196,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 426 `update_required` (`updateRequired()`, title "Upgrade Required") on the `/v1` finance
   routes (transactions, categories, recurrences, summary, reports, captures, imports,
   `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
-  426 too (the currency lives in the settings record). `DELETE /v1/me` still works:
+  426 too (the currency lives in the settings record). Exception: a background request
+  (`x-wambito-background: 1`) to `POST /v1/captures` or `POST /v1/transactions/review` answers
+  the old retryable 403 `encrypted_account` (`encryptedAccount()`), since Android v1.0.3 drops a
+  queued capture on any other 4xx. `DELETE /v1/me` still works:
   `records`, `key_wraps`, `record_purges`, `pairing_requests`, `recovery_verifiers` and bound
   `signin_requests` cascade from `user`.
 - `/v2/migration/*` (`src/routes/migration.ts`, `src/services/migration.ts`; spec 2026-11-19 §2):
