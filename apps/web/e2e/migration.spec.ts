@@ -98,6 +98,7 @@ async function readPlain(page: Page): Promise<Record<string, unknown>> {
  * loaded from the dev server: the vault answers the screens in the browser, never over the network.
  */
 type VaultModule = typeof import("../app/local/vault-session.ts");
+type StoreModule = typeof import("../app/local/encrypted-store.ts");
 
 async function vaultFetch(
   page: Page,
@@ -129,6 +130,28 @@ async function readVault(page: Page): Promise<Record<string, unknown>> {
     out[path] = body;
   }
   return out;
+}
+
+/**
+ * Records straight from this browser's vault (its IndexedDB store, opened a second time and closed
+ * again), for the fields no `/v1` answer carries: a capture's merchant key and time, and the
+ * merchant records (the phone's merchant memory; the web's backend never reads them).
+ */
+async function vaultRecords(page: Page, transactionId: string) {
+  return page.evaluate(
+    async ({ userId, transactionId, module }) => {
+      const { createEncryptedStore }: StoreModule = await import(/* @vite-ignore */ module);
+      const store = await createEncryptedStore(userId);
+      try {
+        const tx = await store.get("transaction", transactionId);
+        const merchants = await store.list("merchant");
+        return { transaction: tx?.body ?? null, merchants: merchants.map((m) => m.body) };
+      } finally {
+        store.close();
+      }
+    },
+    { userId: USER_ID, transactionId, module: "/app/local/encrypted-store.ts" },
+  );
 }
 
 /** The fields a transaction keeps through the move (the vault adds none and drops `accountId`). */
@@ -188,6 +211,28 @@ test("a plain account migrates and keeps everything", async ({ page }) => {
     `select id from transactions where user_id = '${USER_ID}' and name = 'Taxi al aeropuerto'`,
   );
   expect(taxi).toMatch(/^[0-9a-f-]{36}$/);
+  // The capture, as the plain API lists it, and what only the database holds of it and its rule.
+  type Captured = {
+    id: string;
+    note: string | null;
+    source: string;
+    captureSource: string | null;
+    needsReview: boolean;
+  };
+  const capturedBefore = (octoberItems as unknown as Captured[]).find(
+    (t) => t.source === "capture",
+  );
+  expect(capturedBefore?.captureSource).toBe("revolut");
+  const capturedId = capturedBefore?.id ?? "";
+  const [merchantKey, capturedAt] = psql(
+    `select capture_merchant_key, to_char(captured_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') from transactions where id = '${capturedId}'`,
+  ).split("|");
+  expect(merchantKey).toBe("supermercado la esquina");
+  const rule = psql(
+    `select merchant_key || '|' || category_id from merchant_categories where user_id = '${USER_ID}'`,
+  );
+  const noted = (octoberItems as unknown as Captured[]).find((t) => t.note !== null);
+  expect(noted?.note).toBe("Frutas para la semana");
 
   // The flow: intro, the key and its check, the copy, done.
   await page.getByRole("button", { name: "Empezar" }).click();
@@ -248,6 +293,36 @@ test("a plain account migrates and keeps everything", async ({ page }) => {
     rules(before["/api/v1/recurrences"] as Rule[]),
   );
 
+  // The capture keeps its source, merchant key and time, the note stays, and the merchant rule
+  // is a merchant record with the same category.
+  const listedAfter = (after["/api/v1/transactions?month=2026-10&limit=200"] as Listed)
+    .items as unknown as Captured[];
+  const pickCapture = ({ note, source, captureSource, needsReview }: Captured) => ({
+    note,
+    source,
+    captureSource,
+    needsReview,
+  });
+  const capturedAfter = listedAfter.find((t) => t.id === capturedId);
+  expect(capturedAfter && pickCapture(capturedAfter)).toEqual(
+    capturedBefore && pickCapture(capturedBefore),
+  );
+  expect(listedAfter.find((t) => t.id === noted?.id)?.note).toBe("Frutas para la semana");
+  const records = await vaultRecords(page, capturedId);
+  expect(records.transaction).toMatchObject({
+    captureSource: "revolut",
+    captureMerchantKey: merchantKey,
+  });
+  expect(
+    new Date(String((records.transaction as { capturedAt: unknown }).capturedAt)).toISOString(),
+  ).toBe(`${capturedAt}.000Z`);
+  expect(
+    records.merchants.map((m) => {
+      const { merchantKey, categoryId } = m as { merchantKey: string; categoryId: string };
+      return `${merchantKey}|${categoryId}`;
+    }),
+  ).toEqual([rule]);
+
   // Restoring the deleted taxi brings it back, under its own id.
   const restored = await vaultFetch(page, `/api/v1/transactions/${taxi}/restore`, "POST");
   expect(restored.status).toBeLessThan(300);
@@ -272,6 +347,19 @@ test("a reload during copying resumes and finishes", async ({ page }) => {
   await expect(page.getByRole("progressbar", { name: "Progreso del cifrado" })).toBeVisible();
   await expect.poll(() => held).toBe(true);
   expect(psql(`select encryption from "user" where id = '${USER_ID}'`)).toBe("migrating");
+  // The data key as the server holds it before the reload: its wraps and links.
+  const keys = () => ({
+    recovery: psql(
+      `select id || '|' || key_v || '|' || md5(wrapped) from key_wraps where user_id = '${USER_ID}' and kind = 'recovery'`,
+    ),
+    devices: psql(
+      `select string_agg(id || '|' || key_v || '|' || md5(wrapped), ',' order by id) from key_wraps where user_id = '${USER_ID}' and kind = 'device'`,
+    ),
+    links: psql(`select count(*) from key_links where user_id = '${USER_ID}'`),
+  });
+  const keysBefore = keys();
+  expect(keysBefore.recovery).toMatch(/^[0-9a-f-]{36}\|1\|[0-9a-f]{32}$/);
+  expect(keysBefore.devices).toMatch(/^[0-9a-f-]{36}\|1\|[0-9a-f]{32}$/);
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await page.reload();
@@ -281,9 +369,8 @@ test("a reload during copying resumes and finishes", async ({ page }) => {
   );
   await intoTheVault(page);
   expectNoPlaintextLeft();
-  expect(
-    psql(`select count(*) from key_wraps where user_id = '${USER_ID}' and kind = 'recovery'`),
-  ).toBe("1");
+  // The same data key: the very wraps (id, version, bytes) and no new link.
+  expect(keys()).toEqual(keysBefore);
   await expect(page.getByRole("region", { name: "Te quedan este mes" })).toContainText(
     cop(october.remaining),
   );
