@@ -147,9 +147,12 @@ class _RemoveBodyState extends State<_RemoveBody> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: WambitoTokens.space3,
       children: [
-        CssParagraph(
-          l10n.settingsSecurityRemovedDone(name),
-          style: LkText.body.copyWith(color: colors.ink, fontWeight: FontWeight.w700),
+        Semantics(
+          header: true,
+          child: CssParagraph(
+            l10n.settingsSecurityRemovedDone(name),
+            style: LkText.body.copyWith(color: colors.ink, fontWeight: FontWeight.w700),
+          ),
         ),
         CssParagraph(
           l10n.settingsSecurityChangeKeysSuggest,

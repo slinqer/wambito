@@ -124,6 +124,11 @@ void main() {
     await tapKey(t, 'security.remove.confirm');
     expect(security.calls, ['removeDevice $laptopId']);
     expect(find.bySemanticsLabel('Firefox on Linux no longer has access.'), findsOneWidget);
+    // the done line is the step's heading, as on the web
+    expect(
+      t.getSemantics(find.bySemanticsLabel('Firefox on Linux no longer has access.')),
+      isSemantics(isHeader: true),
+    );
     expect(
       find.bySemanticsLabel(
         "If someone else had your key, change it: they won't be able to read anything you save "
