@@ -614,9 +614,7 @@ describe("POST /v2/migration/finish", () => {
       }),
     );
     await problem(await finish(p.headers, counts), 409, "key_version_mismatch");
-    await t.admin
-      .insert(keyLinks)
-      .values({ userId: p.userId, keyV: 2, link: Buffer.alloc(60, 5) });
+    await t.admin.insert(keyLinks).values({ userId: p.userId, keyV: 2, link: Buffer.alloc(60, 5) });
     await ok(await finish(p.headers, counts));
     expect((await userRow(p.userId)).encryption).toBe("encrypted");
   });
