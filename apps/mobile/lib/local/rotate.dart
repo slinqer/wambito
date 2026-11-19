@@ -6,8 +6,9 @@ import 'keys.dart';
 import 'prf.dart';
 import 'store.dart';
 
-/// Twin of apps/web/app/local/rotate.ts. Removing a device rotates the data key (spec 2026-11-08
-/// section 7.5, addendum 2026-11-08-e2e-stage-1b section 2, stage 2b Rulings 1, 2 and 7), and a new
+/// Twin of apps/web/app/local/rotate.ts. Rotating the data key now serves "Change keys" (spec
+/// 2026-11-08 section 7.5, addendum 2026-11-08-e2e-stage-1b section 2, stage 2b Rulings 1, 2 and 7;
+/// removing a device no longer rotates: one `DELETE /v2/keys/{id}`, spec 2026-11-18), and a new
 /// recovery key replaces the recovery wrap. Both are two steps, like `prepareAccount`: everything
 /// is made in memory first (DK from this phone's own device wrap and the recovery secret are zeroed
 /// before the first step returns) and nothing reaches the server until `commit()`. Unlike the web,

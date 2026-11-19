@@ -95,7 +95,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
   every key, waiting at most `vaultCloseWait` in all for the store to close; `seedIfEmpty` makes the first
   settings and suggested categories after a complete first sync, skipped with `OpenVaultOptions.seed: false`
-  when a carry fills the new vault). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
+  when a carry fills the new vault; a device wrap stays linked to the session that first PUT it and a removal
+  ends only that one, so with `OpenVaultOptions.sessionOwner` (the gate passes `sessionOwnerOf(token)`) a kept
+  vault opening under a session not yet in `wambito.vault.<userId>.boundSession` runs `keys.dart`
+  `bindDeviceWrap` before its first sync: `GET /v2/keys`, its own wrap PUT back unchanged (the server links it to
+  this session), or, gone, the vault and keys wiped as a removed device's (`VaultOpenError(deviceRemoved)`), never
+  for a held vault; a fresh open only records the owner; offline or any failure is silent and retried at the next open). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
   `into.transaction`, idempotent: `adopt` copies every live record, settings re-keyed to the new user's seed id
   with `recoveryKeySavedAt` null and no `revokedDevices`; `merge` drops a phone category or `account` that
   matches the account's by `foldedName` (trim, lower case) and kind (not archived), renames same name other
@@ -254,10 +259,11 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `showSigninNotice`, and `SigninNoticeHost` (in `app.dart`'s `builder`, last of the start and resume hooks): with the vault Ready and
   home free it says "A session was opened on {label}" for any device wrap not this phone's and not in the last look, browsers and
   phones added by pairing alike, and the approving phone too (no special case: the first look records silently). "That wasn't me"
-  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device (`suggestChangeKeys`: its done step opens
+  asks `confirmSensitive` (with `noKeyYet` from `noKeyToTypeYet`, as Remove), then opens `RemoveDeviceSheet` for one device (`suggestChangeKeys`: its done step opens
   `ChangeKeysSheet`), or pushes `/settings` for several; "OK" and "That wasn't me"
   record the look, closing the sheet any other way does not. A `plain` account has no `SecurityApi`, so no `/v2/keys` call.
-  Remove, "Change keys" and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes;
+  Remove, "Change keys" and "New recovery key" (making it and showing it) ask `confirmSensitive` first, a guest who never saved a key
+  with `noKeyYet` (`security_section.dart` `noKeyToTypeYet`: never asked for a key they never saw) (D17: no key is made or shown before it passes;
   "Change keys" from a removal's done step rides on that removal's lock); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
@@ -552,7 +558,8 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   removes B with `DELETE /v2/keys/{id}` (no rotation): B's wrap is gone and B's next call is 401 (`unauthenticated`, since the seeded account is a plain user let into preview; `device_removed` is for encrypted users); `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
-  `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
+  `body: null`) is `not_found` on C; last, a phone D pairs on session 1, signs in again on session 2 with its vault
+  kept, opens (its wrap bound to session 2), and A's removal makes D's next call 401). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
   (`phone-first-<run>@wambito.test`, new each run): a guest (`startGuest`) protects (`newRecoveryKey`, its
   verifier signs in) and claims an email; a guest of its own merges into an email account through
   `MergeController` in a `ProviderContainer` over the stack (the held vault survives the sweep, no id the guest

@@ -234,7 +234,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`). `key_unverified` (a new key version whose links do
+  notice `vault.removed`). A device wrap stays linked to the session that first PUT it, and a
+  removal ends only that session: with `sessionId` (`VaultGate`: Better Auth's `get-session` id) a
+  kept vault opening under a session not yet in meta `boundSession` runs `keys.ts` `bindDeviceWrap`
+  first (`GET /v2/keys`; its own wrap, by meta `deviceWrapId`, PUT back unchanged so the server
+  links it to this session; missing = `VaultOpenError("device_removed")` and the vault goes). A
+  fresh open only records the id; offline or any failure is silent and retried at the next open.
+  `key_unverified` (a new key version whose links do
   not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
   stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
   its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`

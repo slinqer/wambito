@@ -36,9 +36,10 @@ import {
 } from "./keys.ts";
 
 /**
- * Removing a device rotates the data key (spec 2026-11-08 section 7.5, addendum 2026-11-08-e2e-
- * stage-1b section 2, stage 2b Rulings 1, 2 and 7), and a new recovery key replaces the recovery
- * wrap. Both are two steps, like `prepareAccount`: everything is made in memory first (DK from
+ * Rotating the data key now serves "Change keys" (spec 2026-11-08 section 7.5, addendum
+ * 2026-11-08-e2e-stage-1b section 2, stage 2b Rulings 1, 2 and 7; removing a device no longer
+ * rotates: one `DELETE /v2/keys/{id}`, spec 2026-11-18), and a new recovery key replaces the
+ * recovery wrap. Both are two steps, like `prepareAccount`: everything is made in memory first (DK from
  * this browser's own device wrap, the new DK and the recovery secret are zeroed before the first
  * step returns: only the sealed wraps and the derived non-extractable record keys are kept), and
  * nothing reaches the server until `commit()`.
