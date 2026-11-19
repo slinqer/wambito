@@ -75,6 +75,7 @@ Serializers _$serializers =
           ..add(MigrationCounts.serializer)
           ..add(MigrationProblem.serializer)
           ..add(MigrationProblemErrors.serializer)
+          ..add(MigrationProblemErrorsMissingInner.serializer)
           ..add(MigrationSource.serializer)
           ..add(MigrationSourceBudgetsInner.serializer)
           ..add(MigrationSourceCategoriesInner.serializer)
@@ -221,6 +222,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyLink)]),
             () => ListBuilder<KeyLink>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationProblemErrorsMissingInner)]),
+            () => ListBuilder<MigrationProblemErrorsMissingInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(MigrationSourceCategoriesInner)]),

@@ -16,6 +16,7 @@ import {
   withUser,
 } from "@wambito/db";
 import { and, asc, eq, sql } from "@wambito/db/orm";
+import { merchantRecordId, uuidv5 } from "@wambito/vault";
 import type { Config } from "../config.ts";
 import { ApiError } from "../http/problem.ts";
 import { revokeAllAssistants } from "./account.ts";
@@ -162,6 +163,94 @@ async function recordCounts(
     }
   }
   return { counts, settings };
+}
+
+/** At most this many missing records are named in a `count_mismatch`. */
+const MAX_MISSING = 20;
+
+/** A soft-deleted month of a recurring payment the person dismissed. */
+const isDismissal = (t: {
+  deletedAt: Date | null;
+  status: string;
+  source: string;
+  recurrenceId: string | null;
+  occurrenceMonth: string | null;
+}) =>
+  t.deletedAt !== null &&
+  t.status === "pending" &&
+  t.source === "recurrence" &&
+  t.recurrenceId !== null &&
+  t.occurrenceMonth !== null;
+
+/**
+ * The plaintext rows that have no record of their own, by id: counts alone would let a missing
+ * record hide behind a stray one of the same type. Every row must be a record of its type, under
+ * the id `recordsFromSource` of `@wambito/vault` gives it (the server id; the derived id for a
+ * dismissed month and a merchant rule), live, or deleted with a body for a soft-deleted
+ * transaction. Inside `finish`'s transaction, under its locks.
+ */
+async function missingRecords(tx: Tx, userId: string): Promise<{ type: string; id: string }[]> {
+  const held = new Map<string, { type: string; deleted: boolean; withBody: boolean }>();
+  const rows = await tx
+    .select({
+      id: records.id,
+      type: records.type,
+      deleted: records.deleted,
+      withBody: sql<boolean>`${records.body} is not null`,
+    })
+    .from(records)
+    .where(eq(records.userId, userId));
+  for (const row of rows) held.set(row.id, row);
+
+  const missing: { type: string; id: string }[] = [];
+  const expect = (type: string, id: string, deleted: boolean) => {
+    const record = held.get(id);
+    const ok =
+      record !== undefined &&
+      record.type === type &&
+      record.deleted === deleted &&
+      (!deleted || record.withBody);
+    if (!ok) missing.push({ type, id });
+  };
+
+  for (const { id } of await tx
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.userId, userId)))
+    expect("category", id, false);
+  for (const { id } of await tx
+    .select({ id: categoryBudgets.id })
+    .from(categoryBudgets)
+    .where(eq(categoryBudgets.userId, userId)))
+    expect("budget", id, false);
+  for (const { id } of await tx
+    .select({ id: recurrences.id })
+    .from(recurrences)
+    .where(eq(recurrences.userId, userId)))
+    expect("recurrence", id, false);
+  for (const { merchantKey } of await tx
+    .select({ merchantKey: merchantCategories.merchantKey })
+    .from(merchantCategories)
+    .where(eq(merchantCategories.userId, userId)))
+    expect("merchant", await merchantRecordId(userId, merchantKey), false);
+  for (const t of await tx
+    .select({
+      id: transactions.id,
+      deletedAt: transactions.deletedAt,
+      status: transactions.status,
+      source: transactions.source,
+      recurrenceId: transactions.recurrenceId,
+      occurrenceMonth: transactions.occurrenceMonth,
+    })
+    .from(transactions)
+    .where(eq(transactions.userId, userId))) {
+    const id =
+      isDismissal(t) && t.recurrenceId && t.occurrenceMonth
+        ? await uuidv5(t.recurrenceId, `${t.occurrenceMonth.slice(0, 7)}:0`)
+        : t.id;
+    expect("transaction", id, t.deletedAt !== null);
+  }
+  return missing;
 }
 
 /**
@@ -339,14 +428,22 @@ export async function finishMigration(
 
     const server = await serverCounts(tx, userId);
     const { counts: stored, settings } = await recordCounts(tx, userId);
-    if (settings !== 1 || !sameCounts(server, stored) || !sameCounts(server, client)) {
+    const missing = await missingRecords(tx, userId);
+    if (
+      settings !== 1 ||
+      missing.length > 0 ||
+      !sameCounts(server, stored) ||
+      !sameCounts(server, client)
+    ) {
       throw new ApiError(
         409,
         "count_mismatch",
-        settings === 1
-          ? "The records do not hold the same as the server"
-          : `The records hold ${settings} settings records, not 1`,
-        { server, records: stored, client },
+        settings !== 1
+          ? `The records hold ${settings} settings records, not 1`
+          : missing.length > 0
+            ? "Some rows have no record of their own"
+            : "The records do not hold the same as the server",
+        { server, records: stored, client, missing: missing.slice(0, MAX_MISSING) },
       );
     }
 

@@ -130,7 +130,18 @@ const MigrationProblem = z
     code: z.string(),
     detail: z.string().optional(),
     errors: z
-      .object({ server: MigrationCounts, records: MigrationCounts, client: MigrationCounts })
+      .object({
+        server: MigrationCounts,
+        records: MigrationCounts,
+        client: MigrationCounts,
+        missing: z
+          .array(z.object({ type: z.string(), id: z.string() }))
+          .max(20)
+          .openapi({
+            description:
+              "Rows with no record of their own type, id and state (at most 20): the record type and the id the record should have",
+          }),
+      })
       .optional(),
   })
   .openapi("MigrationProblem");
@@ -185,7 +196,7 @@ export function migrationRoutes(deps: AppDeps) {
       path: "/v2/migration/finish",
       operationId: "finishMigration",
       description:
-        "Ends the move, from the bound session. Only when the records hold exactly one live `settings` record and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records` and `errors.client`) and nothing changes. 409 `keys_missing` without a recovery wrap.",
+        "Ends the move, from the bound session. Only when the records hold exactly one live `settings` record, a record for every row (its type, its id: the server's, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records`, `errors.client` and `errors.missing`) and nothing changes. 409 `keys_missing` without a recovery wrap.",
       request: { body: jsonBody(FinishMigration) },
       responses: {
         200: jsonResponse(profileDto, "The profile, now encrypted"),

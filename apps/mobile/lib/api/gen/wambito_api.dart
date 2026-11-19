@@ -63,6 +63,7 @@ export 'package:wambito/api/gen/src/model/key_wraps.dart';
 export 'package:wambito/api/gen/src/model/migration_counts.dart';
 export 'package:wambito/api/gen/src/model/migration_problem.dart';
 export 'package:wambito/api/gen/src/model/migration_problem_errors.dart';
+export 'package:wambito/api/gen/src/model/migration_problem_errors_missing_inner.dart';
 export 'package:wambito/api/gen/src/model/migration_source.dart';
 export 'package:wambito/api/gen/src/model/migration_source_budgets_inner.dart';
 export 'package:wambito/api/gen/src/model/migration_source_categories_inner.dart';

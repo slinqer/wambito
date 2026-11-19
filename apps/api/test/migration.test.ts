@@ -15,6 +15,7 @@ import {
   user,
 } from "@wambito/db";
 import { and, eq } from "@wambito/db/orm";
+import { type MigrationSource, recordsFromSource, uuidv5 } from "@wambito/vault";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import type { SyncHooks } from "../src/deps.ts";
 import { createTestApp, type TestApp } from "./harness.ts";
@@ -288,19 +289,21 @@ const change = (type: string, deleted = false): Change => ({
   body: body(),
 });
 
-/** One record per counted row, plus `settings` times (one by default). */
-function changesFor(counts: Counts, settings = 1): Change[] {
-  const out: Change[] = [];
-  const many = (n: number, make: () => Change) => {
-    for (let i = 0; i < n; i++) out.push(make());
-  };
-  many(settings, () => change("settings"));
-  many(counts.transaction, () => change("transaction"));
-  many(counts.deletedTransaction, () => change("transaction", true));
-  many(counts.category, () => change("category"));
-  many(counts.budget, () => change("budget"));
-  many(counts.recurrence, () => change("recurrence"));
-  many(counts.merchant, () => change("merchant"));
+/**
+ * The records the web makes from the source (`recordsFromSource` of `@wambito/vault`: the server
+ * ids, the derived ids of the settings record, the dismissed months and the merchant rules), with
+ * opaque bodies. `settings` is how many settings records (one by default).
+ */
+async function sourceChanges(
+  p: { headers: Headers; userId: string },
+  { settings = 1 }: { settings?: number } = {},
+): Promise<Change[]> {
+  const s = await ok<MigrationSource>(await source(p.headers));
+  const made = await recordsFromSource(s, p.userId);
+  const out: Change[] = made
+    .filter((r) => r.type !== "settings" || settings > 0)
+    .map((r) => ({ ...change(r.type, r.deleted), id: r.id }));
+  for (let i = 1; i < settings; i++) out.push(change("settings"));
   return out;
 }
 
@@ -494,7 +497,7 @@ describe("POST /v2/migration/finish", () => {
     await t.authorize(p.email, { headers: p.headers });
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    await push(p.headers, changesFor(counts));
+    await push(p.headers, await sourceChanges(p));
 
     const profile = await ok<{ encryption: string; migration?: string }>(
       await finish(p.headers, counts),
@@ -526,7 +529,7 @@ describe("POST /v2/migration/finish", () => {
     const p = await plainPerson();
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    const changes = changesFor({ ...counts, merchant: counts.merchant - 1 });
+    const changes = (await sourceChanges(p)).filter((c) => c.type !== "merchant");
     await push(p.headers, changes);
     const before = await plaintextLeft(p.userId);
 
@@ -535,6 +538,7 @@ describe("POST /v2/migration/finish", () => {
       server: counts,
       records: { ...counts, merchant: counts.merchant - 1 },
       client: counts,
+      missing: [{ type: "merchant", id: expect.any(String) }],
     });
     expect(await plaintextLeft(p.userId)).toBe(before);
     expect((await userRow(p.userId)).encryption).toBe("migrating");
@@ -544,7 +548,7 @@ describe("POST /v2/migration/finish", () => {
     const p = await plainPerson();
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    await push(p.headers, changesFor(counts));
+    await push(p.headers, await sourceChanges(p));
     await problem(
       await finish(p.headers, { ...counts, budget: counts.budget + 1 }),
       409,
@@ -557,13 +561,13 @@ describe("POST /v2/migration/finish", () => {
     const none = await plainPerson();
     const counts = await ok<Counts>(await start(none.headers));
     await recoveryWrap(none.headers);
-    await push(none.headers, changesFor(counts, 0));
+    await push(none.headers, await sourceChanges(none, { settings: 0 }));
     await problem(await finish(none.headers, counts), 409, "count_mismatch");
 
     const two = await plainPerson();
     const twoCounts = await ok<Counts>(await start(two.headers));
     await recoveryWrap(two.headers);
-    await push(two.headers, changesFor(twoCounts, 2));
+    await push(two.headers, await sourceChanges(two, { settings: 2 }));
     await problem(await finish(two.headers, twoCounts), 409, "count_mismatch");
     expect((await userRow(two.userId)).encryption).toBe("migrating");
   });
@@ -573,18 +577,82 @@ describe("POST /v2/migration/finish", () => {
     const counts = await tableCounts(p.userId);
     await problem(await finish(p.headers, counts), 409, "not_migrating");
     await ok(await start(p.headers));
-    await push(p.headers, changesFor(counts));
+    await push(p.headers, await sourceChanges(p));
     await problem(await finish(p.headers, counts), 409, "keys_missing");
     const other = await t.signIn(p.email);
     await problem(await finish(other.headers, counts), 409, "migration_in_progress");
     expect((await userRow(p.userId)).encryption).toBe("migrating");
   });
 
+  test("one missing record hidden by a stray one of the same type is refused", async () => {
+    const p = await plainPerson();
+    const counts = await ok<Counts>(await start(p.headers));
+    await recoveryWrap(p.headers);
+    const changes = await sourceChanges(p);
+    const category = changes.find((c) => c.type === "category") as Change;
+    const missingId = category.id;
+    category.id = randomUUID();
+    await push(p.headers, changes);
+    const before = await plaintextLeft(p.userId);
+
+    const json = await problem(await finish(p.headers, counts), 409, "count_mismatch");
+    expect(json.errors).toEqual({
+      server: counts,
+      records: counts,
+      client: counts,
+      missing: [{ type: "category", id: missingId }],
+    });
+    expect(await plaintextLeft(p.userId)).toBe(before);
+    expect((await userRow(p.userId)).encryption).toBe("migrating");
+  });
+
+  test("a dismissed month under its server id instead of the derived id is refused", async () => {
+    const p = await plainPerson();
+    const counts = await ok<Counts>(await start(p.headers));
+    await recoveryWrap(p.headers);
+    const s = await ok<MigrationSource>(await source(p.headers));
+    const dismissal = s.transactions.find((x) => x.deletedAt !== null && x.status === "pending");
+    if (!dismissal?.recurrenceId || !dismissal.occurrenceMonth) throw new Error("no dismissal");
+    const derived = await uuidv5(
+      dismissal.recurrenceId,
+      `${dismissal.occurrenceMonth.slice(0, 7)}:0`,
+    );
+    const changes = await sourceChanges(p);
+    const record = changes.find((c) => c.id === derived) as Change;
+    record.id = dismissal.id;
+    await push(p.headers, changes);
+
+    const json = await problem(await finish(p.headers, counts), 409, "count_mismatch");
+    expect((json.errors as { missing: unknown }).missing).toEqual([
+      { type: "transaction", id: derived },
+    ]);
+    expect((await userRow(p.userId)).encryption).toBe("migrating");
+  });
+
+  test("a deleted transaction pushed live, and a live one pushed deleted, are refused", async () => {
+    const p = await plainPerson();
+    const counts = await ok<Counts>(await start(p.headers));
+    await recoveryWrap(p.headers);
+    const changes = await sourceChanges(p);
+    const gone = changes.find((c) => c.id === p.goneId) as Change;
+    const kept = changes.find((c) => c.id === p.keptId) as Change;
+    gone.deleted = false;
+    kept.deleted = true;
+    await push(p.headers, changes);
+    const json = await problem(await finish(p.headers, counts), 409, "count_mismatch");
+    expect((json.errors as { missing: unknown[] }).missing).toEqual(
+      expect.arrayContaining([
+        { type: "transaction", id: p.goneId },
+        { type: "transaction", id: p.keptId },
+      ]),
+    );
+  });
+
   test("a push that commits while finish waits on the lock is counted", async () => {
     const p = await plainPerson();
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    const changes = changesFor(counts);
+    const changes = await sourceChanges(p);
     const last = changes.pop() as Change;
     await push(p.headers, changes);
 
@@ -614,7 +682,7 @@ describe("POST /v2/migration/finish", () => {
     const p = await plainPerson();
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    await push(p.headers, changesFor(counts));
+    await push(p.headers, await sourceChanges(p));
 
     let release!: () => void;
     let held!: () => void;
@@ -643,7 +711,7 @@ describe("POST /v2/migration/cancel", () => {
     const p = await plainPerson();
     const counts = await ok<Counts>(await start(p.headers));
     await recoveryWrap(p.headers);
-    await push(p.headers, changesFor(counts));
+    await push(p.headers, await sourceChanges(p));
     await t.admin.insert(recordPurges).values({ userId: p.userId, throughVersion: 1 });
     const plain = await plaintextLeft(p.userId);
 

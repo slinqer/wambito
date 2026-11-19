@@ -26,6 +26,7 @@
     "@wambito/crypto": "workspace:*",
     "@wambito/db": "workspace:*",
     "@wambito/importers": "workspace:*",
+    "@wambito/vault": "workspace:*",
     "better-auth": "^1.7.11",
     "hono": "^4.13.13",
     "jose": "6.2.12",

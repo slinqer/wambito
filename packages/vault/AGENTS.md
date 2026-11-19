@@ -54,6 +54,10 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   backend with `source: "mcp"`). A change to the sync engine, the stores or the backend is a change
   to both: run `apps/mcp/test/vault-wambito.test.ts` and `vault-end-to-end.test.ts` too. Design:
   `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
+- The API (`apps/api/src/services/migration.ts`) imports `uuidv5` and `merchantRecordId`: the
+  migration's `finish` checks every plaintext row has its record under the id `recordsFromSource`
+  gives it. Changing a derived id is a change to that check too: run
+  `apps/api/test/migration.test.ts`.
 - A delete carries its sealed body to the server, kept until the server's 180-day purge, so
   `restore_transactions` works across requests and devices. The MCP's cache replay includes
   tombstones, so a later request still sees (and can restore) a delete, and a deleted recurrence

@@ -64,6 +64,7 @@ import 'package:wambito/api/gen/src/model/key_wraps.dart';
 import 'package:wambito/api/gen/src/model/migration_counts.dart';
 import 'package:wambito/api/gen/src/model/migration_problem.dart';
 import 'package:wambito/api/gen/src/model/migration_problem_errors.dart';
+import 'package:wambito/api/gen/src/model/migration_problem_errors_missing_inner.dart';
 import 'package:wambito/api/gen/src/model/migration_source.dart';
 import 'package:wambito/api/gen/src/model/migration_source_budgets_inner.dart';
 import 'package:wambito/api/gen/src/model/migration_source_categories_inner.dart';
@@ -179,6 +180,7 @@ part 'serializers.g.dart';
   MigrationCounts,
   MigrationProblem,
   MigrationProblemErrors,
+  MigrationProblemErrorsMissingInner,
   MigrationSource,
   MigrationSourceBudgetsInner,
   MigrationSourceCategoriesInner,
@@ -351,6 +353,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SummaryCategoriesInner)]),
             () => ListBuilder<SummaryCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationProblemErrorsMissingInner)]),
+            () => ListBuilder<MigrationProblemErrorsMissingInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),

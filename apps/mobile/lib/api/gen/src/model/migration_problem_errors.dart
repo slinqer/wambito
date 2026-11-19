@@ -3,7 +3,9 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:wambito/api/gen/src/model/migration_counts.dart';
+import 'package:wambito/api/gen/src/model/migration_problem_errors_missing_inner.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -15,6 +17,7 @@ part 'migration_problem_errors.g.dart';
 /// * [server]
 /// * [records]
 /// * [client]
+/// * [missing] - Rows with no record of their own type, id and state (at most 20): the record type and the id the record should have
 @BuiltValue()
 abstract class MigrationProblemErrors
     implements Built<MigrationProblemErrors, MigrationProblemErrorsBuilder> {
@@ -26,6 +29,10 @@ abstract class MigrationProblemErrors
 
   @BuiltValueField(wireName: r'client')
   MigrationCounts get client;
+
+  /// Rows with no record of their own type, id and state (at most 20): the record type and the id the record should have
+  @BuiltValueField(wireName: r'missing')
+  BuiltList<MigrationProblemErrorsMissingInner> get missing;
 
   MigrationProblemErrors._();
 
@@ -57,6 +64,11 @@ class _$MigrationProblemErrorsSerializer implements PrimitiveSerializer<Migratio
     yield serializers.serialize(object.records, specifiedType: const FullType(MigrationCounts));
     yield r'client';
     yield serializers.serialize(object.client, specifiedType: const FullType(MigrationCounts));
+    yield r'missing';
+    yield serializers.serialize(
+      object.missing,
+      specifiedType: const FullType(BuiltList, [FullType(MigrationProblemErrorsMissingInner)]),
+    );
   }
 
   @override
@@ -100,6 +112,15 @@ class _$MigrationProblemErrorsSerializer implements PrimitiveSerializer<Migratio
             specifiedType: const FullType(MigrationCounts),
           ) as MigrationCounts;
           result.client.replace(valueDes);
+          break;
+        case r'missing':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [
+              FullType(MigrationProblemErrorsMissingInner),
+            ]),
+          ) as BuiltList<MigrationProblemErrorsMissingInner>;
+          result.missing.replace(valueDes);
           break;
         default:
           unhandled.add(key);

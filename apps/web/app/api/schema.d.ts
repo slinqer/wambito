@@ -1021,7 +1021,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Ends the move, from the bound session. Only when the records hold exactly one live `settings` record and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records` and `errors.client`) and nothing changes. 409 `keys_missing` without a recovery wrap. */
+        /** @description Ends the move, from the bound session. Only when the records hold exactly one live `settings` record, a record for every row (its type, its id: the server's, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records`, `errors.client` and `errors.missing`) and nothing changes. 409 `keys_missing` without a recovery wrap. */
         post: operations["finishMigration"];
         delete?: never;
         options?: never;
@@ -1913,6 +1913,11 @@ export interface components {
                 server: components["schemas"]["MigrationCounts"];
                 records: components["schemas"]["MigrationCounts"];
                 client: components["schemas"]["MigrationCounts"];
+                /** @description Rows with no record of their own type, id and state (at most 20): the record type and the id the record should have */
+                missing: {
+                    type: string;
+                    id: string;
+                }[];
             };
         };
         FinishMigration: {

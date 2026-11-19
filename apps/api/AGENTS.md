@@ -209,16 +209,20 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `finish` takes `lockRecords` (exported from `services/sync.ts`) then `lockWraps`, locks the user
   row, needs a `recovery` wrap (409 `keys_missing`), then compares the records (live per type,
   deleted `transaction` with a body apart, exactly one live `settings`) with the server's and the
-  client's counts: a mismatch is 409 `count_mismatch` with `errors: {server, records, client}`
-  (`ApiError.errors` may be an object for that) and changes nothing; a match deletes
+  client's counts, and checks every row by id (`missingRecords`: a record of its type and state
+  under the id `recordsFromSource` gives it, the server id, or for a dismissed month and a
+  merchant rule the derived one, from `@wambito/vault`'s `uuidv5` and `merchantRecordId`, so a
+  missing record cannot hide behind a stray one): a mismatch is 409 `count_mismatch` with
+  `errors: {server, records, client, missing}` (`missing` at most 20 `{type, id}`;
+  `ApiError.errors` may be an object for that) and changes nothing; a match deletes
   `transactions` first (they reference the rest), then merchant rules, budgets, recurrences,
   categories, imports, accounts and idempotency keys, `revokeAllAssistants`, and sets `encrypted`.
   `cancel` deletes `records` and `record_purges`, keeps the wraps, sets `plain`. The write rule
   (`src/http/migration-lock.ts`, `migrationWriteRule`, after the scopes on `/v2/sync`,
   `/v2/keys*`, `/v2/pairing*` and `/v2/recovery/verifier`): a non-GET from any grant but the
   bound session of a `migrating` account is 409 `migration_in_progress`. It runs before the write's
-  own lock; a write it lets through just before a takeover can only add records, which `finish`
-  then sees as a mismatch.
+  own lock: a write it lets through just before a takeover is one the previous bound session could
+  make anyway, and any change it makes to the records shows in `finish`'s counts or id check.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

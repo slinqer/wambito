@@ -13,12 +13,18 @@ class _$MigrationProblemErrors extends MigrationProblemErrors {
   final MigrationCounts records;
   @override
   final MigrationCounts client;
+  @override
+  final BuiltList<MigrationProblemErrorsMissingInner> missing;
 
   factory _$MigrationProblemErrors([void Function(MigrationProblemErrorsBuilder)? updates]) =>
       (MigrationProblemErrorsBuilder()..update(updates))._build();
 
-  _$MigrationProblemErrors._({required this.server, required this.records, required this.client})
-    : super._();
+  _$MigrationProblemErrors._({
+    required this.server,
+    required this.records,
+    required this.client,
+    required this.missing,
+  }) : super._();
   @override
   MigrationProblemErrors rebuild(void Function(MigrationProblemErrorsBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -32,7 +38,8 @@ class _$MigrationProblemErrors extends MigrationProblemErrors {
     return other is MigrationProblemErrors &&
         server == other.server &&
         records == other.records &&
-        client == other.client;
+        client == other.client &&
+        missing == other.missing;
   }
 
   @override
@@ -41,6 +48,7 @@ class _$MigrationProblemErrors extends MigrationProblemErrors {
     _$hash = $jc(_$hash, server.hashCode);
     _$hash = $jc(_$hash, records.hashCode);
     _$hash = $jc(_$hash, client.hashCode);
+    _$hash = $jc(_$hash, missing.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -50,7 +58,8 @@ class _$MigrationProblemErrors extends MigrationProblemErrors {
     return (newBuiltValueToStringHelper(r'MigrationProblemErrors')
           ..add('server', server)
           ..add('records', records)
-          ..add('client', client))
+          ..add('client', client)
+          ..add('missing', missing))
         .toString();
   }
 }
@@ -71,6 +80,12 @@ class MigrationProblemErrorsBuilder
   MigrationCountsBuilder get client => _$this._client ??= MigrationCountsBuilder();
   set client(MigrationCountsBuilder? client) => _$this._client = client;
 
+  ListBuilder<MigrationProblemErrorsMissingInner>? _missing;
+  ListBuilder<MigrationProblemErrorsMissingInner> get missing =>
+      _$this._missing ??= ListBuilder<MigrationProblemErrorsMissingInner>();
+  set missing(ListBuilder<MigrationProblemErrorsMissingInner>? missing) =>
+      _$this._missing = missing;
+
   MigrationProblemErrorsBuilder() {
     MigrationProblemErrors._defaults(this);
   }
@@ -81,6 +96,7 @@ class MigrationProblemErrorsBuilder
       _server = $v.server.toBuilder();
       _records = $v.records.toBuilder();
       _client = $v.client.toBuilder();
+      _missing = $v.missing.toBuilder();
       _$v = null;
     }
     return this;
@@ -108,6 +124,7 @@ class MigrationProblemErrorsBuilder
             server: server.build(),
             records: records.build(),
             client: client.build(),
+            missing: missing.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -118,6 +135,8 @@ class MigrationProblemErrorsBuilder
         records.build();
         _$failedField = 'client';
         client.build();
+        _$failedField = 'missing';
+        missing.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'MigrationProblemErrors', _$failedField, e.toString());
       }
