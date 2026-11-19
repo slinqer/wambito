@@ -624,6 +624,20 @@ class CaptureWorkersTest {
     }
 
     @Test
+    fun `an account moved to encryption (426) keeps the capture queued for the update`() {
+        statusFor["Mercadona"] = 426
+        queue.add(sampleCapture("Mercadona"))
+        assertEquals(ListenableWorker.Result.retry(), runSend())
+        assertEquals(1, queue.all().size)
+    }
+
+    @Test
+    fun `a confirm answered 426 is tried again, never taken as refused`() {
+        patchStatus = 426
+        assertEquals(ApiResult.Failed, CaptureApi().confirm("http://127.0.0.1:${server.port}", "t", "t-1"))
+    }
+
+    @Test
     fun `an unreadable server setting sends nothing, never the token to the default server`() {
         session.serverUnreadable = true
         queue.add(sampleCapture())

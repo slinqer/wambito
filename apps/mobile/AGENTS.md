@@ -461,7 +461,7 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   (`CaptureQueue`: each item tagged with the account id it was captured for, the prefs' `owner`
   then; `adopt(userId)` drops the items of another account or of none, old untagged items included;
   only the owner's items are sent, and only while the session mark matches `ownerMark`, which
-  `sendQueued` stores), `CaptureApi` (`POST /v1/captures`, confirm) and WorkManager `SendCapturesWorker`
+  `sendQueued` stores), `CaptureApi` (`POST /v1/captures`, confirm; 408, 429 and 426 are retried, as are a capture's 403 and 404) and WorkManager `SendCapturesWorker`
   (`CaptureHooks` replaces the session and the notifier in tests). The notification text is never
   queued, sent or logged. `CaptureListener` (a `NotificationListenerService`) reads only the packages
   enabled in `CaptureSettings` (prefs `wambito.capture.sources`), hands them to `BankParsers` (`RevolutParser`
