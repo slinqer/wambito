@@ -343,7 +343,9 @@ void main() {
     final d1 = Phone(token1, dir);
     final pairing = await startPairing(d1.options);
     final approver = await findPairing(_a.options, code: pairing.code);
-    expect(await approver.number(), await pairing.number());
+    // The new phone's number first: the approver's waits for the new phone's key.
+    final numberOnD = await pairing.number();
+    expect(await approver.number(), numberOnD);
     final finishing = pairing.finish();
     await approver.approve();
     await finishing;
