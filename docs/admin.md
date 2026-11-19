@@ -48,7 +48,8 @@ Every action asks for a reason (1 to 300 characters, no personal data) and is wr
 log together with the action.
 
 - **Consultation.** Answer with the categories of data Wambito stores (the list in
-  `docs/privacy-policy.md`). The person downloads their own data from the app's settings. The admin
+  `docs/privacy-policy.md`). An encrypted account's finances open only on the person's own
+  devices (downloading them from Settings is not available yet for encrypted accounts). The admin
   exports nothing.
 - **Deletion.** Check the request comes from the email address of the account. Delete the account in
   the panel and write the request as the reason. In the answer, say that backups age out within 14

@@ -27,7 +27,8 @@ export const Privacy: Story = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Política de privacidad",
     );
-    await expect(canvas.getByText("Versión del 5 de noviembre de 2026")).toBeVisible();
+    // The date is the switch day's, filled in on the day (docs/deploy/switch-day.md).
+    await expect(canvas.getByText(/^Versión del /)).toBeVisible();
     await expect(canvas.getAllByRole("heading", { level: 2 })).toHaveLength(12);
     const mail = canvas.getAllByRole("link", { name: "privacy@wambito.com" });
     await expect(mail[0]).toHaveAttribute("href", "mailto:privacy@wambito.com");
