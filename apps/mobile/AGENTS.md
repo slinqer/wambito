@@ -95,7 +95,12 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `SqliteStore` per account in the process; `forgetVault(userId, storage)` deletes the vault file and
   every key, waiting at most `vaultCloseWait` in all for the store to close; `seedIfEmpty` makes the first
   settings and suggested categories after a complete first sync, skipped with `OpenVaultOptions.seed: false`
-  when a carry fills the new vault). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
+  when a carry fills the new vault; a device wrap stays linked to the session that first PUT it and a removal
+  ends only that one, so with `OpenVaultOptions.sessionOwner` (the gate passes `sessionOwnerOf(token)`) a kept
+  vault opening under a session not yet in `wambito.vault.<userId>.boundSession` runs `keys.dart`
+  `bindDeviceWrap` before its first sync: `GET /v2/keys`, its own wrap PUT back unchanged (the server links it to
+  this session), or, gone, the vault and keys wiped as a removed device's (`VaultOpenError(deviceRemoved)`), never
+  for a held vault; a fresh open only records the owner; offline or any failure is silent and retried at the next open). `merge.dart` (`carryRecords(from, into, mode:, intoUserId:)`, one
   `into.transaction`, idempotent: `adopt` copies every live record, settings re-keyed to the new user's seed id
   with `recoveryKeySavedAt` null and no `revokedDevices`; `merge` drops a phone category or `account` that
   matches the account's by `foldedName` (trim, lower case) and kind (not archived), renames same name other
@@ -111,8 +116,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `wambito.vault.<id>.*` and `wambito.encryption.<id>`, and `wambito.account` when not `keep`'s;
   `inUse` is asked again before each delete, so an account that signed in meanwhile keeps its vault;
   `holdOf` skips a vault whose `meta.hold` is set (or unreadable), see Traps).
-  `rotate.dart` = `rotate.ts` (`rotateKeys`: removing a device rotates the data key; this phone never removes
-  itself and its own wrap is always posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
+  `rotate.dart` = `rotate.ts` (`rotateKeys`: rotates the data key, which only "Change keys" does now (`remove: []`;
+  removing a device deletes its wrap and keeps the keys); this phone never removes itself and its own wrap is always
+  posted; `commit()` posts, keeps `dk.<n>` + `current` and `revokedDevices`, then
   a fresh recovery key's verifier; also `newRecoveryKey`, `checkRecoveryKey`); `rotate.dart` imports `keys.dart`,
   not the other way;
   `recovery_verifier.dart` holds the verifier hashes (pure crypto) and `keys.dart` `putRecoveryVerifier` sends them.
@@ -188,7 +194,15 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   the start waits for the server. A home cache or a pending-saves queue of this session proves the
   account `plain` (`VaultAccount.inferred`: routing and the offline path only; `knownPlainProvider`
   stays false, so its finance calls wait for the server's answer). The router reads
-  `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
+  `currentVaultAccountProvider`, never the mode provider's value). The welcome (`/welcome`) is decided by `SessionState.onboardingPending`: for a `plain` account the server's
+`onboardingCompletedAt` (`AccountStanding`, at sign-in and at every start's `_refresh`); for a `preview` one its vault's,
+as the web's `LocalOnboardingRoute` (the welcome's `PATCH /v1/me` stamps only the sealed settings record, so the server's
+copy stays empty): `vaultOnboardingProvider` (`lib/vault/vault_onboarding.dart`) reads the local `GET /v1/me` once the
+vault is open and hands it to `SessionController.onboardingFromVault`, which keeps it (a cold widget link reads it before
+the vault opens); `_refresh` never takes the server's flag over a known one for an encrypted account, and the router
+keeps an open vault on the loading route (`VaultRoute.loading`) until that answer is in (always set, even when keeping it
+fails). A cold `wambito://` link of an encrypted account waits for the same (`LaunchLinks.vaultWait`, 10 s; dropped if the
+vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
   `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
   sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
@@ -225,33 +239,48 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   (`VaultGateDeps.takeSignInRecoverySecret`) and tries it once through `keys.unlockWithRecoverySecret` on an account
   with wraps and no keys here, before Unlock, zeroing it either way; a failure shows `Unlock(error: …)`. Opened that
   way, the vault marks `recoveryKeySavedAt` when it was null. The other side of a pairing is
-  `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen`, twin of `ApproveDevice.tsx`, titled
-  "Approve a new device" as `vaultPairLead` tells the new phone; its entry is Settings → Security, below): type the
-  code or Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`; `isAvailable`,
-  `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default `[pairQrPrefix]`,
-  the sign-in screen asks `[signinQrPrefix]`; the native sides know only those two), or null for a close or a
-  refused permission), then the number, then
-  "They match". It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
+  `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen({pairing, onStartAgain, onDone})`, twin of
+  `ApproveDevice.tsx`, titled "Approve a new device"): the confirmation only. Its entry is
+  `connect_device_screen.dart` (`ConnectDeviceScreen`, Settings → Security → "Connect another device", below), which
+  takes the code or a Scan (`lib/scanner/qr_scanner.dart`: `QrScanner` over `wambito/scanner`, `qrScannerProvider`;
+  `isAvailable`, `scan({prefixes})` → the first QR with one of `prefixes` (channel argument `prefixes`; default
+  `[pairQrPrefix]`; "Connect another device" asks both, the link-opened sign-in screen `[signinQrPrefix]`; the native
+  sides know only those two), or null for a close or a refused permission) and hands the found `ApproverPairing`
+  here; then the number, then "They match"; "Start again" goes back to the entry. It cancels its `ApproverPairing` (the ephemeral private key) on Cancel, "They do not match", a
   failure, back and dispose; only a finished approval lets go of it. The camera and its permission open only inside
   `scan`. Settings → Security (`lib/settings/security/`, `preview` accounts only, the same section with or without email):
   `security_api.dart` (`SecurityApi`, `liveSecurity`, `securityApiProvider` (null without an open vault), `securitySnapshotProvider`:
   wraps, own id, revoked, verified, unreadable), `security_model.dart` (`deviceRows`, `passkeyRows`, `hasPasskeyWrap`, `anyPasskeyWrap`),
-  `security_section.dart` (devices, Remove, Approve, "Sign in on the web" `security.signinWeb`, "New recovery key"),
-  `approve_signin_screen.dart` (`ApproveSigninScreen({qr})`, also at `/settings/signin?qr=`: code or Scan, "Sign in on
+  `security_section.dart` (devices, Remove, "Connect another device" `security.connect`, "New recovery key",
+  "Change keys" `security.changeKeys`),
+  `connect_device_screen.dart` (`ConnectDeviceScreen`: one entry for a web sign-in and a device to approve; one scan
+  takes `wambito://pair?` and `wambito://signin?` and goes by the prefix; a typed code is looked up with
+  `findSigninRequest` first (it posts nothing) and, on `bad_code` only, with `findPairing`; neither shows
+  `connectDeviceBadCode`, offline and the rest are said under the field; then it shows `ApproveSigninScreen(found:)`
+  or `ApproveDeviceScreen(pairing:)`, whose "Start again" comes back; registered in `openSigninApprovalsProvider`
+  while open; a request found after it went away is cancelled),
+  `approve_signin_screen.dart` (`ApproveSigninScreen({qr, found, onStartAgain})`, also at `/settings/signin?qr=` for
+  a link (with its own code field and Scan for "Start again"), or handed a found request by "Connect another device": "Sign in on
   **{label}**?", "Only scan a code you see on **{host}**" (`serverUrlProvider`'s host), Approve/Cancel, the number and
   "They match" after a typed code or for a link-opened QR (ruling P18: any app can send the link, so it is
   unauthenticated intent; it also shows `signin.fromLink`); the host line is the trust signal, the label is quoted
   and muted; Approve is off for `signinApproveDelay` (1 s) after a request appears; a seal whose pickup cannot be
   seen shows "Sent"; through `SecurityApi.findSigninRequest`; registered in `openSigninApprovalsProvider` while
-  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (typed key or a new one),
+  open; cancels on every way out; with no open vault it only says so), `remove_device_sheet.dart` (confirm only: `SecurityApi.removeDevice`
+  = `DELETE /v2/keys/{id}`, a 404 counts as removed, `offline`/`failed` keep the sheet; a toast "{name} no longer has access",
+  or, with `suggestChangeKeys`, a done step suggesting "Change keys"), `change_keys_sheet.dart` (`ChangeKeysSheet.open`: the
+  web's "Change keys", `rotate(remove: [])` with the typed key or a new one through `RecoverySetupPage`),
   `recovery_setup_page.dart` (the new key's setup screen: shown and checked before `commit()`, no way out after a failed save).
   `signin_notice.dart` (phone-first spec 8.3, ruling 16): `newDevices`, `SeenDevicesStore` (`wambito.vault.<userId>.seenDevices`),
   `showSigninNotice`, and `SigninNoticeHost` (in `app.dart`'s `builder`, last of the start and resume hooks): with the vault Ready and
   home free it says "A session was opened on {label}" for any device wrap not this phone's and not in the last look, browsers and
   phones added by pairing alike, and the approving phone too (no special case: the first look records silently). "That wasn't me"
-  asks `confirmSensitive`, then opens `RemoveDeviceSheet` for one device, or pushes `/settings` for several; "OK" and "That wasn't me"
+  asks `confirmSensitive` (with `noKeyYet` from `noKeyToTypeYet`, as Remove), then opens `RemoveDeviceSheet` for one device (`suggestChangeKeys`: its done step opens
+  `ChangeKeysSheet`), or pushes `/settings` for several; "OK" and "That wasn't me"
   record the look, closing the sheet any other way does not. A `plain` account has no `SecurityApi`, so no `/v2/keys` call.
-  Remove and "New recovery key" (making it and showing it) ask `confirmSensitive` first (D17: no key is made or shown before it passes); approving a device is not guarded. After a rotation
+  Remove, "Change keys" and "New recovery key" (making it and showing it) ask `confirmSensitive` first, a guest who never saved a key
+  with `noKeyYet` (`security_section.dart` `noKeyToTypeYet`: never asked for a key they never saw) (D17: no key is made or shown before it passes;
+  "Change keys" from a removal's done step rides on that removal's lock); approving a device is not guarded. After a rotation
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
   "Opens your data" per passkey, offers "Turn on" (`evaluatePrf` + `addPasskeyWrap`) and adds a new passkey with its wrap
@@ -261,6 +290,10 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
   (`forgetVault`), the kept account and mode, before the token goes; Settings asks
   `confirmUnsyncedSignOut` (`unsynced_sheet.dart`) first, at a sign-out and before changing server.
+  Before ending the session, `signOut` deletes this phone's own device wrap (`AuthApi.deleteDeviceWrap`,
+  `DELETE /v2/keys/{deviceWrapId}`, so Settings → Devices keeps no leftover row): only a `preview` account
+  with a kept wrap id whose vault is not held; both calls share one `signOutWait` budget and every failure is
+  ignored (the wrap stays). A 401 / `sessionExpired` never deletes it. Tests: `test/api/session_vault_test.dart`.
   A 401 is told apart by its code (phone-first spec 10, `lib/api/unauthorized.dart`: `Unauthorized`
   `deviceRemoved`, `userDeleted`, `expired` = `unauthenticated` or anything else; `unauthorizedOf(code)`,
   `unauthorizedOfError(dio)`). `GET /v1/me` at start (`AuthApi.standing(token, userId:)`), in
@@ -536,13 +569,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   other. The first two share the seeded account, each after `seed:e2e-preview` in the api container:
   `test_stack/vault_e2e_test.dart` (tag `stack`: sign in with the Mailpit
   code, set up through `VaultGate`, add a movement, sync, a second empty phone unlocks with the recovery key) and
-  `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B pairs through `/v2/pairing` (`startPairing`, `findPairing` +
+  `test_stack/vault_3b_e2e_test.dart` (stage 3b: phone B, signed in on its own session, pairs through `/v2/pairing` (`startPairing`, `findPairing` +
   `approve`); `runBackground` on A saves a queued capture with its `Idempotency-Key` and B syncs and reads it; A
-  removes B with `TypedRecovery`, a background sync re-seals under the new key version and B's next sync ends
-  `deviceRemoved`; `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
+  removes B with `DELETE /v2/keys/{id}` (no rotation): B's wrap is gone and B's next call is 401 (`unauthenticated`, since the seeded account is a plain user let into preview; `device_removed` is for encrypted users); `newRecoveryKey` + `commit` signs in on `/v2/recovery/sign-in` and the old key gets 401
   `recovery_key_invalid`; then, on the same account and phone A, a new phone C pairs, a delete on A is restored
   on C through `POST /v1/transactions/{id}/restore` and A sees it live, and an old client's delete (pushed with
-  `body: null`) is `not_found` on C). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
+  `body: null`) is `not_found` on C; last, a phone D pairs on session 1, signs in again on session 2 with its vault
+  kept, opens (its wrap bound to session 2), and A's removal makes D's next call 401). The third, `test_stack/phone_first_e2e_test.dart`, makes its own users
   (`phone-first-<run>@wambito.test`, new each run): a guest (`startGuest`) protects (`newRecoveryKey`, its
   verifier signs in) and claims an email; a guest of its own merges into an email account through
   `MergeController` in a `ProviderContainer` over the stack (the held vault survives the sweep, no id the guest

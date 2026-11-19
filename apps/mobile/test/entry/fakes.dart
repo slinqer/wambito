@@ -250,6 +250,21 @@ class FakeAuthApi implements AuthApi {
   /// While set, signOut waits for it (a server that accepts the connection and then says nothing).
   Completer<void>? holdSignOut;
 
+  @override
+  Future<void> deleteDeviceWrap(
+    String token, {
+    required String userId,
+    required String wrapId,
+  }) async {
+    calls.add('deleteDeviceWrap $token $userId $wrapId');
+    _fail('deleteDeviceWrap');
+    final hold = holdDeleteDeviceWrap;
+    if (hold != null) await hold.future;
+  }
+
+  /// While set, deleteDeviceWrap waits for it (a server that says nothing).
+  Completer<void>? holdDeleteDeviceWrap;
+
   /// Called by `deleteUser` before it answers (a test looks at the phone at that moment).
   Future<void> Function()? onDeleteUser;
 
@@ -345,6 +360,8 @@ Future<ProviderContainer> pumpApp(
   List<Override> overrides = const [],
   bool plain = true,
   HomeCacheStore? homeCache,
+  // False for a screen that animates for ever (the welcome): one frame, and the test pumps on.
+  bool settle = true,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -372,6 +389,10 @@ Future<ProviderContainer> pumpApp(
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const WambitoApp()),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
   return container;
 }

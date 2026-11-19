@@ -13,7 +13,6 @@ import 'package:wambito/local/keys.dart' as keys;
 import 'package:wambito/local/pairing.dart';
 import 'package:wambito/local/rotate.dart';
 import 'package:wambito/local/sqlite_store.dart';
-import 'package:wambito/local/sync.dart' show SyncProblemCode;
 import 'package:wambito/local/vault_lock.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/vault/encryption_mode.dart';
@@ -33,7 +32,8 @@ import 'support.dart';
 ///
 /// The restore tests run after it, in order, on the same account and phone A (one sign-in for the
 /// file): a new phone C pairs with A, then a delete on A is restored on C, and an old client's
-/// delete (no body on the tombstone) is `not_found` on C.
+/// delete (no body on the tombstone) is `not_found` on C. The last test signs a phone D in again
+/// with its vault kept, and checks that a removal still cuts off its new session.
 ///
 /// Plain `flutter test` with sqflite_common_ffi; no emulator.
 const _merchant = 'panaderia e2e';
@@ -87,7 +87,10 @@ void main() {
     await a.session!.close();
 
     // 2. Phone B pairs through /v2/pairing: its code typed on A, the numbers compared, A approves.
-    final b = Phone(token, Directory('${root.path}/b')..createSync());
+    // B signs in on its own, as a second phone does: its wrap belongs to its own session, which a
+    // removal ends (with A's session shared, the server would keep it for A's wrap).
+    final (token: tokenB, profile: _) = await signIn();
+    final b = Phone(tokenB, Directory('${root.path}/b')..createSync());
     final pairing = await startPairing(b.options);
     final approver = await findPairing(a.options, code: pairing.code);
     final numberOnB = await pairing.number();
@@ -99,8 +102,6 @@ void main() {
     expect(bWrap, isNotNull);
     // B opens its vault and keeps it open: a vault session is one per process and account.
     final sessionB = await _open(b, profile);
-    var removedByAccount = false;
-    sessionB.onRemoved(() => removedByAccount = true);
 
     // 3. A background run on A (its app closed) saves a queued capture, then syncs it.
     final queued = QueuedCapture(
@@ -153,37 +154,26 @@ void main() {
     expect(found, hasLength(1));
     expect(found.single['amount'], -_cents);
 
-    // 4. A removes B with its recovery key (A's app closed: the rotation writes through a store of
-    // its own); B's next sync ends deviceRemoved and its vault and keys are gone.
-    final storeA = await SqliteStore.open(
-      userId,
-      directory: a.dir.path,
-      factory: databaseFactoryFfi,
-      background: true,
+    // 4. A removes B as Settings → Security does (`SecurityApi.removeDevice`): `DELETE /v2/keys/{id}`
+    // deletes B's wrap and ends B's session, with no rotation. B's next call is refused (401). The
+    // seeded account is a `plain` user let into preview (`E2E_PREVIEW_USER_IDS`), so the server
+    // says `unauthenticated` rather than `device_removed` (spec 2026-11-15 section 11: the code is
+    // for encrypted users); what the phone does with `device_removed` is in test/api.
+    await keys.api(a.options)('/v2/keys/${bWrap!}', method: 'DELETE');
+    final refused = await b.network.get<Object?>(
+      '/v1/me',
+      options: Options(validateStatus: (_) => true),
     );
-    try {
-      final rotation = await rotateKeys(
-        a.options,
-        store: storeA,
-        remove: [bWrap!],
-        recovery: TypedRecovery(recoveryKey),
-      );
-      final rotated = await rotation.commit();
-      expect(rotated.dropped.map((d) => d.id), contains(bWrap));
-    } finally {
-      await storeA.close();
-    }
-    // A's next sync re-seals the vault under the new key version; B meets it and finds itself gone.
-    expect((await background()).outcome, BackgroundOutcome.changed);
-    expect((await sessionB.sync()).problem, SyncProblemCode.deviceRemoved);
-    for (var i = 0; i < 50 && !removedByAccount; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    expect(removedByAccount, isTrue);
-    expect(await b.options.storage.deviceWrapId(userId), isNull);
+    expect(refused.statusCode, 401);
+    final left = (await keys.api(a.options)('/v2/keys')).data! as Map<String, Object?>;
+    expect(
+      (left['wraps']! as List).cast<Map<String, Object?>>().map((w) => w['id']),
+      isNot(contains(bWrap)),
+    );
+    await sessionB.close();
 
-    // 5. A makes a new recovery key: it signs in, the old one does not (the first has the
-    // verifier of the rotation's typed key, so the old key worked until now).
+    // 5. A makes a new recovery key: it signs in, the old one does not (the old key's verifier was
+    // set up with the account, so it worked until now).
     expect((await _recoverySignIn(recoveryKey)).status, 200);
     final fresh = await newRecoveryKey(a.options);
     await fresh.commit();
@@ -344,5 +334,41 @@ void main() {
     });
     final after = await serverRow(id);
     expect([after['deleted'], after['body'], after['version']], [true, null, tombstone['version']]);
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('a phone back on a new session with its vault kept is cut off by a removal', () async {
+    // 1. D signs in (session 1), pairs with A and opens its vault: its wrap is PUT under session 1.
+    final (token: token1, profile: _) = await signIn();
+    final dir = Directory('${root.path}/d')..createSync();
+    final d1 = Phone(token1, dir);
+    final pairing = await startPairing(d1.options);
+    final approver = await findPairing(_a.options, code: pairing.code);
+    // The new phone's number first: the approver's waits for the new phone's key.
+    final numberOnD = await pairing.number();
+    expect(await approver.number(), numberOnD);
+    final finishing = pairing.finish();
+    await approver.approve();
+    await finishing;
+    final dWrap = await d1.options.storage.deviceWrapId(userId);
+    expect(dWrap, isNotNull);
+    await on(d1, (session) async => expect((await session.sync()).problem, isNull));
+
+    // 2. D signs in again (session 2), its vault and keys kept (as after a session that expired),
+    // and opens: it lists the keys and PUTs its own wrap back, which links it to session 2.
+    final (token: token2, profile: _) = await signIn();
+    final d2 = Phone(token2, dir, storage: d1.storage);
+    final session = await _open(d2, _profile);
+    expect(await d2.options.storage.deviceWrapId(userId), dWrap);
+    expect((await session.sync()).problem, isNull);
+
+    // 3. A removes D (`DELETE /v2/keys/{id}`): the server ends the session D's wrap is linked to
+    // now, so D's next call on session 2 is refused.
+    await keys.api(_a.options)('/v2/keys/${dWrap!}', method: 'DELETE');
+    final refused = await d2.network.get<Object?>(
+      '/v1/me',
+      options: Options(validateStatus: (_) => true),
+    );
+    expect(refused.statusCode, 401);
+    await session.close();
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

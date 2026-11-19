@@ -1,6 +1,7 @@
 // Twin of apps/web/app/features/settings/security.ts: Settings → Security's effects, as an
 // interface so tests stand in for the vault, the passkey prompt and `/v2/keys`. Errors carry a
 // `code` (`KeysError` / `PairingError` codes).
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/passkeys.dart' show passkeysProvider;
@@ -45,8 +46,14 @@ class SecuritySnapshot {
 abstract interface class SecurityApi {
   Future<SecuritySnapshot> load();
 
-  /// Removes devices and rotates the data key (`rotateKeys`); nothing reaches the server until the
-  /// prepared rotation's `commit()`. A touched [passkey] keeps its wrap; its PRF is used up.
+  /// Removes a device: `DELETE /v2/keys/{id}` deletes its wrap and ends its session. The data key
+  /// does not change. A wrap already gone (404) counts as removed; failures carry `offline` or
+  /// `failed`.
+  Future<void> removeDevice(String id);
+
+  /// Rotates the data key (`rotateKeys`), leaving out [remove] ("Change keys" passes none);
+  /// nothing reaches the server until the prepared rotation's `commit()`. A touched [passkey]
+  /// keeps its wrap; its PRF is used up.
   Future<PreparedRotation> rotate({
     required List<String> remove,
     required RotateRecovery recovery,
@@ -123,6 +130,9 @@ class _LiveSecurity implements SecurityApi {
   }
 
   @override
+  Future<void> removeDevice(String id) => removeDeviceWrap(api(_options), id);
+
+  @override
   Future<PreparedRotation> rotate({
     required List<String> remove,
     required RotateRecovery recovery,
@@ -161,6 +171,21 @@ class _LiveSecurity implements SecurityApi {
   @override
   Future<SigninApproval> findSigninRequest({String? code, String? qr, bool fromLink = false}) =>
       signin.findSigninRequest(_options, code: code, qr: qr, fromLink: fromLink);
+}
+
+/// [SecurityApi.removeDevice] over [call]: `DELETE /v2/keys/{id}`. A 404 (removed meanwhile, from
+/// another device) is done; no connection is `KeysError('offline')`, anything else `failed`.
+@visibleForTesting
+Future<void> removeDeviceWrap(KeysApi call, String id) async {
+  try {
+    await call('/v2/keys/${Uri.encodeComponent(id)}', method: 'DELETE');
+  } on KeysError catch (error) {
+    if (error.status == 404) return;
+    if (error.code == 'offline') rethrow;
+    throw const KeysError('failed');
+  } on Object {
+    throw const KeysError('failed');
+  }
 }
 
 /// The open vault's [SecurityApi]; null while no vault is open (signed out, a `plain` account, or

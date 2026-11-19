@@ -118,6 +118,15 @@ class FakeSecurity implements SecurityApi {
     );
   }
 
+  Object? removeFailure;
+
+  @override
+  Future<void> removeDevice(String id) async {
+    calls.add('removeDevice $id');
+    final failure = removeFailure;
+    if (failure != null) throw failure;
+  }
+
   @override
   Future<void> checkRecoveryKey(String text) async {
     calls.add('check $text');
@@ -172,10 +181,21 @@ class FakeSecurity implements SecurityApi {
     if (failure != null) throw failure;
   }
 
+  /// What [findPairing] throws, when set; else it hands out [approver].
+  Object? pairingFailure;
+  ApproverPairing approver = FakeApprover();
+
+  /// When set, [findPairing] answers only once it completes.
+  Future<void>? pairingGate;
+
   @override
   Future<ApproverPairing> findPairing({String? code, String? qr}) async {
     calls.add('findPairing code=$code qr=$qr');
-    return FakeApprover();
+    final gate = pairingGate;
+    if (gate != null) await gate;
+    final failure = pairingFailure;
+    if (failure != null) throw failure;
+    return approver;
   }
 
   /// What [findSigninRequest] hands out; unset, it is a [StateError] (no test asked for it).

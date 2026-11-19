@@ -11,24 +11,29 @@ import 'package:wambito/vault/encryption_mode.dart';
 const settingsId = '01930000-0000-7000-8000-0000000000f1';
 
 /// The seeded settings record of a vault.
-Map<String, Object?> seededSettings({String? recoveryKeySavedAt}) => {
-  's': 1,
-  'name': null,
-  'currency': 'EUR',
-  'locale': 'es',
-  'timezone': 'America/Bogota',
-  'onboardingCompletedAt': null,
-  'revokedDevices': <Object?>[],
-  'recoveryKeySavedAt': recoveryKeySavedAt,
-};
+Map<String, Object?> seededSettings({String? recoveryKeySavedAt, String? onboardingCompletedAt}) =>
+    {
+      's': 1,
+      'name': null,
+      'currency': 'EUR',
+      'locale': 'es',
+      'timezone': 'America/Bogota',
+      'onboardingCompletedAt': onboardingCompletedAt,
+      'revokedDevices': <Object?>[],
+      'recoveryKeySavedAt': recoveryKeySavedAt,
+    };
 
 /// An open vault on a memory store with its settings record; counts its syncs and key reloads.
 class FakeVault implements VaultSession {
-  FakeVault({String? recoveryKeySavedAt, this.userId = 'user-1'}) : store = createMemoryStore() {
+  FakeVault({String? recoveryKeySavedAt, String? onboardingCompletedAt, this.userId = 'user-1'})
+    : store = createMemoryStore() {
     seeded = store.put(
       RecordType.settings,
       settingsId,
-      seededSettings(recoveryKeySavedAt: recoveryKeySavedAt),
+      seededSettings(
+        recoveryKeySavedAt: recoveryKeySavedAt,
+        onboardingCompletedAt: onboardingCompletedAt,
+      ),
     );
   }
 

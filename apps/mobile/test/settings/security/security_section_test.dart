@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/security/screen_lock.dart';
-import 'package:wambito/settings/security/approve_device_screen.dart';
-import 'package:wambito/settings/security/approve_signin_screen.dart';
+import 'package:wambito/settings/security/connect_device_screen.dart';
 import 'package:wambito/settings/security/recovery_setup_page.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/security_section.dart';
@@ -101,7 +101,7 @@ void main() {
     expect(find.textContaining('Could not read'), findsNothing);
   });
 
-  testWidgets('a preview guest sees devices, Remove and New recovery key', (t) async {
+  testWidgets('a preview guest sees devices, Remove, New recovery key and Change keys', (t) async {
     // Settings as a guest (no email) on an encrypted account: the full section, as with an email.
     final security = FakeSecurity();
     final env = await pumpSettingsApp(
@@ -127,19 +127,30 @@ void main() {
     expect(find.text('Firefox on Linux'), findsOneWidget);
     expect(find.byKey(const Key('security.remove.$laptopId')), findsOneWidget);
     expect(find.byKey(const Key('security.newKey')), findsOneWidget);
-    expect(find.byKey(const Key('security.approve')), findsOneWidget);
+    expect(find.byKey(const Key('security.changeKeys')), findsOneWidget);
+    expect(find.byKey(const Key('security.connect')), findsOneWidget);
   });
 
-  testWidgets(
-    'the entry is named as the new phone says: Settings → Security → Approve a new device',
-    (t) async {
-      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
-      expect(find.text('Security'), findsWidgets);
-      expect(find.text('APPROVE A NEW DEVICE'), findsOneWidget);
-    },
-  );
+  testWidgets('one entry connects another device, instead of Approve and Sign in on the web', (
+    t,
+  ) async {
+    await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
+    expect(find.text('CONNECT ANOTHER DEVICE'), findsOneWidget);
+    expect(find.byKey(const Key('security.connect')), findsOneWidget);
+    expect(find.byKey(const Key('security.approve')), findsNothing);
+    expect(find.byKey(const Key('security.signinWeb')), findsNothing);
+    expect(find.text('APPROVE A NEW DEVICE'), findsNothing);
+    expect(find.text('SIGN IN ON THE WEB'), findsNothing);
+  });
 
-  for (final key in ['security.newKey', 'security.remove.$laptopId']) {
+  test('the new device names this entry, in every language', () {
+    for (final locale in AppLocalizations.supportedLocales) {
+      final l10n = lookupAppLocalizations(locale);
+      expect(l10n.vaultPairLead, contains('→ ${l10n.settingsSecurityConnect},'), reason: '$locale');
+    }
+  });
+
+  for (final key in ['security.newKey', 'security.remove.$laptopId', 'security.changeKeys']) {
     testWidgets('a double tap on $key asks the lock once', (t) async {
       final lock = _SlowLock();
       await pumpSection(t, FakeSecurity(), lock);
@@ -151,23 +162,17 @@ void main() {
     });
   }
 
-  testWidgets('"Approve a new device" opens the approver screen', (t) async {
-    await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
-    await tapKey(t, 'security.approve');
-    expect(find.byType(ApproveDeviceScreen), findsOneWidget);
-  });
-
-  testWidgets('"Sign in on the web" opens the sign-in approval, which closes back', (t) async {
+  testWidgets('"Connect another device" opens its screen, which closes back', (t) async {
     final security = FakeSecurity();
     await pumpSection(t, security, FakeLock(LockCheck.passed));
     final loads = security.loads;
-    await tapKey(t, 'security.signinWeb');
-    expect(find.byType(ApproveSigninScreen), findsOneWidget);
+    await tapKey(t, 'security.connect');
+    expect(find.byType(ConnectDeviceScreen), findsOneWidget);
     // nothing is looked up before a code or a scan
-    expect(security.calls.where((c) => c.startsWith('findSigninRequest')), isEmpty);
-    await tapKey(t, 'signin.cancel');
-    expect(find.byType(ApproveSigninScreen), findsNothing);
-    // a browser may have joined as a device: the list is read again
+    expect(security.calls.where((c) => c.startsWith('find')), isEmpty);
+    await tapKey(t, 'connect.cancel');
+    expect(find.byType(ConnectDeviceScreen), findsNothing);
+    // a browser or a phone may have joined as a device: the list is read again
     expect(security.loads, greaterThan(loads));
   });
 
@@ -182,14 +187,96 @@ void main() {
       expect(find.byKey(const Key('security.remove.key')), findsNothing);
     });
 
-    testWidgets('with the lock passed the choice sheet opens', (t) async {
+    testWidgets('with the lock passed the sheet opens; Remove deletes the wrap only', (t) async {
       final security = FakeSecurity();
       await pumpSection(t, security, FakeLock(LockCheck.passed));
       await tapKey(t, 'security.remove.$laptopId');
-      expect(find.byKey(const Key('security.remove.key')), findsOneWidget);
-      expect(find.byKey(const Key('security.remove.newKey')), findsOneWidget);
-      // asking is not removing: nothing was prepared
+      expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
+      expect(find.byKey(const Key('security.remove.key')), findsNothing);
+      // asking is not removing
       expect(security.calls, isEmpty);
+      final loads = security.loads;
+      await tapKey(t, 'security.remove.confirm');
+      expect(security.calls, ['removeDevice $laptopId']);
+      expect(find.text('Firefox on Linux no longer has access.'), findsOneWidget);
+      // a plain removal suggests nothing
+      expect(find.byKey(const Key('security.remove.changeKeys')), findsNothing);
+      // the list is read again
+      expect(security.loads, greaterThan(loads));
+    });
+
+    testWidgets('a preview guest with no saved key and no lock reaches the sheet', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.remove.$laptopId');
+      // never asked for a key they never saw
+      expect(find.byKey(const Key('screenLock.key')), findsNothing);
+      expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
+    });
+
+    testWidgets('an email account with no lock is still asked for the key first', (t) async {
+      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.noLock));
+      await tapKey(t, 'security.remove.$laptopId');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+      expect(find.byKey(const Key('security.remove.confirm')), findsNothing);
+    });
+  });
+
+  group('changing the keys', () {
+    testWidgets('a cancelled screen lock does nothing', (t) async {
+      final security = FakeSecurity();
+      final lock = FakeLock(LockCheck.cancelled);
+      await pumpSection(t, security, lock);
+      await tapKey(t, 'security.changeKeys');
+      expect(lock.reasons, ["Confirm it's you to change your keys"]);
+      expect(security.calls, isEmpty);
+      expect(find.byKey(const Key('security.changeKeys.key')), findsNothing);
+    });
+
+    testWidgets('with the lock passed it rotates with nothing removed', (t) async {
+      final security = FakeSecurity();
+      await pumpSection(t, security, FakeLock(LockCheck.passed));
+      await tapKey(t, 'security.changeKeys');
+      await t.enterText(find.byKey(const Key('security.changeKeys.key')), recoveryKeyText);
+      await t.pump();
+      await tapKey(t, 'security.changeKeys.confirm');
+      expect(security.calls, ['rotate remove= typed:$recoveryKeyText', 'commit', 'reloadKeys']);
+      expect(find.text('Your keys changed.'), findsOneWidget);
+      final loads = security.loads;
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      // the keys changed: the list is read again
+      expect(security.loads, greaterThan(loads));
+    });
+
+    testWidgets('a preview guest with no saved key and no lock reaches the sheet', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.changeKeys');
+      // no key to type for the lock: the sheet opens, and its new-key way is there
+      expect(find.byKey(const Key('screenLock.key')), findsNothing);
+      expect(find.byKey(const Key('security.changeKeys.newKey')), findsOneWidget);
+    });
+
+    testWidgets('an email account with no lock is still asked for the key first', (t) async {
+      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.noLock));
+      await tapKey(t, 'security.changeKeys');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+      expect(find.byKey(const Key('security.changeKeys.key')), findsNothing);
     });
   });
 

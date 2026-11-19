@@ -3,13 +3,14 @@ import { useTranslations } from "use-intl";
 import { useClearSession } from "../../api/ApiProvider.tsx";
 import { authClient } from "../../auth/auth-client.ts";
 import { clearSignInPrf } from "../../local/prf.ts";
-import { forgetVault } from "../../local/vault-session.ts";
+import { forgetOwnDeviceWrap, forgetVault } from "../../local/vault-session.ts";
 import { useToast } from "../../ui/Toast.tsx";
 
 /** Ends the session; Better Auth answers `{ error }` rather than throwing on an HTTP failure. */
 export type SignOutRequest = () => Promise<{ error: unknown }>;
 
 /**
+ * This browser's own device wrap is deleted on the server (best effort, 3 s at most), then
  * Better Auth's sign-out, then (only once it worked) this browser's vault of a preview account:
  * the sync stops, the store closes and the database with its keys is deleted, before anything
  * navigates. A plain account has no vault: nothing more happens. Deleting the account signs out
@@ -18,6 +19,8 @@ export type SignOutRequest = () => Promise<{ error: unknown }>;
 export const liveSignOut: SignOutRequest = async () => {
   // A passkey's PRF kept for the vault never outlives the sign-out, whatever its answer.
   clearSignInPrf();
+  // Before the session ends (the call needs it): this browser's device wrap goes from the server.
+  await forgetOwnDeviceWrap();
   const result = await authClient.signOut();
   if (!result.error) {
     await forgetVault().catch(() => {

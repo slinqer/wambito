@@ -11,6 +11,7 @@ import '../api/passkeys.dart';
 import '../api/session.dart';
 import '../api/unauthorized.dart';
 import '../background/background_channel.dart';
+import '../home/home_cache.dart' show sessionOwnerOf;
 import '../local/db.dart' show VaultHold, VaultHoldKind, pendingChangesInVault, vaultHoldOf;
 import '../local/key_storage.dart';
 import '../local/keys.dart' as keys;
@@ -362,6 +363,7 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         final markKeySaved = openedWithSignInKey;
         openedWithSignInKey = false;
         await refuseAdopted();
+        final token = read(sessionProvider).stored?.token;
         final session = await read(openVaultSessionProvider)(
           OpenVaultOptions(
             profile: profile,
@@ -369,6 +371,8 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
             fresh: fresh,
             network: network(),
             storage: storage(),
+            // A kept vault under a new session links its device wrap to it (a removal ends it).
+            sessionOwner: token == null ? null : sessionOwnerOf(token),
             onUnauthorized: (kind) => unawaited(signInAgain(kind)),
             onSessionChanged: () {
               if (current()) gate.sessionChanged();

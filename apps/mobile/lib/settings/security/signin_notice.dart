@@ -1,7 +1,7 @@
 // The sign-in notice (phone-first spec 8.3, rulings 16 and the founder's answer 3): the next time the
 // phone opens with its vault Ready, it says "A session was opened on {label}" for every device
 // wrap that is not this phone's and was not in its last look, with "That wasn't me" (the device's
-// removal) and "OK". Any new device counts, a browser signed in from the web as much as a phone added by
+// removal, whose done step suggests changing the keys) and "OK". Any new device counts, a browser signed in from the web as much as a phone added by
 // pairing, and the phone that approved it too (ruling 16's cost: the person may have just done it).
 // The last look is the list of device wrap ids, kept per account in `wambito.vault.<userId>.seenDevices`
 // (it goes with the account's other vault keys when the phone signs out); the first look records
@@ -26,6 +26,7 @@ import '../../ui/sheet.dart';
 import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
+import 'security_section.dart' show noKeyToTypeYet;
 import 'security_model.dart';
 
 /// The device wraps that are not this phone's and not in [seen], in the server's order. [seen] is
@@ -141,18 +142,24 @@ Future<void> showSigninNotice(BuildContext context, WidgetRef ref) async {
     return;
   }
   final row = rows.others.firstWhere((r) => r.id == fresh.single.id);
+  final noKeyYet = await noKeyToTypeYet(ref);
+  if (!context.mounted) return;
   final ok = await confirmSensitive(
     context,
     ref,
     reason: l10n.settingsSecurityLockRemove,
     checkRecoveryKey: security.checkRecoveryKey,
+    noKeyYet: noKeyYet,
   );
   if (!ok || !context.mounted) return;
+  // Someone else may have had this device, and a copy of the data key with it: the done step
+  // suggests "Change keys" (the removal alone does not change them).
   await RemoveDeviceSheet.show(
     context,
     device: row,
     security: security,
     hasPasskeys: anyPasskeyWrap(snapshot.wraps),
+    suggestChangeKeys: true,
     onChanged: () => ref.invalidate(securitySnapshotProvider),
   );
 }

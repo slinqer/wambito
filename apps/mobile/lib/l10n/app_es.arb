@@ -2351,11 +2351,19 @@
       }
     }
   },
-  "settingsSecurityApprove": "Aprobar un dispositivo nuevo",
-  "@settingsSecurityApprove": {
-    "description": "Settings → Security entry that approves a new device; the new device's own screen names this path."
+  "settingsSecurityConnect": "Conectar otro dispositivo",
+  "@settingsSecurityConnect": {
+    "description": "Settings → Security entry that connects another device: approves a web sign-in or a new device, by its QR or its code."
   },
-  "settingsSecurityApproveLead": "Abre tus datos en un celular o navegador nuevo, sin tu clave de recuperación.",
+  "settingsSecurityConnectLead": "Escanea el código QR que te muestra tu computador u otro celular, o escribe su código.",
+  "connectDeviceCodeLabel": "Código del otro dispositivo",
+  "@connectDeviceCodeLabel": {
+    "description": "Connect another device: the code field label (a web sign-in's or a new device's code)."
+  },
+  "connectDeviceBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el otro dispositivo.",
+  "@connectDeviceBadCode": {
+    "description": "Connect another device: the typed code matches no web sign-in and no device to approve."
+  },
   "settingsSecurityRecoveryTitle": "Clave de recuperación",
   "settingsSecurityRecoveryLead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
   "settingsSecurityNewRecovery": "Nueva clave de recuperación",
@@ -2370,7 +2378,7 @@
   },
   "settingsSecurityUnreadableLead": "Se guardaron con una clave que este teléfono no tiene. Siguen a salvo tal como están.",
   "settingsSecurityMaybeSaved": "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.",
-  "settingsSecurityRemoveTitle": "¿Quitar {name}?",
+  "settingsSecurityRemoveTitle": "Quitar {name}",
   "@settingsSecurityRemoveTitle": {
     "description": "Remove-device sheet title.",
     "placeholders": {
@@ -2379,28 +2387,38 @@
       }
     }
   },
-  "settingsSecurityRemoveBody": "Ya no podrá abrir tus datos. Para eso cambian tus claves de cifrado: escribe tu clave de recuperación para confirmar. Los asistentes conectados se desconectan y hay que conectarlos otra vez.",
+  "settingsSecurityRemoveBody": "Este dispositivo dejará de entrar a tu cuenta y no recibirá nada nuevo.",
   "settingsSecurityKeyLabel": "Clave de recuperación",
-  "settingsSecurityRemoveConfirm": "Sí, quitarlo",
   "settingsSecurityRemoving": "Quitando…",
   "settingsSecurityOrNew": "¿No la tienes? Crea una clave de recuperación nueva",
   "settingsSecurityRotatedElsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
   "settingsSecurityTampered": "Detente: las claves nuevas no coinciden con las que tiene este teléfono, así que aquí no se cambió nada. Puede que alguien esté interfiriendo. No lo intentes de nuevo.",
   "settingsSecurityRemoveFailed": "No pudimos quitarlo. Inténtalo otra vez.",
-  "settingsSecurityDoneTitle": "Listo",
-  "settingsSecurityDoneLead": "{name} ya no puede abrir tus datos y se cerró su sesión.",
-  "@settingsSecurityDoneLead": {
-    "description": "Remove-device sheet, after removing.",
+  "settingsSecurityRemovedDone": "{name} ya no tiene acceso.",
+  "@settingsSecurityRemovedDone": {
+    "description": "Toast (or the done step from the sign-in notice) after a device was removed.",
     "placeholders": {
       "name": {
         "type": "String"
       }
     }
   },
+  "settingsSecurityChangeKeys": "Cambiar claves",
+  "@settingsSecurityChangeKeys": {
+    "description": "Settings → Security: the action, sheet title and button that rotate the encryption keys without removing a device."
+  },
+  "settingsSecurityChangeKeysBody": "Crea claves de cifrado nuevas para tus datos. Tus dispositivos siguen funcionando; los asistentes conectados se desconectan. Escribe tu clave de recuperación para confirmar.",
+  "settingsSecurityChanging": "Cambiando…",
+  "settingsSecurityChangeKeysDone": "Tus claves cambiaron.",
+  "settingsSecurityChangeKeysFailed": "No pudimos cambiar tus claves. Inténtalo otra vez.",
+  "settingsSecurityChangeKeysSuggest": "Si alguien más tuvo tu clave, cámbiala: lo que guardes desde ahora no lo podrá leer.",
+  "@settingsSecurityChangeKeysSuggest": {
+    "description": "Done step of a removal that came from the sign-in notice's \"That wasn't me\": suggests changing the keys."
+  },
   "settingsSecurityDroppedLead": "También quedaron fuera:",
-  "settingsSecurityDroppedItem": "{name} ({reason, select, removed {quitado ahora} revoked {quitado antes} other {sin verificar}})",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {quitado antes} other {sin verificar}})",
   "@settingsSecurityDroppedItem": {
-    "description": "A device left out of a rotation, with why (removed, revoked, other).",
+    "description": "A device left out of a rotation, with why (revoked, other).",
     "placeholders": {
       "name": {
         "type": "String"
@@ -2447,6 +2465,10 @@
   "settingsSecurityLockNewKey": "Confirma que eres tú para crear una clave de recuperación nueva",
   "@settingsSecurityLockNewKey": {
     "description": "Reason shown by the phone's lock before a new recovery key."
+  },
+  "settingsSecurityLockChangeKeys": "Confirma que eres tú para cambiar tus claves",
+  "@settingsSecurityLockChangeKeys": {
+    "description": "Reason shown by the phone's lock before changing the keys."
   },
   "categoriesKindLabel": "Tipo",
   "@categoriesKindLabel": {
@@ -4081,7 +4103,7 @@
   "@vaultPairTitle": {
     "description": "Pairing: the title."
   },
-  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Aprobar un dispositivo nuevo, y escanea este código o escríbelo.",
+  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Conectar otro dispositivo, y escanea este código o escríbelo.",
   "@vaultPairLead": {
     "description": "Pairing: what to do on the other device."
   },
@@ -4155,14 +4177,6 @@
   "@vaultApproveTitle": {
     "description": "Approve a device: the screen title (Settings \u2192 Security)."
   },
-  "vaultApproveLead": "En el dispositivo nuevo, elige «Desde otro dispositivo». Luego escribe el código que muestra, o escanea su QR.",
-  "@vaultApproveLead": {
-    "description": "Approve a device: what to do first."
-  },
-  "vaultApproveCodeLabel": "Código del dispositivo nuevo",
-  "@vaultApproveCodeLabel": {
-    "description": "Approve a device: the code field label."
-  },
   "vaultApprovePlaceholder": "XXXX XXXX",
   "@vaultApprovePlaceholder": {
     "description": "Approve a device: the code field placeholder."
@@ -4182,10 +4196,6 @@
   "vaultApproveCameraFailed": "No pudimos usar la cámara. Escribe el código.",
   "@vaultApproveCameraFailed": {
     "description": "Approve a device: the camera could not be used."
-  },
-  "vaultApproveErrorBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el dispositivo nuevo.",
-  "@vaultApproveErrorBadCode": {
-    "description": "Approve a device: the code matches no request."
   },
   "vaultApproveWaiting": "Esperando al dispositivo nuevo…",
   "@vaultApproveWaiting": {
@@ -4630,14 +4640,6 @@
   "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
   "@provisionalNoGuests": {
     "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
-  },
-  "settingsSecuritySignin": "Iniciar sesión en la web",
-  "@settingsSecuritySignin": {
-    "description": "Settings → Security entry that approves a web sign-in from this phone (phone-first spec 8.1)."
-  },
-  "settingsSecuritySigninLead": "Abre Wambito en un computador con este teléfono: escanea el código QR que te muestra.",
-  "@settingsSecuritySigninLead": {
-    "description": "Settings → Security: what signing in on the web does."
   },
   "signinApproveTitle": "Iniciar sesión en la web",
   "@signinApproveTitle": {

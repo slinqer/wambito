@@ -27,6 +27,14 @@ import '../settings/harness.dart';
 import '../settings/security/fake_security.dart';
 
 import 'package:wambito/ui/lk_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:wambito/local/vault_session.dart' show VaultSession;
+import 'package:wambito/vault/vault_gate.dart';
+import 'package:wambito/vault/vault_providers.dart';
+
+import '../protect/fakes.dart' show FakeVault;
+import '../support/preview_account.dart' show previewAccount;
 
 import '../support/icons.dart';
 
@@ -72,6 +80,28 @@ class _KeptSession extends SessionStore {
   @override
   Future<StoredSession?> read() async => session;
 }
+
+/// The gate's state, set by the test (a `preview` account's vault opening, or not).
+class _Gate extends Notifier<VaultGateState<VaultSession>?> {
+  @override
+  VaultGateState<VaultSession>? build() => const Opening();
+
+  void open() =>
+      state = Ready<VaultSession>(FakeVault(onboardingCompletedAt: '2026-11-01T12:00:00.000Z'));
+}
+
+final _gate = NotifierProvider<_Gate, VaultGateState<VaultSession>?>(_Gate.new);
+
+/// A `preview` account, past the welcome as the phone kept it, whose vault opens when the test
+/// says.
+List<Override> _previewOpening() => [
+  previewAccount(id: 'user-1'),
+  vaultGateStateProvider.overrideWith((ref) => ref.watch(_gate)),
+  vaultSessionProvider.overrideWithValue(null),
+  sessionStoreProvider.overrideWithValue(
+    _KeptSession(const StoredSession(token: 'email-token-0', guest: false)),
+  ),
+];
 
 const _key = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
 const _signinQr = 'wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=$_key';
@@ -586,6 +616,49 @@ void main() {
         ],
       );
       expect(env.router.state.uri.path, '/welcome');
+      expect(find.byType(AddSheet), findsNothing);
+    });
+  });
+
+  group("an encrypted account's cold link waits for its vault, as a plain one's opens on home", () {
+    testWidgets('＋ opens the add sheet on home once the vault is open, never over Unlock', (
+      tester,
+    ) async {
+      final env = await pumpSettingsApp(
+        tester,
+        settle: false,
+        overrides: [
+          ..._previewOpening(),
+          launchLinkSourceProvider.overrideWithValue(FakeLaunchLinks('wambito://add')),
+        ],
+      );
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.byType(AddSheet), findsNothing);
+      expect(env.router.state.uri.path, isNot('/'));
+      env.container.read(_gate.notifier).open();
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.path, '/');
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(AddSheet), findsOneWidget);
+    });
+
+    testWidgets('a vault that does not open in time drops the link, as a locked one does', (
+      tester,
+    ) async {
+      final env = await pumpSettingsApp(
+        tester,
+        settle: false,
+        overrides: [
+          ..._previewOpening(),
+          launchLinkSourceProvider.overrideWithValue(FakeLaunchLinks('wambito://add')),
+        ],
+      );
+      await tester.pump(LaunchLinks.vaultWait + const Duration(seconds: 1));
+      env.container.read(_gate.notifier).open();
+      await tester.pumpAndSettle();
+      expect(env.router.state.uri.path, '/');
       expect(find.byType(AddSheet), findsNothing);
     });
   });

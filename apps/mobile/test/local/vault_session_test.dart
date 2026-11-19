@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wambito/core/suggested_categories.dart';
 import 'package:wambito/crypto/crypto.dart';
+import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind;
 import 'package:wambito/local/ids.dart';
 import 'package:wambito/local/install_marker.dart';
 import 'package:wambito/local/keys.dart';
@@ -212,6 +213,7 @@ Future<VaultSession> open(
   Future<LocalKeys> Function(KeysOptions options)? refresh,
   Future<VaultLease?> Function()? lease,
   bool seed = true,
+  String? sessionOwner,
 }) {
   _opened.add(profile.id);
   return openVaultSession(
@@ -229,6 +231,7 @@ Future<VaultSession> open(
       refreshKeys: refresh,
       lease: lease,
       seed: seed,
+      sessionOwner: sessionOwner,
     ),
   );
 }
@@ -883,6 +886,138 @@ void main() {
       );
       expect(vaultExists(profile.id), isFalse);
     });
+  });
+
+  group('a kept vault opened under a new session', () {
+    /// An account set up on this phone (its device wrap PUT under the session `s1`), whose vault
+    /// opened once under `s1` and closed: the phone then signs in again, keeping its vault.
+    List<FakeCall> keyCalls(FakeAccount net) =>
+        net.keys.calls.where((c) => c.path.startsWith('/api/v2/keys')).toList();
+
+    Future<({FakeAccount net, VaultProfile profile, LocalKeys local, List<FakeCall> firstOpen})>
+    keptVault() async {
+      final net = FakeAccount();
+      final profile = profileOf();
+      final options = KeysOptions(userId: profile.id, dio: network(net), storage: storage);
+      final prepared = await prepareAccount(options, guest: false);
+      final local = await prepared.commit();
+      net.keys.calls.clear();
+      final first = await open(profile, net: net, keys: local, sessionOwner: 's1');
+      final firstOpen = keyCalls(net);
+      await first.close();
+      return (net: net, profile: profile, local: local, firstOpen: firstOpen);
+    }
+
+    test('a fresh open needs no call: its device wrap was just PUT under this session', () async {
+      final (:net, :profile, :local, :firstOpen) = await keptVault();
+      expect(firstOpen, isEmpty);
+      // and it counts as bound to that session
+      final again = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's1');
+      expect(keyCalls(net), isEmpty);
+      await again.close();
+    });
+
+    test('puts its own device wrap back unchanged, once per session', () async {
+      final (:net, :profile, :local, firstOpen: _) = await keptVault();
+      final own = net.keys.wraps.firstWhere((w) => w.kind == 'device').toJson();
+      net.keys.calls.clear();
+
+      final session = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2');
+      final calls = keyCalls(net);
+      expect(calls.map((c) => '${c.method} ${c.path}'), [
+        'GET /api/v2/keys',
+        'PUT /api/v2/keys/${own['id']}',
+      ]);
+      expect(calls.last.body, {
+        'kind': own['kind'],
+        'ref': own['ref'],
+        'keyV': own['keyV'],
+        'wrapped': own['wrapped'],
+        'publicKey': own['publicKey'],
+        'attestation': own['attestation'],
+        'label': own['label'],
+      });
+      expect(net.keys.wraps.firstWhere((w) => w.kind == 'device').toJson(), own);
+      await session.close();
+
+      // the same session again: nothing
+      net.keys.calls.clear();
+      final again = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2');
+      expect(keyCalls(net), isEmpty);
+      await again.close();
+    });
+
+    test('the session it was bound to: nothing', () async {
+      final (:net, :profile, :local, firstOpen: _) = await keptVault();
+      net.keys.calls.clear();
+      final session = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's1');
+      expect(keyCalls(net), isEmpty);
+      await session.close();
+    });
+
+    test('its device wrap gone (removed meanwhile): fails with device_removed and wipes', () async {
+      final (:net, :profile, :local, firstOpen: _) = await keptVault();
+      net.keys.wraps.removeWhere((w) => w.kind == 'device');
+      net.keys.calls.clear();
+      expect(
+        await failure(open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2')),
+        isOpenError(SyncProblemCode.deviceRemoved),
+      );
+      expect(net.keys.puts, isEmpty);
+      expect(vaultExists(profile.id), isFalse);
+      expect(await storage.current(profile.id), isNull);
+      expect(await storage.deviceWrapId(profile.id), isNull);
+    });
+
+    test('a held vault whose device wrap is gone is never wiped by it', () async {
+      final (:net, :profile, :local, firstOpen: _) = await keptVault();
+      final held = await openStore(profile.id);
+      await held.setHold(
+        const VaultHold(VaultHoldKind.merging, target: 'ana@wambito.test', since: '2026-11-18'),
+      );
+      await held.close();
+      net.keys
+        ..wraps.removeWhere((w) => w.kind == 'device')
+        ..calls.clear();
+      final session = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2');
+      expect(net.keys.puts, isEmpty);
+      expect(vaultExists(profile.id), isTrue);
+      expect(await storage.deviceWrapId(profile.id), isNotNull);
+      await session.close();
+    });
+
+    test(
+      'offline or a failure: opens on its data, puts nothing, and tries at the next open',
+      () async {
+        final (:net, :profile, :local, firstOpen: _) = await keptVault();
+        final own = net.keys.wraps.firstWhere((w) => w.kind == 'device');
+        net.keys.calls.clear();
+        net.keys.offline = true;
+        final offline = await open(
+          profile,
+          net: net,
+          keys: local,
+          fresh: false,
+          sessionOwner: 's2',
+        );
+        expect(net.keys.puts, isEmpty);
+        await offline.close();
+
+        net.keys
+          ..offline = false
+          ..intercept = (call) => call.method == 'PUT' ? (503, {'code': 'unavailable'}) : null;
+        final failed = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2');
+        expect(vaultExists(profile.id), isTrue);
+        await failed.close();
+
+        net.keys
+          ..intercept = null
+          ..calls.clear();
+        final bound = await open(profile, net: net, keys: local, fresh: false, sessionOwner: 's2');
+        expect(net.keys.puts.map((c) => c.path), ['/api/v2/keys/${own.id}']);
+        await bound.close();
+      },
+    );
   });
 
   group('reloadKeys', () {

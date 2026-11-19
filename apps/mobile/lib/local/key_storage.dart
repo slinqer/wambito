@@ -12,7 +12,9 @@ import '../storage/secure_storage.dart';
 /// - `current`: the current version;
 /// - `device`: the X25519 device private key, base64url;
 /// - `deviceWrapId` and `devicePublicKey`: the id and public key (base64url) of this phone's device
-///   wrap, which the web keeps in its vault's meta.
+///   wrap, which the web keeps in its vault's meta;
+/// - `boundSession`: the session (a hash of its token, `sessionOwnerOf`) this phone's device wrap
+///   was last linked to on the server (`bindDeviceWrap` in keys.dart, the vault session's open).
 ///
 /// The phone keeps the raw data keys, where the web keeps non-extractable derived `CryptoKey`s:
 /// the Keychain and the Keystore are what protects them here.
@@ -88,6 +90,14 @@ class KeyStorage {
     await _storage.write(key: '${_prefix(userId)}deviceWrapId', value: id);
     await _storage.write(key: '${_prefix(userId)}devicePublicKey', value: publicKey);
   }
+
+  /// The session (a hash of its token) this phone's device wrap was last linked to on the server;
+  /// null when none is known.
+  Future<String?> boundSession(String userId) =>
+      _storage.read(key: '${_prefix(userId)}boundSession');
+
+  Future<void> setBoundSession(String userId, String owner) =>
+      _storage.write(key: '${_prefix(userId)}boundSession', value: owner);
 
   /// The key versions whose data key is kept for [userId], ascending.
   Future<List<int>> versions(String userId) async {

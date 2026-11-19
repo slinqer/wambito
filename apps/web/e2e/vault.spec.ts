@@ -268,10 +268,10 @@ test("a second browser unlocks by pairing", async ({ browser }) => {
   await expect(shown).toBeVisible();
   const code = (await shown.innerText()).trim();
 
-  // -- the first approves: Settings → Security → "Approve a new device", the code ---------------
+  // -- the first approves: Settings → Security → "Connect another device", the code -------------
   await openSecurity(first.page);
-  await first.page.getByRole("button", { name: "Aprobar un dispositivo nuevo" }).click();
-  const approve = first.page.getByRole("dialog", { name: "Aprobar un dispositivo nuevo" });
+  await first.page.getByRole("button", { name: "Conectar otro dispositivo" }).click();
+  const approve = first.page.getByRole("dialog", { name: "Conectar otro dispositivo" });
   await approve.getByRole("textbox", { name: "Código del dispositivo nuevo" }).fill(code);
   await approve.getByRole("button", { name: "Continuar" }).click();
 
@@ -450,20 +450,14 @@ test("a removed browser is signed out", async ({ browser }) => {
     { timeout: 90_000 },
   );
 
-  // -- the first removes the second, with the recovery key typed --------------------------------
+  // -- the first removes the second, in one tap ------------------------------------------------
   await openSecurity(first.page);
   const devices = first.page.getByRole("button", { name: /^Quitar / });
   await expect(devices).toHaveCount(1);
   await devices.click();
-  const sheet = first.page.getByRole("dialog", { name: /^¿Quitar / });
-  await sheet.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
-  await sheet.getByRole("button", { name: "Sí, quitarlo" }).click();
-  await expect(first.page.getByRole("dialog", { name: "Listo" })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(
-    first.page.getByText(/ya no puede abrir tus datos y se cerró su sesión\./),
-  ).toBeVisible();
+  const sheet = first.page.getByRole("dialog", { name: /^Quitar / });
+  await sheet.getByRole("button", { name: "Quitar", exact: true }).click();
+  await expect(first.page.getByText(/ya no tiene acceso\./)).toBeVisible({ timeout: 20_000 });
 
   // -- the second's session ended with it: its next sync is a 401 and it lands on sign-in -----
   await expect(async () => {
@@ -477,13 +471,13 @@ test("a removed browser is signed out", async ({ browser }) => {
   await signInExisting(second.page, EMAIL);
   await showsPlainUnlock(second.page);
 
-  // -- the first still opens its movements after a reload, now at key version 2 ---------------
+  // -- the first still opens its movements after a reload, the keys unchanged (version 1) ---
   await first.page.goto("/app");
   await first.page.reload();
   await expect(first.page.getByText(NAME, { exact: true })).toBeVisible();
   const after = await vaultKeys(first.page);
-  expect(after.keyV).toBe(2);
-  expect(after.names).toContain("record:2");
+  expect(after.keyV).toBe(1);
+  expect(after.names).toContain("record:1");
 
   await first.context.close();
   await second.context.close();
@@ -502,12 +496,9 @@ test("a browser removed while closed is signed out when it opens again", async (
   await second.page.close();
   await openSecurity(first.page);
   await first.page.getByRole("button", { name: /^Quitar / }).click();
-  const sheet = first.page.getByRole("dialog", { name: /^¿Quitar / });
-  await sheet.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
-  await sheet.getByRole("button", { name: "Sí, quitarlo" }).click();
-  await expect(first.page.getByRole("dialog", { name: "Listo" })).toBeVisible({
-    timeout: 20_000,
-  });
+  const sheet = first.page.getByRole("dialog", { name: /^Quitar / });
+  await sheet.getByRole("button", { name: "Quitar", exact: true }).click();
+  await expect(first.page.getByText(/ya no tiene acceso\./)).toBeVisible({ timeout: 20_000 });
 
   // -- the second opens the app again: its session is gone, so sign-in first -----------------
   const page = await second.context.newPage();
@@ -524,7 +515,9 @@ test("a browser removed while closed is signed out when it opens again", async (
   await second.context.close();
 });
 
-test("a browser closed through two rotations opens and shows the data", async ({ browser }) => {
+test("a browser closed while two others are removed opens and shows the data", async ({
+  browser,
+}) => {
   test.setTimeout(180_000);
   reseed();
 
@@ -555,7 +548,7 @@ test("a browser closed through two rotations opens and shows the data", async ({
       .getByRole("link", { name, exact: true })
       .click();
 
-  /** The first removes one Chrome browser: a rotation to the next key version. */
+  /** The first removes one Chrome browser: one tap, the keys do not change. */
   const removeOne = async () => {
     await nav("Ajustes");
     await expect(first.page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
@@ -563,13 +556,10 @@ test("a browser closed through two rotations opens and shows the data", async ({
       .getByRole("button", { name: /^Quitar Chrome/ })
       .first()
       .click();
-    const sheet = first.page.getByRole("dialog", { name: /^¿Quitar Chrome/ });
-    await sheet.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
-    await sheet.getByRole("button", { name: "Sí, quitarlo" }).click();
-    const done = first.page.getByRole("dialog", { name: "Listo" });
-    await expect(done).toBeVisible({ timeout: 20_000 });
-    await done.getByRole("button", { name: "Cerrar" }).click();
-    await expect(done).toBeHidden();
+    const sheet = first.page.getByRole("dialog", { name: /^Quitar Chrome/ });
+    await sheet.getByRole("button", { name: "Quitar", exact: true }).click();
+    await expect(first.page.getByText(/ya no tiene acceso\./)).toBeVisible({ timeout: 20_000 });
+    await expect(sheet).toBeHidden();
   };
 
   /** How many changes the first browser still has to push. */
@@ -589,9 +579,9 @@ test("a browser closed through two rotations opens and shows the data", async ({
       return count;
     }, `wambito-vault-${USER_ID}`);
 
-  // -- two rotations, with a movement added (and pushed) between them --------------------------
+  // -- two removals, with a movement added (and pushed) between them --------------------------
   await removeOne();
-  expect((await vaultKeys(first.page)).keyV).toBe(2);
+  expect((await vaultKeys(first.page)).keyV).toBe(1);
   const between = `${NAME} entre claves`;
   await nav("Inicio");
   await addMovement(first.page, between, ["1", "7"]);
@@ -601,16 +591,16 @@ test("a browser closed through two rotations opens and shows the data", async ({
   }).toPass({ timeout: 30_000 });
   await removeOne();
   await expect(first.page.getByRole("button", { name: /^Quitar Chrome/ })).toHaveCount(0);
-  expect((await vaultKeys(first.page)).keyV).toBe(3);
+  expect((await vaultKeys(first.page)).keyV).toBe(1);
 
-  // -- the closed browser opens again: no unlock, both movements, now at version 3 ------------
+  // -- the closed browser opens again: no unlock, both movements, still at version 1 ------------
   const page = await closed.context.newPage();
   await pinClock(page);
   await page.goto("/app");
   await expect(page.getByText(between, { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(NAME, { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Abre tus datos aquí" })).toHaveCount(0);
-  await expect.poll(async () => (await vaultKeys(page)).keyV).toBe(3);
+  await expect.poll(async () => (await vaultKeys(page)).keyV).toBe(1);
 
   await first.context.close();
   await closed.context.close();

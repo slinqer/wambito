@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -8,8 +9,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/client.dart';
 import 'package:wambito/api/session.dart';
+import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/home/home_cache.dart';
-import 'package:wambito/local/key_storage.dart';
+import 'package:wambito/local/keys.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/vault/vault_providers.dart';
 
@@ -27,6 +29,8 @@ String? go(String path, {VaultRoute vault = VaultRoute.open, SessionState sessio
     sessionRedirect(session, Uri.parse(path), vault: vault);
 
 void main() {
+  encryptedWelcomeTests();
+
   group('sessionRedirect and the vault', () {
     test('a preview account whose vault is not open goes to /unlock from every screen', () {
       for (final path in ['/', '/settings', '/review/abc', '/welcome', '/progress', '/loading']) {
@@ -341,6 +345,146 @@ void main() {
       server.holdMe!.complete();
       await tester.pumpAndSettle();
       expect(where(c), '/unlock');
+    });
+  });
+}
+
+/// The welcome of an encrypted account follows its vault's settings (`onboardingCompletedAt`
+/// there), as the web's `LocalOnboardingRoute`: the server's copy stays empty for a `preview`
+/// account, so its `GET /v1/me` always says the welcome is to do.
+void encryptedWelcomeTests() {
+  group("an encrypted account's welcome follows its vault", () {
+    late FakeServer server;
+    late FakeAuthApi auth;
+    late KeyStorage storage;
+
+    const profile = VaultProfile(
+      id: 'user_p',
+      email: 'a@wambito.test',
+      isAnonymous: false,
+      locale: 'es',
+      timezone: 'America/Bogota',
+    );
+
+    setUp(() {
+      setUpVaultFiles();
+      server = FakeServer({'tok': (id: 'user_p', mode: 'preview')});
+      // The server's flag stays empty for a preview account: it always says "to do".
+      auth = FakeAuthApi()
+        ..account = 'user_p'
+        ..pendingOnboarding['tok'] = true;
+      storage = KeyStorage();
+    });
+
+    /// An earlier run: this phone has the account's keys and its vault, whose settings say the
+    /// welcome is [done] (or not); the session is kept as that run left it.
+    Future<void> earlierRun(WidgetTester tester, {required bool done}) async {
+      mockStorage(token: 'tok');
+      await tester.runAsync(() async {
+        await storage.writeDataKey('user_p', 1, generateDataKey());
+        await storage.setCurrent('user_p', 1);
+        final vault = await openVaultSession(
+          OpenVaultOptions(
+            profile: profile,
+            keys: (await loadLocalKeys('user_p', storage))!,
+            fresh: false,
+            network: Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = server,
+            storage: storage,
+            openStore: openTestStore,
+            deleteStore: deleteTestStore,
+          ),
+        );
+        if (done) {
+          await vault.backend.handle('PATCH', '/v1/me', const {}, {'onboardingCompleted': true});
+        }
+        await vault.close();
+      });
+      await const EncryptionStore().remember(
+        'tok',
+        VaultAccount(owner: sessionOwnerOf('tok'), profile: profile, mode: EncryptionMode.preview),
+      );
+    }
+
+    Future<ProviderContainer> start(WidgetTester tester) => pumpApp(
+      tester,
+      auth: auth,
+      plain: false,
+      settle: false,
+      overrides: [
+        networkClientProvider.overrideWith(
+          (ref) => ApiClient.forServer(
+            Uri.parse('http://x'),
+            token: ref.watch(sessionProvider.select((s) => s.stored?.token)),
+          )..dio.httpClientAdapter = server,
+        ),
+        keyStorageProvider.overrideWithValue(storage),
+        staleVaultsProvider.overrideWithValue((_) async {}),
+        openVaultSessionProvider.overrideWithValue(
+          (o) => openVaultSession(
+            OpenVaultOptions(
+              profile: o.profile,
+              keys: o.keys,
+              fresh: o.fresh,
+              network: o.network,
+              storage: o.storage,
+              onUnauthorized: o.onUnauthorized,
+              onSessionChanged: o.onSessionChanged,
+              openStore: openTestStore,
+              deleteStore: deleteTestStore,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    /// Waits for the vault to open and its answer to be read (the welcome animates: no settle).
+    Future<void> opened(WidgetTester tester, ProviderContainer c) async {
+      Future<void> turn() async {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      for (var i = 0; i < 100 && c.read(vaultSessionProvider) == null; i++) {
+        await turn();
+      }
+      expect(c.read(vaultSessionProvider), isNotNull);
+      // Then the vault's own answer, and the start's GET /v1/me of the server.
+      for (var i = 0; i < 10; i++) {
+        await turn();
+      }
+    }
+
+    /// Closes the open vault (its sync timers go with it) and the app, inside the test.
+    Future<void> finish(WidgetTester tester, ProviderContainer c) async {
+      await tester.runAsync(() => c.read(vaultSessionProvider)?.close() ?? Future<void>.value());
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    String where(ProviderContainer c) =>
+        c.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
+
+    testWidgets('its vault says the welcome is done, the server says nothing: after a restart, '
+        'home, never the welcome', (tester) async {
+      await earlierRun(tester, done: true);
+      final c = await start(tester);
+      await opened(tester, c);
+      expect(where(c), '/');
+      expect(c.read(sessionProvider).onboardingPending, isFalse);
+      // What a widget link reads at the next cold start, before the vault opens.
+      final kept = await SessionStore().read();
+      expect(kept?.onboardingPending, isFalse);
+      expect(kept?.onboardingKnown, isTrue);
+      await finish(tester, c);
+    });
+
+    testWidgets('its vault says the welcome is still to do: the welcome', (tester) async {
+      await earlierRun(tester, done: false);
+      final c = await start(tester);
+      await opened(tester, c);
+      expect(where(c), '/welcome');
+      expect(c.read(sessionProvider).onboardingPending, isTrue);
+      await finish(tester, c);
     });
   });
 }

@@ -419,13 +419,55 @@ async function enrollTrusted(
 }
 
 /** The device wrap id a vault held here kept at its enroll, if any. */
-async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
+export async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
   const store = await createEncryptedStore(userId);
   try {
     return await store.getMeta<string>("deviceWrapId");
   } finally {
     store.close();
   }
+}
+
+/**
+ * Links this browser's device wrap to the session the call runs under. A device wrap remembers the
+ * session that first PUT it, and a removal ends only that session: a browser that kept its vault
+ * through an ended session and signed in again would otherwise keep its new session after a
+ * removal. Lists the keys (`GET /v2/keys`); when the wrap whose id the vault kept is listed with
+ * this browser's public key, PUTs it back unchanged (`PUT /v2/keys/{id}`, the row's fields as
+ * listed), which moves the link to this session: `bound`. Not listed (or sealed to another key):
+ * `missing`, it was removed. No wrap id kept (a 2a vault before its first refresh): `unknown`.
+ * Network and server failures reject with `KeysError`s; nothing is written in this browser.
+ */
+export async function bindDeviceWrap(
+  options: KeysOptions,
+): Promise<"bound" | "missing" | "unknown"> {
+  const store = await createEncryptedStore(options.userId);
+  let wrapId: string | undefined;
+  let publicKey: string | undefined;
+  try {
+    wrapId = await store.getMeta<string>("deviceWrapId");
+    publicKey = await store.getMeta<string>("devicePublicKey");
+  } finally {
+    store.close();
+  }
+  if (!wrapId || !publicKey) return "unknown";
+  const call = api(options);
+  const { wraps } = await listKeys(call);
+  const wrap = wraps.find((w) => w.kind === "device" && w.id === wrapId);
+  if (!wrap || wrap.publicKey !== publicKey) return "missing";
+  await call(
+    `/v2/keys/${encodeURIComponent(wrap.id)}`,
+    putJson({
+      kind: wrap.kind,
+      ref: wrap.ref,
+      keyV: wrap.keyV,
+      wrapped: wrap.wrapped,
+      publicKey: wrap.publicKey,
+      attestation: wrap.attestation,
+      label: wrap.label,
+    }),
+  );
+  return "bound";
 }
 
 async function enrollWithPair(

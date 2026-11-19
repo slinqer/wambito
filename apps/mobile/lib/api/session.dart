@@ -345,15 +345,21 @@ class SessionController extends Notifier<SessionState> {
       // Naming the account kept for the session (ruling 17): a deleted one says `user_deleted`.
       final standing = await _auth.standing(stored.token, userId: _keptAtStart);
       if (!ref.mounted || state.stored?.token != stored.token) return;
+      // An encrypted account's flag is its vault's: what the vault said while the server was asked
+      // ([onboardingFromVault]) is kept. A plain account compares with what was kept at start, as
+      // before (a welcome finished meanwhile stays finished).
+      final now = standing.encrypted ? state.stored! : stored;
       // What the server says about the welcome wins over what was kept (another phone, or the web,
-      // may have finished it).
-      if (standing.guest != stored.guest ||
-          standing.onboardingPending != stored.onboardingPending ||
-          !stored.onboardingKnown) {
+      // may have finished it); but not for an encrypted account: its welcome is the vault's to say
+      // (the server's `onboardingCompletedAt` stays empty), and [onboardingFromVault] keeps it.
+      final pending = standing.encrypted && now.onboardingKnown
+          ? now.onboardingPending
+          : standing.onboardingPending;
+      if (standing.guest != now.guest || pending != now.onboardingPending || !now.onboardingKnown) {
         await _signedIn(
           stored.token,
           guest: standing.guest,
-          onboardingPending: standing.onboardingPending,
+          onboardingPending: pending,
           userId: standing.userId,
         );
       } else {
@@ -669,6 +675,22 @@ class SessionController extends Notifier<SessionState> {
     );
   }
 
+  /// The open vault of an encrypted account says how its welcome stands (its settings'
+  /// `onboardingCompletedAt`, lib/vault/vault_onboarding.dart): that is the account's flag, kept
+  /// for the next start (a widget's link reads it before the vault opens). A guest has none.
+  Future<void> onboardingFromVault({required bool pending}) async {
+    final stored = state.stored;
+    if (stored == null || state.status != SessionStatus.signedIn || stored.guest) return;
+    if (stored.onboardingKnown && stored.onboardingPending == pending) return;
+    // This start follows the vault at once; keeping it is for the next one, and a write the
+    // Keystore refuses (thrown to the caller) leaves this start as the vault says.
+    state = SessionState.signedIn(
+      StoredSession(token: stored.token, guest: false, onboardingPending: pending),
+      offerPasskeyFor: state.offerPasskeyFor,
+    );
+    await _store.write(stored.token, guest: false, onboardingPending: pending);
+  }
+
   /// The passkey offer was answered ("Crear mi huella" or "Ahora no"): it is kept for the account,
   /// so this phone does not ask it again, and the offer is no longer pending.
   Future<void> answerPasskeyOffer() async {
@@ -834,14 +856,25 @@ class SessionController extends Notifier<SessionState> {
     if (state.isGuest && !discardGuest) throw const GuestInTheWay();
     final token = state.stored?.token;
     if (token != null) {
-      try {
-        // Best effort, and never for long: a server that is down (the reason someone changes
-        // server) must not hold the sign-out up. Forgetting the session here is what matters.
-        await _auth.signOut(token).timeout(signOutWait);
-      } on Object {
-        // Offline, not answering, already gone, a 5xx, a failed TLS handshake, a bug in the call:
-        // whatever went wrong there, the session is forgotten here all the same.
-      }
+      // Best effort, and never for long: a server that is down (the reason someone changes
+      // server) must not hold the sign-out up. Forgetting the session here is what matters. One
+      // budget for both calls: this phone's device wrap first (it needs the session), then the
+      // session itself, which is asked for even when the wrap's call used the budget up.
+      final budget = Completer<void>();
+      final timer = Timer(signOutWait, budget.complete);
+      await Future.any([_forgetOwnDeviceWrap(token), budget.future]);
+      await Future.any([
+        _auth
+            .signOut(token)
+            .then<void>(
+              (_) {},
+              // Offline, not answering, already gone, a 5xx, a failed TLS handshake, a bug in the
+              // call: whatever went wrong there, the session is forgotten here all the same.
+              onError: (Object _) {},
+            ),
+        budget.future,
+      ]);
+      timer.cancel();
     }
     ref.read(signInRecoveryKeyProvider).clear();
     _resetAdoptionWait();
@@ -850,6 +883,22 @@ class SessionController extends Notifier<SessionState> {
     _forgetCaptures();
     await _store.clear();
     state = SessionState.signedOut;
+  }
+
+  /// Deletes this phone's own device wrap (`DELETE /v2/keys/{id}`) before a sign-out, so Settings →
+  /// Devices keeps no row of a phone that left: only for a `preview` account whose wrap id is kept
+  /// and whose vault is not held (a merge, an adoption or a provisional vault keeps its wrap for its
+  /// own flow). Never throws: any failure keeps the wrap, and the sign-out goes on as before.
+  Future<void> _forgetOwnDeviceWrap(String token) async {
+    try {
+      final userId = await _previewAccountOf(token);
+      if (userId == null || await _isHeld(userId)) return;
+      final wrapId = await ref.read(keyStorageProvider).deviceWrapId(userId);
+      if (wrapId == null) return;
+      await _auth.deleteDeviceWrap(token, userId: userId, wrapId: wrapId);
+    } on Object {
+      // Offline, a 5xx, a bug: the wrap stays, as it did before.
+    }
   }
 
   /// [adoptionNeedsEncryptedServerProvider] back to false (the next adoption's step sets it again).

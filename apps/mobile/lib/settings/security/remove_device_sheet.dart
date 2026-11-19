@@ -1,71 +1,63 @@
-// Twin of apps/web/app/features/settings/RemoveDeviceSheet.tsx. Removing a device rotates the data
-// key (stage 2b Ruling 2, D15): the person types the recovery key (re-wrapped, nothing new to write
-// down), or makes a new one, shown through the setup screen and committed only after its four
-// characters are typed back. The caller asked the screen lock first (confirmSensitive). Then the
-// sync takes the new keys and the sheet lists what was left out.
+// Twin of apps/web/app/features/settings/RemoveDeviceSheet.tsx. Removing a device is one tap: its
+// wrap is deleted and its session ends (`SecurityApi.removeDevice`, `DELETE /v2/keys/{id}`). The data
+// key does not change and no recovery key is asked; changing the keys is its own action
+// (`ChangeKeysSheet`). The caller asked the screen lock first (confirmSensitive). A wrap already gone
+// (removed meanwhile from another device) counts as removed. Offline or any other failure keeps the
+// sheet and says so; nothing is half-done.
 //
-// What the web leaves to its caller, this does (reviews of 3b tasks 11 and 12): after a commit the
-// session's `reloadKeys()` runs; a commit that fails after the rotation was posted is retried with
-// the same prepared rotation (never a new one); a prepared rotation the person gives up on is
-// `forget()`ten, which zeroes the new data key it holds.
+// From the sign-in notice's "That wasn't me" (`suggestChangeKeys`), the sheet stays on a done step
+// that suggests changing the keys (someone else may have copied the data key) and opens
+// `ChangeKeysSheet` from there. Any other removal closes the sheet and says it with a toast.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../../entry/sign_in_frame.dart';
 import '../../l10n/app_localizations.dart';
-import '../../local/rotate.dart' show FreshRecovery, PreparedRotation, RotateResult, TypedRecovery;
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.g.dart';
 import '../../ui/css_text.dart';
 import '../../ui/lk_theme.dart';
 import '../../ui/press_button.dart';
 import '../../ui/sheet.dart';
-import '../../ui/web_text_field.dart';
-import '../../vault/unlock_view.dart' show unlockErrorText;
-import 'recovery_setup_page.dart';
+import '../../ui/toast.dart';
+import 'change_keys_sheet.dart';
 import 'security_api.dart';
 import 'security_model.dart';
 
-/// Anything but a refused key, shown under the buttons.
-enum _Problem { rotatedElsewhere, tampered, offline, failed }
+/// What stopped a removal, shown under the button.
+enum _Problem { offline, failed }
 
-_Problem _problemOf(Object? error) => switch (codeOf(error)) {
-  'rotated_elsewhere' => _Problem.rotatedElsewhere,
-  'tampered' => _Problem.tampered,
-  'offline' => _Problem.offline,
-  _ => _Problem.failed,
-};
-
-/// A typed recovery key's refusal, shown on the field.
-String? _keyErrorOf(Object? error) {
-  final code = codeOf(error);
-  return code == 'bad_recovery_key' || code == 'wrong_recovery_key' ? code : null;
-}
+/// How the sheet ended.
+enum _Outcome { removed, changeKeys }
 
 abstract final class RemoveDeviceSheet {
-  /// Opens the sheet for [device] (never this phone's own). [hasPasskeys]: the account's passkeys
-  /// have wraps, which a rotation drops (the sheet says so when it is done). [onChanged]: the
-  /// account's keys changed (or may have): read them again.
+  /// Opens the sheet for [device] (never this phone's own: the list does not offer it).
+  /// [onChanged]: the account's keys changed: read them again. [hasPasskeys] goes to
+  /// `ChangeKeysSheet` when the done step opens it.
   static Future<void> show(
     BuildContext context, {
     required DeviceRow device,
     required SecurityApi security,
-    required bool hasPasskeys,
     required VoidCallback onChanged,
+    bool suggestChangeKeys = false,
+    bool hasPasskeys = false,
   }) async {
     final l10n = AppLocalizations.of(context);
+    final toasts = ToastHost.of(context);
+    final name = device.label ?? l10n.settingsSecurityUnnamed;
     final locked = ValueNotifier(false);
+    final _Outcome? outcome;
     try {
-      await LkSheet.show<void>(
+      outcome = await LkSheet.show<_Outcome>(
         context,
-        title: l10n.settingsSecurityRemoveTitle(device.label ?? l10n.settingsSecurityUnnamed),
+        title: l10n.settingsSecurityRemoveTitle(name),
         locked: locked,
         children: [
           _RemoveBody(
             device: device,
             security: security,
-            hasPasskeys: hasPasskeys,
+            suggestChangeKeys: suggestChangeKeys,
             onChanged: onChanged,
             locked: locked,
           ),
@@ -74,6 +66,11 @@ abstract final class RemoveDeviceSheet {
     } finally {
       locked.dispose();
     }
+    if (outcome == _Outcome.removed) toasts.say(l10n.settingsSecurityRemovedDone(name));
+    if (outcome == _Outcome.changeKeys && context.mounted) {
+      await ChangeKeysSheet.open(context, security: security, hasPasskeys: hasPasskeys);
+      onChanged();
+    }
   }
 }
 
@@ -81,14 +78,14 @@ class _RemoveBody extends StatefulWidget {
   const _RemoveBody({
     required this.device,
     required this.security,
-    required this.hasPasskeys,
+    required this.suggestChangeKeys,
     required this.onChanged,
     required this.locked,
   });
 
   final DeviceRow device;
   final SecurityApi security;
-  final bool hasPasskeys;
+  final bool suggestChangeKeys;
   final VoidCallback onChanged;
   final ValueNotifier<bool> locked;
 
@@ -97,180 +94,54 @@ class _RemoveBody extends StatefulWidget {
 }
 
 class _RemoveBodyState extends State<_RemoveBody> {
-  final _text = TextEditingController();
-  final _focus = FocusNode();
   var _busy = false;
-  String? _keyError;
+  var _done = false;
   _Problem? _problem;
-  RotateResult? _done;
 
-  /// A prepared rotation whose commit failed after it may have been posted: "Try again" commits
-  /// this one, never a new one. Forgotten (its new key zeroed) when the sheet goes.
-  PreparedRotation? _pending;
-
-  @override
-  void initState() {
-    super.initState();
-    _text.addListener(() {
-      if (mounted) setState(() {});
+  Future<void> _remove() async {
+    if (_busy) return;
+    widget.locked.value = true;
+    setState(() {
+      _busy = true;
+      _problem = null;
     });
-  }
-
-  @override
-  void dispose() {
-    // `_pending` was attempted (its commit ran), so `forget()` would do nothing: it is just let go.
-    _text.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  bool get _canSubmit => !_busy && (_pending != null || _text.text.trim().isNotEmpty);
-
-  void _setBusy(bool busy) {
-    widget.locked.value = busy;
-    if (mounted) setState(() => _busy = busy);
-  }
-
-  void _asking({String? keyError, _Problem? problem}) {
-    // A commit was tried and failed: the server may hold the rotation, so the sheet stays until
-    // "Try again" succeeds or the server refuses it for good (R17).
-    widget.locked.value = _pending != null;
+    try {
+      await widget.security.removeDevice(widget.device.id);
+    } on Object catch (error) {
+      widget.locked.value = false;
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _problem = codeOf(error) == 'offline' ? _Problem.offline : _Problem.failed;
+        });
+      }
+      return;
+    }
+    widget.locked.value = false;
+    widget.onChanged();
     if (!mounted) return;
+    if (!widget.suggestChangeKeys) {
+      Navigator.of(context).pop(_Outcome.removed);
+      return;
+    }
     setState(() {
       _busy = false;
-      _keyError = keyError;
-      _problem = problem;
+      _done = true;
     });
-  }
-
-  /// A refusal before anything was sent, or the commit's own.
-  void _failed(Object error) {
-    final keyError = _keyErrorOf(error);
-    if (keyError != null) {
-      _asking(keyError: keyError);
-      return;
-    }
-    final problem = _problemOf(error);
-    if (problem == _Problem.rotatedElsewhere) {
-      // The sync picks up the other device's keys; the list follows.
-      unawaited(widget.security.reloadKeys().catchError((Object _) {}));
-      widget.onChanged();
-    }
-    // The keys' links do not check out: the message says to stop, and the list shows what is there.
-    if (problem == _Problem.tampered) widget.onChanged();
-    _asking(problem: problem);
-  }
-
-  Future<void> _finish(RotateResult result) async {
-    _pending = null;
-    try {
-      await widget.security.reloadKeys();
-    } on Object {
-      // The sync tries again on its own; the rotation is kept.
-    }
-    widget.onChanged();
-    widget.locked.value = false;
-    if (mounted) {
-      setState(() {
-        _busy = false;
-        _done = result;
-      });
-    }
-  }
-
-  /// Commits [prepared] (typed key). A failure that may have been saved keeps it for "Try again".
-  Future<void> _commit(PreparedRotation prepared) async {
-    _pending = prepared;
-    _setBusy(true);
-    final RotateResult result;
-    try {
-      result = await prepared.commit();
-    } on Object catch (error) {
-      // Refused for good (rotated elsewhere, tampered): a retry would say the same, so the
-      // sheet is free again. Anything else may have been saved: "Try again" on the same rotation.
-      if (prepared.refused) _pending = null;
-      _failed(error);
-      return;
-    }
-    await _finish(result);
-  }
-
-  Future<void> _withKey() async {
-    if (!_canSubmit) return;
-    final pending = _pending;
-    if (pending != null) {
-      await _commit(pending);
-      return;
-    }
-    _setBusy(true);
-    final PreparedRotation prepared;
-    try {
-      prepared = await widget.security.rotate(
-        remove: [widget.device.id],
-        recovery: TypedRecovery(_text.text),
-      );
-    } on Object catch (error) {
-      _failed(error);
-      return;
-    }
-    await _commit(prepared);
-  }
-
-  Future<void> _withNewKey() async {
-    if (_busy) return;
-    _setBusy(true);
-    final PreparedRotation prepared;
-    try {
-      prepared = await widget.security.rotate(
-        remove: [widget.device.id],
-        recovery: const FreshRecovery(),
-      );
-    } on Object catch (error) {
-      _failed(error);
-      return;
-    }
-    if (!mounted) {
-      prepared.forget();
-      return;
-    }
-    // The key is shown, and written down, before anything reaches the server.
-    final outcome = await RecoverySetupPage.open<RotateResult>(
-      context,
-      recoveryKey: prepared.recoveryKey!,
-      commit: prepared.commit,
-      refused: () => prepared.refused,
-    );
-    final result = outcome?.value;
-    if (result != null) {
-      await _finish(result);
-      return;
-    }
-    // Gave up, or refused for sure (rotated elsewhere): the prepared rotation is dropped.
-    prepared.forget();
-    if (outcome == null) {
-      _asking();
-    } else {
-      _failed(outcome.refused!);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final done = _done;
-    final name = widget.device.label ?? l10n.settingsSecurityUnnamed;
     return Padding(
       padding: const EdgeInsets.only(top: WambitoTokens.space3),
-      child: done != null ? _doneView(l10n, name, done) : _askView(l10n),
+      child: _done ? _doneView(l10n) : _askView(l10n),
     );
   }
 
-  Widget _doneView(AppLocalizations l10n, String name, RotateResult done) {
+  Widget _doneView(AppLocalizations l10n) {
     final colors = context.lkColors;
-    final dropped = [
-      for (final d in done.dropped)
-        if (d.id != widget.device.id) d,
-    ];
+    final name = widget.device.label ?? l10n.settingsSecurityUnnamed;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -278,38 +149,21 @@ class _RemoveBodyState extends State<_RemoveBody> {
       children: [
         Semantics(
           header: true,
-          child: Text(
-            l10n.settingsSecurityDoneTitle,
+          child: CssParagraph(
+            l10n.settingsSecurityRemovedDone(name),
             style: LkText.body.copyWith(color: colors.ink, fontWeight: FontWeight.w700),
           ),
         ),
         CssParagraph(
-          l10n.settingsSecurityDoneLead(name),
+          l10n.settingsSecurityChangeKeysSuggest,
           style: LkText.body.copyWith(color: colors.ink),
         ),
-        if (dropped.isNotEmpty) ...[
-          CssParagraph(
-            l10n.settingsSecurityDroppedLead,
-            style: LkText.body.copyWith(color: colors.ink),
-          ),
-          for (final d in dropped)
-            CssParagraph(
-              l10n.settingsSecurityDroppedItem(
-                d.label ?? l10n.settingsSecurityUnnamed,
-                switch (d.reason) {
-                  'removed' => 'removed',
-                  'revoked' => 'revoked',
-                  _ => 'other',
-                },
-              ),
-              style: LkText.body.copyWith(color: colors.ink),
-            ),
-        ],
-        if (widget.hasPasskeys)
-          CssParagraph(
-            l10n.settingsSecurityPasskeysNote,
-            style: LkText.bodySm.copyWith(color: colors.inkMuted),
-          ),
+        PressButton.text(
+          l10n.settingsSecurityChangeKeys,
+          key: const Key('security.remove.changeKeys'),
+          tone: PressTone.secondary,
+          onPressed: () => Navigator.of(context).pop(_Outcome.changeKeys),
+        ),
       ],
     );
   }
@@ -317,9 +171,6 @@ class _RemoveBodyState extends State<_RemoveBody> {
   Widget _askView(AppLocalizations l10n) {
     final colors = context.lkColors;
     final problem = _problem;
-    final retrying = _pending != null;
-    // After `tampered` the message says not to try again: nothing to press.
-    final stopped = problem == _Problem.tampered;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -329,46 +180,15 @@ class _RemoveBodyState extends State<_RemoveBody> {
           l10n.settingsSecurityRemoveBody,
           style: LkText.body.copyWith(color: colors.ink),
         ),
-        FieldCaption(l10n.settingsSecurityKeyLabel),
-        WebTextField(
-          fieldKey: const Key('security.remove.key'),
-          controller: _text,
-          focusNode: _focus,
-          label: l10n.settingsSecurityKeyLabel,
-          placeholder: l10n.vaultUnlockPlaceholder,
-          invalid: _keyError != null,
-          readOnly: _busy || retrying,
-          enableIMEPersonalizedLearning: false,
-          textInputAction: TextInputAction.done,
-          onChanged: (_) {
-            if (_keyError != null) setState(() => _keyError = null);
-          },
-          onSubmitted: (_) => unawaited(_withKey()),
+        PressButton.text(
+          _busy ? l10n.settingsSecurityRemoving : l10n.settingsSecurityRemove,
+          key: const Key('security.remove.confirm'),
+          tone: PressTone.secondary,
+          onPressed: _busy ? null : () => unawaited(_remove()),
         ),
-        if (_keyError != null) FieldError(unlockErrorText(l10n, _keyError!)),
-        if (!stopped)
-          PressButton.text(
-            _busy
-                ? l10n.settingsSecurityRemoving
-                : retrying
-                ? l10n.retry
-                : l10n.settingsSecurityRemoveConfirm,
-            key: const Key('security.remove.confirm'),
-            tone: PressTone.secondary,
-            onPressed: _canSubmit ? () => unawaited(_withKey()) : null,
-          ),
-        if (!retrying && !stopped)
-          PressButton.text(
-            l10n.settingsSecurityOrNew,
-            key: const Key('security.remove.newKey'),
-            tone: PressTone.ghost,
-            onPressed: _busy ? null : () => unawaited(_withNewKey()),
-          ),
         if (problem != null)
           FieldError(switch (problem) {
             _Problem.offline => l10n.vaultUnlockErrorOffline,
-            _Problem.rotatedElsewhere => l10n.settingsSecurityRotatedElsewhere,
-            _Problem.tampered => l10n.settingsSecurityTampered,
             _Problem.failed => l10n.settingsSecurityRemoveFailed,
           }),
       ],

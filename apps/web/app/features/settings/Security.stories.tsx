@@ -9,7 +9,7 @@ import type { SecurityWrap } from "./security-model.ts";
 
 /**
  * Settings → Security for an encrypted account (`mode="local"`, stage 2b Task 8): the devices that
- * open the data, removing one (a key rotation), approving a new device, a new recovery key, the
+ * open the data, removing one (one tap, the keys stay), approving a new device, a new recovery key, the
  * passkeys that unlock, and the records that could not be read. Web-only, not in parity.json.
  */
 
@@ -71,6 +71,8 @@ interface FakeOptions {
   touch?: "prf" | "no_prf" | "cancel";
   /** What each commit of a rotation does, in turn (default: works). */
   commitRotate?: Array<"ok" | "offline" | "rotated_elsewhere">;
+  /** What each removeDevice does, in turn (default: works; "gone": it was already removed). */
+  removeDevice?: Array<"ok" | "offline" | "failed" | "gone">;
   /** What each commit of a new recovery key does, in turn (default: works). */
   commitNewKey?: Array<"ok" | "offline" | "rotated_elsewhere">;
 }
@@ -82,11 +84,13 @@ function fakeSecurity({
   touch = "prf",
   commitRotate: rotateCommits = [],
   commitNewKey: newKeyCommits = [],
+  removeDevice: removals = [],
 }: FakeOptions = {}) {
   let wraps = [...WRAPS];
   let attempt = 0;
   let rotateCommit = 0;
   let newKeyCommit = 0;
+  let removal = 0;
   const commitRotate = fn(async (request: RotateRequest): Promise<RotateResult> => {
     const outcome = rotateCommits[rotateCommit++] ?? "ok";
     if (outcome !== "ok") throw coded(outcome);
@@ -126,6 +130,11 @@ function fakeSecurity({
         unreadable,
       }),
     ),
+    removeDevice: fn(async (id: string) => {
+      const outcome = removals[removal++] ?? "ok";
+      if (outcome === "offline" || outcome === "failed") throw coded(outcome);
+      wraps = wraps.filter((w) => w.id !== id);
+    }),
     rotate: fn(async (request: RotateRequest) => {
       const outcome = rotate[attempt++] ?? "ok";
       if (outcome !== "ok") throw coded(outcome);
@@ -242,9 +251,7 @@ export const Overview: Story = {
     await expect(forged?.getByText("Sin verificar")).toBeVisible();
     await expect(forged?.getByRole("button", { name: "Quitar Safari on iOS" })).toBeVisible();
     await expect(security.queryByText("Edge on Windows")).toBeNull();
-    await expect(
-      security.getByRole("button", { name: "Aprobar un dispositivo nuevo" }),
-    ).toBeVisible();
+    await expect(security.getByRole("button", { name: "Conectar otro dispositivo" })).toBeVisible();
     await expect(
       security.getByRole("button", { name: "Nueva clave de recuperación" }),
     ).toBeVisible();
@@ -265,7 +272,7 @@ export const NothingUnreadable: Story = {
 
 /**
  * An account made by the phone (no email) gets the whole section, like any encrypted account: its
- * devices, "Approve a new device" and the keys.
+ * devices, "Connect another device" and the keys.
  */
 export const AnonymousAccount: Story = {
   render: (args) => stage(args, { anonymous: true }),
@@ -277,9 +284,9 @@ export const AnonymousAccount: Story = {
     await area.findAllByRole("listitem");
     await expect(security.load).toHaveBeenCalled();
     await expect(area.getByRole("button", { name: "Nueva clave de recuperación" })).toBeVisible();
-    await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
+    await userEvent.click(area.getByRole("button", { name: "Conectar otro dispositivo" }));
     await expect(
-      await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),
+      await screen.findByRole("dialog", { name: "Conectar otro dispositivo" }),
     ).toBeVisible();
   },
 };
@@ -296,120 +303,58 @@ export const HiddenInTheLiveApp: Story = {
 const openRemove = async (canvas: Canvas, name = "Firefox on Linux") => {
   const security = await section(canvas);
   await userEvent.click(await security.findByRole("button", { name: `Quitar ${name}` }));
-  return within(await screen.findByRole("dialog", { name: `¿Quitar ${name}?` }));
+  return within(await screen.findByRole("dialog", { name: `Quitar ${name}` }));
 };
 
 /**
- * Remove asks for the recovery key or a new one; a wrong key keeps the sheet with the error; the
- * right one rotates, the sync takes the keys, and the sheet lists what was dropped.
+ * Remove is one tap: the wrap is deleted (no recovery key, no rotation), the toast says it, and
+ * the row goes.
  */
-export const RemoveWithRecoveryKey: Story = {
-  args: { options: { rotate: ["wrong_recovery_key"] } },
+export const RemoveDevice: Story = {
   render: (args) => stage(args),
   play: async ({ canvasElement, args }) => {
-    const { security, commitRotate } = fakeOf(args);
+    const { security } = fakeOf(args);
     const sheet = await openRemove(within(canvasElement));
-    const field = sheet.getByRole("textbox", { name: "Clave de recuperación" });
-    await expect(sheet.getByRole("button", { name: "Sí, quitarlo" })).toBeDisabled();
-    await expect(
-      sheet.getByRole("button", { name: "¿No la tienes? Crea una clave de recuperación nueva" }),
-    ).toBeEnabled();
-
-    await userEvent.type(field, "AAAA-BBBB");
-    await userEvent.click(sheet.getByRole("button", { name: "Sí, quitarlo" }));
-    await expect(await sheet.findByRole("alert")).toHaveTextContent(
-      "Esa clave no abre esta cuenta.",
-    );
-    await expect(field).toHaveAttribute("aria-invalid", "true");
-    await expect(commitRotate).not.toHaveBeenCalled();
-
-    await userEvent.clear(field);
-    await userEvent.type(field, KEY);
-    await userEvent.click(sheet.getByRole("button", { name: "Sí, quitarlo" }));
-    const done = within(await screen.findByRole("dialog", { name: "Listo" }));
-    await expect(
-      done.getByText(/^Firefox on Linux ya no puede abrir tus datos y se cerró su sesión\.$/),
-    ).toBeVisible();
-    await expect(done.getByText("Edge on Windows (quitado antes)")).toBeVisible();
-    await expect(done.getByText("Safari on iOS (sin verificar)")).toBeVisible();
-    await expect(done.getByText(/vuelve a activarlas/)).toBeVisible();
-    await expect(security.rotate).toHaveBeenLastCalledWith({
-      remove: [LAPTOP],
-      recovery: { text: KEY },
-    });
-    await expect(commitRotate).toHaveBeenCalledTimes(1);
-    await expect(security.reloadKeys).toHaveBeenCalledTimes(1);
-
-    await userEvent.click(done.getByRole("button", { name: "Cerrar" }));
+    await expect(sheet.queryByRole("textbox")).toBeNull();
+    await userEvent.click(sheet.getByRole("button", { name: "Quitar" }));
+    await expect(await screen.findByText("Firefox on Linux ya no tiene acceso.")).toBeVisible();
+    await expect(security.removeDevice).toHaveBeenCalledTimes(1);
+    await expect(security.removeDevice).toHaveBeenCalledWith(LAPTOP);
+    await expect(security.rotate).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /^Quitar/ })).toBeNull());
     const list = await section(within(canvasElement));
     await waitFor(() => expect(list.queryByText("Firefox on Linux")).toBeNull());
   },
 };
 
-/** Another device rotated first: the sheet says to try again after the refresh, and stays. */
-export const RemoveRotatedElsewhere: Story = {
-  args: { options: { rotate: ["rotated_elsewhere"] } },
+/** Already removed from another device (the server answers 404): it reads as done. */
+export const RemoveDeviceAlreadyGone: Story = {
+  args: { options: { removeDevice: ["gone"] } },
+  render: (args) => stage(args),
+  play: async ({ canvasElement }) => {
+    const sheet = await openRemove(within(canvasElement));
+    await userEvent.click(sheet.getByRole("button", { name: "Quitar" }));
+    await expect(await screen.findByText("Firefox on Linux ya no tiene acceso.")).toBeVisible();
+  },
+};
+
+/** No connection: the sheet says so and the row stays. */
+export const RemoveDeviceOffline: Story = {
+  args: { options: { removeDevice: ["offline"] } },
   render: (args) => stage(args),
   play: async ({ canvasElement, args }) => {
     const { security } = fakeOf(args);
     const sheet = await openRemove(within(canvasElement));
-    await userEvent.type(sheet.getByRole("textbox", { name: "Clave de recuperación" }), KEY);
-    await userEvent.click(sheet.getByRole("button", { name: "Sí, quitarlo" }));
+    await userEvent.click(sheet.getByRole("button", { name: "Quitar" }));
     await expect(await sheet.findByRole("alert")).toHaveTextContent(
-      "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
+      "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
     );
-    await expect(security.reloadKeys).toHaveBeenCalledTimes(1);
-    await expect(screen.getByRole("dialog", { name: "¿Quitar Firefox on Linux?" })).toBeVisible();
-  },
-};
-
-/**
- * "Make a new recovery key": a passkey touch confirms it (that passkey keeps its wrap), the new
- * key is shown, and nothing is committed until its four characters are typed back.
- */
-export const RemoveWithNewKey: Story = {
-  render: (args) => stage(args),
-  play: async ({ canvasElement, args }) => {
-    const { security, commitRotate } = fakeOf(args);
-    const sheet = await openRemove(within(canvasElement));
-    await userEvent.click(
-      sheet.getByRole("button", { name: "¿No la tienes? Crea una clave de recuperación nueva" }),
-    );
-    await expect(
-      await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" }),
-    ).toBeVisible();
-    await expect(security.evaluatePrf).toHaveBeenCalledWith(["cred-1", "cred-2"]);
-    const request = security.rotate.mock.calls[0]?.[0] as RotateRequest;
-    await expect(request.recovery).toEqual({ fresh: true });
-    await expect(request.passkey?.credentialId).toBe("cred-1");
-    await expect(commitRotate).not.toHaveBeenCalled();
-
-    await typeBack(KEY);
-    await expect(commitRotate).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await expect(await screen.findByRole("dialog", { name: "Listo" })).toBeVisible();
-    await expect(commitRotate).toHaveBeenCalledTimes(1);
-    await expect(security.reloadKeys).toHaveBeenCalledTimes(1);
-  },
-};
-
-/** A touch that gave no PRF still confirms (Ruling 2); a cancelled one does not. */
-export const RemoveWithNewKeyNoPrf: Story = {
-  args: { options: { touch: "no_prf" } },
-  render: (args) => stage(args),
-  play: async ({ canvasElement, args }) => {
-    const { security } = fakeOf(args);
-    const sheet = await openRemove(within(canvasElement));
-    await userEvent.click(
-      sheet.getByRole("button", { name: "¿No la tienes? Crea una clave de recuperación nueva" }),
-    );
-    await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" });
-    const request = security.rotate.mock.calls[0]?.[0] as RotateRequest;
-    await expect(request.passkey).toBeUndefined();
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    await expect(
-      await screen.findByRole("dialog", { name: "¿Quitar Firefox on Linux?" }),
-    ).toBeVisible();
+    await expect(security.removeDevice).toHaveBeenCalledTimes(1);
+    await expect(screen.queryByText("Firefox on Linux ya no tiene acceso.")).toBeNull();
+    await expect(screen.getByRole("dialog", { name: "Quitar Firefox on Linux" })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    const list = await section(within(canvasElement));
+    await expect(list.getByText("Firefox on Linux")).toBeVisible();
   },
 };
 
@@ -475,21 +420,24 @@ export const NewRecoveryKeyCancelledTouch: Story = {
   },
 };
 
-/** "Aprobar un dispositivo nuevo" opens the approval screen over Settings; Cancel closes it. */
+/**
+ * "Conectar otro dispositivo" opens the device approval over Settings (its heading is still
+ * "Aprobar un dispositivo nuevo"); Cancel closes it.
+ */
 export const ApproveANewDevice: Story = {
   render: (args) => stage(args),
   play: async ({ canvasElement }) => {
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Aprobar un dispositivo nuevo" }));
+    await userEvent.click(area.getByRole("button", { name: "Conectar otro dispositivo" }));
     const takeover = within(
-      await screen.findByRole("dialog", { name: "Aprobar un dispositivo nuevo" }),
+      await screen.findByRole("dialog", { name: "Conectar otro dispositivo" }),
     );
     await expect(
       takeover.getByRole("heading", { level: 1, name: "Aprobar un dispositivo nuevo" }),
     ).toBeVisible();
     await userEvent.click(takeover.getByRole("button", { name: "Cancelar" }));
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Aprobar un dispositivo nuevo" })).toBeNull(),
+      expect(screen.queryByRole("dialog", { name: "Conectar otro dispositivo" })).toBeNull(),
     );
   },
 };
@@ -534,28 +482,16 @@ export const PasskeyCannotUnlock: Story = {
   },
 };
 
-const OR_NEW = "¿No la tienes? Crea una clave de recuperación nueva";
-
 /** A passkey list that never answers: the account may have passkeys, so no touch-free new key. */
 const loadingPasskeys = (): PasskeysApi => ({
   ...storyPasskeys({ initial: PASSKEYS }),
   list: () => new Promise<PasskeyItem[]>(() => {}),
 });
 
-/** While the passkey list loads, "make a new recovery key" waits (disabled), in both sheets. */
+/** While the passkey list loads, "use a fingerprint" waits (disabled). */
 export const NewKeyWaitsForThePasskeyList: Story = {
   render: (args) => stage(args, { passkeys: loadingPasskeys() }),
-  play: async ({ canvasElement, args }) => {
-    const { security } = fakeOf(args);
-    const sheet = await openRemove(within(canvasElement));
-    const orNew = sheet.getByRole("button", { name: OR_NEW });
-    await expect(orNew).toBeDisabled();
-    await userEvent.click(orNew, { pointerEventsCheck: 0 });
-    await expect(security.rotate).not.toHaveBeenCalled();
-    await expect(security.evaluatePrf).not.toHaveBeenCalled();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
+  play: async ({ canvasElement }) => {
     const area = await section(within(canvasElement));
     await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
     const newKey = within(
@@ -568,8 +504,7 @@ export const NewKeyWaitsForThePasskeyList: Story = {
 /** A passkey list that failed: no new key is offered, only the typed key, with a retry. */
 export const NewKeyNotOfferedWhenThePasskeyListFailed: Story = {
   render: (args) => stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, failList: true }) }),
-  play: async ({ canvasElement, args }) => {
-    const { security } = fakeOf(args);
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     // the list's query gives up after its retries
     await canvas.findByText(
@@ -577,19 +512,6 @@ export const NewKeyNotOfferedWhenThePasskeyListFailed: Story = {
       {},
       { timeout: 15000 },
     );
-    const sheet = await openRemove(canvas);
-    await expect(sheet.queryByRole("button", { name: OR_NEW })).toBeNull();
-    await expect(
-      sheet.getByText(
-        "No pudimos cargar tus huellas, así que todavía no podemos ofrecerte una clave nueva.",
-      ),
-    ).toBeVisible();
-    await expect(sheet.getByRole("button", { name: "Reintentar" })).toBeVisible();
-    await expect(sheet.getByRole("textbox", { name: "Clave de recuperación" })).toBeVisible();
-    await expect(security.rotate).not.toHaveBeenCalled();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
     const area = await section(within(canvasElement));
     await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
     const newKey = within(
@@ -597,39 +519,6 @@ export const NewKeyNotOfferedWhenThePasskeyListFailed: Story = {
     );
     await expect(newKey.queryByRole("button", { name: "Usar una huella" })).toBeNull();
     await expect(newKey.getByRole("button", { name: "Reintentar" })).toBeVisible();
-  },
-};
-
-/** The account has passkeys but this browser cannot touch one: only the typed key. */
-export const OnlyTheTypedKeyWithoutTouch: Story = {
-  render: (args) =>
-    stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, supported: false }) }),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await (await section(canvas)).findAllByRole("listitem");
-    // the list has loaded
-    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
-      "Pixel 9",
-    );
-    const sheet = await openRemove(canvas);
-    await expect(sheet.getByRole("textbox", { name: "Clave de recuperación" })).toBeVisible();
-    await expect(sheet.queryByRole("button", { name: OR_NEW })).toBeNull();
-  },
-};
-
-/** No passkeys at all: a new key needs no touch; the type-back confirms it. */
-export const NewKeyWithoutPasskeys: Story = {
-  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: [] }) }),
-  play: async ({ canvasElement, args }) => {
-    const { security } = fakeOf(args);
-    const canvas = within(canvasElement);
-    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
-      /Aún no tienes/,
-    );
-    const sheet = await openRemove(canvas);
-    await userEvent.click(sheet.getByRole("button", { name: OR_NEW }));
-    await screen.findByRole("heading", { name: "Guarda tu clave de recuperación" });
-    await expect(security.evaluatePrf).not.toHaveBeenCalled();
   },
 };
 
@@ -701,25 +590,6 @@ export const NewRecoveryKeyRotatedElsewhere: Story = {
     );
     await expect(security.reloadKeys).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(security.load).toHaveBeenCalledTimes(2));
-  },
-};
-
-/** Removing with a new key whose commit failed: the setup stays and Continue retries the same commit. */
-export const RemoveWithNewKeyCommitFails: Story = {
-  args: { options: { commitRotate: ["offline"] } },
-  render: (args) => stage(args),
-  play: async ({ canvasElement, args }) => {
-    const { security, commitRotate } = fakeOf(args);
-    const sheet = await openRemove(within(canvasElement));
-    await userEvent.click(sheet.getByRole("button", { name: OR_NEW }));
-    await typeBack(KEY);
-    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await expect(await screen.findByText(MAYBE_SAVED)).toHaveAttribute("role", "alert");
-    await expect(screen.getByRole("heading", { name: "Confirma que la guardaste" })).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await expect(await screen.findByRole("dialog", { name: "Listo" })).toBeVisible();
-    await expect(commitRotate).toHaveBeenCalledTimes(2);
-    await expect(security.rotate).toHaveBeenCalledTimes(1);
   },
 };
 

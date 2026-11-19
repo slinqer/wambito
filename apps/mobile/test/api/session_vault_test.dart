@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -431,6 +432,154 @@ void main() {
         }
       },
     );
+
+    // Quick device removal: signing out leaves no row behind in Settings → Devices.
+    group("this phone's device wrap", () {
+      Future<void> keepWrapId() => const FlutterSecureStorage().write(
+        key: 'wambito.vault.user_p.deviceWrapId',
+        value: 'wrap_p',
+      );
+
+      test(
+        "a preview account's sign-out deletes its own device wrap before ending the session",
+        () async {
+          await keepWrapId();
+          final container = containerWith();
+          final controller = container.read(sessionProvider.notifier);
+          await controller.ready;
+          await controller.signOut();
+
+          expect(
+            auth.calls,
+            containsAllInOrder(['deleteDeviceWrap tok user_p wrap_p', 'signOut tok']),
+          );
+          expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+          expect((await kept()).keys.where((k) => k.startsWith('wambito.vault.user_p.')), isEmpty);
+        },
+      );
+
+      test('no DELETE for a plain account', () async {
+        await rememberPlain();
+        await keepWrapId();
+        final container = containerWith();
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.signOut();
+
+        expect(auth.calls.where((c) => c.startsWith('deleteDeviceWrap')), isEmpty);
+        expect(auth.calls, contains('signOut tok'));
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+      });
+
+      test('no DELETE without a wrap id', () async {
+        final container = containerWith();
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.signOut();
+
+        expect(auth.calls.where((c) => c.startsWith('deleteDeviceWrap')), isEmpty);
+        expect(auth.calls, contains('signOut tok'));
+      });
+
+      for (final kind in VaultHoldKind.values) {
+        test('no DELETE while the vault is held ${kind.name}: it keeps its wrap', () async {
+          await keepWrapId();
+          final container = containerWith(
+            holds: {'user_p': VaultHold(kind, since: '2026-11-18T00:00:00Z')},
+          );
+          final controller = container.read(sessionProvider.notifier);
+          await controller.ready;
+          await controller.signOut();
+
+          expect(auth.calls.where((c) => c.startsWith('deleteDeviceWrap')), isEmpty);
+          expect(auth.calls, contains('signOut tok'));
+          expect((await kept())['wambito.vault.user_p.deviceWrapId'], 'wrap_p');
+          expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+        });
+      }
+
+      test('a 401 at start keeps the wrap: no DELETE, its id stays', () async {
+        await keepWrapId();
+        auth.failures['isGuest'] = const AuthFailure(status: 401);
+        final container = containerWith();
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+        await controller.refreshed;
+
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+        expect(auth.calls.where((c) => c.startsWith('deleteDeviceWrap')), isEmpty);
+        expect((await kept())['wambito.vault.user_p.deviceWrapId'], 'wrap_p');
+      });
+
+      test('a DELETE that fails changes nothing else: the sign-out goes on', () async {
+        for (final failure in <Object>[
+          const AuthFailure(status: 0),
+          const AuthFailure(status: 500),
+          const SocketException('no route'),
+          StateError('a bug in the call'),
+        ]) {
+          FlutterSecureStorage.setMockInitialValues({
+            SessionStore.tokenKey: 'tok',
+            SessionStore.guestKey: 'false',
+            SessionStore.onboardingKey: 'done',
+            'wambito.vault.user_p.deviceWrapId': 'wrap_p',
+          });
+          await const EncryptionStore().remember(
+            'tok',
+            VaultAccount(
+              owner: sessionOwnerOf('tok'),
+              profile: const VaultProfile(
+                id: 'user_p',
+                email: 'ana@wambito.test',
+                isAnonymous: false,
+                locale: 'es',
+                timezone: 'America/Bogota',
+              ),
+              mode: EncryptionMode.preview,
+            ),
+          );
+          auth = FakeAuthApi()..failures['deleteDeviceWrap'] = failure;
+          final container = containerWith();
+          final controller = container.read(sessionProvider.notifier);
+          await controller.ready;
+          await controller.signOut();
+
+          expect(
+            auth.calls,
+            containsAllInOrder(['deleteDeviceWrap tok user_p wrap_p', 'signOut tok']),
+          );
+          expect(
+            container.read(sessionProvider).status,
+            SessionStatus.signedOut,
+            reason: '$failure',
+          );
+        }
+      });
+
+      testWidgets('an offline DELETE does not delay the sign-out past signOutWait', (tester) async {
+        await keepWrapId();
+        auth.holdDeleteDeviceWrap = Completer<void>();
+        auth.holdSignOut = Completer<void>();
+        final container = containerWith();
+        final controller = container.read(sessionProvider.notifier);
+        await controller.ready;
+
+        var done = false;
+        unawaited(controller.signOut().then((_) => done = true));
+        await tester.pump(const Duration(seconds: 9));
+        expect(done, isFalse, reason: 'still waiting for the server');
+        expect(container.read(sessionProvider).status, SessionStatus.signedIn);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(done, isTrue);
+        expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+        // The server is still told the session ends, even after a DELETE that never answered.
+        expect(
+          auth.calls,
+          containsAllInOrder(['deleteDeviceWrap tok user_p wrap_p', 'signOut tok']),
+        );
+      });
+    });
   });
 
   group('reinstall', () {

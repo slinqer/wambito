@@ -234,7 +234,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `keys.ts` `refreshKeys` over the session's network; `device_removed` fails the opening
   (`VaultOpenError("device_removed")`) or, later, stops the sync, deletes the vault and calls
   `session.onRemoved(cb)` listeners (`VaultGate` routes them to `gate.removed()`: Unlock with the
-  notice `vault.removed`). `key_unverified` (a new key version whose links do
+  notice `vault.removed`). A device wrap stays linked to the session that first PUT it, and a
+  removal ends only that session: with `sessionId` (`VaultGate`: Better Auth's `get-session` id) a
+  kept vault opening under a session not yet in meta `boundSession` runs `keys.ts` `bindDeviceWrap`
+  first (`GET /v2/keys`; its own wrap, by meta `deviceWrapId`, PUT back unchanged so the server
+  links it to this session; missing = `VaultOpenError("device_removed")` and the vault goes). A
+  fresh open only records the id; offline or any failure is silent and retried at the next open.
+  `key_unverified` (a new key version whose links do
   not lead back to the held key) fails the opening (`VaultOpenError("key_unverified")`) or, later,
   stops the sync, closes the session and calls `session.onUnverified(cb)` listeners; the vault and
   its outbox are kept (never `forgetDevice`). `VaultGate` routes them to `gate.unverified()`
@@ -246,6 +252,8 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `current`) and runs a sync; called after a rotation commits. Its `fetch` is the local backend plus `DELETE /v1/me` and `/v1/me/assistants*`
   (list, revoke) sent to the API; `LOCAL_UNAVAILABLE` (export, imports) answers 403. `forgetVault()` stops the
   sync, closes the store and deletes the vault (sign-out via `liveSignOut`, and a 401 from sync).
+  `forgetOwnDeviceWrap()` runs first in `liveSignOut`: `DELETE /v2/keys/{meta deviceWrapId}` (best effort, 3 s, never rejects)
+  so Settings > Devices keeps no row for a signed-out browser.
   If the store closes under it (another tab), the session stops its sync, drops itself and calls
   `onClosed`; the gate then checks again (`gate.closed()`: reopen with kept keys, else Unlock).
   The local backend also serves `POST /v1/transactions/review` (all or nothing, 404 on an unknown
@@ -311,15 +319,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   empty) also "Lost it? Make a new one without it", the type-back confirming it; with passkeys
   this browser cannot touch, only the typed key, and the copy says why; then `RecoveryKeySetup`,
   `commit()` after the four characters), "Could not read N items" only when N > 0). A failed
-  commit of a new recovery key (here and in `RemoveDeviceSheet`'s "make a new one") may have
+  commit of a new recovery key may have
   been saved: the setup stays with the same key, says `settings.security.maybe_saved`, hides
   Cancel, and Continue retries the same `commit()`; only `rotated_elsewhere` goes back, reloading
-  the keys and invalidating `SECURITY_KEY`; `RemoveDeviceSheet.tsx`
-  (the recovery key typed, or "make a new one": a passkey touch, whose PRF (a copy per try, since
-  `rotateKeys` zeroes it) keeps that passkey's wrap; then `commit()`, `reloadKeys()`, and what was
-  dropped; `rotated_elsewhere` reloads the keys and says to try again; "make a new one" (and New
-  recovery key's touch) waits for the passkey list (`PasskeyList`: disabled while loading, hidden
-  with a retry when it failed; with passkeys but no WebAuthn here, only the typed key); a
+  the keys and invalidating `SECURITY_KEY`; "New recovery key" waits for the passkey list
+  (`PasskeyList`: disabled while loading, hidden with a retry when it failed; with passkeys but no
+  WebAuthn here, only the typed key); `RemoveDeviceSheet.tsx` is confirm-only: one tap calls
+  `SecurityApi.removeDevice(id)` (`DELETE /v2/keys/{id}`: the wrap goes and that device's session
+  ends; no rotation, no recovery key, the keys do not change; a 404 counts as done; offline shows
+  `vault.unlock.error_offline` and keeps the row, any other failure `remove_sheet.failed`), then
+  `SecuritySection` toasts `removed_done` and invalidates `SECURITY_KEY` (the sheet's file also
+  keeps the shared `Takeover`, `RecoveryKeyField`, `PasskeyList`, `keyErrorOf` and `problemOf`); the
+  web's "Change keys" (`ChangeKeysSheet`) still rotates; a
   `Takeover` makes the rest of the page `inert`); `PasskeysSection` with
   `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
   then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories

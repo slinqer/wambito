@@ -151,6 +151,11 @@ abstract interface class AuthApi {
   /// session's token and the id of the account it signed in to (the answer's `userId`).
   Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth);
 
+  /// Deletes this phone's own device wrap [wrapId] of [userId] (`DELETE /v2/keys/{id}` with
+  /// [token]'s bearer and `x-wambito-user`), before a sign-out: the API deletes the caller's own
+  /// wrap without ending its session. A 404 (already gone) counts as done.
+  Future<void> deleteDeviceWrap(String token, {required String userId, required String wrapId});
+
   /// Ends the session on the server (best effort).
   Future<void> signOut(String token);
 
@@ -451,6 +456,22 @@ class HttpAuthApi implements AuthApi {
       options: Options(headers: _bearer(token)),
     );
   });
+
+  @override
+  Future<void> deleteDeviceWrap(
+    String token, {
+    required String userId,
+    required String wrapId,
+  }) async {
+    try {
+      await _settle(
+        () =>
+            _api.deleteKeyWrap(id: wrapId, headers: {..._bearer(token), 'x-wambito-user': userId}),
+      );
+    } on AuthFailure catch (failure) {
+      if (failure.status != 404) rethrow;
+    }
+  }
 
   @override
   Future<void> deleteUser(String token) async {

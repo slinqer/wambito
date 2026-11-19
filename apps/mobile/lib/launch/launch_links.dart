@@ -13,6 +13,9 @@ import '../local/signin_approval.dart' show isSigninQr;
 import '../router.dart';
 import '../settings/security/approve_signin_screen.dart' show openSigninApprovalsProvider;
 import '../settings/security/security_api.dart' show securityApiProvider;
+import '../vault/encryption_mode.dart' show currentVaultAccountProvider, vaultAccountProvider;
+import '../vault/vault_onboarding.dart';
+import '../vault/vault_providers.dart' show vaultGateStateProvider;
 
 /// What a `wambito://` link asks for (spec section 7.1): the widget's ＋ (`wambito://add`, the add
 /// sheet with the keypad ready) and its 🎤, also the Quick Settings tile's (`wambito://capture`,
@@ -125,6 +128,10 @@ class LaunchLinks {
   /// The most a link waits for the server's word on the welcome.
   static const refreshWait = Duration(seconds: 3);
 
+  /// The most a link waits for an encrypted account's vault to open (and say how its welcome
+  /// stands); a vault that needs the person (Unlock) drops it, as a locked vault drops a sign-in.
+  static const vaultWait = Duration(seconds: 10);
+
   final Ref _ref;
   StreamSubscription<String>? _subscription;
 
@@ -153,6 +160,11 @@ class LaunchLinks {
         // Offline or slow: what was kept stands.
       }
     }
+    if (_ref.read(sessionProvider).status != SessionStatus.signedIn) return;
+    // An encrypted account's screens wait for its vault, and its welcome is the vault's to say: the
+    // link waits for both (a plain account's opens on home at once), and is dropped, as a locked
+    // vault drops a sign-in, when the vault does not open in time (it needs the person: Unlock).
+    if (!await _vaultOpen()) return;
     final session = _ref.read(sessionProvider);
     if (session.status != SessionStatus.signedIn) return;
     // An account with the welcome to do is sent to it from everywhere, and its link is dropped, as
@@ -186,6 +198,32 @@ class LaunchLinks {
       await _go(action, link, signinQr);
     } finally {
       if (signin) _signinPending = false;
+    }
+  }
+
+  /// Whether the signed-in account's screens are open (`vaultRouteOf`: plain, or its vault open
+  /// with its welcome flag read), waiting [vaultWait] at most for them.
+  Future<bool> _vaultOpen() async {
+    bool open() => vaultRouteOf(_ref) == VaultRoute.open;
+    if (open()) return true;
+    final opened = Completer<bool>();
+    void check() {
+      if (!opened.isCompleted && open()) opened.complete(true);
+    }
+
+    final subscriptions = [
+      _ref.listen(sessionProvider, (_, _) => check()),
+      _ref.listen(vaultAccountProvider, (_, _) => check()),
+      _ref.listen(currentVaultAccountProvider, (_, _) => check()),
+      _ref.listen(vaultGateStateProvider, (_, _) => check()),
+      _ref.listen(vaultOnboardingProvider, (_, _) => check()),
+    ];
+    try {
+      return await opened.future.timeout(vaultWait, onTimeout: open);
+    } finally {
+      for (final subscription in subscriptions) {
+        subscription.close();
+      }
     }
   }
 

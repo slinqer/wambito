@@ -1,10 +1,11 @@
 // Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
 // (`preview`) account, with or without email (the same section for both): this phone and the other
 // devices that open the data (name, added date, "Not verified" when an attestation fails), each
-// other one with "Remove" (a key rotation, `RemoveDeviceSheet`); "Approve a new device"; "Sign in
-// on the web" (approving a browser's QR or code, `ApproveSigninScreen`, phone-first spec 8.1); "New
-// recovery key"; and how many records could not be read, when any. The sensitive steps (removing a
-// device, making a new key, showing it) ask the phone's screen lock first (spec 7.7, D17), which
+// other one with "Remove" (its wrap is deleted, the keys stay: `RemoveDeviceSheet`); "Connect
+// another device" (`ConnectDeviceScreen`: a browser's sign-in, phone-first spec 8.1, or a new device
+// to approve, by its QR or its code); "New recovery key"; "Change keys" (a rotation that removes no device, `ChangeKeysSheet`);
+// and how many records could not be read, when any. The sensitive steps (removing a device, making
+// a new key, showing it, changing the keys) ask the phone's screen lock first (spec 7.7, D17), which
 // replaces the web's passkey touch.
 import 'dart:async';
 
@@ -27,12 +28,28 @@ import '../../ui/toast.dart';
 import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import '../passkeys_section.dart' show passkeyDay;
 import '../settings_parts.dart';
-import 'approve_device_screen.dart';
-import 'approve_signin_screen.dart';
+import 'change_keys_sheet.dart';
+import 'connect_device_screen.dart';
 import 'recovery_setup_page.dart';
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
 import 'security_model.dart';
+
+/// Whether this account has no recovery key to type for the screen lock's fallback: a guest who
+/// never saved a shown key (ruling 3). An email account whose settings predate
+/// `recoveryKeySavedAt` still is asked for it (D17). Shared by Remove, Change keys and New
+/// recovery key here, and by the sign-in notice's "That wasn't me".
+Future<bool> noKeyToTypeYet(WidgetRef ref) async {
+  final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
+  final session = ref.read(vaultSessionProvider);
+  if (!anonymous || session == null) return false;
+  try {
+    return await recoveryKeySavedAt(session.store) == null;
+  } on Object {
+    // Unreadable: the key is asked, as for any account.
+    return false;
+  }
+}
 
 class SecuritySection extends ConsumerStatefulWidget {
   const SecuritySection({super.key, required this.timeZone});
@@ -49,26 +66,13 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
 
   void _changed() => ref.invalidate(securitySnapshotProvider);
 
-  Future<void> _approve(SecurityApi security) async {
+  /// "Connect another device": a browser or a phone joins as a device, so the list is read again
+  /// after.
+  Future<void> _connect() async {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (route) => ApproveDeviceScreen(
-          options: security.pairing,
-          findPairing: (options, {code, qr}) => security.findPairing(code: code, qr: qr),
-          onDone: () => Navigator.of(route).pop(),
-        ),
-      ),
-    );
-    _changed();
-  }
-
-  /// "Sign in on the web": a browser joins as a device, so the list is read again after.
-  Future<void> _signinWeb() async {
-    await Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (route) => ApproveSigninScreen(onDone: () => Navigator.of(route).pop()),
+        builder: (route) => ConnectDeviceScreen(onDone: () => Navigator.of(route).pop()),
       ),
     );
     _changed();
@@ -79,12 +83,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      final noKeyYet = await _noKeyYet();
+      if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       final ok = await confirmSensitive(
         context,
         ref,
         reason: l10n.settingsSecurityLockRemove,
         checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
       );
       if (!ok || !mounted) return;
       await RemoveDeviceSheet.show(
@@ -99,6 +106,33 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     }
   }
 
+  /// "Change keys" (the web's twin): the screen lock confirms, then the sheet rotates with nothing
+  /// removed (the typed recovery key, or a new one shown first). The keys are read again after,
+  /// whatever happened (a refusal may mean another device changed them).
+  Future<void> _changeKeys(SecurityApi security, bool hasPasskeys) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final noKeyYet = await _noKeyYet();
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      final ok = await confirmSensitive(
+        context,
+        ref,
+        reason: l10n.settingsSecurityLockChangeKeys,
+        checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
+      );
+      if (!ok || !mounted) return;
+      await ChangeKeysSheet.open(context, security: security, hasPasskeys: hasPasskeys);
+      _changed();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<bool> _noKeyYet() => noKeyToTypeYet(ref);
+
   /// "New recovery key" (spec 7.4's "ask again"): the screen lock confirms, then the new key is
   /// shown with its four-character check and committed only after the check (D17).
   Future<void> _newKey(SecurityApi security) async {
@@ -107,18 +141,8 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final toasts = ToastHost.of(context);
     setState(() => _busy = true);
     try {
-      // A guest who never saved a shown key has none to type (ruling 3); an email account whose
-      // settings predate `recoveryKeySavedAt` still is asked for it (D17).
-      final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
       final session = ref.read(vaultSessionProvider);
-      var noKeyYet = false;
-      if (anonymous && session != null) {
-        try {
-          noKeyYet = await recoveryKeySavedAt(session.store) == null;
-        } on Object {
-          // Unreadable: the key is asked, as for any account.
-        }
-      }
+      final noKeyYet = await _noKeyYet();
       if (!mounted) return;
       final ok = await confirmSensitive(
         context,
@@ -243,29 +267,16 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (security == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    final approve = Column(
+    final connect = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: WambitoTokens.space2,
       children: [
-        SettingLabel(label: l10n.settingsSecurityApprove, hint: l10n.settingsSecurityApproveLead),
+        SettingLabel(label: l10n.settingsSecurityConnect, hint: l10n.settingsSecurityConnectLead),
         PressButton.text(
-          l10n.settingsSecurityApprove,
-          key: const Key('security.approve'),
+          l10n.settingsSecurityConnect,
+          key: const Key('security.connect'),
           tone: PressTone.secondary,
-          onPressed: () => unawaited(_approve(security)),
-        ),
-      ],
-    );
-    final signinWeb = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: WambitoTokens.space2,
-      children: [
-        SettingLabel(label: l10n.settingsSecuritySignin, hint: l10n.settingsSecuritySigninLead),
-        PressButton.text(
-          l10n.settingsSecuritySignin,
-          key: const Key('security.signinWeb'),
-          tone: PressTone.secondary,
-          onPressed: () => unawaited(_signinWeb()),
+          onPressed: () => unawaited(_connect()),
         ),
       ],
     );
@@ -301,8 +312,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
             ],
           ],
         ),
-        approve,
-        signinWeb,
+        connect,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: WambitoTokens.space2,
@@ -316,6 +326,22 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
               key: const Key('security.newKey'),
               tone: PressTone.secondary,
               onPressed: _busy ? null : () => unawaited(_newKey(security)),
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: WambitoTokens.space2,
+          children: [
+            SettingLabel(
+              label: l10n.settingsSecurityChangeKeys,
+              hint: l10n.settingsSecurityChangeKeysBody,
+            ),
+            PressButton.text(
+              l10n.settingsSecurityChangeKeys,
+              key: const Key('security.changeKeys'),
+              tone: PressTone.secondary,
+              onPressed: _busy ? null : () => unawaited(_changeKeys(security, hasPasskeys)),
             ),
           ],
         ),
