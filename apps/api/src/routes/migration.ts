@@ -196,7 +196,7 @@ export function migrationRoutes(deps: AppDeps) {
       path: "/v2/migration/finish",
       operationId: "finishMigration",
       description:
-        "Ends the move, from the bound session. Only when the records hold exactly one live `settings` record, a record for every row (its type, its id: the server's, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records`, `errors.client` and `errors.missing`) and nothing changes. 409 `keys_missing` without a recovery wrap.",
+        "Ends the move, from the bound session. Only when the records hold exactly one live `settings` record, a record for every row (its type, its id: the server's, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records`, `errors.client` and `errors.missing`) and nothing changes. 409 `keys_missing` without a recovery wrap; 409 `key_version_mismatch` when a record is sealed under a key version the current key does not reach (neither the current one nor an older one its key links lead to).",
       request: { body: jsonBody(FinishMigration) },
       responses: {
         200: jsonResponse(profileDto, "The profile, now encrypted"),

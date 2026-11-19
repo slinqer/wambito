@@ -5,6 +5,7 @@ import {
   categoryBudgets,
   idempotencyKeys,
   imports,
+  keyLinks,
   keyWraps,
   merchantCategories,
   oauthConsent,
@@ -582,6 +583,42 @@ describe("POST /v2/migration/finish", () => {
     const other = await t.signIn(p.email);
     await problem(await finish(other.headers, counts), 409, "migration_in_progress");
     expect((await userRow(p.userId)).encryption).toBe("migrating");
+  });
+
+  test("records sealed under a key version no wrap opens are refused", async () => {
+    const p = await plainPerson();
+    const counts = await ok<Counts>(await start(p.headers));
+    // Without wraps a push takes any keyV: these are sealed under a key the recovery wrap is not.
+    await push(
+      p.headers,
+      (await sourceChanges(p)).map((c) => ({ ...c, keyV: 2 })),
+    );
+    await recoveryWrap(p.headers);
+    const before = await plaintextLeft(p.userId);
+    await problem(await finish(p.headers, counts), 409, "key_version_mismatch");
+    expect(await plaintextLeft(p.userId)).toBe(before);
+    expect((await userRow(p.userId)).encryption).toBe("migrating");
+  });
+
+  test("records under an older key pass once a link reaches them from the current one", async () => {
+    const p = await plainPerson();
+    const counts = await ok<Counts>(await start(p.headers));
+    await push(p.headers, await sourceChanges(p));
+    // The recovery wrap holds key 2; the records are under key 1.
+    await ok(
+      await call("PUT", `/v2/keys/${randomUUID()}`, p.headers, {
+        kind: "recovery",
+        ref: null,
+        keyV: 2,
+        wrapped: filled(48, 3),
+      }),
+    );
+    await problem(await finish(p.headers, counts), 409, "key_version_mismatch");
+    await t.admin
+      .insert(keyLinks)
+      .values({ userId: p.userId, keyV: 2, link: Buffer.alloc(60, 5) });
+    await ok(await finish(p.headers, counts));
+    expect((await userRow(p.userId)).encryption).toBe("encrypted");
   });
 
   test("one missing record hidden by a stray one of the same type is refused", async () => {

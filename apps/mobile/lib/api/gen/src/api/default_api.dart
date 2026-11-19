@@ -1399,7 +1399,7 @@ class DefaultApi {
   }
 
   /// finishMigration
-  /// Ends the move, from the bound session. Only when the records hold exactly one live &#x60;settings&#x60; record, a record for every row (its type, its id: the server&#39;s, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as &#x60;counts&#x60; does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 &#x60;count_mismatch&#x60; (with &#x60;errors.server&#x60;, &#x60;errors.records&#x60;, &#x60;errors.client&#x60; and &#x60;errors.missing&#x60;) and nothing changes. 409 &#x60;keys_missing&#x60; without a recovery wrap.
+  /// Ends the move, from the bound session. Only when the records hold exactly one live &#x60;settings&#x60; record, a record for every row (its type, its id: the server&#39;s, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as &#x60;counts&#x60; does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 &#x60;count_mismatch&#x60; (with &#x60;errors.server&#x60;, &#x60;errors.records&#x60;, &#x60;errors.client&#x60; and &#x60;errors.missing&#x60;) and nothing changes. 409 &#x60;keys_missing&#x60; without a recovery wrap; 409 &#x60;key_version_mismatch&#x60; when a record is sealed under a key version the current key does not reach (neither the current one nor an older one its key links lead to).
   ///
   /// Parameters:
   /// * [finishMigration]

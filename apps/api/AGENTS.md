@@ -210,7 +210,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   no restore window, and a dismissal left out would come back in the vault). `source` (bound session
   only) answers every row as the DB holds it (`MigrationSource` of `@wambito/vault`); never logged.
   `finish` takes `lockRecords` (exported from `services/sync.ts`) then `lockWraps`, locks the user
-  row, needs a `recovery` wrap (409 `keys_missing`), then compares the records (live per type,
+  row, needs a `recovery` wrap (409 `keys_missing`) and every record with a body under the current
+  key version or one its `key_links` reach (409 `key_version_mismatch`), then compares the records (live per type,
   deleted `transaction` with a body apart, exactly one live `settings`) with the server's and the
   client's counts, and checks every row by id (`missingRecords`: a record of its type and state
   under the id `recordsFromSource` gives it, the server id, or for a dismissed month and a

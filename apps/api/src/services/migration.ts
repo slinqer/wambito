@@ -5,6 +5,7 @@ import {
   type Db,
   idempotencyKeys,
   imports,
+  keyLinks,
   keyWraps,
   merchantCategories,
   recordPurges,
@@ -21,7 +22,7 @@ import type { Config } from "../config.ts";
 import { ApiError } from "../http/problem.ts";
 import { revokeAllAssistants } from "./account.ts";
 import { migrationOf, toEncryption } from "./encryption.ts";
-import { lockWraps } from "./keys.ts";
+import { currentKeyV, lockWraps } from "./keys.ts";
 import { lockRecords } from "./sync.ts";
 
 /**
@@ -424,6 +425,32 @@ export async function finishMigration(
       .where(and(eq(keyWraps.userId, userId), eq(keyWraps.kind, "recovery")));
     if (!recovery) {
       throw new ApiError(409, "keys_missing", "The account has no data key to read its records");
+    }
+    // Every record with a body must open with the current data key: sealed under it, or under an
+    // older one the key links reach (one link per rotation since). A push before the first wrap
+    // takes any keyV, so this is the only place a record no wrap opens would show.
+    const current = await currentKeyV(tx, userId);
+    const [unreadable] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(records)
+      .where(
+        and(
+          eq(records.userId, userId),
+          sql`${records.body} is not null`,
+          sql`${records.keyV} <> ${current}`,
+          sql`not (${records.keyV} < ${current} and (
+            select count(*) from ${keyLinks}
+            where ${keyLinks.userId} = ${userId} and ${keyLinks.keyV} > ${records.keyV}
+              and ${keyLinks.keyV} <= ${current}
+          ) = ${current} - ${records.keyV})`,
+        ),
+      );
+    if ((unreadable?.n ?? 0) > 0) {
+      throw new ApiError(
+        409,
+        "key_version_mismatch",
+        "Some records are sealed under a key version the account's keys do not open",
+      );
     }
 
     const server = await serverCounts(tx, userId);
