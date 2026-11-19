@@ -76,6 +76,9 @@ through the allowlist.
 
 - `user.encryption` gains `migrating`. The full set is `plain` | `migrating` | `encrypted`.
 - **Only the session that called `start` may write during the migration** (builder-check ruling).
+  It is kept in a new column `user.migration_session_id`. A `start` from another session of the
+  same account while `migrating` takes the migration over (planning ruling): a lost tab or a new
+  sign-in can always resume or cancel.
   - For a `migrating` account, `/v2/sync` pushes and `/v2/keys` writes from any other session get
     409 `migration_in_progress`.
   - Its old `/v1` finance routes answer 426 for every session.
@@ -83,9 +86,12 @@ through the allowlist.
   So a phone or another tab that opens meanwhile cannot add records and break the count check.
   (`/v2/keys` and `/v2/sync` are open to any account today; this rule is new.)
 - `GET /v1/me` gains an optional `migration` field: `"available"` for a `plain` account with an
-  email while `NEW_USERS_ENCRYPTED` is on, `"in_progress"` while `migrating`, absent otherwise.
-  - The web runs the flow only on `available`, so the deploy is inert until the founder turns the
-    flag on.
+  email while the new config flag `MIGRATION_OPEN` is on (or its id is in `MIGRATION_OPEN_USER_IDS`,
+  for the dev stack's seeded test user); `"in_progress"` while `migrating`; absent otherwise.
+  - It is a flag of its own, not `NEW_USERS_ENCRYPTED`, because CI runs every web e2e with
+    `NEW_USERS_ENCRYPTED=true` on plain seeded users (planning ruling).
+  - The web runs the flow only on `available`, so the deploy is inert until the founder turns
+    `MIGRATION_OPEN` on.
   - The web resumes on `in_progress`.
   - `encryption` answers `"preview"` for `migrating` and `encrypted` (an additive field; old
     clients ignore it).
@@ -125,7 +131,7 @@ through the allowlist.
   4. on a mismatch, deletes nothing, stays `migrating`, and answers 409 `count_mismatch` with both
      sets of counts.
 
-  The profile columns of `user` (currency, time zone, language, onboarding) stay: they are the
+  The profile columns of `user` (time zone, language, onboarding) stay: they are the
   profile, not finance rows, and the policy says so. The vault's `settings` record copies them.
   The vault writes no `account` records, so the default account is not counted.
 - **`POST /v2/migration/cancel`** (`migrating` only, the starting session).
@@ -206,7 +212,7 @@ Each step names who does it.
    4. The throwaway database and the dump are deleted afterwards.
 
    No real data goes into the repo, the PR or a log: the PR records only counts and totals.
-3. **Founder, in production:** sets `NEW_USERS_ENCRYPTED=true` and removes `E2E_PREVIEW_USER_IDS`
+3. **Founder, in production:** sets `NEW_USERS_ENCRYPTED=true` and `MIGRATION_OPEN=true`, and removes `E2E_PREVIEW_USER_IDS`
    in the VPS `.env`, then restarts the API.
 4. **Founder:**
    - opens app.wambito.com and runs the migration of their own account;
