@@ -200,6 +200,29 @@ void main() {
       // the list is read again
       expect(security.loads, greaterThan(loads));
     });
+
+    testWidgets('a preview guest with no saved key and no lock reaches the sheet', (t) async {
+      final vault = FakeVault();
+      await t.runAsync(() => vault.seeded);
+      final security = FakeSecurity();
+      await pumpSection(
+        t,
+        security,
+        FakeLock(LockCheck.noLock),
+        overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+      );
+      await tapKey(t, 'security.remove.$laptopId');
+      // never asked for a key they never saw
+      expect(find.byKey(const Key('screenLock.key')), findsNothing);
+      expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
+    });
+
+    testWidgets('an email account with no lock is still asked for the key first', (t) async {
+      await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.noLock));
+      await tapKey(t, 'security.remove.$laptopId');
+      expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+      expect(find.byKey(const Key('security.remove.confirm')), findsNothing);
+    });
   });
 
   group('changing the keys', () {

@@ -36,6 +36,22 @@ import 'remove_device_sheet.dart';
 import 'security_api.dart';
 import 'security_model.dart';
 
+/// Whether this account has no recovery key to type for the screen lock's fallback: a guest who
+/// never saved a shown key (ruling 3). An email account whose settings predate
+/// `recoveryKeySavedAt` still is asked for it (D17). Shared by Remove, Change keys and New
+/// recovery key here, and by the sign-in notice's "That wasn't me".
+Future<bool> noKeyToTypeYet(WidgetRef ref) async {
+  final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
+  final session = ref.read(vaultSessionProvider);
+  if (!anonymous || session == null) return false;
+  try {
+    return await recoveryKeySavedAt(session.store) == null;
+  } on Object {
+    // Unreadable: the key is asked, as for any account.
+    return false;
+  }
+}
+
 class SecuritySection extends ConsumerStatefulWidget {
   const SecuritySection({super.key, required this.timeZone});
 
@@ -81,12 +97,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      final noKeyYet = await _noKeyYet();
+      if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       final ok = await confirmSensitive(
         context,
         ref,
         reason: l10n.settingsSecurityLockRemove,
         checkRecoveryKey: security.checkRecoveryKey,
+        noKeyYet: noKeyYet,
       );
       if (!ok || !mounted) return;
       await RemoveDeviceSheet.show(
@@ -126,20 +145,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     }
   }
 
-  /// Whether this account has no recovery key to type for the screen lock's fallback: a guest who
-  /// never saved a shown key (ruling 3). An email account whose settings predate
-  /// `recoveryKeySavedAt` still is asked for it (D17).
-  Future<bool> _noKeyYet() async {
-    final anonymous = ref.read(currentVaultAccountProvider)?.profile.isAnonymous ?? false;
-    final session = ref.read(vaultSessionProvider);
-    if (!anonymous || session == null) return false;
-    try {
-      return await recoveryKeySavedAt(session.store) == null;
-    } on Object {
-      // Unreadable: the key is asked, as for any account.
-      return false;
-    }
-  }
+  Future<bool> _noKeyYet() => noKeyToTypeYet(ref);
 
   /// "New recovery key" (spec 7.4's "ask again"): the screen lock confirms, then the new key is
   /// shown with its four-character check and committed only after the check (D17).

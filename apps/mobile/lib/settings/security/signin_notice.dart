@@ -26,6 +26,7 @@ import '../../ui/sheet.dart';
 import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import 'remove_device_sheet.dart';
 import 'security_api.dart';
+import 'security_section.dart' show noKeyToTypeYet;
 import 'security_model.dart';
 
 /// The device wraps that are not this phone's and not in [seen], in the server's order. [seen] is
@@ -141,11 +142,14 @@ Future<void> showSigninNotice(BuildContext context, WidgetRef ref) async {
     return;
   }
   final row = rows.others.firstWhere((r) => r.id == fresh.single.id);
+  final noKeyYet = await noKeyToTypeYet(ref);
+  if (!context.mounted) return;
   final ok = await confirmSensitive(
     context,
     ref,
     reason: l10n.settingsSecurityLockRemove,
     checkRecoveryKey: security.checkRecoveryKey,
+    noKeyYet: noKeyYet,
   );
   if (!ok || !context.mounted) return;
   // Someone else may have had this device, and a copy of the data key with it: the done step

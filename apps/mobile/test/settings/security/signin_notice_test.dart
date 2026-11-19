@@ -3,6 +3,7 @@
 // change the keys; several: Settings).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wambito/local/keys.dart' show WrapDto;
@@ -13,8 +14,10 @@ import 'package:wambito/router.dart' show routerProvider;
 import 'package:wambito/security/screen_lock.dart' show LockCheck, screenLockProvider;
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/security/signin_notice.dart';
+import 'package:wambito/vault/encryption_mode.dart' show currentVaultAccountProvider;
 import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
 
+import '../../protect/fakes.dart';
 import '../../support/fonts.dart';
 import '../../support/plain_account.dart';
 import '../../support/ui_app.dart';
@@ -70,7 +73,14 @@ GoRouter _router() => GoRouter(
   ],
 );
 
-Future<void> _pump(WidgetTester t, SecurityApi? security, _Store store, {GoRouter? router}) async {
+Future<void> _pump(
+  WidgetTester t,
+  SecurityApi? security,
+  _Store store, {
+  GoRouter? router,
+  LockCheck lock = LockCheck.passed,
+  List<Override> overrides = const [],
+}) async {
   t.view
     ..physicalSize = const Size(824, 2400)
     ..devicePixelRatio = 2;
@@ -80,8 +90,14 @@ Future<void> _pump(WidgetTester t, SecurityApi? security, _Store store, {GoRoute
       overrides: [
         securityApiProvider.overrideWithValue(security),
         seenDevicesStoreProvider.overrideWithValue(store),
-        screenLockProvider.overrideWithValue(FakeLock(LockCheck.passed)),
+        screenLockProvider.overrideWithValue(FakeLock(lock)),
         if (router != null) routerProvider.overrideWithValue(router),
+        // No account nor vault unless the test gives them: the lock asks the key as for any account.
+        if (!overrides.any((o) => o.origin == currentVaultAccountProvider))
+          currentVaultAccountProvider.overrideWithValue(null),
+        if (!overrides.any((o) => o.origin == vaultSessionProvider))
+          vaultSessionProvider.overrideWithValue(null),
+        ...overrides,
       ],
       child: uiApp(
         Column(
@@ -216,6 +232,37 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byKey(const Key('security.changeKeys.key')), findsOneWidget);
     expect(find.byKey(const Key('security.changeKeys.newKey')), findsOneWidget);
+  });
+
+  testWidgets("That wasn't me: a preview guest with no saved key and no lock is never asked for "
+      'a key they never saw', (t) async {
+    final vault = FakeVault();
+    await t.runAsync(() => vault.seeded);
+    final store = _Store({ownId});
+    await _pump(
+      t,
+      FakeSecurity(_snapshot([_laptop])),
+      store,
+      lock: LockCheck.noLock,
+      overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
+    );
+    await _look(t);
+    await t.tap(find.byKey(const Key('signinNotice.notMe')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('screenLock.key')), findsNothing);
+    expect(find.byKey(const Key('security.remove.confirm')), findsOneWidget);
+  });
+
+  testWidgets("That wasn't me: an email account with no lock is still asked for the key", (
+    t,
+  ) async {
+    final store = _Store({ownId});
+    await _pump(t, FakeSecurity(_snapshot([_laptop])), store, lock: LockCheck.noLock);
+    await _look(t);
+    await t.tap(find.byKey(const Key('signinNotice.notMe')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
+    expect(find.byKey(const Key('security.remove.confirm')), findsNothing);
   });
 
   testWidgets('with two it opens Settings → Security', (t) async {
