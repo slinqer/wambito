@@ -52,6 +52,7 @@ import 'package:wambito/api/gen/src/model/create_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/delete_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/email_change_confirm.dart';
 import 'package:wambito/api/gen/src/model/file_import.dart';
+import 'package:wambito/api/gen/src/model/finish_migration.dart';
 import 'package:wambito/api/gen/src/model/get_signin200_response.dart';
 import 'package:wambito/api/gen/src/model/import_stats.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
@@ -60,6 +61,16 @@ import 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
 import 'package:wambito/api/gen/src/model/key_link.dart';
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
+import 'package:wambito/api/gen/src/model/migration_counts.dart';
+import 'package:wambito/api/gen/src/model/migration_problem.dart';
+import 'package:wambito/api/gen/src/model/migration_problem_errors.dart';
+import 'package:wambito/api/gen/src/model/migration_source.dart';
+import 'package:wambito/api/gen/src/model/migration_source_budgets_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_categories_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_merchants_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_profile.dart';
+import 'package:wambito/api/gen/src/model/migration_source_recurrences_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_transactions_inner.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
 import 'package:wambito/api/gen/src/model/pairing_found.dart';
 import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
@@ -156,6 +167,7 @@ part 'serializers.g.dart';
   DeleteTransactionsBatch,
   EmailChangeConfirm,
   FileImport,
+  FinishMigration,
   GetSignin200Response,
   ImportStats,
   ImportStatsAverageMonthlySpendingInner,
@@ -164,6 +176,16 @@ part 'serializers.g.dart';
   KeyLink,
   KeyWrap,
   KeyWraps,
+  MigrationCounts,
+  MigrationProblem,
+  MigrationProblemErrors,
+  MigrationSource,
+  MigrationSourceBudgetsInner,
+  MigrationSourceCategoriesInner,
+  MigrationSourceMerchantsInner,
+  MigrationSourceProfile,
+  MigrationSourceRecurrencesInner,
+  MigrationSourceTransactionsInner,
   PairingApprover,
   PairingFound,
   PairingPickup,
@@ -259,6 +281,18 @@ Serializers serializers =
             () => ListBuilder<CostOfLivingReportCategoriesInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceBudgetsInner)]),
+            () => ListBuilder<MigrationSourceBudgetsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceRecurrencesInner)]),
+            () => ListBuilder<MigrationSourceRecurrencesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceMerchantsInner)]),
+            () => ListBuilder<MigrationSourceMerchantsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(KeyWrap)]),
             () => ListBuilder<KeyWrap>(),
           )
@@ -311,6 +345,10 @@ Serializers serializers =
             () => ListBuilder<Category>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceCategoriesInner)]),
+            () => ListBuilder<MigrationSourceCategoriesInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SummaryCategoriesInner)]),
             () => ListBuilder<SummaryCategoriesInner>(),
           )
@@ -337,6 +375,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ImportStatsRejectedInner)]),
             () => ListBuilder<ImportStatsRejectedInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceTransactionsInner)]),
+            () => ListBuilder<MigrationSourceTransactionsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Assistant)]),

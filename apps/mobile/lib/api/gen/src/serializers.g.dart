@@ -62,6 +62,7 @@ Serializers _$serializers =
           ..add(EmailChangeConfirm.serializer)
           ..add(FileImport.serializer)
           ..add(FileImportStatusEnum.serializer)
+          ..add(FinishMigration.serializer)
           ..add(GetSignin200Response.serializer)
           ..add(ImportStats.serializer)
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
@@ -71,6 +72,20 @@ Serializers _$serializers =
           ..add(KeyWrap.serializer)
           ..add(KeyWrapKindEnum.serializer)
           ..add(KeyWraps.serializer)
+          ..add(MigrationCounts.serializer)
+          ..add(MigrationProblem.serializer)
+          ..add(MigrationProblemErrors.serializer)
+          ..add(MigrationSource.serializer)
+          ..add(MigrationSourceBudgetsInner.serializer)
+          ..add(MigrationSourceCategoriesInner.serializer)
+          ..add(MigrationSourceCategoriesInnerKindEnum.serializer)
+          ..add(MigrationSourceMerchantsInner.serializer)
+          ..add(MigrationSourceProfile.serializer)
+          ..add(MigrationSourceRecurrencesInner.serializer)
+          ..add(MigrationSourceRecurrencesInnerFrequencyEnum.serializer)
+          ..add(MigrationSourceTransactionsInner.serializer)
+          ..add(MigrationSourceTransactionsInnerSource_Enum.serializer)
+          ..add(MigrationSourceTransactionsInnerStatusEnum.serializer)
           ..add(PairingApprover.serializer)
           ..add(PairingFound.serializer)
           ..add(PairingPickup.serializer)
@@ -206,6 +221,26 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyLink)]),
             () => ListBuilder<KeyLink>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceCategoriesInner)]),
+            () => ListBuilder<MigrationSourceCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceBudgetsInner)]),
+            () => ListBuilder<MigrationSourceBudgetsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceRecurrencesInner)]),
+            () => ListBuilder<MigrationSourceRecurrencesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceTransactionsInner)]),
+            () => ListBuilder<MigrationSourceTransactionsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceMerchantsInner)]),
+            () => ListBuilder<MigrationSourceMerchantsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

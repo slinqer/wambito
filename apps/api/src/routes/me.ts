@@ -34,7 +34,7 @@ import { endLongSessions } from "../services/sessions.ts";
 import { userToday } from "../services/time.ts";
 import { defaultAccount, toTransactionDto } from "../services/transactions.ts";
 
-const profileDto = z
+export const profileDto = z
   .object({
     id: z.string(),
     email: z.string(),
@@ -101,7 +101,7 @@ function requireAllowed(deps: AppDeps, email: string) {
 const csvField = (value: string) =>
   /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 
-async function profile(deps: AppDeps, userId: string) {
+export async function profile(deps: AppDeps, userId: string) {
   // Every profile the API answers with is the same one, so each read stamps (see the function).
   await stampOnboardedIfUsed(deps, userId);
   const [row] = await deps.db

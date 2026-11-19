@@ -69,7 +69,7 @@ export function toSyncRecord(row: RecordRow): SyncRecordDto {
  * never committed after a higher one of the same person, and a device that pulled up to `latest`
  * cannot miss a record committed later with a lower version.
  */
-async function lockRecords(tx: Tx, userId: string): Promise<void> {
+export async function lockRecords(tx: Tx, userId: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`records:${userId}`}, 0))`);
 }
 

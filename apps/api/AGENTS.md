@@ -199,6 +199,26 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   426 too (the currency lives in the settings record). `DELETE /v1/me` still works:
   `records`, `key_wraps`, `record_purges`, `pairing_requests`, `recovery_verifiers` and bound
   `signin_requests` cascade from `user`.
+- `/v2/migration/*` (`src/routes/migration.ts`, `src/services/migration.ts`; spec 2026-11-19 §2):
+  the web moves a plain account into records. `start` (gate `migrationOf`: `available`, or
+  `in_progress` for a takeover) sets `migrating` and `migration_session_id` = the calling session,
+  under the records and wraps locks, and answers `MigrationCounts` (`serverCounts`: live rows per
+  table; `deletedTransaction` = every soft-deleted transaction, dismissed months included: there is
+  no restore window, and a dismissal left out would come back in the vault). `source` (bound session
+  only) answers every row as the DB holds it (`MigrationSource` of `@wambito/vault`); never logged.
+  `finish` takes `lockRecords` (exported from `services/sync.ts`) then `lockWraps`, locks the user
+  row, needs a `recovery` wrap (409 `keys_missing`), then compares the records (live per type,
+  deleted `transaction` with a body apart, exactly one live `settings`) with the server's and the
+  client's counts: a mismatch is 409 `count_mismatch` with `errors: {server, records, client}`
+  (`ApiError.errors` may be an object for that) and changes nothing; a match deletes
+  `transactions` first (they reference the rest), then merchant rules, budgets, recurrences,
+  categories, imports, accounts and idempotency keys, `revokeAllAssistants`, and sets `encrypted`.
+  `cancel` deletes `records` and `record_purges`, keeps the wraps, sets `plain`. The write rule
+  (`src/http/migration-lock.ts`, `migrationWriteRule`, after the scopes on `/v2/sync`,
+  `/v2/keys*`, `/v2/pairing*` and `/v2/recovery/verifier`): a non-GET from any grant but the
+  bound session of a `migrating` account is 409 `migration_in_progress`. It runs before the write's
+  own lock; a write it lets through just before a takeover can only add records, which `finish`
+  then sees as a mismatch.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

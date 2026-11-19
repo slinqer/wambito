@@ -978,6 +978,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/migration/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Starts moving a plain account with an email to end-to-end encryption (once the move is open to it) and binds it to this session: while it runs, only this session may push records or write key material (others get 409 `migration_in_progress`). On a migrating account it takes the move over for this session. Answers the server's counts; a retry answers the same. 409 `not_migratable` otherwise. */
+        post: operations["startMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/migration/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every finance row of the migrating account, with the server's ids, for the bound session. 409 `not_migrating`, or `migration_in_progress` for another session. */
+        get: operations["migrationSource"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/migration/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Ends the move, from the bound session. Only when the records hold exactly one live `settings` record and the same counts as the server and as `counts` does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 `count_mismatch` (with `errors.server`, `errors.records` and `errors.client`) and nothing changes. 409 `keys_missing` without a recovery wrap. */
+        post: operations["finishMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/migration/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Gives up on the move, from the bound session: deletes the account's records, keeps its key wraps and makes it plain again. */
+        post: operations["cancelMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/me/seen": {
         parameters: {
             query?: never;
@@ -1727,6 +1795,128 @@ export interface components {
             lookupHash: string;
             /** @description SHA-256 of the recovery key's auth bytes, 32 bytes, base64url */
             authHash: string;
+        };
+        /** @description Per type, the live rows (records), and the soft-deleted transactions apart. The one `settings` record is checked apart. */
+        MigrationCounts: {
+            transaction: number;
+            /** @description Soft-deleted transactions (dismissed months among them): records deleted with a body */
+            deletedTransaction: number;
+            category: number;
+            budget: number;
+            recurrence: number;
+            merchant: number;
+        };
+        MigrationSource: {
+            profile: {
+                timezone: string;
+                locale: string;
+                /** @description ISO 8601 timestamp */
+                onboardingCompletedAt: string | null;
+                /** @description The default account's currency */
+                currency: string;
+            };
+            categories: {
+                id: string;
+                name: string;
+                /** @enum {string} */
+                kind: "expense" | "income";
+                icon: string;
+                color: string;
+                sortOrder: number;
+                /** @description ISO 8601 timestamp */
+                archivedAt: string | null;
+                systemKey: string | null;
+                /** @description ISO 8601 timestamp */
+                createdAt: string;
+                /** @description ISO 8601 timestamp */
+                updatedAt: string;
+            }[];
+            budgets: {
+                id: string;
+                categoryId: string;
+                amount: number;
+                /** @description `YYYY-MM-DD`, the first day of the month */
+                effectiveFrom: string;
+                /** @description ISO 8601 timestamp */
+                createdAt: string;
+                /** @description ISO 8601 timestamp */
+                updatedAt: string;
+            }[];
+            recurrences: {
+                id: string;
+                accountId: string;
+                categoryId: string;
+                name: string;
+                amount: number;
+                /** @enum {string} */
+                frequency: "monthly" | "yearly";
+                dayOfMonth: number;
+                monthOfYear: number | null;
+                /** @description `YYYY-MM-DD` */
+                startDate: string;
+                /** @description `YYYY-MM-DD` */
+                endDate: string | null;
+                /** @description ISO 8601 timestamp */
+                createdAt: string;
+                /** @description ISO 8601 timestamp */
+                updatedAt: string;
+            }[];
+            /** @description Live rows and every soft-deleted one the server still has */
+            transactions: {
+                id: string;
+                accountId: string;
+                categoryId: string;
+                name: string;
+                amount: number;
+                currency: string;
+                /** @description `YYYY-MM-DD` */
+                date: string;
+                /** @enum {string} */
+                status: "paid" | "pending";
+                note: string | null;
+                recurrenceId: string | null;
+                /** @description `YYYY-MM-DD` */
+                occurrenceMonth: string | null;
+                importId: string | null;
+                /** @enum {string} */
+                source: "app" | "web" | "widget" | "mcp" | "import" | "recurrence" | "capture";
+                externalHash: string | null;
+                needsReview: boolean;
+                captureSource: string | null;
+                /** @description ISO 8601 timestamp */
+                capturedAt: string | null;
+                captureMerchantKey: string | null;
+                /** @description ISO 8601 timestamp */
+                deletedAt: string | null;
+                /** @description ISO 8601 timestamp */
+                createdAt: string;
+                /** @description ISO 8601 timestamp */
+                updatedAt: string;
+            }[];
+            merchants: {
+                id: string;
+                merchantKey: string;
+                categoryId: string;
+                /** @description ISO 8601 timestamp */
+                createdAt: string;
+                /** @description ISO 8601 timestamp */
+                updatedAt: string;
+            }[];
+        };
+        MigrationProblem: {
+            type: string;
+            title: string;
+            status: number;
+            code: string;
+            detail?: string;
+            errors?: {
+                server: components["schemas"]["MigrationCounts"];
+                records: components["schemas"]["MigrationCounts"];
+                client: components["schemas"]["MigrationCounts"];
+            };
+        };
+        FinishMigration: {
+            counts: components["schemas"]["MigrationCounts"];
         };
     };
     responses: never;
@@ -4712,6 +4902,169 @@ export interface operations {
             };
             /** @description Problem */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server's counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MigrationCounts"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    migrationSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plaintext rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MigrationSource"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    finishMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinishMigration"];
+            };
+        };
+        responses: {
+            /** @description The profile, now encrypted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["MigrationProblem"];
+                };
+            };
+            /** @description Problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancelMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Problem */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
