@@ -75,6 +75,13 @@ check "the API's database" wambito "${api_url##*/}"
 with_env admin ADMIN_USER_IDS=some-id ADMIN_ALLOWED_IPS=203.0.113.0/24
 check "the API gets ADMIN_USER_IDS" some-id "$(compose config --format json | jq -r .services.api.environment.ADMIN_USER_IDS)"
 check "the API gets ADMIN_ALLOWED_IPS" 203.0.113.0/24 "$(compose config --format json | jq -r .services.api.environment.ADMIN_ALLOWED_IPS)"
+# The migration gate reaches the API (off and nobody by default).
+with_env migration-default
+check "MIGRATION_OPEN is false by default" false "$(compose config --format json | jq -r .services.api.environment.MIGRATION_OPEN)"
+check "MIGRATION_OPEN_USER_IDS is empty by default" "" "$(compose config --format json | jq -r .services.api.environment.MIGRATION_OPEN_USER_IDS)"
+with_env migration MIGRATION_OPEN=true MIGRATION_OPEN_USER_IDS=some-id
+check "the API gets MIGRATION_OPEN" true "$(compose config --format json | jq -r .services.api.environment.MIGRATION_OPEN)"
+check "the API gets MIGRATION_OPEN_USER_IDS" some-id "$(compose config --format json | jq -r .services.api.environment.MIGRATION_OPEN_USER_IDS)"
 # The MCP's key pair: the public half reaches the API, the private half the MCP (and no other).
 with_env keys "MCP_WK_PUBLIC_KEY={\"kty\":\"OKP\",\"crv\":\"X25519\",\"x\":\"pub\"}" \
   "MCP_WK_PRIVATE_KEY={\"kty\":\"OKP\",\"crv\":\"X25519\",\"d\":\"priv\",\"x\":\"pub\"}"

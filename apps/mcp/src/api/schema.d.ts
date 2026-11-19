@@ -361,7 +361,7 @@ export interface paths {
         delete: operations["deleteMe"];
         options?: never;
         head?: never;
-        /** @description Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 `encrypted_account`. */
+        /** @description Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview, or migrating) keeps it in its records, so sending it is 426 `update_required`. */
         patch: operations["updateMe"];
         trace?: never;
     };
@@ -1210,6 +1210,8 @@ export interface components {
             isAnonymous: boolean;
             /** @enum {string} */
             encryption: "plain" | "preview";
+            /** @enum {string} */
+            migration?: "available" | "in_progress";
         };
         UpdateProfile: {
             timezone?: string;
@@ -2978,6 +2980,15 @@ export interface operations {
             };
             /** @description Problem */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem */
+            426: {
                 headers: {
                     [name: string]: unknown;
                 };

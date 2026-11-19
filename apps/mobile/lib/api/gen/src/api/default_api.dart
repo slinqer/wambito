@@ -4133,7 +4133,7 @@ class DefaultApi {
   }
 
   /// updateMe
-  /// Updates the profile. &#x60;currency&#x60; is the default account&#39;s; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 &#x60;encrypted_account&#x60;.
+  /// Updates the profile. &#x60;currency&#x60; is the default account&#39;s; an end-to-end encrypted account (preview, or migrating) keeps it in its records, so sending it is 426 &#x60;update_required&#x60;.
   ///
   /// Parameters:
   /// * [updateProfile]

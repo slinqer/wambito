@@ -226,7 +226,7 @@
     "import_currency_changed": "Your account's currency changed after the file was read. Upload it again.",
     "guest_cannot_authorize": "Save your progress with your email before connecting an assistant.",
     "insufficient_scope": "This assistant isn't allowed to do that.",
-    "encrypted_account": "This account keeps its finances end-to-end encrypted; this part of Wambito doesn't work with it yet.",
+    "update_required": "Update Wambito: reload the page.",
     "already_set_up": "This account already has its keys. Open it with your recovery key.",
     "session_changed": "Another account signed in on this browser. Reload the page.",
     "assistant_keys_missing": "Assistants can't be connected right now. Try again later.",

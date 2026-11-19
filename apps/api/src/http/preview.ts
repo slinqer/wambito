@@ -6,8 +6,8 @@ import { accountEncryption } from "../services/encryption.ts";
 import { ApiError } from "./problem.ts";
 
 /**
- * The `/v1` finance routes: what a preview account (`E2E_PREVIEW_USER_IDS`) keeps only as
- * encrypted records under `/v2`. The account itself (`/v1/me` GET/PATCH/DELETE, the assistants,
+ * The `/v1` finance routes: what a preview account (`migrating`, `encrypted` or listed in
+ * `E2E_PREVIEW_USER_IDS`) keeps only as encrypted records under `/v2`. The account itself (`/v1/me` GET/PATCH/DELETE, the assistants,
  * claiming an email) is not here.
  */
 const FINANCE_PATHS = [
@@ -21,15 +21,19 @@ const FINANCE_PATHS = [
   /^\/v1\/me\/export$/,
 ];
 
-export const encryptedAccount = () =>
+/**
+ * 426 `update_required`: the client predates the account's move to end-to-end encryption (its
+ * finances are records under `/v2/sync` now). The web reloads; the MCP asks to connect again.
+ */
+export const updateRequired = () =>
   new ApiError(
-    403,
-    "encrypted_account",
-    "This account keeps its finances end-to-end encrypted; use /v2/sync",
+    426,
+    "update_required",
+    "This account keeps its finances end-to-end encrypted; update the app",
   );
 
 /**
- * A preview account uses `/v2` only: its `/v1` finance routes answer 403 `encrypted_account`,
+ * A preview account uses `/v2` only: its `/v1` finance routes answer 426 `update_required`,
  * whether the request comes from a session or an assistant's token (after `requireUser`).
  */
 export function previewOnlyV2(deps: Pick<AppDeps, "config" | "db">) {
@@ -38,7 +42,7 @@ export function previewOnlyV2(deps: Pick<AppDeps, "config" | "db">) {
     if (FINANCE_PATHS.some((p) => p.test(path))) {
       const userId = c.get("userId");
       const encryption = await accountEncryption(deps.db, userId);
-      if (isPreviewAccount(deps.config, { id: userId, encryption })) throw encryptedAccount();
+      if (isPreviewAccount(deps.config, { id: userId, encryption })) throw updateRequired();
     }
     await next();
   });

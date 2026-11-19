@@ -258,7 +258,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `onClosed`; the gate then checks again (`gate.closed()`: reopen with kept keys, else Unlock).
   The local backend also serves `POST /v1/transactions/review` (all or nothing, 404 on an unknown
   or deleted id; no merchant memory). The server refuses a preview account's `/v1` finance routes
-  (403 `encrypted_account`): only `GET`/`PATCH /v1/me` (locale on sign-in), `DELETE /v1/me` and the
+  (426 `update_required`, `errors.update_required`: reload): only `GET`/`PATCH /v1/me` (locale on sign-in), `DELETE /v1/me` and the
   assistants go live.
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`

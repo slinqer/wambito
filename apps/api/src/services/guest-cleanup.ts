@@ -83,7 +83,14 @@ async function deleteBatch(db: Db, now: Date): Promise<number> {
     const inactive = tx
       .select({ id: user.id })
       .from(user)
-      .where(and(eq(user.isAnonymous, true), eq(user.encryption, "plain"), before(cutoff)))
+      // A `migrating` guest is in the plain tier (spec 2026-11-19 §1).
+      .where(
+        and(
+          eq(user.isAnonymous, true),
+          inArray(user.encryption, ["plain", "migrating"]),
+          before(cutoff),
+        ),
+      )
       .limit(GUEST_CLEANUP_BATCH);
     const deleted = await tx
       .delete(user)

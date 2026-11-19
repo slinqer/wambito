@@ -30,6 +30,7 @@ const TITLES: Record<number, string> = {
   410: "Gone",
   413: "Payload Too Large",
   422: "Unprocessable Content",
+  426: "Upgrade Required",
   429: "Too Many Requests",
   500: "Internal Server Error",
 };

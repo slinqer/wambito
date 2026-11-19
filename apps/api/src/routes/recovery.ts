@@ -10,6 +10,7 @@ import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
 import { PutRecoveryVerifier, RecoverySignedIn, RecoverySignIn } from "../http/schemas.ts";
 import { signInAs } from "../http/sign-in-response.ts";
+import { toEncryption } from "../services/encryption.ts";
 import { findVerifiedUser, putVerifier } from "../services/recovery.ts";
 import { lifetimeFor } from "../services/sessions.ts";
 
@@ -59,7 +60,7 @@ export function recoverySignInRoutes(deps: AppDeps, auth: Auth) {
       if (!found) throw recoveryKeyInvalid();
       const lifetime = lifetimeFor(
         {
-          encryption: found.encryption === "encrypted" ? "encrypted" : "plain",
+          encryption: toEncryption(found.encryption),
           isAnonymous: found.isAnonymous === true,
         },
         platformOf(c.req.raw.headers),

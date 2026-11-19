@@ -140,6 +140,26 @@ const configSchema = z
       )
       .default(false),
     /**
+     * The switch day's migration (spec 2026-11-19 §1): while `true`, `GET /v1/me` offers every
+     * `plain` account with an email the move to end-to-end encryption (`migration: "available"`).
+     * Off by default, `"true"` or `"false"`, blank = default. Its own flag, not
+     * `NEW_USERS_ENCRYPTED`: the web e2e runs with that one on over plain seeded users.
+     */
+    MIGRATION_OPEN: z
+      .preprocess(
+        (v) => (v === "" || v === undefined ? "false" : v),
+        z.enum(["true", "false"]).transform((v) => v === "true"),
+      )
+      .default(false),
+    /**
+     * Comma-separated user ids offered the migration while `MIGRATION_OPEN` is off (the dev
+     * stack's seeded test user). Unset or blank: nobody.
+     */
+    MIGRATION_OPEN_USER_IDS: z
+      .string()
+      .default("")
+      .transform((v) => csv(v)),
+    /**
      * The SHA-256 fingerprints of the certificates the Android app is signed with, comma-separated,
      * as release.sh prints them (AA:BB:…, 32 pairs) — the value the web container writes into
      * /.well-known/assetlinks.json. Passkeys from the app (whose origin is
@@ -280,13 +300,14 @@ export function apiPathPrefix(config: Pick<Config, "API_URL">): string {
 
 /**
  * Whether the account keeps its finances only as encrypted records: listed in
- * `E2E_PREVIEW_USER_IDS`, or `encrypted` (born while `NEW_USERS_ENCRYPTED` was on).
+ * `E2E_PREVIEW_USER_IDS`, `encrypted` (born while `NEW_USERS_ENCRYPTED` was on, or migrated), or
+ * `migrating` (its finances are moving into records; old clients must not write `/v1`).
  */
 export function isPreviewAccount(
   config: Pick<Config, "E2E_PREVIEW_USER_IDS">,
   user: { id: string; encryption: Encryption },
 ): boolean {
-  return user.encryption === "encrypted" || config.E2E_PREVIEW_USER_IDS.includes(user.id);
+  return user.encryption !== "plain" || config.E2E_PREVIEW_USER_IDS.includes(user.id);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {

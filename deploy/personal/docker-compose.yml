@@ -92,6 +92,10 @@ services:
       # allowlist (comma-separated IPs or CIDRs) is off when empty.
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       ADMIN_ALLOWED_IPS: ${ADMIN_ALLOWED_IPS:-}
+      # The switch day's migration (the web moves a plain account to end-to-end encryption): off
+      # unless MIGRATION_OPEN is true; MIGRATION_OPEN_USER_IDS opens it for those ids only.
+      MIGRATION_OPEN: ${MIGRATION_OPEN:-false}
+      MIGRATION_OPEN_USER_IDS: ${MIGRATION_OPEN_USER_IDS:-}
       # Caddy puts the client address Cloudflare reports into X-Forwarded-For. Only that hop is
       # trusted: Caddy's fixed address in this network.
       CLIENT_IP_HEADER: x-forwarded-for

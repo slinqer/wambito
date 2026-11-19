@@ -18,7 +18,7 @@ enum FinanceVerdict {
 /// of it once the vault is open, answers them first; what it passes on stops here too.
 ///
 /// The paths are the API's `FINANCE_PATHS` (apps/api/src/http/preview.ts), which a `preview`
-/// account is refused anyway (403 `encrypted_account`). `GET /v1/me`, `/auth` and `/v2` go on.
+/// account is refused anyway (426 `update_required`). `GET /v1/me`, `/auth` and `/v2` go on.
 ///
 /// While the mode is loading, a call waits for it ([verdict]): `plain` lets it go on; a known
 /// `preview` account (its vault not open) is refused with a 423 `vault_locked` problem, so the

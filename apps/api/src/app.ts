@@ -88,7 +88,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", signinRoutes(deps, auth));
   app.use("/v1/*", requireUser(auth, deps.config, deps.db));
   app.use("/v1/*", assistantScopes());
-  // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
+  // A preview account's finances are records under /v2 only (426 `update_required` on /v1's).
   app.use("/v1/*", previewOnlyV2(deps));
   // Revoking an assistant names the account it means too (the consent page's "Try again"): a
   // cookie that now belongs to someone else gets 409 `session_changed`, not their assistant gone.

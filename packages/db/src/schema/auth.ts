@@ -35,6 +35,7 @@ export const user = pgTable("user", {
   appVersion: text("app_version"),
   lastSeenDay: text("last_seen_day"),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  migrationSessionId: text("migration_session_id"),
 });
 
 export const session = pgTable(

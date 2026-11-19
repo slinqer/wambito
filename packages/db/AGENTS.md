@@ -41,6 +41,7 @@ Drizzle schema, SQL migrations and row-level security for Postgres.
 - `0018` adds `activity_daily` (`apps/api/src/services/activity.ts`): `day` date, `platform`, `app_version` (`''` when none), `cohort_week` date (the Monday of the user's `created_at`), `has_email`, `count`; primary key over the first five. No user id column and no row-level security (plan decision 4): it counts people per day and keeps no per-person history. Also `user.app_version` and `user.last_seen_day` (text `YYYY-MM-DD`), Better Auth fields.
 - `0019` adds `ended_sessions` (`session_hash` primary key, SHA-256 of the session token; `reason` CHECK `device_removed`; `ended_at`, purged after 90 days) and `deleted_users` (`user_hash` primary key, SHA-256 of a user id the inactivity cleanup deleted; `deleted_at`; kept), both `bytea` CHECK 32 bytes (`apps/api/src/services/ended.ts`). No user id column and no row-level security (plan decision 4): both are read before the user is known.
 - `0020` replaces the `records` CHECK `records_deleted_body` with `records_live_body` (`deleted or body is not null`): a tombstone may keep its sealed body until the 180-day purge.
+- `0021` adds `user.migration_session_id` (text null: the session that started the switch day's migration, spec 2026-11-19) and widens the CHECK `user_encryption_check` to `plain`/`migrating`/`encrypted` (dropped and added again; the CHECK is in the SQL only).
 - In production `docker compose run --rm migrate` (`deploy/personal/up.sh`) runs bootstrap +
   migrations.
 

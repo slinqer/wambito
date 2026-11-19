@@ -15,6 +15,8 @@ export const auth = createAuth({
     CLIENT_IP_HEADER: "x-forwarded-for",
     GUEST_SIGNUP: true,
     NEW_USERS_ENCRYPTED: false,
+    MIGRATION_OPEN: false,
+    MIGRATION_OPEN_USER_IDS: [],
     TRUSTED_PROXIES: [],
     ADMIN_USER_IDS: [],
     E2E_PREVIEW_USER_IDS: [],
