@@ -15,6 +15,8 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   `AppIcon.appiconset`: the 1024 light icon solid plum without alpha, the dark one on transparency,
   the tinted one the monochrome silhouette in white) and
   `drawable/ic_launcher_{foreground,monochrome}.xml`; never hand-edit those (usage in its header).
+  `docs/brand/tools/gen-banner.cjs` writes the root README's `wambi-banner.png` (Wambi waving, the
+  wordmark, the tagline) from the same sources; never hand-edit it.
   `docs/brand/tools/gen-email-images.cjs` writes the emails' `apps/web/public/email/*` (Wambi,
   the wordmark day/night, the fonts) from the landing's sprite and Fredoka; a changed image needs
   a new name (Gmail's proxy caches by URL).
@@ -29,8 +31,12 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   listing images, made the same way; `apps/mobile/tool/store_shots/compose.cjs` uses them
   (`docs/mobile/play.md`).
   `docs/brand/e2e/wambi-e2e-step{1..5}.webp`: the end-to-end encryption scenes (same Codex method,
-  1024 px masters), used by the root `README.md`; `docs/brand/e2e/README.md` lists each scene and a
+  1024 px masters), used by `docs/encryption.md`; `docs/brand/e2e/README.md` lists each scene and a
   Spanish caption for the apps.
+- `docs/development.md`: running the dev stack, the web app and the tests (moved out of the root
+  README). `docs/self-hosting.md`: the public guide to running your own install, with the prompt for
+  a coding agent; it must stay true to `deploy/personal/` (its runbook has the details).
+  `docs/encryption.md`: the end-to-end encryption explainer with the `brand/e2e` scenes.
 - `docs/deploy/`: `personal.md` (private install, short; the runbook is
   `deploy/personal/README.md`), `landing.md` (Cloudflare landing), `api.md` (client addresses,
   rate limits).
