@@ -200,7 +200,9 @@ as the web's `LocalOnboardingRoute` (the welcome's `PATCH /v1/me` stamps only th
 copy stays empty): `vaultOnboardingProvider` (`lib/vault/vault_onboarding.dart`) reads the local `GET /v1/me` once the
 vault is open and hands it to `SessionController.onboardingFromVault`, which keeps it (a cold widget link reads it before
 the vault opens); `_refresh` never takes the server's flag over a known one for an encrypted account, and the router
-keeps an open vault on the loading route (`VaultRoute.loading`) until that answer is in. A guest never has it. `vault_screen.dart` (route `/unlock`) switches over the gate state:
+keeps an open vault on the loading route (`VaultRoute.loading`) until that answer is in (always set, even when keeping it
+fails). A cold `wambito://` link of an encrypted account waits for the same (`LaunchLinks.vaultWait`, 10 s; dropped if the
+vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
   `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
   sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two

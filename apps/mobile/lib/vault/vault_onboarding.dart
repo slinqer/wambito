@@ -46,11 +46,16 @@ class VaultOnboarding extends Notifier<bool?> {
     }
     if (!_current(vault)) return;
     // The session first: the router reads its flag the moment this answer is known.
-    if (pending != null) {
-      await ref.read(sessionProvider.notifier).onboardingFromVault(pending: pending);
+    try {
+      if (pending != null) {
+        await ref.read(sessionProvider.notifier).onboardingFromVault(pending: pending);
+      }
+    } on Object {
+      // Not kept for the next start (the Keystore refused): this start still goes on with it.
+    } finally {
+      // Always set: a null here keeps the open vault on the loading route.
+      if (_current(vault)) state = pending ?? ref.read(sessionProvider).onboardingPending;
     }
-    if (!_current(vault)) return;
-    state = pending ?? ref.read(sessionProvider).onboardingPending;
   }
 
   bool _current(VaultSession vault) =>

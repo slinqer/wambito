@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,18 @@ import '../home/fakes.dart';
 /// `destinationAfterSignIn`). A new email account has none, so it is sent to /welcome after signing
 /// in, and from every other screen until it finishes. An account that has it never sees the
 /// welcome. A guest keeps its guest start: the web has no guests, and the app's has no welcome.
+/// A server whose `GET /v1/me` answers what it said when asked, only once [hold] completes.
+class _HeldStanding extends FakeAuthApi {
+  final hold = Completer<void>();
+
+  @override
+  Future<AccountStanding> standing(String token, {String? userId}) async {
+    final answer = await super.standing(token, userId: userId);
+    await hold.future;
+    return answer;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -192,6 +206,22 @@ void main() {
       expect(container.read(sessionProvider).onboardingPending, isTrue);
       await controller.refreshed;
 
+      expect(container.read(sessionProvider).onboardingPending, isFalse);
+    });
+
+    test('a plain account that finishes the welcome while the start asks the server keeps it '
+        'finished', () async {
+      final held = _HeldStanding()..plainTokens.add('tok');
+      auth = held;
+      held.pendingOnboarding['tok'] = true;
+      mockStorage(token: 'tok', onboarding: true);
+      final container = containerWith();
+      final controller = await ready(container);
+      expect(container.read(sessionProvider).onboardingPending, isTrue);
+      // The welcome ends while GET /v1/me is in flight; the answer was read before it ended.
+      await controller.onboardingDone();
+      held.hold.complete();
+      await controller.refreshed;
       expect(container.read(sessionProvider).onboardingPending, isFalse);
     });
 

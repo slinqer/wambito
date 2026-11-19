@@ -345,8 +345,10 @@ class SessionController extends Notifier<SessionState> {
       // Naming the account kept for the session (ruling 17): a deleted one says `user_deleted`.
       final standing = await _auth.standing(stored.token, userId: _keptAtStart);
       if (!ref.mounted || state.stored?.token != stored.token) return;
-      // What the vault said while the server was asked ([onboardingFromVault]) is kept.
-      final now = state.stored!;
+      // An encrypted account's flag is its vault's: what the vault said while the server was asked
+      // ([onboardingFromVault]) is kept. A plain account compares with what was kept at start, as
+      // before (a welcome finished meanwhile stays finished).
+      final now = standing.encrypted ? state.stored! : stored;
       // What the server says about the welcome wins over what was kept (another phone, or the web,
       // may have finished it); but not for an encrypted account: its welcome is the vault's to say
       // (the server's `onboardingCompletedAt` stays empty), and [onboardingFromVault] keeps it.
@@ -680,12 +682,13 @@ class SessionController extends Notifier<SessionState> {
     final stored = state.stored;
     if (stored == null || state.status != SessionStatus.signedIn || stored.guest) return;
     if (stored.onboardingKnown && stored.onboardingPending == pending) return;
-    await _store.write(stored.token, guest: false, onboardingPending: pending);
-    if (!ref.mounted || state.stored?.token != stored.token) return;
+    // This start follows the vault at once; keeping it is for the next one, and a write the
+    // Keystore refuses (thrown to the caller) leaves this start as the vault says.
     state = SessionState.signedIn(
       StoredSession(token: stored.token, guest: false, onboardingPending: pending),
       offerPasskeyFor: state.offerPasskeyFor,
     );
+    await _store.write(stored.token, guest: false, onboardingPending: pending);
   }
 
   /// The passkey offer was answered ("Crear mi huella" or "Ahora no"): it is kept for the account,
