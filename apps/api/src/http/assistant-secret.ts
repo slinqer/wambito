@@ -200,11 +200,15 @@ async function tokensHolder(
   return undefined;
 }
 
+/**
+ * Whether the account's assistants carry `S`: `encrypted` or in `E2E_PREVIEW_USER_IDS`. A
+ * `migrating` account keeps the plain path (spec 2026-11-19 §1): its old connection gets 426 on the
+ * finance routes, and the migration's `finish` revokes it.
+ */
 async function isEncrypted(deps: AppDeps, userId: string): Promise<boolean> {
-  return isPreviewAccount(deps.config, {
-    id: userId,
-    encryption: await accountEncryption(deps.db, userId),
-  });
+  const encryption = await accountEncryption(deps.db, userId);
+  if (encryption === "migrating") return deps.config.E2E_PREVIEW_USER_IDS.includes(userId);
+  return isPreviewAccount(deps.config, { id: userId, encryption });
 }
 
 /**

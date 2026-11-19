@@ -36,7 +36,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/assistant-secret.ts` (`assistantSecret`, spec 2026-11-16 §4): a wrapper on
   `/auth/oauth2/*`, mounted before `/auth/*`, that carries the assistant secret `S` (32 bytes,
-  base64url) of an encrypted account (`isPreviewAccount`) in its tokens. Authorize: adds
+  base64url) of an encrypted account (`isPreviewAccount`, but never a `migrating` one: its
+  assistants keep the plain path) in its tokens. Authorize: adds
   `prompt=consent` for such an account. Consent: takes `wk` out of the JSON (400 `invalid_request`
   if not 32 bytes; 503 `assistant_keys_missing` without `MCP_WK_PUBLIC_KEY`), keeps `code → S` in
   process memory (10 min; a restart loses it). Token: runs Better Auth inside an AsyncLocalStorage

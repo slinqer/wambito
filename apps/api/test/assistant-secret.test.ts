@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { keyWraps, oauthConsent } from "@wambito/db";
+import { keyWraps, oauthConsent, user } from "@wambito/db";
 import { and, eq, sql } from "@wambito/db/orm";
 import { compactDecrypt, decodeProtectedHeader } from "jose";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
@@ -459,5 +459,32 @@ describe("a plain account", () => {
     const body = (await res.json()) as { access_token: string; refresh_token: string };
     expect(body.refresh_token).not.toContain(".");
     expect(payloadOf(body.access_token)).not.toHaveProperty("wk");
+  });
+});
+
+// The switch day (spec 2026-11-19 §1): a migrating account is still plain for its assistants. Its
+// old connection gets 426 on the finance routes, and `finish` revokes it.
+describe("a migrating account", () => {
+  const migrate = (userId: string) =>
+    t.admin.update(user).set({ encryption: "migrating" }).where(eq(user.id, userId));
+
+  test("a migrating account's refresh without S is not refused with invalid_grant", async () => {
+    const email = "migrating-refresh@wambito.test";
+    const { headers, userId } = await t.signIn(email);
+    const tokens = await t.authorize(email, { headers });
+    await migrate(userId);
+    const res = await refresh(tokens.refreshToken, tokens.clientId);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { refresh_token: string };
+    expect(body.refresh_token).not.toContain(".");
+  });
+
+  test("a migrating account's second authorize skips the consent page", async () => {
+    const email = "migrating-skip@wambito.test";
+    const { headers, userId } = await t.signIn(email);
+    const { clientId } = await t.authorize(email, { headers });
+    await migrate(userId);
+    const { res } = await t.authorizeRequest(clientId, headers);
+    expect(res.headers.get("location") ?? "").toMatch(new RegExp(`^${ASSISTANT_REDIRECT}\\?`));
   });
 });
