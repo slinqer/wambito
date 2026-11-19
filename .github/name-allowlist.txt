@@ -88,6 +88,7 @@ packages/core/quick-capture/README.md  # money
 packages/core/quick-capture/cases.json  # money
 packages/core/src/quick-capture-cases.test.ts              # money
 README.md  # money, history
+docs/brand/tools/gen-banner.cjs  # money
 docs/design/stage-2-mockups/landing.html                   # money
 docs/design/system/project/README.md                       # money
 docs/design/system/project/components/Cover/preview.html   # money
