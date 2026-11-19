@@ -2,6 +2,7 @@ import { SUGGESTED_CATEGORIES } from "@wambito/core";
 import {
   createLocalBackend,
   createSyncEngine,
+  SETTINGS_SEED_NAMESPACE,
   type SyncProblemCode,
   type UnavailableRoute,
   uuidv5,
@@ -142,9 +143,6 @@ const isLive = (method: string, pathname: string) =>
     return rest === "" || (r.prefix === true && rest.startsWith("/"));
   });
 
-/** The namespace of the seeded records' ids; the account's own namespace is made from it. */
-const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";
-
 /**
  * Creates the account's first records when it has none after the first sync: the settings (from
  * the server's profile, the web's default currency EUR) and the suggested categories in the
@@ -158,7 +156,7 @@ const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";
 async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promise<void> {
   if ((await store.list("settings")).length > 0) return;
   const locale: Locale = isLocale(profile.locale) ? profile.locale : "es";
-  const namespace = await uuidv5(SEED_NAMESPACE, profile.id);
+  const namespace = await uuidv5(SETTINGS_SEED_NAMESPACE, profile.id);
   const settingsId = await uuidv5(namespace, "settings");
   const categories = await Promise.all(
     SUGGESTED_CATEGORIES.map(async (suggestion, sortOrder) => ({

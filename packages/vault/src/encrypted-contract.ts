@@ -187,6 +187,49 @@ export function encryptedStoreContract(
       ]);
     });
 
+    it("resetAll leaves no record, no outbox entry and no cursor, and keeps keyV and deviceWrapId", async () => {
+      const store = await make();
+      const listener = vi.fn();
+      await store.put("category", "a", category("A"));
+      await store.put("category", "b", category("B"), { origin: "remote", version: 3, keyV: 1 });
+      await store.delete("category", "b");
+      await store.put("merchant", "m", {
+        s: 1,
+        merchantKey: "cafe",
+        categoryId: CAT,
+      });
+      await store.quarantine({ id: "q", type: "merchant", version: 1, reason: "x" });
+      // An entry already set aside by an earlier resync goes too.
+      await store.wipeRecords();
+      await store.put("category", "c", category("C"));
+      await store.setMeta("latest", 5);
+      await store.setMeta("base", 4);
+      await store.setMeta("keyV", 2);
+      await store.setMeta("deviceWrapId", "wrap-1");
+      await store.setMeta("userId", "u");
+      await store.putKey("k", "kept");
+      store.subscribe(listener);
+      await store.resetAll();
+      for (const type of ["category", "merchant", "transaction", "settings"] as const) {
+        expect(await store.list(type, { includeDeleted: true })).toEqual([]);
+      }
+      expect(await store.getRaw("category", "b")).toBeUndefined();
+      expect(await store.readOutbox(100)).toEqual([]);
+      expect(await store.quarantineCount()).toBe(0);
+      expect(await store.getMeta("latest")).toBeUndefined();
+      expect(await store.getMeta("base")).toBeUndefined();
+      expect(await store.getMeta("keyV")).toBe(2);
+      expect(await store.getMeta("deviceWrapId")).toBe("wrap-1");
+      expect(await store.getMeta("userId")).toBe("u");
+      expect(await store.getKey("k")).toBe("kept");
+      expect(listener).toHaveBeenCalledTimes(1);
+      // A write after the reset is an ordinary create again.
+      await store.put("category", "a", category("A2"));
+      expect(await store.readOutbox(10)).toMatchObject([
+        { id: "a", baseVersion: null, deleted: false },
+      ]);
+    });
+
     it("keeps a set-aside body up to date with writes made before it is restored", async () => {
       const store = await make();
       await store.put("category", "a", category("A"), { origin: "remote", version: 3, keyV: 1 });

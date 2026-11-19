@@ -19,12 +19,24 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   its types (`RawRecord`, `OutboxEntry`, `OutboxPark`, `QuarantineEntry`, `SetAsideOutcome`),
   `changedKeys`, `VaultClosedError`. `src/encrypted-contract.ts`: `encryptedStoreContract(name, make)`;
   the IndexedDB-only cases (other tabs, `deleteVault`, non-extractable keys) stay in the web's test.
+  Every store has `resetAll()`: records, quarantine, the whole outbox and the `latest`/`base`
+  cursors go, keys and the other meta (`keyV`, `userId`, `deviceWrapId`) stay (the switch day's
+  retry after `cancel`, with the same data key).
 - `src/memory-encrypted-store.ts`: `createMemoryEncryptedStore(userId)`, the in-process
   `EncryptedStore` (the MCP's, per request); passes both contracts.
 - `src/keyring.ts`: `Keyring`, `recordKeyName`, `dedupeKeyName`, `KeysError`.
 - `src/sync.ts`: `createSyncEngine` over an `EncryptedStore`; option `upgrade: false` skips the
   re-seal pass (the MCP). Its tests stay in `apps/web/app/local/sync.test.ts` (over IndexedDB);
   `src/sync.test.ts` is a smoke test over the memory store.
+- `src/migration.ts`: the switch day (stage 5, a plain account becomes encrypted from the web):
+  `MigrationSource` / `MigrationCounts` (the JSON of `/v2/migration/source`, `start` and
+  `finish`), `recordsFromSource(source, userId)` (every row to a `MigrationRecord` with the server's
+  id, each body checked by `parseRecord`; dates `YYYY-MM-DD` to `YYYY-MM` for `occurrenceMonth` and
+  `effectiveFrom`, `accountId` null, recurrences at `rev` 0; a dismissed month, soft-deleted
+  pending `source: "recurrence"`, takes `uuidv5(recurrenceId, "<YYYY-MM>:0")` as the backend's
+  `materialize` expects), `countsOf(records)` (live per type, deleted transactions apart, the
+  settings not counted), `SETTINGS_SEED_NAMESPACE` and `settingsRecordId(userId)` (the web's seed
+  uses the same namespace). Tests: `src/migration.test.ts`.
 - `src/ids.ts`: `uuidv7`, `uuidv5`, `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`).
 - `src/backend.ts`: `createLocalBackend` (the `/v1` routes over a store, one store transaction per
   request), `DEMO_UNAVAILABLE`. Its round-trip tests need the web's typed API client, so they stay in

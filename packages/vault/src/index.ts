@@ -26,6 +26,15 @@ export {
 } from "./keyring.ts";
 export { createMemoryEncryptedStore } from "./memory-encrypted-store.ts";
 export { createMemoryStore } from "./memory-store.ts";
+export {
+  countsOf,
+  type MigrationCounts,
+  type MigrationRecord,
+  type MigrationSource,
+  recordsFromSource,
+  SETTINGS_SEED_NAMESPACE,
+  settingsRecordId,
+} from "./migration.ts";
 export type {
   FinanceStore,
   ReadOptions,

@@ -447,6 +447,16 @@ export function createMemoryEncryptedStore(_userId: string): EncryptedStore {
       });
       fire();
     },
+    async resetAll() {
+      await serial(async () => {
+        for (const type of RECORD_TYPES) table(type).clear();
+        state.outbox.clear();
+        state.quarantine.clear();
+        state.meta.delete("latest");
+        state.meta.delete("base");
+      });
+      fire();
+    },
     restoreSetAside: (resolve) =>
       transaction(async (txOps) => {
         const local = txOps as ReturnType<typeof ops>;

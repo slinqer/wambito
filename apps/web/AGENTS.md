@@ -33,7 +33,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   or upgrading the database) closes it for good: every later op rejects with `VaultClosedError`
   (code `vault_closed`); `isClosed()`, `onClosed(cb)` → unsubscribe. `wipeRecords` keeps the outbox
   and sets pending entries aside (`restoreSetAside` puts them back after the full download,
-  merging the touched fields); remote writes take `skipIfPending` / `ifSeq`.
+  merging the touched fields); `resetAll` (the switch day's retry) clears records, quarantine,
+  the whole outbox and the cursors and keeps keys and other meta; remote writes take
+  `skipIfPending` / `ifSeq`. The seeded ids' namespace is `SETTINGS_SEED_NAMESPACE`
+  (`@wambito/vault`).
   `sync.ts` (now `packages/vault/src/sync.ts`, imported from `@wambito/vault`; `createSyncEngine({ store, fetch, userId, keyring, refreshKeys, onError })` → `run()` /
   `start()`: push the outbox, then pull `/v2/sync`; field-by-field conflict merge, quarantine,
   `410` resync that keeps pending edits (set aside, then re-applied); the design notes are at the
