@@ -226,6 +226,7 @@
     "import_currency_changed": "La valuta del tuo account è cambiata dopo la lettura del file. Caricalo di nuovo.",
     "guest_cannot_authorize": "Salva i tuoi progressi con la tua email prima di collegare un assistente.",
     "insufficient_scope": "Questo assistente non ha il permesso di farlo.",
+    "encrypted_account": "Aggiorna Wambito: ricarica la pagina.",
     "update_required": "Aggiorna Wambito: ricarica la pagina.",
     "already_set_up": "Questo account ha già le sue chiavi. Aprilo con la tua chiave di recupero.",
     "session_changed": "Su questo browser è entrato un altro account. Ricarica la pagina.",
