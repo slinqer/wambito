@@ -105,3 +105,18 @@ Fixed copy:
 - [ ] Write failing tests: "a preview account's sign-out deletes its own device wrap before ending the session"; "no DELETE for a plain account, without a wrap id, or while the vault is held"; "an offline DELETE does not delay the sign-out past signOutWait".
 - [ ] Watch them fail; implement; rerun with `flutter analyze`.
 - [ ] Update `apps/mobile/AGENTS.md` (sign-out). Commit `feat(mobile): signing out deletes this phone's device wrap`.
+
+### Task 5: Phone: one "Connect another device" entry
+
+**Files:**
+- Modify: `apps/mobile/lib/settings/security/security_section.dart` (one entry instead of `approve` and `signinWeb`)
+- Create: `apps/mobile/lib/settings/security/connect_device_screen.dart` (scan both prefixes or type a code, then hand over to the existing confirmation flow of `ApproveSigninScreen` or `ApproveDeviceScreen`), or extend one of the two screens, whichever keeps each confirmation's code untouched
+- Modify: `apps/mobile/lib/l10n/app_{es,en,it,pt}.arb` (remove keys nothing uses)
+- Modify: the Kotlin/Swift scanner allowlists only if they need both prefixes in one scan (`scripts/check-channels.sh` must still pass)
+- Test: `apps/mobile/test/settings/security/`
+
+Copy: title es "Conectar otro dispositivo" / en "Connect another device"; lead es "Escanea el código QR que te muestra tu computador u otro celular, o escribe su código." / en "Scan the QR code your computer or another phone shows you, or type its code." it/pt in the same voice (pt "telemóvel").
+
+- [ ] Failing tests: the section shows one entry and no longer the two; a scanned `wambito://signin?…` QR reaches the sign-in confirmation; a scanned `wambito://pair?…` QR reaches the device approval; a typed code found as a sign-in goes there, one not found as a sign-in but found as a pairing goes to the approval, one found as neither says `bad_code`; offline says so.
+- [ ] Implement; `flutter analyze`; `flutter test --exclude-tags golden,stack test/settings test/launch`.
+- [ ] Update `apps/mobile/AGENTS.md` and `docs/mobile/parity.md`. Commit `feat(mobile): one entry connects another device, by its QR or its code`.

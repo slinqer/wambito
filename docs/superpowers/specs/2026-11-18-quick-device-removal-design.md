@@ -58,3 +58,19 @@ API (a server leak). Bitwarden and 1Password accept the same. "Change keys" clos
 - **Fingerprint, then an optional key change:** the same, plus a question after every removal.
   Rejected: the question comes back every time.
 - **Keep the rotation:** safest, but the heavy step the founder noticed.
+
+## Addendum (2026-11-19): one entry to connect another device
+
+Found in the same device test: on the phone, "Approve a new device" (`/v2/pairing`, QR
+`wambito://pair?…`) and "Sign in on the web" (`/v2/signin`, QR `wambito://signin?…`) open the same
+kind of screen: scan a QR from another screen or type an 8-character code. The person cannot tell
+which one they need. The founder approved merging them:
+
+- Settings → Security has one entry, "Conectar otro dispositivo", instead of the two.
+- Its scanner accepts both prefixes and goes on to the matching confirmation: the web sign-in's
+  ("Sign in on {label}?", with its warning, the 1 s wait and the 6-digit number for a link-opened
+  request, unchanged) or the device approval's (the numbers compared, unchanged).
+- A typed code is looked up as a web sign-in first; when that finds nothing, as a device to approve.
+  Both codes are random, so they do not collide.
+- The `wambito://signin` link handling and the new-device notice are unchanged. The web is unchanged
+  (it only approves devices).
