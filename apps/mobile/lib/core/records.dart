@@ -39,6 +39,8 @@ final _transaction = ObjectSchema({
   'captureSource': _nullableDefaultNull(fEnum(captureSources)),
   'capturedAt': _nullableDefaultNull(_timestamp),
   'captureMerchantKey': _nullableDefaultNull(_text),
+  // An import's dedupe hash (the plaintext row's `external_hash`), kept by the migration.
+  'externalHash': fOptional(fNullable(_text)),
   'createdAt': fOptional(_timestamp),
   // Set on create and on every edit; an older record has none (read `createdAt`).
   'updatedAt': fOptional(_timestamp),

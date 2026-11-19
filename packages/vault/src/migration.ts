@@ -259,6 +259,8 @@ export async function recordsFromSource(
         captureSource: t.captureSource as RecordBodies["transaction"]["captureSource"],
         capturedAt: t.capturedAt,
         captureMerchantKey: t.captureMerchantKey,
+        // An imported row keeps its dedupe hash, so a later import can tell it apart.
+        ...(typeof t.externalHash === "string" ? { externalHash: t.externalHash } : {}),
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
       },

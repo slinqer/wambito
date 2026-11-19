@@ -225,10 +225,30 @@ describe("recordsFromSource", () => {
     // Nothing of the server's bookkeeping columns gets into a body.
     for (const r of records) {
       expect(r.body).not.toHaveProperty("importId");
-      expect(r.body).not.toHaveProperty("externalHash");
       expect(r.body).not.toHaveProperty("deletedAt");
       expect(r.body).not.toHaveProperty("id");
     }
+  });
+
+  it("an imported transaction keeps its externalHash, the import's dedupe hash; importId is dropped", async () => {
+    const s = source();
+    s.transactions.push(
+      tx("01930000-0000-7000-8000-000000000009", {
+        source: "import",
+        importId: "01930000-0000-7000-8000-0000000000aa",
+        externalHash: "b1946ac92492d2347c6235b4d2611184",
+      }),
+    );
+    const records = await recordsFromSource(s, USER);
+    const imported = find(records, "transaction", "01930000-0000-7000-8000-000000000009");
+    expect(imported?.body).toMatchObject({
+      source: "import",
+      externalHash: "b1946ac92492d2347c6235b4d2611184",
+    });
+    expect(imported?.body).not.toHaveProperty("importId");
+    // A row without one carries none.
+    const plain = find(records, "transaction", "01930000-0000-7000-8000-000000000001");
+    expect(plain?.body).not.toHaveProperty("externalHash");
   });
 
   it("a soft-deleted transaction is a deleted record with its body", async () => {

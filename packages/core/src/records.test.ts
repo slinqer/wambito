@@ -91,6 +91,19 @@ describe("parseRecord", () => {
     expect(parseRecord("recurrence", { ...(valid.recurrence as object), rev: -1 }).ok).toBe(false);
   });
 
+  test("a transaction's externalHash (an import's dedupe hash) is optional, a string or null", () => {
+    const plain = parseRecord("transaction", valid.transaction);
+    expect(plain.ok && "externalHash" in plain.value).toBe(false);
+    for (const externalHash of ["9f2c0a", null]) {
+      expect(
+        parseRecord("transaction", { ...(valid.transaction as object), externalHash }),
+      ).toMatchObject({ ok: true, value: { externalHash } });
+    }
+    expect(
+      parseRecord("transaction", { ...(valid.transaction as object), externalHash: 7 }).ok,
+    ).toBe(false);
+  });
+
   test("a transaction's updatedAt is optional", () => {
     expect(parseRecord("transaction", valid.transaction).ok).toBe(true);
     expect(

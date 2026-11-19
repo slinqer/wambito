@@ -32,7 +32,8 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   `MigrationSource` / `MigrationCounts` (the JSON of `/v2/migration/source`, `start` and
   `finish`), `recordsFromSource(source, userId)` (every row to a `MigrationRecord` with the server's
   id, each body checked by `parseRecord`; dates `YYYY-MM-DD` to `YYYY-MM` for `occurrenceMonth` and
-  `effectiveFrom`, `accountId` null, recurrences at `rev` 0; a dismissed month, soft-deleted
+  `effectiveFrom`, `accountId` null, recurrences at `rev` 0, an imported row's `externalHash` kept and
+  `importId` dropped; a dismissed month, soft-deleted
   pending `source: "recurrence"`, takes `uuidv5(recurrenceId, "<YYYY-MM>:0")` as the backend's
   `materialize` expects; a merchant takes the phone's `merchantRecordId(userId, key)`,
   `uuidv5(uuidv5(SETTINGS_SEED_NAMESPACE, userId), "merchant:<key>")`), `countsOf(records)` (live per type, deleted transactions apart, the

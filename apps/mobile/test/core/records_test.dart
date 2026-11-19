@@ -113,6 +113,19 @@ void main() {
       expect(parseRecord(RecordType.recurrence, {...valid['recurrence']!, 'rev': -1}).ok, false);
     });
 
+    test("a transaction's externalHash (an import's dedupe hash) is optional, a string or null", () {
+      expect(
+        parseRecord(RecordType.transaction, valid['transaction']).value!.containsKey('externalHash'),
+        isFalse,
+      );
+      for (final hash in ['9f2c0a', null]) {
+        final r = parseRecord(RecordType.transaction, {...valid['transaction']!, 'externalHash': hash});
+        expect(r.ok, isTrue);
+        expect(r.value!['externalHash'], hash);
+      }
+      expect(parseRecord(RecordType.transaction, {...valid['transaction']!, 'externalHash': 7}).ok, isFalse);
+    });
+
     test("a transaction's updatedAt is optional", () {
       expect(parseRecord(RecordType.transaction, valid['transaction']).ok, isTrue);
       final r = parseRecord(RecordType.transaction, {
