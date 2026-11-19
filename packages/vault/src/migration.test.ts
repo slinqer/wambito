@@ -1,6 +1,8 @@
 import { parseRecord } from "@wambito/core";
 import { describe, expect, it } from "vitest";
+import { createLocalBackend } from "./backend.ts";
 import { uuidv5 } from "./ids.ts";
+import { createMemoryStore } from "./memory-store.ts";
 import {
   countsOf,
   type MigrationRecord,
@@ -339,15 +341,63 @@ describe("recordsFromSource", () => {
     expect(find(records, "recurrence", RENT)?.body).toMatchObject({ monthOfYear: null, rev: 0 });
   });
 
-  it("merchants become merchant records with their categoryId", async () => {
+  it("merchants become merchant records with their categoryId, under the id the phone gives them", async () => {
     const records = await recordsFromSource(source(), USER);
+    // The phone's merchantRecordId (apps/mobile/lib/local/captures.dart): its seed namespace is
+    // this literal (apps/mobile/lib/local/ids.dart), so its capture learning writes this record.
+    const phone = await uuidv5(
+      await uuidv5("6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10", USER),
+      "merchant:corner shop",
+    );
     expect(records.filter((r) => r.type === "merchant")).toEqual([
       {
         type: "merchant",
-        id: "01930000-0000-7000-8000-0000000000e1",
+        id: phone,
         deleted: false,
         body: { s: 1, merchantKey: "corner shop", categoryId: FOOD },
       },
+    ]);
+  });
+
+  it("two merchant rows never map to one id", async () => {
+    const src = source();
+    const keys = ["corner shop", "corner", "corner shop 2", "Corner shop", "café"];
+    src.merchants = keys.map((merchantKey, i) => ({
+      id: `01930000-0000-7000-8000-0000000000e${i + 2}`,
+      merchantKey,
+      categoryId: i % 2 ? OLD : FOOD,
+    }));
+    const ids = (await recordsFromSource(src, USER))
+      .filter((r) => r.type === "merchant")
+      .map((r) => r.id);
+    expect(new Set(ids).size).toBe(keys.length);
+    // Another account's merchant of the same key is another record.
+    const [other] = (await recordsFromSource(src, "user-migrate-2")).filter(
+      (r) => r.type === "merchant",
+    );
+    expect(ids).not.toContain(other?.id);
+  });
+
+  it("a migrated dismissal keeps its month dismissed in the local backend", async () => {
+    const store = createMemoryStore();
+    for (const r of await recordsFromSource(source(), USER)) {
+      await store.put(r.type, r.id, r.body as never);
+      if (r.deleted) await store.delete(r.type, r.id);
+    }
+    const backend = createLocalBackend({
+      store,
+      now: () => new Date("2026-11-19T12:00:00Z"),
+      profile: { id: USER, email: "someone@example.test", isAnonymous: false },
+    });
+    const res = await backend.fetch("http://local/v1/transactions?month=2026-10&limit=200");
+    expect(res.status).toBe(200);
+    const { items } = (await res.json()) as { items: Array<{ name: string; date: string }> };
+    expect(items.filter((t) => t.name === "Veg box")).toEqual([]);
+    // November's edited occurrence is still the only one for its month.
+    const nov = await backend.fetch("http://local/v1/transactions?month=2026-11&limit=200");
+    const novItems = ((await nov.json()) as { items: Array<{ name: string }> }).items;
+    expect(novItems.filter((t) => t.name.startsWith("Veg box")).map((t) => t.name)).toEqual([
+      "Veg box (bigger)",
     ]);
   });
 
@@ -378,6 +428,35 @@ describe("recordsFromSource", () => {
     const src = source();
     src.profile.currency = "XXX";
     await expect(recordsFromSource(src, USER)).rejects.toThrow(/settings/);
+  });
+
+  it("an unknown locale falls back to es, and an unknown time zone is refused", async () => {
+    const src = source();
+    src.profile.locale = "fr";
+    const [settings] = (await recordsFromSource(src, USER)).filter((r) => r.type === "settings");
+    expect(settings?.body).toMatchObject({ locale: "es" });
+    src.profile.timezone = "Mars/Olympus";
+    await expect(recordsFromSource(src, USER)).rejects.toThrow(/settings/);
+  });
+
+  it("a deleted occurrence whose rule is gone keeps its server id", async () => {
+    const src = source();
+    src.transactions = [
+      tx("01930000-0000-7000-8000-000000000007", {
+        status: "pending",
+        recurrenceId: null,
+        occurrenceMonth: "2026-07-01",
+        source: "recurrence",
+        deletedAt: AT,
+      }),
+      // A live row in an archived category stays live there.
+      tx("01930000-0000-7000-8000-000000000008", { categoryId: OLD }),
+    ];
+    const txs = (await recordsFromSource(src, USER)).filter((r) => r.type === "transaction");
+    expect(txs.map((r) => [r.id, r.deleted])).toEqual([
+      ["01930000-0000-7000-8000-000000000007", true],
+      ["01930000-0000-7000-8000-000000000008", false],
+    ]);
   });
 });
 

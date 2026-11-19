@@ -34,7 +34,8 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   id, each body checked by `parseRecord`; dates `YYYY-MM-DD` to `YYYY-MM` for `occurrenceMonth` and
   `effectiveFrom`, `accountId` null, recurrences at `rev` 0; a dismissed month, soft-deleted
   pending `source: "recurrence"`, takes `uuidv5(recurrenceId, "<YYYY-MM>:0")` as the backend's
-  `materialize` expects), `countsOf(records)` (live per type, deleted transactions apart, the
+  `materialize` expects; a merchant takes the phone's `merchantRecordId(userId, key)`,
+  `uuidv5(uuidv5(SETTINGS_SEED_NAMESPACE, userId), "merchant:<key>")`), `countsOf(records)` (live per type, deleted transactions apart, the
   settings not counted), `SETTINGS_SEED_NAMESPACE` and `settingsRecordId(userId)` (the web's seed
   uses the same namespace). Tests: `src/migration.test.ts`.
 - `src/ids.ts`: `uuidv7`, `uuidv5`, `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`).

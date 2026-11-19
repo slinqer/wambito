@@ -3,7 +3,8 @@ import { uuidv5 } from "./ids.ts";
 
 /**
  * The switch day (E2E stage 5): a plain account's server rows, as `GET /v2/migration/source`
- * answers them, become sealed-record bodies with the same ids. Design:
+ * answers them, become sealed-record bodies with the same ids (but for a dismissed month and a
+ * merchant, which take the ids the vault derives). Design:
  * `docs/superpowers/specs/2026-11-19-e2e-stage-5-switch-design.md` section 3.
  */
 
@@ -140,6 +141,16 @@ export async function settingsRecordId(userId: string): Promise<string> {
 }
 
 /**
+ * The id of the `merchant` record that remembers `merchantKey`, as the phone makes it
+ * (`merchantRecordId` in apps/mobile/lib/local/captures.dart): every device converges on one record
+ * per merchant, so a migrated memory is the one the phone's capture learning updates. The server's
+ * unique `(userId, merchantKey)` means two rows never share an id.
+ */
+export async function merchantRecordId(userId: string, merchantKey: string): Promise<string> {
+  return uuidv5(await uuidv5(SETTINGS_SEED_NAMESPACE, userId), `merchant:${merchantKey}`);
+}
+
+/**
  * Every record the vault needs for this source, each body checked by `parseRecord` (and stored as
  * it parses, defaults filled). Throws on a row that would not make a valid record; the error names
  * the type and id, never a value.
@@ -215,7 +226,11 @@ export async function recordsFromSource(
   }
 
   for (const m of source.merchants) {
-    add("merchant", m.id, { s: 1, merchantKey: m.merchantKey, categoryId: m.categoryId });
+    add("merchant", await merchantRecordId(userId, m.merchantKey), {
+      s: 1,
+      merchantKey: m.merchantKey,
+      categoryId: m.categoryId,
+    });
   }
 
   for (const t of source.transactions) {

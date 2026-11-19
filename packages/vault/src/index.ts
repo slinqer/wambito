@@ -31,6 +31,7 @@ export {
   type MigrationCounts,
   type MigrationRecord,
   type MigrationSource,
+  merchantRecordId,
   recordsFromSource,
   SETTINGS_SEED_NAMESPACE,
   settingsRecordId,
