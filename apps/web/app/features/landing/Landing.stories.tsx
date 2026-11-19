@@ -320,28 +320,29 @@ export const HowItWorksSection: Story = {
     for (const demo of demos) {
       await expect(demo).toHaveAttribute("aria-hidden", "true");
     }
-    // "Bring your history": Budge today; Buddy, Excel and Google Sheets (with their marks) marked as
-    // coming soon.
+    // "Bring your history": the apps on top, each with its mark; Buddy, Excel and Sheets tagged as
+    // coming soon, Budge (which imports today) not; no file name.
     const history = canvas.getByRole("heading", { name: "Bring your history" }).closest("li");
-    const soon = history?.querySelector<HTMLElement>(".lk-landing-sources");
-    await expect(soon?.querySelector(".lk-landing-soon")).toHaveTextContent("Soon");
-    await expect([...(soon?.querySelectorAll("li") ?? [])].map((li) => li.textContent)).toEqual([
+    await expect(history?.querySelector("p")).toHaveTextContent(
+      "You don't have to start from scratch: bring your transactions from other apps.",
+    );
+    const apps = [...(history?.querySelectorAll(".lk-landing-sources li") ?? [])];
+    await expect(apps.map((li) => li.firstChild?.nextSibling?.textContent)).toEqual([
+      "Budge",
       "Buddy",
       "Excel",
-      "Google Sheets",
+      "Sheets",
     ]);
     await expect(
-      [...(soon?.querySelectorAll("li img") ?? [])].map((img) => img.getAttribute("src")),
-    ).toEqual([
+      apps.map((li) => li.querySelector(".lk-landing-soon")?.textContent ?? null),
+    ).toEqual([null, "Soon", "Soon", "Soon"]);
+    await expect(apps.map((li) => li.querySelector("img")?.getAttribute("src"))).toEqual([
+      "/landing/logos/budge.png",
       "/landing/logos/buddy.png",
       "/landing/logos/microsoft-excel.svg",
       "/landing/logos/google-sheets.svg",
     ]);
-    // The file comes from Budge, with Budge's icon.
-    await expect(history?.querySelector(".lk-landing-file img")).toHaveAttribute(
-      "src",
-      "/landing/logos/budge.png",
-    );
+    await expect(history?.textContent).not.toContain(".csv");
     // Subscriptions: each with its brand's mark, what it costs and when it is due; the total a month.
     const subs = canvas
       .getByRole("heading", { name: "Your subscriptions, under control" })
@@ -420,7 +421,7 @@ export const HowItWorksSection: Story = {
     // Signing in without a password is told in the FAQ, not in a card.
     await expect(canvasElement).not.toHaveTextContent("482 913");
     await expect(canvasElement).toHaveTextContent("1,248 transactions ready");
-    await expect(canvasElement).toHaveTextContent("Budge today, Buddy and others soon.");
+    await expect(canvasElement).toHaveTextContent("You don't have to start from scratch");
   },
 };
 
