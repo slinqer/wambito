@@ -579,6 +579,14 @@ class NoticeWorkersTest {
     }
 
     @Test
+    fun `an encrypted (preview) guest never gets the warning, the server keeps it for months`() {
+        AccountMode(context).write("preview", "u1")
+        runGuest()
+        assertTrue(posted().isEmpty())
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
     fun `an account the app knows has an email gets nothing`() {
         session.guestFlag = false
         runGuest()

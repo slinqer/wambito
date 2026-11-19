@@ -525,13 +525,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: ref.watch(dueNoticeEnabledProvider),
                 onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
               ),
-              SettingSwitch(
-                key: const Key('settings.guestNotice'),
-                label: l10n.settingsGuestNotice,
-                hint: l10n.settingsGuestNoticeHint,
-                value: ref.watch(guestNoticeEnabledProvider),
-                onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
-              ),
+              // The 45-day guest warning is a `plain` guest's: an encrypted guest is kept 12 or 24
+              // months and never gets it (lib/notices/notice_sync.dart).
+              if (!ref.watch(isPreviewProvider))
+                SettingSwitch(
+                  key: const Key('settings.guestNotice'),
+                  label: l10n.settingsGuestNotice,
+                  hint: l10n.settingsGuestNoticeHint,
+                  value: ref.watch(guestNoticeEnabledProvider),
+                  onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
+                ),
               // The widgets are Android's: iOS has none, so no setting about them.
               if (defaultTargetPlatform == TargetPlatform.android &&
                   ref.watch(widgetOnHomeProvider).value == false)

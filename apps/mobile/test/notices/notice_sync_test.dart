@@ -277,6 +277,35 @@ void main() {
       expect(env.platform.callsNamed('scheduleDue'), isEmpty);
       expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
     });
+
+    // The server keeps an encrypted guest for 12 or 24 months, not 60 days: the warning would be
+    // false. A job left from before (a plain guest on this phone) is cancelled.
+    testWidgets('a preview guest never gets the 45-day warning, with the vault locked', (tester) async {
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: previewOpen(),
+      );
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+      expect(env.platform.callsNamed('cancelGuest'), isNotEmpty);
+      expect(env.prompt.reasons, isNot(contains(NoticeReason.guest)));
+    });
+
+    testWidgets('a preview guest never gets the 45-day warning, with the vault open', (tester) async {
+      final (backend, _) = await _vaultBackend();
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: _previewWith(_Vault(backend)),
+      );
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+      expect(env.platform.callsNamed('cancelGuest'), isNotEmpty);
+      expect(env.prompt.reasons, isNot(contains(NoticeReason.guest)));
+    });
   });
 
   group('Hoy vence… at 9:00', () {

@@ -451,7 +451,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
   `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
-  local notices only. A `preview` account's "Hoy vence…" is computed in Dart from the vault
+  local notices only. The 45-day guest warning is a `plain` guest's: for a `preview` account `NoticeSync` cancels it,
+  `GuestWorker` posts nothing and Settings hides its switch (an encrypted guest is kept 12 or 24 months). A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)
   and handed over as `scheduleDueList {zone, language, owner, days}` (14 days, replaced whole);
   `DueList` keeps it in prefs `wambito.notice.duelist` (excluded from backups) with its owner, and `DueWorker`

@@ -25,10 +25,11 @@ import 'notice_prompt.dart';
 ///    the job is left as it is. For a `preview` account the payments are read from the open vault
 ///    ([dueListOf]) and handed over as days and names (`scheduleDueList`), again after every commit
 ///    to the vault; the server is never asked.
-///  * **The guest warning** is set 44 days ahead, again at every opening of the app on a guest
-///    account **that the server accepted a request from** (that is when its own 60-day clock
+///  * **The guest warning** is set 44 days ahead, again at every opening of the app on a `plain`
+///    guest account **that the server accepted a request from** (that is when its own 60-day clock
 ///    restarts; an opening offline leaves the job as it was), and cancelled when the account
-///    stops being a guest (a claimed email, a sign-out) or its switch goes off.
+///    stops being a guest (a claimed email, a sign-out), its switch goes off, or the account is
+///    `preview` (an encrypted guest is kept 12 or 24 months: it never gets the warning).
 ///  * **The notification permission** (Android 13+) is asked in the app, with one sentence on why,
 ///    the first time a notice is relevant while the app is open: a recurring payment and the due
 ///    switch on, or a guest account and the guest switch on. It is asked once, whatever the
@@ -93,12 +94,13 @@ class NoticeSync with WidgetsBindingObserver {
     }
     // A `preview` account's payments live only in the vault on this phone: nothing is asked of the
     // server for them (no recurrence list). "Hoy vence…" is computed in Dart from the open vault
-    // and handed to the phone as a list of days and names ([_previewDue]). The guest warning needs
-    // no finances but is only (re)scheduled on proof the server saw the person, which a pass that
-    // asks nothing cannot give: it stays as it is.
+    // and handed to the phone as a list of days and names ([_previewDue]). The guest warning is
+    // never set: the server keeps an encrypted guest for 12 or 24 months, not 60 days, so "se
+    // borrarán en 15 días" would be false. A job left from before is cancelled.
     final account = _ref.read(currentVaultAccountProvider);
     if (account?.mode == EncryptionMode.preview) {
       _facts = null;
+      await platform.cancelGuest();
       await _previewDue(platform, permission, account!.profile.id);
       return;
     }
