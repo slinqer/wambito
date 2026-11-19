@@ -194,7 +194,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   the start waits for the server. A home cache or a pending-saves queue of this session proves the
   account `plain` (`VaultAccount.inferred`: routing and the offline path only; `knownPlainProvider`
   stays false, so its finance calls wait for the server's answer). The router reads
-  `currentVaultAccountProvider`, never the mode provider's value). `vault_screen.dart` (route `/unlock`) switches over the gate state:
+  `currentVaultAccountProvider`, never the mode provider's value). The welcome (`/welcome`) is decided by `SessionState.onboardingPending`: for a `plain` account the server's
+`onboardingCompletedAt` (`AccountStanding`, at sign-in and at every start's `_refresh`); for a `preview` one its vault's,
+as the web's `LocalOnboardingRoute` (the welcome's `PATCH /v1/me` stamps only the sealed settings record, so the server's
+copy stays empty): `vaultOnboardingProvider` (`lib/vault/vault_onboarding.dart`) reads the local `GET /v1/me` once the
+vault is open and hands it to `SessionController.onboardingFromVault`, which keeps it (a cold widget link reads it before
+the vault opens); `_refresh` never takes the server's flag over a known one for an encrypted account, and the router
+keeps an open vault on the loading route (`VaultRoute.loading`) until that answer is in. A guest never has it. `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
   `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
   sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two

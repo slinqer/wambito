@@ -47,7 +47,9 @@ class _VerifierServer extends FakeAuthApi {
 
 /// An open vault on a memory store, as far as the gate's wiring needs one.
 class _Vault extends FakeVault {
-  _Vault(String userId) : super(userId: userId);
+  // Set up on another phone, which also finished the welcome (the vault's flag; the server's
+  // stays empty for an encrypted account).
+  _Vault(String userId) : super(userId: userId, onboardingCompletedAt: '2026-11-01T12:00:00.000Z');
 
   @override
   Interceptor get interceptor => Interceptor();

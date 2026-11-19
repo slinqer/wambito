@@ -345,15 +345,19 @@ class SessionController extends Notifier<SessionState> {
       // Naming the account kept for the session (ruling 17): a deleted one says `user_deleted`.
       final standing = await _auth.standing(stored.token, userId: _keptAtStart);
       if (!ref.mounted || state.stored?.token != stored.token) return;
+      // What the vault said while the server was asked ([onboardingFromVault]) is kept.
+      final now = state.stored!;
       // What the server says about the welcome wins over what was kept (another phone, or the web,
-      // may have finished it).
-      if (standing.guest != stored.guest ||
-          standing.onboardingPending != stored.onboardingPending ||
-          !stored.onboardingKnown) {
+      // may have finished it); but not for an encrypted account: its welcome is the vault's to say
+      // (the server's `onboardingCompletedAt` stays empty), and [onboardingFromVault] keeps it.
+      final pending = standing.encrypted && now.onboardingKnown
+          ? now.onboardingPending
+          : standing.onboardingPending;
+      if (standing.guest != now.guest || pending != now.onboardingPending || !now.onboardingKnown) {
         await _signedIn(
           stored.token,
           guest: standing.guest,
-          onboardingPending: standing.onboardingPending,
+          onboardingPending: pending,
           userId: standing.userId,
         );
       } else {
@@ -665,6 +669,21 @@ class SessionController extends Notifier<SessionState> {
     await _store.write(stored.token, guest: stored.guest);
     state = SessionState.signedIn(
       StoredSession(token: stored.token, guest: stored.guest),
+      offerPasskeyFor: state.offerPasskeyFor,
+    );
+  }
+
+  /// The open vault of an encrypted account says how its welcome stands (its settings'
+  /// `onboardingCompletedAt`, lib/vault/vault_onboarding.dart): that is the account's flag, kept
+  /// for the next start (a widget's link reads it before the vault opens). A guest has none.
+  Future<void> onboardingFromVault({required bool pending}) async {
+    final stored = state.stored;
+    if (stored == null || state.status != SessionStatus.signedIn || stored.guest) return;
+    if (stored.onboardingKnown && stored.onboardingPending == pending) return;
+    await _store.write(stored.token, guest: false, onboardingPending: pending);
+    if (!ref.mounted || state.stored?.token != stored.token) return;
+    state = SessionState.signedIn(
+      StoredSession(token: stored.token, guest: false, onboardingPending: pending),
       offerPasskeyFor: state.offerPasskeyFor,
     );
   }

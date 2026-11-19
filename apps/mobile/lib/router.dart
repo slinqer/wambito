@@ -26,6 +26,7 @@ import 'settings/security/approve_signin_screen.dart';
 import 'settings/settings_screen.dart';
 import 'vault/encryption_mode.dart';
 import 'vault/vault_gate.dart';
+import 'vault/vault_onboarding.dart';
 import 'vault/vault_providers.dart';
 import 'vault/vault_screen.dart';
 import 'welcome/welcome_screen.dart';
@@ -40,7 +41,8 @@ const _offerFirst = {'/', '/loading', '/entry', '/entry/email'};
 /// - `locked`: a `preview` account whose vault is not open, or one whose mode nobody could tell
 ///   (an offline first start): `/unlock` is all it gets, and says what to do;
 /// - `loading`: the mode of the account is still being learned: the loading route, so a screen
-///   never treats a possibly-`preview` account as `plain`.
+///   never treats a possibly-`preview` account as `plain`; and a `preview` account's open vault
+///   until its welcome flag is in the session (`vaultOnboardingProvider`).
 enum VaultRoute { open, locked, loading }
 
 /// The vault's standing for the session signed in now. Reads [currentVaultAccountProvider], never
@@ -55,7 +57,10 @@ VaultRoute vaultRouteOf(Ref ref) {
     return asked.hasError ? VaultRoute.locked : VaultRoute.loading;
   }
   if (account.mode == EncryptionMode.plain) return VaultRoute.open;
-  return ref.read(vaultGateStateProvider) is Ready ? VaultRoute.open : VaultRoute.locked;
+  if (ref.read(vaultGateStateProvider) is! Ready) return VaultRoute.locked;
+  // Its welcome is the vault's to say (lib/vault/vault_onboarding.dart): until that answer is in
+  // the session, the loading route, so an account that finished it never sees the welcome flash.
+  return ref.read(vaultOnboardingProvider) == null ? VaultRoute.loading : VaultRoute.open;
 }
 
 /// Where the session sends a [location], or null to stay:
@@ -73,7 +78,9 @@ VaultRoute vaultRouteOf(Ref ref) {
 ///   person was going from the sign-in screens; its address is for that moment only;
 /// - signed in with a `preview` account (the [vault]): every screen but the magic link, the entry
 ///   screens and the debug ones goes to `/unlock` until its vault is open, and `/unlock` goes home
-///   once it is; while the mode is unknown, the loading route;
+///   once it is; while the mode is unknown, or the open vault's welcome flag is being read (the
+///   welcome of a `preview` account follows its vault, never the server's empty copy), the
+///   loading route;
 /// - while a `preview` guest's claim finishes ([finishingClaim]: its recovery key, then the passkey
 ///   offer), the email screen (and "Guarda tu progreso" under it) stay although the account has an
 ///   email now;
@@ -165,6 +172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(vaultAccountProvider, (_, _) => update());
   ref.listen(currentVaultAccountProvider, (_, _) => update());
   ref.listen(vaultGateStateProvider, (_, _) => update());
+  ref.listen(vaultOnboardingProvider, (_, _) => update());
   ref.listen(mergeBlocksAppProvider, (_, next) {
     merge.value = next;
     update();

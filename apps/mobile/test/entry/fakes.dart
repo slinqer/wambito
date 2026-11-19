@@ -360,6 +360,8 @@ Future<ProviderContainer> pumpApp(
   List<Override> overrides = const [],
   bool plain = true,
   HomeCacheStore? homeCache,
+  // False for a screen that animates for ever (the welcome): one frame, and the test pumps on.
+  bool settle = true,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -387,6 +389,10 @@ Future<ProviderContainer> pumpApp(
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const WambitoApp()),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
   return container;
 }
