@@ -22,6 +22,10 @@ export function posthogOptions(config: AnalyticsConfig): Partial<PostHogConfig> 
     cross_subdomain_cookie: false,
     opt_out_persistence_by_default: true,
     session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask]" },
+    // The landing uses no feature flags; with them on, the withdrawal's `reset()` reloads them and
+    // sends a request to PostHog after the person said no (the built-landing e2e proves it). Not
+    // `advanced_disable_flags`: that also drops the remote config session recording needs.
+    advanced_disable_feature_flags: true,
   };
 }
 

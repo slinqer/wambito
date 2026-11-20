@@ -58,6 +58,12 @@ describe("posthogOptions", () => {
       session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask]" },
     });
   });
+
+  it("turns feature flags off, so a withdrawal's reset() sends no flags request", () => {
+    expect(posthogOptions({ key: "k", host: "https://h.test" })).toMatchObject({
+      advanced_disable_feature_flags: true,
+    });
+  });
 });
 
 describe("startAnalytics and stopAnalytics", () => {
