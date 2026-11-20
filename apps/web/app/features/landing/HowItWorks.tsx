@@ -76,12 +76,13 @@ function ImportedCount({ total, play, pace }: { total: number; play: boolean; pa
 }
 
 /**
- * The apps a history comes from, `logo` being the mark in public/landing/logos/: Budge imports
- * today, the others are marked as coming soon. Brand names stay as they are in every language;
+ * The apps a history comes from, `logo` being the mark in public/landing/logos/: all marked as
+ * coming soon, since encrypted accounts cannot import yet (a later stage brings Budge back first,
+ * then the others). Brand names stay as they are in every language;
  * the marks stay their owners' trademarks and only say where a file comes from.
  */
 const SOURCES = [
-  { name: "Budge", logo: "budge.png", soon: false },
+  { name: "Budge", logo: "budge.png", soon: true },
   { name: "Buddy", logo: "buddy.png", soon: true },
   { name: "Excel", logo: "microsoft-excel.svg", soon: true },
   { name: "Sheets", logo: "google-sheets.svg", soon: true },
@@ -186,7 +187,7 @@ function Feature({
 /**
  * What Wambito does, as a grid of five cards (three then two, centred, on desktop; two on tablets,
  * the last centred; one on phones), each with its name, one line and a small illustration that fills the card's foot:
- * importing your history first (the apps it comes from, Budge today and the rest soon, all pointing down to the transactions ready; where people start), then where the money goes and
+ * importing your history first (the apps it comes from, all coming soon, all pointing down to the transactions ready; where people start), then where the money goes and
  * budgets that warn you (the app's real screens, in phones), subscriptions with their due dates and what they cost a month,
  * end-to-end encryption (an expense on the phone, noise on the server), under a big title (signing in without a password is in the FAQ). Automatic capture has
  * its own section above (`AutomaticCapture.tsx`). `pace` scales the timing (stories only).

@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · In arrivo",
-      "description": "Cosa abbiamo in programma per Wambito: la tua IA collegata, l'app per iPhone, la crittografia end-to-end e altro. Senza date, e può cambiare."
+      "description": "Cosa abbiamo in programma per Wambito: la tua IA collegata, l'app per iPhone e altro. Senza date, e può cambiare."
     },
     "title": "In arrivo",
     "intro": "Questo è quello che abbiamo in programma. Può cambiare nel tempo.",
@@ -53,8 +53,8 @@
         "body": "Di' «Ho speso 15 per il pranzo e 3 per Uber» e restano annotate entrambe."
       },
       "import_budge": {
-        "title": "Importa il tuo storico da Budge",
-        "body": "Carica il tuo file CSV e guarda un'anteprima prima di importare qualsiasi cosa."
+        "title": "Importa e scarica i tuoi dati, cifrati",
+        "body": "Presto potrai di nuovo importare e scaricare i tuoi dati, ora cifrati."
       },
       "iphone_app": {
         "title": "App per iPhone",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "Crittografia end-to-end",
-        "body": "I tuoi dati vengono cifrati sul tuo dispositivo: nemmeno il server potrà leggerli."
+        "body": "I tuoi dati vengono cifrati sul tuo dispositivo: nemmeno il server può leggerli."
       },
       "bank_alerts": {
         "title": "Cattura automatica delle notifiche della tua banca",
@@ -184,7 +184,7 @@
       },
       "import": {
         "title": "Porta il tuo storico",
-        "body": "Non devi ricominciare da zero: porta i tuoi movimenti da altre app.",
+        "body": "Non dovrai ricominciare da zero: presto potrai portare i tuoi movimenti da altre app, ora cifrati.",
         "demo_rows": "{count, plural, one {# movimento pronto} other {# movimenti pronti}}",
         "soon": "Presto"
       }
@@ -278,7 +278,7 @@
       },
       "import": {
         "q": "Posso portare il mio storico da altre app?",
-        "a": "Sì. Oggi puoi importare da Budge: esporta i tuoi movimenti in CSV e caricalo quando crei il tuo account o dopo, da Impostazioni. Presto anche da Buddy e da altre app. Prima di importare vedi un'anteprima: quanti movimenti entrano, quali sono duplicati e quali categorie verranno create."
+        "a": "Non ancora: con la cifratura end-to-end, l'importazione è in pausa. Presto potrai di nuovo importare e scaricare i tuoi dati, ora cifrati. Per primo torna Budge, con il suo file CSV; poi arrivano Buddy e altre app. Prima di importare vedrai un'anteprima: quanti movimenti entrano, quali sono duplicati e quali categorie verranno create. Il file verrà letto sul tuo dispositivo, e quello che entra verrà cifrato come tutto il resto."
       },
       "passwords": {
         "q": "Perché non mi chiede la password?",
@@ -286,7 +286,7 @@
       },
       "privacy": {
         "q": "Cosa fate con i miei dati?",
-        "a": "I tuoi dati sono cifrati end-to-end: vengono cifrati sul tuo dispositivo, con una chiave che hai solo tu, prima di uscirne. Ai nostri server arriva solo testo cifrato, che non possiamo leggere. Per questo non potremmo vendere i tuoi dati nemmeno se volessimo: per come è progettato Wambito, non possiamo vederli. Puoi esportarli o cancellare il tuo account quando vuoi. Il codice è open source: chiunque può verificare come vengono cifrati. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
+        "a": "I tuoi dati sono cifrati end-to-end: vengono cifrati sul tuo dispositivo, con una chiave che hai solo tu, prima di uscirne. Ai nostri server arriva solo testo cifrato, che non possiamo leggere, tranne mentre hai collegato un assistente IA: allora aprono in memoria quello che chiede, solo per rispondergli. Per questo non potremmo vendere i tuoi dati nemmeno se volessimo: per come è progettato Wambito, non possiamo vederli. Puoi cancellare il tuo account quando vuoi. Presto potrai di nuovo importare e scaricare i tuoi dati, ora cifrati. Il codice è open source: chiunque può verificare come vengono cifrati. I dettagli sono nell’<privacy>informativa sulla privacy</privacy>."
       },
       "free": {
         "q": "È gratis?",
@@ -323,7 +323,7 @@
         "description": "Come Wambito tratta i tuoi dati: cosa conserva, dove, chi può vederli e come chiederne la cancellazione."
       },
       "title": "Informativa sulla privacy",
-      "version": "Versione del 5 novembre 2026",
+      "version": "Versione del SWITCH_DATE",
       "sections": {
         "controller": {
           "title": "Chi è responsabile dei tuoi dati",
@@ -331,15 +331,15 @@
         },
         "data": {
           "title": "Cosa conserviamo",
-          "body": "La tua email. Le tue passkey, solo la loro parte pubblica: la chiave privata resta sul tuo dispositivo. Quello che annoti o importi: movimenti, categorie, budget e ricorrenti. Il tuo fuso orario e la tua lingua. Se colleghi un assistente IA, il permesso che gli hai dato. E, per sicurezza, l’indirizzo IP e il tipo di browser o di app di ogni sessione, più un registro minimo delle visite: quando, da quale IP, quale pagina e come ha risposto. Quel registro non conserva né quello che viene dopo il «?» negli indirizzi né le intestazioni."
+          "body": "La tua email. Le tue passkey, solo la loro parte pubblica: la chiave privata resta sul tuo dispositivo. Quello che annoti o importi (movimenti, categorie, budget, ricorrenti, la categoria che hai dato a ogni esercente, la tua valuta) è cifrato end-to-end: viene cifrato sul tuo dispositivo, con una chiave che hanno solo tu e i tuoi dispositivi, e il nostro server lo conserva solo come testo cifrato che non può leggere. Quello che il server vede: quanti record di ogni tipo hai, la loro dimensione approssimativa, quando cambiano e quali sono eliminati; il tuo fuso orario, la tua lingua e se hai finito il benvenuto; la piattaforma e la versione della tua app e l’ultimo giorno in cui l’hai aperta; i nomi dei dispositivi che colleghi; e, se colleghi un assistente IA, il permesso che gli hai dato. Di ogni sessione, il tipo di browser o di app, mai il tuo indirizzo IP. E un registro minimo delle visite: quando, quale pagina e come ha risposto. Quel registro non conserva né l’IP, né quello che viene dopo il «?» negli indirizzi, né le intestazioni."
         },
         "purposes": {
           "title": "Perché lo conserviamo",
-          "body": "La tua email, per farti entrare con un codice o un link, e per risponderti se ci scrivi. Le passkey, per farti entrare senza password. I tuoi movimenti, categorie, budget e ricorrenti, per mostrarti il tuo budget: l’app serve a questo. Il fuso orario, per sapere quando iniziano il tuo giorno e il tuo mese. La lingua, per parlarti nella tua, nell’app e nelle email. L’IP e le sessioni, per proteggere il tuo account e fermare gli abusi, come chiedere codici senza sosta. Le email per entrare partono tramite un servizio di invio email, che riceve solo il tuo indirizzo e il messaggio."
+          "body": "La tua email, per farti entrare con un codice o un link, e per risponderti se ci scrivi. Le passkey, per farti entrare senza password. I tuoi movimenti, categorie, budget e ricorrenti, per mostrarti il tuo budget: l’app serve a questo, e succede sui tuoi dispositivi, che sono quelli che hanno la chiave. Il fuso orario, per sapere quando iniziano il tuo giorno e il tuo mese. La lingua, per parlarti nella tua, nell’app e nelle email. Le sessioni, per proteggere il tuo account. Il tuo indirizzo IP si usa solo in memoria, per fermare gli abusi come chiedere codici senza sosta, e non viene mai conservato. Le email per entrare partono tramite un servizio di invio email, che riceve solo il tuo indirizzo e il messaggio."
         },
         "storage": {
           "title": "Dove si trova",
-          "body": "Su un server nell’Unione europea. I tuoi dati viaggiano cifrati tra il tuo dispositivo e il server. Ogni giorno facciamo una copia di sicurezza sul server e ne conserviamo un’altra, cifrata con age, su Cloudflare R2. Nessuna copia dura più di 14 giorni: dopo si cancella da sola. Così, se cancelli il tuo account, esce anche dalle copie entro 14 giorni al massimo."
+          "body": "Su un server nell’Unione europea. I tuoi dati viaggiano cifrati tra il tuo dispositivo e il server, e le tue finanze restano lì cifrate end-to-end. Ogni giorno facciamo una copia di sicurezza sul server e ne conserviamo un’altra, cifrata con age, su Cloudflare R2. Nessuna copia dura più di 14 giorni: dopo si cancella da sola. Così, se cancelli il tuo account, esce anche dalle copie entro 14 giorni al massimo. Gli account creati prima della cifratura end-to-end sono passati a essa il SWITCH_DATE; le copie di prima di quel giorno conservano ancora quelle finanze in una forma che potremmo leggere, e l’ultima si cancella da sola il SWITCH_DATE_PLUS_14. Un limite che devi conoscere: sul web, il codice dell’app arriva dal nostro server ogni volta che la apri, quindi chi controllasse il server potrebbe cambiarlo per leggere la tua chiave mentre la pagina è aperta. L’app Android non ha questa debolezza: il suo codice è quello che hai installato."
         },
         "not_done": {
           "title": "Cosa non facciamo",
@@ -347,19 +347,19 @@
         },
         "voice": {
           "title": "La tua voce",
-          "body": "Nell’app Android puoi dettare una spesa. La voce viene elaborata sul tuo telefono, con Vosk, e l’audio non lo lascia mai. I modelli vocali si scaricano una volta, quando lo chiedi tu, dalle release del progetto su GitHub. Al nostro server arriva solo il movimento che salvi, come se lo avessi scritto."
+          "body": "Nell’app Android puoi dettare una spesa. La voce viene elaborata sul tuo telefono, con Vosk, e l’audio non lo lascia mai. I modelli vocali si scaricano una volta, quando lo chiedi tu, dalle release del progetto su GitHub. Dal telefono esce solo il movimento che salvi, cifrato end-to-end, come se lo avessi scritto."
         },
         "capture": {
           "title": "Cattura automatica",
-          "body": "Nell’app Android puoi attivare la cattura automatica: parte spenta. Se la attivi e dai a Wambito l’accesso alle notifiche, legge solo quelle delle app che scegli, Revolut e Google Wallet, e ignora tutte le altre. Il testo della notifica viene elaborato sul telefono e non lascia mai il tuo telefono: non lo conserviamo né lo inviamo. Al nostro server arriva solo il movimento ricavato: l’importo e la valuta, l’esercente, la data e l’ora, e l’app da cui è arrivato. Arriva segnato «da rivedere», e puoi confermarlo, cambiarlo o eliminarlo. Per suggerirti la categoria, ricordiamo quella che hai dato a ogni esercente. Puoi spegnerla quando vuoi in Impostazioni → Cattura automatica, o togliere a Wambito l’accesso alle notifiche nelle impostazioni di Android."
+          "body": "Nell’app Android puoi attivare la cattura automatica: parte spenta. Se la attivi e dai a Wambito l’accesso alle notifiche, legge solo quelle delle app che scegli, Revolut e Google Wallet, e ignora tutte le altre. Il testo della notifica viene elaborato sul telefono e non lascia mai il tuo telefono: non lo conserviamo né lo inviamo. Dal telefono esce solo il movimento ricavato, cifrato end-to-end: l’importo e la valuta, l’esercente, la data e l’ora, e l’app da cui è arrivato. Arriva segnato «da rivedere», e puoi confermarlo, cambiarlo o eliminarlo. Per suggerirti la categoria, l’app ricorda quella che hai dato a ogni esercente, cifrata come tutto il resto. Puoi spegnerla quando vuoi in Impostazioni → Cattura automatica, o togliere a Wambito l’accesso alle notifiche nelle impostazioni di Android."
         },
         "assistants": {
           "title": "Assistenti IA",
-          "body": "Puoi collegare un assistente IA al tuo account. Entra solo se lo autorizzi tu, in una schermata di permesso (OAuth) che ti dice cosa potrà fare: leggere i tuoi dati, annotare per te o entrambe le cose. Puoi togliergli l’accesso quando vuoi, nelle Impostazioni. Quello che l’assistente legge lo tratta l’azienda che lo offre, secondo la sua informativa."
+          "body": "Puoi collegare un assistente IA al tuo account. Entra solo se lo autorizzi tu, in una schermata di permesso (OAuth) che ti dice cosa potrà fare: leggere i tuoi dati, annotare per te o entrambe le cose. Siccome i tuoi dati sono cifrati end-to-end, mentre l’assistente è collegato il nostro server apre in memoria quello che chiede, a ogni richiesta, con una chiave che porta l’assistente, solo per rispondergli; non conserva mai quella chiave né i tuoi dati in chiaro. Puoi togliergli l’accesso quando vuoi, nelle Impostazioni, e si interrompe subito. Quello che l’assistente legge lo tratta l’azienda che lo offre, secondo la sua informativa."
         },
         "guest": {
           "title": "Senza email: la modalità ospite",
-          "body": "Nell’app Android puoi iniziare senza email. I tuoi dati sono conservati sul server, in un account ospite. Se poi aggiungi la tua email, li tieni. Un account ospite che resta inutilizzato per 60 giorni viene cancellato con tutti i suoi dati, anche se hai chiuso la sessione."
+          "body": "Nell’app Android puoi iniziare senza email. I tuoi dati sono conservati sul server, cifrati end-to-end, in un account ospite. Se poi aggiungi la tua email, li tieni. Un account ospite che resta inutilizzato per 12 mesi viene cancellato con tutti i suoi dati, anche se hai chiuso la sessione; se l’hai protetto con una chiave di recupero o con una passkey, dopo 24 mesi."
         },
         "self_hosted": {
           "title": "Se usi un altro server",
@@ -367,7 +367,7 @@
         },
         "rights": {
           "title": "I tuoi diritti",
-          "body": "Secondo la Ley 1581 de 2012, puoi sapere quali dati abbiamo su di te, aggiornarli, correggerli, chiederci di cancellarli e revocare il tuo consenso. Per farlo, scrivici a <email>privacy@wambito.com</email> dall’email del tuo account. Molte cose le fai senza scriverci: scaricare i tuoi dati nelle Impostazioni o <link>cancellare il tuo account</link>. Se la nostra risposta non ti soddisfa, puoi rivolgerti alla Superintendencia de Industria y Comercio della Colombia."
+          "body": "Secondo la Ley 1581 de 2012, puoi sapere quali dati abbiamo su di te, aggiornarli, correggerli, chiederci di cancellarli e revocare il tuo consenso. Per farlo, scrivici a <email>privacy@wambito.com</email> dall’email del tuo account. Le tue finanze sono cifrate end-to-end e non possiamo leggerle: se ci chiedi i tuoi dati, ti diciamo quali dati conserviamo su di te e quali sono cifrati. Senza scriverci, puoi <link>cancellare il tuo account</link>. Se la nostra risposta non ti soddisfa, puoi rivolgerti alla Superintendencia de Industria y Comercio della Colombia."
         },
         "changes": {
           "title": "Modifiche a questa informativa",
@@ -381,11 +381,11 @@
         "description": "Come eliminare il tuo account Wambito e i dati che conserva, dall’app o via email."
       },
       "title": "Elimina il tuo account",
-      "version": "Versione del 4 novembre 2026",
+      "version": "Versione del SWITCH_DATE",
       "sections": {
         "in_app": {
           "title": "Dall’app",
-          "body": "Sul web o nell’app Android, vai nelle Impostazioni e scegli «Elimina il mio account». Per confermare, ti chiediamo di scrivere la tua email. Se vuoi, prima scarica i tuoi dati: il pulsante è proprio lì. Se usi l’app come ospite, prima salva i tuoi progressi con un’email; altrimenti il tuo account si cancella da solo dopo 60 giorni senza uso."
+          "body": "Sul web o nell’app Android, vai nelle Impostazioni e scegli «Elimina il mio account». Per confermare, ti chiediamo di scrivere la tua email. Scaricare prima i tuoi dati non è ancora possibile: presto potrai di nuovo importare e scaricare i tuoi dati, ora cifrati. Se usi l’app come ospite, prima salva i tuoi progressi con un’email; altrimenti il tuo account si cancella da solo dopo 12 mesi senza uso."
         },
         "by_email": {
           "title": "Per email",

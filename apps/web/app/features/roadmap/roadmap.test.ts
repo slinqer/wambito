@@ -108,6 +108,16 @@ describe("the roadmap's statuses", () => {
     expect(roadmapItem("connect_ai").status).toBe("done");
   });
 
+  it("has end-to-end encryption done since the switch day", () => {
+    expect(roadmapItem("e2e_encryption").status).toBe("done");
+  });
+
+  it("brings import and download back next, encrypted, and other apps' imports later", () => {
+    // Encrypted accounts cannot import or download yet: a later stage brings both back.
+    expect(roadmapItem("import_budge").status).toBe("next");
+    expect(roadmapItem("import_others").status).toBe("later");
+  });
+
   it("builds the store listings and plans the iPhone app next", () => {
     expect(roadmapItem("stores").status).toBe("building");
     expect(roadmapItem("bank_alerts").status).toBe("building");

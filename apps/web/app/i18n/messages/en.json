@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · What's next",
-      "description": "What we have planned for Wambito: your AI connected, the iPhone app, end-to-end encryption and more. No dates, and it may change."
+      "description": "What we have planned for Wambito: your AI connected, the iPhone app and more. No dates, and it may change."
     },
     "title": "What's next",
     "intro": "This is what we have planned. It may change over time.",
@@ -53,8 +53,8 @@
         "body": "Say “Spent 15k on lunch and 3k on Uber” and both are logged."
       },
       "import_budge": {
-        "title": "Import your history from Budge",
-        "body": "Upload your CSV file and see a preview before anything comes in."
+        "title": "Import and download your data, encrypted",
+        "body": "Soon you'll be able to import and download your data again, now encrypted."
       },
       "iphone_app": {
         "title": "iPhone app",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "End-to-end encryption",
-        "body": "Your data is encrypted on your device: not even the server will be able to read it."
+        "body": "Your data is encrypted on your device: not even the server can read it."
       },
       "bank_alerts": {
         "title": "Automatic capture of your bank's notifications",
@@ -184,7 +184,7 @@
       },
       "import": {
         "title": "Bring your history",
-        "body": "You don't have to start from scratch: bring your transactions from other apps.",
+        "body": "You won't have to start from scratch: soon you'll be able to bring your transactions from other apps, now encrypted.",
         "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}",
         "soon": "Soon"
       }
@@ -278,7 +278,7 @@
       },
       "import": {
         "q": "Can I bring my history from other apps?",
-        "a": "Yes. Today you can import from Budge: export your transactions as a CSV and upload it when you sign up or later from Settings. Buddy and other apps are coming soon. Before anything is imported you see a preview: how many transactions come in, which ones are duplicates and which categories will be created."
+        "a": "Not yet: with end-to-end encryption, importing is on hold. Soon you'll be able to import and download your data again, now encrypted. Budge comes back first, with its CSV file; Buddy and other apps follow. Before anything is imported you'll see a preview: how many transactions come in, which ones are duplicates and which categories will be created. The file will be read on your device, and what comes in will be encrypted like everything else."
       },
       "passwords": {
         "q": "Why doesn't it ask for a password?",
@@ -286,7 +286,7 @@
       },
       "privacy": {
         "q": "What do you do with my data?",
-        "a": "Your data is end-to-end encrypted: it is encrypted on your device, with a key only you hold, before it leaves it. Our servers only ever receive encrypted text they can't read. So we couldn't sell your data even if we wanted to: by design, we can't see it. You can export it or delete your account whenever you want. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
+        "a": "Your data is end-to-end encrypted: it is encrypted on your device, with a key only you hold, before it leaves it. Our servers only ever receive encrypted text they can't read, except while you have an AI assistant connected: then they open what it asks for in memory, only to answer it. So we couldn't sell your data even if we wanted to: by design, we can't see it. You can delete your account whenever you want. Soon you'll be able to import and download your data again, now encrypted. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
       },
       "free": {
         "q": "Is it free?",
@@ -323,7 +323,7 @@
         "description": "How Wambito handles your data: what it stores, where, who can see it and how to ask us to delete it."
       },
       "title": "Privacy policy",
-      "version": "Version of 5 November 2026",
+      "version": "Version of SWITCH_DATE",
       "sections": {
         "controller": {
           "title": "Who is responsible for your data",
@@ -331,15 +331,15 @@
         },
         "data": {
           "title": "What we store",
-          "body": "Your email. Your passkeys, only their public part: the private key stays on your device. What you log or import: transactions, categories, budgets and recurring items. Your time zone and language. If you connect an AI assistant, the permission you gave it. And, for security, the IP address and the kind of browser or app of each session, plus a minimal log of visits: when, from which IP, which page and how it answered. That log keeps neither what comes after the “?” in addresses nor the headers."
+          "body": "Your email. Your passkeys, only their public part: the private key stays on your device. What you log or import (transactions, categories, budgets, recurring items, the category you gave each merchant, your currency) is end-to-end encrypted: it is encrypted on your device, with a key only you and your devices hold, and our server keeps it only as encrypted text it can't read. What the server does see: how many records of each kind you have, their approximate size, when they change and which are deleted; your time zone, your language and whether you finished the welcome; the platform and version of your app and the last day you opened it; the names of the devices you connect; and, if you connect an AI assistant, the permission you gave it. For each session, the kind of browser or app, never your IP address. And a minimal log of visits: when, which page and how it answered. That log keeps no IP address, nothing that comes after the “?” in addresses and no headers."
         },
         "purposes": {
           "title": "Why we store it",
-          "body": "Your email, so you can sign in with a code or a link, and so we can answer if you write to us. Passkeys, so you can sign in without a password. Your transactions, categories, budgets and recurring items, to show you your budget: that is what the app is for. The time zone, to know when your day and your month start. The language, to speak yours, in the app and in emails. The IP and sessions, to keep your account safe and stop abuse, such as asking for codes nonstop. Sign-in emails go out through an email delivery service, which only gets your address and the message."
+          "body": "Your email, so you can sign in with a code or a link, and so we can answer if you write to us. Passkeys, so you can sign in without a password. Your transactions, categories, budgets and recurring items, to show you your budget: that is what the app is for, and it happens on your devices, which are the ones that hold the key. The time zone, to know when your day and your month start. The language, to speak yours, in the app and in emails. Sessions, to keep your account safe. Your IP address is used only in memory, to stop abuse such as asking for codes nonstop, and is never stored. Sign-in emails go out through an email delivery service, which only gets your address and the message."
         },
         "storage": {
           "title": "Where it is stored",
-          "body": "On a server in the European Union. Your data travels encrypted between your device and the server. Every day we make a backup on the server and keep another copy, encrypted with age, in Cloudflare R2. No backup lasts more than 14 days: after that it deletes itself. So if you delete your account, it also leaves the backups within 14 days at most."
+          "body": "On a server in the European Union. Your data travels encrypted between your device and the server, and your finances stay there end-to-end encrypted. Every day we make a backup on the server and keep another copy, encrypted with age, in Cloudflare R2. No backup lasts more than 14 days: after that it deletes itself. So if you delete your account, it also leaves the backups within 14 days at most. Accounts created before end-to-end encryption moved to it on SWITCH_DATE; the backups from before that day still hold those finances in a form we could read, and the last of them deletes itself on SWITCH_DATE_PLUS_14. One limit you should know: on the web, the app's code comes from our server every time you open it, so whoever controlled the server could change it to read your key while the page is open. The Android app doesn't have that weakness: its code is the one you installed."
         },
         "not_done": {
           "title": "What we don't do",
@@ -347,19 +347,19 @@
         },
         "voice": {
           "title": "Your voice",
-          "body": "In the Android app you can dictate an expense. Your voice is processed on your phone, with Vosk, and the audio never leaves it. The voice models are downloaded once, when you ask for them, from the project's releases on GitHub. Only the transaction you save reaches our server, as if you had typed it."
+          "body": "In the Android app you can dictate an expense. Your voice is processed on your phone, with Vosk, and the audio never leaves it. The voice models are downloaded once, when you ask for them, from the project's releases on GitHub. Only the transaction you save leaves the phone, end-to-end encrypted, as if you had typed it."
         },
         "capture": {
           "title": "Automatic capture",
-          "body": "In the Android app you can turn on automatic capture: it starts off. If you turn it on and give Wambito access to notifications, it reads only those of the apps you choose, Revolut and Google Wallet, and ignores every other one. The notification text is processed on the phone and never leaves your phone: we neither store it nor send it. Only the transaction taken from it reaches our server: the amount and currency, the merchant, the date and time, and the app it came from. It arrives marked “to review”, and you can confirm, change or delete it. To suggest the category, we remember the one you gave each merchant. You can turn it off at any time in Settings → Automatic capture, or remove Wambito's access to notifications in Android's settings."
+          "body": "In the Android app you can turn on automatic capture: it starts off. If you turn it on and give Wambito access to notifications, it reads only those of the apps you choose, Revolut and Google Wallet, and ignores every other one. The notification text is processed on the phone and never leaves your phone: we neither store it nor send it. Only the transaction taken from it leaves the phone, end-to-end encrypted: the amount and currency, the merchant, the date and time, and the app it came from. It arrives marked “to review”, and you can confirm, change or delete it. To suggest the category, the app remembers the one you gave each merchant, encrypted like everything else. You can turn it off at any time in Settings → Automatic capture, or remove Wambito's access to notifications in Android's settings."
         },
         "assistants": {
           "title": "AI assistants",
-          "body": "You can connect an AI assistant to your account. It only gets in if you allow it, on a permission screen (OAuth) that tells you what it will be able to do: read your data, log things for you, or both. You can take its access away whenever you like, in Settings. What the assistant reads is handled by the company that offers it, under its own policy."
+          "body": "You can connect an AI assistant to your account. It only gets in if you allow it, on a permission screen (OAuth) that tells you what it will be able to do: read your data, log things for you, or both. Since your data is end-to-end encrypted, while the assistant is connected our server opens what it asks for in memory, during each request, with a key the assistant carries, only to answer it; it never stores that key or your data unencrypted. You can take its access away whenever you like, in Settings, and it is cut at once. What the assistant reads is handled by the company that offers it, under its own policy."
         },
         "guest": {
           "title": "Without an email: guest mode",
-          "body": "In the Android app you can start without an email. Your data is stored on the server, in a guest account. If you add your email later, you keep it. A guest account left unused for 60 days is deleted with all its data, even if you signed out."
+          "body": "In the Android app you can start without an email. Your data is stored on the server, end-to-end encrypted, in a guest account. If you add your email later, you keep it. A guest account left unused for 12 months is deleted with all its data, even if you signed out; if you protected it with a recovery key or a passkey, after 24 months."
         },
         "self_hosted": {
           "title": "If you use another server",
@@ -367,7 +367,7 @@
         },
         "rights": {
           "title": "Your rights",
-          "body": "Under Ley 1581 de 2012, you can know what data we hold about you, update it, correct it, ask us to delete it and withdraw your consent. To do so, write to <email>privacy@wambito.com</email> from your account's email. Many things you can do without writing to us: download your data in Settings or <link>delete your account</link>. If you are not satisfied with our answer, you can turn to Colombia's Superintendencia de Industria y Comercio."
+          "body": "Under Ley 1581 de 2012, you can know what data we hold about you, update it, correct it, ask us to delete it and withdraw your consent. To do so, write to <email>privacy@wambito.com</email> from your account's email. Your finances are end-to-end encrypted and we can't read them: if you ask for your data, we tell you what data we hold about you and which of it is encrypted. Without writing to us, you can <link>delete your account</link>. If you are not satisfied with our answer, you can turn to Colombia's Superintendencia de Industria y Comercio."
         },
         "changes": {
           "title": "Changes to this policy",
@@ -381,11 +381,11 @@
         "description": "How to delete your Wambito account and the data it holds, from the app or by email."
       },
       "title": "Delete your account",
-      "version": "Version of 4 November 2026",
+      "version": "Version of SWITCH_DATE",
       "sections": {
         "in_app": {
           "title": "From the app",
-          "body": "On the web or in the Android app, go to Settings and choose “Delete my account”. To confirm, we ask you to type your email. If you like, download your data first: the button is right there. If you use the app as a guest, save your progress with an email first; otherwise your account deletes itself after 60 days unused."
+          "body": "On the web or in the Android app, go to Settings and choose “Delete my account”. To confirm, we ask you to type your email. Downloading your data first isn't possible yet: soon you'll be able to import and download your data again, now encrypted. If you use the app as a guest, save your progress with an email first; otherwise your account deletes itself after 12 months unused."
         },
         "by_email": {
           "title": "By email",

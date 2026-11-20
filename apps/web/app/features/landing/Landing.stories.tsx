@@ -320,11 +320,11 @@ export const HowItWorksSection: Story = {
     for (const demo of demos) {
       await expect(demo).toHaveAttribute("aria-hidden", "true");
     }
-    // "Bring your history": the apps on top, each with its mark; Buddy, Excel and Sheets tagged as
-    // coming soon, Budge (which imports today) not; no file name.
+    // "Bring your history": the apps on top, each with its mark, all tagged as coming soon
+    // (encrypted accounts cannot import yet); no file name.
     const history = canvas.getByRole("heading", { name: "Bring your history" }).closest("li");
     await expect(history?.querySelector("p")).toHaveTextContent(
-      "You don't have to start from scratch: bring your transactions from other apps.",
+      "You won't have to start from scratch: soon you'll be able to bring your transactions from other apps, now encrypted.",
     );
     const apps = [...(history?.querySelectorAll(".lk-landing-sources li") ?? [])];
     await expect(apps.map((li) => li.firstChild?.nextSibling?.textContent)).toEqual([
@@ -335,7 +335,7 @@ export const HowItWorksSection: Story = {
     ]);
     await expect(
       apps.map((li) => li.querySelector(".lk-landing-soon")?.textContent ?? null),
-    ).toEqual([null, "Soon", "Soon", "Soon"]);
+    ).toEqual(["Soon", "Soon", "Soon", "Soon"]);
     await expect(apps.map((li) => li.querySelector("img")?.getAttribute("src"))).toEqual([
       "/landing/logos/budge.png",
       "/landing/logos/buddy.png",
@@ -421,7 +421,7 @@ export const HowItWorksSection: Story = {
     // Signing in without a password is told in the FAQ, not in a card.
     await expect(canvasElement).not.toHaveTextContent("482 913");
     await expect(canvasElement).toHaveTextContent("1,248 transactions ready");
-    await expect(canvasElement).toHaveTextContent("You don't have to start from scratch");
+    await expect(canvasElement).toHaveTextContent("You won't have to start from scratch");
   },
 };
 

@@ -1074,7 +1074,7 @@
   .lk-landing-import .lk-landing-arrow {
     rotate: 90deg;
   }
-  /* The apps a history comes from: Budge today, the others tagged as coming soon. */
+  /* The apps a history comes from, each tagged as coming soon. */
   .lk-landing-sources {
     display: flex;
     flex-wrap: wrap;

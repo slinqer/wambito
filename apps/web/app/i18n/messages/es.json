@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · Lo que viene",
-      "description": "Lo que tenemos planeado para Wambito: tu IA conectada, la app para iPhone, el cifrado de punta a punta y más. Sin fechas, y puede cambiar."
+      "description": "Lo que tenemos planeado para Wambito: tu IA conectada, la app para iPhone y más. Sin fechas, y puede cambiar."
     },
     "title": "Lo que viene",
     "intro": "Esto es lo que tenemos planeado. Puede cambiar con el tiempo.",
@@ -53,8 +53,8 @@
         "body": "Di «Gasté 15 mil en almuerzo y 3 mil en Uber» y quedan los dos anotados."
       },
       "import_budge": {
-        "title": "Importa tu historial de Budge",
-        "body": "Sube tu archivo CSV y mira una vista previa antes de traer nada."
+        "title": "Importa y descarga tus datos, cifrados",
+        "body": "Pronto podrás importar y descargar tus datos de nuevo, ahora cifrados."
       },
       "iphone_app": {
         "title": "App para iPhone",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "Cifrado de punta a punta",
-        "body": "Tus datos se cifran en tu dispositivo: ni el servidor podrá leerlos."
+        "body": "Tus datos se cifran en tu dispositivo: ni el servidor puede leerlos."
       },
       "bank_alerts": {
         "title": "Captura automática de las notificaciones de tu banco",
@@ -184,7 +184,7 @@
       },
       "import": {
         "title": "Trae tu historial",
-        "body": "No tienes que empezar de cero: trae tus movimientos desde otras apps.",
+        "body": "No tendrás que empezar de cero: pronto podrás traer tus movimientos desde otras apps, ahora cifrados.",
         "demo_rows": "{count, plural, one {# movimiento listo} other {# movimientos listos}}",
         "soon": "Pronto"
       }
@@ -278,7 +278,7 @@
       },
       "import": {
         "q": "¿Puedo traer mi historial de otras apps?",
-        "a": "Sí. Hoy puedes importar desde Budge: exporta tus movimientos como CSV y súbelo al crear tu cuenta o después, desde Ajustes. Pronto también desde Buddy y otras apps. Antes de importar ves una vista previa: cuántos movimientos entran, cuáles están repetidos y qué categorías se van a crear."
+        "a": "Todavía no: con el cifrado de punta a punta, importar quedó en pausa. Pronto podrás importar y descargar tus datos de nuevo, ahora cifrados. Primero vuelve Budge, con su archivo CSV; después llegan Buddy y otras apps. Antes de importar verás una vista previa: cuántos movimientos entran, cuáles están repetidos y qué categorías se van a crear. El archivo se leerá en tu dispositivo, y lo que entre se cifrará como todo lo demás."
       },
       "passwords": {
         "q": "¿Por qué no me pide contraseña?",
@@ -286,7 +286,7 @@
       },
       "privacy": {
         "q": "¿Qué hacen con mis datos?",
-        "a": "Tus datos se cifran de punta a punta: se cifran en tu dispositivo, con una llave que solo tienes tú, antes de salir de él. A nuestros servidores solo llega texto cifrado, que no podemos leer. Por eso no podríamos vender tus datos aunque quisiéramos: por diseño, no podemos verlos. Puedes exportarlos o borrar tu cuenta cuando quieras. El código es abierto: cualquiera puede revisar cómo se cifran. Los detalles están en la <privacy>política de privacidad</privacy>."
+        "a": "Tus datos se cifran de punta a punta: se cifran en tu dispositivo, con una llave que solo tienes tú, antes de salir de él. A nuestros servidores solo llega texto cifrado, que no podemos leer, salvo mientras tengas conectado un asistente de IA: entonces abren en memoria lo que pide, solo para responderle. Por eso no podríamos vender tus datos aunque quisiéramos: por diseño, no podemos verlos. Puedes borrar tu cuenta cuando quieras. Pronto podrás importar y descargar tus datos de nuevo, ahora cifrados. El código es abierto: cualquiera puede revisar cómo se cifran. Los detalles están en la <privacy>política de privacidad</privacy>."
       },
       "free": {
         "q": "¿Es gratis?",
@@ -323,7 +323,7 @@
         "description": "Cómo Wambito trata tus datos: qué guarda, dónde, quién lo ve y cómo pedir que lo borremos."
       },
       "title": "Política de privacidad",
-      "version": "Versión del 5 de noviembre de 2026",
+      "version": "Versión del SWITCH_DATE",
       "sections": {
         "controller": {
           "title": "Quién responde por tus datos",
@@ -331,15 +331,15 @@
         },
         "data": {
           "title": "Qué guardamos",
-          "body": "Tu correo. Tus passkeys, pero solo su parte pública: la llave privada se queda en tu dispositivo. Lo que anotas o importas: movimientos, categorías, presupuestos y recurrentes. Tu zona horaria y tu idioma. Si conectas un asistente de IA, el permiso que le diste. Y, por seguridad, la dirección IP y el tipo de navegador o app de cada sesión, más un registro mínimo de visitas: cuándo, desde qué IP, qué página y cómo respondió. Ese registro no guarda lo que va después del «?» en las direcciones, ni las cabeceras."
+          "body": "Tu correo. Tus passkeys, pero solo su parte pública: la llave privada se queda en tu dispositivo. Lo que anotas o importas (movimientos, categorías, presupuestos, recurrentes, la categoría que le diste a cada comercio, tu moneda) va cifrado de punta a punta: se cifra en tu dispositivo, con una llave que solo tienen tus dispositivos y tú, y nuestro servidor lo guarda solo como texto cifrado que no puede leer. Lo que el servidor sí ve: cuántos registros de cada tipo tienes, su tamaño aproximado, cuándo cambian y cuáles están borrados; tu zona horaria, tu idioma y si terminaste la bienvenida; la plataforma y la versión de tu app y el último día que la abriste; los nombres de los dispositivos que conectas; y, si conectas un asistente de IA, el permiso que le diste. De cada sesión, el tipo de navegador o app, nunca tu dirección IP. Y un registro mínimo de visitas: cuándo, qué página y cómo respondió. Ese registro no guarda la IP, ni lo que va después del «?» en las direcciones, ni las cabeceras."
         },
         "purposes": {
           "title": "Para qué lo usamos",
-          "body": "Tu correo, para que entres con un código o un enlace, y para responderte si nos escribes. Las passkeys, para que entres sin contraseña. Tus movimientos, categorías, presupuestos y recurrentes, para mostrarte tu presupuesto: para eso existe la app. La zona horaria, para saber cuándo empieza tu día y tu mes. El idioma, para hablarte en el tuyo, en la app y en los correos. La IP y las sesiones, para cuidar tu cuenta y frenar abusos, como pedir códigos sin parar. Los correos para entrar salen por un servicio de envío de correo, que solo recibe tu dirección y el mensaje."
+          "body": "Tu correo, para que entres con un código o un enlace, y para responderte si nos escribes. Las passkeys, para que entres sin contraseña. Tus movimientos, categorías, presupuestos y recurrentes, para mostrarte tu presupuesto: para eso existe la app, y eso pasa en tus dispositivos, que son los que tienen la llave. La zona horaria, para saber cuándo empieza tu día y tu mes. El idioma, para hablarte en el tuyo, en la app y en los correos. Las sesiones, para cuidar tu cuenta. Tu dirección IP se usa solo en memoria, para frenar abusos como pedir códigos sin parar, y nunca se guarda. Los correos para entrar salen por un servicio de envío de correo, que solo recibe tu dirección y el mensaje."
         },
         "storage": {
           "title": "Dónde se guarda",
-          "body": "En un servidor en la Unión Europea. Tus datos viajan cifrados entre tu dispositivo y el servidor. Cada día hacemos una copia de seguridad en el servidor y guardamos otra copia, cifrada con age, en Cloudflare R2. Ninguna copia dura más de 14 días: después se borra sola. Por eso, si borras tu cuenta, también sale de las copias en 14 días como mucho."
+          "body": "En un servidor en la Unión Europea. Tus datos viajan cifrados entre tu dispositivo y el servidor, y tus finanzas se quedan allí cifradas de punta a punta. Cada día hacemos una copia de seguridad en el servidor y guardamos otra copia, cifrada con age, en Cloudflare R2. Ninguna copia dura más de 14 días: después se borra sola. Por eso, si borras tu cuenta, también sale de las copias en 14 días como mucho. Las cuentas creadas antes del cifrado de punta a punta pasaron a él el SWITCH_DATE; las copias de antes de ese día todavía guardan esas finanzas de una forma que podríamos leer, y la última se borra sola el SWITCH_DATE_PLUS_14. Un límite que debes conocer: en la web, el código de la app llega de nuestro servidor cada vez que la abres, así que quien controlara el servidor podría cambiarlo para leer tu llave mientras la página está abierta. La app de Android no tiene esa debilidad: su código es el que instalaste."
         },
         "not_done": {
           "title": "Lo que no hacemos",
@@ -347,19 +347,19 @@
         },
         "voice": {
           "title": "Tu voz",
-          "body": "En la app de Android puedes dictar un gasto. La voz se procesa en tu teléfono, con Vosk, y el audio nunca sale de él. Los modelos de voz se descargan una vez, cuando tú lo pides, desde las versiones del proyecto en GitHub. A nuestro servidor solo llega el movimiento que guardas, como si lo hubieras escrito."
+          "body": "En la app de Android puedes dictar un gasto. La voz se procesa en tu teléfono, con Vosk, y el audio nunca sale de él. Los modelos de voz se descargan una vez, cuando tú lo pides, desde las versiones del proyecto en GitHub. Del teléfono solo sale el movimiento que guardas, cifrado de punta a punta, como si lo hubieras escrito."
         },
         "capture": {
           "title": "Captura automática",
-          "body": "En la app de Android puedes encender la captura automática: viene apagada. Si la enciendes y le das a Wambito acceso a las notificaciones, lee solo las de las apps que elijas, Revolut y Google Wallet, e ignora todas las demás. El texto de la notificación se procesa en el teléfono y nunca sale de tu teléfono: no lo guardamos ni lo enviamos. A nuestro servidor solo llega el movimiento que se saca de ella: el monto y la moneda, el comercio, la fecha y la hora, y la app de la que vino. Llega marcado «por revisar», y lo puedes confirmar, cambiar o borrar. Para sugerirte la categoría, recordamos cuál le diste a cada comercio. Puedes apagarla cuando quieras en Ajustes → Captura automática, o quitarle a Wambito el acceso a las notificaciones en los ajustes de Android."
+          "body": "En la app de Android puedes encender la captura automática: viene apagada. Si la enciendes y le das a Wambito acceso a las notificaciones, lee solo las de las apps que elijas, Revolut y Google Wallet, e ignora todas las demás. El texto de la notificación se procesa en el teléfono y nunca sale de tu teléfono: no lo guardamos ni lo enviamos. Del teléfono solo sale el movimiento que se saca de ella, cifrado de punta a punta: el monto y la moneda, el comercio, la fecha y la hora, y la app de la que vino. Llega marcado «por revisar», y lo puedes confirmar, cambiar o borrar. Para sugerirte la categoría, la app recuerda cuál le diste a cada comercio, cifrada como todo lo demás. Puedes apagarla cuando quieras en Ajustes → Captura automática, o quitarle a Wambito el acceso a las notificaciones en los ajustes de Android."
         },
         "assistants": {
           "title": "Asistentes de IA",
-          "body": "Puedes conectar un asistente de IA a tu cuenta. Solo entra si tú lo autorizas, en una pantalla de permiso (OAuth) que te dice qué va a poder hacer: leer tus datos, anotar por ti o las dos cosas. Le quitas el acceso cuando quieras, en Ajustes. Lo que el asistente lee lo trata la empresa que lo ofrece, según su propia política."
+          "body": "Puedes conectar un asistente de IA a tu cuenta. Solo entra si tú lo autorizas, en una pantalla de permiso (OAuth) que te dice qué va a poder hacer: leer tus datos, anotar por ti o las dos cosas. Como tus datos van cifrados de punta a punta, mientras el asistente está conectado nuestro servidor abre en memoria lo que pide, en cada petición, con una llave que lleva el asistente, solo para responderle; nunca guarda esa llave ni tus datos sin cifrar. Le quitas el acceso cuando quieras, en Ajustes, y se corta al instante. Lo que el asistente lee lo trata la empresa que lo ofrece, según su propia política."
         },
         "guest": {
           "title": "Sin correo: el modo invitado",
-          "body": "En la app de Android puedes empezar sin correo. Tus datos se guardan en el servidor, en una cuenta de invitado. Si después agregas tu correo, los conservas. Una cuenta de invitado que pasa 60 días sin usarse se borra con todos sus datos, también si cerraste sesión."
+          "body": "En la app de Android puedes empezar sin correo. Tus datos se guardan en el servidor, cifrados de punta a punta, en una cuenta de invitado. Si después agregas tu correo, los conservas. Una cuenta de invitado que pasa 12 meses sin usarse se borra con todos sus datos, también si cerraste sesión; si la protegiste con una clave de recuperación o con una passkey, a los 24 meses."
         },
         "self_hosted": {
           "title": "Si usas otro servidor",
@@ -367,7 +367,7 @@
         },
         "rights": {
           "title": "Tus derechos",
-          "body": "Según la Ley 1581 de 2012, puedes conocer los datos que tenemos de ti, actualizarlos, corregirlos, pedir que los borremos y retirar tu autorización. Para eso, escríbenos a <email>privacy@wambito.com</email> desde el correo de tu cuenta. Muchas cosas las haces sin escribirnos: descargar tus datos en Ajustes o <link>borrar tu cuenta</link>. Si no quedas conforme con nuestra respuesta, puedes acudir a la Superintendencia de Industria y Comercio."
+          "body": "Según la Ley 1581 de 2012, puedes conocer los datos que tenemos de ti, actualizarlos, corregirlos, pedir que los borremos y retirar tu autorización. Para eso, escríbenos a <email>privacy@wambito.com</email> desde el correo de tu cuenta. Tus finanzas van cifradas de punta a punta y no podemos leerlas: si nos pides tus datos, te decimos qué datos guardamos de ti y cuáles van cifrados. Sin escribirnos, puedes <link>borrar tu cuenta</link>. Si no quedas conforme con nuestra respuesta, puedes acudir a la Superintendencia de Industria y Comercio."
         },
         "changes": {
           "title": "Cambios a esta política",
@@ -381,11 +381,11 @@
         "description": "Cómo borrar tu cuenta de Wambito y los datos que guarda, desde la app o por correo."
       },
       "title": "Borrar tu cuenta",
-      "version": "Versión del 4 de noviembre de 2026",
+      "version": "Versión del SWITCH_DATE",
       "sections": {
         "in_app": {
           "title": "Desde la app",
-          "body": "En la web o en la app de Android, entra a Ajustes y elige «Eliminar mi cuenta». Para confirmar, te pedimos escribir tu correo. Si quieres, antes descarga tus datos: el botón está ahí mismo. Si usas la app como invitado, primero guarda tu progreso con un correo; si no, tu cuenta se borra sola tras 60 días sin uso."
+          "body": "En la web o en la app de Android, entra a Ajustes y elige «Eliminar mi cuenta». Para confirmar, te pedimos escribir tu correo. Descargar antes tus datos todavía no se puede: pronto podrás importar y descargar tus datos de nuevo, ahora cifrados. Si usas la app como invitado, primero guarda tu progreso con un correo; si no, tu cuenta se borra sola tras 12 meses sin uso."
         },
         "by_email": {
           "title": "Por correo",

@@ -23,15 +23,18 @@ listings, `README.md`, `docs/encryption.md`, `docs/privacy-policy.md`, `docs/adm
 `feat/e2e-stage-5-copy`). Merging deploys, so that PR is merged only on the day, after its dates are
 filled (section 2, "The day starts").
 
-1. The encrypted import and export stage (importing a Budge CSV and downloading your data, made on
-   the device, for encrypted accounts) is merged and deployed. The policy, the FAQ and the store
-   listings in the switch-day copy PR say both work.
-2. `deploy/personal/docker-compose.yml` passes `NEW_USERS_ENCRYPTED`, `MIGRATION_OPEN` and
+Import and export for encrypted accounts (importing a Budge CSV and downloading your data, made on
+the device) are a later stage, not a precondition: from the switch, nobody can import or export
+(the web says "Not available yet with end-to-end encryption", the phone "Coming soon"). The
+switch-day copy says so: the FAQ, the policy, the deletion page, the store listings and the
+roadmap promise both back soon, encrypted, and no download button.
+
+1. `deploy/personal/docker-compose.yml` passes `NEW_USERS_ENCRYPTED`, `MIGRATION_OPEN` and
    `MIGRATION_OPEN_USER_IDS` to the `api` service, and `deploy/personal/.env.example` documents
    them. The `api` service lists its variables one by one, so a `.env` line it does not list has no
    effect. Done: all three are passed, off by default, and `test-compose-files.sh` checks each one.
    The direct-mode file adds no `api` variables of its own.
-3. **Founder:** the MCP's key pair is set on the VPS, or the founder's assistant cannot connect
+2. **Founder:** the MCP's key pair is set on the VPS, or the founder's assistant cannot connect
    again after the move (step 4.6). Check by name only, never printing a value, from
    `deploy/personal`:
 
@@ -44,10 +47,10 @@ filled (section 2, "The day starts").
    If either is false, make the pair once with `deploy/personal/gen-mcp-keys.sh`
    (`deploy/personal/AGENTS.md`, "The MCP's key pair"), put both lines in `.env`, and
    `docker compose up -d api mcp`.
-4. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
+3. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
    the founder installs it in step 4.
-5. The rehearsal below passed, on `main` with PR #84 merged.
-6. The founder picks the day.
+4. The rehearsal below passed, on `main` with PR #84 merged.
+5. The founder picks the day.
 
 ## 1. The rehearsal (builder runs it, the founder decrypts)
 
