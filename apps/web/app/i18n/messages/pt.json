@@ -335,7 +335,7 @@
         "description": "Como o Wambito trata os teus dados: o que guarda, onde, quem os vê e como pedir que os apaguemos."
       },
       "title": "Política de privacidade",
-      "version": "Versão de 5 de novembro de 2026",
+      "version": "Versão de 20 de novembro de 2026",
       "sections": {
         "controller": {
           "title": "Quem responde pelos teus dados",
@@ -353,9 +353,17 @@
           "title": "Onde fica guardado",
           "body": "Num servidor na União Europeia. Os teus dados viajam cifrados entre o teu dispositivo e o servidor. Todos os dias fazemos uma cópia de segurança no servidor e guardamos outra cópia, cifrada com age, no Cloudflare R2. Nenhuma cópia dura mais de 14 dias: depois apaga-se sozinha. Por isso, se apagares a tua conta, ela também sai das cópias em 14 dias, no máximo."
         },
+        "analytics": {
+          "title": "Análises em wambito.com",
+          "body": "Só em wambito.com, e só se aceitares no aviso de cookies, usamos o PostHog para ver que páginas visitas e onde clicas, e gravamos a visita sem o que escreves. A PostHog Inc. é uma empresa dos Estados Unidos que trata estes dados por nós nos seus servidores na União Europeia, segundo o seu acordo de tratamento de dados, com cláusulas contratuais-tipo. Não guarda o teu IP. Os eventos apagam-se ao fim de {eventsMonths, plural, one {# mês} other {# meses}} e as gravações ao fim de {recordingsDays, plural, one {# dia} other {# dias}}. Nada de dentro da app chega às análises: as tuas finanças vão cifradas de ponta a ponta. Se o teu navegador pedir para não ser rastreado (GPC ou Do Not Track), não carregamos o PostHog. Podes retirar a tua autorização quando quiseres em «Preferências de cookies», no fundo de cada página. Para apagarmos o que já ficou guardado, escreve-nos para <email>privacy@wambito.com</email>."
+        },
         "not_done": {
           "title": "O que não fazemos",
           "body": "Sem rastreadores, sem análises, sem publicidade. Não vendemos os teus dados nem os partilhamos. Só passam pelos serviços de que precisamos para funcionar (o servidor, as cópias e o envio de emails), e só para isso."
+        },
+        "not_done_with_analytics": {
+          "title": "O que não fazemos",
+          "body": "Sem publicidade. Não vendemos os teus dados nem os partilhamos. Só passam pelos serviços de que precisamos para funcionar (o servidor, as cópias e o envio de emails), e só para isso. Além disso, em wambito.com e só com a tua autorização, usamos o PostHog para ver como a página é usada. Nada de dentro da app chega alguma vez às análises: as tuas finanças vão cifradas de ponta a ponta."
         },
         "voice": {
           "title": "A tua voz",

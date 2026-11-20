@@ -1,9 +1,16 @@
+import { createTranslator } from "use-intl/core";
 import { describe, expect, it } from "vitest";
 import en from "../../i18n/messages/en.json" with { type: "json" };
 import es from "../../i18n/messages/es.json" with { type: "json" };
 import itMessages from "../../i18n/messages/it.json" with { type: "json" };
 import ptMessages from "../../i18n/messages/pt.json" with { type: "json" };
-import { DELETE_ACCOUNT_SECTIONS, LEGAL_MESSAGES, PRIVACY_SECTIONS } from "./legal.ts";
+import {
+  ANALYTICS_RETENTION,
+  DELETE_ACCOUNT_SECTIONS,
+  LEGAL_MESSAGES,
+  PRIVACY_SECTIONS,
+  privacySections,
+} from "./legal.ts";
 
 type Section = { title?: string; body?: string };
 type Legal = {
@@ -14,6 +21,8 @@ type Legal = {
 
 const CATALOGS = { es, en, it: itMessages, pt: ptMessages } as const;
 const PAGES = { privacy: PRIVACY_SECTIONS, deleteAccount: DELETE_ACCOUNT_SECTIONS } as const;
+/** Every privacy section a catalog holds: the keyless list plus the two analytics-build ones. */
+const ALL_PRIVACY = [...new Set([...PRIVACY_SECTIONS, ...privacySections(true)])].sort();
 
 /** Each language's words for "the notification text never leaves your phone". */
 const NOTIFICATION_STAYS: Record<keyof typeof CATALOGS, string> = {
@@ -47,6 +56,30 @@ describe("legal pages", () => {
     expect(DELETE_ACCOUNT_SECTIONS).toEqual(["in_app", "by_email", "what_goes", "backups"]);
   });
 
+  it("privacy without analytics: today's list, unchanged", () => {
+    expect(privacySections(false)).toEqual(PRIVACY_SECTIONS);
+  });
+
+  it("privacy with analytics: the analytics section after storage, its own not_done", () => {
+    const sections = privacySections(true);
+    expect(sections[sections.indexOf("storage") + 1]).toBe("analytics");
+    expect(sections).toContain("not_done_with_analytics");
+    expect(sections).not.toContain("not_done");
+    expect(sections).toHaveLength(PRIVACY_SECTIONS.length + 1);
+  });
+
+  it("privacy (es): the analytics section names PostHog, the contact and the retention", () => {
+    const t = createTranslator({ locale: "es", messages: es });
+    const body = t.markup("legal.privacy.sections.analytics.body", {
+      ...ANALYTICS_RETENTION,
+      email: (chunks) => chunks,
+    });
+    expect(body).toContain("PostHog");
+    expect(body).toContain("privacy@wambito.com");
+    expect(body).toContain(String(ANALYTICS_RETENTION.eventsMonths));
+    expect(body).toContain(String(ANALYTICS_RETENTION.recordingsDays));
+  });
+
   for (const locale of Object.keys(CATALOGS) as (keyof typeof CATALOGS)[]) {
     describe(locale, () => {
       for (const page of Object.keys(PAGES) as (keyof typeof PAGES)[]) {
@@ -54,7 +87,9 @@ describe("legal pages", () => {
           const messages = legal(locale, page);
           expect(messages.title?.trim()).toBeTruthy();
           expect(messages.version?.trim()).toBeTruthy();
-          expect(Object.keys(messages.sections ?? {})).toEqual([...PAGES[page]]);
+          const keys = Object.keys(messages.sections ?? {});
+          if (page === "privacy") expect([...keys].sort()).toEqual(ALL_PRIVACY);
+          else expect(keys).toEqual([...PAGES[page]]);
           for (const key of PAGES[page]) {
             const section = messages.sections?.[key];
             expect(section?.title?.trim(), `${key}.title`).toBeTruthy();
@@ -62,6 +97,21 @@ describe("legal pages", () => {
           }
         });
       }
+
+      it("privacy with analytics: every section has a title and a body", () => {
+        const sections = legal(locale, "privacy").sections ?? {};
+        for (const key of privacySections(true)) {
+          expect(sections[key]?.title?.trim(), `${key}.title`).toBeTruthy();
+          expect(sections[key]?.body?.trim(), `${key}.body`).toBeTruthy();
+        }
+      });
+
+      it("privacy: the analytics section names the footer's withdraw link as the footer does", () => {
+        const body = legal(locale, "privacy").sections?.analytics?.body ?? "";
+        expect(body).toContain(CATALOGS[locale].landing.footer.cookies);
+        expect(body).toContain("<email>privacy@wambito.com</email>");
+        expect(body).toContain("PostHog Inc.");
+      });
 
       it("privacy: names the controller, the law and the contact", () => {
         const sections = legal(locale, "privacy").sections ?? {};
