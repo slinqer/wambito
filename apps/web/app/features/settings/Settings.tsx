@@ -168,6 +168,7 @@ export function Settings({
         <FeedbackSection />
         <DeleteAccount
           email={me.email}
+          {...(demo ? {} : { userId: me.id })}
           signOut={signOut}
           onExport={(format) => void exporter.run(format)}
           exporting={exporter.busy !== null}

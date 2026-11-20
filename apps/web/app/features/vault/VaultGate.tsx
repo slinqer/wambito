@@ -9,6 +9,7 @@ import { useMe } from "../../api/queries.ts";
 import { authClient } from "../../auth/auth-client.ts";
 import {
   addPasskeyWrap,
+  hasPasskeyWrap,
   KeysError,
   type LocalKeys,
   loadLocalKeys,
@@ -18,6 +19,11 @@ import {
 } from "../../local/keys.ts";
 import { startPairing } from "../../local/pairing.ts";
 import { clearSignInPrf, evaluatePrf, takeSignInPrf } from "../../local/prf.ts";
+import {
+  notePasskeyOpened,
+  notePasskeyWithoutPrf,
+  passkeyGaveNoPrf,
+} from "../../local/unlock-hint.ts";
 import {
   forgetVault,
   openVaultSession,
@@ -103,6 +109,11 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
     addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
     evaluatePrf: (ids) => evaluatePrf(ids),
     accountPasskeyIds,
+    // What can open the data on this device: the "no PRF here" hint and the account's wraps.
+    passkeyGaveNoPrf: () => passkeyGaveNoPrf(userId),
+    notePasskeyWithoutPrf: () => notePasskeyWithoutPrf(userId),
+    notePasskeyOpened: () => notePasskeyOpened(userId),
+    hasPasskeyWrap: () => signInAgainOn401(hasPasskeyWrap({ userId })),
     // "From another device": a device that has the data approves this one.
     startPairing: () => signInAgainOn401(startPairing({ userId })),
     open: (keys, fresh) =>
