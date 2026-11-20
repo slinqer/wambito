@@ -527,7 +527,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   dynamic import only after consent (`startAnalytics` / `stopAnalytics`); `use-analytics-consent.ts`
   is the hook; `ConsentBanner` is mounted from the public `Footer` (with the preferences link).
   Keyless build (no `VITE_POSTHOG_KEY`) means off: no banner, no request, the old privacy policy.
-  Go-live: `docs/deploy/landing.md`.
+  Only the landing-only build honours the key (`siteAnalyticsConfig`), so `pnpm dev` and the VPS
+  full build never load PostHog. The hook calls `stopAnalytics` on every refusal and on mount
+  when the choice is not `granted` (safe when nothing started: it only clears `ph_*` storage).
+  While the banner is open it sets `--lk-consent-h` on `<html>` so the footer can scroll clear
+  of it. Go-live: `docs/deploy/landing.md`.
 
 ## Traps
 
