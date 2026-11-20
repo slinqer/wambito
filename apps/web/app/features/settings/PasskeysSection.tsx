@@ -114,15 +114,20 @@ export function PasskeysSection({
     setAdding(true);
     setAddedWithoutWrap(false);
     // With the open vault's keys: whether the new passkey gave a PRF, and whether it wrapped the
-    // data key. Only a passkey that gave none gets the password-manager notice.
+    // data key. Only a passkey that gave none (told by `onNoPrf`) gets the password-manager notice;
+    // a second touch that was cancelled or failed is not the password manager's doing.
     let gavePrf = false;
     let wrapped = false;
+    let noPrf = false;
     try {
       const outcome = await passkeys.add(
         vaultUserId
           ? {
               userId: vaultUserId,
               explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
+              onNoPrf: () => {
+                noPrf = true;
+              },
               ...(security
                 ? {
                     keep: async (passkey: PasskeyPrf) => {
@@ -137,9 +142,10 @@ export function PasskeysSection({
       );
       if (outcome === "added") {
         // An encrypted account's passkey that opens nothing: said at once, as text that stays.
-        if (!security || !vaultUserId || wrapped) toast.show({ message: t("added") });
-        else if (gavePrf) toast.show({ tone: "error", message: t("turn_on_failed") });
-        else setAddedWithoutWrap(true);
+        if (security && vaultUserId && gavePrf && !wrapped) {
+          toast.show({ tone: "error", message: t("turn_on_failed") });
+        } else if (security && vaultUserId && noPrf) setAddedWithoutWrap(true);
+        else toast.show({ message: t("added") });
         await qc.invalidateQueries({ queryKey: PASSKEYS_KEY });
         if (security) await qc.invalidateQueries({ queryKey: SECURITY_KEY });
       } else if (outcome === "failed") {

@@ -2,15 +2,21 @@ import { useMemo } from "react";
 import { redirect } from "react-router";
 import { createTranslator } from "use-intl/core";
 import { accountGate } from "../auth/encryption.ts";
+import { accountPasskeyIds } from "../auth/passkey.ts";
 import { requireSession } from "../auth/session.ts";
 import { Consent } from "../features/assistants/Consent.tsx";
 import { createConsentApi, liveConsentApi } from "../features/assistants/consent-api.ts";
+import { consentKeysOf } from "../features/assistants/consent-keys.ts";
 import type { ConsentKeys } from "../features/assistants/consent-model.ts";
 import type { UnlockMeans } from "../features/vault/vault-gate.ts";
 import { CATALOGS } from "../i18n/catalog.ts";
 import { hasPasskeyWrap, loadLocalKeys, withDataKeyFrom } from "../local/keys.ts";
 import { evaluatePrf } from "../local/prf.ts";
-import { passkeyGaveNoPrf } from "../local/unlock-hint.ts";
+import {
+  notePasskeyOpened,
+  notePasskeyWithoutPrf,
+  passkeyGaveNoPrf,
+} from "../local/unlock-hint.ts";
 import type { Route } from "./+types/oauth.consent";
 
 /** The query carries the assistant's state and a signature: this page never sends a referrer. */
@@ -82,16 +88,21 @@ export default function ConsentRoute({ loaderData }: Route.ComponentProps) {
     () => (userId ? createConsentApi(undefined, { userId }) : liveConsentApi),
     [userId],
   );
+  // A passkey touch here offers only the account's passkeys and keeps the "no PRF here" hint
+  // (noted without PRF, cleared when its PRF opens the data), as the vault gate does.
   const keys = useMemo<ConsentKeys | undefined>(
     () =>
       userId
-        ? {
-            userId,
-            device,
-            open: (source, fn) => withDataKeyFrom({ userId }, source, fn),
-            touchPasskey: () => evaluatePrf(),
-            ...(means ? { means } : {}),
-          }
+        ? consentKeysOf(
+            { userId, device, means },
+            {
+              withDataKeyFrom,
+              evaluatePrf,
+              accountPasskeyIds,
+              notePasskeyWithoutPrf,
+              notePasskeyOpened,
+            },
+          )
         : undefined,
     [userId, device, means],
   );

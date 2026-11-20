@@ -964,6 +964,7 @@ describe("vault gate", () => {
       const notePasskeyWithoutPrf = vi.fn();
       const { gate } = gateWith({
         ...elsewhere,
+        accountPasskeyIds: async () => ["cred-1"],
         evaluatePrf: vi.fn(async () => {
           throw fail("no_prf");
         }),
@@ -1018,24 +1019,126 @@ describe("vault gate", () => {
       expect(notePasskeyOpened).not.toHaveBeenCalled();
     });
 
-    it("the sign-in's PRF of another account is zeroed and no hint is written for this one", async () => {
-      const kept = stash();
+    it("a touch without PRF notes nothing when the account's passkeys are not known (it may be another account's passkey)", async () => {
       const notePasskeyWithoutPrf = vi.fn();
-      const notePasskeyOpened = vi.fn();
       const { gate } = gateWith({
         ...elsewhere,
-        userId: "me",
-        sessionUserId: async () => "someone-else",
-        reload: vi.fn(),
-        takeSignInPrf: () => kept,
+        accountPasskeyIds: async () => {
+          throw fail("passkeys_unavailable");
+        },
+        evaluatePrf: vi.fn(async () => {
+          throw fail("no_prf");
+        }),
         notePasskeyWithoutPrf,
-        notePasskeyOpened,
       });
       gate.start();
       await settle();
-      expect(kept.prf.every((b) => b === 0)).toBe(true);
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
       expect(notePasskeyWithoutPrf).not.toHaveBeenCalled();
-      expect(notePasskeyOpened).not.toHaveBeenCalled();
+    });
+
+    it("back from pairing after a touch without PRF leads with the recovery key", async () => {
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => ["cred-1"],
+        evaluatePrf: vi.fn(async () => {
+          throw fail("no_prf");
+        }),
+        notePasskeyWithoutPrf: vi.fn(),
+        startPairing: vi.fn(),
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
+      // The screen under the person's hands keeps its layout...
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
+      await gate.pair();
+      gate.leavePairing();
+      // ...but coming back to it, Unlock knows this device's passkey gives no PRF.
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        means: { noPrfHere: true, passkeyWrap: true },
+      });
+    });
+
+    it("back to Unlock from an open vault, Unlock shows at once with the last known means, then what is read now", async () => {
+      let resolveWraps!: (value: boolean) => void;
+      let reads = 0;
+      let hint = true;
+      const { gate } = gateWith({
+        ...elsewhere,
+        passkeyGaveNoPrf: () => hint,
+        notePasskeyOpened: () => {
+          hint = false;
+        },
+        hasPasskeyWrap: () => {
+          reads += 1;
+          return reads === 1
+            ? Promise.resolve(false)
+            : new Promise<boolean>((resolve) => (resolveWraps = resolve));
+        },
+        evaluatePrf: async () => stash(),
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "passkey" } });
+
+      const removing = gate.removed();
+      // Never "ready" while the wraps are read: Unlock at once, with what was known (the passkey
+      // that opened the data cleared the hint).
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        notice: "removed",
+        means: { noPrfHere: false, passkeyWrap: false },
+      });
+      resolveWraps(true);
+      await removing;
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        notice: "removed",
+        means: { noPrfHere: false, passkeyWrap: true },
+      });
+    });
+
+    it("a 401 on the wraps read after a removal still shows Unlock with the removed notice", async () => {
+      const { gate } = gateWith({
+        loadLocalKeys: async () => ({ k: "kept" }),
+        hasPasskeyWrap: async () => {
+          throw Object.assign(new Error("unauthorized"), { code: "unauthorized", status: 401 });
+        },
+      });
+      gate.start();
+      await settle();
+      await gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed", means: MEANS });
+    });
+
+    it("a late wraps read never overwrites a newer state", async () => {
+      let resolveWraps!: (value: boolean) => void;
+      let reads = 0;
+      const { gate } = gateWith({
+        ...elsewhere,
+        hasPasskeyWrap: () => {
+          reads += 1;
+          return reads === 1
+            ? Promise.resolve(true)
+            : new Promise<boolean>((resolve) => (resolveWraps = resolve));
+        },
+        evaluatePrf: async () => stash(),
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+        startPairing: vi.fn(),
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      const unverifying = gate.unverified();
+      await gate.pair();
+      expect(gate.getState()).toEqual({ status: "pairing" });
+      resolveWraps(false);
+      await unverifying;
+      expect(gate.getState()).toEqual({ status: "pairing" });
     });
   });
 });

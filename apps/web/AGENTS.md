@@ -147,15 +147,19 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   autofill, `features/sign-in/auth.ts`) and `auth/passkey.ts` `addPasskey(prf?)` ask for the
   extension with `returnWebAuthnResponse: true`; a registration that says `prf.enabled` without
   results gets one second touch (`evaluatePrf([newId])`, explained first by a toast
-  `vault.passkey_second_touch`) only for an encrypted account. The passkey offer
+  `vault.passkey_second_touch`) only for an encrypted account. `PasskeyPrfUse.onNoPrf` is told
+  when the new passkey itself gave no PRF (the registration without `prf.enabled`, or the second
+  touch's `no_prf`), never for a cancelled or failed second touch nor a PRF whose `keep` failed
+  (the phone's twin: `passkeys_settings.dart` `onNoPrf`). The passkey offer
   (`offerPrfUse`) stashes the new passkey's PRF for that user's gate, and knows the account is
   encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
   plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
-  at once. A new passkey that gives no PRF on an encrypted account (after the second touch) is
+  at once. A new passkey that gives no PRF on an encrypted account (told by `onNoPrf`: Settings'
+  `VaultPasskeyHooks.onNoPrf`, the offer's `PasskeyOfferApi.add` hook `onNoPrf`) is
   kept, and the screen says so at once in text that stays (`role="status"`, never a toast;
-  `settings.passkeys.add_no_prf`): Settings until the next add or leaving, the offer
-  (`PasskeyOfferApi.add` hook `onKept`: its PRF went to the stash) with a "Continue"
-  (`passkey_offer.continue`) instead of moving on by itself. In Settings, a PRF whose wrap could
+  `settings.passkeys.add_no_prf`): Settings until the next add or leaving, the offer with a
+  "Continue" (`passkey_offer.continue`) instead of moving on by itself. A second touch that was
+  cancelled or failed gets the usual "added" toast (its row says it does not open the data). In Settings, a PRF whose wrap could
   not be saved is kept too, with the generic `turn_on_failed` toast (never the password-manager
   line); its row's "Turn on" tries again. e2e: `addVirtualAuthenticator(page, { prf })` (default
   no PRF, as Chromium's) picks which path the offer takes.
@@ -310,20 +314,26 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   the migration codes).
   Preview switch: `auth/encryption.ts` `previewProfile()` reads `GET /v1/me` `encryption` in the
   `/app` and `/welcome` loaders; for `preview` they render `features/vault/VaultGate.tsx`
-  (state machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
+  (its live deps in `gateFor`, wiring-tested in `VaultGate.test.ts` with mocked modules; state
+  machine `vault-gate.ts`, unit-tested with fakes: checking → setup | unlock | open →
   ready; a setup committed in this browser goes through `install` first (`InstallApp`: Wambi, the
   Android APK and release links, a store button only for a non-null `PLAY_HREF`/`FDROID_HREF`/`APP_STORE_HREF`
   in `landing/links.ts` `STORE_LINKS`; `gate.installDone()` opens the vault; never after an unlock, a
   pairing or a known browser; story `Vault/Install app`, copy `vault.install.*`), else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
   from Unlock's passkey button, `gate.unlockWithPasskey()`, which offers only the account's
-  passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
+  passkeys from Better Auth's list (`auth/passkey.ts` `accountPasskeyIds`), none: `no_passkey_wrap`
+  without a touch) gets its wrap once the vault is
   unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
   device" enters `pairing` (`gate.pair()`;
   `gate.startPairing()` makes the request, again for "Start again", cancelling the previous one;
   the latest call wins: an older one answering later cancels its own request;
   its `finish()` opens the vault like a recovery unlock: pending passkey wrap, full sync; a failed
-  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock);
+  pairing stays on its screen; `gate.leavePairing()` cancels and goes back to Unlock, with the
+  gate's last known means: a `no_prf` touch there sets `noPrfHere`, a passkey that opens the data
+  clears it); `gate.removed()` / `gate.unverified()` show Unlock at once with the last known means
+  and refine them once read (a read that comes back after another change of state changes
+  nothing);
   before making or unlocking keys, when the
   open vault closes, and on `session_changed` (`gate.sessionChanged()`), it reads who is signed in
   (live `GET /v1/me`) and, when it is another account or none, reloads the app at `/app`, so
@@ -347,8 +357,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   over `means` (`UnlockMeans`, default `{ noPrfHere: false, passkeyWrap: true }`; the gate's
   unlock state carries it, read by `readMeans()`: `local/unlock-hint.ts` `passkeyGaveNoPrf(userId)`,
   a `wambito.unlock.no-prf.<userId>` boolean set by a passkey touch here without PRF (sign-in
-  `keepPrfOf`, unlock) and cleared when a passkey's PRF opens the data, kept by sign-out, removed
-  with the account; and `keys.ts` `hasPasskeyWrap`, true when the wraps cannot be read): the
+  `keepPrfOf`, unlock and the consent page, only when the touch was limited to the account's
+  passkeys) and cleared when a passkey's PRF opens the data, kept by sign-out, removed
+  with the account; and `keys.ts` `hasPasskeyWrap`, true when the wraps cannot be read, a 401
+  included: never wrapped in `signInAgainOn401`, since a removal ends the session and its notice
+  must show): the
   recovery key first with the line `vault.unlock.no_prf_line` (no PRF here; "Use another passkey"
   under "More options" when a passkey could work), "Open with my passkey" first (a passkey wrap and
   passkeys here), or "From another device" first; the pairing below a first passkey or key; the
@@ -358,7 +371,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   prompt without a tap. The field is `RecoveryKeyField` (`recovery-key-input.ts`
   `groupRecoveryKey`, `isFullRecoveryKey`: groups of four while typing, any pasted shape, a
   "Paste" button where the clipboard can be read); the submit waits for a full key. The consent
-  route reads the same `means` in its loader (`ConsentKeys.means`, only without a vault here).
+  route reads the same `means` in its loader (`ConsentKeys.means`, only without a vault here);
+  its keys come from `features/assistants/consent-keys.ts` `consentKeysOf` (the touch offers only
+  the account's passkeys and notes or clears the hint as the gate does; unit-tested with fakes).
   Stories `Vault/Unlock` (`KeyFirst`, `PasskeyFirst`, `PairFirst`, `PasskeyFails`,
   `ConsentNoPairing`, …)), `Locked` (retry or sign-out only); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
@@ -502,7 +517,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `Phone` (web-only; the parity stories there now show the recovery button and the QR below the
   email form on a phone).
 - `/oauth/consent` (`routes/oauth.consent.tsx`, `features/assistants/Consent.tsx`,
-  `consent-api.ts`, `consent-model.ts`): an assistant asks to connect. A plain account posts the
+  `consent-api.ts`, `consent-model.ts`, `consent-keys.ts`): an assistant asks to connect. A plain account posts the
   consent. An encrypted one (`accountGate().vault` in the loader; `device` when `loadLocalKeys` finds
   its vault here) shows `consent.encrypted_note`, and "Allow" takes DK through `withDataKeyFrom`:
   this browser's device wrap with no touch, else the unlock step (`ConsentUnlock`: a passkey's PRF

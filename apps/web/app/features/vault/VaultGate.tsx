@@ -7,6 +7,7 @@ import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
 import { authClient } from "../../auth/auth-client.ts";
+import { accountPasskeyIds } from "../../auth/passkey.ts";
 import {
   addPasskeyWrap,
   hasPasskeyWrap,
@@ -74,13 +75,6 @@ async function sessionUserId(): Promise<string | null> {
   }
 }
 
-/** The signed-in account's passkey credential ids (Better Auth's list); throws when unreadable. */
-async function accountPasskeyIds(): Promise<string[]> {
-  const { data, error } = await authClient.passkey.listUserPasskeys();
-  if (error || !Array.isArray(data)) throw new Error("passkeys_unavailable");
-  return data.map((passkey) => passkey.credentialID);
-}
-
 /**
  * The id of the session signed in now (Better Auth's `get-session`): a kept vault links its device
  * wrap to it, so a removal ends this session. Null when it cannot tell.
@@ -95,7 +89,8 @@ function reloadApp() {
   window.location.assign("/app");
 }
 
-function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
+/** The live gate of `profile`'s account (exported for its wiring tests). */
+export function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
   const userId = profile.id;
   // Set below: the open session's sync tells the gate when the cookie changed hands.
   let gate: Gate<VaultSession, LocalKeys> | undefined;
@@ -113,7 +108,9 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
     passkeyGaveNoPrf: () => passkeyGaveNoPrf(userId),
     notePasskeyWithoutPrf: () => notePasskeyWithoutPrf(userId),
     notePasskeyOpened: () => notePasskeyOpened(userId),
-    hasPasskeyWrap: () => signInAgainOn401(hasPasskeyWrap({ userId })),
+    // Never a reason to sign in again: a removal ends the session, and its notice must show.
+    // Any failure (a 401 included) counts as a wrap.
+    hasPasskeyWrap: () => hasPasskeyWrap({ userId }),
     // "From another device": a device that has the data approves this one.
     startPairing: () => signInAgainOn401(startPairing({ userId })),
     open: (keys, fresh) =>

@@ -117,12 +117,6 @@ export const CreatePasskey: Story = {
 export const CreatePasskeyThatUnlocks: Story = {
   args: {
     offerEncrypted: true,
-    offer: fakeOffer({
-      add: fn(async (hooks?: Parameters<PasskeyOfferApi["add"]>[0]) => {
-        hooks?.onKept?.();
-        return "added" as const;
-      }),
-    }),
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
@@ -145,7 +139,15 @@ export const CreatePasskeyThatUnlocks: Story = {
  * not open the data; "Seguir" goes on.
  */
 export const CreatePasskeyWithoutPrf: Story = {
-  args: { offerEncrypted: true },
+  args: {
+    offerEncrypted: true,
+    offer: fakeOffer({
+      add: fn(async (hooks?: Parameters<PasskeyOfferApi["add"]>[0]) => {
+        hooks?.onNoPrf?.();
+        return "added" as const;
+      }),
+    }),
+  },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Crear mi huella" }));
@@ -161,6 +163,28 @@ export const CreatePasskeyWithoutPrf: Story = {
     await expectTarget(go);
     await userEvent.click(go);
     await waitFor(() => expect(currentPage(canvas)).toHaveTextContent("/welcome"));
+  },
+};
+
+/**
+ * An encrypted account whose new passkey's second touch was cancelled (or failed): nothing was
+ * kept, but the password manager is not the cause, so no notice: it goes on as usual.
+ */
+export const CreatePasskeySecondTouchCancelled: Story = {
+  args: { offerEncrypted: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Crear mi huella" }));
+    await waitFor(() => expect(currentPage(canvas)).toHaveTextContent("/welcome"));
+    await expect(args.offer?.decide).toHaveBeenCalledWith(NEW_USER.id);
+    await expect(canvas.queryByText(/no le permite abrir tus datos/)).toBeNull();
+    const toast = await within(canvasElement.ownerDocument.body).findByText(
+      "Listo: la próxima vez entras con tu huella.",
+    );
+    // The toast fades in (Motion): checked once it is fully opaque.
+    await waitFor(() =>
+      expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
+    );
   },
 };
 

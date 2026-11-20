@@ -824,7 +824,9 @@ function homeFetch({
 /**
  * Passkeys kept in memory, standing in for Better Auth and the browser's prompt: `outcome` is what
  * adding one comes to (a new passkey when "added"); with `prf`, a new passkey's provider hands its
- * PRF to the open vault's `keep` (without it, as Proton Pass, nothing is kept).
+ * PRF to the open vault's `keep` (without it, as Proton Pass, nothing is kept and `onNoPrf` is
+ * told); `secondTouchCancelled`: without `prf`, the second touch was cancelled (or failed), so
+ * nothing is kept and nothing is told.
  */
 export function storyPasskeys({
   initial = [],
@@ -832,12 +834,14 @@ export function storyPasskeys({
   outcome = "added",
   failList = false,
   prf = false,
+  secondTouchCancelled = false,
 }: {
   initial?: PasskeyItem[];
   supported?: boolean;
   outcome?: PasskeyOutcome;
   failList?: boolean;
   prf?: boolean;
+  secondTouchCancelled?: boolean;
 } = {}): PasskeysApi {
   let items = [...initial];
   return {
@@ -865,6 +869,8 @@ export function storyPasskeys({
           } catch {
             // as `addPasskey`: the passkey was added and signs in, it only does not open the data
           }
+        } else if (!prf && !secondTouchCancelled) {
+          vault?.onNoPrf?.();
         }
       }
       return outcome;

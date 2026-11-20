@@ -504,7 +504,11 @@ export const AddPasskeyThatUnlocks: Story = {
     );
     await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
     await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
-    await expect(await page.findByText("Listo: ya puedes entrar con tu huella.")).toBeVisible();
+    const toast = await page.findByText("Listo: ya puedes entrar con tu huella.");
+    // The toast fades in (Motion): checked once it is fully opaque.
+    await waitFor(() =>
+      expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
+    );
     await expect(passkeys.queryByText(/no le permite abrir tus datos/)).toBeNull();
     await waitFor(() => expect(passkeys.getAllByText("Abre tus datos")).toHaveLength(2));
   },
@@ -533,6 +537,34 @@ export const AddPasskeyWithoutPrf: Story = {
     // Kept: three rows, two of which do not open the data.
     await waitFor(() => expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(2));
     await expect(notice).toBeVisible();
+  },
+};
+
+/**
+ * A new passkey whose second touch was cancelled (or failed): it signs in, its row says it does not
+ * open the data and offers "Turn on"; the password manager is not blamed, so no notice, only the
+ * usual toast.
+ */
+export const AddPasskeySecondTouchCancelled: Story = {
+  render: (args) =>
+    stage(args, {
+      passkeys: storyPasskeys({ initial: PASSKEYS, secondTouchCancelled: true }),
+    }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const page = within(canvasElement.ownerDocument.body);
+    const passkeys = within(
+      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+    );
+    await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
+    const toast = await page.findByText("Listo: ya puedes entrar con tu huella.");
+    // The toast fades in (Motion): checked once it is fully opaque.
+    await waitFor(() =>
+      expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
+    );
+    await expect(page.queryByText(/no le permite abrir tus datos/)).toBeNull();
+    await expect(security.addPasskeyWrap).not.toHaveBeenCalled();
+    await waitFor(() => expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(2));
   },
 };
 

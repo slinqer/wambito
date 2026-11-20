@@ -27,8 +27,11 @@ export interface PasskeyOfferApi {
     userId: string;
     encrypted: boolean;
     explainSecondTouch(): void;
-    /** The new passkey's PRF was kept for the vault gate: it will open the data too. */
-    onKept?(): void;
+    /**
+     * The new passkey gave no PRF (`PasskeyPrfUse.onNoPrf`): its password manager does not let it
+     * open the data. Not told for a cancelled or failed second touch.
+     */
+    onNoPrf?(): void;
   }): Promise<PasskeyOutcome>;
   /** Remembers that this user answered, so the offer is not shown to them again on this device. */
   decide(userId: string): void;
@@ -38,17 +41,7 @@ export const livePasskeyOffer: PasskeyOfferApi = {
   supported: passkeysSupported,
   // The offer comes right after sign-in, before the vault opens: the new passkey's PRF waits for
   // the vault gate, which adds its wrap once the data is open (a plain account drops it).
-  add: (hooks) => {
-    if (!hooks) return addPasskey();
-    const use = offerPrfUse(hooks);
-    return addPasskey({
-      ...use,
-      keep: async (passkey) => {
-        await use.keep(passkey);
-        hooks.onKept?.();
-      },
-    });
-  },
+  add: (hooks) => (hooks ? addPasskey(offerPrfUse(hooks)) : addPasskey()),
   decide: (userId) => rememberOfferDecided(userId),
 };
 
@@ -101,14 +94,14 @@ export function PasskeyOffer({
     inFlight.current = true;
     setBusy(true);
     setFailed(false);
-    let kept = false;
+    let noPrf = false;
     try {
       const outcome = await offer.add({
         userId,
         encrypted,
         explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
-        onKept: () => {
-          kept = true;
+        onNoPrf: () => {
+          noPrf = true;
         },
       });
       if (outcome === "failed") {
@@ -117,7 +110,7 @@ export function PasskeyOffer({
       }
       if (outcome === "cancelled") return;
       offer.decide(userId);
-      if (encrypted && !kept) {
+      if (encrypted && noPrf) {
         setWithoutPrf(true);
         return;
       }

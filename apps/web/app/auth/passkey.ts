@@ -1,4 +1,5 @@
 import { localArea, readStored, type StoredArea, writeStored } from "../lib/stored.ts";
+import { KeysError } from "../local/keys.ts";
 import {
   evaluatePrf,
   keepSignInPrf,
@@ -136,6 +137,16 @@ export const liveOfferDeps: OfferDeps = {
 };
 
 /**
+ * The signed-in account's passkey credential ids (Better Auth's list): a passkey touch for the
+ * data (Unlock, the consent page) offers only these. Throws when the list cannot be read.
+ */
+export async function accountPasskeyIds(): Promise<string[]> {
+  const { data, error } = await authClient.passkey.listUserPasskeys();
+  if (error || !Array.isArray(data)) throw new Error("passkeys_unavailable");
+  return data.map((passkey) => passkey.credentialID);
+}
+
+/**
  * The browser's and Better Auth's error codes when registering. Closing the prompt (or letting it
  * time out: browsers report both as `NotAllowedError`, passed through by SimpleWebAuthn) is not a
  * failure worth a message, as on sign-in. A passkey this device already has counts as added.
@@ -168,6 +179,14 @@ export interface PasskeyPrfUse {
   explainSecondTouch(): void;
   /** Takes the new passkey's PRF; it owns (and zeroes) the bytes from then on. */
   keep(passkey: PasskeyPrf): Promise<void> | void;
+  /**
+   * Told when the new passkey itself gave no PRF (its password manager does not allow one): from
+   * the registration, or from the second touch when the registration said `enabled` without
+   * results. Not told for a cancelled or failed second touch, nor when a PRF came and `keep`
+   * failed: the password manager is not the cause then. The phone's twin is `onNoPrf` in
+   * `apps/mobile/lib/settings/passkeys_settings.dart`.
+   */
+  onNoPrf?(): void;
 }
 
 /**
@@ -180,11 +199,13 @@ export function offerPrfUse(options: {
   userId: string;
   encrypted: boolean;
   explainSecondTouch(): void;
+  onNoPrf?(): void;
 }): PasskeyPrfUse {
   return {
     wantsPrf: async () => options.encrypted,
     explainSecondTouch: options.explainSecondTouch,
     keep: (passkey) => keepSignInPrf({ userId: options.userId, ...passkey }),
+    ...(options.onNoPrf ? { onNoPrf: options.onNoPrf } : {}),
   };
 }
 
@@ -194,7 +215,8 @@ type AddExtensions = NonNullable<Parameters<typeof authClient.passkey.addPasskey
 /**
  * The new passkey's PRF: from the registration itself, else (when it said `prf.enabled` without an
  * output and the account wants one) from a second touch of that passkey only. A second touch that
- * is cancelled or gives nothing leaves the passkey without a wrap: it still signs in.
+ * is cancelled or fails leaves the passkey without a wrap: it still signs in. A passkey that gives
+ * no PRF (the registration, or the second touch's `no_prf`) is told to `use.onNoPrf`.
  */
 async function prfOfNewPasskey(
   webauthn: { response?: { id?: string }; clientExtensionResults?: unknown } | undefined,
@@ -205,12 +227,16 @@ async function prfOfNewPasskey(
   if (prf && !credentialId) prf.fill(0);
   if (!credentialId) return null;
   if (prf) return { credentialId, prf };
-  if (!prfEnabledWithoutResults(webauthn?.clientExtensionResults)) return null;
+  if (!prfEnabledWithoutResults(webauthn?.clientExtensionResults)) {
+    use.onNoPrf?.();
+    return null;
+  }
   if (!(await use.wantsPrf().catch(() => false))) return null;
   use.explainSecondTouch();
   try {
     return await evaluatePrf([credentialId]);
-  } catch {
+  } catch (error) {
+    if (error instanceof KeysError && error.code === "no_prf") use.onNoPrf?.();
     return null;
   }
 }
