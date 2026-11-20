@@ -24,6 +24,7 @@ class WebTextField extends StatefulWidget {
     this.readOnly = false,
     this.autofocus = false,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
     this.textInputAction,
     this.autofillHints,
     this.inputFormatters,
@@ -48,6 +49,9 @@ class WebTextField extends StatefulWidget {
   final bool readOnly;
   final bool autofocus;
   final TextInputType? keyboardType;
+
+  /// What the keyboard capitalises (the recovery key asks for capitals).
+  final TextCapitalization textCapitalization;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
   final List<TextInputFormatter>? inputFormatters;
@@ -172,6 +176,7 @@ class _WebTextFieldState extends State<WebTextField> {
                       readOnly: widget.readOnly,
                       autofocus: widget.autofocus,
                       keyboardType: widget.keyboardType,
+                      textCapitalization: widget.textCapitalization,
                       textInputAction: widget.textInputAction,
                       autofillHints: widget.autofillHints,
                       autocorrect: false,

@@ -173,4 +173,25 @@ void main() {
     expect(find.textContaining('No pudimos guardar tu huella'), findsOneWidget);
     expect(enabled(tester, add), isTrue);
   });
+
+  testWidgets('a passkey that gives no PRF: the add notice stays, and Seguir answers', (
+    tester,
+  ) async {
+    final answers = await pumpOffer(tester, () async => PasskeyOfferOutcome.addedWithoutPrf);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    const notice =
+        'Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus '
+        'datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.';
+    expect(find.text(notice), findsOneWidget);
+    // Not answered yet: the notice waits for the person, it does not pass.
+    expect(answers, isEmpty);
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    expect(find.text(notice), findsOneWidget);
+    expect(find.text('SEGUIR'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('offer.continue')));
+    await tester.pumpAndSettle();
+    expect(answers, [true]);
+  });
 }

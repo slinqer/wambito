@@ -210,10 +210,13 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   with the no-PRF line, "Open with my passkey" first, or "Add this phone from another device" first; the rest under
   "More options" (`vault.more`), closed at first, opened by a tap (the key field takes the focus) or by itself when the
   leading passkey fails with `no_prf` / `no_passkey_wrap` (the error is a live region), or at once for the sign-in
-  key's error; no passkey prompt without a tap; sign out last; the recovery key is
+  key's error; no passkey prompt without a tap; sign out last; while `unlockPasskeyOfferedProvider` has not answered,
+  `passkeysLoading` keeps the passkey's place with its button waiting, and pairing waits too while the passkey could
+  still lead, so no tappable button changes place; the recovery key is
   `recovery_key_input.dart`'s `RecoveryKeyField`, the web's `recovery-key-input.ts`: one field, `RecoveryKeyFormatter`
   over `groupRecoveryKeyEdit` (upper case, a dash after every fourth character, at most 27, O/I/L kept, other
-  characters dropped, a paste regrouped, the caret kept), "Paste" reads the clipboard, submit enables on
+  characters dropped, a paste regrouped, the caret kept, never a composing range back; the keyboard is
+  `visiblePassword` in capitals, no suggestions or autocorrect), "Paste" reads the clipboard, submit enables on
   `isFullRecoveryKey` and `parseRecoveryKey` stays the judge), `locked_view.dart` (why, a retry when one helps, and
   sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
   groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
@@ -390,8 +393,9 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `wambito.protect.<userId>.keyAfterClaim`, written just before `confirmClaim`, cleared once the key is saved): a key
   that could not be made (lock refused, offline) stops there, no offer; a kill on its page, or that, brings the page
   back when the vault opens with home there (`resumeKeyAfterClaim`, from `HomeScreen`). For a `preview` account with
-  its vault open the offer page makes the passkey with `protectWithPasskey` (PRF wrap; no PRF toasts
-  `protectPasskeyNoPrf`); otherwise `registerPasskey`. The email screen runs it under `claimFinishingProvider`, which keeps
+  its vault open the offer page makes the passkey with `protectWithPasskey` (PRF wrap; a passkey that gave no PRF
+  is `PasskeyOfferOutcome.addedWithoutPrf`: the offer shows `settingsPasskeysAddNoPrf` as text that stays and "Seguir",
+  `offer.continue`; a PRF whose wrap failed still toasts `protectPasskeyNoPrf` on the way home); otherwise `registerPasskey`. The email screen runs it under `claimFinishingProvider`, which keeps
   `/entry/email` open past the router's "no email screen once there is an email" (`sessionRedirect(finishingClaim:)`).
   A `preview` guest's email_taken asks `askMerge`; yes is `MergeController.begin` then `sendCode(replaceGuest: true)`,
   the code is `verifyCode(keepCapturesOf: guestUserId)`, and backing out of it ("Usar otro correo", back) is

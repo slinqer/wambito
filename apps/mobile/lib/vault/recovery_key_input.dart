@@ -73,9 +73,12 @@ class RecoveryKeyFormatter extends TextInputFormatter {
     final selection = newValue.selection;
     final caret = selection.isValid ? selection.extentOffset : newValue.text.length;
     final edit = groupRecoveryKeyEdit(oldValue.text, newValue.text, caret);
+    // No composing range back: the keyboard must not keep composing over text this rewrote (a
+    // known source of doubled or garbled characters on some keyboards, Samsung's among them).
     return TextEditingValue(
       text: edit.text,
       selection: TextSelection.collapsed(offset: edit.caret),
+      composing: TextRange.empty,
     );
   }
 }
@@ -83,7 +86,7 @@ class RecoveryKeyFormatter extends TextInputFormatter {
 /// The recovery key's one field (the web's `RecoveryKeyField.tsx`): it shows the key in groups of
 /// four while it is typed, regroups a paste in any shape and keeps the caret after the same
 /// characters; "Paste" in the field reads the clipboard (an empty or refused read does nothing).
-class RecoveryKeyField extends StatelessWidget {
+class RecoveryKeyField extends StatefulWidget {
   const RecoveryKeyField({
     super.key,
     required this.controller,
@@ -113,6 +116,11 @@ class RecoveryKeyField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
+  @override
+  State<RecoveryKeyField> createState() => _RecoveryKeyFieldState();
+}
+
+class _RecoveryKeyFieldState extends State<RecoveryKeyField> {
   Future<void> _paste() async {
     final String? text;
     try {
@@ -120,39 +128,44 @@ class RecoveryKeyField extends StatelessWidget {
     } on Object {
       return;
     }
-    if (text == null || text.isEmpty) return;
+    // The screen may have gone (or the field turned read-only) while the clipboard answered.
+    if (!mounted || widget.readOnly || text == null || text.isEmpty) return;
     final grouped = groupRecoveryKey(text);
-    controller.value = TextEditingValue(
+    widget.controller.value = TextEditingValue(
       text: grouped,
       selection: TextSelection.collapsed(offset: grouped.length),
     );
-    onChanged?.call(grouped);
-    focusNode.requestFocus();
+    widget.onChanged?.call(grouped);
+    widget.focusNode.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return WebTextField(
-      fieldKey: fieldKey,
-      controller: controller,
-      focusNode: focusNode,
+      fieldKey: widget.fieldKey,
+      controller: widget.controller,
+      focusNode: widget.focusNode,
       label: l10n.vaultUnlockLabel,
       placeholder: l10n.vaultUnlockPlaceholder,
-      invalid: invalid,
-      readOnly: readOnly,
-      autofocus: autofocus,
+      invalid: widget.invalid,
+      readOnly: widget.readOnly,
+      autofocus: widget.autofocus,
+      // A keyboard that composes nothing (no predictions, no autocorrect) in capitals: the
+      // formatter rewrites every change, which a composing keyboard garbles.
+      keyboardType: TextInputType.visiblePassword,
+      textCapitalization: TextCapitalization.characters,
       enableIMEPersonalizedLearning: false,
       inputFormatters: const [RecoveryKeyFormatter()],
       textInputAction: TextInputAction.done,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
       trailing: PressButton.text(
         l10n.vaultUnlockPaste,
-        key: pasteKey,
+        key: widget.pasteKey,
         tone: PressTone.ghost,
         size: PressSize.sm,
-        onPressed: readOnly ? null : () => unawaited(_paste()),
+        onPressed: widget.readOnly ? null : () => unawaited(_paste()),
       ),
     );
   }

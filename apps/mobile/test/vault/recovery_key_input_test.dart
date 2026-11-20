@@ -85,5 +85,18 @@ void main() {
       expect(out.text, full);
       expect(out.selection, const TextSelection.collapsed(offset: full.length));
     });
+
+    test('never hands a composing range back to the keyboard', () {
+      final out = formatter.formatEditUpdate(
+        _value('ABCD', 4),
+        const TextEditingValue(
+          text: 'ABCDe',
+          selection: TextSelection.collapsed(offset: 5),
+          composing: TextRange(start: 4, end: 5),
+        ),
+      );
+      expect(out.text, 'ABCD-E');
+      expect(out.composing, TextRange.empty);
+    });
   });
 }

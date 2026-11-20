@@ -461,6 +461,7 @@
   "passkeyOfferFailed": "Non siamo riusciti a salvare la tua impronta. Riprova o continua senza.",
   "resendIn": "Reinvia tra {seconds} s",
   "passkeyOfferAdded": "Fatto: la prossima volta entri con l'impronta.",
+  "passkeyOfferContinue": "Continua",
   "homeMenuRecurring": "Ricorrenti",
   "homeMenuCategories": "Categorie",
   "homeNudgeImportTitle": "Porta il tuo storico",

@@ -461,6 +461,7 @@
   "passkeyOfferFailed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez ou continua sem ela.",
   "resendIn": "Reenviar em {seconds} s",
   "passkeyOfferAdded": "Pronto: da próxima vez entras com a impressão digital.",
+  "passkeyOfferContinue": "Continuar",
   "homeMenuRecurring": "Recorrentes",
   "homeMenuCategories": "Categorias",
   "homeNudgeImportTitle": "Traz o teu histórico",

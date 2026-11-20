@@ -2067,6 +2067,10 @@
   "@passkeyOfferAdded": {
     "description": "Passkey offer: the confirmation, shown after the passkey was made."
   },
+  "passkeyOfferContinue": "Seguir",
+  "@passkeyOfferContinue": {
+    "description": "Passkey offer: goes on after the notice that the new passkey does not open the data."
+  },
   "homeMenuRecurring": "Recurrentes",
   "@homeMenuRecurring": {
     "description": "Home menu: the link to the recurring payments."

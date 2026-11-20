@@ -1402,6 +1402,7 @@
   "passkeyOfferFailed": "We couldn't save your fingerprint. Try again or carry on without it.",
   "resendIn": "Resend in {seconds} s",
   "passkeyOfferAdded": "Done: next time you'll sign in with your fingerprint.",
+  "passkeyOfferContinue": "Continue",
   "homeMenuRecurring": "Recurring",
   "homeMenuCategories": "Categories",
   "homeNudgeImportTitle": "Bring your history",

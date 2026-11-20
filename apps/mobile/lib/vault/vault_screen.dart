@@ -64,6 +64,9 @@ class VaultScreen extends ConsumerWidget {
     final state = ref.watch(vaultGateStateProvider);
     void signOut() => unawaited(_signOut(context, ref));
     final merging = ref.watch(mergeControllerProvider) is MergeWaitingUnlock;
+    final offered = ref.watch(unlockPasskeyOfferedProvider);
+    // Not answered yet (an error counts as answered: no passkey button, as before).
+    final offeredLoading = !offered.hasValue && !offered.hasError;
     if (gate == null || state == null) {
       // No gate: the mode of the account is not known yet, or could not be learned (an offline
       // first start with nothing kept). A `plain` account never stays here (the router).
@@ -100,9 +103,10 @@ class VaultScreen extends ConsumerWidget {
         noPrfHere: noPrfHere,
         passkeyWrap: passkeyWrap,
         onUnlock: gate.unlock,
-        onPasskey: (ref.watch(unlockPasskeyOfferedProvider).value ?? false)
-            ? gate.unlockWithPasskey
-            : null,
+        // While it is not known yet whether passkeys work here, the passkey's place is kept (its
+        // button waits): the layout never swaps under a thumb once something is tappable.
+        onPasskey: (offered.value ?? offeredLoading) ? gate.unlockWithPasskey : null,
+        passkeysLoading: offeredLoading,
         onPair: () => unawaited(gate.pair()),
         merging: merging,
         // While a merge waits, leaving calls it off: back to this phone's own session and data

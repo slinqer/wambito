@@ -40,6 +40,7 @@ class UnlockView extends StatefulWidget {
     this.merging = false,
     this.noPrfHere = false,
     this.passkeyWrap = true,
+    this.passkeysLoading = false,
   });
 
   /// [Unlock.removed] or [Unlock.unverified]: why the phone is asked again.
@@ -73,6 +74,11 @@ class UnlockView extends StatefulWidget {
   /// The account has a passkey wrap ([Unlock.passkeyWrap]).
   final bool passkeyWrap;
 
+  /// Whether passkeys work here is not known yet: [onPasskey] holds the passkey's place and its
+  /// button waits, and while the layout could still change (the passkey would lead) pairing waits
+  /// too, so no tappable button ever changes place.
+  final bool passkeysLoading;
+
   @override
   State<UnlockView> createState() => _UnlockViewState();
 }
@@ -87,6 +93,9 @@ class _UnlockViewState extends State<UnlockView> {
   /// "More options" is open: closed at first, opened by a tap or by a passkey above it that cannot
   /// open the data.
   var _moreOpen = false;
+
+  /// The layout may still change once passkeys are known: the passkey would lead.
+  bool get _settling => widget.passkeysLoading && widget.passkeyWrap && !widget.noPrfHere;
 
   UnlockPlacement get _layout => unlockLayout(
     noPrfHere: widget.noPrfHere,
@@ -203,7 +212,9 @@ class _UnlockViewState extends State<UnlockView> {
           PressButton(
             key: const Key('vault.passkey'),
             tone: primary ? PressTone.primary : PressTone.secondary,
-            onPressed: _busy ? null : () => unawaited(_run(onPasskey, passkey: true)),
+            onPressed: _busy || widget.passkeysLoading
+                ? null
+                : () => unawaited(_run(onPasskey, passkey: true)),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               spacing: WambitoTokens.space2,
@@ -225,7 +236,7 @@ class _UnlockViewState extends State<UnlockView> {
       l10n.vaultUnlockPair,
       key: const Key('vault.pair'),
       tone: primary ? PressTone.primary : PressTone.secondary,
-      onPressed: _busy ? null : widget.onPair,
+      onPressed: _busy || _settling ? null : widget.onPair,
     ),
   );
 

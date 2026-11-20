@@ -142,6 +142,7 @@ void main() {
     int unsent = 0,
     void Function(FakeGate gate)? prepare,
     List<Override> extra = const [],
+    Future<bool>? offered,
   }) async {
     final gate = FakeGate(state);
     prepare?.call(gate);
@@ -155,7 +156,10 @@ void main() {
         overrides: [
           vaultGateProvider.overrideWithValue(gate),
           vaultGateStateProvider.overrideWithValue(state),
-          unlockPasskeyOfferedProvider.overrideWithValue(AsyncData(passkeyOffered)),
+          if (offered != null)
+            unlockPasskeyOfferedProvider.overrideWith((ref) => offered)
+          else
+            unlockPasskeyOfferedProvider.overrideWithValue(AsyncData(passkeyOffered)),
           filesChannelProvider.overrideWithValue(files),
           sessionProvider.overrideWith(() => session),
           unsentChangesProvider.overrideWithValue(() async => unsent),
@@ -416,6 +420,80 @@ void main() {
       await tester.pumpAndSettle();
       expect(gate.passkeys, 1);
       handle.dispose();
+    });
+
+    /// The primary button on screen: its key, and whether it can be tapped.
+    (Key?, bool) primary(WidgetTester tester) {
+      final buttons = tester
+          .widgetList<PressButton>(find.byType(PressButton))
+          .where((b) => b.tone == PressTone.primary)
+          .toList();
+      expect(buttons, hasLength(1));
+      return (buttons.single.key, buttons.single.onPressed != null);
+    }
+
+    testWidgets('while it is not known whether passkeys work here, the layout holds: the passkey '
+        'leads, waiting, and nothing below it moves into its place', (tester) async {
+      final known = Completer<bool>();
+      await pumpScreen(tester, const Unlock(), offered: known.future);
+      expect(primary(tester), (const Key('vault.passkey'), false));
+      // Pairing waits too: its place is not settled yet.
+      expect(enabled(tester, find.byKey(const Key('vault.pair'))), isFalse);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      known.complete(true);
+      await tester.pumpAndSettle();
+      // Once tappable, the same button in the same place.
+      expect(primary(tester), (const Key('vault.passkey'), true));
+      expect(enabled(tester, find.byKey(const Key('vault.pair'))), isTrue);
+    });
+
+    testWidgets('no passkeys after all: pairing leads, and it was never tappable before', (
+      tester,
+    ) async {
+      final known = Completer<bool>();
+      await pumpScreen(tester, const Unlock(error: 'wrong_recovery_key'), offered: known.future);
+      expect(primary(tester), (const Key('vault.passkey'), false));
+      // The sign-in key's error: the field is in sight from the start, and stays.
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      known.complete(false);
+      await tester.pumpAndSettle();
+      expect(primary(tester), (const Key('vault.pair'), true));
+      expect(find.byKey(const Key('vault.passkey')), findsNothing);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+    });
+
+    testWidgets('without a passkey wrap the loading changes nothing: pairing leads at once', (
+      tester,
+    ) async {
+      await pumpScreen(tester, const Unlock(passkeyWrap: false), offered: Completer<bool>().future);
+      expect(primary(tester), (const Key('vault.pair'), true));
+    });
+
+    testWidgets('the Paste button is a button named Pegar', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpScreen(tester, keyFirst);
+      expect(
+        tester.getSemantics(find.byKey(const Key('vault.paste'))),
+        matchesSemantics(
+          label: 'PEGAR',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('the key field asks for a keyboard that composes nothing', (tester) async {
+      await pumpScreen(tester, keyFirst);
+      final field = tester.widget<EditableText>(find.byKey(const Key('vault.recoveryKey')));
+      expect(field.keyboardType, TextInputType.visiblePassword);
+      expect(field.autocorrect, isFalse);
+      expect(field.enableSuggestions, isFalse);
+      expect(field.textCapitalization, TextCapitalization.characters);
     });
 
     testWidgets('pair first', (tester) async {
