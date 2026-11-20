@@ -1,6 +1,6 @@
-// An encrypted (`preview`) account: export, import and the assistants wait for encryption. Each
-// shows "Próximamente con cifrado" in place of its action, and nothing of it reaches the server
-// (fake repositories record zero calls).
+// An encrypted (`preview`) account: export and import wait for encryption. Each shows
+// "Próximamente con cifrado" in place of its action, and nothing of it reaches the server (fake
+// repositories record zero calls). The assistants are offered as to any account.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -90,10 +90,7 @@ void main() {
   });
 
   group('assistants', () {
-    testWidgets('no address to connect and no list: the notice, and the list is never read', (
-      t,
-    ) async {
-      final handle = t.ensureSemantics();
+    testWidgets('are offered: no notice, the address and the list', (t) async {
       final assistants = FakeAssistantsRepository();
       await pumpSettingsApp(
         t,
@@ -103,13 +100,10 @@ void main() {
           assistantsRepositoryProvider.overrideWithValue(assistants),
         ],
       );
-      await _show(t, 'settings.assistants.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
-      expect(find.byKey(const Key('settings.assistants.url')), findsNothing);
-      expect(find.byKey(const Key('settings.assistants.copy')), findsNothing);
-      expect(assistants.lists, 0);
-      expect(assistants.revokes, isEmpty);
-      handle.dispose();
+      await _show(t, 'settings.assistants.copy');
+      expect(find.byKey(const Key('settings.assistants.comingSoon')), findsNothing);
+      expect(find.byKey(const Key('settings.assistants.url')), findsOneWidget);
+      expect(assistants.lists, 1);
     });
   });
 }

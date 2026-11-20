@@ -1,6 +1,7 @@
 // "Conecta tu asistente" in Settings (spec §6.2): the MCP's address with its copy button, where Claude
 // and ChatGPT take it, two things to ask, and the connected assistants, each revoked after asking.
-// A guest sees a note to save their progress instead of the list.
+// A guest sees a note to save their progress instead of the list. An encrypted (`preview`) account
+// sees the same: the server's MCP opens its data on the consent page.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -11,6 +12,9 @@ import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/settings/assistants_repository.dart';
 import 'package:wambito/settings/initial_settings.dart';
+import 'package:wambito/vault/vault_providers.dart';
+
+import '../support/preview_account.dart';
 
 import '../home/fakes.dart';
 import 'fakes.dart';
@@ -76,6 +80,17 @@ Future<void> _scrollTo(WidgetTester t, Finder finder) async {
 }
 
 Finder _row(String clientId) => find.byKey(Key('settings.assistants.row.$clientId'));
+
+/// The open vault's gate, as far as a revoke refused with `session_changed` tells it.
+class _Gate implements AppVaultGate {
+  int changed = 0;
+
+  @override
+  void sessionChanged() => changed++;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
 
 void main() {
   group('how to connect', () {
@@ -268,6 +283,84 @@ void main() {
       expect(_row(_claudeId), findsNothing);
       expect(said('Asistentes conectados'), findsNothing);
       expect(assistants.lists, 0, reason: 'the server refuses a guest; it is not asked');
+    });
+  });
+
+  group('an encrypted account', () {
+    testPage('sees the address, the steps and the list, as any account', (t) async {
+      final assistants = FakeAssistantsRepository([_claude()]);
+      await _pump(t, assistants: assistants, overrides: previewOpen());
+      final revoke = find.byKey(const Key('settings.assistants.revoke.$_claudeId'));
+      await _scrollTo(t, revoke);
+      expect(find.byKey(const Key('settings.assistants.comingSoon')), findsNothing);
+      expect(find.byKey(const Key('settings.assistants.url')), findsOneWidget);
+      expect(find.byKey(const Key('settings.assistants.copy')), findsOneWidget);
+      expect(
+        said(
+          'En Claude: Ajustes → Conectores → Añadir conector personalizado, y pega la dirección.',
+        ),
+        findsOneWidget,
+      );
+      expect(said('«¿cómo voy este mes?»'), findsOneWidget);
+      expect(said('Asistentes conectados'), findsOneWidget);
+      expect(
+        find.descendant(of: _row(_claudeId), matching: find.text('Conectado el 30 oct 2026')),
+        findsOneWidget,
+      );
+      expect(revoke, findsOneWidget);
+      expect(assistants.lists, 1);
+    });
+
+    testPage('Revocar asks first, revokes and takes the row out', (t) async {
+      final assistants = FakeAssistantsRepository([_claude(), _chatGpt()]);
+      await _pump(t, assistants: assistants, overrides: previewOpen());
+      final revoke = find.byKey(const Key('settings.assistants.revoke.$_claudeId'));
+      await _scrollTo(t, revoke);
+      await t.tap(revoke);
+      await t.pumpAndSettle();
+      expect(find.text('¿Revocar Claude?'), findsOneWidget);
+      await t.tap(find.byKey(const Key('settings.assistants.revoke.confirm')));
+      await t.pumpAndSettle();
+      expect(assistants.revokes, [_claudeId]);
+      expect(find.text('Revocamos Claude.'), findsOneWidget);
+      expect(_row(_claudeId), findsNothing);
+      expect(_row('chatgpt-1'), findsOneWidget);
+      await t.pump(const Duration(seconds: 10));
+    });
+
+    testPage('a session that changed hands: nothing revoked, the gate checks who is in', (t) async {
+      final gate = _Gate();
+      final assistants = FakeAssistantsRepository([_claude()])
+        ..revokeFailure = const HomeFailure(409, code: 'session_changed');
+      await _pump(
+        t,
+        assistants: assistants,
+        overrides: [...previewOpen(), vaultGateProvider.overrideWithValue(gate)],
+      );
+      final revoke = find.byKey(const Key('settings.assistants.revoke.$_claudeId'));
+      await _scrollTo(t, revoke);
+      await t.tap(revoke);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('settings.assistants.revoke.confirm')));
+      await t.pumpAndSettle();
+      expect(gate.changed, 1);
+      expect(find.text('Revocamos Claude.'), findsNothing);
+      expect(find.byKey(const Key('settings.assistants.revoke.confirm')), findsOneWidget);
+      await t.pump(const Duration(seconds: 10));
+    });
+
+    testPage('a guest sees the note to save their progress, and the list is not read', (t) async {
+      final assistants = FakeAssistantsRepository([_claude()]);
+      await _pump(t, guest: true, assistants: assistants, overrides: previewOpen());
+      final note = said(
+        'Primero guarda tu progreso con un correo; después podrás conectar un asistente.',
+      );
+      await _scrollTo(t, note);
+      expect(note, findsOneWidget);
+      expect(find.byKey(const Key('settings.assistants.comingSoon')), findsNothing);
+      expect(find.byKey(const Key('settings.assistants.copy')), findsOneWidget);
+      expect(_row(_claudeId), findsNothing);
+      expect(assistants.lists, 0);
     });
   });
 }

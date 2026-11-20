@@ -282,7 +282,9 @@ void main() {
       expect(res.status, 403);
       expect(_body(res.body), containsPair('code', 'demo_unavailable'));
       expect((await closed.api.call('GET', '/v1/imports/abc')).status, 403);
-      expect((await closed.api.call('POST', '/v1/me/assistants/x')).status, 403);
+      // The connected assistants are the account's, not its finances: they go to the network.
+      expect(await closed.api.backend.handle('GET', '/v1/me/assistants', {}, null), isNull);
+      expect(await closed.api.backend.handle('DELETE', '/v1/me/assistants/x', {}, null), isNull);
       // The account itself goes to the network: not served here, in either setup.
       expect(await closed.api.backend.handle('DELETE', '/v1/me', {}, null), isNull);
       expect(_body(await closed.api.ok('GET', '/v1/me')), isNotEmpty);

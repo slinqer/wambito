@@ -317,16 +317,22 @@ void main() {
       }
     });
 
-    test('refuses what a preview account cannot do yet, and sends deleting the account to the '
+    test('refuses what a preview account cannot do yet, and sends the account\'s routes to the '
         'API', () async {
       final net = FakeNetwork();
       final session = await open(profileOf(), net: net, keys: await keys());
       final dio = appDio(session, net);
       expect((await send(dio, 'GET', '/v1/me/export?format=json')).statusCode, 403);
       expect((await send(dio, 'POST', '/v1/imports')).statusCode, 403);
-      expect((await send(dio, 'GET', '/v1/me/assistants')).statusCode, 403);
+      // The connected assistants are the account's, not its finances: listed and revoked live.
+      await send(dio, 'GET', '/v1/me/assistants');
+      await send(dio, 'DELETE', '/v1/me/assistants/abc123');
       expect((await send(dio, 'DELETE', '/v1/me')).statusCode, 204);
-      expect(net.live, ['DELETE /api/v1/me']);
+      expect(net.live, [
+        'GET /api/v1/me/assistants',
+        'DELETE /api/v1/me/assistants/abc123',
+        'DELETE /api/v1/me',
+      ]);
     });
 
     test(
