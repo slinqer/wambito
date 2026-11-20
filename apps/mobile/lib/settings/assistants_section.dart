@@ -2,7 +2,9 @@
 // Claude and ChatGPT take it, two things to ask, and the assistants the person let in, each with
 // when it was connected, when it was last used and its own "Revocar" after asking. Connecting
 // happens in the assistant and on the web's consent screen; the app only reads and revokes.
-// A guest's account cannot be connected: they save their progress with an email first.
+// A guest's account cannot be connected: they save their progress with an email first. An
+// encrypted (`preview`) account sees the same: the server's MCP opens its data once the person
+// opens it on the consent page.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,7 +25,7 @@ import '../ui/offset_underline.dart';
 import '../ui/pressable.dart' show PressSurface;
 import '../ui/press_button.dart';
 import '../ui/toast.dart';
-import '../vault/preview.dart';
+import '../vault/vault_providers.dart' show vaultGateProvider;
 import 'assistants_repository.dart';
 import 'passkeys_section.dart' show passkeyDay;
 import 'profile_settings.dart' show profileFailureMessage;
@@ -78,6 +80,11 @@ class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
           if (failure.unauthorized) {
             unawaited(ref.read(sessionProvider.notifier).signOut(discardGuest: true));
           }
+          // The session now belongs to another account: nothing was revoked, and the vault's gate
+          // checks who is signed in (reloads for them), as for its sync's 409.
+          if (failure.status == 409 && failure.code == 'session_changed') {
+            ref.read(vaultGateProvider)?.sessionChanged();
+          }
           // The sheet stays for another try, and says why.
           toasts.say(profileFailureMessage(l10n, failure), error: true);
           rethrow;
@@ -95,15 +102,6 @@ class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
     final colors = lk.colors;
     final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
     final inkSm = LkText.bodySm.copyWith(color: colors.ink);
-    // The assistants read the server's data, and an encrypted account's lives on the phone: no
-    // address to connect to and no list (`GET /v1/me/assistants` is not asked).
-    if (ref.watch(isPreviewProvider)) {
-      return SettingsSection(
-        key: const Key('settings.card.assistants'),
-        title: l10n.settingsAssistantsTitle,
-        children: const [ComingSoonNotice(key: Key('settings.assistants.comingSoon'))],
-      );
-    }
     final url = mcpUrl(ref.watch(serverUrlProvider));
     final guest = widget.guest;
 

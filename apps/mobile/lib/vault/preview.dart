@@ -12,8 +12,10 @@ import 'encryption_mode.dart';
 /// [currentVaultAccountProvider], never the previous session's value).
 ///
 /// Automatic capture, the home widget and due notices run on the vault (stage 3b, in a headless
-/// engine). What is still left out (export, import and the assistants) is not offered to such an
-/// account: each shows [ComingSoonNotice], and nothing of it sends or fetches finance data.
+/// engine), and the assistants are listed and revoked on the server as for any account (its MCP
+/// opens the data on the consent page). What is still left out (export and import) is not offered
+/// to such an account: each shows [ComingSoonNotice], and nothing of it sends or fetches finance
+/// data.
 final isPreviewProvider = Provider<bool>(
   (ref) => ref.watch(currentVaultAccountProvider)?.mode == EncryptionMode.preview,
 );

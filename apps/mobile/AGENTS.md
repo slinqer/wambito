@@ -361,8 +361,11 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   a Locked gate check again by itself). Tests: `test/local/adopt_test.dart`. A 423 `vault_locked` save
   is retried (`canRetrySave`), never dropped. Tests of screens that are not about the vault pass
   `plainAccount()` (`test/support/plain_account.dart`) so the account is `plain`.
-  What stays out for a `preview` account (export, import, assistants) shows `ComingSoonNotice` ("Próximamente con cifrado",
-  `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing.
+  What stays out for a `preview` account (export, import) shows `ComingSoonNotice` ("Próximamente con cifrado",
+  `comingSoonWithEncryption`; `isPreviewProvider`, `preview.dart`) and sends or fetches nothing (`localUnavailable`
+  in `local/backend.dart`). The assistants work as for a `plain` account: `/v1/me/assistants*` is not served by the
+  vault and goes to the server with the session's bearer and `x-wambito-user` (`assistantsRepositoryProvider`); a
+  revoke refused with 409 `session_changed` revokes nothing and calls the gate's `sessionChanged()`.
   `preview_sync.dart` (`previewSyncProvider`, watched in `app.dart`) writes the mode where native code
   reads it (`wambito/notices` `setEncryptionMode {mode, owner}`, keys `wambito.encryption.mode`: `plain`, `preview`,
   `unknown` while the account is not known, and `wambito.encryption.owner`: the user id; both cleared on sign-out; untouched while the session loads),

@@ -36,12 +36,12 @@ class UnavailableRoute {
   final bool prefix;
 }
 
-/// What the phone turns off for a vault account (the web's `LOCAL_UNAVAILABLE`): export, imports
-/// and the assistants.
+/// What the phone turns off for a vault account (the web's `LOCAL_UNAVAILABLE`): export and
+/// imports. The connected assistants (`/v1/me/assistants`) are the account's, not its finances:
+/// not served here, so they go on to the server (the web's `LIVE_ROUTES`).
 const localUnavailable = [
   UnavailableRoute('*', '/v1/me/export'),
   UnavailableRoute('*', '/v1/imports', prefix: true),
-  UnavailableRoute('*', '/v1/me/assistants', prefix: true),
 ];
 
 /// The account facts the settings record does not hold.

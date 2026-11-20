@@ -4,10 +4,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/client.dart';
+import 'package:wambito/api/session.dart' show apiClientProvider;
 import 'package:wambito/home/home_repository.dart';
+import 'package:wambito/local/vault_session.dart' show VaultProfile;
 import 'package:wambito/settings/assistants_repository.dart';
+import 'package:wambito/vault/encryption_mode.dart';
 
 const _claude = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
 
@@ -15,6 +19,7 @@ const _claude = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
 class _Adapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   int? status;
+  String? code;
   bool noAnswer = false;
 
   @override
@@ -32,7 +37,7 @@ class _Adapter implements HttpClientAdapter {
     };
     if (status != null) {
       return ResponseBody.fromString(
-        jsonEncode({'code': status == 404 ? 'not_found' : 'internal_error'}),
+        jsonEncode({'code': code ?? (status == 404 ? 'not_found' : 'internal_error')}),
         status!,
         headers: json,
       );
@@ -137,6 +142,88 @@ void main() {
       repo.revoke('abc123'),
       throwsA(isA<HomeFailure>().having((f) => f.offline, 'offline', isTrue)),
     );
+  });
+
+  group('an encrypted account', () {
+    late ApiAssistantsRepository named;
+    setUp(() {
+      final client = ApiClient.forServer(Uri.parse('https://example.test'), token: 'tok');
+      client.dio.httpClientAdapter = adapter;
+      named = ApiAssistantsRepository(client.api.getDefaultApi(), userId: 'user-1');
+    });
+
+    test('both calls name the account they mean (x-wambito-user)', () async {
+      await named.list();
+      await named.revoke(_claude);
+      expect(adapter.requests, hasLength(2));
+      for (final request in adapter.requests) {
+        expect(request.headers['x-wambito-user'], 'user-1', reason: request.method);
+      }
+    });
+
+    test('a plain account\'s calls name none', () async {
+      await repo.list();
+      await repo.revoke(_claude);
+      for (final request in adapter.requests) {
+        expect(request.headers.containsKey('x-wambito-user'), isFalse);
+      }
+    });
+
+    test('a session that changed hands is 409 session_changed, never counted as revoked', () async {
+      adapter
+        ..status = 409
+        ..code = 'session_changed';
+      await expectLater(
+        named.revoke(_claude),
+        throwsA(
+          isA<HomeFailure>()
+              .having((f) => f.status, 'status', 409)
+              .having((f) => f.code, 'code', 'session_changed'),
+        ),
+      );
+    });
+  });
+
+  group('the provider', () {
+    VaultAccount account(EncryptionMode mode) => VaultAccount(
+      owner: 'owner-1',
+      mode: mode,
+      profile: const VaultProfile(
+        id: 'user-9',
+        email: 'ana@wambito.test',
+        isAnonymous: false,
+        locale: 'es',
+        timezone: 'America/Bogota',
+      ),
+    );
+
+    Future<RequestOptions> listedWith(VaultAccount? signedIn) async {
+      final client = ApiClient.forServer(Uri.parse('https://example.test'), token: 'tok');
+      client.dio.httpClientAdapter = adapter;
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(client),
+          currentVaultAccountProvider.overrideWithValue(signedIn),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(assistantsRepositoryProvider).list();
+      return adapter.requests.last;
+    }
+
+    test('an encrypted account\'s calls name it', () async {
+      final request = await listedWith(account(EncryptionMode.preview));
+      expect(request.headers['x-wambito-user'], 'user-9');
+      expect(request.headers['Authorization'], 'Bearer tok', reason: 'the session\'s bearer');
+    });
+
+    test('a plain account\'s, or one not known yet, name none', () async {
+      expect(
+        (await listedWith(account(EncryptionMode.plain))).headers.containsKey('x-wambito-user'),
+        isFalse,
+      );
+      expect((await listedWith(null)).headers.containsKey('x-wambito-user'), isFalse);
+    });
   });
 
   group('the MCP\'s address', () {
