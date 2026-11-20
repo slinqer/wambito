@@ -115,6 +115,9 @@ jobs:
       - run: pnpm --filter @wambito/web e2e:landing
       - run: pnpm --filter @wambito/web e2e:landing-only
       - run: pnpm --filter @wambito/web e2e:landing-only-app
+      # Landing analytics with consent: a build with a PostHog key and a fake host, the real
+      # library, every PostHog request answered by the test.
+      - run: pnpm --filter @wambito/web e2e:landing-analytics
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -157,6 +160,8 @@ jobs:
         env:
           VITE_SITE_URL: https://wambito.com
           VITE_APP_URL: https://app.wambito.com
+          # An unset repository variable is empty: the build is keyless and analytics stay off.
+          VITE_POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
       # From deploy/landing, so wrangler reads its config there and does not auto-configure the app.
       - run: npx --yes wrangler@4.151.3 deploy
         working-directory: deploy/landing

@@ -521,7 +521,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   writes the ring's place to `app/features/landing/app-screen.gen.ts`. Generated: never edit them.
 - e2e: `E2E_NOW=2026-10-21T15:00:00Z NEW_USERS_ENCRYPTED=true docker compose up -d --build`
   (the clock from `e2e/helpers.ts`; every new user born encrypted, as CI runs it), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
-  `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).
+  `e2e:landing-only-app` | `e2e:landing-analytics`. Afterwards `docker compose stop` (never `down -v`).
+- `e2e:landing-analytics` (`e2e/landing-analytics.spec.ts`, no stack needed): a landing-only build
+  with `VITE_POSTHOG_KEY=phc_e2e` and the fake host `posthog.example.test`, the real posthog-js,
+  every PostHog request answered by the test. posthog-js drops events from an automated browser,
+  so the spec hides `navigator.webdriver`; it proves a negative with `settle()` (the fake clock runs
+  the batch timers, then a sentinel round trip), never `networkidle` after a client-side move. The
+  posthog-js chunk is `module-*.js` (found by its content, not its name).
 - e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
   seed:admin` (`dev-admin`, admin spec), `seed:e2e-plain-user <email> [lang]` (a plain user,
   not onboarded, with the starter data; `signUpNewUser` runs it through `seedPlainUser` before
@@ -563,6 +569,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (`/sign-in?lang=`: the header's "Entrar"); "Demo" stays beside the hero's primary. The same in
   every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
   (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
+
+- Landing analytics (`app/features/analytics/`, PostHog, only with consent): `consent.ts` is the
+  consent model (stored choice, withdrawal); `config.ts` `SITE_ANALYTICS_CONFIG` reads
+  `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` (build time); `posthog.ts` loads posthog-js with a
+  dynamic import only after consent (`startAnalytics` / `stopAnalytics`); `use-analytics-consent.ts`
+  is the hook; `ConsentBanner` is mounted from the public `Footer` (with the preferences link).
+  Keyless build (no `VITE_POSTHOG_KEY`) means off: no banner, no request, the old privacy policy.
+  Only the landing-only build honours the key (`siteAnalyticsConfig`), so `pnpm dev` and the VPS
+  full build never load PostHog. The hook calls `stopAnalytics` on every refusal and on mount
+  when the choice is not `granted` (safe when nothing started: it only clears `ph_*` storage).
+  While the banner is open it sets `--lk-consent-h` on `<html>` so the footer can scroll clear
+  of it. Go-live: `docs/deploy/landing.md`.
 
 ## Traps
 

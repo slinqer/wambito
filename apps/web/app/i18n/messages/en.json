@@ -302,12 +302,24 @@
       "body": "Wambito was born in 2026 out of the frustration of not knowing how much I spent on coffee each month.",
       "body_soon": "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens."
     },
+    "consent": {
+      "label": "Cookie preferences",
+      "title": "Will you help us improve Wambito?",
+      "body": "With PostHog we see how this page is used, including recordings of the visit, without knowing who you are and without what you type.",
+      "decline": "No, thanks",
+      "accept": "Yes, I want to help",
+      "current_granted": "Right now: you accepted.",
+      "current_denied": "Right now: you declined.",
+      "browser_no": "Your browser asked not to be tracked, so we don't track you.",
+      "close": "Close"
+    },
     "footer": {
       "language": "Language",
       "privacy": "Privacy",
       "copyright": "© {year} Wambito",
       "roadmap": "What's next",
-      "delete_account": "Delete account"
+      "delete_account": "Delete account",
+      "cookies": "Cookie preferences"
     },
     "not_found": {
       "title": "This page doesn't exist",
@@ -323,7 +335,7 @@
         "description": "How Wambito handles your data: what it stores, where, who can see it and how to ask us to delete it."
       },
       "title": "Privacy policy",
-      "version": "Version of 5 November 2026",
+      "version": "Version of 20 November 2026",
       "sections": {
         "controller": {
           "title": "Who is responsible for your data",
@@ -341,9 +353,17 @@
           "title": "Where it is stored",
           "body": "On a server in the European Union. Your data travels encrypted between your device and the server. Every day we make a backup on the server and keep another copy, encrypted with age, in Cloudflare R2. No backup lasts more than 14 days: after that it deletes itself. So if you delete your account, it also leaves the backups within 14 days at most."
         },
+        "analytics": {
+          "title": "Analytics on wambito.com",
+          "body": "Only on wambito.com, and only if you accept in the cookie notice, we use PostHog to see which pages you visit and where you click, and we record the visit without what you type. PostHog Inc. is a US company that processes this data for us on its servers in the European Union, under its data processing agreement, with standard contractual clauses. It stores a random identifier in a cookie and in your browser's local storage, and records the type of browser and device. It does not keep your IP. Events are deleted after {eventsMonths, plural, one {# month} other {# months}} and recordings after {recordingsDays, plural, one {# day} other {# days}}. Nothing from inside the app reaches analytics: PostHog never loads on app.wambito.com or in the phone app. If your browser asks not to be tracked (GPC or Do Not Track), we don't load PostHog. You can withdraw your consent at any time in “Cookie preferences”, at the foot of every page. To have us delete what was already stored, write to <email>privacy@wambito.com</email>."
+        },
         "not_done": {
           "title": "What we don't do",
           "body": "No trackers, no analytics, no ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that."
+        },
+        "not_done_with_analytics": {
+          "title": "What we don't do",
+          "body": "No ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that. On top of that, on wambito.com and only with your consent, we use PostHog to see how the page is used. Nothing from inside the app ever reaches analytics: PostHog never loads on app.wambito.com or in the phone app."
         },
         "voice": {
           "title": "Your voice",

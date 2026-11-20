@@ -4,10 +4,11 @@ const baseURL = "http://localhost:5173";
 
 /** App flows against `pnpm dev` and the dev stack (`docker compose up -d`, with the API's clock
  * pinned: see e2e/global-setup.ts). The landing specs run against the built site instead: see
- * playwright.built.config.ts (`pnpm e2e:landing`, `e2e:landing-only`, `e2e:landing-only-app`). */
+ * playwright.built.config.ts (`pnpm e2e:landing`, `e2e:landing-only`, `e2e:landing-only-app`,
+ * `e2e:landing-analytics`). */
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: /landing(-wambi|-only|-only-app)?\.spec\.ts$/,
+  testIgnore: /landing(-wambi|-only|-only-app|-analytics)?\.spec\.ts$/,
   globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
