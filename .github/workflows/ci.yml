@@ -115,6 +115,9 @@ jobs:
       - run: pnpm --filter @wambito/web e2e:landing
       - run: pnpm --filter @wambito/web e2e:landing-only
       - run: pnpm --filter @wambito/web e2e:landing-only-app
+      # Landing analytics with consent: a build with a PostHog key and a fake host, the real
+      # library, every PostHog request answered by the test.
+      - run: pnpm --filter @wambito/web e2e:landing-analytics
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

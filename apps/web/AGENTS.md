@@ -480,7 +480,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   writes the ring's place to `app/features/landing/app-screen.gen.ts`. Generated: never edit them.
 - e2e: `E2E_NOW=2026-10-21T15:00:00Z NEW_USERS_ENCRYPTED=true docker compose up -d --build`
   (the clock from `e2e/helpers.ts`; every new user born encrypted, as CI runs it), then `pnpm --filter @wambito/web e2e` | `e2e:landing` | `e2e:landing-only` |
-  `e2e:landing-only-app`. Afterwards `docker compose stop` (never `down -v`).
+  `e2e:landing-only-app` | `e2e:landing-analytics`. Afterwards `docker compose stop` (never `down -v`).
+- `e2e:landing-analytics` (`e2e/landing-analytics.spec.ts`, no stack needed): a landing-only build
+  with `VITE_POSTHOG_KEY=phc_e2e` and the fake host `posthog.example.test`, the real posthog-js,
+  every PostHog request answered by the test. posthog-js drops events from an automated browser,
+  so the spec hides `navigator.webdriver`; it proves a negative with `settle()` (the fake clock runs
+  the batch timers, then a sentinel round trip), never `networkidle` after a client-side move. The
+  posthog-js chunk is `module-*.js` (found by its content, not its name).
 - e2e accounts seeded in the API container: `docker compose exec -T api pnpm --filter @wambito/api
   seed:admin` (`dev-admin`, admin spec), `seed:e2e-plain-user <email> [lang]` (a plain user,
   not onboarded, with the starter data; `signUpNewUser` runs it through `seedPlainUser` before

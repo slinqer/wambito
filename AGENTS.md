@@ -48,7 +48,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   caddy, compose-files, version, mcp-keys).
 - `e2e`: root stack with `E2E_NOW=2026-10-21T15:00:00Z` and `NEW_USERS_ENCRYPTED=true` (plain-app
   specs seed plain users), then web `e2e`, `e2e:landing`,
-  `e2e:landing-only`, `e2e:landing-only-app`.
+  `e2e:landing-only`, `e2e:landing-only-app`, `e2e:landing-analytics`.
 - `deploy-landing`: push to `main` after `check` + `e2e`; `wrangler deploy` from `deploy/landing`.
 - `mobile` / `mobile-build` (only when mobile paths change): pub get, analyze, tests without
   goldens and the `stack` tag, tokens and `apps/mobile/lib/api/gen` staleness, release self-tests, `build-native-deps.sh`
