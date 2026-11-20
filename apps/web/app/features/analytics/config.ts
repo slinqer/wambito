@@ -17,3 +17,6 @@ export function analyticsConfig(
   const host = env.VITE_POSTHOG_HOST?.trim().replace(/\/+$/, "") || DEFAULT_HOST;
   return { key, host };
 }
+
+/** The build's PostHog switch (a build-time constant): `null` means no analytics in this build. */
+export const SITE_ANALYTICS_CONFIG = analyticsConfig();

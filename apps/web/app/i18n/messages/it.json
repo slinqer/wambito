@@ -355,7 +355,7 @@
         },
         "analytics": {
           "title": "Analytics su wambito.com",
-          "body": "Solo su wambito.com, e solo se accetti nell’avviso sui cookie, usiamo PostHog per vedere quali pagine visiti e dove clicchi, e registriamo la visita senza quello che scrivi. PostHog Inc. è un’azienda statunitense che tratta questi dati per nostro conto sui suoi server nell’Unione europea, secondo il suo accordo sul trattamento dei dati, con clausole contrattuali tipo. Non conserva il tuo IP. Gli eventi si cancellano dopo {eventsMonths, plural, one {# mese} other {# mesi}} e le registrazioni dopo {recordingsDays, plural, one {# giorno} other {# giorni}}. Niente di quello che c’è dentro l’app arriva agli analytics: le tue finanze sono cifrate end-to-end. Se il tuo browser chiede di non essere tracciato (GPC o Do Not Track), non carichiamo PostHog. Puoi revocare il tuo consenso quando vuoi in «Preferenze sui cookie», in fondo a ogni pagina. Per farci cancellare quello che è già stato salvato, scrivici a <email>privacy@wambito.com</email>."
+          "body": "Solo su wambito.com, e solo se accetti nell’avviso sui cookie, usiamo PostHog per vedere quali pagine visiti e dove clicchi, e registriamo la visita senza quello che scrivi. PostHog Inc. è un’azienda statunitense che tratta questi dati per nostro conto sui suoi server nell’Unione europea, secondo il suo accordo sul trattamento dei dati, con clausole contrattuali tipo. Salva nel tuo browser un cookie con un identificativo casuale, e registra il tipo di browser e di dispositivo. Non conserva il tuo IP. Gli eventi si cancellano dopo {eventsMonths, plural, one {# mese} other {# mesi}} e le registrazioni dopo {recordingsDays, plural, one {# giorno} other {# giorni}}. Niente di quello che c’è dentro l’app arriva agli analytics: PostHog non si carica su app.wambito.com né nell’app del telefono. Se il tuo browser chiede di non essere tracciato (GPC o Do Not Track), non carichiamo PostHog. Puoi revocare il tuo consenso quando vuoi in «Preferenze sui cookie», in fondo a ogni pagina. Per farci cancellare quello che è già stato salvato, scrivici a <email>privacy@wambito.com</email>."
         },
         "not_done": {
           "title": "Cosa non facciamo",
@@ -363,7 +363,7 @@
         },
         "not_done_with_analytics": {
           "title": "Cosa non facciamo",
-          "body": "Niente pubblicità. Non vendiamo i tuoi dati e non li condividiamo. Passano solo dai servizi che ci servono per funzionare (il server, le copie e l’invio delle email), e solo per questo. In più, su wambito.com e solo con il tuo consenso, usiamo PostHog per vedere come si usa la pagina. Niente di quello che c’è dentro l’app arriva mai agli analytics: le tue finanze sono cifrate end-to-end."
+          "body": "Niente pubblicità. Non vendiamo i tuoi dati e non li condividiamo. Passano solo dai servizi che ci servono per funzionare (il server, le copie e l’invio delle email), e solo per questo. In più, su wambito.com e solo con il tuo consenso, usiamo PostHog per vedere come si usa la pagina. Niente di quello che c’è dentro l’app arriva mai agli analytics: PostHog non si carica su app.wambito.com né nell’app del telefono."
         },
         "voice": {
           "title": "La tua voce",

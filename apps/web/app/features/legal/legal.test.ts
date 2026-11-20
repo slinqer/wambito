@@ -32,6 +32,17 @@ const NOTIFICATION_STAYS: Record<keyof typeof CATALOGS, string> = {
   pt: "nunca sai do teu telemóvel",
 };
 
+/**
+ * Each language's "end to end": the analytics sections must not use it, since plain accounts are
+ * not encrypted; app data stays out because PostHog never loads in the app.
+ */
+const END_TO_END: Record<keyof typeof CATALOGS, string> = {
+  es: "extremo a extremo",
+  en: "end to end",
+  it: "end-to-end",
+  pt: "ponta a ponta",
+};
+
 function legal(locale: keyof typeof CATALOGS, page: keyof typeof PAGES): Legal {
   const tree = CATALOGS[locale].legal as unknown as Record<string, Legal>;
   return tree[LEGAL_MESSAGES[page]] ?? {};
@@ -111,6 +122,15 @@ describe("legal pages", () => {
         expect(body).toContain(CATALOGS[locale].landing.footer.cookies);
         expect(body).toContain("<email>privacy@wambito.com</email>");
         expect(body).toContain("PostHog Inc.");
+      });
+
+      it("privacy: the analytics sections say why app data stays out, without an E2E claim", () => {
+        const sections = legal(locale, "privacy").sections ?? {};
+        for (const key of ["analytics", "not_done_with_analytics"]) {
+          const body = sections[key]?.body ?? "";
+          expect(body, key).not.toContain(END_TO_END[locale]);
+          expect(body, key).toContain("app.wambito.com");
+        }
       });
 
       it("privacy: names the controller, the law and the contact", () => {

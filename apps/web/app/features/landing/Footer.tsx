@@ -11,12 +11,9 @@ import {
   type SitePage,
 } from "../../site/paths.ts";
 import { ConsentBanner } from "../analytics/ConsentBanner.tsx";
-import { type AnalyticsConfig, analyticsConfig } from "../analytics/config.ts";
+import { type AnalyticsConfig, SITE_ANALYTICS_CONFIG } from "../analytics/config.ts";
 import { type ConsentDeps, useAnalyticsConsent } from "../analytics/use-analytics-consent.ts";
 import { COPYRIGHT_YEAR } from "./links.ts";
-
-/** The build's PostHog switch (a build-time constant): `null` means no banner and no link. */
-const SITE_ANALYTICS = analyticsConfig();
 
 /**
  * Language switch (the same page in the other language), the roadmap, privacy and account deletion
@@ -37,7 +34,7 @@ export function Footer({
 }) {
   const t = useTranslations();
   const { locale } = useLocale();
-  const config = seam?.config === undefined ? SITE_ANALYTICS : seam.config;
+  const config = seam?.config === undefined ? SITE_ANALYTICS_CONFIG : seam.config;
   const consent = useAnalyticsConsent(config, seam?.deps);
   const preferences = useRef<HTMLButtonElement>(null);
   return (

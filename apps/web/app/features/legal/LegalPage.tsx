@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslations } from "use-intl";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { DELETE_ACCOUNT_PATH, PRIVACY_PATH } from "../../site/paths.ts";
-import { analyticsConfig } from "../analytics/config.ts";
+import { SITE_ANALYTICS_CONFIG } from "../analytics/config.ts";
 import { Footer } from "../landing/Footer.tsx";
 import { SiteHeader } from "../landing/SiteHeader.tsx";
 import {
@@ -16,9 +16,6 @@ import {
 } from "./legal.ts";
 import "../landing/landing.css";
 import "./legal.css";
-
-/** The build's PostHog switch (a build-time constant): only a keyed build's policy covers analytics. */
-const SITE_ANALYTICS = analyticsConfig() !== null;
 
 function sections(page: LegalPageName, withAnalytics: boolean): readonly string[] {
   return page === "privacy" ? privacySections(withAnalytics) : DELETE_ACCOUNT_SECTIONS;
@@ -43,7 +40,7 @@ const OTHER_PAGE = { privacy: DELETE_ACCOUNT_PATH, deleteAccount: PRIVACY_PATH }
  */
 export function LegalPage({
   page,
-  withAnalytics = SITE_ANALYTICS,
+  withAnalytics = SITE_ANALYTICS_CONFIG !== null,
 }: {
   page: LegalPageName;
   withAnalytics?: boolean;

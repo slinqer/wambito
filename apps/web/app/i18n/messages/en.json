@@ -355,7 +355,7 @@
         },
         "analytics": {
           "title": "Analytics on wambito.com",
-          "body": "Only on wambito.com, and only if you accept in the cookie notice, we use PostHog to see which pages you visit and where you click, and we record the visit without what you type. PostHog Inc. is a US company that processes this data for us on its servers in the European Union, under its data processing agreement, with standard contractual clauses. It does not keep your IP. Events are deleted after {eventsMonths, plural, one {# month} other {# months}} and recordings after {recordingsDays, plural, one {# day} other {# days}}. Nothing from inside the app reaches analytics: your finances are encrypted end to end. If your browser asks not to be tracked (GPC or Do Not Track), we don't load PostHog. You can withdraw your consent at any time in “Cookie preferences”, at the foot of every page. To have us delete what was already stored, write to <email>privacy@wambito.com</email>."
+          "body": "Only on wambito.com, and only if you accept in the cookie notice, we use PostHog to see which pages you visit and where you click, and we record the visit without what you type. PostHog Inc. is a US company that processes this data for us on its servers in the European Union, under its data processing agreement, with standard contractual clauses. It stores a cookie with a random identifier in your browser, and records the type of browser and device. It does not keep your IP. Events are deleted after {eventsMonths, plural, one {# month} other {# months}} and recordings after {recordingsDays, plural, one {# day} other {# days}}. Nothing from inside the app reaches analytics: PostHog never loads on app.wambito.com or in the phone app. If your browser asks not to be tracked (GPC or Do Not Track), we don't load PostHog. You can withdraw your consent at any time in “Cookie preferences”, at the foot of every page. To have us delete what was already stored, write to <email>privacy@wambito.com</email>."
         },
         "not_done": {
           "title": "What we don't do",
@@ -363,7 +363,7 @@
         },
         "not_done_with_analytics": {
           "title": "What we don't do",
-          "body": "No ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that. On top of that, on wambito.com and only with your consent, we use PostHog to see how the page is used. Nothing from inside the app ever reaches analytics: your finances are encrypted end to end."
+          "body": "No ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that. On top of that, on wambito.com and only with your consent, we use PostHog to see how the page is used. Nothing from inside the app ever reaches analytics: PostHog never loads on app.wambito.com or in the phone app."
         },
         "voice": {
           "title": "Your voice",

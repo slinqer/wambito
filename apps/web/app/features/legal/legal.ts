@@ -33,7 +33,7 @@ export function privacySections(withAnalytics: boolean): readonly PrivacySection
   });
 }
 
-// Provisional: Task 6's go-live checklist confirms these against the PostHog project before the key is set.
+// Provisional: the founder confirms these against the PostHog project before VITE_POSTHOG_KEY is set (docs/deploy/landing.md).
 /** How long PostHog keeps landing events and session recordings, as the policy states it. */
 export const ANALYTICS_RETENTION = { eventsMonths: 12, recordingsDays: 30 } as const;
 
