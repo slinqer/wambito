@@ -106,12 +106,12 @@ describe("flag on", () => {
     expect(rows.categories).toHaveLength(0);
   });
 
-  test("flag on: a new email user is encrypted and its /v1 finance routes answer 403 encrypted_account", async () => {
+  test("flag on: a new email user is encrypted and its /v1 finance routes answer 426 update_required", async () => {
     const e = await emailUser(t, "on@wambito.test");
     expect((await stored(t, e.userId))?.encryption).toBe("encrypted");
     const res = await t.request("GET", "/v1/transactions", { headers: e.headers });
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { code?: string; type?: string }).code).toBe("encrypted_account");
+    expect(res.status).toBe(426);
+    expect(((await res.json()) as { code?: string; type?: string }).code).toBe("update_required");
   });
 
   test("flag on: a user created before the flag stays plain", async () => {

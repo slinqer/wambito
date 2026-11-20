@@ -39,7 +39,13 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   `docs/encryption.md`: the end-to-end encryption explainer with the `brand/e2e` scenes.
 - `docs/deploy/`: `personal.md` (private install, short; the runbook is
   `deploy/personal/README.md`), `landing.md` (Cloudflare landing), `api.md` (client addresses,
-  rate limits).
+  rate limits), `switch-day.md` (E2E stage 5: the branch merges on the day, after its policy
+  dates are filled and `scripts/check-switch-dates.sh` passes; the rehearsal on a restored copy,
+  the production flags, the founder's migration (phone and assistant idle first), the rollback to
+  plain from the browser console, deleting the test accounts, the Play data safety
+  form, the later table-drop PR).
+- `docs/privacy-policy.md`: the English draft of the live policy (`legal.privacy` in the web's
+  site catalogs); keep the two saying the same.
 - `docs/admin.md`: the admin panel: who is an admin (`ADMIN_USER_IDS`, `ADMIN_ALLOWED_IPS`), Ley 1581
   deadlines and procedures, the dry run.
 - `docs/mobile/`: `setup.md` (toolchain, JDK 17, emulator, tests), `release.md` (signing, APK

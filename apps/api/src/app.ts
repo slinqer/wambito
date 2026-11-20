@@ -7,6 +7,7 @@ import type { AppDeps } from "./deps.ts";
 import type { AppEnv } from "./env.ts";
 import { assistantSecret } from "./http/assistant-secret.ts";
 import { expectedUser } from "./http/expected-user.ts";
+import { migrationWriteRule } from "./http/migration-lock.ts";
 import { previewOnlyV2 } from "./http/preview.ts";
 import { notFound, onError, validationHook } from "./http/problem.ts";
 import { assistantScopes } from "./http/scopes.ts";
@@ -20,6 +21,7 @@ import { emailChangeRoutes } from "./routes/email-change.ts";
 import { importRoutes } from "./routes/imports.ts";
 import { keyRoutes } from "./routes/keys.ts";
 import { meRoutes } from "./routes/me.ts";
+import { migrationRoutes } from "./routes/migration.ts";
 import { pairingRoutes } from "./routes/pairing.ts";
 import { recoveryRoutes, recoverySignInRoutes } from "./routes/recovery.ts";
 import { recurrenceRoutes } from "./routes/recurrences.ts";
@@ -88,7 +90,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", signinRoutes(deps, auth));
   app.use("/v1/*", requireUser(auth, deps.config, deps.db));
   app.use("/v1/*", assistantScopes());
-  // A preview account's finances are records under /v2 only (403 `encrypted_account` on /v1's).
+  // A preview account's finances are records under /v2 only (426 `update_required` on /v1's).
   app.use("/v1/*", previewOnlyV2(deps));
   // Revoking an assistant names the account it means too (the consent page's "Try again"): a
   // cookie that now belongs to someone else gets 409 `session_changed`, not their assistant gone.
@@ -97,6 +99,13 @@ export function createApp(deps: AppDeps) {
   // A call for another account than the signed-in one (409 `session_changed`), before the scopes.
   app.use("/v2/*", expectedUser());
   app.use("/v2/*", assistantScopes());
+  // While an account moves to end-to-end encryption, only the session that started the move may
+  // write records or key material (409 `migration_in_progress`); reads pass.
+  const writeRule = migrationWriteRule(deps);
+  for (const path of ["/v2/sync", "/v2/keys", "/v2/keys/*", "/v2/pairing", "/v2/pairing/*"]) {
+    app.use(path, writeRule);
+  }
+  app.use("/v2/recovery/verifier", writeRule);
   app.route("/", meRoutes(deps));
   app.route("/", assistantRoutes(deps));
   app.route("/", categoryRoutes(deps));
@@ -110,6 +119,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", keyRoutes(deps));
   app.route("/", pairingRoutes(deps));
   app.route("/", recoveryRoutes(deps));
+  app.route("/", migrationRoutes(deps));
   app.route("/", activityRoutes(deps));
 
   app.doc31("/openapi.json", {

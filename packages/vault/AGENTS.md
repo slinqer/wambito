@@ -19,12 +19,26 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   its types (`RawRecord`, `OutboxEntry`, `OutboxPark`, `QuarantineEntry`, `SetAsideOutcome`),
   `changedKeys`, `VaultClosedError`. `src/encrypted-contract.ts`: `encryptedStoreContract(name, make)`;
   the IndexedDB-only cases (other tabs, `deleteVault`, non-extractable keys) stay in the web's test.
+  Every store has `resetAll()`: records, quarantine, the whole outbox and the `latest`/`base`
+  cursors go, keys and the other meta (`keyV`, `userId`, `deviceWrapId`) stay (the switch day's
+  retry after `cancel`, with the same data key).
 - `src/memory-encrypted-store.ts`: `createMemoryEncryptedStore(userId)`, the in-process
   `EncryptedStore` (the MCP's, per request); passes both contracts.
 - `src/keyring.ts`: `Keyring`, `recordKeyName`, `dedupeKeyName`, `KeysError`.
 - `src/sync.ts`: `createSyncEngine` over an `EncryptedStore`; option `upgrade: false` skips the
   re-seal pass (the MCP). Its tests stay in `apps/web/app/local/sync.test.ts` (over IndexedDB);
   `src/sync.test.ts` is a smoke test over the memory store.
+- `src/migration.ts`: the switch day (stage 5, a plain account becomes encrypted from the web):
+  `MigrationSource` / `MigrationCounts` (the JSON of `/v2/migration/source`, `start` and
+  `finish`), `recordsFromSource(source, userId)` (every row to a `MigrationRecord` with the server's
+  id, each body checked by `parseRecord`; dates `YYYY-MM-DD` to `YYYY-MM` for `occurrenceMonth` and
+  `effectiveFrom`, `accountId` null, recurrences at `rev` 0, an imported row's `externalHash` kept and
+  `importId` dropped; a dismissed month, soft-deleted
+  pending `source: "recurrence"`, takes `uuidv5(recurrenceId, "<YYYY-MM>:0")` as the backend's
+  `materialize` expects; a merchant takes the phone's `merchantRecordId(userId, key)`,
+  `uuidv5(uuidv5(SETTINGS_SEED_NAMESPACE, userId), "merchant:<key>")`), `countsOf(records)` (live per type, deleted transactions apart, the
+  settings not counted), `SETTINGS_SEED_NAMESPACE` and `settingsRecordId(userId)` (the web's seed
+  uses the same namespace). Tests: `src/migration.test.ts`.
 - `src/ids.ts`: `uuidv7`, `uuidv5`, `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`).
 - `src/backend.ts`: `createLocalBackend` (the `/v1` routes over a store, one store transaction per
   request), `DEMO_UNAVAILABLE`. Its round-trip tests need the web's typed API client, so they stay in
@@ -41,6 +55,10 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   backend with `source: "mcp"`). A change to the sync engine, the stores or the backend is a change
   to both: run `apps/mcp/test/vault-wambito.test.ts` and `vault-end-to-end.test.ts` too. Design:
   `docs/superpowers/specs/2026-11-16-e2e-stage-4-mcp-design.md`.
+- The API (`apps/api/src/services/migration.ts`) imports `uuidv5` and `merchantRecordId`: the
+  migration's `finish` checks every plaintext row has its record under the id `recordsFromSource`
+  gives it. Changing a derived id is a change to that check too: run
+  `apps/api/test/migration.test.ts`.
 - A delete carries its sealed body to the server, kept until the server's 180-day purge, so
   `restore_transactions` works across requests and devices. The MCP's cache replay includes
   tombstones, so a later request still sees (and can restore) a delete, and a deleted recurrence

@@ -514,6 +514,17 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       });
       notify();
     },
+    async resetAll() {
+      await transaction(async () => undefined);
+      await short(DATA_STORES, "readwrite", async (tx) => {
+        for (const name of [...RECORD_TYPES, QUARANTINE, OUTBOX]) {
+          await request(tx.objectStore(name).clear());
+        }
+        await request(tx.objectStore(META).delete("latest"));
+        await request(tx.objectStore(META).delete("base"));
+      });
+      notify();
+    },
     restoreSetAside: (resolve) =>
       transaction(async (txOps) => {
         const local = txOps as ReturnType<typeof ops>;

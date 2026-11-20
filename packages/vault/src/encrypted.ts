@@ -164,6 +164,13 @@ export interface EncryptedStore extends FinanceStore {
    */
   wipeRecords(): Promise<void>;
   /**
+   * Starts the vault's data over (the switch day's retry, after `cancel`): forgets every record,
+   * the quarantine, every outbox entry (set-aside ones included) and the `latest` and `base`
+   * cursors, in one commit. Keys and every other meta value (`keyV`, `userId`, `deviceWrapId`...)
+   * stay. Notifies subscribers.
+   */
+  resetAll(): Promise<void>;
+  /**
    * After the full download: for each set-aside change, `resolve` (synchronous) gets the entry and
    * the fresh record (if any) and says what to write. All of it in one commit; the entries come
    * back as ordinary pending changes based on the fresh version, or are removed.

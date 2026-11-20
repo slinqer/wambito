@@ -36,7 +36,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
 - `src/http/assistant-secret.ts` (`assistantSecret`, spec 2026-11-16 §4): a wrapper on
   `/auth/oauth2/*`, mounted before `/auth/*`, that carries the assistant secret `S` (32 bytes,
-  base64url) of an encrypted account (`isPreviewAccount`) in its tokens. Authorize: adds
+  base64url) of an encrypted account (`isPreviewAccount`, but never a `migrating` one: its
+  assistants keep the plain path) in its tokens. Authorize: adds
   `prompt=consent` for such an account. Consent: takes `wk` out of the JSON (400 `invalid_request`
   if not 32 bytes; 503 `assistant_keys_missing` without `MCP_WK_PUBLIC_KEY`), keeps `code → S` in
   process memory (10 min; a restart loses it). Token: runs Better Auth inside an AsyncLocalStorage
@@ -178,17 +179,54 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   is `encrypted` (born while `NEW_USERS_ENCRYPTED` is `true`, default off; set by the user-create
   hook, which also records `user.platform` through `platformOf`: `x-wambito-client` `android` or
   `ios`, else `web`) or its id is in `E2E_PREVIEW_USER_IDS` (comma-separated, unset by default).
-  `isPreviewAccount(config, { id, encryption })` in `config.ts`; `accountEncryption(db, userId)` in
+  `isPreviewAccount(config, { id, encryption })` in `config.ts` (also true for `migrating`);
+  `accountEncryption(db, userId)` and `toEncryption` (unknown → `plain`) in
   `services/encryption.ts`. `GET /v1/me` (every profile answer) says
-  `encryption: "preview" | "plain"`. A preview account's finances live only as records under
+  `encryption: "preview" | "plain"`.
+  Switch day (spec 2026-11-19 §1): `user.encryption` is `plain` | `migrating` | `encrypted`, and
+  `user.migration_session_id` is the session that started the migration. `GET /v1/me` `migration`
+  (`migrationOf`, `services/encryption.ts`): `available` for a non-anonymous `plain` user while
+  `MIGRATION_OPEN` is on or its id is in `MIGRATION_OPEN_USER_IDS` (root compose: `migrate-e2e`),
+  `in_progress` while `migrating`, absent otherwise. A `migrating` account is `preview` for the
+  426 and plain everywhere else: session lifetime (`lifetimeFor`, `slideLongSession`), the cleanup
+  tiers (the 60-day plain tier takes a `migrating` guest; the encrypted tier does not), the 401
+  codes (`deleteSessions` in `services/keys.ts`) and recovery sign-in. A preview account's finances live only as records under
   `/v2`; the user-create hook in `auth.ts` seeds no default account or categories for it (the web
   creates them as records), so its `/v1` finance tables stay empty.
-  `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 403 `encrypted_account` on the `/v1` finance
+  `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 426 `update_required` (`updateRequired()`, title "Upgrade Required") on the `/v1` finance
   routes (transactions, categories, recurrences, summary, reports, captures, imports,
   `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
-  403 too (the currency lives in the settings record). `DELETE /v1/me` still works:
+  426 too (the currency lives in the settings record). Exception: a background request
+  (`x-wambito-background: 1`) to `POST /v1/captures` or `POST /v1/transactions/review` answers
+  the old retryable 403 `encrypted_account` (`encryptedAccount()`), since Android v1.0.3 drops a
+  queued capture on any other 4xx. `DELETE /v1/me` still works:
   `records`, `key_wraps`, `record_purges`, `pairing_requests`, `recovery_verifiers` and bound
   `signin_requests` cascade from `user`.
+- `/v2/migration/*` (`src/routes/migration.ts`, `src/services/migration.ts`; spec 2026-11-19 §2):
+  the web moves a plain account into records. `start` (gate `migrationOf`: `available`, or
+  `in_progress` for a takeover) sets `migrating` and `migration_session_id` = the calling session,
+  under the records and wraps locks, and answers `MigrationCounts` (`serverCounts`: live rows per
+  table; `deletedTransaction` = every soft-deleted transaction, dismissed months included: there is
+  no restore window, and a dismissal left out would come back in the vault). `source` (bound session
+  only) answers every row as the DB holds it (`MigrationSource` of `@wambito/vault`); never logged.
+  `finish` takes `lockRecords` (exported from `services/sync.ts`) then `lockWraps`, locks the user
+  row, needs a `recovery` wrap (409 `keys_missing`) and every record with a body under the current
+  key version or one its `key_links` reach (409 `key_version_mismatch`), then compares the records (live per type,
+  deleted `transaction` with a body apart, exactly one live `settings`) with the server's and the
+  client's counts, and checks every row by id (`missingRecords`: a record of its type and state
+  under the id `recordsFromSource` gives it, the server id, or for a dismissed month and a
+  merchant rule the derived one, from `@wambito/vault`'s `uuidv5` and `merchantRecordId`, so a
+  missing record cannot hide behind a stray one): a mismatch is 409 `count_mismatch` with
+  `errors: {server, records, client, missing}` (`missing` at most 20 `{type, id}`;
+  `ApiError.errors` may be an object for that) and changes nothing; a match deletes
+  `transactions` first (they reference the rest), then merchant rules, budgets, recurrences,
+  categories, imports, accounts and idempotency keys, `revokeAllAssistants`, and sets `encrypted`.
+  `cancel` deletes `records` and `record_purges`, keeps the wraps, sets `plain`. The write rule
+  (`src/http/migration-lock.ts`, `migrationWriteRule`, after the scopes on `/v2/sync`,
+  `/v2/keys*`, `/v2/pairing*` and `/v2/recovery/verifier`): a non-GET from any grant but the
+  bound session of a `migrating` account is 409 `migration_in_progress`. It runs before the write's
+  own lock: a write it lets through just before a takeover is one the previous bound session could
+  make anyway, and any change it makes to the records shows in `finish`'s counts or id check.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email

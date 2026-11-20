@@ -1,4 +1,4 @@
-import { accounts, categories } from "@wambito/db";
+import { accounts, categories, user } from "@wambito/db";
 import { eq } from "@wambito/db/orm";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { createTestApp, type TestApp } from "./harness.ts";
@@ -70,9 +70,10 @@ test("a preview account's profile still reads without a default account", async 
   }
 });
 
-// A preview account uses /v2 only: every /v1 finance route answers 403 `encrypted_account`, for
-// its sessions and for an assistant's token alike. The account itself (profile, assistants list,
-// deletion) stays on /v1.
+// A preview account uses /v2 only: every /v1 finance route answers 426 `update_required` (an old
+// client: the account's finances moved to records), for a `migrating` or `encrypted` account and
+// for one in E2E_PREVIEW_USER_IDS, for its sessions and for an assistant's token alike. The
+// account itself (profile, assistants list, deletion) stays on /v1.
 const FINANCE_ROUTES: [string, string][] = [
   ["GET", "/v1/transactions"],
   ["POST", "/v1/transactions"],
@@ -102,25 +103,82 @@ const FINANCE_ROUTES: [string, string][] = [
   ["GET", "/v1/me/export"],
 ];
 
+const STATES = ["migrating", "encrypted"] as const;
+
+async function personIn(state: (typeof STATES)[number], email: string) {
+  const person = await t.signIn(email);
+  await t.admin.update(user).set({ encryption: state }).where(eq(user.id, person.userId));
+  return person;
+}
+
 async function previewPerson(email: string) {
   const person = await t.signIn(email);
   t.config.E2E_PREVIEW_USER_IDS = ["listed-user", person.userId];
   return person;
 }
 
+async function expectUpdateRequired(res: Response) {
+  expect(res.status).toBe(426);
+  expect(await res.json()).toMatchObject({
+    code: "update_required",
+    title: "Upgrade Required",
+    status: 426,
+  });
+}
+
+describe.each(STATES)("a %s account's /v1", (state) => {
+  let finance: { headers: { authorization: string }; userId: string } | undefined;
+  test.each(FINANCE_ROUTES)("%s %s is 426 update_required", async (method, path) => {
+    finance ??= await personIn(state, `v1-finance-${state}@wambito.test`);
+    const { headers } = finance;
+    const res = await t.request(method, path, { headers, body: method === "GET" ? undefined : {} });
+    await expectUpdateRequired(res);
+  });
+
+  // The installed Android release retries a 403 on a capture but drops it on any other 4xx: its
+  // background capture and review requests keep the old retryable 403 `encrypted_account`.
+  test.each([
+    ["POST", "/v1/captures"],
+    ["POST", "/v1/transactions/review"],
+  ])("a background %s %s keeps the retryable 403 encrypted_account", async (method, path) => {
+    const { headers } = await personIn(state, `v1-background-${state}-${path.length}@wambito.test`);
+    const res = await t.request(method, path, {
+      headers: { ...headers, "x-wambito-background": "1" },
+      body: {},
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "encrypted_account", status: 403 });
+  });
+
+  test("a background request to another finance route is still 426", async () => {
+    const { headers } = await personIn(state, `v1-background-other-${state}@wambito.test`);
+    const res = await t.request("GET", "/v1/summary", {
+      headers: { ...headers, "x-wambito-background": "1" },
+    });
+    await expectUpdateRequired(res);
+  });
+
+  test("PATCH /v1/me with a currency is 426: the currency lives in the records", async () => {
+    const { headers } = await personIn(state, `v1-currency-${state}@wambito.test`);
+    const res = await t.request("PATCH", "/v1/me", { headers, body: { currency: "COP" } });
+    await expectUpdateRequired(res);
+  });
+
+  test("GET /v1/me and DELETE /v1/me still answer", async () => {
+    const { headers } = await personIn(state, `v1-me-${state}@wambito.test`);
+    expect((await t.request("GET", "/v1/me", { headers })).status).toBe(200);
+    expect((await t.request("DELETE", "/v1/me", { headers })).status).toBe(204);
+  });
+});
+
 describe("a preview account's /v1", () => {
   afterEach(() => {
     t.config.E2E_PREVIEW_USER_IDS = ["listed-user"];
   });
 
-  let finance: { headers: { authorization: string }; userId: string } | undefined;
-  test.each(FINANCE_ROUTES)("%s %s is 403 encrypted_account", async (method, path) => {
-    finance ??= await t.signIn("v1-finance@wambito.test");
-    t.config.E2E_PREVIEW_USER_IDS = ["listed-user", finance.userId];
-    const { headers } = finance;
-    const res = await t.request(method, path, { headers, body: method === "GET" ? undefined : {} });
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "encrypted_account" });
+  test("an account in E2E_PREVIEW_USER_IDS is 426 update_required too", async () => {
+    const { headers } = await previewPerson("v1-listed@wambito.test");
+    await expectUpdateRequired(await t.request("GET", "/v1/transactions", { headers }));
   });
 
   test("the account routes stay: profile, its locale, the assistants list, /v2", async () => {
@@ -134,13 +192,6 @@ describe("a preview account's /v1", () => {
     expect((await t.request("GET", "/v1/me/assistants", { headers })).status).toBe(200);
     expect((await t.request("GET", "/v2/sync?since=0", { headers })).status).toBe(200);
     expect((await t.request("GET", "/v2/keys", { headers })).status).toBe(200);
-  });
-
-  test("PATCH /v1/me with a currency is 403: the currency lives in the records", async () => {
-    const { headers } = await previewPerson("v1-currency@wambito.test");
-    const res = await t.request("PATCH", "/v1/me", { headers, body: { currency: "COP" } });
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "encrypted_account" });
   });
 
   test("DELETE /v1/me still deletes the account", async () => {
@@ -157,8 +208,7 @@ describe("a preview account's /v1", () => {
     const res = await t.request("GET", "/v1/transactions", {
       headers: { authorization: `Bearer ${accessToken}` },
     });
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "encrypted_account" });
+    await expectUpdateRequired(res);
   });
 
   test("a plain account's finance routes still answer", async () => {

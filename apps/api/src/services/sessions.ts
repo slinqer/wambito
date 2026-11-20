@@ -19,7 +19,8 @@ export const SHORT_SESSION_SECONDS = 12 * 60 * 60;
 
 /**
  * The lifetime of a session a sign-in gives `user` from `client`: `long` for an encrypted user
- * without an email on the phone (its only way back in is its recovery key), else `standard`.
+ * without an email on the phone (its only way back in is its recovery key), else `standard`. A
+ * `migrating` user is plain here.
  */
 export function lifetimeFor(
   user: { encryption: Encryption; isAnonymous: boolean },

@@ -137,6 +137,10 @@ class CaptureApi(
                 // For a capture, 403 and 404 are a server that lacks the endpoint (a phone updated
                 // before its server): the capture waits for it instead of being lost.
                 403, 404 -> if (endpointMayBeMissing) ApiResult.Failed else ApiResult.Rejected
+                // 426: the account moved to end-to-end encryption and this request predates it.
+                // The capture or the confirm waits: once the app opens, it learns the account is
+                // `preview` and the queue goes to the vault.
+                426 -> ApiResult.Failed
                 in 400..499 -> ApiResult.Rejected
                 else -> ApiResult.Failed
             }

@@ -226,11 +226,17 @@
     "import_currency_changed": "La moneda de tu cuenta cambió después de leer el archivo. Súbelo otra vez.",
     "guest_cannot_authorize": "Guarda tu progreso con tu correo antes de conectar un asistente.",
     "insufficient_scope": "Este asistente no tiene permiso para hacer eso.",
-    "encrypted_account": "Esta cuenta guarda sus finanzas cifradas de extremo a extremo; esta parte de Wambito todavía no funciona con ella.",
+    "encrypted_account": "Actualiza Wambito: recarga la página.",
+    "update_required": "Actualiza Wambito: recarga la página.",
     "already_set_up": "Esta cuenta ya tiene sus claves. Ábrela con tu clave de recuperación.",
     "session_changed": "Se inició sesión con otra cuenta en este navegador. Recarga la página.",
     "assistant_keys_missing": "Ahora mismo no se pueden conectar asistentes. Inténtalo más tarde.",
-    "assistant_wrap_in_rotation": "Cambiar tus claves desconecta tus asistentes. Vuelve a conectarlos después."
+    "assistant_wrap_in_rotation": "Cambiar tus claves desconecta tus asistentes. Vuelve a conectarlos después.",
+    "keys_missing": "Primero guarda tu clave de recuperación.",
+    "not_migrating": "Tu cuenta no está en medio de un cambio. Recarga la página.",
+    "count_mismatch": "Algo no cuadró y no borramos nada. Inténtalo de nuevo.",
+    "migration_in_progress": "Tu cuenta se está cifrando en otra pestaña o dispositivo. Espera a que termine.",
+    "not_migratable": "Esta cuenta no puede cifrarse todavía."
   },
   "sign_in": {
     "meta_title": "Entrar · Wambito",
@@ -1037,5 +1043,29 @@
     },
     "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
     "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación."
+  },
+  "migration": {
+    "intro_title": "Protege tus datos",
+    "intro_body": "Vamos a cifrar tu cuenta: desde ahora solo tú podrás leer tus movimientos. Toma un minuto y no se pierde nada.",
+    "intro_start": "Empezar",
+    "checking": "Un momento…",
+    "copying": "Cifrando tus datos… {done} de {total}",
+    "copying_label": "Progreso del cifrado",
+    "finishing": "Comprobando que no falte nada…",
+    "done_title": "Listo: tu cuenta está cifrada.",
+    "done_lead": "Tus movimientos están como los dejaste, y ahora solo tú puedes leerlos.",
+    "continue": "Continuar",
+    "failed_title": "Tus datos siguen a salvo",
+    "count_mismatch": "Algo no cuadró y no borramos nada. Inténtalo de nuevo.",
+    "taken_over": "Esta migración sigue en otra pestaña o dispositivo.",
+    "offline": "Sin conexión. No cambió nada: inténtalo de nuevo cuando vuelva.",
+    "server": "Algo falló y no borramos nada. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "retrying": "Reintentando…",
+    "continue_here": "Seguir aquí",
+    "no_local_title": "Esta migración empezó en otro lugar",
+    "no_local_body": "La empezaste en otro navegador o dispositivo. Puedes terminarla allí, o empezar de nuevo aquí: no se pierde nada.",
+    "restart": "Empezar de nuevo aquí",
+    "unlock_lead": "Tu cuenta ya tiene una clave de recuperación. Escríbela para seguir en este navegador."
   }
 }

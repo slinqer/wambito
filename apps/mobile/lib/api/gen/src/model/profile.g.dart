@@ -28,8 +28,32 @@ final BuiltSet<ProfileEncryptionEnum> _$profileEncryptionEnumValues =
       _$profileEncryptionEnum_preview,
     ]);
 
+const ProfileMigrationEnum _$profileMigrationEnum_available = const ProfileMigrationEnum._(
+  'available',
+);
+const ProfileMigrationEnum _$profileMigrationEnum_inProgress = const ProfileMigrationEnum._(
+  'inProgress',
+);
+
+ProfileMigrationEnum _$profileMigrationEnumValueOf(String name) {
+  switch (name) {
+    case 'available':
+      return _$profileMigrationEnum_available;
+    case 'inProgress':
+      return _$profileMigrationEnum_inProgress;
+    default:
+      throw ArgumentError(name);
+  }
+}
+
+final BuiltSet<ProfileMigrationEnum> _$profileMigrationEnumValues = BuiltSet<ProfileMigrationEnum>(
+  const <ProfileMigrationEnum>[_$profileMigrationEnum_available, _$profileMigrationEnum_inProgress],
+);
+
 Serializer<ProfileEncryptionEnum> _$profileEncryptionEnumSerializer =
     _$ProfileEncryptionEnumSerializer();
+Serializer<ProfileMigrationEnum> _$profileMigrationEnumSerializer =
+    _$ProfileMigrationEnumSerializer();
 
 class _$ProfileEncryptionEnumSerializer implements PrimitiveSerializer<ProfileEncryptionEnum> {
   static const Map<String, Object> _toWire = const <String, Object>{
@@ -63,6 +87,38 @@ class _$ProfileEncryptionEnumSerializer implements PrimitiveSerializer<ProfileEn
   );
 }
 
+class _$ProfileMigrationEnumSerializer implements PrimitiveSerializer<ProfileMigrationEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'available': 'available',
+    'inProgress': 'in_progress',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'available': 'available',
+    'in_progress': 'inProgress',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[ProfileMigrationEnum];
+  @override
+  final String wireName = 'ProfileMigrationEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    ProfileMigrationEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  ProfileMigrationEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => ProfileMigrationEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$Profile extends Profile {
   @override
   final String id;
@@ -80,6 +136,8 @@ class _$Profile extends Profile {
   final bool isAnonymous;
   @override
   final ProfileEncryptionEnum encryption;
+  @override
+  final ProfileMigrationEnum? migration;
 
   factory _$Profile([void Function(ProfileBuilder)? updates]) =>
       (ProfileBuilder()..update(updates))._build();
@@ -93,6 +151,7 @@ class _$Profile extends Profile {
     required this.currency,
     required this.isAnonymous,
     required this.encryption,
+    this.migration,
   }) : super._();
   @override
   Profile rebuild(void Function(ProfileBuilder) updates) => (toBuilder()..update(updates)).build();
@@ -111,7 +170,8 @@ class _$Profile extends Profile {
         onboardingCompletedAt == other.onboardingCompletedAt &&
         currency == other.currency &&
         isAnonymous == other.isAnonymous &&
-        encryption == other.encryption;
+        encryption == other.encryption &&
+        migration == other.migration;
   }
 
   @override
@@ -125,6 +185,7 @@ class _$Profile extends Profile {
     _$hash = $jc(_$hash, currency.hashCode);
     _$hash = $jc(_$hash, isAnonymous.hashCode);
     _$hash = $jc(_$hash, encryption.hashCode);
+    _$hash = $jc(_$hash, migration.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -139,7 +200,8 @@ class _$Profile extends Profile {
           ..add('onboardingCompletedAt', onboardingCompletedAt)
           ..add('currency', currency)
           ..add('isAnonymous', isAnonymous)
-          ..add('encryption', encryption))
+          ..add('encryption', encryption)
+          ..add('migration', migration))
         .toString();
   }
 }
@@ -180,6 +242,10 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
   ProfileEncryptionEnum? get encryption => _$this._encryption;
   set encryption(ProfileEncryptionEnum? encryption) => _$this._encryption = encryption;
 
+  ProfileMigrationEnum? _migration;
+  ProfileMigrationEnum? get migration => _$this._migration;
+  set migration(ProfileMigrationEnum? migration) => _$this._migration = migration;
+
   ProfileBuilder() {
     Profile._defaults(this);
   }
@@ -195,6 +261,7 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
       _currency = $v.currency;
       _isAnonymous = $v.isAnonymous;
       _encryption = $v.encryption;
+      _migration = $v.migration;
       _$v = null;
     }
     return this;
@@ -229,6 +296,7 @@ class ProfileBuilder implements Builder<Profile, ProfileBuilder> {
             'isAnonymous',
           ),
           encryption: BuiltValueNullFieldError.checkNotNull(encryption, r'Profile', 'encryption'),
+          migration: migration,
         );
     replace(_$result);
     return _$result;

@@ -23,6 +23,7 @@ import type { AppDeps } from "./deps.ts";
 import { assistantEmail, claimEmail, signInEmail } from "./emails/sign-in.ts";
 import { assistantSecretClaims } from "./http/assistant-secret.ts";
 import { clientHeader } from "./http/client-headers.ts";
+import { toEncryption } from "./services/encryption.ts";
 import { stampActivity } from "./services/guest-cleanup.ts";
 import { deletePasskeyWraps } from "./services/keys.ts";
 import {
@@ -413,7 +414,8 @@ export function createAuth(deps: AppDeps) {
         timezone: { type: "string", required: false, defaultValue: "UTC", input: false },
         locale: { type: "string", required: false, defaultValue: "es", input: false },
         onboardingCompletedAt: { type: "date", required: false, input: false },
-        // `plain` or `encrypted`, fixed at sign-up by NEW_USERS_ENCRYPTED (services/encryption.ts).
+        // `plain` or `encrypted` at sign-up (NEW_USERS_ENCRYPTED), `migrating` on the switch day
+        // (services/encryption.ts).
         encryption: { type: "string", required: true, defaultValue: "plain", input: false },
         // The client that created the user (`android`, `ios`, `web`); null for users made before.
         platform: { type: "string", required: false, input: false },
@@ -426,6 +428,8 @@ export function createAuth(deps: AppDeps) {
         lastSeenDay: { type: "string", required: false, input: false, returned: false },
         // Set by an admin's suspend (spec §5.4): no new session, no token works while it is set.
         suspendedAt: { type: "date", required: false, input: false, returned: false },
+        // The session that started the switch day's migration: only it writes while `migrating`.
+        migrationSessionId: { type: "string", required: false, input: false, returned: false },
       },
     },
     advanced: {
@@ -552,7 +556,7 @@ export function createAuth(deps: AppDeps) {
                 ? given
                 : lifetimeFor(
                     {
-                      encryption: found?.encryption === "encrypted" ? "encrypted" : "plain",
+                      encryption: toEncryption(found?.encryption),
                       isAnonymous: found?.isAnonymous === true,
                     },
                     platformOf(ctx?.headers ?? ctx?.request?.headers),
@@ -623,7 +627,7 @@ export function createAuth(deps: AppDeps) {
             if (
               isPreviewAccount(config, {
                 id: created.id,
-                encryption: created.encryption === "encrypted" ? "encrypted" : "plain",
+                encryption: toEncryption(String(created.encryption)),
               })
             )
               return;

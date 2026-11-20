@@ -8,13 +8,16 @@ export interface FieldError {
   message: string;
 }
 
-/** An error rendered as RFC 9457 problem+json with a stable `code`. */
+/**
+ * An error rendered as RFC 9457 problem+json with a stable `code`. `errors` is a list of field
+ * errors, or an object for a route that documents its own shape (the migration's `count_mismatch`).
+ */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
     readonly detail?: string,
-    readonly errors?: FieldError[],
+    readonly errors?: FieldError[] | Record<string, unknown>,
   ) {
     super(detail ?? code);
     this.name = "ApiError";
@@ -30,6 +33,7 @@ const TITLES: Record<number, string> = {
   410: "Gone",
   413: "Payload Too Large",
   422: "Unprocessable Content",
+  426: "Upgrade Required",
   429: "Too Many Requests",
   500: "Internal Server Error",
 };

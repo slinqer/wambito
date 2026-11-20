@@ -451,7 +451,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
   `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
 - `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
-  local notices only. A `preview` account's "Hoy vence…" is computed in Dart from the vault
+  local notices only. The 45-day guest warning is a `plain` guest's: for a `preview` account `NoticeSync` cancels it,
+  `GuestWorker` posts nothing and Settings hides its switch (an encrypted guest is kept 12 or 24 months). A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)
   and handed over as `scheduleDueList {zone, language, owner, days}` (14 days, replaced whole);
   `DueList` keeps it in prefs `wambito.notice.duelist` (excluded from backups) with its owner, and `DueWorker`
@@ -461,7 +462,7 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   (`CaptureQueue`: each item tagged with the account id it was captured for, the prefs' `owner`
   then; `adopt(userId)` drops the items of another account or of none, old untagged items included;
   only the owner's items are sent, and only while the session mark matches `ownerMark`, which
-  `sendQueued` stores), `CaptureApi` (`POST /v1/captures`, confirm) and WorkManager `SendCapturesWorker`
+  `sendQueued` stores), `CaptureApi` (`POST /v1/captures`, confirm; 408, 429 and 426 are retried, as are a capture's 403 and 404) and WorkManager `SendCapturesWorker`
   (`CaptureHooks` replaces the session and the notifier in tests). The notification text is never
   queued, sent or logged. `CaptureListener` (a `NotificationListenerService`) reads only the packages
   enabled in `CaptureSettings` (prefs `wambito.capture.sources`), hands them to `BankParsers` (`RevolutParser`

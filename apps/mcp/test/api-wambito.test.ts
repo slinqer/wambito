@@ -118,3 +118,16 @@ test("the category filter reaches the API and finds the movement", async () => {
   });
   expect(none.items).toEqual([]);
 });
+
+test("an account that moved to end-to-end encryption (426 update_required) is the reconnect error", async () => {
+  const { headers, userId } = await t.signIn("mcp-migrating@wambito.test");
+  const { accessToken } = await t.authorize("mcp-migrating@wambito.test", { headers });
+  const fetchApi = (async (input: string | URL | Request, init?: RequestInit) =>
+    t.app.request(input instanceof Request ? input : String(input), init)) as typeof fetch;
+  const moved = apiWambito(t.config.API_URL, accessToken, fetchApi);
+  t.config.E2E_PREVIEW_USER_IDS = [userId];
+  const error = await moved.listCategories().catch((e: unknown) => e);
+  t.config.E2E_PREVIEW_USER_IDS = [];
+  expect(error).toBeInstanceOf(ToolError);
+  expect((error as ToolError).code).toBe("reconnect");
+});

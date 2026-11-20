@@ -1,6 +1,7 @@
 import { useMemo } from "react";
+import { redirect } from "react-router";
 import { createTranslator } from "use-intl/core";
-import { previewProfile } from "../auth/encryption.ts";
+import { accountGate } from "../auth/encryption.ts";
 import { requireSession } from "../auth/session.ts";
 import { Consent } from "../features/assistants/Consent.tsx";
 import { createConsentApi, liveConsentApi } from "../features/assistants/consent-api.ts";
@@ -25,13 +26,16 @@ export const meta = () => {
  * query and all. A failed session check throws to the error boundary. An encrypted account
  * (`GET /v1/me` `encryption: "preview"`) gives its assistant a key: `device` when this browser
  * holds its vault (DK from the device wrap, no touch), else the page asks for a passkey or the
- * recovery key.
+ * recovery key. While the account's move to end-to-end encryption runs, the page sends it to the
+ * flow (`/app`): an assistant connected then would be revoked by the move's finish. One the move
+ * is only open to connects as a plain account (the move's finish revokes it too, later).
  */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   const url = new URL(request.url);
   const user = await requireSession(`${url.pathname}${url.search}`);
   const guest = user.isAnonymous === true;
-  const profile = await previewProfile();
+  const { vault: profile, migration } = await accountGate();
+  if (migration?.migration === "in_progress") throw redirect("/app");
   if (!profile) return { guest, encrypted: null };
   let device = false;
   try {

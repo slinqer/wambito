@@ -187,7 +187,8 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
  * It makes **no call to the server**: any authenticated request is activity there and would move
  * the deletion 60 days on, making the warning false. It decides from what is on the phone: the
  * switch, a session that is still stored, and the guest flag the app keeps next to the token. The
- * app cancels the job when the account claims an email and when the person signs out.
+ * app cancels the job when the account claims an email, when the person signs out and when the
+ * account is `preview` (an encrypted guest is kept for months and never gets it, nor posts it here).
  */
 class GuestWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -197,6 +198,8 @@ class GuestWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val outcome = when {
             !settings.guestEnabled -> "off"
             dependencies.session.mark() == null -> "signed out"
+            // An encrypted guest is kept 12 or 24 months, not 60 days: the warning would be false.
+            AccountMode(context).isPreview() -> "encrypted"
             // A flag that is missing reads as a guest, as in the app: the safe side is to warn.
             dependencies.session.guest() == false -> "has an email"
             NoticePoster(context).postGuestWarning(settings.language) -> "posted"

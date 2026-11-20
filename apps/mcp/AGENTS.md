@@ -11,8 +11,8 @@ memory for the request (below) and keeps only their ciphertext.
   with one and no `MCP_WK_PRIVATE_KEY` → every call is the `reconnect` tool error.
 - `src/app.ts`: MCP server `{ name: "wambito", title: "Wambito" }`, tools and prompts from
   `@wambito/ai-assistant-tools`, protected-resource metadata, rate limit (`src/rate-limit.ts`).
-- `src/api-wambito.ts`: the `Wambito` interface over the HTTP API (bearer token); 401 and 403
-  `encrypted_account` are the `reconnect` tool error (`RECONNECT_MESSAGE`).
+- `src/api-wambito.ts`: the `Wambito` interface over the HTTP API (bearer token); 401 and 426
+  `update_required` are the `reconnect` tool error (`RECONNECT_MESSAGE`).
 - `src/vault-wambito.ts`: encrypted accounts (spec 2026-11-16 §7). Per MCP request, under the
   account's lock: `wk` (a JWE) → `S`, `GET /v2/keys/assistant` → wrap and links → record keys
   (`S` and data keys zeroed once derived), a memory store rebuilt from the cache, one `/v2/sync`

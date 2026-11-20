@@ -19,11 +19,11 @@ export const reconnectError = () => new ToolError("reconnect", RECONNECT_MESSAGE
 
 /**
  * What the API's answer means for the model: its problem code and words, or a plain failure. A
- * token the API no longer takes (401), or an old connection to an encrypted account reaching
- * `/v1` (403 `encrypted_account`), asks the person to connect the assistant again.
+ * token the API no longer takes (401), or an old connection to an encrypted (or migrating) account
+ * reaching `/v1` (426 `update_required`), asks the person to connect the assistant again.
  */
 export function toToolError(status: number, problem: Problem | undefined): ToolError {
-  if (status === 401 || (status === 403 && problem?.code === "encrypted_account")) {
+  if (status === 401 || (status === 426 && problem?.code === "update_required")) {
     return reconnectError();
   }
   const code = problem?.code ?? (status === 404 ? "not_found" : `http_${status}`);

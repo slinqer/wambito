@@ -403,6 +403,20 @@ void main() {
       }
     });
 
+    testWidgets('a preview account has no switch for the 45-day guest warning, which it never gets', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: [..._previewGuest(), isPreviewProvider.overrideWithValue(true)],
+      );
+      await _scrollTo(tester, 'settings.dueNotice');
+      expect(find.byKey(const Key('settings.guestNotice')), findsNothing);
+      expect(find.text('Aviso si no tienes correo'), findsNothing);
+    });
+
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
       tester,
     ) async {

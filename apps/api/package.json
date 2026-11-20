@@ -11,6 +11,7 @@
     "seed:admin": "tsx --env-file-if-exists=../../.env src/scripts/seed-admin.ts",
     "seed:e2e-preview": "tsx --env-file-if-exists=../../.env src/scripts/seed-e2e-preview.ts",
     "seed:e2e-plain-user": "tsx --env-file-if-exists=../../.env src/scripts/seed-e2e-plain-user.ts",
+    "seed:e2e-migrate": "tsx --env-file-if-exists=../../.env src/scripts/seed-e2e-migrate.ts",
     "auth:generate": "auth generate --config src/scripts/auth-cli.ts --adapter drizzle --dialect postgresql --output ../../packages/db/src/schema/auth.ts -y",
     "build": "esbuild src/server.ts ../../packages/db/src/scripts/bootstrap.ts --bundle --platform=node --target=node22 --format=esm --outdir=dist --entry-names=[name] --legal-comments=none --banner:js=\"import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);\"",
     "start:prod": "node dist/server.js"
@@ -26,6 +27,7 @@
     "@wambito/crypto": "workspace:*",
     "@wambito/db": "workspace:*",
     "@wambito/importers": "workspace:*",
+    "@wambito/vault": "workspace:*",
     "better-auth": "^1.7.11",
     "hono": "^4.13.13",
     "jose": "6.2.12",

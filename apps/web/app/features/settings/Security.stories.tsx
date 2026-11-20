@@ -317,7 +317,9 @@ export const RemoveDevice: Story = {
     const sheet = await openRemove(within(canvasElement));
     await expect(sheet.queryByRole("textbox")).toBeNull();
     await userEvent.click(sheet.getByRole("button", { name: "Quitar" }));
-    await expect(await screen.findByText("Firefox on Linux ya no tiene acceso.")).toBeVisible();
+    // the toast animates in: wait until it is shown, not only in the DOM
+    const done = await screen.findByText("Firefox on Linux ya no tiene acceso.");
+    await waitFor(() => expect(done).toBeVisible());
     await expect(security.removeDevice).toHaveBeenCalledTimes(1);
     await expect(security.removeDevice).toHaveBeenCalledWith(LAPTOP);
     await expect(security.rotate).not.toHaveBeenCalled();
@@ -334,7 +336,9 @@ export const RemoveDeviceAlreadyGone: Story = {
   play: async ({ canvasElement }) => {
     const sheet = await openRemove(within(canvasElement));
     await userEvent.click(sheet.getByRole("button", { name: "Quitar" }));
-    await expect(await screen.findByText("Firefox on Linux ya no tiene acceso.")).toBeVisible();
+    // the toast animates in: wait until it is shown, not only in the DOM
+    const done = await screen.findByText("Firefox on Linux ya no tiene acceso.");
+    await waitFor(() => expect(done).toBeVisible());
   },
 };
 

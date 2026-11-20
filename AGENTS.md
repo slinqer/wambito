@@ -15,13 +15,13 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 | `packages/ai-assistant-tools` | MCP tools, prompts, instructions | `packages/ai-assistant-tools/AGENTS.md` |
 | `packages/core` | shared domain: money, dates, budgets, quick-capture cases | `packages/core/AGENTS.md` |
 | `packages/crypto` | end-to-end encryption: data key, record sealing, dedupe tags | `packages/crypto/AGENTS.md` |
-| `packages/vault` | browser-free vault (web and MCP): store contract, memory stores, sync engine, local `/v1` backend, ids | `packages/vault/AGENTS.md` |
+| `packages/vault` | browser-free vault (web and MCP; the API for migration ids): store contract, memory stores, sync engine, local `/v1` backend, ids | `packages/vault/AGENTS.md` |
 | `packages/db` | Drizzle schema, migrations, RLS | `packages/db/AGENTS.md` |
 | `packages/importers` | CSV importers | `packages/importers/AGENTS.md` |
 | `deploy/personal` | the VPS / home install: compose, Caddy, backups, auto-deploy | `deploy/personal/AGENTS.md` |
 | `deploy/landing` | Cloudflare Worker for the landing | `deploy/landing/AGENTS.md` |
 | `docs` | design system, deploy, mobile, admin panel guide (`docs/admin.md`), history | `docs/AGENTS.md` |
-| `scripts` | repo guards (`scripts/check-old-name.sh`) | here |
+| `scripts` | repo guards (`scripts/check-old-name.sh`); `scripts/check-switch-dates.sh` (the switch day's policy dates, run by hand from `docs/deploy/switch-day.md`, not in CI) | here |
 | `docker-compose.yml` | root dev stack: postgres, mailpit, api | here |
 
 ## Dev stack and commands (repo root)

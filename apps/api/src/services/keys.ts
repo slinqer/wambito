@@ -147,7 +147,8 @@ async function endSessions(
     .delete(session)
     .where(and(eq(session.userId, userId), inArray(session.id, ended)))
     .returning({ token: session.token });
-  // The 401 codes are for encrypted accounts only (spec 2026-11-15 §11).
+  // The 401 codes are for encrypted accounts only (spec 2026-11-15 §11); a `migrating` one is
+  // still plain here (spec 2026-11-19 §1).
   const [owner] = await tx
     .select({ encryption: user.encryption })
     .from(user)

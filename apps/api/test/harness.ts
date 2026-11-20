@@ -21,6 +21,8 @@ export const TEST_CONFIG = {
   CLIENT_IP_HEADER: "x-forwarded-for",
   GUEST_SIGNUP: true,
   NEW_USERS_ENCRYPTED: false,
+  MIGRATION_OPEN: false,
+  MIGRATION_OPEN_USER_IDS: [] as string[],
   TRUSTED_PROXIES: ["10.0.0.0/8"],
   ADMIN_USER_IDS: [],
   E2E_PREVIEW_USER_IDS: [] as string[],
