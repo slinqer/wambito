@@ -26,8 +26,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const KEY = "7QK2-M9XD-HT4V-R3WB-N8YC-5FJ6-A0Z";
+
 const typeKey = async (canvas: ReturnType<typeof within>, text: string) => {
   await userEvent.type(canvas.getByLabelText("Clave de recuperación"), text);
+  await expect(canvas.getByRole("button", { name: "Abrir mis datos" })).toBeEnabled();
   await userEvent.click(canvas.getByRole("button", { name: "Abrir mis datos" }));
 };
 
@@ -37,8 +40,9 @@ export const Ready: Story = {
     await expect(
       canvas.getByRole("heading", { level: 1, name: "Abre tus datos aquí" }),
     ).toBeVisible();
-    // The recovery key, a passkey, another device, and sign-out (plus the screen's own).
-    await expect(canvas.getAllByRole("button")).toHaveLength(5);
+    // Paste, the key's submit, a passkey, another device and sign-out.
+    await expect(canvas.getAllByRole("button", { name: "Pegar" })).toHaveLength(1);
+    await expect(canvas.getAllByRole("button")).toHaveLength(6);
     const pair = canvas.getByRole("button", { name: "Desde otro dispositivo" });
     await expectTarget(pair);
     await userEvent.click(pair);
@@ -47,8 +51,15 @@ export const Ready: Story = {
     await expect(args.onSignOut).toHaveBeenCalledTimes(1);
     await expectTarget(canvas.getByLabelText("Clave de recuperación").parentElement as HTMLElement);
     await expect(canvas.getByRole("button", { name: "Abrir mis datos" })).toBeDisabled();
-    await typeKey(canvas, "  7qk2 m9xd-ht4v ");
-    await expect(args.onUnlock).toHaveBeenCalledWith("  7qk2 m9xd-ht4v ");
+    // Typed in any shape, the field shows the key in groups and submits it grouped.
+    const field = canvas.getByLabelText("Clave de recuperación");
+    await userEvent.type(field, "  7qk2 m9xd-ht4v r3wb n8yc 5fj6 a0");
+    await expect(field).toHaveValue("7QK2-M9XD-HT4V-R3WB-N8YC-5FJ6-A0");
+    await expect(canvas.getByRole("button", { name: "Abrir mis datos" })).toBeDisabled();
+    await userEvent.type(field, "z");
+    await expect(field).toHaveValue(KEY);
+    await userEvent.click(canvas.getByRole("button", { name: "Abrir mis datos" }));
+    await expect(args.onUnlock).toHaveBeenCalledWith(KEY);
   },
 };
 
@@ -56,7 +67,7 @@ export const BadFormat: Story = {
   args: { onUnlock: fn(async () => "bad_recovery_key" as const) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await typeKey(canvas, "nope");
+    await typeKey(canvas, KEY);
     await expect(await canvas.findByRole("alert")).toHaveTextContent(
       "no tiene el formato correcto",
     );
@@ -64,8 +75,8 @@ export const BadFormat: Story = {
       "aria-invalid",
       "true",
     );
-    // Typing again clears it.
-    await userEvent.type(canvas.getByLabelText("Clave de recuperación"), "x");
+    // Editing again clears it.
+    await userEvent.type(canvas.getByLabelText("Clave de recuperación"), "{Backspace}");
     await expect(canvas.queryByRole("alert")).toBeNull();
   },
 };
@@ -74,7 +85,7 @@ export const WrongKey: Story = {
   args: { onUnlock: fn(async () => "wrong_recovery_key" as const) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await typeKey(canvas, "7QK2-M9XD-HT4V-R3WB-N8YC-5FJ6-A0Z");
+    await typeKey(canvas, KEY);
     await expect(await canvas.findByRole("alert")).toHaveTextContent("no abre esta cuenta");
     await expect(canvas.getByRole("button", { name: "Abrir mis datos" })).toBeEnabled();
   },
@@ -84,7 +95,7 @@ export const Offline: Story = {
   args: { onUnlock: fn(async () => "offline" as const) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await typeKey(canvas, "7QK2");
+    await typeKey(canvas, KEY);
     await expect(await canvas.findByRole("alert")).toHaveTextContent("No hay conexión");
   },
 };
@@ -93,7 +104,7 @@ export const Opening: Story = {
   args: { onUnlock: fn(() => new Promise<UnlockError | null>(() => {})) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await typeKey(canvas, "7QK2");
+    await typeKey(canvas, KEY);
     await expect(await canvas.findByRole("button", { name: "Abriendo…" })).toBeDisabled();
   },
 };
@@ -134,8 +145,8 @@ export const NoPasskeys: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole("button", { name: "Usar una llave de acceso" })).toBeNull();
-    // The screen's own buttons, another device and sign-out.
-    await expect(canvas.getAllByRole("button")).toHaveLength(4);
+    // Paste, the key's submit, another device and sign-out.
+    await expect(canvas.getAllByRole("button")).toHaveLength(5);
   },
 };
 

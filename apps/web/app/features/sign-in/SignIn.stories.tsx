@@ -531,10 +531,17 @@ export const RecoveryKey: Story = {
     await userEvent.click(open);
     const field = await canvas.findByRole("textbox", { name: "Tu clave de recuperación" });
     await expect(field).toHaveFocus();
-    await userEvent.type(field, "abcd-efgh-jkmn-pqrs-tvwx-yz01-234");
-    await userEvent.click(canvas.getByRole("button", { name: "Entrar con la clave" }));
+    const submit = canvas.getByRole("button", { name: "Entrar con la clave" });
+    // The field groups what is typed; the button waits for the whole key.
+    await userEvent.type(field, "abcd efgh jkmn pqrs tvwx yz01 23");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23");
+    await expect(submit).toBeDisabled();
+    await userEvent.type(field, "4");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234");
+    await expect(submit).toBeEnabled();
+    await userEvent.click(submit);
     await expect(args.auth.signInWithRecoveryKey).toHaveBeenCalledWith(
-      "abcd-efgh-jkmn-pqrs-tvwx-yz01-234",
+      "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234",
     );
     await expect(await canvas.findByRole("alert")).toHaveTextContent(
       "Esta clave de recuperación no inicia sesión. Revísala e inténtalo de nuevo.",

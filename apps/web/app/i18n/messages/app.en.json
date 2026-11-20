@@ -958,6 +958,7 @@
       "lead": "Your data is encrypted. Type your recovery key to open it in this browser.",
       "label": "Recovery key",
       "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "paste": "Paste",
       "submit": "Open my data",
       "busy": "Opening…",
       "error_bad_recovery_key": "That key is not in the right format. Check that you copied all of it.",

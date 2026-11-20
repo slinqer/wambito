@@ -958,6 +958,7 @@
       "lead": "I tuoi dati sono cifrati. Scrivi la tua chiave di recupero per aprirli in questo browser.",
       "label": "Chiave di recupero",
       "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "paste": "Incolla",
       "submit": "Apri i miei dati",
       "busy": "Apertura…",
       "error_bad_recovery_key": "Quella chiave non ha il formato giusto. Controlla di averla copiata tutta.",

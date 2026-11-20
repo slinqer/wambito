@@ -1,10 +1,11 @@
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { passkeysSupported as browserPasskeys } from "../../auth/passkey.ts";
-import { cx } from "../../ui/cx.ts";
 import { FingerprintIcon } from "../../ui/FingerprintIcon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
+import { RecoveryKeyField } from "./RecoveryKeyField.tsx";
+import { isFullRecoveryKey } from "./recovery-key-input.ts";
 
 /** Why unlocking failed; `null` from `onUnlock` means it worked. Mirrors `KeysError.code`. */
 export type UnlockError =
@@ -82,7 +83,7 @@ export function Unlock({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (busy || text.trim() === "") return;
+    if (busy || !isFullRecoveryKey(text)) return;
     setBusy(true);
     setError(null);
     setPasskeyError(null);
@@ -106,29 +107,18 @@ export function Unlock({
         <label htmlFor={inputId} className="text-sm text-ink-muted">
           {t("label")}
         </label>
-        <div className={cx("lk-input min-h-11", error && "border-over")}>
-          <input
-            id={inputId}
-            name="recovery-key"
-            type="text"
-            autoComplete="off"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            translate="no"
-            placeholder={t("placeholder")}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value);
-              if (error) setError(null);
-            }}
-            aria-invalid={error !== null || undefined}
-            aria-describedby={error ? errorId : undefined}
-            className="min-h-9 min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[16px] text-ink uppercase outline-none placeholder:font-normal placeholder:text-ink-muted"
-          />
-        </div>
+        <RecoveryKeyField
+          id={inputId}
+          value={text}
+          onChange={(next) => {
+            setText(next);
+            if (error) setError(null);
+          }}
+          invalid={error !== null}
+          describedBy={error ? errorId : undefined}
+        />
         {error && <FieldError id={errorId}>{t(`error_${error}`)}</FieldError>}
-        <PressButton type="submit" className="w-full" disabled={busy || text.trim() === ""}>
+        <PressButton type="submit" className="w-full" disabled={busy || !isFullRecoveryKey(text)}>
           {busy ? t("busy") : t("submit")}
         </PressButton>
       </form>

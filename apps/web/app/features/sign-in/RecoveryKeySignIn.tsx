@@ -1,7 +1,8 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
-import { cx } from "../../ui/cx.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
+import { RecoveryKeyField } from "../vault/RecoveryKeyField.tsx";
+import { isFullRecoveryKey } from "../vault/recovery-key-input.ts";
 import type { RecoveryErrorCode, RecoveryResult } from "./auth.ts";
 import { FieldError } from "./SignInScreen.tsx";
 import { useSecondsUntil } from "./use-seconds-until.ts";
@@ -62,7 +63,7 @@ export function RecoveryKeySignIn({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (inFlight.current || disabled || text.trim() === "" || retryIn > 0) return;
+    if (inFlight.current || disabled || !isFullRecoveryKey(text) || retryIn > 0) return;
     inFlight.current = true;
     setBusy(true);
     onBusy?.(true);
@@ -114,34 +115,23 @@ export function RecoveryKeySignIn({
           <label htmlFor={fieldId} className="text-sm text-ink-muted">
             {t("label")}
           </label>
-          <div className={cx("lk-input min-h-11", error && "border-over")}>
-            <input
-              ref={input}
-              id={fieldId}
-              name="recovery-key"
-              type="text"
-              autoComplete="off"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              translate="no"
-              placeholder={tRoot("vault.unlock.placeholder")}
-              value={text}
-              readOnly={busy}
-              onChange={(event) => {
-                setText(event.target.value);
-                if (error) setError(null);
-              }}
-              aria-invalid={error !== null || undefined}
-              aria-describedby={error ? errorId : undefined}
-              className="min-h-9 min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[16px] text-ink uppercase outline-none placeholder:font-normal placeholder:text-ink-muted"
-            />
-          </div>
+          <RecoveryKeyField
+            id={fieldId}
+            inputRef={input}
+            value={text}
+            readOnly={busy}
+            onChange={(next) => {
+              setText(next);
+              if (error) setError(null);
+            }}
+            invalid={error !== null}
+            describedBy={error ? errorId : undefined}
+          />
           {errorText && <FieldError id={errorId}>{errorText}</FieldError>}
           <PressButton
             type="submit"
             className="w-full"
-            disabled={busy || disabled || text.trim() === "" || retryIn > 0}
+            disabled={busy || disabled || !isFullRecoveryKey(text) || retryIn > 0}
           >
             {busy
               ? t("busy")
