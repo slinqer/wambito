@@ -47,6 +47,7 @@ export function resetAnalyticsForTests(): void {
 export function startAnalytics(
   config: AnalyticsConfig,
   load: () => Promise<PostHogLike> = loadPosthog,
+  storage: Storage | undefined = safeLocalStorage(),
 ): Promise<void> {
   if (started) {
     started.opt_in_capturing({ captureEventName: null });
@@ -59,6 +60,9 @@ export function startAnalytics(
     try {
       const ph = await load();
       if (mine !== generation) return; // withdrawn while loading: never init
+      // A withdrawal on an earlier visit left its opt-out marker behind; PostHog would read it as
+      // a denial. This runs only after consent, so a stale marker is never right here.
+      removeOptOutMarkers(storage);
       ph.init(config.key, posthogOptions(config));
       started = ph;
     } catch (error) {
@@ -94,6 +98,20 @@ export function stopAnalytics(
     }
   }
   clearPosthogStorage(env.document, env.localStorage);
+}
+
+function removeOptOutMarkers(storage: Storage | undefined): void {
+  try {
+    if (!storage) return;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith("__ph_opt_in_out_")) keys.push(key);
+    }
+    for (const key of keys) storage.removeItem(key);
+  } catch {
+    // Storage blocked: nothing to remove.
+  }
 }
 
 function safeLocalStorage(): Storage | undefined {

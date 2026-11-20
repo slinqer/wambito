@@ -61,7 +61,20 @@ describe("posthogOptions", () => {
 });
 
 describe("startAnalytics and stopAnalytics", () => {
-  it("starts once per page", async () => {
+  it("removes a stale opt-out marker before init", async () => {
+    const ph = fakePosthog();
+    const storage = memoryStorage({ __ph_opt_in_out_phc_x: "0", theme: "dark" });
+    let markerAtInit: string | null = "unset";
+    ph.init.mockImplementation(() => {
+      markerAtInit = storage.getItem("__ph_opt_in_out_phc_x");
+    });
+    await startAnalytics(config, async () => ph, storage);
+    expect(ph.init).toHaveBeenCalledTimes(1);
+    expect(markerAtInit).toBeNull();
+    expect(storage.getItem("theme")).toBe("dark");
+  });
+
+  it("inits once for concurrent starts", async () => {
     const ph = fakePosthog();
     const load = vi.fn(async () => ph);
     const first = startAnalytics(config, load);
