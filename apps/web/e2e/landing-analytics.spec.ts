@@ -161,6 +161,19 @@ test("nothing before accept", async ({ page }) => {
   expect((await posthogStorage(page)).cookies).toEqual([]);
 });
 
+for (const answer of ["accept", "decline"] as const) {
+  test(`answering the first visit's banner (${answer}) keeps the page where it was`, async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(banner(page)).toBeVisible();
+    await (answer === "accept" ? accept(page) : decline(page));
+    // The focus never jumps to the footer's "Cookie preferences": the page does not scroll.
+    await expect(preferences(page)).not.toBeFocused();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+}
+
 test("the open banner never covers the footer's focused links", async ({ page }) => {
   await page.goto("/");
   await expect(banner(page)).toBeVisible();
