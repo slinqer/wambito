@@ -62,8 +62,10 @@ export function useAnalyticsConsent(
     });
   }, []);
 
+  // Always stops, even when this footer started nothing: PostHog is one per page, and an earlier
+  // footer (before a client-side move) may have started it. With nothing started, `stopAnalytics`
+  // loads nothing and only clears PostHog's storage.
   const end = useCallback(() => {
-    if (!running.current) return;
     running.current = false;
     (latest.current.deps.stop ?? stopAnalytics)();
   }, []);
@@ -81,7 +83,10 @@ export function useAnalyticsConsent(
     setState(current);
     setOpen(current === "ask");
     setReady(true);
+    // Not `granted` (asking, denied, an expired or old-version grant, GPC/DNT): stop, so what an
+    // earlier visit left (`ph_*`) goes. A first visit has nothing to clear and sends nothing.
     if (current === "granted") begin();
+    else end();
     // Another tab withdrew (or cleared the choice): stop here too.
     const unwatch = watchConsent(() => {
       setState(consentState(readStoredConsent(storage), signals, now()));

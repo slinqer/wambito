@@ -128,18 +128,43 @@ export const AcceptStores: Story = {
   },
 };
 
-/** Declining stores `denied`, starts nothing and closes the banner. */
+/**
+ * Declining stores `denied`, starts nothing and closes the banner. It still calls `stop`: PostHog
+ * is one per page, and another footer (before a client-side move) may have started it. With
+ * nothing started, the real `stop` only clears PostHog's storage; it never loads PostHog.
+ */
 export const DeclineStores: Story = {
   loaders: [fakes(() => memoryStorage())],
   play: async ({ canvasElement, loaded }) => {
     const { storage, start, stop } = loaded as Loaded;
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "No, gracias" }));
+    const decline = await canvas.findByRole("button", { name: "No, gracias" });
+    // Mounted asking (not `granted`): one `stop` already cleared any leftovers.
+    await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+    await userEvent.click(decline);
     await expect(storedChoice(storage)).toBe("denied");
     await expect(start).not.toHaveBeenCalled();
-    // Nothing was started, so there is nothing to stop.
-    await expect(stop).not.toHaveBeenCalled();
+    // Nothing ran in this footer, and the decline stops anyway.
+    await expect(stop).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(canvas.queryByRole("region")).toBeNull());
+  },
+};
+
+/**
+ * Mounted with a stored `denied` (or an expired or old-version grant, or GPC): `stop` runs once,
+ * so a `ph_*` left by an earlier visit goes; nothing starts and the banner stays closed.
+ */
+export const MountDeniedClears: Story = {
+  loaders: [fakes(() => memoryStorage({ [CONSENT_KEY]: encodeChoice("denied", NOW) }))],
+  play: async ({ canvasElement, loaded }) => {
+    const { start, stop } = loaded as Loaded;
+    const canvas = within(canvasElement);
+    await canvas.findByRole("button", { name: "Preferencias de cookies" });
+    await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await expect(stop).toHaveBeenCalledTimes(1);
+    await expect(start).not.toHaveBeenCalled();
+    await expect(canvas.queryByRole("region")).toBeNull();
   },
 };
 
