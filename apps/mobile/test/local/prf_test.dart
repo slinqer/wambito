@@ -129,6 +129,69 @@ void main() {
     });
   });
 
+  group('withPrfExtension', () {
+    test('adds the PRF extension and keeps the rest of the options', () {
+      final out = jsonDecode(
+        withPrfExtension(
+          jsonEncode({
+            'challenge': 'c',
+            'extensions': {'other': true},
+          }),
+        ),
+      ) as Map;
+      expect(out['challenge'], 'c');
+      expect(out['extensions'], {
+        'other': true,
+        'prf': {
+          'eval': {'first': _saltB64},
+        },
+      });
+    });
+  });
+
+  group('prfOfAssertion', () {
+    test('takes the credential id and a 32-byte PRF', () {
+      final passkey = prfOfAssertion(
+        credentialJson('cred-1', {
+          'prf': {
+            'results': {'first': b64(bytes(32, 9))},
+          },
+        }),
+      );
+      expect(passkey?.credentialId, 'cred-1');
+      expect(passkey?.prf, bytes(32, 9));
+    });
+
+    test('is null without a PRF, with another length, without an id, or not JSON', () {
+      expect(prfOfAssertion(credentialJson('cred-1', {'prf': <String, Object?>{}})), isNull);
+      expect(prfOfAssertion(credentialJson('cred-1', null)), isNull);
+      expect(
+        prfOfAssertion(
+          credentialJson('cred-1', {
+            'prf': {
+              'results': {'first': b64(bytes(16))},
+            },
+          }),
+        ),
+        isNull,
+      );
+      expect(
+        prfOfAssertion(
+          jsonEncode({
+            'clientExtensionResults': {
+              'prf': {
+                'results': {'first': b64(bytes(32))},
+              },
+            },
+          }),
+        ),
+        isNull,
+      );
+      expect(prfOfAssertion('{"assertion":true}'), isNull);
+      expect(prfOfAssertion('not json'), isNull);
+    });
+  });
+
   group('evaluatePrf', () {
     const options =
         '{"challenge":"AQIDBA","rpId":"app.wambito.test","userVerification":"required"}';

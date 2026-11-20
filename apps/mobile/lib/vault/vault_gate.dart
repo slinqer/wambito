@@ -37,6 +37,15 @@ import '../local/vault_session.dart' show VaultOpenError;
 /// ([VaultGateDeps.evaluatePrf]); one without a wrap is kept the same way. A known phone zeroes
 /// the stash. Every PRF is zeroed once used.
 ///
+/// What can open the data here (spec 2026-11-20 section 1): [Unlock] carries [Unlock.noPrfHere], a
+/// stored hint that this phone's last passkey touch for the account gave no PRF
+/// ([VaultGateDeps.passkeyGaveNoPrf]; noted by a passkey sign-in without one, and by Unlock's
+/// passkey button when its touch was limited to the account's passkeys; cleared when a passkey's PRF
+/// opens the data), and [Unlock.passkeyWrap] ([VaultGateDeps.hasPasskeyWrap], true when the wraps
+/// cannot be read). Unlock reached from an open vault ([removed], [unverified]) shows at once with
+/// the last known values and is refined once they are read; a read that comes back after another
+/// change of state changes nothing.
+///
 /// Recovery-key sign-in: the key typed to sign in, held as its parsed bytes
 /// ([VaultGateDeps.takeSignInRecoverySecret]), is taken at every check and tried once on an account
 /// with wraps and no keys here, before Unlock; it is zeroed after that attempt, and at once when it
@@ -128,7 +137,7 @@ final class Committing<S> extends VaultGateState<S> {
 }
 
 final class Unlock<S> extends VaultGateState<S> {
-  const Unlock({this.notice, this.error});
+  const Unlock({this.notice, this.error, this.noPrfHere = false, this.passkeyWrap = true});
 
   /// This phone was removed from the account (its vault is gone).
   static const removed = 'removed';
@@ -143,19 +152,42 @@ final class Unlock<S> extends VaultGateState<S> {
   /// as the field's error; null otherwise.
   final String? error;
 
+  /// This phone's last passkey touch for the account gave no PRF (the stored hint): the screen
+  /// leads with the recovery key (the web's `UnlockMeans.noPrfHere`).
+  final bool noPrfHere;
+
+  /// The account has a passkey wrap (true when its wraps cannot be read).
+  final bool passkeyWrap;
+
+  /// The same Unlock with what can open the data here.
+  Unlock<S> withMeans(UnlockMeans means) => Unlock(
+    notice: notice,
+    error: error,
+    noPrfHere: means.noPrfHere,
+    passkeyWrap: means.passkeyWrap,
+  );
+
   @override
   String get status => 'unlock';
 
   @override
   bool operator ==(Object other) =>
-      other is Unlock && other.notice == notice && other.error == error;
+      other is Unlock &&
+      other.notice == notice &&
+      other.error == error &&
+      other.noPrfHere == noPrfHere &&
+      other.passkeyWrap == passkeyWrap;
 
   @override
-  int get hashCode => Object.hash(status, notice, error);
+  int get hashCode => Object.hash(status, notice, error, noPrfHere, passkeyWrap);
 
   @override
-  String toString() => 'Unlock(notice: $notice, error: $error)';
+  String toString() =>
+      'Unlock(notice: $notice, error: $error, noPrfHere: $noPrfHere, passkeyWrap: $passkeyWrap)';
 }
+
+/// What the Unlock screen needs to know to pick its layout: the web's `UnlockMeans`.
+typedef UnlockMeans = ({bool noPrfHere, bool passkeyWrap});
 
 /// Where the person came from to pair: Unlock.
 enum PairingFrom { unlock }
@@ -287,6 +319,10 @@ class VaultGateDeps<K, S> {
     this.startPairing,
     this.takeSignInRecoverySecret,
     this.unlockWithRecoverySecret,
+    this.passkeyGaveNoPrf,
+    this.notePasskeyWithoutPrf,
+    this.notePasskeyOpened,
+    this.hasPasskeyWrap,
   });
 
   /// The keys this phone kept, or null.
@@ -337,6 +373,18 @@ class VaultGateDeps<K, S> {
   /// Opens the recovery wrap with that secret; throws `wrong_recovery_key` when it opens nothing.
   /// The caller (the gate) zeroes the secret.
   final Future<K> Function(Uint8List secret)? unlockWithRecoverySecret;
+
+  /// Whether this phone's last passkey touch for this account gave no PRF (a stored hint).
+  final Future<bool> Function()? passkeyGaveNoPrf;
+
+  /// A passkey touch here, for this account, gave no PRF: remember it.
+  final Future<void> Function()? notePasskeyWithoutPrf;
+
+  /// A passkey's PRF opened the data here: forget the hint.
+  final Future<void> Function()? notePasskeyOpened;
+
+  /// Whether the account has a passkey wrap (its wraps list); may throw, which counts as true.
+  final Future<bool> Function()? hasPasskeyWrap;
 }
 
 /// The codes Unlock shows; anything else is `server`.
@@ -428,7 +476,11 @@ class VaultGate<K, S> {
     return () => _listeners.remove(listener);
   }
 
+  /// Counts every change of [state], so a step that waited can tell whether it is still current.
+  int _changes = 0;
+
   void _set(VaultGateState<S> next) {
+    _changes++;
     _state = next;
     for (final listener in List.of(_listeners)) {
       listener();
@@ -498,6 +550,7 @@ class VaultGate<K, S> {
     try {
       final keys = await unlock(passkey);
       _zero(passkey);
+      await _passkeyOpened();
       return (keys: keys, error: null);
     } on Object catch (error) {
       if (gateErrorCode(error) == 'no_passkey_wrap') {
@@ -509,16 +562,57 @@ class VaultGate<K, S> {
     }
   }
 
-  /// The account has keys made elsewhere: Unlock.
-  void _hasKeysElsewhere() {
-    _prepared = null;
-    _set(const Unlock());
+  /// What Unlock last showed, for a screen that comes back to it (pairing's back, a notice over
+  /// the open vault).
+  UnlockMeans _lastMeans = (noPrfHere: false, passkeyWrap: true);
+
+  /// What can open the data here: the stored hint, and whether the account has a passkey wrap. A
+  /// hint that cannot be read is false; wraps that cannot be read count as a passkey wrap. Never
+  /// throws.
+  Future<UnlockMeans> _readMeans() async {
+    var noPrfHere = false;
+    try {
+      noPrfHere = await _deps.passkeyGaveNoPrf?.call() ?? false;
+    } on Object {
+      noPrfHere = false;
+    }
+    var passkeyWrap = true;
+    try {
+      passkeyWrap = await _deps.hasPasskeyWrap?.call() ?? true;
+    } on Object {
+      passkeyWrap = true;
+    }
+    return _lastMeans = (noPrfHere: noPrfHere, passkeyWrap: passkeyWrap);
   }
 
-  /// Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice.
-  void _showNotice(String notice) {
+  /// Shows [unlock] with what can open the data here. [now]: shown at once with the last known
+  /// means and refined once they are read (the gate leaves an open vault, and must never keep
+  /// saying it is open meanwhile); else shown once they are read. A read that comes back after
+  /// another change of state (or a disposed gate) changes nothing.
+  Future<void> _showUnlock(Unlock<S> unlock, {bool now = false}) async {
     _prepared = null;
-    _set(Unlock(notice: notice));
+    if (now) _set(unlock.withMeans(_lastMeans));
+    final at = _changes;
+    final means = await _readMeans();
+    if (_disposed || _changes != at) return;
+    final next = unlock.withMeans(means);
+    if (next != _state) _set(next);
+  }
+
+  /// The account has keys made elsewhere: Unlock.
+  Future<void> _hasKeysElsewhere() => _showUnlock(Unlock<S>());
+
+  /// Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice.
+  Future<void> _showNotice(String notice, {bool now = false}) =>
+      _showUnlock(Unlock<S>(notice: notice), now: now);
+
+  /// A passkey's PRF opened the data here: the "no PRF" hint no longer holds.
+  Future<void> _passkeyOpened() async {
+    try {
+      await _deps.notePasskeyOpened?.call();
+    } on Object {
+      // A hint that cannot be cleared only costs a different layout.
+    }
   }
 
   /// Shows Locked; its retry runs [step].
@@ -563,11 +657,11 @@ class VaultGate<K, S> {
         case 'device_removed':
           // Removed while the app was closed: the session deleted the vault, so say so.
           _keepPending(null);
-          _showNotice(Unlock.removed);
+          await _showNotice(Unlock.removed);
         case 'key_unverified':
           // A new key version did not verify: the vault is kept, an unlock opens it again.
           _keepPending(null);
-          _showNotice(Unlock.unverified);
+          await _showNotice(Unlock.unverified);
         default:
           _lock(error, _check);
       }
@@ -624,7 +718,7 @@ class VaultGate<K, S> {
             return _changed(tried.error, _check);
           }
         }
-        _hasKeysElsewhere();
+        await _hasKeysElsewhere();
       } else if (code == 'session_changed') {
         await _changed(error, _check);
       } else {
@@ -657,9 +751,7 @@ class VaultGate<K, S> {
         case 'unsupported_browser':
           return _lock(error, _check);
       }
-      _prepared = null;
-      _set(Unlock(error: _unlockError(error)));
-      return;
+      return _showUnlock(Unlock<S>(error: _unlockError(error)));
     }
     _zeroBytes(secret);
     await _wrapPending();
@@ -677,7 +769,7 @@ class VaultGate<K, S> {
       // Another phone or browser set the account up first: its data key wins, this one is dropped.
       switch (gateErrorCode(error)) {
         case 'already_set_up':
-          _hasKeysElsewhere();
+          await _hasKeysElsewhere();
         case 'session_changed':
           await _changed(error, _commit);
         default:
@@ -742,6 +834,15 @@ class VaultGate<K, S> {
     try {
       passkey = await evaluatePrf(ids);
     } on Object catch (error) {
+      // Noted only when the touch was limited to this account's passkeys: another account's
+      // passkey must never mark this one. The screen keeps its layout; the next Unlock reads it.
+      if (gateErrorCode(error) == 'no_prf' && ids != null) {
+        try {
+          await _deps.notePasskeyWithoutPrf?.call();
+        } on Object {
+          // Not remembered; the error is still shown.
+        }
+      }
       return _unlockError(error);
     }
     if (passkey == null) return null;
@@ -803,7 +904,7 @@ class VaultGate<K, S> {
     if (state is! Pairing<S>) return;
     _pairingCall++;
     _dropPairing();
-    _set(const Unlock());
+    _set(Unlock<S>().withMeans(_lastMeans));
   }
 
   /// Locked's retry.
@@ -825,16 +926,18 @@ class VaultGate<K, S> {
   }
 
   /// This phone was removed from the account (`VaultSession.onRemoved`: its device wrap is gone and
-  /// the vault was deleted): Unlock with the `removed` notice.
-  void removed() {
+  /// the vault was deleted): Unlock with the `removed` notice, at once (with the last known means,
+  /// refined once read).
+  Future<void> removed() async {
     if (_state is! Ready) return;
-    _showNotice(Unlock.removed);
+    await _showNotice(Unlock.removed, now: true);
   }
 
   /// A new key version did not verify (`VaultSession.onUnverified`: the sync stopped, the vault is
-  /// kept): Unlock with the `unverified` notice.
-  void unverified() {
+  /// kept): Unlock with the `unverified` notice, at once (with the last known means, refined once
+  /// read).
+  Future<void> unverified() async {
     if (_state is! Ready) return;
-    _showNotice(Unlock.unverified);
+    await _showNotice(Unlock.unverified, now: true);
   }
 }

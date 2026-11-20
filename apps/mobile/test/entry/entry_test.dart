@@ -622,7 +622,7 @@ void main() {
       await tester.tap(find.byKey(const Key('entry.passkey')));
       await tester.pumpAndSettle();
 
-      expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+      expect(passkeys.calls, ['get $signInOptionsWithPrf']);
       expect(auth.calls.take(3), [
         'passkeySignInOptions',
         'passkeySignIn {"assertion":true}',
@@ -655,7 +655,7 @@ void main() {
   });
 
   group('passkey on the email screen', () {
-    const getAvailable = 'getAvailable {"challenge":"sign-in"}';
+    final getAvailable = 'getAvailable $signInOptionsWithPrf';
 
     Future<ProviderContainer> openEmail(
       WidgetTester tester,
@@ -777,7 +777,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The button may show the provider's picker (a passkey made anywhere), not only what is at hand.
-      expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+      expect(passkeys.calls, ['get $signInOptionsWithPrf']);
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(_stored(container)?.token, 'passkey-token-1');
     });
@@ -872,7 +872,7 @@ void main() {
         await tester.tap(find.byKey(const Key('guest.leaveConfirm')));
         await tester.pumpAndSettle();
 
-        expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+        expect(passkeys.calls, ['get $signInOptionsWithPrf']);
         expect(_stored(container)?.token, 'passkey-token-1');
         expect(find.byType(HomeScreen), findsOneWidget);
       });

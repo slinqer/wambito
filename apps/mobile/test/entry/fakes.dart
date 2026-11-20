@@ -14,6 +14,7 @@ import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/widget_snapshot.dart';
+import 'package:wambito/local/prf.dart' show withPrfExtension;
 import 'package:wambito/review/review_repository.dart';
 
 import '../home/fakes.dart';
@@ -282,6 +283,9 @@ class FakeAuthApi implements AuthApi {
 }
 
 /// The phone's passkey prompt, answered at once.
+/// The options a passkey sign-in hands the phone: the fake server's, with the PRF extension.
+final signInOptionsWithPrf = withPrfExtension('{"challenge":"sign-in"}');
+
 class FakePasskeys implements Passkeys {
   FakePasskeys({this.isSupported = true, this.hasPasskey = false});
 
@@ -302,6 +306,9 @@ class FakePasskeys implements Passkeys {
   /// What `create` answers (the attestation JSON), and what `get` answers (the assertion JSON).
   String createJson = '{"attestation":true}';
   String getJson = '{"assertion":true}';
+
+  /// What `getAvailable` answers (the assertion JSON).
+  String availableJson = '{"assertion":true}';
 
   /// Thrown by `get` only (not `create`), then cleared.
   Object? getFailure;
@@ -326,7 +333,7 @@ class FakePasskeys implements Passkeys {
     failure = null;
     if (error != null) throw error;
     if (!hasPasskey) throw const AuthFailure(code: 'NO_CREDENTIAL', status: 400);
-    return '{"assertion":true}';
+    return availableJson;
   }
 
   @override

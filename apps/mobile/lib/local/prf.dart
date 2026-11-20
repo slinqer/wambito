@@ -62,28 +62,53 @@ bool prfEnabledWithoutResults(Map<String, Object?> clientExtensionResults) {
   return prf?['enabled'] == true && _firstOf(prf) == null;
 }
 
-/// A touch of one of the person's passkeys only to evaluate its PRF: [Passkeys.get] with the
-/// request [optionsJson] plus the PRF extension. Null when the person cancels; `KeysError('no_prf')`
-/// when the passkey gives no PRF.
-Future<PasskeyPrf?> evaluatePrf(Passkeys passkeys, String optionsJson) async {
+/// The request [optionsJson] with the PRF extension added (any other extension kept), so the
+/// assertion it asks for carries the passkey's PRF: Unlock's touch and the passkey sign-in share it.
+String withPrfExtension(String optionsJson) {
   final options = (jsonDecode(optionsJson) as Map).cast<String, Object?>();
   final extensions = {
     ...?(options['extensions'] as Map?)?.cast<String, Object?>(),
     ...prfExtension(),
   };
+  return jsonEncode({...options, 'extensions': extensions});
+}
+
+/// The credential id and PRF of an assertion's JSON (`id`, `clientExtensionResults.prf`); null
+/// without an id or without a 32-byte PRF, or when the JSON is not an assertion. The caller owns
+/// the returned bytes and zeroes them.
+PasskeyPrf? prfOfAssertion(String assertionJson) {
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(assertionJson);
+  } on FormatException {
+    return null;
+  }
+  if (decoded is! Map) return null;
+  final id = decoded['id'];
+  final results = decoded['clientExtensionResults'];
+  final prf = readPrf(results is Map ? results.cast<String, Object?>() : const {});
+  if (prf == null) return null;
+  if (id is! String) {
+    prf.fillRange(0, prf.length, 0);
+    return null;
+  }
+  return PasskeyPrf(credentialId: id, prf: prf);
+}
+
+/// A touch of one of the person's passkeys only to evaluate its PRF: [Passkeys.get] with the
+/// request [optionsJson] plus the PRF extension. Null when the person cancels; `KeysError('no_prf')`
+/// when the passkey gives no PRF.
+Future<PasskeyPrf?> evaluatePrf(Passkeys passkeys, String optionsJson) async {
   final String json;
   try {
-    json = await passkeys.get(jsonEncode({...options, 'extensions': extensions}));
+    json = await passkeys.get(withPrfExtension(optionsJson));
   } on AuthFailure catch (error) {
     if (error.code == 'AUTH_CANCELLED') return null;
     rethrow;
   }
   final decoded = jsonDecode(json);
-  final id = decoded is Map ? decoded['id'] : null;
-  if (decoded is! Map || id is! String) throw const KeysError('bad_response');
-  final credential = decoded.cast<String, Object?>();
-  final results = credential['clientExtensionResults'];
-  final prf = readPrf(results is Map ? results.cast<String, Object?>() : const {});
-  if (prf == null) throw const KeysError('no_prf');
-  return PasskeyPrf(credentialId: id, prf: prf);
+  if (decoded is! Map || decoded['id'] is! String) throw const KeysError('bad_response');
+  final passkey = prfOfAssertion(json);
+  if (passkey == null) throw const KeysError('no_prf');
+  return passkey;
 }

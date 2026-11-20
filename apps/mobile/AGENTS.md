@@ -238,7 +238,16 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   failed sign-in, a sign-out or an expiry; never a `String`). The gate takes it at every check
   (`VaultGateDeps.takeSignInRecoverySecret`) and tries it once through `keys.unlockWithRecoverySecret` on an account
   with wraps and no keys here, before Unlock, zeroing it either way; a failure shows `Unlock(error: …)`. Opened that
-  way, the vault marks `recoveryKeySavedAt` when it was null. The other side of a pairing is
+  way, the vault marks `recoveryKeySavedAt` when it was null. A passkey sign-in (`signInWithPasskey`,
+  `signInWithAvailablePasskey`) asks for the PRF too (`prf.dart` `withPrfExtension`, read back with `prfOfAssertion`):
+  the PRF waits in `signInPrfProvider` (`lib/vault/sign_in_prf.dart`, `SignInPrf`: memory only, for the account the
+  server named, one take, zeroed by another account's take, a failed sign-in, a sign-out or an expiry, wherever
+  `signInRecoveryKeyProvider` is cleared), and the gate's `takeSignInPrf` tries it on the account's passkey wrap before
+  Unlock. A passkey touch here (that sign-in, or Unlock's button limited to the account's passkey ids) that gives no
+  PRF notes `UnlockHint` (`lib/vault/unlock_hint.dart`, pref `wambito.unlock.no_prf.<userId>`, a boolean; cleared when
+  a passkey's PRF opens the data, kept by a sign-out, forgotten by Delete account). `Unlock` carries `noPrfHere` (that
+  hint) and `passkeyWrap` (`keys.hasPasskeyWrap`, true when the wraps cannot be read); going back to Unlock from an
+  open vault (`removed`, `unverified`) shows it at once with the last known means and refines them. The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen({pairing, onStartAgain, onDone})`, twin of
   `ApproveDevice.tsx`, titled "Approve a new device"): the confirmation only. Its entry is
   `connect_device_screen.dart` (`ConnectDeviceScreen`, Settings → Security → "Connect another device", below), which

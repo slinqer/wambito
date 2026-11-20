@@ -226,9 +226,8 @@ void main() {
       expect(env.app.models.installed, isFalse);
     });
 
-    testWidgets('the welcome\'s draft and the passkey offer\'s answer, of this account only', (
-      t,
-    ) async {
+    testWidgets('the welcome\'s draft, the passkey offer\'s answer and the unlock hint, of this '
+        'account only', (t) async {
       final env = await pumpAccount(t);
       await _openSheet(t);
       await _type(t, 'ana@example.com');
@@ -237,6 +236,8 @@ void main() {
       expect(kept.containsKey('onboarding.draft.user-1'), isFalse);
       expect(kept['onboarding.draft.other'], '{"currency":"USD"}');
       expect(jsonDecode(kept['passkey.offered']!), ['other']);
+      expect(kept.containsKey('wambito.unlock.no_prf.user-1'), isFalse);
+      expect(kept['wambito.unlock.no_prf.other'], '1');
     });
 
     testWidgets('the cards put away on home', (t) async {

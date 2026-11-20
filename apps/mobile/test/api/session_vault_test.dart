@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,15 +15,19 @@ import 'package:wambito/api/server_url.dart';
 import 'package:wambito/local/db.dart' show VaultHold, VaultHoldKind;
 import 'package:wambito/local/install_marker.dart';
 import 'package:wambito/local/key_storage.dart';
+import 'package:wambito/local/prf.dart' show PasskeyPrf, prfExtension;
 import 'package:wambito/local/sync.dart' show SyncResult;
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/ui/press_button.dart';
 import 'package:wambito/vault/encryption_mode.dart';
+import 'package:wambito/vault/sign_in_prf.dart';
+import 'package:wambito/vault/unlock_hint.dart';
 import 'package:wambito/vault/unsynced_sheet.dart';
 import 'package:wambito/vault/vault_providers.dart';
 
 import '../entry/fakes.dart';
 import '../home/fakes.dart';
+import '../settings/fakes.dart';
 import '../support/ui_app.dart';
 
 /// Signing out of a `preview` account takes the vault with it: its file, its keys and what the
@@ -56,6 +62,163 @@ class _FakeSession extends Fake implements VaultSession {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  group("the passkey sign-in's PRF", () {
+    late FakeAuthApi auth;
+    late FakePasskeys passkeys;
+    late FakeSettingsStore prefs;
+
+    String b64(Uint8List bytes) => base64Url.encode(bytes).replaceAll('=', '');
+    String withPrf(String id, [int fill = 9]) => jsonEncode({
+      'id': id,
+      'clientExtensionResults': {
+        'prf': {
+          'results': {'first': b64(Uint8List(32)..fillRange(0, 32, fill))},
+        },
+      },
+    });
+
+    ProviderContainer containerWith() {
+      final container = ProviderContainer(
+        overrides: [
+          vaultHoldReaderProvider.overrideWithValue((userId) async => null),
+          authApiProvider.overrideWithValue(auth),
+          passkeysProvider.overrideWithValue(passkeys),
+          widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+          homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+          unlockHintProvider.overrideWithValue(UnlockHint(prefs)),
+          forgetVaultProvider.overrideWithValue((userId, storage) async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    Future<SessionController> ready(ProviderContainer container) async {
+      final controller = container.read(sessionProvider.notifier);
+      await controller.ready;
+      return controller;
+    }
+
+    setUp(() {
+      auth = FakeAuthApi()..account = 'user-1';
+      passkeys = FakePasskeys(hasPasskey: true);
+      prefs = FakeSettingsStore();
+      mockStorage();
+    });
+
+    Map<String, Object?> optionsOf(String call) =>
+        (jsonDecode(call.substring(call.indexOf(' ') + 1)) as Map).cast<String, Object?>();
+
+    test('a passkey sign-in asks for the PRF', () async {
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.signInWithPasskey();
+      await controller.signOut();
+      expect(await controller.signInWithAvailablePasskey(), isTrue);
+
+      expect(passkeys.calls, hasLength(2));
+      for (final call in passkeys.calls) {
+        final options = optionsOf(call);
+        expect(options['challenge'], 'sign-in');
+        expect(options['extensions'], prfExtension());
+      }
+      expect(passkeys.calls.first, startsWith('get '));
+      expect(passkeys.calls.last, startsWith('getAvailable '));
+    });
+
+    test('a passkey sign-in with a PRF keeps it for that user', () async {
+      passkeys.getJson = withPrf('cred-1');
+      passkeys.availableJson = withPrf('cred-2', 5);
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.signInWithPasskey();
+
+      final kept = container.read(signInPrfProvider).take('user-1');
+      expect(kept?.credentialId, 'cred-1');
+      expect(kept?.prf, Uint8List(32)..fillRange(0, 32, 9));
+      // Taken once.
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+      expect(await UnlockHint(prefs).gaveNoPrf('user-1'), isFalse);
+
+      await controller.signOut();
+      expect(await controller.signInWithAvailablePasskey(), isTrue);
+      // Never another account's.
+      expect(container.read(signInPrfProvider).take('user-2'), isNull);
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+    });
+
+    test('one without a PRF keeps nothing and notes the hint', () async {
+      prefs.values['wambito.unlock.no_prf.user-2'] = '1';
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.signInWithPasskey();
+
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+      expect(await UnlockHint(prefs).gaveNoPrf('user-1'), isTrue);
+      expect(prefs.values.keys, containsAll(['wambito.unlock.no_prf.user-1']));
+    });
+
+    test('sign-out clears the kept PRF and keeps the hint', () async {
+      passkeys.getJson = withPrf('cred-1');
+      prefs.values['wambito.unlock.no_prf.user-1'] = '1';
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.signInWithPasskey();
+      await controller.signOut();
+
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+      expect(prefs.values['wambito.unlock.no_prf.user-1'], '1');
+    });
+
+    test('a failed sign-in keeps nothing and notes nothing', () async {
+      passkeys.getJson = withPrf('cred-1');
+      auth.failures['passkeySignIn'] = const AuthFailure(code: 'INVALID', status: 400);
+      final container = containerWith();
+      final controller = await ready(container);
+      await expectLater(controller.signInWithPasskey(), throwsA(isA<AuthFailure>()));
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+
+      // Signed in, but whose account the server could not say: nothing kept, nothing noted.
+      passkeys.getJson = '{"assertion":true}';
+      auth.failures['isGuest'] = const AuthFailure(code: 'NETWORK', status: 0);
+      await controller.signInWithPasskey();
+      expect(container.read(signInPrfProvider).take('user-1'), isNull);
+      expect(prefs.values, isEmpty);
+    });
+  });
+
+  group('SignInPrf', () {
+    PasskeyPrf passkey() => PasskeyPrf(credentialId: 'c', prf: Uint8List(32)..fillRange(0, 32, 7));
+    bool zeroed(Uint8List b) => b.every((x) => x == 0);
+
+    test("hands the PRF once to its account's take; another account's take zeroes it", () {
+      final held = SignInPrf();
+      final mine = passkey();
+      held.keep('user-1', mine);
+      expect(identical(held.take('user-1'), mine), isTrue);
+      expect(held.take('user-1'), isNull);
+
+      final other = passkey();
+      held.keep('user-1', other);
+      expect(held.take('user-2'), isNull);
+      expect(zeroed(other.prf), isTrue);
+      expect(held.take('user-1'), isNull);
+    });
+
+    test('a new keep or a clear zeroes the one held', () {
+      final held = SignInPrf();
+      final first = passkey();
+      final second = passkey();
+      held.keep('user-1', first);
+      held.keep('user-1', second);
+      expect(zeroed(first.prf), isTrue);
+      expect(zeroed(second.prf), isFalse);
+      held.clear();
+      expect(zeroed(second.prf), isTrue);
+      expect(held.take('user-1'), isNull);
+    });
+  });
 
   group('signing out of a preview account', () {
     late FakeAuthApi auth;

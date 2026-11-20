@@ -24,6 +24,8 @@ import '../local/vault_session.dart';
 import '../protect/protect_actions.dart' show markRecoveryKeySaved;
 import '../protect/protect_status.dart' show recoveryKeySavedAt;
 import 'encryption_mode.dart';
+import 'sign_in_prf.dart';
+import 'unlock_hint.dart';
 import 'vault_gate.dart';
 
 /// The vault gate in the app: how `VaultGate.tsx` wires `vault-gate.ts` to the keys, the passkeys
@@ -351,6 +353,8 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         openedWithSignInKey = true;
         return local;
       },
+      // The passkey sign-in's PRF, this account's only, and never for a gate no longer current.
+      takeSignInPrf: () => current() ? ref.read(signInPrfProvider).take(userId) : null,
       unlockWithPasskey: (passkey) =>
           signInAgainOn401(() => keys.unlockWithPasskey(options(), passkey)),
       addPasskeyWrap: (passkey) => keys.addPasskeyWrap(options(), passkey),
@@ -406,6 +410,19 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       userId: userId,
       sessionUserId: sessionUserId,
       reload: reload,
+      // The "no PRF here" hint of this account (a pref), and its passkey wraps for Unlock's layout.
+      passkeyGaveNoPrf: () => read(unlockHintProvider).gaveNoPrf(userId),
+      notePasskeyWithoutPrf: () => read(unlockHintProvider).noteWithoutPrf(userId),
+      notePasskeyOpened: () => read(unlockHintProvider).noteOpened(userId),
+      // Any failure (offline, a 5xx, a 401) counts as a wrap: the screen never hides the passkey on
+      // a guess, and the read never ends the session nor locks the gate.
+      hasPasskeyWrap: () async {
+        try {
+          return await keys.hasPasskeyWrap(options());
+        } on Object {
+          return true;
+        }
+      },
     ),
   );
   return gate;

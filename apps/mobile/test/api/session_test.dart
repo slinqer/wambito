@@ -243,7 +243,7 @@ void main() {
       final controller = await ready(container);
       await controller.signInWithPasskey();
 
-      expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+      expect(passkeys.calls, ['get $signInOptionsWithPrf']);
       expect(auth.calls, [
         'passkeySignInOptions',
         'passkeySignIn {"assertion":true}',
@@ -282,7 +282,7 @@ void main() {
         final controller = await ready(container);
 
         expect(await controller.signInWithAvailablePasskey(), isTrue);
-        expect(passkeys.calls, ['getAvailable {"challenge":"sign-in"}']);
+        expect(passkeys.calls, ['getAvailable $signInOptionsWithPrf']);
         expect(container.read(sessionProvider).stored?.token, 'passkey-token-1');
         expect(container.read(sessionProvider).isGuest, isFalse);
       });
