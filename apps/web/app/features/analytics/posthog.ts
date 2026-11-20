@@ -5,7 +5,9 @@ import { type BrowserSignals, CONSENT_KEY, consentState } from "./consent";
 /** The subset of the PostHog instance used here. */
 export type PostHogLike = {
   init(key: string, options: Partial<PostHogConfig>): unknown;
+  opt_in_capturing(options?: { captureEventName?: string | null | false }): void;
   opt_out_capturing(): void;
+  startSessionRecording(): void;
   stopSessionRecording(): void;
   reset(): void;
 };
@@ -18,6 +20,7 @@ export function posthogOptions(config: AnalyticsConfig): Partial<PostHogConfig> 
     capture_pageview: "history_change",
     persistence: "localStorage+cookie",
     cross_subdomain_cookie: false,
+    opt_out_persistence_by_default: true,
     session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask]" },
   };
 }
@@ -27,39 +30,65 @@ const loadPosthog = async (): Promise<PostHogLike> => (await import("posthog-js"
 
 let started: PostHogLike | null = null;
 let starting: Promise<void> | null = null;
+// Bumped by every stop: a start that was still loading when it changed must not init.
+let generation = 0;
 
-/** Loads and starts PostHog, at most once per page. Call it only after consent. */
+/** Test hook: forgets everything this module remembers about the page. */
+export function resetAnalyticsForTests(): void {
+  started = null;
+  starting = null;
+  generation = 0;
+}
+
+/**
+ * Starts PostHog, at most once per page. Call it only after consent. After a withdrawal on the
+ * same page, a new start opts back in instead of initialising again.
+ */
 export function startAnalytics(
   config: AnalyticsConfig,
   load: () => Promise<PostHogLike> = loadPosthog,
 ): Promise<void> {
+  if (started) {
+    started.opt_in_capturing({ captureEventName: null });
+    started.startSessionRecording();
+    return Promise.resolve();
+  }
   if (starting) return starting;
-  starting = (async () => {
+  const mine = generation;
+  const attempt = (async () => {
     try {
       const ph = await load();
+      if (mine !== generation) return; // withdrawn while loading: never init
       ph.init(config.key, posthogOptions(config));
       started = ph;
     } catch (error) {
-      starting = null;
+      if (mine === generation) starting = null; // a failed load can be retried
       throw error;
     }
   })();
-  return starting;
+  starting = attempt;
+  return attempt;
 }
 
-/** Withdraws: stops capture and recording, forgets the visitor, clears PostHog's own storage. */
+/**
+ * Withdraws: stops recording, forgets the visitor, clears PostHog's own storage and leaves capture
+ * opted out. The order matters (posthog-js 1.447): `reset()` removes the opt-out marker, so the
+ * opt-out comes last, and the marker key `__ph_opt_in_out_*` survives the clearing.
+ */
 export function stopAnalytics(
   env: { document: Pick<Document, "cookie">; localStorage?: Storage } = {
     document,
     localStorage: safeLocalStorage(),
   },
 ): void {
+  generation += 1;
+  starting = null;
   const ph = started;
   if (ph) {
     try {
-      ph.opt_out_capturing();
       ph.stopSessionRecording();
       ph.reset();
+      ph.opt_out_capturing();
     } catch {
       // Clearing the storage below still runs.
     }
@@ -75,7 +104,10 @@ function safeLocalStorage(): Storage | undefined {
   }
 }
 
-/** Expires every `ph_*` cookie (this host, path `/`) and removes every `ph_*` / `__ph*` key. */
+/**
+ * Expires every `ph_*` cookie (this host, path `/`) and removes every `ph_*` / `__ph*` key, except
+ * the `__ph_opt_in_out_*` opt-out marker, which is what keeps capture off.
+ */
 export function clearPosthogStorage(
   doc: Pick<Document, "cookie">,
   storage: Storage | undefined,
@@ -93,6 +125,7 @@ export function clearPosthogStorage(
     const keys: string[] = [];
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
+      if (key?.startsWith("__ph_opt_in_out_")) continue;
       if (key?.startsWith("ph_") || key?.startsWith("__ph")) keys.push(key);
     }
     for (const key of keys) storage.removeItem(key);
@@ -105,13 +138,16 @@ export function clearPosthogStorage(
 export function watchConsent(onDenied: () => void, win: Window = window): () => void {
   const listener = (event: Event) => {
     const { key, newValue } = event as StorageEvent;
-    if (key !== CONSENT_KEY) return;
+    // A null key is another tab's `localStorage.clear()`: the consent is gone too.
+    if (key !== null && key !== CONSENT_KEY) return;
     const nav = win.navigator as BrowserSignals | undefined;
     const signals: BrowserSignals = {
       globalPrivacyControl: nav?.globalPrivacyControl,
       doNotTrack: nav?.doNotTrack,
     };
-    if (consentState(newValue, signals, new Date()) !== "granted") onDenied();
+    if (consentState(key === null ? null : newValue, signals, new Date()) !== "granted") {
+      onDenied();
+    }
   };
   win.addEventListener("storage", listener);
   return () => win.removeEventListener("storage", listener);
