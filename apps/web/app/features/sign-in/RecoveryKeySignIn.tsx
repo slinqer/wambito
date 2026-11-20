@@ -33,9 +33,10 @@ export interface RecoveryKeySignInProps {
 }
 
 /**
- * "Recovery key" on `/sign-in` (web plan ruling 14): a button that opens the field; the typed key
- * (any case, spaces or dashes) signs in and opens the data in this browser. The text lives in this
- * component's state only: never logged or stored.
+ * The recovery key on `/sign-in` (web plan ruling 14), under "More options" (spec 2026-11-20
+ * section 4): a button with `aria-expanded`, closed by default, that shows the field directly; the
+ * typed key (any case, spaces or dashes) signs in and opens the data in this browser. The text
+ * lives in this component's state only: never logged or stored.
  */
 export function RecoveryKeySignIn({
   signIn,
@@ -96,14 +97,14 @@ export function RecoveryKeySignIn({
   return (
     <div className="flex w-full flex-col gap-(--space-3)">
       <PressButton
-        variant="secondary"
+        variant="ghost"
         className="w-full"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         disabled={disabled && !open}
         onClick={() => setOpen((was) => !was)}
       >
-        {t("open")}
+        {tRoot("vault.unlock.more")}
       </PressButton>
       {open && (
         <form

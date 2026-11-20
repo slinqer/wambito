@@ -284,7 +284,6 @@
     "other_ways": "Other ways to sign in",
     "qr_on_computer": "Signing in on a computer? Scan it with your phone.",
     "recovery": {
-      "open": "Recovery key",
       "label": "Your recovery key",
       "submit": "Sign in with the key",
       "busy": "Signing in…",
@@ -453,7 +452,8 @@
     "adding": "Waiting for your fingerprint…",
     "not_now": "Not now",
     "added": "Done: next time you'll sign in with your fingerprint.",
-    "failed": "We couldn't save your fingerprint. Try again or carry on without it."
+    "failed": "We couldn't save your fingerprint. Try again or carry on without it.",
+    "continue": "Continue"
   },
   "manage": {
     "back": "Back to home",
@@ -708,7 +708,8 @@
       "turn_on_named_label": "Turn on {name} for your data",
       "turned_on": "Done: this fingerprint opens your data too.",
       "turn_on_failed": "We couldn't turn it on. Try again.",
-      "turn_on_no_prf": "This fingerprint's provider can't open your data. Use your recovery key, or open your data from another device."
+      "turn_on_no_prf": "This fingerprint's provider can't open your data. Use your recovery key, or open your data from another device.",
+      "add_no_prf": "This passkey signs you in, but your password manager does not let it open your data. Keep your recovery key: you will need it on a new device."
     },
     "protect": {
       "title": "Protect your data",
@@ -967,8 +968,12 @@
       "error_no_passkey_wrap": "This passkey doesn't open your data yet. Type your recovery key once, and from then on it will.",
       "error_offline": "You are offline. Try again when you are back online.",
       "error_server": "Something went wrong on our side. Try again.",
-      "passkey": "Use a passkey",
-      "pair": "From another device"
+      "passkey": "Open with my fingerprint",
+      "pair": "From another device",
+      "lead_other": "Your data is encrypted. Choose how to open it in this browser.",
+      "more": "More options",
+      "no_prf_line": "Your passkey signs you in, but your password manager does not let it open your data.",
+      "other_passkey": "Use another passkey"
     },
     "install": {
       "title": "Wambito lives on your phone",

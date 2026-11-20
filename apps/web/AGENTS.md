@@ -151,7 +151,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (`offerPrfUse`) stashes the new passkey's PRF for that user's gate, and knows the account is
   encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
   plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
-  at once.
+  at once. A new passkey that ends without a wrap on an encrypted account (no PRF, or the wrap
+  failed in Settings) is kept, and the screen says so at once in text that stays (`role="status"`,
+  never a toast; `settings.passkeys.add_no_prf`): Settings until the next add or leaving, the
+  offer (`PasskeyOfferApi.add` hook `onKept`: its PRF went to the stash) with a "Continue"
+  (`passkey_offer.continue`) instead of moving on by itself.
   `rotate.ts` (two steps, like `prepareAccount`; a new key's verifier is put after its wrap, by
   `newRecoveryKey` and by `rotateKeys` with `{ fresh: true }`, never with the typed key): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,
@@ -309,7 +313,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   in `landing/links.ts` `STORE_LINKS`; `gate.installDone()` opens the vault; never after an unlock, a
   pairing or a known browser; story `Vault/Install app`, copy `vault.install.*`), else `Locked` with a retry of the failed step; an account with keys elsewhere first tries
   the stashed sign-in PRF (`takeSignInPrf`), and a passkey that opens nothing (stashed, or touched
-  from Unlock's "Use a passkey", `gate.unlockWithPasskey()`, which offers only the account's
+  from Unlock's passkey button, `gate.unlockWithPasskey()`, which offers only the account's
   passkeys from Better Auth's list, none: `no_passkey_wrap` without a touch) gets its wrap once the vault is
   unlocked by the recovery key or set up; a known browser zeroes the stash; Unlock's "From another
   device" enters `pairing` (`gate.pair()`;
@@ -332,9 +336,28 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `app/features/vault/`: `RecoveryKeySetup` (key in groups of four, copy, `.txt`, then type four
   characters back, each named "group N, character M"; `onCancel` instead of `onSignOut` in Settings,
   `busy` and `problem` for Settings' commit), `Unlock` (`notice: "removed" | "unverified"` shows `vault.removed` / `vault.unverified`; `onUnlock(text) → UnlockError |
-  null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no button
-  where `passkeysSupported()` is false; `onPair` "From another device"; `title`, `lead` (null: none)
-  and `exitLabel` for the consent page's unlock step), `Locked` (retry or sign-out only); all three have `onSignOut` (the gate passes `useSignOut`,
+  null`, `onPasskey() → UnlockError | null` with the `no_prf` / `no_passkey_wrap` copy; no passkey
+  where `passkeysSupported()` is false or without `onPasskey`; `onPair` "From another device";
+  `title`, `lead` (null: none; by default `lead` when the key leads, else `lead_other`) and
+  `exitLabel` for the consent page's unlock step). Its layout (spec 2026-11-20 section 1) comes
+  from `unlock-layout.ts` `unlockLayout({ noPrfHere, passkeyWrap, passkeysSupported, canPair })`
+  over `means` (`UnlockMeans`, default `{ noPrfHere: false, passkeyWrap: true }`; the gate's
+  unlock state carries it, read by `readMeans()`: `local/unlock-hint.ts` `passkeyGaveNoPrf(userId)`,
+  a `wambito.unlock.no-prf.<userId>` boolean set by a passkey touch here without PRF (sign-in
+  `keepPrfOf`, unlock) and cleared when a passkey's PRF opens the data, kept by sign-out, removed
+  with the account; and `keys.ts` `hasPasskeyWrap`, true when the wraps cannot be read): the
+  recovery key first with the line `vault.unlock.no_prf_line` (no PRF here; "Use another passkey"
+  under "More options" when a passkey could work), "Open with my passkey" first (a passkey wrap and
+  passkeys here), or "From another device" first; the pairing below a first passkey or key; the
+  rest under "More options" (`vault.unlock.more`, a ghost button with `aria-expanded`, closed by
+  default, opening by itself when the passkey above it answers `no_prf` or `no_passkey_wrap`); with
+  nothing else (the consent page without a wrap, the migration) the field leads alone. No passkey
+  prompt without a tap. The field is `RecoveryKeyField` (`recovery-key-input.ts`
+  `groupRecoveryKey`, `isFullRecoveryKey`: groups of four while typing, any pasted shape, a
+  "Paste" button where the clipboard can be read); the submit waits for a full key. The consent
+  route reads the same `means` in its loader (`ConsentKeys.means`, only without a vault here).
+  Stories `Vault/Unlock` (`KeyFirst`, `PasskeyFirst`, `PairFirst`, `PasskeyFails`,
+  `ConsentNoPairing`, …)), `Locked` (retry or sign-out only); all three have `onSignOut` (the gate passes `useSignOut`,
   which wipes the vault); `PairNewDevice` (`start() → request`, `onBack`, `timeZone` (the profile's, for the expiry): the QR as `uqr`
   `renderSVG` in an `<img>` data URL, alt = the code, the code as `ABCD EFGH`, the expiry, the
   number once `number()` resolves, done after `finish()`; expired / offline / server offer "Start
@@ -450,13 +473,13 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   "sign-in" | "create", qr? })` (`qr`: a `QrFactory(page) → QrSignin`, `liveQrFactory(auth)` by
   default, faked in stories). `sign-in` (in every build, no flag): the screen's own width decides
   (`WIDE_PX` 768, measured on the screen root, starting from `document.documentElement.clientWidth` so a computer's first render is already wide: moving the email field later ends Chrome's passkey autofill request): wide puts the QR panel first and "Other ways to sign
-  in" beside it (fingerprint button, "Recovery key", the email form), narrow puts the other ways
+  in" beside it (fingerprint button, the email form, "More options" with the recovery key), narrow puts the other ways
   first and the QR under "Signing in on a computer? Scan it with your phone"; both are keyed, so the
   model survives a change of layout. `QrArea` makes the model only once the panel is on screen
   (`IntersectionObserver`), and its `visible()` is "tab shown and panel on screen", so an off-screen
   QR is not renewed; it is stopped only on unmount, and while it is `finishing`/`done` the other
-  ways (and leaving the email step) wait. `RecoveryKeySignIn` (a button with `aria-expanded` that
-  opens the field; copy `sign_in.recovery.*`, errors from `vault.unlock.error_*` and
+  ways (and leaving the email step) wait. `RecoveryKeySignIn` ("More options", `vault.unlock.more`: a
+  ghost button with `aria-expanded`, closed by default, that shows the recovery-key field directly; copy `sign_in.recovery.*`, errors from `vault.unlock.error_*` and
   `errors.recovery_key_invalid` / `account_suspended`; a 429 waits out `retryAfterS`). `create`:
   the email code form under "Create your account" (`sign_in.create.*`) with "Already have an
   account? Sign in" (`/sign-in` with the same query); no QR, recovery or fingerprint button.

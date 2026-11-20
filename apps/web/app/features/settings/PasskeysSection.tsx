@@ -3,6 +3,7 @@ import { useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { intlTag, type Locale } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
+import type { PasskeyPrf } from "../../local/prf.ts";
 import { ConfirmSheet } from "../../ui/ConfirmSheet.tsx";
 import { FingerprintIcon } from "../../ui/FingerprintIcon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
@@ -30,7 +31,9 @@ export function formatDay(iso: string, locale: Locale, timeZone: string): string
  * whether it syncs, and its own "Eliminar" after asking; "Agregar una huella" where the browser
  * can make one. Closing the browser's prompt is silent, as on sign-in. With `security` (an
  * encrypted account), each says whether it opens the data ("Unlocks" / "Does not unlock", from the
- * passkey wraps); "Turn on" touches that passkey (`evaluatePrf([id])`) and adds its wrap.
+ * passkey wraps); "Turn on" touches that passkey (`evaluatePrf([id])`) and adds its wrap. A new
+ * passkey that ends without a wrap (its provider gives no PRF, or the wrap failed) is kept, and the
+ * section says so in text that stays (`role="status"`), not a toast.
  */
 export function PasskeysSection({
   passkeys,
@@ -69,6 +72,8 @@ export function PasskeysSection({
   const [turningOn, setTurningOn] = useState<string | null>(null);
   /** A passkey whose provider gives no PRF: it cannot open the data, say so under it. */
   const [noPrf, setNoPrf] = useState<string | null>(null);
+  /** The passkey just added got no wrap: it signs in only; said until the next add or leaving. */
+  const [addedWithoutWrap, setAddedWithoutWrap] = useState(false);
   const noPrfId = useId();
 
   const turnOn = async (item: PasskeyItem) => {
@@ -106,17 +111,30 @@ export function PasskeysSection({
     if (inFlight.current) return;
     inFlight.current = true;
     setAdding(true);
+    setAddedWithoutWrap(false);
+    // With the open vault's keys, whether the new passkey's PRF wrapped the data key.
+    let wrapped = false;
     try {
       const outcome = await passkeys.add(
         vaultUserId
           ? {
               userId: vaultUserId,
               explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
+              ...(security
+                ? {
+                    keep: async (passkey: PasskeyPrf) => {
+                      await security.addPasskeyWrap(passkey);
+                      wrapped = true;
+                    },
+                  }
+                : {}),
             }
           : undefined,
       );
       if (outcome === "added") {
-        toast.show({ message: t("added") });
+        // An encrypted account's passkey that opens nothing: said at once, as text that stays.
+        if (security && vaultUserId && !wrapped) setAddedWithoutWrap(true);
+        else toast.show({ message: t("added") });
         await qc.invalidateQueries({ queryKey: PASSKEYS_KEY });
         if (security) await qc.invalidateQueries({ queryKey: SECURITY_KEY });
       } else if (outcome === "failed") {
@@ -236,6 +254,11 @@ export function PasskeysSection({
         </PressButton>
       ) : (
         <p className="m-0 text-[14px] text-ink-muted">{t("unsupported")}</p>
+      )}
+      {addedWithoutWrap && (
+        <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
+          {t("add_no_prf")}
+        </p>
       )}
       <ConfirmSheet
         open={confirmOpen}

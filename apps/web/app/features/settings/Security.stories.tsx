@@ -486,6 +486,52 @@ export const PasskeyCannotUnlock: Story = {
   },
 };
 
+/**
+ * A new passkey whose provider gives a PRF: its wrap is added, a toast confirms, and its row says
+ * it opens the data.
+ */
+export const AddPasskeyThatUnlocks: Story = {
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, prf: true }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const page = within(canvasElement.ownerDocument.body);
+    const passkeys = within(
+      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+    );
+    await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
+    await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
+    await expect(await page.findByText("Listo: ya puedes entrar con tu huella.")).toBeVisible();
+    await expect(passkeys.queryByText(/no le permite abrir tus datos/)).toBeNull();
+    await waitFor(() => expect(passkeys.getAllByText("Abre tus datos")).toHaveLength(2));
+  },
+};
+
+/**
+ * A new passkey whose provider gives no PRF (Proton Pass, 1Password): kept, and the section says
+ * at once, as text that stays (not a toast), that it signs in but does not open the data.
+ */
+export const AddPasskeyWithoutPrf: Story = {
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const page = within(canvasElement.ownerDocument.body);
+    const passkeys = within(
+      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+    );
+    await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
+    const notice = await passkeys.findByText(
+      "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.",
+    );
+    await expect(notice).toHaveAttribute("role", "status");
+    await expect(notice.closest(".lk-toast")).toBeNull();
+    await expect(page.queryByText("Listo: ya puedes entrar con tu huella.")).toBeNull();
+    await expect(security.addPasskeyWrap).not.toHaveBeenCalled();
+    // Kept: three rows, two of which do not open the data.
+    await waitFor(() => expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(2));
+    await expect(notice).toBeVisible();
+  },
+};
+
 /** A passkey list that never answers: the account may have passkeys, so no touch-free new key. */
 const loadingPasskeys = (): PasskeysApi => ({
   ...storyPasskeys({ initial: PASSKEYS }),

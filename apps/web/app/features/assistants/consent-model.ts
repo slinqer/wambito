@@ -1,6 +1,7 @@
 import { toBase64Url, wrapDataKey } from "@wambito/crypto";
 import { uuidv7 } from "@wambito/vault";
 import type { DataKeySource, PasskeySecret } from "../../local/keys.ts";
+import type { UnlockMeans } from "../vault/vault-gate.ts";
 import type { ConsentApi } from "./consent-api.ts";
 
 /**
@@ -132,6 +133,11 @@ export interface ConsentKeys {
   open<T>(source: DataKeySource, fn: (dk: Uint8Array, keyV: number) => Promise<T>): Promise<T>;
   /** A touch of one of the person's passkeys for its PRF (`evaluatePrf`); null when cancelled. */
   touchPasskey(): Promise<PasskeySecret | null>;
+  /**
+   * What can open the data here, for the unlock step's layout: the device's no-PRF hint and
+   * whether the account has a passkey wrap. Absent: a passkey wrap, no hint.
+   */
+  means?: UnlockMeans;
 }
 
 /**

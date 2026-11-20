@@ -284,7 +284,6 @@
     "other_ways": "Altri modi per entrare",
     "qr_on_computer": "Entri da un computer? Inquadralo con il telefono.",
     "recovery": {
-      "open": "Chiave di recupero",
       "label": "La tua chiave di recupero",
       "submit": "Entra con la chiave",
       "busy": "Accesso…",
@@ -453,7 +452,8 @@
     "adding": "In attesa della tua impronta…",
     "not_now": "Non ora",
     "added": "Fatto: la prossima volta entri con l'impronta.",
-    "failed": "Non siamo riusciti a salvare la tua impronta. Riprova o continua senza."
+    "failed": "Non siamo riusciti a salvare la tua impronta. Riprova o continua senza.",
+    "continue": "Continua"
   },
   "manage": {
     "back": "Torna alla home",
@@ -708,7 +708,8 @@
       "turn_on_named_label": "Attiva {name} per i tuoi dati",
       "turned_on": "Fatto: questa impronta apre anche i tuoi dati.",
       "turn_on_failed": "Non siamo riusciti ad attivarla. Riprova.",
-      "turn_on_no_prf": "Il fornitore di questa impronta non può aprire i tuoi dati. Usa la tua chiave di recupero o apri i dati da un altro dispositivo."
+      "turn_on_no_prf": "Il fornitore di questa impronta non può aprire i tuoi dati. Usa la tua chiave di recupero o apri i dati da un altro dispositivo.",
+      "add_no_prf": "Questa passkey ti fa entrare, ma il tuo gestore di password non le permette di aprire i tuoi dati. Conserva la tua chiave di recupero: ti servirà su un nuovo dispositivo."
     },
     "protect": {
       "title": "Proteggi i tuoi dati",
@@ -967,8 +968,12 @@
       "error_no_passkey_wrap": "Questa passkey non apre ancora i tuoi dati. Scrivi la tua chiave di recupero una volta e da allora li aprirà anche lei.",
       "error_offline": "Sei offline. Riprova quando torni online.",
       "error_server": "Qualcosa è andato storto da parte nostra. Riprova.",
-      "passkey": "Usa una passkey",
-      "pair": "Da un altro dispositivo"
+      "passkey": "Apri con la mia impronta",
+      "pair": "Da un altro dispositivo",
+      "lead_other": "I tuoi dati sono cifrati. Scegli come aprirli in questo browser.",
+      "more": "Altre opzioni",
+      "no_prf_line": "La tua passkey ti fa entrare, ma il tuo gestore di password non le permette di aprire i tuoi dati.",
+      "other_passkey": "Usa un'altra passkey"
     },
     "install": {
       "title": "Wambito vive sul tuo telefono",

@@ -823,18 +823,21 @@ function homeFetch({
 
 /**
  * Passkeys kept in memory, standing in for Better Auth and the browser's prompt: `outcome` is what
- * adding one comes to (a new passkey when "added").
+ * adding one comes to (a new passkey when "added"); with `prf`, a new passkey's provider hands its
+ * PRF to the open vault's `keep` (without it, as Proton Pass, nothing is kept).
  */
 export function storyPasskeys({
   initial = [],
   supported = true,
   outcome = "added",
   failList = false,
+  prf = false,
 }: {
   initial?: PasskeyItem[];
   supported?: boolean;
   outcome?: PasskeyOutcome;
   failList?: boolean;
+  prf?: boolean;
 } = {}): PasskeysApi {
   let items = [...initial];
   return {
@@ -843,18 +846,26 @@ export function storyPasskeys({
       if (failList) throw new Error("passkeys_unavailable");
       return [...items];
     },
-    add: async () => {
+    add: async (vault) => {
       if (outcome === "added") {
+        const credentialId = `cred-${items.length + 1}`;
         items = [
           ...items,
           {
             id: `pk-${items.length + 1}`,
-            credentialId: `cred-${items.length + 1}`,
+            credentialId,
             name: null,
             createdAt: `${STORY_TODAY}T10:00:00.000Z`,
             synced: true,
           },
         ];
+        if (prf && vault?.keep) {
+          try {
+            await vault.keep({ credentialId, prf: new Uint8Array(32).fill(7) });
+          } catch {
+            // as `addPasskey`: the passkey was added and signs in, it only does not open the data
+          }
+        }
       }
       return outcome;
     },

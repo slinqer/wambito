@@ -131,19 +131,48 @@ describe("Consent for an encrypted account", () => {
 
   it("an encrypted account without the vault offers the passkey and the recovery key", async () => {
     expect(firstKeySource({ device: false })).toBeNull();
+    // A passkey wrap and passkeys here: the passkey leads, the recovery key under "More options".
     const html = render(
       <ConsentUnlock
         onRecovery={async () => null}
         onPasskey={async () => null}
         onCancel={() => undefined}
         passkeysSupported={() => true}
+        means={{ noPrfHere: false, passkeyWrap: true }}
       />,
     );
     expect(html).toContain("Open your data to connect it");
-    expect(html).toContain("Recovery key");
-    expect(html).toContain("Use a passkey");
+    expect(html).toContain("Open with my fingerprint");
+    expect(html).toContain("More options");
+    expect(html).not.toContain("Recovery key");
     // nothing about this browser keeping the data: it is opened only to connect
     expect(html).not.toContain("in this browser");
+    // No passkey wrap and no pairing here: the recovery key alone, with no disclosure.
+    const keyOnly = render(
+      <ConsentUnlock
+        onRecovery={async () => null}
+        onPasskey={async () => null}
+        onCancel={() => undefined}
+        passkeysSupported={() => true}
+        means={{ noPrfHere: false, passkeyWrap: false }}
+      />,
+    );
+    expect(keyOnly).toContain("Recovery key");
+    expect(keyOnly).not.toContain("More options");
+    expect(keyOnly).not.toContain("fingerprint");
+    // The last passkey touched here gave no PRF: the recovery key leads, with the line.
+    const noPrf = render(
+      <ConsentUnlock
+        onRecovery={async () => null}
+        onPasskey={async () => null}
+        onCancel={() => undefined}
+        passkeysSupported={() => true}
+        means={{ noPrfHere: true, passkeyWrap: true }}
+      />,
+    );
+    expect(noPrf).toContain("Recovery key");
+    expect(noPrf).toContain("does not let it open your data");
+    expect(noPrf).toContain("More options");
   });
 
   it("a failed wrap PUT says so; Try again revokes and consents again with a new S", async () => {

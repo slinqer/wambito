@@ -6,9 +6,11 @@ import { requireSession } from "../auth/session.ts";
 import { Consent } from "../features/assistants/Consent.tsx";
 import { createConsentApi, liveConsentApi } from "../features/assistants/consent-api.ts";
 import type { ConsentKeys } from "../features/assistants/consent-model.ts";
+import type { UnlockMeans } from "../features/vault/vault-gate.ts";
 import { CATALOGS } from "../i18n/catalog.ts";
-import { loadLocalKeys, withDataKeyFrom } from "../local/keys.ts";
+import { hasPasskeyWrap, loadLocalKeys, withDataKeyFrom } from "../local/keys.ts";
 import { evaluatePrf } from "../local/prf.ts";
+import { passkeyGaveNoPrf } from "../local/unlock-hint.ts";
 import type { Route } from "./+types/oauth.consent";
 
 /** The query carries the assistant's state and a signature: this page never sends a referrer. */
@@ -43,7 +45,26 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   } catch {
     // no IndexedDB here: the passkey or the recovery key
   }
-  return { guest, encrypted: { userId: profile.id, device } };
+  return {
+    guest,
+    encrypted: { userId: profile.id, device, means: await meansOf(profile.id, device) },
+  };
+}
+
+/**
+ * What can open the data here, for the unlock step's layout (as the vault gate reads it): the
+ * device's no-PRF hint, and whether the account has a passkey wrap (true when the wraps cannot be
+ * read). Not asked when this browser holds the vault: no unlock step then.
+ */
+async function meansOf(userId: string, device: boolean): Promise<UnlockMeans> {
+  if (device) return { noPrfHere: false, passkeyWrap: true };
+  let passkeyWrap = true;
+  try {
+    passkeyWrap = await hasPasskeyWrap({ userId });
+  } catch {
+    passkeyWrap = true;
+  }
+  return { noPrfHere: passkeyGaveNoPrf(userId), passkeyWrap };
 }
 
 /** While the session is checked: the screen's background, nothing to read yet. */
@@ -56,6 +77,7 @@ export default function ConsentRoute({ loaderData }: Route.ComponentProps) {
   const { guest, encrypted } = loaderData;
   const userId = encrypted?.userId;
   const device = encrypted?.device ?? false;
+  const means = encrypted?.means;
   const api = useMemo(
     () => (userId ? createConsentApi(undefined, { userId }) : liveConsentApi),
     [userId],
@@ -68,9 +90,10 @@ export default function ConsentRoute({ loaderData }: Route.ComponentProps) {
             device,
             open: (source, fn) => withDataKeyFrom({ userId }, source, fn),
             touchPasskey: () => evaluatePrf(),
+            ...(means ? { means } : {}),
           }
         : undefined,
-    [userId, device],
+    [userId, device, means],
   );
   return <Consent api={api} guest={guest} {...(keys ? { keys } : {})} />;
 }

@@ -183,6 +183,7 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
       return (
         <Unlock
           notice={state.notice}
+          means={state.means}
           onUnlock={gate.unlock}
           onPasskey={gate.unlockWithPasskey}
           onPair={() => void gate.pair()}

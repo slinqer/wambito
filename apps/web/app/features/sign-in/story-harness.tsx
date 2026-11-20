@@ -152,6 +152,8 @@ export interface SignInStageProps {
   userAgent?: string;
   /** The QR panel's model; `liveQr` (no phone answers) by default. */
   qr?: QrFactory;
+  /** The passkey offer's account is end-to-end encrypted. */
+  offerEncrypted?: boolean;
 }
 
 /**
@@ -167,6 +169,7 @@ export function SignInStage({
   resendDelayMs,
   userAgent,
   qr = liveQr,
+  offerEncrypted = false,
 }: SignInStageProps) {
   const [fetchImpl] = useState(() => exposeStoryFetch(profileFetch(profileUser, onPatchMe)));
   const [fallbackOffer] = useState(() => fakeOffer());
@@ -192,7 +195,13 @@ export function SignInStage({
             />
             <Route
               path="/passkey-offer"
-              element={<PasskeyOffer offer={offer ?? fallbackOffer} userId={profileUser.id} />}
+              element={
+                <PasskeyOffer
+                  offer={offer ?? fallbackOffer}
+                  userId={profileUser.id}
+                  encrypted={offerEncrypted}
+                />
+              }
             />
             <Route path="/welcome" element={<Landed label="Welcome (stand-in)" />} />
             <Route path="/app/*" element={<Landed label="App (stand-in)" />} />

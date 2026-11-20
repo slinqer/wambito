@@ -284,7 +284,6 @@
     "other_ways": "Otras formas de entrar",
     "qr_on_computer": "¿Entras en un computador? Escanéalo con tu celular.",
     "recovery": {
-      "open": "Clave de recuperación",
       "label": "Tu clave de recuperación",
       "submit": "Entrar con la clave",
       "busy": "Entrando…",
@@ -453,7 +452,8 @@
     "adding": "Esperando tu huella…",
     "not_now": "Ahora no",
     "added": "Listo: la próxima vez entras con tu huella.",
-    "failed": "No pudimos guardar tu huella. Inténtalo otra vez o sigue sin ella."
+    "failed": "No pudimos guardar tu huella. Inténtalo otra vez o sigue sin ella.",
+    "continue": "Seguir"
   },
   "manage": {
     "back": "Volver al inicio",
@@ -708,7 +708,8 @@
       "turn_on_named_label": "Activar {name} para tus datos",
       "turned_on": "Listo: esta huella también abre tus datos.",
       "turn_on_failed": "No pudimos activarla. Inténtalo otra vez.",
-      "turn_on_no_prf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo."
+      "turn_on_no_prf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo.",
+      "add_no_prf": "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo."
     },
     "protect": {
       "title": "Protege tus datos",
@@ -963,12 +964,16 @@
       "busy": "Abriendo…",
       "error_bad_recovery_key": "Esa clave no tiene el formato correcto. Revisa que la copiaste completa.",
       "error_wrong_recovery_key": "Esa clave no abre esta cuenta. Prueba con la que guardaste al crearla.",
-      "error_no_prf": "Esta llave de acceso no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
-      "error_no_passkey_wrap": "Esta llave de acceso todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
+      "error_no_prf": "Esta huella no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
+      "error_no_passkey_wrap": "Esta huella todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
       "error_offline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
       "error_server": "Algo falló de nuestro lado. Inténtalo de nuevo.",
-      "passkey": "Usar una llave de acceso",
-      "pair": "Desde otro dispositivo"
+      "passkey": "Abrir con mi huella",
+      "pair": "Desde otro dispositivo",
+      "lead_other": "Tus datos están cifrados. Elige cómo abrirlos en este navegador.",
+      "more": "Más opciones",
+      "no_prf_line": "Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.",
+      "other_passkey": "Usar otra huella"
     },
     "install": {
       "title": "Wambito vive en tu teléfono",
@@ -1043,7 +1048,7 @@
       "close": "Cerrar"
     },
     "removed": "Este navegador se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
-    "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación."
+    "unverified": "Este navegador no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu huella o escribe tu clave de recuperación."
   },
   "migration": {
     "intro_title": "Protege tus datos",

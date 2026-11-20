@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { expectTarget } from "../../../.storybook/story-utils.ts";
+import type { PasskeyOfferApi } from "./PasskeyOffer.tsx";
 import {
   fakeAuth,
   fakeOffer,
@@ -106,6 +107,60 @@ export const CreatePasskey: Story = {
     await waitFor(() =>
       expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
     );
+  },
+};
+
+/**
+ * An encrypted account whose new passkey gives its PRF: kept for the vault, so it goes on as
+ * usual, with the toast.
+ */
+export const CreatePasskeyThatUnlocks: Story = {
+  args: {
+    offerEncrypted: true,
+    offer: fakeOffer({
+      add: fn(async (hooks?: Parameters<PasskeyOfferApi["add"]>[0]) => {
+        hooks?.onKept?.();
+        return "added" as const;
+      }),
+    }),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Crear mi huella" }));
+    await waitFor(() => expect(currentPage(canvas)).toHaveTextContent("/welcome"));
+    await expect(args.offer?.decide).toHaveBeenCalledWith(NEW_USER.id);
+    const toast = await within(canvasElement.ownerDocument.body).findByText(
+      "Listo: la próxima vez entras con tu huella.",
+    );
+    // The toast fades in (Motion): checked once it is fully opaque.
+    await waitFor(() =>
+      expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
+    );
+  },
+};
+
+/**
+ * An encrypted account whose new passkey gives no PRF (Proton Pass, 1Password): the passkey is
+ * kept, and the screen says at once, as text that stays (not a toast), that it signs in but does
+ * not open the data; "Seguir" goes on.
+ */
+export const CreatePasskeyWithoutPrf: Story = {
+  args: { offerEncrypted: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Crear mi huella" }));
+    const notice = await canvas.findByText(
+      "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.",
+    );
+    await expect(notice).toHaveAttribute("role", "status");
+    await expect(notice.closest(".lk-toast")).toBeNull();
+    await expect(args.offer?.decide).toHaveBeenCalledWith(NEW_USER.id);
+    await expect(currentPage(canvas)).toHaveTextContent("/passkey-offer");
+    await expect(canvas.queryByRole("button", { name: "Crear mi huella" })).toBeNull();
+    const go = canvas.getByRole("button", { name: "Seguir" });
+    await expectTarget(go);
+    await userEvent.click(go);
+    await waitFor(() => expect(currentPage(canvas)).toHaveTextContent("/welcome"));
   },
 };
 
