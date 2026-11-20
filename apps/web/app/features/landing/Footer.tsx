@@ -38,7 +38,7 @@ export function Footer({
   const consent = useAnalyticsConsent(config, seam?.deps);
   const preferences = useRef<HTMLButtonElement>(null);
   return (
-    <footer className="lk-landing-wrap">
+    <footer className="lk-landing-wrap lk-landing-site-footer">
       <div className="lk-landing-footer">
         <span className="lk-logo">{t("app.name")}</span>
         <div className="lk-landing-footer-links">

@@ -1377,6 +1377,17 @@
   .lk-consent-actions > .lk-btn {
     flex: 1 1 8rem;
   }
+  /*
+   * While the banner is open, `ConsentBanner` sets `--lk-consent-h` (what it covers at the bottom
+   * of the viewport): focus scrolling keeps clear of it, and the footer gets that much room below,
+   * so its last links can scroll above the banner. Unset, both are 0.
+   */
+  html {
+    scroll-padding-bottom: var(--lk-consent-h, 0px);
+  }
+  .lk-landing-site-footer {
+    padding-bottom: var(--lk-consent-h, 0px);
+  }
 
   /*
    * Phones and small tablets: the base values above are the tightest the layout allows (320px);

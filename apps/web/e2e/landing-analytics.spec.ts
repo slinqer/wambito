@@ -86,17 +86,23 @@ async function storedChoice(page: Page): Promise<string | null> {
   }, CONSENT_KEY);
 }
 
-/** PostHog's own storage left in the page: `ph_*` cookies and `ph_*`/`__ph*` keys. */
+/**
+ * PostHog's own storage left in the page: `ph_*` cookies and `ph_*`/`__ph*` keys in localStorage
+ * (`keys`) and sessionStorage (`sessionKeys`).
+ */
 async function posthogStorage(page: Page) {
   const cookies = (await page.context().cookies())
     .map((c) => c.name)
     .filter((n) => n.startsWith("ph_"));
-  const keys = await page.evaluate(() =>
-    Object.keys(localStorage).filter(
-      (k) => (k.startsWith("ph_") || k.startsWith("__ph")) && !k.startsWith("__ph_opt_in_out_"),
-    ),
-  );
-  return { cookies, keys };
+  const { keys, sessionKeys } = await page.evaluate(() => {
+    const posthog = (k: string) =>
+      (k.startsWith("ph_") || k.startsWith("__ph")) && !k.startsWith("__ph_opt_in_out_");
+    return {
+      keys: Object.keys(localStorage).filter(posthog),
+      sessionKeys: Object.keys(sessionStorage).filter(posthog),
+    };
+  });
+  return { cookies, keys, sessionKeys };
 }
 
 async function accept(page: Page) {
@@ -155,6 +161,33 @@ test("nothing before accept", async ({ page }) => {
   expect((await posthogStorage(page)).cookies).toEqual([]);
 });
 
+test("the open banner never covers the footer's focused links", async ({ page }) => {
+  await page.goto("/");
+  await expect(banner(page)).toBeVisible();
+  const privacy = page
+    .getByRole("contentinfo")
+    .getByRole("link", { name: "Privacidad", exact: true });
+  const clearOfBanner = async () => {
+    const link = await privacy.boundingBox();
+    const card = await banner(page).boundingBox();
+    if (!link || !card) return "missing";
+    return link.y + link.height <= card.y ? "clear" : "covered";
+  };
+  // Focused from the top of the page, it scrolls clear of the banner (WCAG 2.2 SC 2.4.11).
+  await privacy.focus();
+  await expect(privacy).toBeFocused();
+  await expect.poll(clearOfBanner).toBe("clear");
+  // Scrolled as far as the page goes, the footer still clears it.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(clearOfBanner).toBe("clear");
+  // Closed, the reserve goes with it.
+  await banner(page).getByRole("button", { name: COPY.decline }).click();
+  await expect(banner(page)).toBeHidden();
+  expect(
+    await page.evaluate(() => document.documentElement.style.getPropertyValue("--lk-consent-h")),
+  ).toBe("");
+});
+
 test("accept starts it, and a reload keeps it on", async ({ page }) => {
   const seen = watch(page);
   await page.goto("/");
@@ -210,17 +243,43 @@ test("gpc wins over a stored yes", async ({ context, page }) => {
   expect(seen.chunk).toHaveLength(0);
 });
 
+test("dnt wins over a stored yes", async ({ context, page }) => {
+  await context.addInitScript(
+    ({ key, value }) => {
+      Object.defineProperty(navigator, "doNotTrack", { value: "1" });
+      localStorage.setItem(key, value);
+    },
+    {
+      key: CONSENT_KEY,
+      value: JSON.stringify({ v: 1, choice: "granted", at: new Date().toISOString() }),
+    },
+  );
+  const seen = watch(page);
+  await page.goto("/");
+  await settle(page);
+  // Hydrated: the footer link opens the browser note, not the question.
+  await preferences(page).click();
+  await expect(banner(page).getByText(COPY.browserNo)).toBeVisible();
+  await expect(banner(page).getByRole("button", { name: COPY.accept })).toHaveCount(0);
+  await banner(page).getByRole("button", { name: COPY.close }).click();
+  await expect(banner(page)).toBeHidden();
+  await settle(page);
+  expect(seen.posthog).toHaveLength(0);
+  expect(seen.chunk).toHaveLength(0);
+});
+
 test("withdrawing from the footer stops it and clears its storage", async ({ page }) => {
   const seen = watch(page);
   await page.goto("/");
   await accept(page);
   await expect.poll(() => seen.posthog.filter(isCapture).length).toBeGreaterThan(0);
   await expect.poll(async () => (await posthogStorage(page)).cookies.length).toBeGreaterThan(0);
+  await expect.poll(async () => (await posthogStorage(page)).sessionKeys.length).toBeGreaterThan(0);
 
   await preferences(page).click();
   await decline(page);
   const atWithdrawal = seen.posthog.length;
-  expect(await posthogStorage(page)).toEqual({ cookies: [], keys: [] });
+  expect(await posthogStorage(page)).toEqual({ cookies: [], keys: [], sessionKeys: [] });
 
   // Moving around (client-side, then a full load) would send page views if capture were on.
   await page.getByRole("contentinfo").getByRole("link", { name: "English" }).click();
@@ -232,7 +291,7 @@ test("withdrawing from the footer stops it and clears its storage", async ({ pag
   await settle(page);
   await expectDeniedHere(page);
   expect(seen.posthog.slice(atWithdrawal).map((r) => r.url())).toEqual([]);
-  expect(await posthogStorage(page)).toEqual({ cookies: [], keys: [] });
+  expect(await posthogStorage(page)).toEqual({ cookies: [], keys: [], sessionKeys: [] });
 });
 
 test("a decline in another tab stops it in this one", async ({ context }) => {
@@ -254,10 +313,10 @@ test("a decline in another tab stops it in this one", async ({ context }) => {
   await settle(a);
   const atDecline = seenA.posthog.length;
 
-  // Client-side moves would each send a page view if capture were still on. The open banner
-  // covers the footer on a phone, so the first move is its own privacy link (the next page's
-  // footer starts with it closed).
-  await banner(a).getByRole("link", { name: "política de privacidad" }).click();
+  // Client-side moves would each send a page view if capture were still on. The banner is still
+  // open; the footer scrolls clear of it, so its own links work (the next page's footer starts
+  // with the banner closed).
+  await a.getByRole("contentinfo").getByRole("link", { name: "Privacidad", exact: true }).click();
   await expect(a).toHaveURL(/\/privacy$/);
   await expect(banner(a)).toBeHidden();
   await a.getByRole("contentinfo").getByRole("link", { name: "English" }).click();

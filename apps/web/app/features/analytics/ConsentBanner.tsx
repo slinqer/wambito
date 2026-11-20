@@ -32,6 +32,28 @@ export function ConsentBanner({
     if (shown && asked) box.current?.focus();
   }, [shown, asked]);
 
+  // While open, it reserves what it covers at the bottom of the viewport (`--lk-consent-h` on
+  // `<html>`), so the footer can scroll clear of it and a focused link is never hidden behind it
+  // (WCAG 2.2 SC 2.4.11). The reserve goes when it closes or unmounts.
+  useEffect(() => {
+    const el = box.current;
+    if (!shown || !el) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const covered = Math.max(0, Math.ceil(window.innerHeight - el.getBoundingClientRect().top));
+      root.style.setProperty("--lk-consent-h", `${covered}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      root.style.removeProperty("--lk-consent-h");
+    };
+  }, [shown]);
+
   if (!shown) return null;
 
   const done = (act: () => void) => () => {
