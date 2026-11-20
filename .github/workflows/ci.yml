@@ -160,6 +160,8 @@ jobs:
         env:
           VITE_SITE_URL: https://wambito.com
           VITE_APP_URL: https://app.wambito.com
+          # An unset repository variable is empty: the build is keyless and analytics stay off.
+          VITE_POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
       # From deploy/landing, so wrangler reads its config there and does not auto-configure the app.
       - run: npx --yes wrangler@4.151.3 deploy
         working-directory: deploy/landing

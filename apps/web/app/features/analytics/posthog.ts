@@ -25,6 +25,8 @@ export function posthogOptions(config: AnalyticsConfig): Partial<PostHogConfig> 
     // The landing uses no feature flags; with them on, the withdrawal's `reset()` reloads them and
     // sends a request to PostHog after the person said no (the built-landing e2e proves it). Not
     // `advanced_disable_flags`: that also drops the remote config session recording needs.
+    // Because flags are off, never configure a session-replay "linked flag" in the PostHog project:
+    // it would never evaluate and recording would never start.
     advanced_disable_feature_flags: true,
   };
 }

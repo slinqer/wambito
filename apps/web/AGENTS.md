@@ -521,6 +521,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
   (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
 
+- Landing analytics (`app/features/analytics/`, PostHog, only with consent): `consent.ts` is the
+  consent model (stored choice, withdrawal); `config.ts` `SITE_ANALYTICS_CONFIG` reads
+  `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` (build time); `posthog.ts` loads posthog-js with a
+  dynamic import only after consent (`startAnalytics` / `stopAnalytics`); `use-analytics-consent.ts`
+  is the hook; `ConsentBanner` is mounted from the public `Footer` (with the preferences link).
+  Keyless build (no `VITE_POSTHOG_KEY`) means off: no banner, no request, the old privacy policy.
+  Go-live: `docs/deploy/landing.md`.
+
 ## Traps
 
 - Money slang (see root `AGENTS.md`) is in the Spanish copy.
