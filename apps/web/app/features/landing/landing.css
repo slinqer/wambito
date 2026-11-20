@@ -1368,14 +1368,28 @@
     color: var(--ink-muted);
     font-weight: 800;
   }
+  /* Two equal columns: both answers always take the same room. */
   .lk-consent-actions {
     flex: 1 1 18rem;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
   }
-  .lk-consent-actions > .lk-btn {
-    flex: 1 1 8rem;
+  /* Wide screens: a card in the bottom-right corner instead of a bar across the page. */
+  @media (min-width: 900px) {
+    .lk-consent {
+      inset-inline: auto var(--space-5);
+      bottom: var(--space-5);
+      width: 500px;
+      max-width: none;
+      margin-inline: 0;
+    }
+    .lk-consent-text {
+      flex-basis: 100%;
+    }
+    .lk-consent-actions > .lk-btn {
+      white-space: nowrap;
+    }
   }
   /*
    * While the banner is open, `ConsentBanner` sets `--lk-consent-h` (what it covers at the bottom

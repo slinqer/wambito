@@ -304,10 +304,10 @@
     },
     "consent": {
       "label": "Preferências de cookies",
-      "title": "Deixas-nos ver como usas esta página?",
-      "body": "Com o PostHog vemos o que lês e onde clicas, e gravamos a visita sem o que escreves. Só em wambito.com, nunca na app nem com as tuas finanças. Mais na <privacy>política de privacidade</privacy>.",
+      "title": "Ajudas-nos a melhorar o Wambito?",
+      "body": "Com o PostHog vemos como esta página é usada, com gravações da visita, sem saber quem és e sem o que escreves.",
       "decline": "Não, obrigado",
-      "accept": "Sim, aceito",
+      "accept": "Sim, quero ajudar",
       "current_granted": "Agora: aceitaste.",
       "current_denied": "Agora: não aceitaste.",
       "browser_no": "O teu navegador pediu para não ser rastreado, por isso não te rastreamos.",

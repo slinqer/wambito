@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { Footer } from "../landing/Footer.tsx";
+import "../landing/landing.css";
 import type { AnalyticsConfig } from "./config.ts";
 import { type BrowserSignals, CONSENT_KEY, encodeChoice } from "./consent.ts";
 import type { ConsentDeps } from "./use-analytics-consent.ts";
@@ -89,7 +90,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** First visit: the banner asks; "No, gracias" and "Sí, acepto" look the same, decline first. */
+/**
+ * First visit: the banner asks; "No, gracias" (secondary) and "Sí, quiero ayudar" (primary) are the
+ * same size, decline first, so refusing is as easy as accepting.
+ */
 export const Ask: Story = {
   globals: { theme: "day" },
   loaders: [fakes(() => memoryStorage())],
@@ -98,18 +102,18 @@ export const Ask: Story = {
     const banner = await canvas.findByRole("region", { name: "Preferencias de cookies" });
     await expect(banner).toBeVisible();
     const decline = within(banner).getByRole("button", { name: "No, gracias" });
-    const accept = within(banner).getByRole("button", { name: "Sí, acepto" });
-    await expect(decline.className).toBe(accept.className);
-    await expect(decline.getBoundingClientRect().height).toBe(
-      accept.getBoundingClientRect().height,
-    );
+    const accept = within(banner).getByRole("button", { name: "Sí, quiero ayudar" });
+    await expect(decline).toHaveClass("lk-btn-secondary");
+    await expect(accept).toHaveClass("lk-btn-primary");
+    // The same size, give or take the secondary button's 2px border (as in the hero's pair).
+    const [d, a] = [decline.getBoundingClientRect(), accept.getBoundingClientRect()];
+    await expect(Math.abs(d.height - a.height)).toBeLessThanOrEqual(4);
+    await expect(d.width).toBe(a.width);
     // Decline comes first in the reading order.
     await expect(
       decline.compareDocumentPosition(accept) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    await expect(
-      within(banner).getByRole("link", { name: "política de privacidad" }),
-    ).toHaveAttribute("href", "/privacy");
+    await expect(banner).toHaveTextContent("¿Nos ayudas a mejorar Wambito?");
     await expect(banner).not.toHaveTextContent("Ahora:");
   },
 };
@@ -120,7 +124,7 @@ export const AcceptStores: Story = {
   play: async ({ canvasElement, loaded }) => {
     const { storage, start } = loaded as Loaded;
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "Sí, acepto" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "Sí, quiero ayudar" }));
     await expect(storedChoice(storage)).toBe("granted");
     await expect(start).toHaveBeenCalledTimes(1);
     await expect(start).toHaveBeenCalledWith(CONFIG);
@@ -216,7 +220,7 @@ export const BlockedStorage: Story = {
     const { start } = loaded as Loaded;
     const canvas = within(canvasElement);
     await canvas.findByRole("region", { name: "Preferencias de cookies" });
-    await userEvent.click(canvas.getByRole("button", { name: "Sí, acepto" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Sí, quiero ayudar" }));
     await expect(start).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(canvas.queryByRole("region")).toBeNull());
   },

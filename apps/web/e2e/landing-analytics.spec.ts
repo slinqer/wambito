@@ -17,7 +17,7 @@ const POSTHOG_HOST = /(^|\.)posthog\.example\.test$|(^|\.)posthog\.com$/;
 const COPY = {
   /** The banner's name and the footer link's, in Spanish and English (the tests visit `/en`). */
   preferences: /^(Preferencias de cookies|Cookie preferences)$/,
-  accept: "Sí, acepto",
+  accept: "Sí, quiero ayudar",
   decline: "No, gracias",
   close: "Cerrar",
   browserNo: "Tu navegador pidió no ser rastreado, así que no te rastreamos.",

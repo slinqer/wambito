@@ -1,8 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
-import { Link } from "react-router";
 import { useTranslations } from "use-intl";
-import { useLocale } from "../../i18n/IntlProvider.tsx";
-import { PRIVACY_PATH } from "../../site/paths.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
 import type { ConsentChoice } from "./consent.ts";
 import type { AnalyticsConsent } from "./use-analytics-consent.ts";
@@ -22,7 +19,6 @@ export function ConsentBanner({
   returnFocus?: RefObject<HTMLElement | null>;
 }) {
   const t = useTranslations("landing.consent");
-  const { locale } = useLocale();
   const box = useRef<HTMLElement>(null);
   const asked = consent.state !== "ask" || consent.browserSaysNo;
   const shown = consent.ready && consent.open;
@@ -78,11 +74,7 @@ export function ConsentBanner({
         <>
           <div className="lk-consent-text">
             <h2 className="lk-consent-title">{t("title")}</h2>
-            <p>
-              {t.rich("body", {
-                privacy: (chunks) => <Link to={PRIVACY_PATH[locale]}>{chunks}</Link>,
-              })}
-            </p>
+            <p>{t("body")}</p>
             {consent.state !== "ask" && (
               <p className="lk-consent-current">
                 {t(consent.state === "granted" ? "current_granted" : "current_denied")}
@@ -93,7 +85,7 @@ export function ConsentBanner({
             <PressButton variant="secondary" onClick={choose("denied")}>
               {t("decline")}
             </PressButton>
-            <PressButton variant="secondary" onClick={choose("granted")}>
+            <PressButton variant="primary" onClick={choose("granted")}>
               {t("accept")}
             </PressButton>
           </div>
