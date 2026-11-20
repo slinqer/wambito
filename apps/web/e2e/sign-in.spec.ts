@@ -207,7 +207,8 @@ test("a link from a sign-in started in the Android app offers the app, and spend
 test("no fingerprint button before a passkey, then the offer creates one and the button signs in", async ({
   page,
 }) => {
-  await addVirtualAuthenticator(page);
+  // A passkey with PRF opens the data too: the offer goes on at once, with no notice.
+  await addVirtualAuthenticator(page, { prf: true });
   // The software authenticator would pick its passkey from the email field's autofill by itself
   // (see the next test); here only the button is under test.
   await page.addInitScript(() => {
@@ -242,6 +243,7 @@ test("no fingerprint button before a passkey, then the offer creates one and the
   await expect(
     page.getByText("Done: next time you'll sign in with your fingerprint."),
   ).toBeVisible();
+  await expect(page.getByText(/does not let it open your data/)).toHaveCount(0);
   const user = await sessionUser(page);
   expect(user?.email).toBe(email);
 
@@ -277,6 +279,7 @@ test("no fingerprint button before a passkey, then the offer creates one and the
 test("a passkey picked from the email field's autofill signs in with no button", async ({
   page,
 }) => {
+  // No PRF: the passkey signs in but cannot open the encrypted data, and the offer says so.
   await addVirtualAuthenticator(page);
   const email = freshEmail("autofill");
   await page.goto("/sign-in?lang=en");
@@ -285,6 +288,12 @@ test("a passkey picked from the email field's autofill signs in with no button",
   const mail = await readSignInMail(email);
   await page.getByRole("textbox", { name: "Digit 1 of 6" }).fill(mail.code);
   await page.getByRole("button", { name: "Create my fingerprint" }).click();
+  // The notice stays (not a toast) until "Continue" goes on.
+  await expect(
+    page.getByRole("status").filter({ hasText: "does not let it open your data" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/passkey-offer\?next=%2Fwelcome$/);
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/welcome$/);
   const user = await sessionUser(page);
 

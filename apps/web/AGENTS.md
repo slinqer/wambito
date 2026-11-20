@@ -151,11 +151,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   (`offerPrfUse`) stashes the new passkey's PRF for that user's gate, and knows the account is
   encrypted from the profile the sign-in cached (`queryKeys.me()`; no request, a reload counts as
   plain); Settings (mode `local`, `PasskeysSection` `vaultUserId`) adds the wrap
-  at once. A new passkey that ends without a wrap on an encrypted account (no PRF, or the wrap
-  failed in Settings) is kept, and the screen says so at once in text that stays (`role="status"`,
-  never a toast; `settings.passkeys.add_no_prf`): Settings until the next add or leaving, the
-  offer (`PasskeyOfferApi.add` hook `onKept`: its PRF went to the stash) with a "Continue"
-  (`passkey_offer.continue`) instead of moving on by itself.
+  at once. A new passkey that gives no PRF on an encrypted account (after the second touch) is
+  kept, and the screen says so at once in text that stays (`role="status"`, never a toast;
+  `settings.passkeys.add_no_prf`): Settings until the next add or leaving, the offer
+  (`PasskeyOfferApi.add` hook `onKept`: its PRF went to the stash) with a "Continue"
+  (`passkey_offer.continue`) instead of moving on by itself. In Settings, a PRF whose wrap could
+  not be saved is kept too, with the generic `turn_on_failed` toast (never the password-manager
+  line); its row's "Turn on" tries again. e2e: `addVirtualAuthenticator(page, { prf })` (default
+  no PRF, as Chromium's) picks which path the offer takes.
   `rotate.ts` (two steps, like `prepareAccount`; a new key's verifier is put after its wrap, by
   `newRecoveryKey` and by `rotateKeys` with `{ fresh: true }`, never with the typed key): `rotateKeys({ userId, remove, recovery: { text }
   | { fresh: true }, passkey?: { credentialId, prf } })` → `{ recoveryKey, commit() → { keyV,

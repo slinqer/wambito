@@ -32,8 +32,9 @@ export function formatDay(iso: string, locale: Locale, timeZone: string): string
  * can make one. Closing the browser's prompt is silent, as on sign-in. With `security` (an
  * encrypted account), each says whether it opens the data ("Unlocks" / "Does not unlock", from the
  * passkey wraps); "Turn on" touches that passkey (`evaluatePrf([id])`) and adds its wrap. A new
- * passkey that ends without a wrap (its provider gives no PRF, or the wrap failed) is kept, and the
- * section says so in text that stays (`role="status"`), not a toast.
+ * passkey whose provider gives no PRF is kept, and the section says so in text that stays
+ * (`role="status"`), not a toast; one that gave a PRF whose wrap could not be saved is kept too, with
+ * the generic failure (its row's "Turn on" tries again).
  */
 export function PasskeysSection({
   passkeys,
@@ -72,7 +73,7 @@ export function PasskeysSection({
   const [turningOn, setTurningOn] = useState<string | null>(null);
   /** A passkey whose provider gives no PRF: it cannot open the data, say so under it. */
   const [noPrf, setNoPrf] = useState<string | null>(null);
-  /** The passkey just added got no wrap: it signs in only; said until the next add or leaving. */
+  /** The passkey just added gave no PRF: it signs in only; said until the next add or leaving. */
   const [addedWithoutWrap, setAddedWithoutWrap] = useState(false);
   const noPrfId = useId();
 
@@ -112,7 +113,9 @@ export function PasskeysSection({
     inFlight.current = true;
     setAdding(true);
     setAddedWithoutWrap(false);
-    // With the open vault's keys, whether the new passkey's PRF wrapped the data key.
+    // With the open vault's keys: whether the new passkey gave a PRF, and whether it wrapped the
+    // data key. Only a passkey that gave none gets the password-manager notice.
+    let gavePrf = false;
     let wrapped = false;
     try {
       const outcome = await passkeys.add(
@@ -123,6 +126,7 @@ export function PasskeysSection({
               ...(security
                 ? {
                     keep: async (passkey: PasskeyPrf) => {
+                      gavePrf = true;
                       await security.addPasskeyWrap(passkey);
                       wrapped = true;
                     },
@@ -133,8 +137,9 @@ export function PasskeysSection({
       );
       if (outcome === "added") {
         // An encrypted account's passkey that opens nothing: said at once, as text that stays.
-        if (security && vaultUserId && !wrapped) setAddedWithoutWrap(true);
-        else toast.show({ message: t("added") });
+        if (!security || !vaultUserId || wrapped) toast.show({ message: t("added") });
+        else if (gavePrf) toast.show({ tone: "error", message: t("turn_on_failed") });
+        else setAddedWithoutWrap(true);
         await qc.invalidateQueries({ queryKey: PASSKEYS_KEY });
         if (security) await qc.invalidateQueries({ queryKey: SECURITY_KEY });
       } else if (outcome === "failed") {

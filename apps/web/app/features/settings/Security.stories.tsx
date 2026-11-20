@@ -69,6 +69,8 @@ interface FakeOptions {
   rotate?: Array<"ok" | "wrong_recovery_key" | "rotated_elsewhere">;
   /** What the passkey touch gives. */
   touch?: "prf" | "no_prf" | "cancel";
+  /** What saving a passkey wrap does (default: works). */
+  wrap?: "ok" | "failed";
   /** What each commit of a rotation does, in turn (default: works). */
   commitRotate?: Array<"ok" | "offline" | "rotated_elsewhere">;
   /** What each removeDevice does, in turn (default: works; "gone": it was already removed). */
@@ -82,6 +84,7 @@ function fakeSecurity({
   unreadable = 3,
   rotate = [],
   touch = "prf",
+  wrap: wrapOutcome = "ok",
   commitRotate: rotateCommits = [],
   commitNewKey: newKeyCommits = [],
   removeDevice: removals = [],
@@ -154,6 +157,7 @@ function fakeSecurity({
       return { credentialId: ids?.[0] ?? "cred-1", prf: new Uint8Array(32).fill(7) };
     }),
     addPasskeyWrap: fn(async ({ credentialId }: { credentialId: string; prf: Uint8Array }) => {
+      if (wrapOutcome === "failed") throw coded("offline");
       wraps = [...wraps, wrap({ id: `p-${credentialId}`, kind: "passkey", ref: credentialId })];
     }),
     settings: fn(async () => ({ recoveryKeySavedAt: null })),
@@ -529,6 +533,30 @@ export const AddPasskeyWithoutPrf: Story = {
     // Kept: three rows, two of which do not open the data.
     await waitFor(() => expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(2));
     await expect(notice).toBeVisible();
+  },
+};
+
+/**
+ * A new passkey whose provider gives a PRF, but saving its wrap fails: the passkey gave a PRF, so
+ * the password-manager notice would be untrue. The generic failure shows instead, and its row
+ * keeps "Turn on" to try again.
+ */
+export const AddPasskeyWrapFails: Story = {
+  args: { options: { wrap: "failed" } },
+  render: (args) => stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, prf: true }) }),
+  play: async ({ canvasElement, args }) => {
+    const { security } = fakeOf(args);
+    const page = within(canvasElement.ownerDocument.body);
+    const passkeys = within(
+      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+    );
+    await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
+    await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
+    await expect(await page.findByText("No pudimos activarla. Inténtalo otra vez.")).toBeVisible();
+    await expect(page.queryByText(/no le permite abrir tus datos/)).toBeNull();
+    await expect(page.queryByText("Listo: ya puedes entrar con tu huella.")).toBeNull();
+    // Kept: three rows, two of which do not open the data yet.
+    await waitFor(() => expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(2));
   },
 };
 
