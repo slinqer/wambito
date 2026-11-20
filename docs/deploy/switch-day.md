@@ -16,13 +16,16 @@ Rules for every step:
 
 ## 0. Before the day (builder)
 
-This branch is **not merged before the day**: merging deploys, and the policy and landing copy say
-what is true only from the founder's migration on. The day starts by dating the copy in this
-branch and merging it (section 2, "The day starts").
+The code (PR #84, merged before the day) is inert while `MIGRATION_OPEN` is off. The live copy that
+is true only from the founder's migration on (the privacy policy, the FAQ, the roadmap, the store
+listings, `README.md`, `docs/encryption.md`, `docs/privacy-policy.md`, `docs/admin.md`,
+`docs/mobile/play.md`) waits in its own draft PR, the **switch-day copy PR** (branch
+`feat/e2e-stage-5-copy`). Merging deploys, so that PR is merged only on the day, after its dates are
+filled (section 2, "The day starts").
 
 1. The encrypted import and export stage (importing a Budge CSV and downloading your data, made on
    the device, for encrypted accounts) is merged and deployed. The policy, the FAQ and the store
-   listings in this branch say both work.
+   listings in the switch-day copy PR say both work.
 2. `deploy/personal/docker-compose.yml` passes `NEW_USERS_ENCRYPTED`, `MIGRATION_OPEN` and
    `MIGRATION_OPEN_USER_IDS` to the `api` service, and `deploy/personal/.env.example` documents
    them. The `api` service lists its variables one by one, so a `.env` line it does not list has no
@@ -43,7 +46,7 @@ branch and merging it (section 2, "The day starts").
    `docker compose up -d api mcp`.
 4. A phone release that opens encrypted accounts is published (a `mobile-v*` tag, `docs/mobile/release.md`):
    the founder installs it in step 4.
-5. The rehearsal below passed, on this branch.
+5. The rehearsal below passed, on `main` with PR #84 merged.
 6. The founder picks the day.
 
 ## 1. The rehearsal (builder runs it, the founder decrypts)
@@ -124,7 +127,8 @@ If anything did not match, stop: the day waits for a fix and a new rehearsal.
 
 ### The day starts: date the copy, then merge (builder, with the founder)
 
-1. In this branch, list the date markers the policy still holds:
+1. In the switch-day copy PR's branch (`feat/e2e-stage-5-copy`, rebased on `main`), list the date
+   markers the policy still holds:
 
    ```sh
    scripts/check-switch-dates.sh   # prints each file:line left, exits 1 while any is left
@@ -140,9 +144,9 @@ If anything did not match, stop: the day waits for a fix and a new rehearsal.
    pt `21 de novembro de 2026`.
 3. `scripts/check-switch-dates.sh` prints `none left` and exits 0. Run the i18n tests
    (`cd apps/web && pnpm exec vitest run --project unit app/i18n`), commit
-   `docs: date the privacy policy for the switch day`, and merge. Merging deploys the API and the
-   web (`deploy/personal/auto-deploy.sh`, once CI passes) and the landing (CI). Wait until
-   `/health` on app.wambito.com shows the merge commit.
+   `docs: date the privacy policy for the switch day`, and merge the switch-day copy PR. Merging
+   deploys the web (`deploy/personal/auto-deploy.sh`, once CI passes) and the landing (CI). Wait
+   until `/health` on app.wambito.com shows the merge commit.
 4. If step 4 slips past the dated day, date the copy again in a new PR: the policy's dates are the
    day of the founder's migration and that day plus 14.
 
@@ -279,8 +283,8 @@ whatever was written after it.
     so the developer cannot read it; check Play's current help on end-to-end encrypted data first;
   - "Device or other IDs" goes (no IP address is stored); "App activity → App interactions" is
     declared (the active-day count).
-- `README.md` and `docs/encryption.md` already say encryption is on for every account (they merge
-  with this branch, on the day).
+- `README.md` and `docs/encryption.md` say encryption is on for every account in the switch-day
+  copy PR; they change with it, on the day.
 
 ## 3. Later: dropping the old tables (builder, a PR after a week without problems)
 

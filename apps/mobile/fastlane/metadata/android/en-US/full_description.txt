@@ -10,12 +10,12 @@ Wambito is your budget, and you'll actually enjoy looking after it: log an expen
 </ul>
 
 <b>No email, no passwords</b>
-Try it without an email, as a guest, and add your email later without losing what you logged. With an email you sign in with a 6-digit code or a link, and if you like with a passkey (your fingerprint or phone lock; it needs Android 14 or newer). Without an email, your data stays encrypted on the server and only this phone opens it: make a recovery key or add a passkey (Wambito reminds you on the home screen) to get it back if you lose your phone or delete the app; without either, it is lost. An account with no email is deleted after 12 months without opening Wambito, or 24 if it has a recovery key or a passkey.
+Try it without an email, as a guest, and add your email later without losing what you logged. With an email you sign in with a 6-digit code or a link, and if you like with a passkey (your fingerprint or phone lock; it needs Android 14 or newer). Without an email, if you lose your phone or delete the app you lose your data, and an account with no email is deleted after 60 days without opening Wambito: the app warns you at 45.
 
 <b>Privacy</b>
-Your finances are end-to-end encrypted: they are encrypted on your phone before they leave it, and the server keeps only encrypted text it can't read. No ads, no analytics, no automatic crash reports, no Google Play Services or Firebase. Dictation (in Spanish and English, and in beta in Italian and Portuguese) runs on your phone, offline, with the free Vosk voice models (Apache-2.0): what you say never leaves it. The model for your language downloads once (30 to 50 MB) and you can delete it in Settings. The app asks only for the permissions it uses: internet, microphone (for dictation), vibration, notices, and what the widget needs to refresh (knowing whether there is a network, and rescheduling after the phone restarts).
+No ads, no analytics, no automatic crash reports, no Google Play Services or Firebase. Dictation (in Spanish and English, and in beta in Italian and Portuguese) runs on your phone, offline, with the free Vosk voice models (Apache-2.0): what you say never leaves it. The model for your language downloads once (30 to 50 MB) and you can delete it in Settings. The app asks only for the permissions it uses: internet, microphone (for dictation), vibration, notices, and what the widget needs to refresh (knowing whether there is a network, and rescheduling after the phone restarts).
 
-There is just one notice, local and optional: "Due today…" at 9:00 with the day's recurring payments.
+There are just two notices, both local and both optional: "Due today…" at 9:00 with the day's recurring payments, and a warning if 45 days pass without opening the app and your account has no email.
 
 <b>It needs a Wambito server</b>
 The app keeps your data on a Wambito server. By default it uses the author's (app.wambito.com), which for now is a personal install and may limit who can add an email. You can point it at your own in Settings: the server is free software too.

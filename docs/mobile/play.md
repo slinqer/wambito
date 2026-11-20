@@ -65,20 +65,15 @@ apps/mobile/scripts/check-fastlane.sh
 
 ### Data safety
 
-These answers are true from the switch day (E2E stage 5, `docs/deploy/switch-day.md`), when every
-account is end-to-end encrypted; the founder updates the form that day.
-
-Data is encrypted in transit (HTTPS) and people can ask for it to be deleted (in the app, or at the deletion page). The finance data is also end-to-end encrypted: the developer cannot read it (the server keeps only ciphertext; while an assistant the person connected is answering, the MCP opens what it asks for in memory, never stored). Nothing is shared with third parties: the server, the backups (Cloudflare R2, encrypted) and email delivery are service providers acting for Wambito, which Play does not count as sharing. Nothing is collected for analytics, ads or personalisation. No IP address is stored anywhere.
+Data is encrypted in transit (HTTPS) and people can ask for it to be deleted (in the app, or at the deletion page). Nothing is shared with third parties: the server, the backups (Cloudflare R2, encrypted) and email delivery are service providers acting for Wambito, which Play does not count as sharing. Nothing is collected for analytics, ads or personalisation.
 
 | Data type | Collected | Why | Optional |
 |---|---|---|---|
 | Personal info → Email address | yes | App functionality, Account management | yes (guests have none) |
 | Personal info → User IDs | yes (the account id) | App functionality, Account management | no |
-| Financial info → Purchase history | yes, end-to-end encrypted: transactions the person enters, and the amount, merchant, date and app taken from a bank notification by automatic capture | App functionality | yes |
-| Financial info → Other financial info | yes, end-to-end encrypted: categories, budgets, recurring payments | App functionality | yes |
-| App activity → App interactions | yes: the last day the app was opened, the app version and platform (active days counted per day, without a user id) | App functionality | no |
-
-The financial rows stay declared even though they are end-to-end encrypted: an assistant the person connects makes the server open them in memory, so the conservative answer is "collected". Before submitting, check Play's current help on end-to-end encrypted data; if it says such data is not "collected" even then, the founder may untick them. The sessions keep the kind of browser or app (user agent), no device id, so "Device or other IDs" is no longer declared.
+| Financial info → Purchase history | yes: transactions the person enters, and the amount, merchant, date and app taken from a bank notification by automatic capture | App functionality | yes |
+| Financial info → Other financial info | yes: categories, budgets, recurring payments | App functionality | yes |
+| Device or other IDs | yes: the IP address and browser or app name stored with each sign-in session | Fraud prevention, security | no |
 
 Not collected, because it is processed only on the phone and never sent: **Audio** (voice is transcribed on the phone; the audio stays in memory and is never stored or sent), and the **text of notifications** (only the transaction taken from it is sent, listed above). No location, contacts, photos, files, web history, crash logs or diagnostics are collected.
 

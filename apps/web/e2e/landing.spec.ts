@@ -231,7 +231,12 @@ const ROADMAP = {
       },
       {
         label: "Próximo",
-        items: ["App para iPhone", "Conecta tu IA en un clic", "Apoya a Wambito"],
+        items: [
+          "App para iPhone",
+          "Cifrado de punta a punta",
+          "Conecta tu IA en un clic",
+          "Apoya a Wambito",
+        ],
       },
       {
         label: "Más adelante",
@@ -255,7 +260,6 @@ const ROADMAP = {
           "En cuatro idiomas",
           "Instálalo en tu propio servidor",
           "Conecta tu IA",
-          "Cifrado de punta a punta",
         ],
       },
     ],
@@ -280,7 +284,12 @@ const ROADMAP = {
       },
       {
         label: "Next",
-        items: ["iPhone app", "Connect your AI in one click", "Support Wambito"],
+        items: [
+          "iPhone app",
+          "End-to-end encryption",
+          "Connect your AI in one click",
+          "Support Wambito",
+        ],
       },
       {
         label: "Later",
@@ -304,7 +313,6 @@ const ROADMAP = {
           "In four languages",
           "Run it on your own server",
           "Connect your AI",
-          "End-to-end encryption",
         ],
       },
     ],
@@ -329,7 +337,12 @@ const ROADMAP = {
       },
       {
         label: "Prossimo",
-        items: ["App per iPhone", "Collega la tua IA in un clic", "Sostieni Wambito"],
+        items: [
+          "App per iPhone",
+          "Crittografia end-to-end",
+          "Collega la tua IA in un clic",
+          "Sostieni Wambito",
+        ],
       },
       {
         label: "Più avanti",
@@ -353,7 +366,6 @@ const ROADMAP = {
           "In quattro lingue",
           "Installalo sul tuo server",
           "Collega la tua IA",
-          "Crittografia end-to-end",
         ],
       },
     ],
@@ -378,7 +390,12 @@ const ROADMAP = {
       },
       {
         label: "A seguir",
-        items: ["App para iPhone", "Liga a tua IA num clique", "Apoia o Wambito"],
+        items: [
+          "App para iPhone",
+          "Encriptação ponta a ponta",
+          "Liga a tua IA num clique",
+          "Apoia o Wambito",
+        ],
       },
       {
         label: "Mais à frente",
@@ -402,7 +419,6 @@ const ROADMAP = {
           "Em quatro línguas",
           "Instala-o no teu próprio servidor",
           "Liga a tua IA",
-          "Encriptação ponta a ponta",
         ],
       },
     ],
