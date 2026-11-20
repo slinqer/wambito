@@ -40,7 +40,7 @@ The app still talks about money the Colombian way: in Colombia we call money **l
 | Android app (widgets, automatic capture, voice) | ✅ built; Google Play and F-Droid pending |
 | iOS app | 🧪 base built (no capture, widgets or voice yet); App Store after Android |
 | MCP server for assistants | ✅ live |
-| End-to-end encryption | 🧪 built; switch day pending |
+| End-to-end encryption | ✅ on for every account |
 | Accounts without email (phone-first, QR sign-in on the web) | 🧪 built; ships with the encryption switch |
 | Import and download your data | 🚧 not yet with end-to-end encryption; coming back soon |
 
