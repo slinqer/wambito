@@ -22,13 +22,13 @@ The app still talks about money the Colombian way: in Colombia we call money **l
 - **Automatic capture (Android):** the app reads your bank's payment notifications (Revolut, Google Wallet) and logs them for you to review.
 - **Voice entry:** say "18 lukas almuerzo" and it is logged, recognized on your phone.
 - **Analysis** by category and month-over-month trends.
-- **Import your history from other apps:** Budge today (CSV); Buddy and others soon.
+- **Import your history from other apps:** paused with end-to-end encryption; coming back soon, encrypted on your device (Budge's CSV first, then Buddy and others), with downloading your data.
 - **Connect your assistant:** an MCP server so you can ask your AI to log expenses, prepare reports, or adjust your budget.
 - **No passwords:** sign in with a code sent to your email, a passkey, or by scanning a QR on the web with your phone.
 
 ## End-to-end encryption
 
-🚧 **Built, switching on soon.** Each phone or browser will encrypt your movements with a key only you hold; the server keeps only encrypted records, and an assistant gets a key only while you keep it connected. Every account moves over on one switch day, before the public release. How it works, with pictures: [`docs/encryption.md`](docs/encryption.md).
+🔒 **On for every account.** Each phone or browser encrypts your movements with a key only you hold; the server keeps only encrypted records, and an assistant gets a key only while you keep it connected. Every account moved over on one switch day, before the public release. How it works, with pictures: [`docs/encryption.md`](docs/encryption.md).
 
 ## Status
 
@@ -40,9 +40,9 @@ The app still talks about money the Colombian way: in Colombia we call money **l
 | Android app (widgets, automatic capture, voice) | ✅ built; Google Play and F-Droid pending |
 | iOS app | 🧪 base built (no capture, widgets or voice yet); App Store after Android |
 | MCP server for assistants | ✅ live |
-| End-to-end encryption | 🧪 built; switch day pending |
+| End-to-end encryption | ✅ on for every account |
 | Accounts without email (phone-first, QR sign-in on the web) | 🧪 built; ships with the encryption switch |
-| Import from other apps | ✅ Budge; others soon |
+| Import and download your data | 🚧 not yet with end-to-end encryption; coming back soon |
 
 The first design is in [`docs/superpowers/specs/2026-10-20-lukas-design.md`](docs/superpowers/specs/2026-10-20-lukas-design.md); later ones are in [`docs/superpowers/specs/`](docs/superpowers/specs/).
 

@@ -223,17 +223,13 @@ const ROADMAP = {
     columns: [
       {
         label: "En construcción",
-        items: [
-          "Captura automática de las notificaciones de tu banco",
-          "En F-Droid y Google Play",
-          "Importa desde Buddy y otras apps",
-        ],
+        items: ["Captura automática de las notificaciones de tu banco", "En F-Droid y Google Play"],
       },
       {
         label: "Próximo",
         items: [
+          "Importa y descarga tus datos, cifrados",
           "App para iPhone",
-          "Cifrado de punta a punta",
           "Conecta tu IA en un clic",
           "Apoya a Wambito",
         ],
@@ -241,6 +237,7 @@ const ROADMAP = {
       {
         label: "Más adelante",
         items: [
+          "Importa desde Buddy y otras apps",
           "Sin servidor central",
           "Anota por WhatsApp",
           "Tu resumen del mes con IA en tu teléfono",
@@ -253,13 +250,13 @@ const ROADMAP = {
           "Pruébalo sin cuenta",
           "App para Android",
           "Android: widget con micrófono",
-          "Importa tu historial de Budge",
           "Funciona sin conexión",
           "Sin contraseñas",
           "Pagos recurrentes con avisos",
           "En cuatro idiomas",
           "Instálalo en tu propio servidor",
           "Conecta tu IA",
+          "Cifrado de punta a punta",
         ],
       },
     ],
@@ -276,17 +273,13 @@ const ROADMAP = {
     columns: [
       {
         label: "Being built",
-        items: [
-          "Automatic capture of your bank's notifications",
-          "On F-Droid and Google Play",
-          "Import from Buddy and other apps",
-        ],
+        items: ["Automatic capture of your bank's notifications", "On F-Droid and Google Play"],
       },
       {
         label: "Next",
         items: [
+          "Import and download your data, encrypted",
           "iPhone app",
-          "End-to-end encryption",
           "Connect your AI in one click",
           "Support Wambito",
         ],
@@ -294,6 +287,7 @@ const ROADMAP = {
       {
         label: "Later",
         items: [
+          "Import from Buddy and other apps",
           "No central server",
           "Log it on WhatsApp",
           "Your monthly recap with AI on your phone",
@@ -306,13 +300,13 @@ const ROADMAP = {
           "Try it without an account",
           "Android app",
           "Android: widget with a microphone",
-          "Import your history from Budge",
           "Works offline",
           "No passwords",
           "Recurring payments with reminders",
           "In four languages",
           "Run it on your own server",
           "Connect your AI",
+          "End-to-end encryption",
         ],
       },
     ],
@@ -329,17 +323,13 @@ const ROADMAP = {
     columns: [
       {
         label: "In costruzione",
-        items: [
-          "Cattura automatica delle notifiche della tua banca",
-          "Su F-Droid e Google Play",
-          "Importa da Buddy e da altre app",
-        ],
+        items: ["Cattura automatica delle notifiche della tua banca", "Su F-Droid e Google Play"],
       },
       {
         label: "Prossimo",
         items: [
+          "Importa e scarica i tuoi dati, cifrati",
           "App per iPhone",
-          "Crittografia end-to-end",
           "Collega la tua IA in un clic",
           "Sostieni Wambito",
         ],
@@ -347,6 +337,7 @@ const ROADMAP = {
       {
         label: "Più avanti",
         items: [
+          "Importa da Buddy e da altre app",
           "Senza server centrale",
           "Annota su WhatsApp",
           "Il riepilogo del mese con l'IA sul telefono",
@@ -359,13 +350,13 @@ const ROADMAP = {
           "Provala senza account",
           "App per Android",
           "Android: widget con microfono",
-          "Importa il tuo storico da Budge",
           "Funziona offline",
           "Senza password",
           "Pagamenti ricorrenti con avvisi",
           "In quattro lingue",
           "Installalo sul tuo server",
           "Collega la tua IA",
+          "Crittografia end-to-end",
         ],
       },
     ],
@@ -382,17 +373,13 @@ const ROADMAP = {
     columns: [
       {
         label: "Em construção",
-        items: [
-          "Captura automática das notificações do teu banco",
-          "No F-Droid e no Google Play",
-          "Importa do Buddy e de outras apps",
-        ],
+        items: ["Captura automática das notificações do teu banco", "No F-Droid e no Google Play"],
       },
       {
         label: "A seguir",
         items: [
+          "Importa e descarrega os teus dados, encriptados",
           "App para iPhone",
-          "Encriptação ponta a ponta",
           "Liga a tua IA num clique",
           "Apoia o Wambito",
         ],
@@ -400,6 +387,7 @@ const ROADMAP = {
       {
         label: "Mais à frente",
         items: [
+          "Importa do Buddy e de outras apps",
           "Sem servidor central",
           "Regista pelo WhatsApp",
           "O resumo do mês com IA no teu telemóvel",
@@ -412,13 +400,13 @@ const ROADMAP = {
           "Experimenta sem conta",
           "App para Android",
           "Android: widget com microfone",
-          "Importa o teu histórico do Budge",
           "Funciona sem ligação",
           "Sem palavras-passe",
           "Pagamentos recorrentes com avisos",
           "Em quatro línguas",
           "Instala-o no teu próprio servidor",
           "Liga a tua IA",
+          "Encriptação ponta a ponta",
         ],
       },
     ],
@@ -925,7 +913,7 @@ for (const l of LOCALES) {
       await expect(page.locator("#spreadsheet")).toHaveCount(0);
     });
 
-    test("imports come from other apps: Budge today, Buddy soon", async ({ page }) => {
+    test("imports come from other apps, soon: Budge first, then Buddy", async ({ page }) => {
       await page.goto(l.path);
       const step = page
         .locator("#how")
