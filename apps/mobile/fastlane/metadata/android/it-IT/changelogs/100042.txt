@@ -1,0 +1,6 @@
+- I tuoi dati sono cifrati end-to-end: solo i tuoi dispositivi possono leggerli.
+- Inizia senza email e senza rete; aggiungi la tua email quando vuoi.
+- La tua passkey apre i tuoi dati con un tocco, se il tuo gestore di password lo consente.
+- Accedi sul web scansionando un codice QR con il telefono.
+- Collega un altro dispositivo e rimuovi quelli che non usi più.
+- Collega e gestisci i tuoi assistenti IA con l'account cifrato.

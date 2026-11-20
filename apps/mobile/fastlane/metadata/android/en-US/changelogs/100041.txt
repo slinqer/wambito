@@ -1,0 +1,6 @@
+- Your data is end-to-end encrypted: only your devices can read it.
+- Start with no email and no network; add your email whenever you like.
+- Your passkey opens your data with one touch, if your password manager allows it.
+- Sign in on the web by scanning a QR code with your phone.
+- Connect another device and remove the ones you no longer use.
+- Connect and manage your AI assistants on an encrypted account.

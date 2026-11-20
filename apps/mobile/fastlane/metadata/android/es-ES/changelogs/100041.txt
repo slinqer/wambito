@@ -1,0 +1,6 @@
+- Tus datos van cifrados de extremo a extremo: solo tus dispositivos pueden leerlos.
+- Empieza sin correo y sin red; agrega tu correo cuando quieras.
+- Tu huella abre tus datos con un toque, si tu gestor de contraseñas lo permite.
+- Entra en la web escaneando un código QR con el teléfono.
+- Conecta otro dispositivo y quita los que ya no uses.
+- Conecta y gestiona tus asistentes de IA con la cuenta cifrada.
