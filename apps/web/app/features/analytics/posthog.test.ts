@@ -1,3 +1,4 @@
+import type { CaptureResult } from "posthog-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY, encodeChoice } from "./consent";
 import {
@@ -9,6 +10,13 @@ import {
   stopAnalytics,
   watchConsent,
 } from "./posthog";
+
+// Records any import of the real library: a stop that never started must never load it.
+const posthogImported = vi.hoisted(() => vi.fn());
+vi.mock("posthog-js", () => {
+  posthogImported();
+  return { default: {} };
+});
 
 beforeEach(resetAnalyticsForTests);
 
@@ -55,8 +63,24 @@ describe("posthogOptions", () => {
       persistence: "localStorage+cookie",
       cross_subdomain_cookie: false,
       opt_out_persistence_by_default: true,
-      session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask]" },
+      session_recording: {
+        maskAllInputs: true,
+        // The landing's demo money (`.lk-amount`) is masked like any `[data-ph-mask]` text.
+        maskTextSelector: "[data-ph-mask], .lk-amount",
+      },
     });
+  });
+
+  it("asks PostHog not to enrich any event with a GeoIP location", () => {
+    const { before_send } = posthogOptions({ key: "k", host: "https://h.test" });
+    expect(typeof before_send).toBe("function");
+    const send = before_send as (event: CaptureResult | null) => CaptureResult | null;
+    const event = { uuid: "u", event: "$pageview", properties: { $current_url: "x" } };
+    expect(send(event as unknown as CaptureResult)?.properties).toEqual({
+      $current_url: "x",
+      $geoip_disable: true,
+    });
+    expect(send(null)).toBeNull();
   });
 
   it("turns feature flags off, so a withdrawal's reset() sends no flags request", () => {
@@ -110,6 +134,24 @@ describe("startAnalytics and stopAnalytics", () => {
     expect(ph.init).not.toHaveBeenCalled();
   });
 
+  it("stopped without a start: clears PostHog's storage and never loads or calls PostHog", () => {
+    const ph = fakePosthog();
+    const local = memoryStorage({ ph_phc_x_posthog: "{}", __ph_opt_in_out_phc_x: "0", a: "1" });
+    const session = memoryStorage({ ph_phc_x_window_id: "w", b: "2" });
+    stopAnalytics({
+      document: { cookie: "" } as Document,
+      localStorage: local,
+      sessionStorage: session,
+    });
+    expect(local.getItem("ph_phc_x_posthog")).toBeNull();
+    expect(local.getItem("__ph_opt_in_out_phc_x")).toBe("0");
+    expect(local.getItem("a")).toBe("1");
+    expect(session.getItem("ph_phc_x_window_id")).toBeNull();
+    expect(session.getItem("b")).toBe("2");
+    expect(ph.calls).toEqual([]);
+    expect(posthogImported).not.toHaveBeenCalled();
+  });
+
   it("opts back in on the same page after a withdrawal", async () => {
     const ph = fakePosthog();
     await startAnalytics(config, async () => ph);
@@ -148,6 +190,20 @@ describe("clearPosthogStorage", () => {
     expect(storage.getItem(CONSENT_KEY)).toBe("x");
   });
 
+  it("sweeps sessionStorage too, keeping the opt-out marker", () => {
+    const session = memoryStorage({
+      ph_phc_x_window_id: "w",
+      __ph_session: "s",
+      __ph_opt_in_out_phc_x: "0",
+      other: "1",
+    });
+    clearPosthogStorage({ cookie: "" }, memoryStorage({}), session);
+    expect(session.getItem("ph_phc_x_window_id")).toBeNull();
+    expect(session.getItem("__ph_session")).toBeNull();
+    expect(session.getItem("__ph_opt_in_out_phc_x")).toBe("0");
+    expect(session.getItem("other")).toBe("1");
+  });
+
   it("never throws", () => {
     const doc = {
       get cookie(): string {
@@ -164,6 +220,7 @@ describe("clearPosthogStorage", () => {
     } as unknown as Storage;
     expect(() => clearPosthogStorage(doc, storage)).not.toThrow();
     expect(() => clearPosthogStorage(doc, undefined)).not.toThrow();
+    expect(() => clearPosthogStorage(doc, undefined, storage)).not.toThrow();
   });
 });
 

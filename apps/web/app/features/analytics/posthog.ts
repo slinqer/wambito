@@ -1,4 +1,4 @@
-import type { PostHogConfig } from "posthog-js";
+import type { CaptureResult, PostHogConfig } from "posthog-js";
 import type { AnalyticsConfig } from "./config";
 import { type BrowserSignals, CONSENT_KEY, consentState } from "./consent";
 
@@ -12,6 +12,11 @@ export type PostHogLike = {
   reset(): void;
 };
 
+function withoutGeoip(event: CaptureResult | null): CaptureResult | null {
+  if (!event) return event;
+  return { ...event, properties: { ...event.properties, $geoip_disable: true } };
+}
+
 export function posthogOptions(config: AnalyticsConfig): Partial<PostHogConfig> {
   return {
     api_host: config.host,
@@ -21,7 +26,11 @@ export function posthogOptions(config: AnalyticsConfig): Partial<PostHogConfig> 
     persistence: "localStorage+cookie",
     cross_subdomain_cookie: false,
     opt_out_persistence_by_default: true,
-    session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask]" },
+    // The landing's demo money (`.lk-amount`) is masked in recordings too.
+    session_recording: { maskAllInputs: true, maskTextSelector: "[data-ph-mask], .lk-amount" },
+    // No approximate location: every event asks PostHog to skip GeoIP enrichment. Set here and
+    // not with `register()`, which a withdrawal's `reset()` would clear for the rest of the page.
+    before_send: withoutGeoip,
     // The landing uses no feature flags; with them on, the withdrawal's `reset()` reloads them and
     // sends a request to PostHog after the person said no (the built-landing e2e proves it). Not
     // `advanced_disable_flags`: that also drops the remote config session recording needs.
@@ -84,11 +93,15 @@ export function startAnalytics(
  * Withdraws: stops recording, forgets the visitor, clears PostHog's own storage and leaves capture
  * opted out. The order matters (posthog-js 1.447): `reset()` removes the opt-out marker, so the
  * opt-out comes last, and the marker key `__ph_opt_in_out_*` survives the clearing.
+ * Safe when nothing started on this page (the hook calls it on every refusal, and on mount when
+ * the choice is not `granted`): it then never loads or calls PostHog and only clears what an
+ * earlier page or visit left behind.
  */
 export function stopAnalytics(
-  env: { document: Pick<Document, "cookie">; localStorage?: Storage } = {
+  env: { document: Pick<Document, "cookie">; localStorage?: Storage; sessionStorage?: Storage } = {
     document,
-    localStorage: safeLocalStorage(),
+    localStorage: safeStorage("localStorage"),
+    sessionStorage: safeStorage("sessionStorage"),
   },
 ): void {
   generation += 1;
@@ -103,7 +116,7 @@ export function stopAnalytics(
       // Clearing the storage below still runs.
     }
   }
-  clearPosthogStorage(env.document, env.localStorage);
+  clearPosthogStorage(env.document, env.localStorage, env.sessionStorage);
 }
 
 function removeOptOutMarkers(storage: Storage | undefined): void {
@@ -121,20 +134,26 @@ function removeOptOutMarkers(storage: Storage | undefined): void {
 }
 
 function safeLocalStorage(): Storage | undefined {
+  return safeStorage("localStorage");
+}
+
+function safeStorage(area: "localStorage" | "sessionStorage"): Storage | undefined {
   try {
-    return window.localStorage;
+    return window[area];
   } catch {
     return undefined;
   }
 }
 
 /**
- * Expires every `ph_*` cookie (this host, path `/`) and removes every `ph_*` / `__ph*` key, except
- * the `__ph_opt_in_out_*` opt-out marker, which is what keeps capture off.
+ * Expires every `ph_*` cookie (this host, path `/`) and removes every `ph_*` / `__ph*` key from
+ * localStorage and sessionStorage, except the `__ph_opt_in_out_*` opt-out marker, which is what
+ * keeps capture off.
  */
 export function clearPosthogStorage(
   doc: Pick<Document, "cookie">,
   storage: Storage | undefined,
+  session?: Storage,
 ): void {
   try {
     for (const part of doc.cookie.split(";")) {
@@ -144,6 +163,11 @@ export function clearPosthogStorage(
   } catch {
     // Cookies unavailable: nothing to clear.
   }
+  clearPosthogKeys(storage);
+  clearPosthogKeys(session);
+}
+
+function clearPosthogKeys(storage: Storage | undefined): void {
   try {
     if (!storage) return;
     const keys: string[] = [];
