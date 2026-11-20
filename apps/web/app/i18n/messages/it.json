@@ -302,12 +302,24 @@
       "body": "Wambito è nato nel 2026 dalla frustrazione di non sapere quanto spendevo in caffè ogni mese.",
       "body_soon": "Wambito è in costruzione, alla luce del sole. Guarda come avanza su GitHub e prova l'app appena apre."
     },
+    "consent": {
+      "label": "Preferenze sui cookie",
+      "title": "Ci aiuti a migliorare Wambito?",
+      "body": "Con PostHog vediamo come viene usata questa pagina, con registrazioni della visita, senza sapere chi sei e senza quello che scrivi.",
+      "decline": "No, grazie",
+      "accept": "Sì, voglio aiutare",
+      "current_granted": "Ora: hai accettato.",
+      "current_denied": "Ora: non hai accettato.",
+      "browser_no": "Il tuo browser ha chiesto di non essere tracciato, quindi non ti tracciamo.",
+      "close": "Chiudi"
+    },
     "footer": {
       "language": "Lingua",
       "privacy": "Privacy",
       "copyright": "© {year} Wambito",
       "roadmap": "In arrivo",
-      "delete_account": "Elimina account"
+      "delete_account": "Elimina account",
+      "cookies": "Preferenze sui cookie"
     },
     "not_found": {
       "title": "Questa pagina non esiste",
@@ -323,7 +335,7 @@
         "description": "Come Wambito tratta i tuoi dati: cosa conserva, dove, chi può vederli e come chiederne la cancellazione."
       },
       "title": "Informativa sulla privacy",
-      "version": "Versione del SWITCH_DATE",
+      "version": "Versione del 20 novembre 2026",
       "sections": {
         "controller": {
           "title": "Chi è responsabile dei tuoi dati",
@@ -339,11 +351,19 @@
         },
         "storage": {
           "title": "Dove si trova",
-          "body": "Su un server nell’Unione europea. I tuoi dati viaggiano cifrati tra il tuo dispositivo e il server, e le tue finanze restano lì cifrate end-to-end. Ogni giorno facciamo una copia di sicurezza sul server e ne conserviamo un’altra, cifrata con age, su Cloudflare R2. Nessuna copia dura più di 14 giorni: dopo si cancella da sola. Così, se cancelli il tuo account, esce anche dalle copie entro 14 giorni al massimo. Gli account creati prima della cifratura end-to-end sono passati a essa il SWITCH_DATE; le copie di prima di quel giorno conservano ancora quelle finanze in una forma che potremmo leggere, e l’ultima si cancella da sola il SWITCH_DATE_PLUS_14. Un limite che devi conoscere: sul web, il codice dell’app arriva dal nostro server ogni volta che la apri, quindi chi controllasse il server potrebbe cambiarlo per leggere la tua chiave mentre la pagina è aperta. L’app Android non ha questa debolezza: il suo codice è quello che hai installato."
+          "body": "Su un server nell’Unione europea. I tuoi dati viaggiano cifrati tra il tuo dispositivo e il server, e le tue finanze restano lì cifrate end-to-end. Ogni giorno facciamo una copia di sicurezza sul server e ne conserviamo un’altra, cifrata con age, su Cloudflare R2. Nessuna copia dura più di 14 giorni: dopo si cancella da sola. Così, se cancelli il tuo account, esce anche dalle copie entro 14 giorni al massimo. Gli account creati prima della cifratura end-to-end sono passati a essa il 20 novembre 2026; le copie di prima di quel giorno conservano ancora quelle finanze in una forma che potremmo leggere, e l’ultima si cancella da sola il 4 dicembre 2026. Un limite che devi conoscere: sul web, il codice dell’app arriva dal nostro server ogni volta che la apri, quindi chi controllasse il server potrebbe cambiarlo per leggere la tua chiave mentre la pagina è aperta. L’app Android non ha questa debolezza: il suo codice è quello che hai installato."
+        },
+        "analytics": {
+          "title": "Analytics su wambito.com",
+          "body": "Solo su wambito.com, e solo se accetti nell’avviso sui cookie, usiamo PostHog per vedere quali pagine visiti e dove clicchi, e registriamo la visita senza quello che scrivi. PostHog Inc. è un’azienda statunitense che tratta questi dati per nostro conto sui suoi server nell’Unione europea, secondo il suo accordo sul trattamento dei dati, con clausole contrattuali tipo. Salva un identificativo casuale in un cookie e nella memoria locale del tuo browser, e registra il tipo di browser e di dispositivo. Non conserva il tuo IP. Gli eventi si cancellano dopo {eventsMonths, plural, one {# mese} other {# mesi}} e le registrazioni dopo {recordingsDays, plural, one {# giorno} other {# giorni}}. Niente di quello che c’è dentro l’app arriva agli analytics: PostHog non si carica su app.wambito.com né nell’app del telefono. Se il tuo browser chiede di non essere tracciato (GPC o Do Not Track), non carichiamo PostHog. Puoi revocare il tuo consenso quando vuoi in «Preferenze sui cookie», in fondo a ogni pagina. Per farci cancellare quello che è già stato salvato, scrivici a <email>privacy@wambito.com</email>."
         },
         "not_done": {
           "title": "Cosa non facciamo",
           "body": "Niente tracker, niente analytics, niente pubblicità. Non vendiamo i tuoi dati e non li condividiamo. Passano solo dai servizi che ci servono per funzionare (il server, le copie e l’invio delle email), e solo per questo."
+        },
+        "not_done_with_analytics": {
+          "title": "Cosa non facciamo",
+          "body": "Niente pubblicità. Non vendiamo i tuoi dati e non li condividiamo. Passano solo dai servizi che ci servono per funzionare (il server, le copie e l’invio delle email), e solo per questo. In più, su wambito.com e solo con il tuo consenso, usiamo PostHog per vedere come si usa la pagina. Niente di quello che c’è dentro l’app arriva mai agli analytics: PostHog non si carica su app.wambito.com né nell’app del telefono."
         },
         "voice": {
           "title": "La tua voce",
@@ -381,7 +401,7 @@
         "description": "Come eliminare il tuo account Wambito e i dati che conserva, dall’app o via email."
       },
       "title": "Elimina il tuo account",
-      "version": "Versione del SWITCH_DATE",
+      "version": "Versione del 20 novembre 2026",
       "sections": {
         "in_app": {
           "title": "Dall’app",

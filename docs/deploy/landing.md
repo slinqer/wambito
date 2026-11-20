@@ -58,6 +58,44 @@ It needs two repository secrets (GitHub → the repo → Settings → Secrets an
 Without them the job fails with a message naming them. To revoke the CI's access, delete the token
 in Cloudflare.
 
+## Analytics (PostHog)
+
+The landing can measure visits with PostHog, only after the visitor accepts in the cookie banner
+(`apps/web/app/features/analytics/`). Two build variables, read like `VITE_SITE_URL`:
+
+- `VITE_POSTHOG_KEY`: the project's public key. **Unset or empty is a keyless build: analytics are
+  off.** There is no banner, posthog-js is never loaded, no request goes to PostHog, and the privacy
+  policy keeps its old wording (the analytics paragraphs appear only in builds with a key).
+- `VITE_POSTHOG_HOST`: optional, the ingestion host (the EU region's by default).
+
+Only the landing-only build (`VITE_LANDING_ONLY=true`, `scripts/build-landing.ts`) honours the
+key: `pnpm dev` and the VPS's full build never load PostHog, even with the key in their env.
+
+CI passes the key from the repository variable `POSTHOG_KEY` (`deploy-landing` build step). Nothing
+changes for visitors until it is set.
+
+### Go-live checklist (the founder, in order)
+
+1. Create a PostHog account and a project in the **EU** region.
+2. Project settings: "Discard client IP data" on; authorized domains and recording domains limited
+   to `https://wambito.com`; session recording on with input masking.
+3. Accept PostHog's DPA (organization settings, as Slinqer S.A.S.).
+4. Read the real retention of events and recordings for the plan and put them in
+   `ANALYTICS_RETENTION` (`apps/web/app/features/legal/legal.ts`) in a PR; merge it. The values
+   there (12 months of events, 30 days of recordings) are provisional and must be confirmed. In
+   the same PR, set `legal.privacy.version` (es, en, it and pt) to the go-live date, so the
+   policy's date says when analytics began.
+5. Confirm in PostHog's docs or support whether "Discard client IP data" also stops GeoIP
+   enrichment. The client already sends `$geoip_disable: true` with every event (`before_send` in
+   `posthog.ts`); if that ever goes, either restore it or say in the privacy policy that an
+   approximate location is kept.
+6. Do not configure a session-replay "linked flag" in the PostHog project: the client disables
+   feature flags (`advanced_disable_feature_flags`), so the flag would never evaluate and recording
+   would never start.
+7. Set the repository variable `POSTHOG_KEY` (Settings → Secrets and variables → Actions →
+   Variables) to the project's public key. The next merge to `main` turns analytics on.
+8. To turn it off: delete the variable and merge anything (or rerun `deploy-landing`).
+
 ## Deploy by hand
 
 The landing is served by Cloudflare Workers as static assets: no Worker code, only the files in

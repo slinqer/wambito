@@ -32,6 +32,7 @@ const LOCALES = [
     demoCta: "Demo",
     banned: [/\bjueg(o|a)\b/i],
     toggleToDay: "Cambiar a modo día",
+    cookies: "Preferencias de cookies",
   },
   {
     locale: "en",
@@ -49,6 +50,7 @@ const LOCALES = [
     demoCta: "Demo",
     banned: [/\bgames?\b/i],
     toggleToDay: "Switch to day mode",
+    cookies: "Cookie preferences",
   },
 ] as const;
 
@@ -424,6 +426,31 @@ for (const l of LOCALES) {
           l.newTab,
         );
         expect(errors).toEqual([]);
+      });
+
+      test("has no cookie banner, no cookie preferences and no PostHog without a key", async ({
+        page,
+      }) => {
+        const assets = `${CLIENT}assets/`;
+        // The posthog-js chunk (named after the library's entry file, not "posthog").
+        const posthogChunks = readdirSync(assets).filter(
+          (file) =>
+            file.endsWith(".js") && readFileSync(assets + file, "utf8").includes("posthog-js"),
+        );
+        const loaded: string[] = [];
+        page.on("request", (request) => loaded.push(request.url()));
+        await page.goto(l.path);
+        await page.waitForLoadState("networkidle");
+        // Hydrated: the theme toggle answers.
+        await page.getByRole("banner").getByRole("button", { name: l.toggleToDay }).click();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
+        await expect(page.getByRole("region", { name: l.cookies })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: l.cookies })).toHaveCount(0);
+        await expect(page.getByText(l.cookies)).toHaveCount(0);
+        expect(loaded.filter((url) => /posthog/i.test(new URL(url).hostname))).toEqual([]);
+        expect(
+          loaded.filter((url) => posthogChunks.some((file) => url.endsWith(`/assets/${file}`))),
+        ).toEqual([]);
       });
     });
   });

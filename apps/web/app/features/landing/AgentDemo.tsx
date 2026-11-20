@@ -246,7 +246,9 @@ export function AgentDemo({ pace = 1 }: { pace?: number }) {
               </p>
             )}
             {shown("answer") && (
-              <div className="lk-landing-chat-answer">
+              // `data-ph-mask`: session replays hide the answer's amounts (PostHog's
+              // `maskTextSelector`); invented figures, but money is never recorded.
+              <div className="lk-landing-chat-answer" data-ph-mask>
                 <p className="lk-landing-chat-status is-done">
                   <img src="/favicon.svg" alt="" width={20} height={20} />
                   {t("demo.used")}

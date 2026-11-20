@@ -9,8 +9,9 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * `E2E_LANDING_ONLY=true` runs the landing-only suite instead (`pnpm e2e:landing-only`), against a
  * build made with VITE_LANDING_ONLY=true; `E2E_LANDING_ONLY=app` runs the suite for the landing-only
- * build that also has VITE_APP_URL (`pnpm e2e:landing-only-app`). The default suites need the
- * default build.
+ * build that also has VITE_APP_URL (`pnpm e2e:landing-only-app`); `E2E_LANDING_ONLY=analytics` runs
+ * the analytics consent suite, against a landing-only build with a PostHog key and a fake host
+ * (`pnpm e2e:landing-analytics`). The default suites need the default build.
  */
 const landingMode = process.env.E2E_LANDING_ONLY;
 const testMatch =
@@ -18,7 +19,9 @@ const testMatch =
     ? /landing-only\.spec\.ts$/
     : landingMode === "app"
       ? /landing-only-app\.spec\.ts$/
-      : /landing(-wambi)?\.spec\.ts$/;
+      : landingMode === "analytics"
+        ? /landing-analytics\.spec\.ts$/
+        : /landing(-wambi)?\.spec\.ts$/;
 
 /** `E2E_BUILT_PORT` picks another port, e.g. to run beside a server another checkout reuses. */
 const port = Number(process.env.E2E_BUILT_PORT ?? 4180);
