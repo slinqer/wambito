@@ -34,7 +34,7 @@ import {
   updateRecurrenceSchema,
   updateTransactionSchema,
 } from "@wambito/core";
-import { IDEMPOTENCY_NAMESPACE, uuidv5, uuidv7 } from "./ids.ts";
+import { IDEMPOTENCY_NAMESPACE, uuidv5Sync, uuidv7 } from "./ids.ts";
 import type { FinanceStore, ReadOptions, RecordType, StoreOps } from "./store.ts";
 
 /**
@@ -434,7 +434,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
         const category = categories.get(rule.categoryId);
         if (!category || category.archivedAt !== null) continue;
         for (const date of occurrences(rule, month)) {
-          const id = await uuidv5(rule.id, `${month}:${rule.rev}`);
+          const id = uuidv5Sync(rule.id, `${month}:${rule.rev}`);
           // One per rule and month, deleted or not. A pending occurrence of an older revision
           // that was dropped (a tombstone under another id) does not count.
           const blocked = (byKey.get(`${rule.id}|${month}`) ?? []).some(
@@ -502,7 +502,7 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       await s.put("recurrence", id, { ...rule.body, rev });
       for (const t of kept) {
         if (t.recurrenceId !== id || !t.occurrenceMonth) continue;
-        const moved = await uuidv5(id, `${t.occurrenceMonth}:${rev}`);
+        const moved = uuidv5Sync(id, `${t.occurrenceMonth}:${rev}`);
         const old = await s.get("transaction", t.id, { includeDeleted: true });
         if (!old) continue;
         await s.put("transaction", moved, old.body);
@@ -749,12 +749,8 @@ export function createLocalBackend(options: LocalBackendOptions): LocalBackend {
       await requireActiveCategory(e.s, categoryId);
     }
     const derived = options.idsFromIdempotencyKey;
-    const ids = await Promise.all(
-      items.map((_, i) =>
-        derived
-          ? uuidv5(IDEMPOTENCY_NAMESPACE, `${derived.userId}/${key}/${i}`)
-          : Promise.resolve(newId()),
-      ),
+    const ids = items.map((_, i) =>
+      derived ? uuidv5Sync(IDEMPOTENCY_NAMESPACE, `${derived.userId}/${key}/${i}`) : newId(),
     );
     const payloadItems: TransactionDto[] = [];
     let written = 0;

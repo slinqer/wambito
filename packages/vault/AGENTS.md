@@ -39,7 +39,12 @@ tsconfig `lib` for types only (`CryptoKey`, `BufferSource`, `RequestInfo`).
   `uuidv5(uuidv5(SETTINGS_SEED_NAMESPACE, userId), "merchant:<key>")`), `countsOf(records)` (live per type, deleted transactions apart, the
   settings not counted), `SETTINGS_SEED_NAMESPACE` and `settingsRecordId(userId)` (the web's seed
   uses the same namespace). Tests: `src/migration.test.ts`.
-- `src/ids.ts`: `uuidv7`, `uuidv5`, `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`).
+- `src/ids.ts`: `uuidv7`, `uuidv5Sync` (a small SHA-1 of its own, synchronous), `uuidv5` (the same
+  as a resolved promise), `IDEMPOTENCY_NAMESPACE` (ids derived from an `Idempotency-Key`). Inside a
+  store transaction never await anything but the store (no WebCrypto, `fetch` or timer): IndexedDB
+  commits a transaction on its own once it waits on another task (Firefox; fake-indexeddb in the
+  web's tests too), so the backend names records with `uuidv5Sync`
+  (`apps/web/app/local/backend-indexeddb.test.ts`).
 - `src/backend.ts`: `createLocalBackend` (the `/v1` routes over a store, one store transaction per
   request), `DEMO_UNAVAILABLE`. Its round-trip tests need the web's typed API client, so they stay in
   `apps/web/app/local/backend.test.ts`.
