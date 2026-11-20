@@ -17,6 +17,7 @@ import '../home/home_controller.dart';
 import '../home/home_repository.dart';
 import '../home/nudges.dart';
 import '../notices/notice_platform.dart';
+import '../vault/unlock_hint.dart';
 import '../welcome/welcome_controller.dart';
 import 'account_repository.dart';
 import 'profile_settings.dart';
@@ -93,6 +94,7 @@ class AccountDeletion {
     await _step(platform.cancelGuest);
     if (id != null) {
       await _step(() => _ref.read(passkeyOfferProvider).forget(id));
+      await _step(() => _ref.read(unlockHintProvider).forget(id));
       await _step(() => _ref.read(onboardingDraftStoreProvider).clear(id));
       for (final nudge in Nudge.values) {
         await _step(() => _ref.read(flagStoreProvider('home.dismissed.$id.${nudge.id}')).clear());

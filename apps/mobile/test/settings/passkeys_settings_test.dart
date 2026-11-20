@@ -95,6 +95,7 @@ void main() {
                 kept.add(p);
                 copies.add(List.of(p.prf));
               },
+              onNoPrf: () => told.add('no prf'),
             ),
           );
       expect(outcome, PasskeyOutcome.added);
@@ -133,12 +134,44 @@ void main() {
       expect(get, contains('"id":"cred-1"'));
     });
 
-    testWidgets('a passkey with no PRF at all is added and nothing is kept', (t) async {
+    testWidgets('a passkey with no PRF at all is added, nothing is kept, and it is told', (
+      t,
+    ) async {
       final (_, kept, told) = await run(
         t,
         attestation: '{"id":"cred-1","clientExtensionResults":{}}',
       );
       expect(kept, isEmpty);
+      expect(told, ['no prf']);
+    });
+
+    testWidgets('prf enabled, and the second touch gives none: told after the second touch', (
+      t,
+    ) async {
+      final (_, kept, told) = await run(
+        t,
+        attestation: '{"id":"cred-1","clientExtensionResults":{"prf":{"enabled":true}}}',
+        assertion: '{"id":"cred-1","clientExtensionResults":{}}',
+      );
+      expect(kept, isEmpty);
+      expect(told, ['second touch', 'no prf']);
+    });
+
+    testWidgets('a PRF whose wrap cannot be saved is not a passkey without PRF', (t) async {
+      final env = await pumpSettingsApp(t, passkeysSupported: true);
+      env.passkeys.createJson =
+          '{"id":"cred-1","clientExtensionResults":{"prf":{"enabled":true,"results":{"first":"$prfText"}}}}';
+      final told = <String>[];
+      final outcome = await env.container
+          .read(settingsPasskeysProvider)
+          .add(
+            prf: PasskeyPrfUse(
+              explainSecondTouch: () {},
+              keep: (p) async => throw StateError('the wrap was refused'),
+              onNoPrf: () => told.add('no prf'),
+            ),
+          );
+      expect(outcome, PasskeyOutcome.added);
       expect(told, isEmpty);
     });
 
@@ -148,15 +181,22 @@ void main() {
       final env = await pumpSettingsApp(t, passkeysSupported: true);
       env.passkeys.createJson = '{"id":"cred-1","clientExtensionResults":{"prf":{"enabled":true}}}';
       final kept = <PasskeyPrf>[];
+      final told = <String>[];
       // the second touch (a `get`) is cancelled: the first `create` has already answered
       env.passkeys.getFailure = const AuthFailure(code: 'AUTH_CANCELLED', status: 400);
       final outcome = await env.container
           .read(settingsPasskeysProvider)
           .add(
-            prf: PasskeyPrfUse(explainSecondTouch: () {}, keep: (p) async => kept.add(p)),
+            prf: PasskeyPrfUse(
+              explainSecondTouch: () {},
+              keep: (p) async => kept.add(p),
+              onNoPrf: () => told.add('no prf'),
+            ),
           );
       expect(outcome, PasskeyOutcome.added);
       expect(kept, isEmpty);
+      // Cancelled is not "gives no PRF": nothing is said.
+      expect(told, isEmpty);
     });
 
     testWidgets('closing the prompt is cancelled, as without a wrap', (t) async {

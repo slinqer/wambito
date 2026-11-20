@@ -200,6 +200,87 @@ describe("the offer's passkey PRF", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  describe("a new passkey without PRF (onNoPrf)", () => {
+    /** The settings' use: an encrypted account, the PRF kept by `keep`. */
+    const useOf = () => ({
+      wantsPrf: async () => true,
+      explainSecondTouch: vi.fn(),
+      keep: vi.fn(),
+      onNoPrf: vi.fn(),
+    });
+
+    it("is told when the registration has no PRF at all", async () => {
+      const { get } = stubBrowser();
+      const use = useOf();
+      addPasskeyCall.mockResolvedValue(registered({}));
+      expect(await addPasskey(use)).toBe("added");
+      expect(use.onNoPrf).toHaveBeenCalledTimes(1);
+      expect(get).not.toHaveBeenCalled();
+      expect(use.keep).not.toHaveBeenCalled();
+    });
+
+    it("is told when the second touch answers without a PRF", async () => {
+      const { get } = stubBrowser();
+      get.mockResolvedValue({
+        id: "Y3JlZA",
+        getClientExtensionResults: () => ({ prf: {} }),
+      } as never);
+      const use = useOf();
+      addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+      expect(await addPasskey(use)).toBe("added");
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(use.onNoPrf).toHaveBeenCalledTimes(1);
+      expect(use.keep).not.toHaveBeenCalled();
+    });
+
+    it("is not told when the second touch is cancelled", async () => {
+      const { get } = stubBrowser();
+      get.mockRejectedValue(new DOMException("closed", "NotAllowedError"));
+      const use = useOf();
+      addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+      expect(await addPasskey(use)).toBe("added");
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(use.onNoPrf).not.toHaveBeenCalled();
+      expect(use.keep).not.toHaveBeenCalled();
+    });
+
+    it("is not told when the second touch fails otherwise", async () => {
+      const { get } = stubBrowser();
+      get.mockRejectedValue(new TypeError("network"));
+      const use = useOf();
+      addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+      expect(await addPasskey(use)).toBe("added");
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(use.onNoPrf).not.toHaveBeenCalled();
+      expect(use.keep).not.toHaveBeenCalled();
+    });
+
+    it("is not told when a PRF came (even when keeping it fails)", async () => {
+      stubBrowser();
+      const use = useOf();
+      use.keep.mockRejectedValue(new Error("wrap not saved"));
+      addPasskeyCall.mockResolvedValue(
+        registered({ prf: { results: { first: new Uint8Array(32).fill(4).buffer } } }),
+      );
+      expect(await addPasskey(use)).toBe("added");
+      expect(use.keep).toHaveBeenCalledTimes(1);
+      expect(use.onNoPrf).not.toHaveBeenCalled();
+    });
+
+    it("is not told for a plain account (no second touch), nor for a failed registration", async () => {
+      stubBrowser();
+      const plain = { ...useOf(), wantsPrf: async () => false };
+      addPasskeyCall.mockResolvedValue(registered({ prf: { enabled: true } }));
+      await addPasskey(plain);
+      expect(plain.onNoPrf).not.toHaveBeenCalled();
+
+      const use = useOf();
+      addPasskeyCall.mockResolvedValue({ data: null, error: { code: "AUTH_CANCELLED" } });
+      expect(await addPasskey(use)).toBe("cancelled");
+      expect(use.onNoPrf).not.toHaveBeenCalled();
+    });
+  });
+
   it("a registration's PRF waits for that account's gate only", async () => {
     stubBrowser();
     const first = new Uint8Array(32).fill(4);

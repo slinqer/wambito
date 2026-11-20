@@ -24,6 +24,7 @@ export {
   sealRecord,
 } from "./records.ts";
 export {
+  CROCKFORD,
   formatRecoveryKey,
   newRecoverySecret,
   parseRecoveryKey,

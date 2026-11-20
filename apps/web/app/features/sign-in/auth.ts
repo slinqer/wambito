@@ -14,6 +14,7 @@ import { keepSignInPrf, prfExtension, readPrf } from "../../local/prf.ts";
 import { signInWithRecoveryKey as liveRecoverySignIn } from "../../local/recovery-signin.ts";
 import { startSignin as liveStartSignin } from "../../local/signin.ts";
 import { deleteStaleVaults } from "../../local/stale-vaults.ts";
+import { notePasskeyWithoutPrf } from "../../local/unlock-hint.ts";
 import { liveSignOut } from "../home/use-sign-out.ts";
 
 /** Good enough to catch typos; the server has the final word. */
@@ -382,14 +383,21 @@ interface WithWebAuthn {
  * A passkey sign-in asks for the PRF (`prfExtension`); when the passkey gave one, it waits in
  * memory for the vault gate of that account (`keepSignInPrf`, tied to the user who signed in). A
  * plain account ignores it
- * (the app's loader drops it).
+ * (the app's loader drops it). A successful sign-in without one notes the "no PRF here" hint for
+ * that user (`unlock-hint.ts`), so Unlock leads with the recovery key on this device.
  */
-function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
+export function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
   const credentialId = result.webauthn?.response?.id;
   const userId = (result.data as { user?: { id?: unknown } } | null)?.user?.id;
   // Read (and so zero the browser's bytes) in every case; keep it only for whoever signed in.
   const prf = readPrf(result.webauthn?.clientExtensionResults);
-  if (!prf) return result;
+  if (!prf) {
+    // A passkey that signed in but gave no PRF: this device's unlock hint, for that user only.
+    if (!result.error && result.webauthn && typeof userId === "string") {
+      notePasskeyWithoutPrf(userId);
+    }
+    return result;
+  }
   if (result.error || !credentialId || typeof userId !== "string") prf.fill(0);
   else keepSignInPrf({ userId, credentialId, prf });
   return result;

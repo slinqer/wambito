@@ -191,7 +191,8 @@ test("the recovery key signs in on a new browser", async ({ browser }) => {
 
   const c = await openBrowser(browser);
   await c.page.goto("/sign-in");
-  await c.page.getByRole("button", { name: "Clave de recuperación" }).click();
+  // The recovery key waits under "Más opciones"; opening it shows the field directly.
+  await c.page.getByRole("button", { name: "Más opciones" }).click();
   // Typed the way people type it: lower case, spaces for the dashes.
   await c.page
     .getByRole("textbox", { name: "Tu clave de recuperación" })

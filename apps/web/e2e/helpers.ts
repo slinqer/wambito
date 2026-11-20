@@ -142,8 +142,14 @@ export async function sessionUser(page: Page): Promise<{ id: string; email: stri
 /**
  * A software authenticator in the page's browser (Chrome's WebAuthn domain over CDP): creates and
  * uses passkeys without a person, verifying the user at once. Call it before the page asks for one.
+ * `prf` gives its passkeys the PRF extension (`hasPrf`), which opens an encrypted account's data;
+ * without it (the default, as Chromium's) a new passkey signs in only, and an encrypted account's
+ * passkey offer says so before going on.
  */
-export async function addVirtualAuthenticator(page: Page): Promise<void> {
+export async function addVirtualAuthenticator(
+  page: Page,
+  { prf = false }: { prf?: boolean } = {},
+): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -153,6 +159,7 @@ export async function addVirtualAuthenticator(page: Page): Promise<void> {
       hasResidentKey: true,
       hasUserVerification: true,
       isUserVerified: true,
+      hasPrf: prf,
       automaticPresenceSimulation: true,
     },
   });

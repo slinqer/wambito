@@ -13,11 +13,17 @@ import 'package:wambito/api/client.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/crypto/crypto.dart';
 import 'package:wambito/local/keys.dart';
+import 'package:wambito/local/prf.dart' show PasskeyPrf;
 import 'package:wambito/local/sqlite_store.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/vault/encryption_mode.dart';
+import 'package:wambito/vault/sign_in_prf.dart';
+import 'package:wambito/vault/unlock_hint.dart';
 import 'package:wambito/vault/vault_gate.dart';
 import 'package:wambito/vault/vault_providers.dart';
+
+import '../settings/fakes.dart';
+import 'vault_fakes.dart' as vf;
 
 /// The signed-in session, fixed: nothing is read from storage or asked of the server.
 class _Session extends SessionController {
@@ -198,6 +204,19 @@ void main() {
       );
     });
 
+    test("a plain account drops the passkey sign-in's PRF (zeroed) once its mode is known",
+        () async {
+      final container = containerWith(FakeServer(mode: 'plain'));
+      final prf = Uint8List(32)..fillRange(0, 32, 7);
+      container
+          .read(signInPrfProvider)
+          .keep('vault_user', PasskeyPrf(credentialId: 'cred-1', prf: prf));
+      await container.read(vaultAccountProvider.future);
+      expect(container.read(vaultGateProvider), isNull);
+      expect(prf.every((b) => b == 0), isTrue);
+      expect(container.read(signInPrfProvider).take('vault_user'), isNull);
+    });
+
     test('a preview account with keys elsewhere gets a started gate that asks to unlock', () async {
       final server = FakeServer()
         ..wraps = [
@@ -214,12 +233,100 @@ void main() {
       final gate = container.read(vaultGateProvider);
       expect(gate, isNotNull);
       await pumpEventQueue();
-      expect(gate!.state, const Unlock());
-      expect(container.read(vaultGateStateProvider), const Unlock());
+      // Its only wrap is a recovery wrap: no passkey wrap to open.
+      expect(gate!.state, const Unlock(passkeyWrap: false));
+      expect(container.read(vaultGateStateProvider), const Unlock(passkeyWrap: false));
       expect(container.read(vaultSessionProvider), isNull);
       expect(seen.last, 'unlock');
       // The keys asked the network directly, naming the account.
       expect(server.calls, contains('GET /api/v2/keys'));
+    });
+  });
+
+  group("the sign-in's passkey PRF", () {
+    const vf.FakeAccount account = (id: 'user_s', mode: 'preview');
+    late KeyStorage storage;
+    late FakeSettingsStore prefs;
+    setUpAll(vf.setUpVaultFiles);
+    tearDownAll(() => vf.vaultDir.deleteSync(recursive: true));
+    setUp(() {
+      storage = KeyStorage(const FlutterSecureStorage());
+      prefs = FakeSettingsStore({'wambito.unlock.no_prf.user_s': '1'});
+    });
+    tearDown(() => forgetVault('user_s', storage, deleteStore: vf.deleteTestStore));
+
+    Uint8List prfOf(int fill) => Uint8List(32)..fillRange(0, 32, fill);
+    bool zeroed(Uint8List bytes) => bytes.every((b) => b == 0);
+
+    /// The server with the account's passkey wrap of a data key, under the PRF [fill] gives.
+    Future<vf.FakeServer> serverWithPasskeyWrap(int fill) async {
+      final wrapped = await wrapDataKey(
+        prfOf(fill),
+        const WrapContext(kind: WrapKind.passkey, userId: 'user_s', keyV: 1),
+        generateDataKey(),
+      );
+      return vf.FakeServer({'tok': account})
+        ..wraps['user_s'] = [
+          {
+            'id': '01930000-0000-7000-8000-0000000000b2',
+            'kind': 'passkey',
+            'ref': 'cred-1',
+            'keyV': 1,
+            'wrapped': toBase64Url(wrapped),
+          },
+        ];
+    }
+
+    ProviderContainer containerFor(vf.FakeServer server) {
+      final container = vf.appContainer(
+        server,
+        vf.signedIn('tok'),
+        storage: storage,
+        overrides: [unlockHintProvider.overrideWithValue(UnlockHint(prefs))],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('the gate opens with the sign-in\'s PRF and shows no unlock screen', () async {
+      final server = await serverWithPasskeyWrap(5);
+      final container = containerFor(server);
+      final prf = prfOf(5);
+      container
+          .read(signInPrfProvider)
+          .keep('user_s', PasskeyPrf(credentialId: 'cred-1', prf: prf));
+      final seen = <String?>[];
+      container.listen(
+        vaultGateStateProvider,
+        (_, next) => seen.add(next?.status),
+        fireImmediately: true,
+      );
+      await vf.until(() => container.read(vaultSessionProvider) != null);
+
+      expect(seen, isNot(contains('unlock')));
+      expect(zeroed(prf), isTrue);
+      expect(container.read(signInPrfProvider).take('user_s'), isNull);
+      // A passkey's PRF opened the data here: the "no PRF" hint is cleared.
+      expect(prefs.values, isEmpty);
+    });
+
+    test("another account's PRF is zeroed", () async {
+      final server = await serverWithPasskeyWrap(5);
+      final container = containerFor(server);
+      final prf = prfOf(5);
+      container
+          .read(signInPrfProvider)
+          .keep('someone_else', PasskeyPrf(credentialId: 'cred-1', prf: prf));
+      container.listen(vaultGateStateProvider, (_, _) {}, fireImmediately: true);
+      await vf.until(() => container.read(vaultGateStateProvider) is Unlock);
+
+      expect(zeroed(prf), isTrue);
+      expect(container.read(vaultSessionProvider), isNull);
+      // The hint of this account is read, and the account has a passkey wrap.
+      expect(
+        container.read(vaultGateStateProvider),
+        const Unlock<VaultSession>(noPrfHere: true, passkeyWrap: true),
+      );
     });
   });
 

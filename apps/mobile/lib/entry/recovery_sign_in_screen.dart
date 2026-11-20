@@ -10,14 +10,15 @@ import '../home/wambi_face.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/tokens.g.dart';
 import '../ui/press_button.dart';
-import '../ui/web_text_field.dart';
+import '../vault/recovery_key_input.dart';
 import 'auth_errors.dart';
 import 'sign_in_frame.dart';
 
 /// "Sign in with my recovery key" (the email screen's link, `/entry/recovery`, signed out only): the
 /// recovery key signs in (`POST /v2/recovery/sign-in`), and the same typed key then opens the
 /// account's data without being asked again (the session holds its parsed bytes for the vault gate,
-/// ruling 6). The text is read as Unlock reads it: any case, spaces, dashes, O for 0.
+/// ruling 6). The text is read as Unlock reads it: any case, spaces, dashes, O for 0. The field is
+/// Unlock's (`RecoveryKeyField`): grouped while typed, "Paste" in it, submit once the key is full.
 ///
 /// A key that signs in nothing gets one message whatever the reason (the server does not say why, and
 /// a `plain` account has no verifier); too many tries say how long to wait.
@@ -51,7 +52,8 @@ class _RecoverySignInScreenState extends ConsumerState<RecoverySignInScreen> {
     super.dispose();
   }
 
-  bool get _canSubmit => !_busy && _text.text.trim().isNotEmpty;
+  /// A full key enables it; the parser stays the judge of what is typed.
+  bool get _canSubmit => !_busy && isFullRecoveryKey(_text.text);
 
   /// The words for a failed sign-in: a 429 says the minutes the server asked to wait.
   String _messageFor(AuthFailure failure, AppLocalizations l10n) {
@@ -111,18 +113,14 @@ class _RecoverySignInScreenState extends ConsumerState<RecoverySignInScreen> {
             spacing: WambitoTokens.space3,
             children: [
               FieldCaption(l10n.vaultUnlockLabel),
-              WebTextField(
+              RecoveryKeyField(
                 fieldKey: const Key('recovery.input'),
+                pasteKey: const Key('recovery.paste'),
                 controller: _text,
                 focusNode: _focus,
-                label: l10n.vaultUnlockLabel,
-                placeholder: l10n.vaultUnlockPlaceholder,
                 invalid: error != null,
                 readOnly: _busy,
                 autofocus: true,
-                enableSuggestions: false,
-                enableIMEPersonalizedLearning: false,
-                textInputAction: TextInputAction.done,
                 onChanged: (_) {
                   if (_error != null) setState(() => _error = null);
                 },

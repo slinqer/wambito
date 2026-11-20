@@ -622,7 +622,7 @@ void main() {
       await tester.tap(find.byKey(const Key('entry.passkey')));
       await tester.pumpAndSettle();
 
-      expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+      expect(passkeys.calls, ['get $signInOptionsWithPrf']);
       expect(auth.calls.take(3), [
         'passkeySignInOptions',
         'passkeySignIn {"assertion":true}',
@@ -655,7 +655,7 @@ void main() {
   });
 
   group('passkey on the email screen', () {
-    const getAvailable = 'getAvailable {"challenge":"sign-in"}';
+    final getAvailable = 'getAvailable $signInOptionsWithPrf';
 
     Future<ProviderContainer> openEmail(
       WidgetTester tester,
@@ -760,24 +760,24 @@ void main() {
       expect(passkeys.calls, isEmpty);
       expect(auth.calls, isEmpty);
       expect(find.byKey(const Key('entry.passkey')), findsNothing);
-      expect(find.text('USAR PASSKEY'), findsNothing);
+      expect(find.text('ENTRAR CON HUELLA'), findsNothing);
       expect(emailFocused(tester), isTrue);
     });
 
-    testWidgets('"Usar passkey" is visible when the phone supports passkeys, and signs in', (
+    testWidgets('"Entrar con huella" shows when the phone supports passkeys, and signs in', (
       tester,
     ) async {
       final passkeys = FakePasskeys();
       final container = await openEmail(tester, passkeys);
 
-      expect(find.widgetWithText(PressButton, 'USAR PASSKEY'), findsOneWidget);
+      expect(find.widgetWithText(PressButton, 'ENTRAR CON HUELLA'), findsOneWidget);
       passkeys.calls.clear();
       auth.calls.clear();
-      await tester.tap(find.text('USAR PASSKEY'));
+      await tester.tap(find.text('ENTRAR CON HUELLA'));
       await tester.pumpAndSettle();
 
       // The button may show the provider's picker (a passkey made anywhere), not only what is at hand.
-      expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+      expect(passkeys.calls, ['get $signInOptionsWithPrf']);
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(_stored(container)?.token, 'passkey-token-1');
     });
@@ -794,13 +794,13 @@ void main() {
       await openEmail(tester, passkeys);
 
       passkeys.failure = const AuthFailure(code: 'AUTH_CANCELLED', status: 400);
-      await tester.tap(find.text('USAR PASSKEY'));
+      await tester.tap(find.text('ENTRAR CON HUELLA'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Inténtalo'), findsNothing);
       expect(emailFocused(tester), isTrue);
 
       passkeys.failure = const AuthFailure(code: 'PASSKEY_FAILED', status: 400);
-      await tester.tap(find.text('USAR PASSKEY'));
+      await tester.tap(find.text('ENTRAR CON HUELLA'));
       await tester.pumpAndSettle();
       expect(
         find.text('No pudimos hacerte entrar con tu huella. Inténtalo otra vez o usa tu correo.'),
@@ -823,7 +823,7 @@ void main() {
         expect(passkeys.calls, isEmpty);
         expect(auth.calls, isEmpty);
         expect(_stored(container)?.token, 'guest-token-0');
-        expect(find.text('USAR PASSKEY'), findsOneWidget);
+        expect(find.text('ENTRAR CON HUELLA'), findsOneWidget);
       });
 
       testWidgets('the button warns first; cancelling keeps the guest and asks nothing', (
@@ -832,7 +832,7 @@ void main() {
         final passkeys = FakePasskeys(hasPasskey: true);
         final container = await openEmail(tester, passkeys);
 
-        await tester.tap(find.text('USAR PASSKEY'));
+        await tester.tap(find.text('ENTRAR CON HUELLA'));
         await tester.pumpAndSettle();
         expect(find.text('¿Dejar tu cuenta de invitado?'), findsOneWidget);
         await tester.tap(find.text('CANCELAR'));
@@ -850,7 +850,7 @@ void main() {
         final passkeys = FakePasskeys(hasPasskey: true);
         final container = await openEmail(tester, passkeys);
 
-        await tester.tap(find.text('USAR PASSKEY'));
+        await tester.tap(find.text('ENTRAR CON HUELLA'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('guest.save')));
         await tester.pumpAndSettle();
@@ -867,12 +867,12 @@ void main() {
         final passkeys = FakePasskeys();
         final container = await openEmail(tester, passkeys);
 
-        await tester.tap(find.text('USAR PASSKEY'));
+        await tester.tap(find.text('ENTRAR CON HUELLA'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('guest.leaveConfirm')));
         await tester.pumpAndSettle();
 
-        expect(passkeys.calls, ['get {"challenge":"sign-in"}']);
+        expect(passkeys.calls, ['get $signInOptionsWithPrf']);
         expect(_stored(container)?.token, 'passkey-token-1');
         expect(find.byType(HomeScreen), findsOneWidget);
       });

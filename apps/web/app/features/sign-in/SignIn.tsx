@@ -94,10 +94,10 @@ type Busy = "send" | "verify" | "passkey" | "resend" | null;
 
 /**
  * `/sign-in`: no passwords. The QR for the phone to approve (web plan rulings 8–12), and "Other
- * ways to sign in": with a passkey used here before, "Sign in with fingerprint"; "Recovery key";
- * the email step, which sends a 6-digit code that the code step takes. On a computer the QR comes
- * first, on a phone the other ways do. `mode: "create"` (`/create-account`) is the email step
- * alone, under "Create your account".
+ * ways to sign in": with a passkey used here before, "Sign in with fingerprint"; the email step,
+ * which sends a 6-digit code that the code step takes; last, "More options" (the recovery key). On
+ * a computer the QR comes first, on a phone the other ways do. `mode: "create"`
+ * (`/create-account`) is the email step alone, under "Create your account".
  * The same email carries a magic link to `/auth/verify`. `?next=` is where to go afterwards (same
  * origin only) and `?lang=` (from the landing) the language of the page and of a new profile.
  */
@@ -464,17 +464,17 @@ export function SignIn({
           {passkeyError && errorText && <FieldError id={errorId}>{errorText}</FieldError>}
         </>
       )}
+      <p className="flex w-full items-center gap-(--space-3) text-sm text-ink-muted before:h-0.5 before:flex-1 before:bg-stroke after:h-0.5 after:flex-1 after:bg-stroke">
+        {t("or_email")}
+      </p>
+      {emailForm}
+      <p className="text-center text-[15px] text-ink-muted">{t("first_time")}</p>
       <RecoveryKeySignIn
         signIn={(text) => auth.signInWithRecoveryKey(text)}
         onSignedIn={(userId) => signedIn({ id: userId }, "recovery")}
         disabled={busy !== null || qrBusy}
         onBusy={setRecoveryBusy}
       />
-      <p className="flex w-full items-center gap-(--space-3) text-sm text-ink-muted before:h-0.5 before:flex-1 before:bg-stroke after:h-0.5 after:flex-1 after:bg-stroke">
-        {t("or_email")}
-      </p>
-      {emailForm}
-      <p className="text-center text-[15px] text-ink-muted">{t("first_time")}</p>
     </section>
   );
   const qrArea = (

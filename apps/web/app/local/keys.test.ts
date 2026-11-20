@@ -54,6 +54,7 @@ import {
   dropKeyVersion,
   enrollDevice,
   forgetDevice,
+  hasPasskeyWrap,
   KeysError,
   type LocalKeys,
   loadLocalKeys,
@@ -1024,6 +1025,24 @@ describe("passkey wraps", () => {
     expect(
       await openRecord(currentKeys(await loadLocalKeys(userId)), CTX(userId, REC), sealed),
     ).toEqual({ s: 1 });
+  });
+
+  it("hasPasskeyWrap says whether the account has a passkey wrap, and throws when the list fails", async () => {
+    const { api, userId } = await accountInAnotherBrowser();
+    expect(await hasPasskeyWrap({ userId, fetch: api.fetch })).toBe(false);
+    api.wraps.push({
+      id: "01930000-0000-7000-8000-0000000000c1",
+      kind: "passkey",
+      ref: CRED,
+      keyV: 1,
+      wrapped: "AAAA",
+      publicKey: null,
+      attestation: null,
+      label: null,
+    });
+    expect(await hasPasskeyWrap({ userId, fetch: api.fetch })).toBe(true);
+    const down = vi.fn(async () => new Response("{}", { status: 503 }));
+    await expect(hasPasskeyWrap({ userId, fetch: down })).rejects.toThrow();
   });
 
   it("unlockWithPasskey with an unknown credential is no_passkey_wrap", async () => {

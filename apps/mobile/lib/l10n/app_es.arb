@@ -37,7 +37,7 @@
   "@entryHaveAccount": {
     "description": "First run: a link to the sign-in (email, passkey); no account is created."
   },
-  "emailPasskey": "Usar passkey",
+  "emailPasskey": "Entrar con huella",
   "@emailPasskey": {
     "description": "Email screen: sign in with a passkey stored on the phone (made on the web too). Shown only when the phone supports passkeys."
   },
@@ -2067,6 +2067,10 @@
   "@passkeyOfferAdded": {
     "description": "Passkey offer: the confirmation, shown after the passkey was made."
   },
+  "passkeyOfferContinue": "Seguir",
+  "@passkeyOfferContinue": {
+    "description": "Passkey offer: goes on after the notice that the new passkey does not open the data."
+  },
   "homeMenuRecurring": "Recurrentes",
   "@homeMenuRecurring": {
     "description": "Home menu: the link to the recurring payments."
@@ -2458,6 +2462,10 @@
   "settingsPasskeysTurnOnFailed": "No pudimos activarla. Inténtalo otra vez.",
   "settingsPasskeysTurnOnNoPrf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo.",
   "settingsPasskeysSecondTouch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados.",
+  "settingsPasskeysAddNoPrf": "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.",
+  "@settingsPasskeysAddNoPrf": {
+    "description": "A passkey was added on an encrypted account but its password manager gave no PRF: it signs in only. Shown as text that stays."
+  },
   "settingsSecurityLockRemove": "Confirma que eres tú para quitar un dispositivo",
   "@settingsSecurityLockRemove": {
     "description": "Reason shown by the phone's lock before removing a device."
@@ -4075,11 +4083,11 @@
   "@vaultUnlockErrorWrongKey": {
     "description": "Unlock: a recovery key that opens nothing."
   },
-  "vaultUnlockErrorNoPrf": "Esta llave de acceso no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
+  "vaultUnlockErrorNoPrf": "Esta huella no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
   "@vaultUnlockErrorNoPrf": {
     "description": "Unlock: the passkey gives no way to open the data."
   },
-  "vaultUnlockErrorNoPasskeyWrap": "Esta llave de acceso todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
+  "vaultUnlockErrorNoPasskeyWrap": "Esta huella todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
   "@vaultUnlockErrorNoPasskeyWrap": {
     "description": "Unlock: the passkey does not open the data yet."
   },
@@ -4091,13 +4099,33 @@
   "@vaultUnlockErrorServer": {
     "description": "Unlock: the server failed."
   },
-  "vaultUnlockPasskey": "Usar una llave de acceso",
+  "vaultUnlockPasskey": "Abrir con mi huella",
   "@vaultUnlockPasskey": {
     "description": "Unlock: opens the data with a passkey."
   },
   "vaultUnlockPair": "Añadir este teléfono desde otro dispositivo",
   "@vaultUnlockPair": {
     "description": "Unlock and a guest's Locked: opens the pairing screen, where another device approves this phone."
+  },
+  "vaultUnlockLeadOther": "Tus datos están cifrados. Elige cómo abrirlos en este teléfono.",
+  "@vaultUnlockLeadOther": {
+    "description": "Unlock: the lead when the recovery key does not lead (a passkey or another device does)."
+  },
+  "vaultUnlockMore": "Más opciones",
+  "@vaultUnlockMore": {
+    "description": "Unlock: the disclosure that shows the other ways to open the data (the recovery key, another passkey)."
+  },
+  "vaultUnlockNoPrfLine": "Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.",
+  "@vaultUnlockNoPrfLine": {
+    "description": "Unlock: why the recovery key leads, when this phone's last passkey touch gave no PRF."
+  },
+  "vaultUnlockOtherPasskey": "Usar otra huella",
+  "@vaultUnlockOtherPasskey": {
+    "description": "Unlock: under More options when the recovery key leads, tries a passkey again."
+  },
+  "vaultUnlockPaste": "Pegar",
+  "@vaultUnlockPaste": {
+    "description": "Recovery key field: fills it from the clipboard."
   },
   "vaultPairTitle": "Abre tus datos desde otro dispositivo",
   "@vaultPairTitle": {
@@ -4317,7 +4345,7 @@
   "@vaultRemoved": {
     "description": "Unlock: this phone was removed from the account by another device."
   },
-  "vaultUnverified": "Este teléfono no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu llave de acceso o escribe tu clave de recuperación.",
+  "vaultUnverified": "Este teléfono no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu huella o escribe tu clave de recuperación.",
   "@vaultUnverified": {
     "description": "Unlock: this phone could not verify the account's new key and stopped syncing."
   },

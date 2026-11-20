@@ -30,6 +30,8 @@ export interface VaultPasskeyHooks {
    * `addPasskeyWrap` by default. The PRF is zeroed after it either way.
    */
   keep?(passkey: PasskeyPrf): Promise<void>;
+  /** The new passkey gave no PRF (`PasskeyPrfUse.onNoPrf`): not for a cancelled second touch. */
+  onNoPrf?(): void;
 }
 
 /** What settings does with passkeys, as a prop so stories can stand in for Better Auth and WebAuthn. */
@@ -69,6 +71,7 @@ export const livePasskeys: PasskeysApi = {
       vault && {
         wantsPrf: async () => true,
         explainSecondTouch: vault.explainSecondTouch,
+        ...(vault.onNoPrf ? { onNoPrf: vault.onNoPrf } : {}),
         keep: async (passkey) => {
           try {
             await (vault.keep

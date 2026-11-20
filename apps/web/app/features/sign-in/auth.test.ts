@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { KeysError } from "../../local/keys.ts";
+import { clearSignInPrf, takeSignInPrf } from "../../local/prf.ts";
 import { SigninError, type WebSignin } from "../../local/signin.ts";
+import { passkeyGaveNoPrf } from "../../local/unlock-hint.ts";
 import {
   authErrorKey,
   createSessionSafeAuth,
   destinationAfterSignIn,
+  keepPrfOf,
   langFrom,
   offersPasskey,
   passkeyErrorKey,
@@ -234,5 +237,50 @@ describe("createSessionSafeAuth", () => {
     const before = await fake(404).startQrSignin({ remember: true, label: "Web" });
     await expect(before.finish()).rejects.toBeInstanceOf(SigninError);
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("keepPrfOf (a passkey sign-in's PRF and the unlock hint)", () => {
+  const stubStorage = () => {
+    const data = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => void data.set(key, value),
+      removeItem: (key: string) => void data.delete(key),
+    });
+  };
+  const signedIn = (first?: Uint8Array) => ({
+    data: { user: { id: "user-1" } },
+    error: null,
+    webauthn: {
+      response: { id: "cred-1" },
+      clientExtensionResults: first ? { prf: { results: { first } } } : { prf: {} },
+    },
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearSignInPrf();
+  });
+
+  it("a passkey sign-in without PRF notes the hint for the user who signed in", () => {
+    stubStorage();
+    keepPrfOf(signedIn());
+    expect(passkeyGaveNoPrf("user-1")).toBe(true);
+    expect(passkeyGaveNoPrf("user-2")).toBe(false);
+    expect(takeSignInPrf("user-1")).toBeNull();
+  });
+
+  it("with PRF it does not", () => {
+    stubStorage();
+    keepPrfOf(signedIn(new Uint8Array(32).fill(5)));
+    expect(passkeyGaveNoPrf("user-1")).toBe(false);
+    expect(takeSignInPrf("user-1")).not.toBeNull();
+  });
+
+  it("a failed sign-in notes nothing", () => {
+    stubStorage();
+    keepPrfOf({ ...signedIn(), data: null, error: { status: 400 } });
+    expect(passkeyGaveNoPrf("user-1")).toBe(false);
   });
 });

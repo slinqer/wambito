@@ -100,10 +100,21 @@ async function firstBrowser(opened: Opened): Promise<string> {
   return key;
 }
 
+/**
+ * Unlock leads with a passkey or with "Desde otro dispositivo": the recovery key waits under
+ * "Más opciones".
+ */
+async function openMoreOptions(page: Page) {
+  const more = page.getByRole("button", { name: "Más opciones" });
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await more.click();
+}
+
 /** Another browser opens the vault with the recovery key and sees `NAME`. */
 async function unlockWithKey(opened: Opened, key: string) {
   await signInExisting(opened.page, EMAIL);
   await expect(opened.page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
+  await openMoreOptions(opened.page);
   await opened.page.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
   await opened.page.getByRole("button", { name: "Abrir mis datos" }).click();
   await expect(opened.page).toHaveURL(/\/app$/);
@@ -125,9 +136,13 @@ async function openSecurity(page: Page) {
 
 /**
  * A software authenticator whose passkeys give the WebAuthn PRF (`hmac-secret`), on Chrome's
- * WebAuthn domain over CDP; returns the session and its id, to read or add credentials.
+ * WebAuthn domain over CDP; returns the session and its id, to read or add credentials. With
+ * `prf: false`, its passkeys sign in but give no PRF (as Proton Pass or 1Password).
  */
-async function prfAuthenticator(page: Page): Promise<{ cdp: CDPSession; authenticatorId: string }> {
+async function prfAuthenticator(
+  page: Page,
+  { prf = true }: { prf?: boolean } = {},
+): Promise<{ cdp: CDPSession; authenticatorId: string }> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -137,7 +152,7 @@ async function prfAuthenticator(page: Page): Promise<{ cdp: CDPSession; authenti
       hasResidentKey: true,
       hasUserVerification: true,
       isUserVerified: true,
-      hasPrf: true,
+      hasPrf: prf,
       automaticPresenceSimulation: true,
     },
   });
@@ -213,6 +228,7 @@ test("a recovery key, a second browser, an offline edit and a clean sign-out", a
   const second = await open();
   await signInExisting(second.page, EMAIL);
   await expect(second.page.getByRole("heading", { name: "Abre tus datos aquí" })).toBeVisible();
+  await openMoreOptions(second.page);
   await second.page.getByRole("textbox", { name: "Clave de recuperación" }).fill(key);
   await second.page.getByRole("button", { name: "Abrir mis datos" }).click();
   await expect(second.page).toHaveURL(/\/app$/);
@@ -308,6 +324,8 @@ test("a passkey unlocks with PRF", async ({ browser }) => {
   await expect(row).toHaveCount(1);
   await expect(row.getByText("Abre tus datos", { exact: true })).toBeVisible();
   await expect(row.getByText("No abre tus datos")).toHaveCount(0);
+  // A passkey that opens the data gets the toast, never the "does not open your data" notice.
+  await expect(first.page.getByText(/no le permite abrir tus datos/)).toHaveCount(0);
 
   // -- a browser without the vault signs in with that passkey and lands on the movements -------
   // The brief's second browser would hold a copy of the credential (`WebAuthn.getCredentials`,
@@ -344,6 +362,73 @@ test("a passkey unlocks with PRF", async ({ browser }) => {
   await expect(first.page.getByText(NAME, { exact: true })).toBeVisible();
   await expect(first.page.getByRole("heading", { name: "Abre tus datos aquí" })).toHaveCount(0);
   expect(await vaultDatabases(first.page)).toEqual([`wambito-vault-${USER_ID}`]);
+
+  await first.context.close();
+});
+
+test("a passkey without PRF signs in and the recovery key opens the data", async ({ browser }) => {
+  test.setTimeout(120_000);
+  reseed();
+
+  // -- the first browser adds a passkey whose provider gives no PRF: kept, and said at once -----
+  const first = await openBrowser(browser);
+  const key = await firstBrowser(first);
+  const authenticator = await prfAuthenticator(first.page, { prf: false });
+  await openSecurity(first.page);
+  await first.page.getByRole("button", { name: "Agregar una huella" }).click();
+  const notice = first.page.getByText(
+    "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.",
+  );
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveAttribute("role", "status");
+  const row = first.page.getByRole("listitem").filter({ hasText: "Creada el" });
+  await expect(row).toHaveCount(1);
+  await expect(row.getByText("No abre tus datos")).toBeVisible();
+
+  // -- signed out (the vault is wiped), it signs in with that passkey: no PRF, so Unlock leads ---
+  // -- with the recovery key and the line saying why ----------------------------------------------
+  // As in the PRF test: no presence while the sign-in page's autofill request is pending.
+  await authenticator.cdp.send("WebAuthn.setAutomaticPresenceSimulation", {
+    authenticatorId: authenticator.authenticatorId,
+    enabled: false,
+  });
+  await first.page.goto("/app");
+  await first.page.getByRole("button", { name: "Tu cuenta" }).click();
+  await first.page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(first.page).toHaveURL(/\/sign-in(\?|$)/);
+  await expect.poll(() => vaultDatabases(first.page)).toEqual([]);
+  await authenticator.cdp.send("WebAuthn.setAutomaticPresenceSimulation", {
+    authenticatorId: authenticator.authenticatorId,
+    enabled: true,
+  });
+  const heading = first.page.getByRole("heading", { name: "Abre tus datos aquí" });
+  // The pending autofill request may answer first; either way the same passkey signs in.
+  const click = first.page
+    .getByRole("button", { name: "Entrar con huella" })
+    .click({ timeout: 20_000 });
+  click.catch(() => {});
+  await Promise.race([heading.waitFor({ timeout: 20_000 }), click]);
+  await expect(heading).toBeVisible({ timeout: 20_000 });
+  const line = first.page.getByText(
+    "Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.",
+  );
+  const field = first.page.getByRole("textbox", { name: "Clave de recuperación" });
+  await expect(field).toBeVisible();
+  await expect(line).toBeVisible();
+  await expect(first.page.getByRole("button", { name: "Abrir con mi huella" })).toHaveCount(0);
+
+  // -- a reload keeps the hint ------------------------------------------------------------------
+  await first.page.reload();
+  await expect(heading).toBeVisible();
+  await expect(field).toBeVisible();
+  await expect(line).toBeVisible();
+
+  // -- the key pasted without dashes, in lower case, opens the data -----------------------------
+  await field.fill(key.replaceAll("-", "").toLowerCase());
+  await first.page.getByRole("button", { name: "Abrir mis datos" }).click();
+  await expect(first.page).toHaveURL(/\/app$/, { timeout: 20_000 });
+  await expect(first.page.getByText(NAME, { exact: true })).toBeVisible();
+  await expect(heading).toHaveCount(0);
 
   await first.context.close();
 });

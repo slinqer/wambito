@@ -167,6 +167,15 @@ export async function listWraps(call: KeysApi): Promise<WrapDto[]> {
   return (await listKeys(call)).wraps;
 }
 
+/**
+ * Whether the account has a passkey wrap (any credential's): the unlock screen leads with a
+ * passkey only when one exists. Readable with a signed-in session before the vault is open; a
+ * failure throws (the vault gate counts that as "yes").
+ */
+export async function hasPasskeyWrap(options: KeysOptions): Promise<boolean> {
+  return (await listWraps(api(options))).some((wrap) => wrap.kind === "passkey");
+}
+
 /** Zeroes every data key in the map. */
 function zeroKeys(keys: Map<number, Uint8Array>): void {
   for (const key of keys.values()) key.fill(0);

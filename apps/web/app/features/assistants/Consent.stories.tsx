@@ -28,14 +28,22 @@ interface StageProps {
   putAssistantWrap: ConsentApi["putAssistantWrap"];
   revoke: ConsentApi["revoke"];
   go: (url: string) => void;
-  /** An encrypted account; `device`: this browser holds its vault. */
-  encrypted?: { device: boolean };
+  /**
+   * An encrypted account; `device`: this browser holds its vault; `passkeyWrap` (default true):
+   * the account has one; `noPrfHere`: the last passkey touched here gave no PRF.
+   */
+  encrypted?: { device: boolean; passkeyWrap?: boolean; noPrfHere?: boolean };
 }
 
 /** A vault that opens one made-up data key, from whatever source it is asked. */
-const storyKeys = (device: boolean): ConsentKeys => ({
+const storyKeys = ({
+  device,
+  passkeyWrap = true,
+  noPrfHere = false,
+}: NonNullable<StageProps["encrypted"]>): ConsentKeys => ({
   userId: "u_story",
   device,
+  means: { passkeyWrap, noPrfHere },
   open: async (_source, fn) => {
     const dk = crypto.getRandomValues(new Uint8Array(32));
     try {
@@ -64,7 +72,7 @@ function ConsentStage({
     putAssistantWrap,
     revoke,
   }));
-  const [keys] = useState(() => (encrypted ? storyKeys(encrypted.device) : undefined));
+  const [keys] = useState(() => (encrypted ? storyKeys(encrypted) : undefined));
   return (
     <MemoryRouter initialEntries={[`/oauth/consent${search}`]}>
       <ApiProvider fetch={async () => new Response(null, { status: 404 })}>
@@ -332,7 +340,10 @@ export const EncryptedVaultHere: Story = {
   },
 };
 
-/** An encrypted account with nothing in this browser: Permitir asks for a passkey or the recovery key. */
+/**
+ * An encrypted account with nothing in this browser and a passkey wrap: Permitir asks for the
+ * passkey first, the recovery key under "More options" (no pairing on this page).
+ */
 export const EncryptedUnlock: Story = {
   args: { encrypted: { device: false } },
   play: async ({ canvasElement, args }) => {
@@ -340,12 +351,49 @@ export const EncryptedUnlock: Story = {
     await title(canvas);
     await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
     await title(canvas, "Abre tus datos para conectarlo");
+    await expect(canvas.getByRole("button", { name: "Abrir con mi huella" })).toBeVisible();
+    await expect(canvas.queryByLabelText("Clave de recuperación")).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Desde otro dispositivo" })).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: "Más opciones" }));
     await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Usar una llave de acceso" })).toBeVisible();
     await expect(args.decide).not.toHaveBeenCalled();
-    await userEvent.click(canvas.getByRole("button", { name: "Usar una llave de acceso" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Abrir con mi huella" }));
     await waitFor(() => expect(args.go).toHaveBeenCalled());
     await expect(args.putAssistantWrap).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** No passkey wrap on the account: nothing else to offer here, so the recovery key leads alone. */
+export const EncryptedUnlockKeyOnly: Story = {
+  args: { encrypted: { device: false, passkeyWrap: false } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await title(canvas, "Abre tus datos para conectarlo");
+    await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Más opciones" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: /huella/ })).toBeNull();
+    await expect(args.decide).not.toHaveBeenCalled();
+  },
+};
+
+/** The last passkey touched here gave no PRF: the recovery key and the line lead. */
+export const EncryptedUnlockNoPrfHere: Story = {
+  args: { encrypted: { device: false, noPrfHere: true } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await title(canvas);
+    await userEvent.click(canvas.getByRole("button", { name: "Permitir" }));
+    await title(canvas, "Abre tus datos para conectarlo");
+    await expect(canvas.getByLabelText("Clave de recuperación")).toBeVisible();
+    await expect(
+      canvas.getByText(
+        "Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.",
+      ),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Más opciones" }));
+    await expect(canvas.getByRole("button", { name: "Usar otra huella" })).toBeVisible();
   },
 };
 

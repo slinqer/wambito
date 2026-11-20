@@ -56,6 +56,10 @@ Harness gateWith({
   Future<GatePairing<String>> Function()? startPairing,
   Uint8List? Function()? takeSignInRecoverySecret,
   Future<String> Function(Uint8List secret)? unlockWithRecoverySecret,
+  Future<bool> Function()? passkeyGaveNoPrf,
+  Future<void> Function()? notePasskeyWithoutPrf,
+  Future<void> Function()? notePasskeyOpened,
+  Future<bool> Function()? hasPasskeyWrap,
 }) {
   final h = Harness();
   h.gate = Gate(
@@ -88,6 +92,10 @@ Harness gateWith({
       startPairing: startPairing,
       takeSignInRecoverySecret: takeSignInRecoverySecret,
       unlockWithRecoverySecret: unlockWithRecoverySecret,
+      passkeyGaveNoPrf: passkeyGaveNoPrf,
+      notePasskeyWithoutPrf: notePasskeyWithoutPrf,
+      notePasskeyOpened: notePasskeyOpened,
+      hasPasskeyWrap: hasPasskeyWrap,
     ),
   );
   h.gate.subscribe(() => h.seen.add(h.gate.state.status));
@@ -1127,6 +1135,222 @@ void main() {
         expect(tries, 0);
         expect(zeroed(secret), isTrue);
       });
+    });
+  });
+
+  group('what can open the data here', () {
+    PasskeyPrf stash() =>
+        PasskeyPrf(credentialId: 'cred-1', prf: Uint8List(32)..fillRange(0, 32, 7));
+
+    test('the unlock state carries the hint and the wrap', () async {
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        passkeyGaveNoPrf: () async => true,
+        hasPasskeyWrap: () async => false,
+      );
+      h.gate.start();
+      await settle();
+      expect(h.gate.state, const Unlock(noPrfHere: true, passkeyWrap: false));
+    });
+
+    test('the notices carry the means too', () async {
+      final h = gateWith(
+        loadLocalKeys: () async => 'kept',
+        passkeyGaveNoPrf: () async => true,
+        hasPasskeyWrap: () async => false,
+      );
+      h.gate.start();
+      await settle();
+      await h.gate.removed();
+      expect(
+        h.gate.state,
+        const Unlock(notice: Unlock.removed, noPrfHere: true, passkeyWrap: false),
+      );
+    });
+
+    test('an unreadable wraps list counts as a passkey wrap', () async {
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        passkeyGaveNoPrf: () async => throw StateError('storage'),
+        hasPasskeyWrap: () async => throw fail('offline'),
+      );
+      h.gate.start();
+      await settle();
+      expect(h.gate.state, const Unlock());
+      expect(h.gate.state, const Unlock(noPrfHere: false, passkeyWrap: true));
+    });
+
+    test('a passkey touch without PRF notes the hint', () async {
+      var noted = 0;
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        accountPasskeyIds: () async => ['cred-1'],
+        evaluatePrf: (_) async => throw fail('no_prf'),
+        notePasskeyWithoutPrf: () async => noted += 1,
+      );
+      h.gate.start();
+      await settle();
+      expect(await h.gate.unlockWithPasskey(), 'no_prf');
+      expect(noted, 1);
+      // The layout under the person's hands does not jump; the next Unlock reads the hint.
+      expect(h.gate.state, const Unlock());
+    });
+
+    test("a touch without PRF notes nothing when the account's passkeys are not known (it may be "
+        "another account's passkey)", () async {
+      var noted = 0;
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        accountPasskeyIds: () async => throw fail('passkeys_unavailable'),
+        evaluatePrf: (_) async => throw fail('no_prf'),
+        notePasskeyWithoutPrf: () async => noted += 1,
+      );
+      h.gate.start();
+      await settle();
+      expect(await h.gate.unlockWithPasskey(), 'no_prf');
+      expect(noted, 0);
+    });
+
+    test('back from pairing after a touch without PRF leads with the recovery key', () async {
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        accountPasskeyIds: () async => ['cred-1'],
+        evaluatePrf: (_) async => throw fail('no_prf'),
+        notePasskeyWithoutPrf: () async {},
+        startPairing: () async => FakePairing(),
+      );
+      h.gate.start();
+      await settle();
+      expect(await h.gate.unlockWithPasskey(), 'no_prf');
+      // The screen under the person's hands keeps its layout...
+      expect(h.gate.state, const Unlock());
+      await h.gate.pair();
+      h.gate.leavePairing();
+      // ...but coming back to it, Unlock knows this phone's passkey gives no PRF.
+      expect(h.gate.state, const Unlock(noPrfHere: true));
+    });
+
+    test('a passkey that opens the data clears the hint', () async {
+      var viaButton = 0;
+      final a = gateWith(
+        prepareAccount: alreadySetUp,
+        evaluatePrf: (_) async => stash(),
+        unlockWithPasskey: (_) async => 'passkey',
+        notePasskeyOpened: () async => viaButton += 1,
+      );
+      a.gate.start();
+      await settle();
+      await a.gate.unlockWithPasskey();
+      expect(viaButton, 1);
+
+      var viaSignIn = 0;
+      final b = gateWith(
+        prepareAccount: alreadySetUp,
+        takeSignInPrf: stash,
+        unlockWithPasskey: (_) async => 'passkey',
+        notePasskeyOpened: () async => viaSignIn += 1,
+      );
+      b.gate.start();
+      await settle();
+      expect(viaSignIn, 1);
+      expect(b.gate.state, const Ready('passkey'));
+    });
+
+    test('a passkey that opens nothing does not clear the hint', () async {
+      var opened = 0;
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        takeSignInPrf: stash,
+        unlockWithPasskey: (_) async => throw fail('no_passkey_wrap'),
+        notePasskeyOpened: () async => opened += 1,
+      );
+      h.gate.start();
+      await settle();
+      expect(opened, 0);
+      expect(h.gate.state, const Unlock());
+    });
+
+    test(
+      "the sign-in's PRF of another account is zeroed and no hint is written for this one",
+      () async {
+        final kept = stash();
+        var noted = 0;
+        var opened = 0;
+        final h = gateWith(
+          prepareAccount: alreadySetUp,
+          userId: 'me',
+          sessionUserId: () async => 'someone-else',
+          reload: () {},
+          takeSignInPrf: () => kept,
+          notePasskeyWithoutPrf: () async => noted += 1,
+          notePasskeyOpened: () async => opened += 1,
+        );
+        h.gate.start();
+        await settle();
+        expect(zeroed(kept.prf), isTrue);
+        expect(noted, 0);
+        expect(opened, 0);
+      },
+    );
+
+    test('back to Unlock from an open vault, Unlock shows at once with the last known means, '
+        'then what is read now', () async {
+      final wrapRead = Completer<bool>();
+      var reads = 0;
+      var hint = true;
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        passkeyGaveNoPrf: () async => hint,
+        notePasskeyOpened: () async => hint = false,
+        hasPasskeyWrap: () {
+          reads += 1;
+          return reads == 1 ? Future.value(false) : wrapRead.future;
+        },
+        evaluatePrf: (_) async => stash(),
+        unlockWithPasskey: (_) async => 'passkey',
+      );
+      h.gate.start();
+      await settle();
+      await h.gate.unlockWithPasskey();
+      expect(h.gate.state, const Ready('passkey'));
+
+      final removing = h.gate.removed();
+      // Never "ready" while the wraps are read: Unlock at once, with what was known (the passkey
+      // that opened the data cleared the hint).
+      expect(
+        h.gate.state,
+        const Unlock(notice: Unlock.removed, noPrfHere: false, passkeyWrap: false),
+      );
+      wrapRead.complete(true);
+      await removing;
+      expect(
+        h.gate.state,
+        const Unlock(notice: Unlock.removed, noPrfHere: false, passkeyWrap: true),
+      );
+    });
+
+    test('a late wraps read never overwrites a newer state', () async {
+      final wrapRead = Completer<bool>();
+      var reads = 0;
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        hasPasskeyWrap: () {
+          reads += 1;
+          return reads == 1 ? Future.value(true) : wrapRead.future;
+        },
+        evaluatePrf: (_) async => stash(),
+        unlockWithPasskey: (_) async => 'passkey',
+        startPairing: () async => FakePairing(),
+      );
+      h.gate.start();
+      await settle();
+      await h.gate.unlockWithPasskey();
+      final removing = h.gate.unverified();
+      await h.gate.pair();
+      expect(h.gate.state, const Pairing<String>(PairingFrom.unlock));
+      wrapRead.complete(false);
+      await removing;
+      expect(h.gate.state, const Pairing<String>(PairingFrom.unlock));
     });
   });
 }

@@ -7,6 +7,7 @@ import type { DataKeySource } from "../../local/keys.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
 import { Unlock, type UnlockError } from "../vault/Unlock.tsx";
+import type { UnlockMeans } from "../vault/vault-gate.ts";
 import { type ConsentApi, ConsentError } from "./consent-api.ts";
 import {
   AssistantWrapError,
@@ -75,11 +76,14 @@ export function ConsentUnlock({
   onPasskey,
   onCancel,
   passkeysSupported,
+  means,
 }: {
   onRecovery(text: string): Promise<UnlockError | null>;
   onPasskey(): Promise<UnlockError | null>;
   onCancel(): void;
   passkeysSupported?: () => boolean;
+  /** What can open the data here (no pairing on this page): picks Unlock's layout. */
+  means?: UnlockMeans | undefined;
 }) {
   const t = useTranslations("consent");
   return (
@@ -89,6 +93,7 @@ export function ConsentUnlock({
       onUnlock={onRecovery}
       onPasskey={onPasskey}
       {...(passkeysSupported ? { passkeysSupported } : {})}
+      {...(means ? { means } : {})}
       onSignOut={onCancel}
       exitLabel={t("cancel")}
     />
@@ -354,6 +359,7 @@ export function Consent({
         onPasskey={passkeyKey}
         onCancel={() => setStep(again.current ? "wrap_failed" : "ask")}
         {...(passkeysSupported ? { passkeysSupported } : {})}
+        means={keys?.means}
       />
     );
   }

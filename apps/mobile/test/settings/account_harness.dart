@@ -108,6 +108,8 @@ Future<AccountEnv> pumpAccount(
     'onboarding.draft.user-1': '{"currency":"EUR"}',
     'onboarding.draft.other': '{"currency":"USD"}',
     'passkey.offered': '["user-1","other"]',
+    'wambito.unlock.no_prf.user-1': '1',
+    'wambito.unlock.no_prf.other': '1',
   });
   final app = await pumpSettingsApp(
     t,

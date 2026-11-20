@@ -87,8 +87,13 @@ class _PrfPasskeys implements SettingsPasskeys {
   Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async {
     adds += 1;
     if (givesPrf && prf != null) {
-      await prf.keep(PasskeyPrf(credentialId: 'cred-1', prf: Uint8List(32)));
+      try {
+        await prf.keep(PasskeyPrf(credentialId: 'cred-1', prf: Uint8List(32)));
+      } on Object {
+        // as the live one: a wrap that could not be saved leaves a passkey that only signs in
+      }
     }
+    if (!givesPrf) prf?.onNoPrf?.call();
     return PasskeyOutcome.added;
   }
 
@@ -316,7 +321,7 @@ void main() {
       expect(find.text(l10n.protectPasskeyNoPrf), findsNothing);
     });
 
-    testWidgets('a passkey with no PRF says it cannot open the data', (t) async {
+    testWidgets('a passkey with no PRF: the add notice stays on the offer until Seguir', (t) async {
       final passkeys = _PrfPasskeys(givesPrf: false);
       final p = await _pumpPreviewGuest(
         t,
@@ -331,8 +336,37 @@ void main() {
 
       expect(passkeys.adds, 1);
       expect(p.security.calls.where((c) => c.startsWith('addPasskeyWrap')), isEmpty);
+      expect(find.byType(PasskeyOfferScreen), findsOneWidget);
+      expect(find.text(l10n.settingsPasskeysAddNoPrf), findsOneWidget);
+      expect(find.text(l10n.protectPasskeyNoPrf), findsNothing);
+      await t.tap(find.byKey(const Key('offer.continue')));
+      await _settle(t);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      // Said once, on the offer: no toast after it.
+      expect(find.text(l10n.protectPasskeyNoPrf), findsNothing);
+      expect(find.text(l10n.passkeyOfferAdded), findsNothing);
+    });
+
+    testWidgets('a PRF whose wrap could not be saved keeps the old message, not the notice', (
+      t,
+    ) async {
+      final passkeys = _PrfPasskeys(givesPrf: true);
+      final p = await _pumpPreviewGuest(
+        t,
+        recoveryKeySavedAt: '2026-11-01T10:00:00.000Z',
+        passkeys: passkeys,
+      );
+      p.security.wrapFailure = StateError('the wrap was refused');
+      final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+      await _claim(t, 'ana@correo.com');
+      await _enterCode(t, '123456');
+      await t.tap(find.byKey(const Key('offer.add')));
+      await _settle(t);
+
+      expect(p.security.calls, contains('addPasskeyWrap cred-1'));
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(find.text(l10n.protectPasskeyNoPrf), findsOneWidget);
+      expect(find.text(l10n.settingsPasskeysAddNoPrf), findsNothing);
     });
 
     testWidgets('the preview /progress says what an email adds and has no passkey section', (

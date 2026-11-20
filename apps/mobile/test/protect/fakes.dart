@@ -98,6 +98,9 @@ class FakeSettingsPasskeys implements SettingsPasskeys {
   PasskeyPrfUse? used;
   PasskeyOutcome answer = PasskeyOutcome.added;
 
+  /// The new passkey's provider gives no PRF: `prf.onNoPrf` is told.
+  bool noPrf = false;
+
   @override
   Future<bool> supported() async => true;
 
@@ -107,6 +110,7 @@ class FakeSettingsPasskeys implements SettingsPasskeys {
   @override
   Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async {
     used = prf;
+    if (noPrf) prf?.onNoPrf?.call();
     return answer;
   }
 

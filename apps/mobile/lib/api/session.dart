@@ -13,6 +13,7 @@ import '../home/home_cache.dart';
 import '../home/widget_sync.dart';
 import '../local/adopt.dart';
 import '../local/keys.dart' show keysParseRecoveryKey;
+import '../local/prf.dart' show PasskeyPrf, prfOfAssertion, withPrfExtension;
 import '../local/provisional.dart';
 import '../local/sqlite_store.dart';
 import '../local/vault_lock.dart' show waitLease;
@@ -38,6 +39,8 @@ import '../vault/encryption_mode.dart'
         vaultAccountProvider,
         vaultOwnerProvider;
 import '../vault/finance_guard.dart';
+import '../vault/sign_in_prf.dart';
+import '../vault/unlock_hint.dart';
 import '../vault/vault_providers.dart'
     show
         adoptionNeedsEncryptedServerProvider,
@@ -743,7 +746,8 @@ class SessionController extends Notifier<SessionState> {
     await ready;
     _guardGuest(replaceGuest);
     final challenge = await _auth.passkeySignInOptions();
-    final assertion = await _passkeys.get(challenge.optionsJson);
+    // The PRF too, so the same touch opens the data (spec 2026-11-20 section 2).
+    final assertion = await _passkeys.get(withPrfExtension(challenge.optionsJson));
     await _finishPasskeySignIn(challenge, assertion);
   }
 
@@ -760,7 +764,7 @@ class SessionController extends Notifier<SessionState> {
     final String assertion;
     try {
       challenge = await _auth.passkeySignInOptions();
-      assertion = await _passkeys.getAvailable(challenge.optionsJson);
+      assertion = await _passkeys.getAvailable(withPrfExtension(challenge.optionsJson));
     } on AuthFailure {
       return false;
     }
@@ -768,24 +772,50 @@ class SessionController extends Notifier<SessionState> {
     return true;
   }
 
+  /// Signs in with the [assertion], then hands its PRF (when it carries one) to the vault gate of
+  /// the account it signed in to ([signInPrfProvider]), or, a passkey that signed in without one,
+  /// notes the "no PRF here" hint for that account ([unlockHintProvider]). The PRF is zeroed on any
+  /// failure, and when the account cannot be told; it is never written nor logged.
   Future<void> _finishPasskeySignIn(PasskeyChallenge challenge, String assertion) async {
-    final token = await _auth.passkeySignIn(challenge, assertion);
-    // A guest can add a passkey (spec section 4.3), so the passkey may belong to one: ask, so a
-    // guest stays a guest (warned on sign-out, offered "Guarda tu progreso"). If the server can't
-    // say, the safe side is a guest, which /v1/me corrects at the next start.
-    var guest = true;
-    var pending = false;
-    String? userId;
+    var passkey = prfOfAssertion(assertion);
     try {
-      final standing = await _auth.standing(token);
-      guest = standing.guest;
-      pending = standing.onboardingPending;
-      userId = standing.userId;
-    } on AuthFailure {
-      guest = true;
+      final token = await _auth.passkeySignIn(challenge, assertion);
+      // A guest can add a passkey (spec section 4.3), so the passkey may belong to one: ask, so a
+      // guest stays a guest (warned on sign-out, offered "Guarda tu progreso"). If the server can't
+      // say, the safe side is a guest, which /v1/me corrects at the next start.
+      var guest = true;
+      var pending = false;
+      String? userId;
+      try {
+        final standing = await _auth.standing(token);
+        guest = standing.guest;
+        pending = standing.onboardingPending;
+        userId = standing.userId;
+      } on AuthFailure {
+        guest = true;
+      }
+      // Kept (or noted) for the account the server named, before the session changes: the gate
+      // that the new session starts takes it. Without an account, nothing.
+      if (userId != null) {
+        if (passkey != null) {
+          ref.read(signInPrfProvider).keep(userId, passkey);
+          passkey = null;
+        } else {
+          await ref.read(unlockHintProvider).noteWithoutPrf(userId);
+        }
+      }
+      await _signedIn(token, guest: guest, onboardingPending: pending, userId: userId);
+    } on Object {
+      // A sign-in that failed after the PRF was kept: the gate of no one takes it.
+      if (passkey == null) ref.read(signInPrfProvider).clear();
+      rethrow;
+    } finally {
+      final left = passkey;
+      if (left != null) _zeroPrf(left);
     }
-    await _signedIn(token, guest: guest, onboardingPending: pending, userId: userId);
   }
+
+  static void _zeroPrf(PasskeyPrf passkey) => passkey.prf.fillRange(0, passkey.prf.length, 0);
 
   /// "Use my recovery key": signs in with the typed key (`POST /v2/recovery/sign-in`), then holds
   /// it, as its 16 parsed bytes, for the vault gate, which opens the account's data with it without
@@ -877,6 +907,7 @@ class SessionController extends Notifier<SessionState> {
       timer.cancel();
     }
     ref.read(signInRecoveryKeyProvider).clear();
+    ref.read(signInPrfProvider).clear();
     _resetAdoptionWait();
     await _forgetVault();
     await _forgetWidget();
@@ -922,6 +953,7 @@ class SessionController extends Notifier<SessionState> {
     }
     final accountId = await _accountIdOf(token);
     ref.read(signInRecoveryKeyProvider).clear();
+    ref.read(signInPrfProvider).clear();
     if (accountId != null && accountId != guestUserId) {
       await ref.read(captureHandoverProvider).keep(guestToken, accountId);
     }
@@ -987,6 +1019,7 @@ class SessionController extends Notifier<SessionState> {
     final stored = state.stored?.token;
     if (stored == null || (token != null && token != stored)) return;
     ref.read(signInRecoveryKeyProvider).clear();
+    ref.read(signInPrfProvider).clear();
     await _forgetWidget();
     // A sign-in meanwhile (another token) is not undone.
     if (state.stored?.token != stored) return;
@@ -1138,6 +1171,7 @@ class SessionController extends Notifier<SessionState> {
   /// figures, the queued captures), then the session of [token], unless a newer one came meanwhile.
   Future<void> _wipeAndSignOut(String token) async {
     ref.read(signInRecoveryKeyProvider).clear();
+    ref.read(signInPrfProvider).clear();
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
     await _forgetVault(token: token);
@@ -1157,6 +1191,7 @@ class SessionController extends Notifier<SessionState> {
   Future<void> accountDeleted() async {
     await ready;
     ref.read(signInRecoveryKeyProvider).clear();
+    ref.read(signInPrfProvider).clear();
     await clearHomeCache(ref.read(homeCacheStoreProvider));
     await clearPendingSaves(ref.read(pendingSavesStoreProvider));
     await _forgetVault();

@@ -1,7 +1,8 @@
 // "Entrar con tu huella" of the web's Settings (apps/web/app/features/settings/PasskeysSection.tsx):
 // the person's passkeys, each with its name and when it was made, and its own "Eliminar" after
 // asking; "Agregar una huella" where the phone can make one. Closing the phone's prompt is silent,
-// as on sign-in.
+// as on sign-in. An encrypted account's new passkey that gives no PRF is kept, and the section says
+// so at once in text that stays (`settingsPasskeysAddNoPrf`), not a toast.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -64,6 +65,10 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
   String? _turningOn;
   String? _noPrf;
 
+  /// The passkey just added gave no PRF: it signs in only. Said as text that stays, until the next
+  /// add or leaving Settings.
+  var _addedWithoutPrf = false;
+
   /// The open vault's keys: which passkeys open the data, "Turn on" for the others. Null for an
   /// account with no vault on the phone.
   SecurityApi? get _security => ref.read(securityApiProvider);
@@ -110,7 +115,12 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
     if (_adding) return;
     final l10n = AppLocalizations.of(context);
     final toasts = ToastHost.of(context);
-    setState(() => _adding = true);
+    setState(() {
+      _adding = true;
+      _addedWithoutPrf = false;
+    });
+    // The new passkey itself gave no PRF (not a PRF whose wrap could not be saved).
+    var withoutPrf = false;
     try {
       final security = widget.guest ? null : _security;
       final outcome = await ref
@@ -122,11 +132,17 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
                 : PasskeyPrfUse(
                     explainSecondTouch: () => toasts.say(l10n.settingsPasskeysSecondTouch),
                     keep: security.addPasskeyWrap,
+                    onNoPrf: () => withoutPrf = true,
                   ),
           );
       switch (outcome) {
         case PasskeyOutcome.added:
-          toasts.say(l10n.settingsPasskeysAdded);
+          // An encrypted account's passkey that opens nothing: said at once, as text that stays.
+          if (withoutPrf) {
+            if (mounted) setState(() => _addedWithoutPrf = true);
+          } else {
+            toasts.say(l10n.settingsPasskeysAdded);
+          }
           ref.invalidate(settingsPasskeyListProvider);
           if (security != null) ref.invalidate(securitySnapshotProvider);
         case PasskeyOutcome.failed:
@@ -235,6 +251,25 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
           ),
           if (guest) CssParagraph(l10n.settingsPasskeysGuest, style: mutedSm),
         ],
+        if (_addedWithoutPrf)
+          SizedBox(
+            width: double.infinity,
+            child: Semantics(
+              liveRegion: true,
+              container: true,
+              child: DecoratedBox(
+                decoration: LkSurface.rowCard(context.lk),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Text(
+                    l10n.settingsPasskeysAddNoPrf,
+                    key: const Key('settings.passkeys.addNoPrf'),
+                    style: LkText.note.copyWith(color: colors.ink),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -23,6 +23,12 @@ class _Passkeys implements SettingsPasskeys {
   PasskeyPrfUse? used;
   PasskeyPrf? toKeep;
 
+  /// The new passkey's provider gives no PRF.
+  bool noPrf = false;
+
+  /// Keeping the PRF fails (the wrap is refused): the live one swallows it, the passkey is added.
+  bool keepFails = false;
+
   @override
   Future<bool> supported() async => true;
 
@@ -33,7 +39,16 @@ class _Passkeys implements SettingsPasskeys {
   Future<PasskeyOutcome> add({PasskeyPrfUse? prf}) async {
     used = prf;
     final give = toKeep;
-    if (prf != null && give != null) await prf.keep(give);
+    if (prf != null && noPrf) prf.onNoPrf?.call();
+    if (prf != null && give != null) {
+      try {
+        if (keepFails) throw StateError('the wrap was refused');
+        await prf.keep(give);
+      } on StateError {
+        // as the live one: the passkey signs in, it only does not open the data
+      }
+    }
+    items.add(_item('pk-3', 'cred-3'));
     return PasskeyOutcome.added;
   }
 
@@ -165,6 +180,43 @@ void main() {
     expect(security.calls, ['addPasskeyWrap cred-3']);
     // the passkey list and the wraps are read again
     expect(security.loads, 2);
+  });
+
+  testWidgets('adding a passkey without PRF shows the notice and keeps the passkey', (t) async {
+    final handle = t.ensureSemantics();
+    final security = FakeSecurity(snapshotOf(passkeyWrap: true));
+    final (_, passkeys) = await pumpPasskeys(t, security: security);
+    passkeys.noPrf = true;
+    await t.ensureVisible(find.byKey(const Key('settings.passkeys.add')));
+    await t.tap(find.byKey(const Key('settings.passkeys.add')));
+    await t.pumpAndSettle();
+    const notice =
+        'This passkey signs you in, but your password manager does not let it open your data. '
+        'Keep your recovery key: you will need it on a new device.';
+    expect(find.text(notice), findsOneWidget);
+    expect(find.byKey(const Key('settings.passkeys.addNoPrf')), findsOneWidget);
+    // Said as text that stays, not a toast that goes.
+    expect(find.text('Done: you can now sign in with your fingerprint.'), findsNothing);
+    await t.pump(const Duration(seconds: 10));
+    await t.pumpAndSettle();
+    expect(find.text(notice), findsOneWidget);
+    // The passkey is kept, and its row says it does not open the data.
+    expect(security.calls, isEmpty);
+    expect(find.byKey(const Key('settings.passkeys.remove.pk-3')), findsOneWidget);
+    expect(find.text('Does not open your data'), findsNWidgets(2));
+    handle.dispose();
+  });
+
+  testWidgets('a PRF whose wrap could not be saved does not show the notice', (t) async {
+    final security = FakeSecurity(snapshotOf(passkeyWrap: true));
+    final (_, passkeys) = await pumpPasskeys(t, security: security);
+    passkeys
+      ..toKeep = PasskeyPrf(credentialId: 'cred-3', prf: List.filled(32, 5).toBytes())
+      ..keepFails = true;
+    await t.ensureVisible(find.byKey(const Key('settings.passkeys.add')));
+    await t.tap(find.byKey(const Key('settings.passkeys.add')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('settings.passkeys.addNoPrf')), findsNothing);
   });
 }
 

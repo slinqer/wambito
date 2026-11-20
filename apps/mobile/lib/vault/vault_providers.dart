@@ -24,6 +24,8 @@ import '../local/vault_session.dart';
 import '../protect/protect_actions.dart' show markRecoveryKeySaved;
 import '../protect/protect_status.dart' show recoveryKeySavedAt;
 import 'encryption_mode.dart';
+import 'sign_in_prf.dart';
+import 'unlock_hint.dart';
 import 'vault_gate.dart';
 
 /// The vault gate in the app: how `VaultGate.tsx` wires `vault-gate.ts` to the keys, the passkeys
@@ -79,13 +81,19 @@ final vaultHoldReaderProvider = Provider<Future<VaultHold?> Function(String user
 /// session signed in now is not known yet, and when signed out. It is bound to that session (the
 /// owner of [currentVaultAccountProvider]): another token, even a new one of the same account,
 /// disposes it, closes the vault session it opened (its file and keys stay), and a new gate starts
-/// once the new session's account is known. Its calls read the network client of the moment.
+/// once the new session's account is known. Its calls read the network client of the moment. A
+/// `plain` account has no vault to open: the passkey sign-in's PRF is zeroed then, not kept until
+/// the sign-out (the web's `clearSignInPrf` in the `/app` and `/welcome` loaders).
 final vaultGateProvider = Provider<AppVaultGate?>((ref) {
   final key = ref.watch(
     currentVaultAccountProvider.select((a) => a == null ? null : (a.owner, a.profile.id, a.mode)),
   );
   final account = ref.read(currentVaultAccountProvider);
-  if (key == null || account == null || account.mode != EncryptionMode.preview) return null;
+  if (key == null || account == null) return null;
+  if (account.mode != EncryptionMode.preview) {
+    ref.read(signInPrfProvider).clear();
+    return null;
+  }
   return _gateFor(ref, account.profile, account.owner)..start();
 });
 
@@ -351,6 +359,8 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
         openedWithSignInKey = true;
         return local;
       },
+      // The passkey sign-in's PRF, this account's only, and never for a gate no longer current.
+      takeSignInPrf: () => current() ? ref.read(signInPrfProvider).take(userId) : null,
       unlockWithPasskey: (passkey) =>
           signInAgainOn401(() => keys.unlockWithPasskey(options(), passkey)),
       addPasskeyWrap: (passkey) => keys.addPasskeyWrap(options(), passkey),
@@ -406,6 +416,19 @@ AppVaultGate _gateFor(Ref ref, VaultProfile profile, String owner) {
       userId: userId,
       sessionUserId: sessionUserId,
       reload: reload,
+      // The "no PRF here" hint of this account (a pref), and its passkey wraps for Unlock's layout.
+      passkeyGaveNoPrf: () => read(unlockHintProvider).gaveNoPrf(userId),
+      notePasskeyWithoutPrf: () => read(unlockHintProvider).noteWithoutPrf(userId),
+      notePasskeyOpened: () => read(unlockHintProvider).noteOpened(userId),
+      // Any failure (offline, a 5xx, a 401) counts as a wrap: the screen never hides the passkey on
+      // a guess, and the read never ends the session nor locks the gate.
+      hasPasskeyWrap: () async {
+        try {
+          return await keys.hasPasskeyWrap(options());
+        } on Object {
+          return true;
+        }
+      },
     ),
   );
   return gate;

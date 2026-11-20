@@ -224,6 +224,11 @@ Future<({List<WrapDto> wraps, Map<int, Uint8List> links})> listKeys(KeysApi call
 
 Future<List<WrapDto>> listWraps(KeysApi call) async => (await listKeys(call)).wraps;
 
+/// Whether the account has a passkey wrap (`GET /v2/keys`, which a signed-in session reads before
+/// the vault is open), for Unlock's layout (keys.ts `hasPasskeyWrap`). Throws when unreadable.
+Future<bool> hasPasskeyWrap(KeysOptions options) async =>
+    (await listWraps(api(options))).any((wrap) => wrap.kind == 'passkey');
+
 /// `PUT /v2/recovery/verifier {lookupHash, authHash}` (base64url, as `recovery.ts` reads them):
 /// replaces the account's verifier (D16; the hashes come from [verifierHashesOf]). The server needs
 /// the account's recovery wrap first (409 `recovery_required`) and refuses a lookup another account

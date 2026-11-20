@@ -213,15 +213,22 @@ Future<void> resumeKeyAfterClaim(BuildContext context, WidgetRef ref) async {
 ///
 /// [onPrfKept] is told when the new passkey's PRF made its wrap (the passkey opens the data); an
 /// `added` without it is a passkey that only signs in.
+///
+/// [onNoPrf] is told when the passkey itself gave no PRF (after the second touch when the
+/// registration said `enabled` without results): the caller then says `settingsPasskeysAddNoPrf`
+/// at once, as text that stays, in place of the "added" toast. The passkey is kept. A PRF whose wrap
+/// could not be saved is not that: it ends as before.
 Future<PasskeyOutcome> protectWithPasskey(
   BuildContext context,
   WidgetRef ref, {
   VoidCallback? onPrfKept,
+  VoidCallback? onNoPrf,
 }) async {
   final security = ref.read(securityApiProvider);
   if (security == null) return PasskeyOutcome.failed;
   final l10n = AppLocalizations.of(context);
   final toasts = ToastHost.maybeOf(context);
+  var withoutPrf = false;
   final outcome = await ref
       .read(settingsPasskeysProvider)
       .add(
@@ -231,6 +238,7 @@ Future<PasskeyOutcome> protectWithPasskey(
             await security.addPasskeyWrap(passkey);
             onPrfKept?.call();
           },
+          onNoPrf: () => withoutPrf = true,
         ),
       );
   switch (outcome) {
@@ -239,7 +247,11 @@ Future<PasskeyOutcome> protectWithPasskey(
         ..invalidate(securitySnapshotProvider)
         ..invalidate(settingsPasskeyListProvider)
         ..invalidate(protectStatusProvider);
-      toasts?.say(l10n.settingsPasskeysAdded);
+      if (withoutPrf && onNoPrf != null) {
+        onNoPrf();
+      } else {
+        toasts?.say(l10n.settingsPasskeysAdded);
+      }
     case PasskeyOutcome.failed:
       toasts?.say(l10n.settingsPasskeysAddFailed, error: true);
     case PasskeyOutcome.cancelled:

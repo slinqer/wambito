@@ -27,6 +27,11 @@ export interface PasskeyOfferApi {
     userId: string;
     encrypted: boolean;
     explainSecondTouch(): void;
+    /**
+     * The new passkey gave no PRF (`PasskeyPrfUse.onNoPrf`): its password manager does not let it
+     * open the data. Not told for a cancelled or failed second touch.
+     */
+    onNoPrf?(): void;
   }): Promise<PasskeyOutcome>;
   /** Remembers that this user answered, so the offer is not shown to them again on this device. */
   decide(userId: string): void;
@@ -36,7 +41,7 @@ export const livePasskeyOffer: PasskeyOfferApi = {
   supported: passkeysSupported,
   // The offer comes right after sign-in, before the vault opens: the new passkey's PRF waits for
   // the vault gate, which adds its wrap once the data is open (a plain account drops it).
-  add: (hooks) => addPasskey(hooks && offerPrfUse(hooks)),
+  add: (hooks) => (hooks ? addPasskey(offerPrfUse(hooks)) : addPasskey()),
   decide: (userId) => rememberOfferDecided(userId),
 };
 
@@ -47,7 +52,9 @@ export const livePasskeyOffer: PasskeyOfferApi = {
  * `next` (same origin only), which is where sign-in was heading: onboarding or the app. Cancelling
  * the browser's prompt is silent and the offer stays; where WebAuthn is missing there is nothing
  * to offer and it goes straight on. The heading takes the focus on arrival, since the screen
- * appears without a tap on a link.
+ * appears without a tap on a link. An encrypted account's new passkey that gives no PRF is kept,
+ * and the screen says at once, in text that stays (`role="status"`), that it signs in but does not
+ * open the data; "Continue" goes on.
  */
 export function PasskeyOffer({
   offer,
@@ -61,6 +68,7 @@ export function PasskeyOffer({
 }) {
   const t = useTranslations("passkey_offer");
   const tVault = useTranslations("vault");
+  const tPasskeys = useTranslations("settings.passkeys");
   const toast = useToast();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -68,6 +76,8 @@ export function PasskeyOffer({
   const supported = useState(() => offer.supported())[0];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  /** An encrypted account's new passkey gave no PRF: it signs in only, and the screen says so. */
+  const [withoutPrf, setWithoutPrf] = useState(false);
   // A ref, not state: two quick taps must not open two prompts.
   const inFlight = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -84,11 +94,15 @@ export function PasskeyOffer({
     inFlight.current = true;
     setBusy(true);
     setFailed(false);
+    let noPrf = false;
     try {
       const outcome = await offer.add({
         userId,
         encrypted,
         explainSecondTouch: () => toast.show({ message: tVault("passkey_second_touch") }),
+        onNoPrf: () => {
+          noPrf = true;
+        },
       });
       if (outcome === "failed") {
         setFailed(true);
@@ -96,6 +110,10 @@ export function PasskeyOffer({
       }
       if (outcome === "cancelled") return;
       offer.decide(userId);
+      if (encrypted && noPrf) {
+        setWithoutPrf(true);
+        return;
+      }
       toast.show({ message: t("added") });
       navigate(next, { replace: true });
     } finally {
@@ -108,6 +126,22 @@ export function PasskeyOffer({
     if (inFlight.current) return;
     offer.decide(userId);
     navigate(next, { replace: true });
+  }
+
+  if (withoutPrf) {
+    return (
+      <SignInScreen>
+        <ScreenTitle ref={heading} focusable>
+          {t("title")}
+        </ScreenTitle>
+        <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
+          {tPasskeys("add_no_prf")}
+        </p>
+        <PressButton className="w-full" onClick={() => navigate(next, { replace: true })}>
+          {t("continue")}
+        </PressButton>
+      </SignInScreen>
+    );
   }
 
   return (

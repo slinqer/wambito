@@ -284,7 +284,6 @@
     "other_ways": "Outras formas de entrar",
     "qr_on_computer": "Vais entrar num computador? Lê-o com o telemóvel.",
     "recovery": {
-      "open": "Chave de recuperação",
       "label": "A tua chave de recuperação",
       "submit": "Entrar com a chave",
       "busy": "A entrar…",
@@ -453,7 +452,8 @@
     "adding": "À espera da tua impressão digital…",
     "not_now": "Agora não",
     "added": "Pronto: da próxima vez entras com a impressão digital.",
-    "failed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez ou continua sem ela."
+    "failed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez ou continua sem ela.",
+    "continue": "Continuar"
   },
   "manage": {
     "back": "Voltar ao início",
@@ -708,7 +708,8 @@
       "turn_on_named_label": "Ativar {name} para os teus dados",
       "turned_on": "Feito: esta impressão digital também abre os teus dados.",
       "turn_on_failed": "Não conseguimos ativá-la. Tenta outra vez.",
-      "turn_on_no_prf": "O fornecedor desta impressão digital não consegue abrir os teus dados. Usa a tua chave de recuperação ou abre os dados a partir de outro dispositivo."
+      "turn_on_no_prf": "O fornecedor desta impressão digital não consegue abrir os teus dados. Usa a tua chave de recuperação ou abre os dados a partir de outro dispositivo.",
+      "add_no_prf": "Esta chave de acesso deixa-te entrar, mas o teu gestor de palavras-passe não lhe permite abrir os teus dados. Guarda a tua chave de recuperação: vais precisar dela num dispositivo novo."
     },
     "protect": {
       "title": "Protege os teus dados",
@@ -958,6 +959,7 @@
       "lead": "Os teus dados estão cifrados. Escreve a tua chave de recuperação para os abrires neste navegador.",
       "label": "Chave de recuperação",
       "placeholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+      "paste": "Colar",
       "submit": "Abrir os meus dados",
       "busy": "A abrir…",
       "error_bad_recovery_key": "Essa chave não tem o formato certo. Confirma que a copiaste toda.",
@@ -966,8 +968,12 @@
       "error_no_passkey_wrap": "Esta chave de acesso ainda não abre os teus dados. Escreve a tua chave de recuperação uma vez e, a partir daí, também os abrirá.",
       "error_offline": "Estás sem ligação. Tenta outra vez quando voltares a estar online.",
       "error_server": "Algo correu mal do nosso lado. Tenta outra vez.",
-      "passkey": "Usar uma chave de acesso",
-      "pair": "A partir de outro dispositivo"
+      "passkey": "Abrir com a minha impressão digital",
+      "pair": "A partir de outro dispositivo",
+      "lead_other": "Os teus dados estão cifrados. Escolhe como os abrir neste navegador.",
+      "more": "Mais opções",
+      "no_prf_line": "A tua chave de acesso deixa-te entrar, mas o teu gestor de palavras-passe não lhe permite abrir os teus dados.",
+      "other_passkey": "Usar outra chave de acesso"
     },
     "install": {
       "title": "O Wambito vive no teu telemóvel",

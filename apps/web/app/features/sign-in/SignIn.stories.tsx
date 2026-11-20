@@ -509,11 +509,14 @@ export const PhoneFirst: Story = {
     await expect(canvas.getByRole("heading", { name: "Otras formas de entrar" })).toBeVisible();
     // the QR comes first: beside the other ways, on their left
     await expect(leftOf(qr)).toBeLessThan(leftOf(email));
-    await expect(canvas.getByRole("button", { name: "Clave de recuperación" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Más opciones" })).toBeVisible();
   },
 };
 
-/** "Recovery key" opens its field; a key the server does not know reads `recovery_key_invalid`. */
+/**
+ * The recovery key waits under "More options" (closed by default); opening shows its field at
+ * once; a key the server does not know reads `recovery_key_invalid`.
+ */
 export const RecoveryKey: Story = {
   name: "Recovery key",
   args: {
@@ -525,16 +528,25 @@ export const RecoveryKey: Story = {
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const open = canvas.getByRole("button", { name: "Clave de recuperación" });
+    const open = canvas.getByRole("button", { name: "Más opciones" });
     await expect(open).toHaveAttribute("aria-expanded", "false");
     await expect(canvas.queryByRole("textbox", { name: "Tu clave de recuperación" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Clave de recuperación" })).toBeNull();
     await userEvent.click(open);
     const field = await canvas.findByRole("textbox", { name: "Tu clave de recuperación" });
     await expect(field).toHaveFocus();
-    await userEvent.type(field, "abcd-efgh-jkmn-pqrs-tvwx-yz01-234");
-    await userEvent.click(canvas.getByRole("button", { name: "Entrar con la clave" }));
+    await expect(open).toHaveAttribute("aria-expanded", "true");
+    const submit = canvas.getByRole("button", { name: "Entrar con la clave" });
+    // The field groups what is typed; the button waits for the whole key.
+    await userEvent.type(field, "abcd efgh jkmn pqrs tvwx yz01 23");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23");
+    await expect(submit).toBeDisabled();
+    await userEvent.type(field, "4");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234");
+    await expect(submit).toBeEnabled();
+    await userEvent.click(submit);
     await expect(args.auth.signInWithRecoveryKey).toHaveBeenCalledWith(
-      "abcd-efgh-jkmn-pqrs-tvwx-yz01-234",
+      "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234",
     );
     await expect(await canvas.findByRole("alert")).toHaveTextContent(
       "Esta clave de recuperación no inicia sesión. Revísala e inténtalo de nuevo.",
@@ -556,7 +568,7 @@ export const RecoveryKeySignsIn: Story = {
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Clave de recuperación" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Más opciones" }));
     await userEvent.type(
       await canvas.findByRole("textbox", { name: "Tu clave de recuperación" }),
       "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234",
@@ -576,7 +588,7 @@ export const CreateAccount: Story = {
     await expect(canvas.getByRole("heading", { level: 1, name: "Crea tu cuenta" })).toBeVisible();
     await expect(canvas.getByRole("textbox", { name: "Tu correo" })).toBeVisible();
     await expect(canvas.queryByRole("img", { name: "ABCDEFGH" })).toBeNull();
-    await expect(canvas.queryByRole("button", { name: "Clave de recuperación" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Más opciones" })).toBeNull();
     await expect(args.qr).not.toHaveBeenCalled();
     await expect(canvas.getByRole("link", { name: "Entra" })).toHaveAttribute(
       "href",
