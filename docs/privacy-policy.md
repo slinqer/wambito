@@ -36,9 +36,9 @@ server keeps them only as ciphertext it cannot read.
   on your device. From a Budge export we will keep only your transactions and category names,
   encrypted on your device; Budge's user id and account balances are discarded.
 - **Backups:** a daily backup on the server and an age-encrypted copy in Cloudflare R2, none older
-  than 14 days. Accounts created before end-to-end encryption moved to it on SWITCH_DATE; backups
+  than 14 days. Accounts created before end-to-end encryption moved to it on 20 November 2026; backups
   from before that day still hold those finances in a form we could read, and the last of them
-  deletes itself on SWITCH_DATE_PLUS_14. After that date no plaintext copy of anyone's finances exists.
+  deletes itself on 4 December 2026. After that date no plaintext copy of anyone's finances exists.
 - **Your rights (Ley 1581):** you can know, update, correct and delete your data and withdraw your
   consent by writing to privacy@wambito.com from your account's email. Your finances are end-to-end
   encrypted and we cannot read them: if you ask for your data, we tell you what data we hold about
