@@ -302,12 +302,24 @@
       "body": "O Wambito nasceu em 2026 da frustração de não saber quanto gastava em cafés por mês.",
       "body_soon": "Wambito está em construção, em aberto. Vê como avança no GitHub e experimenta a app assim que abrir."
     },
+    "consent": {
+      "label": "Preferências de cookies",
+      "title": "Deixas-nos ver como usas esta página?",
+      "body": "Com o PostHog vemos o que lês e onde clicas, e gravamos a visita sem o que escreves. Só em wambito.com, nunca na app nem com as tuas finanças. Mais na <privacy>política de privacidade</privacy>.",
+      "decline": "Não, obrigado",
+      "accept": "Sim, aceito",
+      "current_granted": "Agora: aceitaste.",
+      "current_denied": "Agora: não aceitaste.",
+      "browser_no": "O teu navegador pediu para não ser rastreado, por isso não te rastreamos.",
+      "close": "Fechar"
+    },
     "footer": {
       "language": "Idioma",
       "privacy": "Privacidade",
       "copyright": "© {year} Wambito",
       "roadmap": "O que vem aí",
-      "delete_account": "Apagar conta"
+      "delete_account": "Apagar conta",
+      "cookies": "Preferências de cookies"
     },
     "not_found": {
       "title": "Esta página não existe",

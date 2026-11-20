@@ -1302,6 +1302,81 @@
     color: var(--ink-muted);
     font-weight: 800;
   }
+  /* The footer's "Cookie preferences" is a button that looks like the links beside it. */
+  button.lk-landing-link {
+    border: 0;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  /*
+   * The cookie banner: a card fixed at the bottom, not a wall (the page stays usable behind it).
+   * Text and the two equal buttons stack on phones; from 900px they sit side by side.
+   */
+  .lk-consent {
+    position: fixed;
+    z-index: 40;
+    inset-inline: var(--space-4);
+    bottom: var(--space-4);
+    max-width: calc(1240px - 2 * var(--space-4));
+    margin-inline: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-5);
+    padding: var(--space-4);
+    border-radius: var(--radius-xl);
+    background: var(--surface);
+    color: var(--ink);
+    border: 2px solid var(--stroke);
+    box-shadow: var(--edge-md);
+    font-family: var(--font-text);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .lk-consent:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .lk-consent-text {
+    flex: 1 1 28rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+  }
+  .lk-consent .lk-consent-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 1.2;
+    margin: 0;
+  }
+  .lk-consent a {
+    color: var(--ink);
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .lk-consent a:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  .lk-consent-current {
+    color: var(--ink-muted);
+    font-weight: 800;
+  }
+  .lk-consent-actions {
+    flex: 1 1 18rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .lk-consent-actions > .lk-btn {
+    flex: 1 1 8rem;
+  }
 
   /*
    * Phones and small tablets: the base values above are the tightest the layout allows (320px);
