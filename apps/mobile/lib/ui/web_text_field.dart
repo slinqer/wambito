@@ -32,6 +32,7 @@ class WebTextField extends StatefulWidget {
     this.enableSuggestions = false,
     this.enableIMEPersonalizedLearning = true,
     this.leading,
+    this.trailing,
     this.onSubmitted,
     this.onChanged,
   });
@@ -67,6 +68,9 @@ class WebTextField extends StatefulWidget {
 
   /// Something before the text inside the box (the search field's 🔍), 8px from it.
   final Widget? leading;
+
+  /// Something after the text inside the box (the recovery key's "Paste"); its own taps stay its own.
+  final Widget? trailing;
   final ValueChanged<String>? onSubmitted;
   final ValueChanged<String>? onChanged;
 
@@ -124,60 +128,78 @@ class _WebTextFieldState extends State<WebTextField> {
       child: InputBox(
         focused: widget.focusNode.hasFocus,
         borderColor: widget.invalid ? colors.over : null,
-        child: ConstrainedBox(
-          // `min-h-9`: the input inside the box.
-          constraints: BoxConstraints(minHeight: widget.inputMinHeight),
-          child: Semantics(
-            label: widget.label,
-            textField: true,
-            child: _withLeading(
-              Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  if (widget.controller.text.isEmpty)
-                    IgnorePointer(
-                      child: ExcludeSemantics(
-                        child: Text(
-                          widget.placeholder,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: text.copyWith(color: colors.inkMuted, fontWeight: FontWeight.w400),
+        child: _withTrailing(
+          ConstrainedBox(
+            // `min-h-9`: the input inside the box.
+            constraints: BoxConstraints(minHeight: widget.inputMinHeight),
+            child: Semantics(
+              label: widget.label,
+              textField: true,
+              child: _withLeading(
+                Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    if (widget.controller.text.isEmpty)
+                      IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: Text(
+                            widget.placeholder,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.copyWith(
+                              color: colors.inkMuted,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                         ),
                       ),
+                    EditableText(
+                      key: widget.fieldKey,
+                      controller: widget.controller,
+                      focusNode: widget.focusNode,
+                      style: text.copyWith(color: colors.ink),
+                      cursorColor: colors.ink,
+                      backgroundCursorColor: colors.inkMuted,
+                      selectionColor: colors.brand.withValues(alpha: 0.4),
+                      // The phone's own selection: a long press shows its menu, with "Pegar".
+                      selectionControls: materialTextSelectionHandleControls,
+                      contextMenuBuilder: (context, state) =>
+                          AdaptiveTextSelectionToolbar.editableText(editableTextState: state),
+                      maxLines: widget.maxLines,
+                      inputFormatters: widget.inputFormatters,
+                      // The box around it takes the taps and the long press (the field's own are rudimentary).
+                      rendererIgnoresPointer: true,
+                      readOnly: widget.readOnly,
+                      autofocus: widget.autofocus,
+                      keyboardType: widget.keyboardType,
+                      textInputAction: widget.textInputAction,
+                      autofillHints: widget.autofillHints,
+                      autocorrect: false,
+                      enableSuggestions: widget.enableSuggestions,
+                      enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
+                      onSubmitted: widget.onSubmitted,
+                      onChanged: widget.onChanged,
                     ),
-                  EditableText(
-                    key: widget.fieldKey,
-                    controller: widget.controller,
-                    focusNode: widget.focusNode,
-                    style: text.copyWith(color: colors.ink),
-                    cursorColor: colors.ink,
-                    backgroundCursorColor: colors.inkMuted,
-                    selectionColor: colors.brand.withValues(alpha: 0.4),
-                    // The phone's own selection: a long press shows its menu, with "Pegar".
-                    selectionControls: materialTextSelectionHandleControls,
-                    contextMenuBuilder: (context, state) =>
-                        AdaptiveTextSelectionToolbar.editableText(editableTextState: state),
-                    maxLines: widget.maxLines,
-                    inputFormatters: widget.inputFormatters,
-                    // The box around it takes the taps and the long press (the field's own are rudimentary).
-                    rendererIgnoresPointer: true,
-                    readOnly: widget.readOnly,
-                    autofocus: widget.autofocus,
-                    keyboardType: widget.keyboardType,
-                    textInputAction: widget.textInputAction,
-                    autofillHints: widget.autofillHints,
-                    autocorrect: false,
-                    enableSuggestions: widget.enableSuggestions,
-                    enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
-                    onSubmitted: widget.onSubmitted,
-                    onChanged: widget.onChanged,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// The trailing control sits outside the field's own semantics: a button of its own.
+  Widget _withTrailing(Widget field) {
+    final trailing = widget.trailing;
+    if (trailing == null) return field;
+    return Row(
+      spacing: 8,
+      children: [
+        Expanded(child: field),
+        trailing,
+      ],
     );
   }
 

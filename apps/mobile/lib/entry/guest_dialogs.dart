@@ -49,7 +49,7 @@ Future<bool> confirmLeavingGuest(BuildContext context, String email) {
   );
 }
 
-/// What a guest who chose "Usar passkey" decided.
+/// What a guest who chose "Entrar con huella" decided.
 enum GuestPasskeyChoice { save, signIn }
 
 /// The warning before a guest signs in with a passkey (spec section 4.2), which replaces the

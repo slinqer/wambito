@@ -27,6 +27,9 @@ class ProtectBlock extends ConsumerStatefulWidget {
 class _ProtectBlockState extends ConsumerState<ProtectBlock> {
   var _busy = false;
 
+  /// The passkey just added here gave no PRF: said under the step as text that stays.
+  var _addedWithoutPrf = false;
+
   Future<void> _run(Future<void> Function() step) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -103,8 +106,29 @@ class _ProtectBlockState extends ConsumerState<ProtectBlock> {
             done: status.passkey,
             actionKey: 'protect.passkey',
             actionLabel: l10n.protectPasskeyGo,
-            onPressed: () => unawaited(_run(() => protectWithPasskey(context, ref))),
-            note: status.passkeyWithoutPrf && !status.passkey
+            onPressed: () => unawaited(
+              _run(() async {
+                setState(() => _addedWithoutPrf = false);
+                await protectWithPasskey(
+                  context,
+                  ref,
+                  onNoPrf: () {
+                    if (mounted) setState(() => _addedWithoutPrf = true);
+                  },
+                );
+              }),
+            ),
+            note: _addedWithoutPrf && !status.passkey
+                ? Semantics(
+                    liveRegion: true,
+                    container: true,
+                    child: CssParagraph(
+                      l10n.settingsPasskeysAddNoPrf,
+                      key: const Key('protect.passkeyAddNoPrf'),
+                      style: LkText.fieldLabel.copyWith(color: colors.ink),
+                    ),
+                  )
+                : status.passkeyWithoutPrf && !status.passkey
                 ? CssParagraph(
                     l10n.protectPasskeyNoPrf,
                     key: const Key('protect.passkeyNoPrf'),

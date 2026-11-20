@@ -122,6 +122,9 @@ class FakeFiles implements FilesChannel {
 
 const key = 'ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-345';
 
+/// A full key in the key's alphabet (no U), as the unlock field keeps it.
+const typedKey = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ23-456';
+
 void main() {
   late FakeFiles files;
   late FixedSession session;
@@ -323,12 +326,184 @@ void main() {
       expect(find.byKey(const Key('unlock.mergeWaiting')), findsNothing);
     });
 
-    testWidgets('asks for the recovery key, and submit waits for text', (tester) async {
+    // The recovery key leads when this phone's last passkey touch gave no PRF.
+    const keyFirst = Unlock<VaultSession>(noPrfHere: true);
+
+    Future<void> openMore(WidgetTester tester) async {
+      await tester.ensureVisible(find.byKey(const Key('vault.more')));
+      await tester.tap(find.byKey(const Key('vault.more')));
+      await tester.pumpAndSettle();
+    }
+
+    String fieldText(WidgetTester tester) =>
+        tester.widget<EditableText>(find.byKey(const Key('vault.recoveryKey'))).controller.text;
+
+    bool fieldFocused(WidgetTester tester) =>
+        tester.widget<EditableText>(find.byKey(const Key('vault.recoveryKey'))).focusNode.hasFocus;
+
+    /// The top of [finder] on screen, to check the order of the actions.
+    double top(WidgetTester tester, Finder finder) => tester.getTopLeft(finder).dy;
+
+    testWidgets('key first shows the field and the line', (tester) async {
+      await pumpScreen(tester, keyFirst, passkeyOffered: true);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      expect(
+        find.text(
+          'Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Escribe tu clave de recuperación para abrirlos'), findsOneWidget);
+      // Pairing below the key, another passkey under "More options", closed.
+      expect(find.byKey(const Key('vault.pair')), findsOneWidget);
+      expect(
+        top(tester, find.byKey(const Key('vault.pair'))),
+        greaterThan(top(tester, find.byKey(const Key('vault.unlockSubmit')))),
+      );
+      expect(find.byKey(const Key('vault.passkey')), findsNothing);
+      await openMore(tester);
+      expect(find.text('USAR OTRA HUELLA'), findsOneWidget);
+      expect(
+        top(tester, find.byKey(const Key('vault.signOut'))),
+        greaterThan(top(tester, find.byKey(const Key('vault.passkey')))),
+      );
+    });
+
+    testWidgets('key first without a passkey wrap has nothing under More options', (tester) async {
+      await pumpScreen(
+        tester,
+        const Unlock(noPrfHere: true, passkeyWrap: false),
+        passkeyOffered: true,
+      );
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      expect(find.byKey(const Key('vault.more')), findsNothing);
+      expect(find.byKey(const Key('vault.passkey')), findsNothing);
+    });
+
+    testWidgets('passkey first hides the field until More options', (tester) async {
+      final handle = tester.ensureSemantics();
+      final gate = await pumpScreen(tester, const Unlock(), passkeyOffered: true);
+      expect(find.text('ABRIR CON MI HUELLA'), findsOneWidget);
+      expect(find.textContaining('Elige cómo abrirlos en este teléfono'), findsOneWidget);
+      expect(find.textContaining('tu gestor de contraseñas no le permite'), findsNothing);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      expect(
+        top(tester, find.byKey(const Key('vault.pair'))),
+        greaterThan(top(tester, find.byKey(const Key('vault.passkey')))),
+      );
+      // No passkey prompt without a tap.
+      expect(gate.passkeys, 0);
+      expect(find.text('MÁS OPCIONES'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('vault.more'))),
+        matchesSemantics(
+          label: 'MÁS OPCIONES',
+          isButton: true,
+          hasExpandedState: true,
+          isExpanded: false,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      await openMore(tester);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      // Opened by hand: the field takes the focus.
+      expect(fieldFocused(tester), isTrue);
+      await tester.tap(find.byKey(const Key('vault.passkey')));
+      await tester.pumpAndSettle();
+      expect(gate.passkeys, 1);
+      handle.dispose();
+    });
+
+    testWidgets('pair first', (tester) async {
+      final gate = await pumpScreen(tester, const Unlock(passkeyWrap: false), passkeyOffered: true);
+      expect(find.byKey(const Key('vault.passkey')), findsNothing);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      expect(find.text('AÑADIR ESTE TELÉFONO DESDE OTRO DISPOSITIVO'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.pair')));
+      await tester.pump();
+      expect(gate.pairs, 1);
+      await openMore(tester);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      // Without passkeys on the phone, a passkey wrap changes nothing: pairing leads.
+      await tester.pumpWidget(const SizedBox());
       await pumpScreen(tester, const Unlock());
+      expect(find.byKey(const Key('vault.passkey')), findsNothing);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      expect(find.byKey(const Key('vault.more')), findsOneWidget);
+    });
+
+    for (final code in ['no_prf', 'no_passkey_wrap']) {
+      testWidgets('a failed passkey touch opens More options ($code)', (tester) async {
+        final gate = await pumpScreen(tester, const Unlock(), passkeyOffered: true);
+        gate.passkeyResult = code;
+        await tester.tap(find.byKey(const Key('vault.passkey')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+        // Opened by itself: the error is said, the field does not take the focus.
+        expect(fieldFocused(tester), isFalse);
+        expect(
+          find.textContaining(
+            code == 'no_prf'
+                ? 'Esta huella no puede abrir tus datos'
+                : 'Esta huella todavía no abre tus datos',
+          ),
+          findsOneWidget,
+        );
+      });
+    }
+
+    testWidgets('a cancelled or other passkey failure leaves More options closed', (tester) async {
+      final gate = await pumpScreen(tester, const Unlock(), passkeyOffered: true);
+      await tester.tap(find.byKey(const Key('vault.passkey')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      gate.passkeyResult = 'offline';
+      await tester.tap(find.byKey(const Key('vault.passkey')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('vault.recoveryKey')), findsNothing);
+      expect(find.textContaining('No hay conexión'), findsOneWidget);
+    });
+
+    testWidgets('Paste fills and groups the field', (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (
+        call,
+      ) async {
+        if (call.method == 'Clipboard.getData') {
+          return {'text': ' abcd efgh\njkmn-pqrs tvwx yz23 456 '};
+        }
+        return null;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final gate = await pumpScreen(tester, keyFirst);
+      expect(find.text('PEGAR'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vault.paste')));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester), typedKey);
+      expect(enabled(tester, find.byKey(const Key('vault.unlockSubmit'))), isTrue);
+      await tester.tap(find.byKey(const Key('vault.unlockSubmit')));
+      await tester.pumpAndSettle();
+      expect(gate.unlocks, [typedKey]);
+    });
+
+    testWidgets('typing groups the key, and submit waits for a full key', (tester) async {
+      await pumpScreen(tester, keyFirst);
       expect(find.text('Abre tus datos aquí'), findsOneWidget);
       final submit = find.byKey(const Key('vault.unlockSubmit'));
       expect(enabled(tester, submit), isFalse);
-      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), 'abcd');
+      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), 'abcdefgh');
+      await tester.pump();
+      expect(fieldText(tester), 'ABCD-EFGH');
+      expect(enabled(tester, submit), isFalse);
+      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), typedKey.toLowerCase());
       await tester.pump();
       expect(enabled(tester, submit), isTrue);
     });
@@ -336,21 +511,21 @@ void main() {
     testWidgets('a wrong key says "That key does not open this account" and nothing more', (
       tester,
     ) async {
-      final gate = await pumpScreen(tester, const Unlock());
+      final gate = await pumpScreen(tester, keyFirst);
       gate.unlockResult = 'wrong_recovery_key';
-      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), key);
+      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), typedKey);
       await tester.pump();
       await tester.tap(find.byKey(const Key('vault.unlockSubmit')));
       await tester.pumpAndSettle();
-      expect(gate.unlocks, [key]);
+      expect(gate.unlocks, [typedKey]);
       expect(find.text('Esa clave no abre esta cuenta'), findsOneWidget);
       expect(find.textContaining('Prueba con la que guardaste'), findsNothing);
     });
 
     testWidgets('a key that does not parse says it is not in the right format', (tester) async {
-      final gate = await pumpScreen(tester, const Unlock());
+      final gate = await pumpScreen(tester, keyFirst);
       gate.unlockResult = 'bad_recovery_key';
-      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), 'xx');
+      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), typedKey);
       await tester.pump();
       await tester.tap(find.byKey(const Key('vault.unlockSubmit')));
       await tester.pumpAndSettle();
@@ -360,10 +535,16 @@ void main() {
       );
     });
 
+    testWidgets("the sign-in key's error opens More options on the field", (tester) async {
+      await pumpScreen(tester, const Unlock(error: 'wrong_recovery_key'), passkeyOffered: true);
+      expect(find.byKey(const Key('vault.recoveryKey')), findsOneWidget);
+      expect(find.text('Esa clave no abre esta cuenta'), findsOneWidget);
+    });
+
     testWidgets('the button waits while the key is tried', (tester) async {
-      final gate = await pumpScreen(tester, const Unlock());
+      final gate = await pumpScreen(tester, keyFirst);
       gate.holdUnlock = Completer<String?>();
-      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), key);
+      await tester.enterText(find.byKey(const Key('vault.recoveryKey')), typedKey);
       await tester.pump();
       await tester.tap(find.byKey(const Key('vault.unlockSubmit')));
       await tester.pump();
@@ -389,7 +570,14 @@ void main() {
       await tester.tap(find.byKey(const Key('vault.passkey')));
       await tester.pumpAndSettle();
       expect(gate.passkeys, 1);
-      expect(find.textContaining('Esta llave de acceso todavía no abre tus datos'), findsOneWidget);
+      expect(find.textContaining('Esta huella todavía no abre tus datos'), findsOneWidget);
+      expect(find.textContaining('llave'), findsNothing);
+    });
+
+    testWidgets('in English the passkey leads with "Open with my fingerprint"', (tester) async {
+      await pumpScreen(tester, const Unlock(), passkeyOffered: true, locale: const Locale('en'));
+      expect(find.text('OPEN WITH MY FINGERPRINT'), findsOneWidget);
+      expect(find.text('MORE OPTIONS'), findsOneWidget);
     });
 
     testWidgets('says why the phone was asked again', (tester) async {
@@ -397,6 +585,7 @@ void main() {
       expect(find.textContaining('Este teléfono se eliminó de tu cuenta'), findsOneWidget);
       await pumpScreen(tester, const Unlock(notice: Unlock.unverified));
       expect(find.textContaining('Este teléfono no pudo verificar la clave nueva'), findsOneWidget);
+      expect(find.textContaining('usa tu huella'), findsOneWidget);
     });
   });
 

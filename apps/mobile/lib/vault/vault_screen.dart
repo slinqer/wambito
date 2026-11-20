@@ -91,11 +91,14 @@ class VaultScreen extends ConsumerWidget {
           await ref.read(filesChannelProvider).shareFile(name, utf8.encode(text), 'text/plain');
         },
       ),
-      Unlock(:final notice, :final error) => UnlockView(
+      Unlock(:final notice, :final error, :final noPrfHere, :final passkeyWrap) => UnlockView(
         // A new passkey, a recovery key typed again: a new notice is a new screen.
         key: ValueKey((notice, error)),
         notice: notice,
         error: error,
+        // What can open the data here picks the layout (spec 2026-11-20 section 1).
+        noPrfHere: noPrfHere,
+        passkeyWrap: passkeyWrap,
         onUnlock: gate.unlock,
         onPasskey: (ref.watch(unlockPasskeyOfferedProvider).value ?? false)
             ? gate.unlockWithPasskey

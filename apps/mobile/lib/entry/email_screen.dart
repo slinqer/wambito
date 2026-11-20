@@ -31,7 +31,7 @@ import 'sign_in_frame.dart';
 ///
 /// On opening it also asks the phone for a passkey it can offer at once (one made on the web and
 /// held by a provider such as Proton Pass): its sheet appears if there is one, and signing in with
-/// it completes; with none, nothing shows and the email field is ready. "Usar passkey" does the
+/// it completes; with none, nothing shows and the email field is ready. "Entrar con huella" does the
 /// same on demand, with the provider's own picker.
 ///
 /// Signed out, "Sign in with my recovery key" opens the recovery-key sign-in (`/entry/recovery`).
@@ -48,8 +48,8 @@ class EmailScreen extends ConsumerStatefulWidget {
 
   final String? initialEmail;
 
-  /// The passkey button's words, in place of "Usar passkey": the web's own, "Entrar con huella",
-  /// for the parity pictures that compare it with the web's sign-in.
+  /// The passkey button's words, in place of `emailPasskey`: the web's own ("Sign in with
+  /// fingerprint" in English), for the parity pictures that compare it with the web's sign-in.
   final String? passkeyLabel;
 
   /// Start the claim of [initialEmail] at once (a guest chose "Guardar mi progreso" elsewhere).
@@ -170,7 +170,7 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
     }
   }
 
-  /// "Usar passkey": the phone's passkey prompt, with the provider's own picker. A guest is warned
+  /// "Entrar con huella": the phone's passkey prompt, with the provider's own picker. A guest is warned
   /// first (the passkey's account replaces theirs) and may save their progress instead.
   Future<void> _passkey() async {
     if (_passkeyActive) return;
@@ -457,7 +457,7 @@ class _EmailScreenState extends ConsumerState<EmailScreen> {
     );
   }
 
-  /// The email step (`SignIn`'s `email` step): the title and lead, "Usar passkey" first when the
+  /// The email step (`SignIn`'s `email` step): the title and lead, "Entrar con huella" first when the
   /// phone has passkeys, then the email and "Enviar código".
   List<Widget> _emailStage(AppLocalizations l10n) {
     final error = _error;

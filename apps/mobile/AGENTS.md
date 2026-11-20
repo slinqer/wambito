@@ -204,7 +204,17 @@ keeps an open vault on the loading route (`VaultRoute.loading`) until that answe
 fails). A cold `wambito://` link of an encrypted account waits for the same (`LaunchLinks.vaultWait`, 10 s; dropped if the
 vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`) switches over the gate state:
   `recovery_key_setup_view.dart` (Copy, Share through `wambito/files`, four-character check),
-  `unlock_view.dart` ("Add this phone from another device"), `locked_view.dart` (why, a retry when one helps, and
+  `unlock_view.dart` (twin of the web's `Unlock.tsx`: one of three layouts from `unlock_layout.dart`
+  `unlockLayout(noPrfHere:, passkeyWrap:, passkeysSupported:, canPair:)`, the web's `unlock-layout.ts`, fed by the
+  gate's `Unlock.noPrfHere` / `passkeyWrap`, `unlockPasskeyOfferedProvider` and the pairing: the recovery key first
+  with the no-PRF line, "Open with my passkey" first, or "Add this phone from another device" first; the rest under
+  "More options" (`vault.more`), closed at first, opened by a tap (the key field takes the focus) or by itself when the
+  leading passkey fails with `no_prf` / `no_passkey_wrap` (the error is a live region), or at once for the sign-in
+  key's error; no passkey prompt without a tap; sign out last; the recovery key is
+  `recovery_key_input.dart`'s `RecoveryKeyField`, the web's `recovery-key-input.ts`: one field, `RecoveryKeyFormatter`
+  over `groupRecoveryKeyEdit` (upper case, a dash after every fourth character, at most 27, O/I/L kept, other
+  characters dropped, a paste regrouped, the caret kept), "Paste" reads the clipboard, submit enables on
+  `isFullRecoveryKey` and `parseRecoveryKey` stays the judge), `locked_view.dart` (why, a retry when one helps, and
   sign out), `pair_new_device_view.dart` (the `Pairing` gate state: QR with `qr_flutter`, the code in two
   groups of four, the number once known; `GatePairing` is what the gate watches, `startPairing()` / `leavePairing()`;
   a finished pairing opens like a recovery unlock, and a left, failed, expired or disposed one is cancelled, so it
@@ -231,7 +241,7 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `noGuests`. A kill after the carry forgot the vault but before the sign-in: `openProvisionalVault` never remakes a
   missing file while `session.provisionalToken` is kept (`ProvisionalVaultGone`), and the next promotion only signs in. Signed out, the email screen links (`entry.useRecoveryKey`) to the recovery-key sign-in
   (`lib/entry/recovery_sign_in_screen.dart`, route `/entry/recovery`, signed out only; keys `recovery.input`,
-  `recovery.submit`): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
+  `recovery.submit`, `recovery.paste`; the field is Unlock's): `SessionController.signInWithRecoveryKey` parses the text as Unlock does
   (`keysParseRecoveryKey`; one that does not parse is `bad_recovery_key`, nothing sent), posts only `recoveryVerifier`'s
   `lookup`/`auth` (`AuthApi.recoverySignIn`, zeroed once sent; 401 `recovery_key_invalid`, 429 `retryAfter`), then
   holds the parsed 16 bytes in `signInRecoveryKeyProvider` (`SignInRecoveryKey`: memory only, one take, zeroed by a
@@ -293,7 +303,9 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   commit the session's `reloadKeys()` runs; a commit that fails is retried on the same `PreparedRotation` (never a new one); a
   prepared rotation or new key the person gives up is `forget()`ten (zeroes the held DK / verifier hashes). The passkeys card says
   "Opens your data" per passkey, offers "Turn on" (`evaluatePrf` + `addPasskeyWrap`) and adds a new passkey with its wrap
-  (`SettingsPasskeys.add(prf:)`: PRF from the registration, else a second touch). `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
+  (`SettingsPasskeys.add(prf:)`: PRF from the registration, else a second touch; `PasskeyPrfUse.onNoPrf` is told when
+  the passkey itself gave none, never for a cancelled second touch or a wrap that failed to save, and the card then says
+  `settingsPasskeysAddNoPrf` at once as text that stays, `settings.passkeys.addNoPrf`, the passkey kept). `router.dart`: `VaultRoute` (`vaultRouteOf`): a signed-in `preview` account whose
   gate is not Ready goes to `/unlock` from every route except `/auth/verify`, `/entry*` and `/debug/*`;
   while the mode is unknown (nothing kept) the `/loading` route; a mode nobody could tell is
   Locked(offline) with a retry. Sign-out and a deleted account (`session.dart`) wipe the vault
@@ -369,7 +381,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   version, no rotation: it replaces the guest's hidden recovery wrap; `rotated_elsewhere` reloads the keys and makes
   the key again; `canLeave: false` keeps `RecoverySetupPage` until saved) then `markRecoveryKeySaved` (settings record
   in one store transaction, then a sync; Settings → Security's "New recovery key" marks it too);
-  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
+  `protectWithPasskey` (`SettingsPasskeys.add(prf:)`; with `onNoPrf`, a passkey that itself gave no PRF is kept and
+  the block says `settingsPasskeysAddNoPrf` under the step as text that stays, not the "added" toast). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
   `preview` guest's claim, `protectWithRecoveryKey(canLeave: false)` when the settings record's `recoveryKeySavedAt`
   is null (read from the vault, never `protectStatusProvider`, which is null once the account has an email), then
   `SessionController.offerPasskey()` (`offerPasskeyFor` when `PasskeyOffer.dueFor` says so): the only passkey offer

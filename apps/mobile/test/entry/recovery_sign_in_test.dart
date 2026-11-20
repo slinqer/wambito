@@ -1,10 +1,10 @@
 // Signing in with the recovery key (phone-first spec, recovery-key sign-in): the email screen's link
 // opens the recovery screen; the key typed there signs in (`POST /v2/recovery/sign-in`) and the same
 // key then opens the vault, without asking for it again.
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +17,7 @@ import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/local/keys.dart';
 import 'package:wambito/local/vault_session.dart';
 import 'package:wambito/router.dart';
+import 'package:wambito/ui/press_button.dart';
 import 'package:wambito/vault/unlock_view.dart';
 import 'package:wambito/vault/vault_gate.dart';
 import 'package:wambito/vault/vault_providers.dart';
@@ -124,9 +125,53 @@ void main() {
     expect(location(container), '/entry/recovery');
   });
 
+  String fieldText(WidgetTester t) =>
+      t.widget<EditableText>(find.byKey(const Key('recovery.input'))).controller.text;
+
+  bool submitEnabled(WidgetTester t) =>
+      t.widget<PressButton>(find.byKey(const Key('recovery.submit'))).onPressed != null;
+
+  testWidgets('the field groups the key, and submit waits for a full key', (t) async {
+    await openRecovery(t);
+    expect(submitEnabled(t), isFalse);
+    await t.enterText(find.byKey(const Key('recovery.input')), 'abcd efgh 2');
+    await t.pump();
+    expect(fieldText(t), 'ABCD-EFGH-2');
+    expect(submitEnabled(t), isFalse);
+    final key = someKey();
+    await t.enterText(find.byKey(const Key('recovery.input')), key.toLowerCase());
+    await t.pump();
+    expect(fieldText(t), key);
+    expect(submitEnabled(t), isTrue);
+  });
+
+  testWidgets('Paste fills and groups the field', (t) async {
+    final key = someKey();
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (
+      call,
+    ) async {
+      if (call.method == 'Clipboard.getData') {
+        return {'text': key.toLowerCase().replaceAll('-', ' ')};
+      }
+      return null;
+    });
+    addTearDown(
+      () =>
+          t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await openRecovery(t);
+    await t.tap(find.byKey(const Key('recovery.paste')));
+    await t.pumpAndSettle();
+    expect(fieldText(t), key);
+    expect(submitEnabled(t), isTrue);
+  });
+
   testWidgets('a key that does not parse says so, and nothing is sent', (t) async {
     await openRecovery(t);
-    await submit(t, 'ABCD-1234');
+    // A full key whose check character is wrong.
+    final key = someKey();
+    final last = key[key.length - 1];
+    await submit(t, key.substring(0, key.length - 1) + (last == 'A' ? 'B' : 'A'));
     expect(find.text(_es.vaultUnlockErrorBadKey), findsOneWidget);
     expect(auth.calls, isNot(contains('recoverySignIn')));
   });

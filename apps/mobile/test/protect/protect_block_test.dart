@@ -7,12 +7,16 @@ import 'package:go_router/go_router.dart';
 import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/protect/protect_block.dart';
 import 'package:wambito/protect/protect_status.dart';
+import 'package:wambito/settings/passkeys_settings.dart';
+import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/theme/theme.dart';
 import 'package:wambito/ui/css_text.dart';
 import 'package:wambito/ui/toast.dart';
 
+import '../settings/security/fake_security.dart' show FakeSecurity;
 import '../support/fonts.dart';
 import '../support/ui_app.dart';
+import 'fakes.dart' show FakeSettingsPasskeys;
 
 ProtectStatus statusOf({
   bool recoveryKey = false,
@@ -30,6 +34,7 @@ Future<void> pumpBlock(
   WidgetTester t,
   ProtectStatus? status, {
   Locale locale = const Locale('en'),
+  FakeSettingsPasskeys? passkeys,
 }) async {
   t.view
     ..physicalSize = const Size(824, 2400)
@@ -39,7 +44,13 @@ Future<void> pumpBlock(
   await t.pumpWidget(const SizedBox());
   await t.pumpWidget(
     ProviderScope(
-      overrides: [protectStatusProvider.overrideWith((ref) async => status)],
+      overrides: [
+        protectStatusProvider.overrideWith((ref) async => status),
+        if (passkeys != null) ...[
+          settingsPasskeysProvider.overrideWithValue(passkeys),
+          securityApiProvider.overrideWithValue(FakeSecurity()),
+        ],
+      ],
       child: uiApp(const SingleChildScrollView(child: ProtectBlock()), locale: locale),
     ),
   );
@@ -82,6 +93,40 @@ void main() {
     expect(line(), l10n.protectPasskeyNoPrf);
     // the passkey step stays open
     expect(find.byKey(const Key('protect.passkey')), findsOneWidget);
+  });
+
+  testWidgets('adding a passkey without PRF shows the notice and keeps the passkey', (t) async {
+    final passkeys = FakeSettingsPasskeys()..noPrf = true;
+    await pumpBlock(t, statusOf(), passkeys: passkeys);
+    await t.tap(find.byKey(const Key('protect.passkey')));
+    await t.pumpAndSettle();
+    expect(passkeys.used, isNotNull);
+    const notice =
+        'This passkey signs you in, but your password manager does not let it open your data. '
+        'Keep your recovery key: you will need it on a new device.';
+    String line() => t.widget<CssParagraph>(find.byKey(const Key('protect.passkeyAddNoPrf'))).text;
+    expect(line(), notice);
+    // Text that stays, not a toast: still there once a toast would have gone.
+    expect(find.text('Done: you can now sign in with your fingerprint.'), findsNothing);
+    await t.pump(const Duration(seconds: 10));
+    await t.pumpAndSettle();
+    expect(line(), notice);
+    // One sentence about it, not two.
+    expect(find.byKey(const Key('protect.passkeyNoPrf')), findsNothing);
+    final l10n = await AppLocalizations.delegate.load(const Locale('es'));
+    expect(
+      l10n.settingsPasskeysAddNoPrf,
+      'Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. '
+      'Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.',
+    );
+  });
+
+  testWidgets('a passkey that opens the data shows no notice', (t) async {
+    final passkeys = FakeSettingsPasskeys();
+    await pumpBlock(t, statusOf(), passkeys: passkeys);
+    await t.tap(find.byKey(const Key('protect.passkey')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('protect.passkeyAddNoPrf')), findsNothing);
   });
 
   testWidgets('no line about PRF without a passkey', (t) async {

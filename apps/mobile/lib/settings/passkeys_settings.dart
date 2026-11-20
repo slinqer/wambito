@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/auth_api.dart';
 import '../api/session.dart';
+import '../local/keys_error.dart' show KeysError;
 import '../local/prf.dart';
 import '../vault/vault_providers.dart' show touchPasskey;
 
@@ -20,13 +21,18 @@ enum PasskeyOutcome { added, cancelled, failed }
 /// What a new passkey's PRF is for: an encrypted account wraps its data key under it (stage 2b), so
 /// the passkey opens the data too. Twin of the web's `PasskeyPrfUse` (apps/web/app/auth/passkey.ts).
 class PasskeyPrfUse {
-  const PasskeyPrfUse({required this.explainSecondTouch, required this.keep});
+  const PasskeyPrfUse({required this.explainSecondTouch, required this.keep, this.onNoPrf});
 
   /// Says why the phone asks for a second touch, before it does.
   final VoidCallback explainSecondTouch;
 
   /// Takes the new passkey's PRF (the wrap is made from it). The caller zeroes the bytes.
   final Future<void> Function(PasskeyPrf passkey) keep;
+
+  /// Told when the new passkey itself gave no PRF (its password manager does not allow one): from
+  /// the registration, or from the second touch when the registration said `enabled` without
+  /// results. Not told for a cancelled second touch, nor when a PRF came and [keep] failed.
+  final VoidCallback? onNoPrf;
 }
 
 /// What the settings card asks of passkeys, as an interface so tests can stand in for Better Auth
@@ -157,7 +163,7 @@ class LiveSettingsPasskeys implements SettingsPasskeys {
 
   /// The new passkey's PRF: from the registration, else (when it said `prf.enabled` without an
   /// output) from a second touch of that passkey only. A second touch that is cancelled or gives
-  /// nothing leaves the passkey without a wrap.
+  /// nothing leaves the passkey without a wrap; one that gives no PRF is told to `onNoPrf` too.
   Future<PasskeyPrf?> _prfOfNewPasskey(String attestation, PasskeyPrfUse use) async {
     final decoded = jsonDecode(attestation);
     if (decoded is! Map) return null;
@@ -170,10 +176,16 @@ class LiveSettingsPasskeys implements SettingsPasskeys {
       return null;
     }
     if (bytes != null) return PasskeyPrf(credentialId: id, prf: bytes);
-    if (!prfEnabledWithoutResults(extensionResults)) return null;
+    if (!prfEnabledWithoutResults(extensionResults)) {
+      use.onNoPrf?.call();
+      return null;
+    }
     use.explainSecondTouch();
     try {
       return await touchPasskey(_ref.read(authApiProvider), _ref.read(passkeysProvider), [id]);
+    } on KeysError catch (error) {
+      if (error.code == 'no_prf') use.onNoPrf?.call();
+      return null;
     } on Object {
       return null;
     }
