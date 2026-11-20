@@ -24,6 +24,7 @@ export default defineConfig({
       "better-auth/client/plugins",
       "@better-auth/passkey/client",
       "uqr",
+      "posthog-js",
     ],
   },
   test: {
