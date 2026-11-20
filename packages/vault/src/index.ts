@@ -16,7 +16,7 @@ export {
   type SetAsideOutcome,
   VaultClosedError,
 } from "./encrypted.ts";
-export { IDEMPOTENCY_NAMESPACE, uuidv5, uuidv7 } from "./ids.ts";
+export { IDEMPOTENCY_NAMESPACE, uuidv5, uuidv5Sync, uuidv7 } from "./ids.ts";
 export {
   dedupeKeyName,
   type Keyring,

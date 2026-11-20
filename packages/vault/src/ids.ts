@@ -39,8 +39,76 @@ export function uuidv7(now: number = Date.now()): string {
   return hex(bytes);
 }
 
-/** A UUID v5 (RFC 4122): SHA-1 of the namespace id and the name. Async, WebCrypto has no sync hash. */
-export async function uuidv5(namespace: string, name: string): Promise<string> {
+/**
+ * SHA-1 (FIPS 180-4), synchronous. Only for UUID v5, which RFC 4122 defines over SHA-1: never for
+ * anything secret. WebCrypto's digest is async, and awaiting it inside an IndexedDB transaction
+ * lets the transaction commit on its own (Firefox does), so the ids are hashed here.
+ */
+function sha1(data: Uint8Array): Uint8Array {
+  const bitLength = data.length * 8;
+  const padded = new Uint8Array((((data.length + 8) >> 6) + 1) << 6);
+  padded.set(data);
+  padded[data.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(bitLength / 0x100000000));
+  view.setUint32(padded.length - 4, bitLength >>> 0);
+  let h0 = 0x67452301;
+  let h1 = 0xefcdab89;
+  let h2 = 0x98badcfe;
+  let h3 = 0x10325476;
+  let h4 = 0xc3d2e1f0;
+  const w = new Uint32Array(80);
+  for (let offset = 0; offset < padded.length; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4);
+    for (let i = 16; i < 80; i++) {
+      const x = (w[i - 3] ?? 0) ^ (w[i - 8] ?? 0) ^ (w[i - 14] ?? 0) ^ (w[i - 16] ?? 0);
+      w[i] = (x << 1) | (x >>> 31);
+    }
+    let a = h0;
+    let b = h1;
+    let c = h2;
+    let d = h3;
+    let e = h4;
+    for (let i = 0; i < 80; i++) {
+      let f: number;
+      let k: number;
+      if (i < 20) {
+        f = (b & c) | (~b & d);
+        k = 0x5a827999;
+      } else if (i < 40) {
+        f = b ^ c ^ d;
+        k = 0x6ed9eba1;
+      } else if (i < 60) {
+        f = (b & c) | (b & d) | (c & d);
+        k = 0x8f1bbcdc;
+      } else {
+        f = b ^ c ^ d;
+        k = 0xca62c1d6;
+      }
+      const t = (((a << 5) | (a >>> 27)) + f + e + k + (w[i] ?? 0)) >>> 0;
+      e = d;
+      d = c;
+      c = ((b << 30) | (b >>> 2)) >>> 0;
+      b = a;
+      a = t;
+    }
+    h0 = (h0 + a) >>> 0;
+    h1 = (h1 + b) >>> 0;
+    h2 = (h2 + c) >>> 0;
+    h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0;
+  }
+  const out = new Uint8Array(20);
+  const outView = new DataView(out.buffer);
+  [h0, h1, h2, h3, h4].forEach((h, i) => outView.setUint32(i * 4, h));
+  return out;
+}
+
+/**
+ * A UUID v5 (RFC 4122): SHA-1 of the namespace id and the name. Synchronous, so the local backend
+ * can name a record without leaving its IndexedDB transaction.
+ */
+export function uuidv5Sync(namespace: string, name: string): string {
   const ns = namespace.replaceAll("-", "");
   if (!/^[0-9a-f]{32}$/i.test(ns)) throw new Error("uuidv5: the namespace must be a UUID");
   const nsBytes = Uint8Array.from(ns.match(/../g) ?? [], (h) => Number.parseInt(h, 16));
@@ -48,10 +116,19 @@ export async function uuidv5(namespace: string, name: string): Promise<string> {
   const input = new Uint8Array(nsBytes.length + nameBytes.length);
   input.set(nsBytes);
   input.set(nameBytes, nsBytes.length);
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-1", input)).slice(0, 16);
+  const digest = sha1(input).slice(0, 16);
   digest[6] = 0x50 | ((digest[6] ?? 0) & 0x0f);
   digest[8] = 0x80 | ((digest[8] ?? 0) & 0x3f);
   return hex(digest);
+}
+
+/** `uuidv5Sync` as an already-resolved promise (its callers predate the sync version). */
+export function uuidv5(namespace: string, name: string): Promise<string> {
+  try {
+    return Promise.resolve(uuidv5Sync(namespace, name));
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }
 
 /**
