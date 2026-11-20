@@ -204,6 +204,19 @@ void main() {
       );
     });
 
+    test("a plain account drops the passkey sign-in's PRF (zeroed) once its mode is known",
+        () async {
+      final container = containerWith(FakeServer(mode: 'plain'));
+      final prf = Uint8List(32)..fillRange(0, 32, 7);
+      container
+          .read(signInPrfProvider)
+          .keep('vault_user', PasskeyPrf(credentialId: 'cred-1', prf: prf));
+      await container.read(vaultAccountProvider.future);
+      expect(container.read(vaultGateProvider), isNull);
+      expect(prf.every((b) => b == 0), isTrue);
+      expect(container.read(signInPrfProvider).take('vault_user'), isNull);
+    });
+
     test('a preview account with keys elsewhere gets a started gate that asks to unlock', () async {
       final server = FakeServer()
         ..wraps = [

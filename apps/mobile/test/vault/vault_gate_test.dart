@@ -1211,6 +1211,25 @@ void main() {
       expect(noted, 0);
     });
 
+    test('back from pairing after a touch without PRF leads with the recovery key', () async {
+      final h = gateWith(
+        prepareAccount: alreadySetUp,
+        accountPasskeyIds: () async => ['cred-1'],
+        evaluatePrf: (_) async => throw fail('no_prf'),
+        notePasskeyWithoutPrf: () async {},
+        startPairing: () async => FakePairing(),
+      );
+      h.gate.start();
+      await settle();
+      expect(await h.gate.unlockWithPasskey(), 'no_prf');
+      // The screen under the person's hands keeps its layout...
+      expect(h.gate.state, const Unlock());
+      await h.gate.pair();
+      h.gate.leavePairing();
+      // ...but coming back to it, Unlock knows this phone's passkey gives no PRF.
+      expect(h.gate.state, const Unlock(noPrfHere: true));
+    });
+
     test('a passkey that opens the data clears the hint', () async {
       var viaButton = 0;
       final a = gateWith(
@@ -1278,9 +1297,11 @@ void main() {
         'then what is read now', () async {
       final wrapRead = Completer<bool>();
       var reads = 0;
+      var hint = true;
       final h = gateWith(
         prepareAccount: alreadySetUp,
-        passkeyGaveNoPrf: () async => true,
+        passkeyGaveNoPrf: () async => hint,
+        notePasskeyOpened: () async => hint = false,
         hasPasskeyWrap: () {
           reads += 1;
           return reads == 1 ? Future.value(false) : wrapRead.future;
@@ -1294,16 +1315,17 @@ void main() {
       expect(h.gate.state, const Ready('passkey'));
 
       final removing = h.gate.removed();
-      // Never "ready" while the wraps are read: Unlock at once, with what was known.
+      // Never "ready" while the wraps are read: Unlock at once, with what was known (the passkey
+      // that opened the data cleared the hint).
       expect(
         h.gate.state,
-        const Unlock(notice: Unlock.removed, noPrfHere: true, passkeyWrap: false),
+        const Unlock(notice: Unlock.removed, noPrfHere: false, passkeyWrap: false),
       );
       wrapRead.complete(true);
       await removing;
       expect(
         h.gate.state,
-        const Unlock(notice: Unlock.removed, noPrfHere: true, passkeyWrap: true),
+        const Unlock(notice: Unlock.removed, noPrfHere: false, passkeyWrap: true),
       );
     });
 

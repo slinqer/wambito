@@ -255,12 +255,15 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `signInWithAvailablePasskey`) asks for the PRF too (`prf.dart` `withPrfExtension`, read back with `prfOfAssertion`):
   the PRF waits in `signInPrfProvider` (`lib/vault/sign_in_prf.dart`, `SignInPrf`: memory only, for the account the
   server named, one take, zeroed by another account's take, a failed sign-in, a sign-out or an expiry, wherever
-  `signInRecoveryKeyProvider` is cleared), and the gate's `takeSignInPrf` tries it on the account's passkey wrap before
+  `signInRecoveryKeyProvider` is cleared, and by `vaultGateProvider` once the account is known to be `plain`: no vault
+  to open), and the gate's `takeSignInPrf` tries it on the account's passkey wrap before
   Unlock. A passkey touch here (that sign-in, or Unlock's button limited to the account's passkey ids) that gives no
   PRF notes `UnlockHint` (`lib/vault/unlock_hint.dart`, pref `wambito.unlock.no_prf.<userId>`, a boolean; cleared when
   a passkey's PRF opens the data, kept by a sign-out, forgotten by Delete account). `Unlock` carries `noPrfHere` (that
   hint) and `passkeyWrap` (`keys.hasPasskeyWrap`, true when the wraps cannot be read); going back to Unlock from an
-  open vault (`removed`, `unverified`) shows it at once with the last known means and refines them. The other side of a pairing is
+  open vault (`removed`, `unverified`) shows it at once with the last known means and refines them; pairing's back
+  (`leavePairing`) shows the last known means, which a `no_prf` touch on Unlock sets to `noPrfHere` and a passkey that
+  opens the data clears. The other side of a pairing is
   `lib/settings/security/approve_device_screen.dart` (`ApproveDeviceScreen({pairing, onStartAgain, onDone})`, twin of
   `ApproveDevice.tsx`, titled "Approve a new device"): the confirmation only. Its entry is
   `connect_device_screen.dart` (`ConnectDeviceScreen`, Settings → Security → "Connect another device", below), which

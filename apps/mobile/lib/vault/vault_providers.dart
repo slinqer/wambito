@@ -81,13 +81,19 @@ final vaultHoldReaderProvider = Provider<Future<VaultHold?> Function(String user
 /// session signed in now is not known yet, and when signed out. It is bound to that session (the
 /// owner of [currentVaultAccountProvider]): another token, even a new one of the same account,
 /// disposes it, closes the vault session it opened (its file and keys stay), and a new gate starts
-/// once the new session's account is known. Its calls read the network client of the moment.
+/// once the new session's account is known. Its calls read the network client of the moment. A
+/// `plain` account has no vault to open: the passkey sign-in's PRF is zeroed then, not kept until
+/// the sign-out (the web's `clearSignInPrf` in the `/app` and `/welcome` loaders).
 final vaultGateProvider = Provider<AppVaultGate?>((ref) {
   final key = ref.watch(
     currentVaultAccountProvider.select((a) => a == null ? null : (a.owner, a.profile.id, a.mode)),
   );
   final account = ref.read(currentVaultAccountProvider);
-  if (key == null || account == null || account.mode != EncryptionMode.preview) return null;
+  if (key == null || account == null) return null;
+  if (account.mode != EncryptionMode.preview) {
+    ref.read(signInPrfProvider).clear();
+    return null;
+  }
   return _gateFor(ref, account.profile, account.owner)..start();
 });
 

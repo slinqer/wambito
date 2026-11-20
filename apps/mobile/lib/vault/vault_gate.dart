@@ -606,8 +606,10 @@ class VaultGate<K, S> {
   Future<void> _showNotice(String notice, {bool now = false}) =>
       _showUnlock(Unlock<S>(notice: notice), now: now);
 
-  /// A passkey's PRF opened the data here: the "no PRF" hint no longer holds.
+  /// A passkey's PRF opened the data here: the "no PRF" hint no longer holds (nor does the last
+  /// known means a later Unlock comes back to).
   Future<void> _passkeyOpened() async {
+    _lastMeans = (noPrfHere: false, passkeyWrap: _lastMeans.passkeyWrap);
     try {
       await _deps.notePasskeyOpened?.call();
     } on Object {
@@ -835,8 +837,10 @@ class VaultGate<K, S> {
       passkey = await evaluatePrf(ids);
     } on Object catch (error) {
       // Noted only when the touch was limited to this account's passkeys: another account's
-      // passkey must never mark this one. The screen keeps its layout; the next Unlock reads it.
+      // passkey must never mark this one. The screen keeps its layout; a later Unlock (pairing's
+      // back) leads with the recovery key.
       if (gateErrorCode(error) == 'no_prf' && ids != null) {
+        _lastMeans = (noPrfHere: true, passkeyWrap: _lastMeans.passkeyWrap);
         try {
           await _deps.notePasskeyWithoutPrf?.call();
         } on Object {
