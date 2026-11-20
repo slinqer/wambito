@@ -9,7 +9,8 @@ import type { AnalyticsConsent } from "./use-analytics-consent.ts";
  * stays usable). It asks with two equal buttons, decline first; opened again from the footer it
  * also says the current choice; with GPC/DNT on it is only a note with "Close". Nothing renders
  * before the hook is `ready`, so the prerendered HTML has no banner. Opened from the footer it
- * takes the focus, and gives it back to `returnFocus` when it closes.
+ * takes the focus, and gives it back to `returnFocus` when it closes (the first visit's question
+ * never moves the focus, so answering it never scrolls the page).
  */
 export function ConsentBanner({
   consent,
@@ -52,8 +53,11 @@ export function ConsentBanner({
 
   if (!shown) return null;
 
+  // Only a banner opened from the footer gives the focus back there. The first visit's question
+  // was never focused from the footer: a click on its button focuses that button, and moving the
+  // focus to the footer then would scroll the page to its end.
   const done = (act: () => void) => () => {
-    const hadFocus = box.current?.contains(document.activeElement) ?? false;
+    const hadFocus = asked && (box.current?.contains(document.activeElement) ?? false);
     act();
     if (hadFocus) returnFocus?.current?.focus();
   };
