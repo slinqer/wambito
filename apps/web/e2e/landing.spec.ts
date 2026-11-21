@@ -3,7 +3,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 /** The Android download: the arm64 APK of the mobile release, and the release page. */
 const ANDROID_APK_HREF =
-  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.1/wambito-1.0.1-arm64-v8a.apk";
+  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.4/wambito-1.0.4-arm64-v8a.apk";
 
 /**
  * The landing page as shipped: prerendered HTML served statically (playwright.built.config.ts,

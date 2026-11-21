@@ -11,7 +11,7 @@ export const GITHUB_HREF = "https://github.com/slinqer/wambito";
  * The Android app the landing offers: the latest `mobile-v*` release on GitHub. Raised after each
  * Android release is published there, never before (the link would 404); `release.md`.
  */
-export const ANDROID_VERSION = "1.0.1";
+export const ANDROID_VERSION = "1.0.4";
 
 /** "Descargar para Android": the arm64 APK, which nearly every phone in use runs. */
 export const ANDROID_APK_HREF = `${GITHUB_HREF}/releases/download/mobile-v${ANDROID_VERSION}/wambito-${ANDROID_VERSION}-arm64-v8a.apk`;
