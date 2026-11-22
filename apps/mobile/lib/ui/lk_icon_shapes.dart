@@ -45,8 +45,7 @@ enum LkIconName {
   const LkIconName(this.id);
   final String id;
 
-  static LkIconName fromId(String id) =>
-      values.firstWhere((name) => name.id == id);
+  static LkIconName fromId(String id) => values.firstWhere((name) => name.id == id);
 }
 
 /// `filled` everywhere but an inactive tab, which is `outline`.
@@ -55,12 +54,7 @@ enum LkIconVariant { filled, outline }
 /// One shape on the 48 grid: [d] is SVG path data, filled when [fill] (even-odd when [evenOdd]), else
 /// stroked [stroke] wide with round caps and joins.
 class LkIconShape {
-  const LkIconShape(
-    this.d, {
-    this.fill = false,
-    this.evenOdd = false,
-    this.stroke = 0,
-  });
+  const LkIconShape(this.d, {this.fill = false, this.evenOdd = false, this.stroke = 0});
 
   final String d;
   final bool fill;
@@ -89,10 +83,7 @@ const lkIconShapes = <LkIconName, Map<LkIconVariant, List<LkIconShape>>>{
   },
   LkIconName.user: {
     LkIconVariant.filled: [
-      LkIconShape(
-        'M15.5 14.5a8.5 8.5 0 1 0 17.0 0a8.5 8.5 0 1 0 -17.0 0Z',
-        stroke: 6.0,
-      ),
+      LkIconShape('M15.5 14.5a8.5 8.5 0 1 0 17.0 0a8.5 8.5 0 1 0 -17.0 0Z', stroke: 6.0),
       LkIconShape('M8 42c1.5-8 8-12.5 16-12.5S38.5 34 40 42', stroke: 6.0),
     ],
   },
@@ -147,9 +138,7 @@ const lkIconShapes = <LkIconName, Map<LkIconVariant, List<LkIconShape>>>{
     LkIconVariant.filled: [LkIconShape('M24 9v30M9 24h30', stroke: 7.0)],
   },
   LkIconName.close: {
-    LkIconVariant.filled: [
-      LkIconShape('M13 13l22 22M35 13 13 35', stroke: 7.0),
-    ],
+    LkIconVariant.filled: [LkIconShape('M13 13l22 22M35 13 13 35', stroke: 7.0)],
   },
   LkIconName.chevronLeft: {
     LkIconVariant.filled: [LkIconShape('M29 10 15 24l14 14', stroke: 7.0)],
@@ -163,10 +152,7 @@ const lkIconShapes = <LkIconName, Map<LkIconVariant, List<LkIconShape>>>{
         'M24.0 4h0.0a8.5 8.5 0 0 1 8.5 8.5v10.0a8.5 8.5 0 0 1 -8.5 8.5h-0.0a8.5 8.5 0 0 1 -8.5 -8.5v-10.0a8.5 8.5 0 0 1 8.5 -8.5Z',
         fill: true,
       ),
-      LkIconShape(
-        'M8.5 22c0 8.6 6.9 15.5 15.5 15.5S39.5 30.6 39.5 22M24 37.5V44',
-        stroke: 5.0,
-      ),
+      LkIconShape('M8.5 22c0 8.6 6.9 15.5 15.5 15.5S39.5 30.6 39.5 22M24 37.5V44', stroke: 5.0),
     ],
   },
   LkIconName.check: {
