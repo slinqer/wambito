@@ -636,6 +636,10 @@ test("a browser closed while two others are removed opens and shows the data", a
   /** The first removes one Chrome browser: one tap, the keys do not change. */
   const removeOne = async () => {
     await nav("Ajustes");
+    await first.page
+      .getByRole("navigation", { name: "Ajustes" })
+      .getByRole("link", { name: /^Cuenta y seguridad/ })
+      .click();
     await expect(first.page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
     await first.page
       .getByRole("button", { name: /^Quitar Chrome/ })
