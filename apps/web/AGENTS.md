@@ -13,7 +13,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   build dir `WAMBITO_BUILD_DIR` or `build`), `vite.config.ts` (mascot chunk named `mascot-*`).
 - `app/routes/*` thin route modules; `app/features/<feature>/` screens, models, stories;
   `app/ui/` shared components (interface icons: `Icon.tsx` over `icon-shapes.ts`, which reads
-  `docs/design/system/project/icons/icons.json`; emoji only for categories); `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
+  `docs/design/system/project/icons/icons.json`; brand logos in one colour: `BrandLogo.tsx` over `brands.json` beside it; emoji only for categories); `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
   the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/` (the seed over a memory store);
   `app/local/` the browser side of the vault; the store contract (`FinanceStore`), the memory
   store, the local backend (`createLocalBackend`: the `/v1` routes over a store, one store
