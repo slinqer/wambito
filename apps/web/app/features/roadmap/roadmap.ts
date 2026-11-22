@@ -46,6 +46,7 @@ export const ROADMAP_ITEMS: readonly RoadmapItem[] = [
   item("connect_ai", "done", "✨"),
   item("e2e_encryption", "done", "🔒"),
   item("bank_alerts", "building", "🏦"),
+  item("iphone_capture", "building", "💳"),
   item("stores", "building", "📦"),
   item("import_budge", "next", "📥"),
   item("iphone_app", "next", "📱"),

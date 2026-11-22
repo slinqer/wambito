@@ -124,6 +124,10 @@ describe("the roadmap's statuses", () => {
     expect(roadmapItem("iphone_app").status).toBe("next");
   });
 
+  it("builds automatic capture on the iPhone, from Apple Pay payments", () => {
+    expect(roadmapItem("iphone_capture").status).toBe("building");
+  });
+
   it("plans the on-device AI recap for later", () => {
     expect(roadmapItem("on_device_ai").status).toBe("later");
   });

@@ -72,6 +72,10 @@
         "title": "Captura automática das notificações do teu banco",
         "body": "No Android, o Wambito lê as notificações do teu banco e regista os teus gastos e receitas para reveres."
       },
+      "iphone_capture": {
+        "title": "iPhone: regista os teus pagamentos com Apple Pay",
+        "body": "No iPhone, cada pagamento com Apple Pay fica registado para reveres, sem abrir a app."
+      },
       "import_others": {
         "title": "Importa do Buddy e de outras apps",
         "body": "Mais formas de trazer o teu histórico."
