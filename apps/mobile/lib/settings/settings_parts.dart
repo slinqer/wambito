@@ -567,6 +567,13 @@ class RowButton extends RowTrailing {
   final Key? buttonKey;
 }
 
+/// Any widget at the end (a status dot and its word), up to 45 % of the row's width.
+class RowCustom extends RowTrailing {
+  const RowCustom(this.child);
+
+  final Widget child;
+}
+
 /// Nothing at the end.
 class RowNone extends RowTrailing {
   const RowNone();
@@ -735,9 +742,14 @@ class SettingsRow extends StatelessWidget {
   final VoidCallback? onTap;
   final bool danger;
 
-  /// What a screen reader hears under a switch row's name instead of [line] (the full wording of a
-  /// short line).
+  /// What a screen reader hears under a row's name instead of [line] (the full wording of a short
+  /// line, or of a short chip).
   final String? semanticsHint;
+
+  /// A row that is not pressable, with its [semanticsHint] if it has one.
+  Widget _still(Widget body) => semanticsHint == null
+      ? body
+      : Semantics(container: true, hint: semanticsHint, child: body);
 
   Widget _body(BuildContext context, {required Widget? end}) =>
       LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
@@ -805,6 +817,7 @@ class SettingsRow extends StatelessWidget {
     final colors = context.lkColors;
     return Pressable(
       onPressed: onTap,
+      hint: semanticsHint,
       builder: (context, state) => RingBox(
         radius: state.focusVisible ? LkSurface.radius(LkRadius.md) : null,
         color: colors.focus,
@@ -892,7 +905,7 @@ class SettingsRow extends StatelessWidget {
           ],
         );
         final body = _body(context, end: end);
-        return onTap == null ? body : _pressable(context, body);
+        return onTap == null ? _still(body) : _pressable(context, body);
       case RowChip():
         final end = DecoratedBox(
           decoration: BoxDecoration(
@@ -905,7 +918,7 @@ class SettingsRow extends StatelessWidget {
           ),
         );
         final body = _body(context, end: end);
-        return onTap == null ? body : _pressable(context, body);
+        return onTap == null ? _still(body) : _pressable(context, body);
       case RowButton():
         final text = LkText.upperCase(t.label);
         final end = PressButton(
@@ -917,10 +930,13 @@ class SettingsRow extends StatelessWidget {
           child: t.tone == PressTone.ghost ? OffsetUnderline(text) : Text(text),
         );
         final body = _body(context, end: end);
-        return onTap == null ? body : _pressable(context, body);
+        return onTap == null ? _still(body) : _pressable(context, body);
+      case RowCustom():
+        final body = _body(context, end: t.child);
+        return onTap == null ? _still(body) : _pressable(context, body);
       case RowNone():
         final body = _body(context, end: null);
-        return onTap == null ? body : _pressable(context, body);
+        return onTap == null ? _still(body) : _pressable(context, body);
     }
   }
 }

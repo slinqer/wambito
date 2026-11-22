@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/press_link.dart';
@@ -41,35 +42,33 @@ final appVersionProvider = FutureProvider<String>((ref) async {
   }
 });
 
-/// The card: what it is for, the button, and the address in writing under it (the web writes it out
-/// too, for a browser with no email app).
+/// The row in Más: "Comentarios e ideas", whose sheet holds today's form: what it is for, the
+/// button, and the address in writing under it (the web writes it out too, for a browser with no
+/// email app).
 class FeedbackSection extends ConsumerWidget {
   const FeedbackSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final colors = context.lkColors;
-    return SettingsSection(
+    return SettingsRow(
       key: const Key('settings.card.feedback'),
+      icon: LkIcon(LkIconName.chat, size: 20, color: context.lkColors.inkMuted),
       title: l10n.settingsFeedbackTitle,
-      lead: l10n.settingsFeedbackLead,
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PressLink.text(
-            l10n.settingsFeedbackAction,
-            key: const Key('settings.feedback'),
-            tone: PressTone.secondary,
-            onPressed: () => unawaited(_write(context, ref)),
-          ),
-        ),
-        CssParagraph(
-          l10n.settingsFeedbackAddress(feedbackEmail),
-          style: LkText.bodySm.copyWith(color: colors.inkMuted),
-        ),
-      ],
+      line: l10n.settingsFeedbackRowLine,
+      trailing: const RowChevron(),
+      onTap: () => unawaited(_open(context, ref)),
     );
+  }
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final write = await LkSheet.show<bool>(
+      context,
+      title: l10n.settingsFeedbackTitle,
+      children: [const _FeedbackForm()],
+    );
+    if (write == true && context.mounted) await _write(context, ref);
   }
 
   /// Opens the email app with the message: the subject in the person's language and a body of only
@@ -130,6 +129,37 @@ class _NoEmailApp extends StatelessWidget {
               await Clipboard.setData(const ClipboardData(text: feedbackEmail));
               navigator.pop(true);
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedbackForm extends StatelessWidget {
+  const _FeedbackForm();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.lkColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: WambitoTokens.space3),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: WambitoTokens.space3,
+        children: [
+          CssParagraph(l10n.settingsFeedbackLead, style: LkText.body.copyWith(color: colors.ink)),
+          PressLink.text(
+            l10n.settingsFeedbackAction,
+            key: const Key('settings.feedback'),
+            tone: PressTone.secondary,
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+          CssParagraph(
+            l10n.settingsFeedbackAddress(feedbackEmail),
+            style: LkText.bodySm.copyWith(color: colors.inkMuted),
           ),
         ],
       ),

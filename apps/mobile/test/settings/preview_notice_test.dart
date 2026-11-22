@@ -39,7 +39,11 @@ void main() {
         ],
       );
       await _show(t, 'settings.export.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
+      expect(
+        t.getSemantics(find.byKey(const Key('settings.export.comingSoon'))).hint,
+        'Próximamente con cifrado',
+      );
+      expect(find.text('Próximamente'), findsWidgets);
       expect(find.byKey(const Key('settings.export.json')), findsNothing);
       expect(find.byKey(const Key('settings.export.csv')), findsNothing);
       expect(accounts.exports, isEmpty);
@@ -48,7 +52,10 @@ void main() {
 
     testWidgets('a plain account keeps both buttons', (t) async {
       await pumpAccount(t, location: '/settings/data');
-      await _show(t, 'settings.export.json');
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('settings.export.json')), findsOneWidget);
+      expect(find.byKey(const Key('settings.export.csv')), findsOneWidget);
       expect(find.byKey(const Key('settings.export.comingSoon')), findsNothing);
     });
   });
@@ -57,8 +64,10 @@ void main() {
     testWidgets('Settings shows the notice in place of the link to the import', (t) async {
       final handle = t.ensureSemantics();
       await pumpSettingsApp(t, location: '/settings/data', overrides: previewOpen());
-      await _show(t, 'settings.import.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
+      expect(
+        t.getSemantics(find.byKey(const Key('settings.import.comingSoon'))).hint,
+        'Próximamente con cifrado',
+      );
       expect(find.byKey(const Key('settings.import')), findsNothing);
       handle.dispose();
     });

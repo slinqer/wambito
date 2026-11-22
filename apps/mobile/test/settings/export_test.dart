@@ -15,8 +15,15 @@ import 'account_harness.dart';
 
 Finder _said(String text) => find.bySemanticsLabel(text);
 
+/// Opens the sheet of export choices from its row.
+Future<void> _openSheet(WidgetTester t) async {
+  await scrollToKey(t, 'settings.export');
+  await t.tap(find.byKey(const Key('settings.export')));
+  await t.pumpAndSettle();
+}
+
 Future<void> _tapExport(WidgetTester t, String format) async {
-  await scrollToKey(t, 'settings.export.$format');
+  await _openSheet(t);
   await t.tap(find.byKey(Key('settings.export.$format')));
   await t.pumpAndSettle();
 }
@@ -26,9 +33,9 @@ void main() {
     testWidgets('are the web\'s: under the import, JSON and CSV, with what each gives', (t) async {
       final handle = t.ensureSemantics();
       await pumpAccount(t, location: '/settings/data');
-      await scrollToKey(t, 'settings.export.json');
+      await _openSheet(t);
       expect(_said('Tus datos'), findsWidgets);
-      expect(_said('Descarga tus datos'), findsOneWidget);
+      expect(_said('Descarga tus datos'), findsWidgets);
       expect(
         _said('Todo en JSON, o tus movimientos en CSV para abrirlos en Excel o Google Sheets.'),
         findsOneWidget,
@@ -42,7 +49,7 @@ void main() {
 
     testWidgets('are in English, with the web\'s words', (t) async {
       await pumpAccount(t, location: '/settings/data', locale: const Locale('en'));
-      await scrollToKey(t, 'settings.export.json');
+      await _openSheet(t);
       expect(find.text('DOWNLOAD JSON'), findsOneWidget);
       expect(find.text('DOWNLOAD CSV'), findsOneWidget);
     });
@@ -104,7 +111,7 @@ void main() {
       await t.pumpAndSettle();
       expect(env.files.saved, hasLength(1));
       expect(find.textContaining('Listo: guardamos'), findsNothing);
-      expect(find.byKey(const Key('settings.export.json')), findsOneWidget);
+      expect(find.byKey(const Key('settings.export')), findsOneWidget);
     });
 
     testWidgets('a save that fails says so, in a toast', (t) async {
@@ -165,7 +172,9 @@ void main() {
       );
       expect(find.text('Tu archivo está listo'), findsNothing);
       expect(env.files.saved, isEmpty);
-      // The buttons are back for another try.
+      // The buttons are back for another try: the row opens the sheet again.
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
       expect(
         t.widget<PressButton>(find.byKey(const Key('settings.export.json'))).onPressed,
         isNotNull,
@@ -203,9 +212,20 @@ void main() {
     ) async {
       final env = await pumpAccount(t, location: '/settings/data');
       env.accounts.holdExport = Completer<void>();
-      await scrollToKey(t, 'settings.export.json');
+      await _openSheet(t);
       await t.tap(find.byKey(const Key('settings.export.json')));
-      await t.pump();
+      await t.pumpAndSettle();
+      // The sheet closed on the pick; opened again, both buttons are off.
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<PressButton>(find.byKey(const Key('settings.export.json'))).onPressed,
+        isNull,
+      );
+      expect(
+        t.widget<PressButton>(find.byKey(const Key('settings.export.csv'))).onPressed,
+        isNull,
+      );
       await t.tap(find.byKey(const Key('settings.export.json')), warnIfMissed: false);
       await t.tap(find.byKey(const Key('settings.export.csv')), warnIfMissed: false);
       await t.pump();
@@ -220,7 +240,7 @@ void main() {
     testWidgets('sees both buttons off, with why: an email comes first', (t) async {
       final handle = t.ensureSemantics();
       final env = await pumpAccount(t, location: '/settings/data', guest: true);
-      await scrollToKey(t, 'settings.export.json');
+      await _openSheet(t);
       expect(
         _said('Primero guarda tu progreso con un correo; después podrás descargar tus datos.'),
         findsOneWidget,

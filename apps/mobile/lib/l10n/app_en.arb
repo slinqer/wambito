@@ -2450,5 +2450,70 @@
   "settingsSecurityNewKeyContinue": "Continue",
   "@settingsSecurityNewKeyContinue": {
     "description": "Settings: continues to a new recovery key, after what it does."
+  },
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": {
+    "description": "Settings, Preferencias: the group of language and theme."
+  },
+  "settingsSoundTouch": "Sound and touch",
+  "@settingsSoundTouch": {
+    "description": "Settings, Preferencias: the group of sound and vibration."
+  },
+  "settingsSoundTitle": "Sound",
+  "@settingsSoundTitle": {
+    "description": "Settings, Preferencias: the sound row's name."
+  },
+  "settingsSoundLine": "A short sound when you log",
+  "@settingsSoundLine": {
+    "description": "Settings, Preferencias: the sound row's one line (the full sentence is its hint for screen readers)."
+  },
+  "settingsVibrationLine": "A soft tap when you log and undo",
+  "@settingsVibrationLine": {
+    "description": "Settings, Preferencias: the vibration row's one line (the full sentence is its hint for screen readers)."
+  },
+  "settingsImportRow": "Import transactions",
+  "@settingsImportRow": {
+    "description": "Settings, Tus datos: the import row's name."
+  },
+  "settingsImportRowLine": "From your bank's CSV",
+  "@settingsImportRowLine": {
+    "description": "Settings, Tus datos: the import row's one line."
+  },
+  "settingsExportRow": "Download your data",
+  "@settingsExportRow": {
+    "description": "Settings, Tus datos: the export row's name."
+  },
+  "settingsExportRowLine": "A CSV with everything you logged",
+  "@settingsExportRowLine": {
+    "description": "Settings, Tus datos: the export row's one line."
+  },
+  "settingsComingSoonChip": "Coming soon",
+  "@settingsComingSoonChip": {
+    "description": "Settings: the chip on a row that an encrypted account cannot use yet."
+  },
+  "settingsFeedbackRowLine": "Tell us what to improve",
+  "@settingsFeedbackRowLine": {
+    "description": "Settings, Más: the feedback row's one line."
+  },
+  "settingsRoadmapRow": "What's coming",
+  "@settingsRoadmapRow": {
+    "description": "Settings, Más: the row that opens the roadmap on the web."
+  },
+  "settingsWebRow": "Open Wambito on the web",
+  "@settingsWebRow": {
+    "description": "Settings, Más: the row that opens Wambito's page on the web."
+  },
+  "settingsServerConnected": "Connected",
+  "@settingsServerConnected": {
+    "description": "Settings, Más: the server row's status when the server answered."
+  },
+  "settingsAboutVersion": "Version {version}",
+  "@settingsAboutVersion": {
+    "description": "Settings, Más: the about row's line, the app's version.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
   }
 }

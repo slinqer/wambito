@@ -20,6 +20,7 @@ import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/native_radio.dart';
 import '../ui/press_button.dart';
@@ -40,10 +41,10 @@ class TimeAndMoneySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return SettingsSection(
+    return SettingsGroup(
       key: const Key('settings.card.timeMoney'),
-      title: l10n.settingsTimeAndMoney,
-      children: [
+      label: l10n.settingsTimeAndMoney,
+      rows: [
         _TimeZoneSetting(zone: profile.timezone),
         _CurrencySetting(currency: profile.currency),
       ],
@@ -56,9 +57,9 @@ const zonesShown = 40;
 
 // -- the time zone ----------------------------------------------------------------------------------
 
-/// The profile's time zone (`America/Bogota` shown as "Bogota", with its region and offset) and
-/// "Cambiar", which opens a sheet to search the zones by city or country. Picking one saves it, and
-/// everything that reads "today" follows.
+/// The profile's time zone (`America/Bogota` shown as "Bogota" on its row); the row opens a sheet to
+/// search the zones by city or country, with the hint on what the zone is for. Picking one saves it,
+/// and everything that reads "today" follows.
 class _TimeZoneSetting extends ConsumerWidget {
   const _TimeZoneSetting({required this.zone});
 
@@ -78,73 +79,14 @@ class _TimeZoneSetting extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final colors = context.lkColors;
-    final now = ref.read(clockProvider)();
-    final offset = zoneOffset(zone, l10n.localeName, now);
-    final region = [zoneRegion(zone), offset].where((part) => part.isNotEmpty).join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: WambitoTokens.space2,
-      children: [
-        SettingLabel(label: l10n.settingsTimezoneLabel, hint: l10n.settingsTimezoneHint),
-        _RowCard(
-          child: Row(
-            spacing: 10,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      zoneCity(zone),
-                      key: const Key('settings.timezone.current'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: LkText.step.copyWith(color: colors.ink),
-                    ),
-                    if (region.isNotEmpty)
-                      CssBlinkLines(
-                        style: LkText.fieldLabel,
-                        child: Text(
-                          region,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: LkText.fieldLabel.copyWith(color: colors.inkMuted),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              PressButton.text(
-                l10n.settingsTimezoneChange,
-                key: const Key('settings.timezone.change'),
-                tone: PressTone.secondary,
-                size: PressSize.sm,
-                semanticLabel: l10n.settingsTimezoneChangeLabel,
-                onPressed: () => unawaited(_change(context)),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return SettingsRow(
+      key: const Key('settings.timezone.change'),
+      icon: LkIcon(LkIconName.clock, size: 20, color: context.lkColors.inkMuted),
+      title: l10n.settingsTimezoneLabel,
+      trailing: RowChevron(value: zoneCity(zone)),
+      onTap: () => unawaited(_change(context)),
     );
   }
-}
-
-/// `.lk-rowcard`: a row on its own card, 10px by 12px inside.
-class _RowCard extends StatelessWidget {
-  const _RowCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => PressSurface(
-    minSize: 0,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: LkSurface.rowCard(context.lk),
-    child: SizedBox(width: double.infinity, child: child),
-  );
 }
 
 /// The sheet that searches the zones: the search field, the phone's own zone while nothing is typed,
@@ -225,6 +167,7 @@ class _ZoneSheetState extends ConsumerState<_ZoneSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: WambitoTokens.space3,
         children: [
+          CssParagraph(l10n.settingsTimezoneHint, style: mutedStyle),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: WambitoTokens.space1,
@@ -414,28 +357,60 @@ final _recurrencesProvider = FutureProvider.autoDispose<List<Recurrence>>(
   retry: (_, _) => null,
 );
 
-/// The account's currency, while it can still change: one radio per supported currency with an
-/// example amount, shown while this screen sees no transactions and no recurring payments. The
-/// server has the last word, since it also counts deleted transactions, which the list here never
-/// returns: a 409 `currency_locked` turns the choice into the same short line as an account that
-/// visibly has movements. Another pick is ignored until the first one is answered.
-class _CurrencySetting extends ConsumerStatefulWidget {
+/// The currency's row: the code as its value; it opens [_CurrencySheet]. The row watches what the
+/// sheet reads, so the answers are in by the time it opens.
+class _CurrencySetting extends ConsumerWidget {
   const _CurrencySetting({required this.currency});
 
   final String currency;
 
   @override
-  ConsumerState<_CurrencySetting> createState() => _CurrencySettingState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    ref
+      ..watch(_hasTransactionsProvider)
+      ..watch(_recurrencesProvider);
+    return SettingsRow(
+      key: const Key('settings.currency.row'),
+      icon: LkIcon(LkIconName.coin, size: 20, color: context.lkColors.inkMuted),
+      title: l10n.settingsCurrencyLabel,
+      trailing: RowChevron(value: currency),
+      onTap: () => unawaited(
+        LkSheet.show<void>(
+          context,
+          title: l10n.settingsCurrencyLabel,
+          children: [_CurrencySheet(currency: currency, toasts: ToastHost.of(context))],
+        ),
+      ),
+    );
+  }
 }
 
-class _CurrencySettingState extends ConsumerState<_CurrencySetting> {
+/// The account's currency, while it can still change: one radio per supported currency with an
+/// example amount, shown while this screen sees no transactions and no recurring payments. The
+/// server has the last word, since it also counts deleted transactions, which the list here never
+/// returns: a 409 `currency_locked` turns the choice into the same short line as an account that
+/// visibly has movements. Another pick is ignored until the first one is answered.
+class _CurrencySheet extends ConsumerStatefulWidget {
+  const _CurrencySheet({required this.currency, required this.toasts});
+
+  final String currency;
+
+  /// Where a failure or the saved line is said: the screen's, which shows over the sheet.
+  final ToastController toasts;
+
+  @override
+  ConsumerState<_CurrencySheet> createState() => _CurrencySheetState();
+}
+
+class _CurrencySheetState extends ConsumerState<_CurrencySheet> {
   var _lockedByServer = false;
   var _busy = false;
 
   Future<void> _choose(String next) async {
     if (_busy || next == widget.currency) return;
     final l10n = AppLocalizations.of(context);
-    final toasts = ToastHost.of(context);
+    final toasts = widget.toasts;
     setState(() => _busy = true);
     try {
       await ref.read(profileActionsProvider).setCurrency(next);
@@ -450,10 +425,16 @@ class _CurrencySettingState extends ConsumerState<_CurrencySetting> {
       if (mounted) setState(() => _busy = false);
     }
     toasts.say(l10n.settingsCurrencySaved(next));
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: WambitoTokens.space3),
+    child: _content(context),
+  );
+
+  Widget _content(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
     final transactions = ref.watch(_hasTransactionsProvider);
@@ -468,17 +449,10 @@ class _CurrencySettingState extends ConsumerState<_CurrencySetting> {
         !isSupportedCurrency(widget.currency);
 
     if (known && locked) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: WambitoTokens.space1,
-        children: [
-          SettingLabel(label: l10n.settingsCurrencyLabel),
-          CssParagraph(
-            l10n.settingsCurrencyLocked(widget.currency),
-            key: const Key('settings.currency.locked'),
-            style: LkText.bodySm.copyWith(color: colors.inkMuted),
-          ),
-        ],
+      return CssParagraph(
+        l10n.settingsCurrencyLocked(widget.currency),
+        key: const Key('settings.currency.locked'),
+        style: LkText.bodySm.copyWith(color: colors.inkMuted),
       );
     }
 

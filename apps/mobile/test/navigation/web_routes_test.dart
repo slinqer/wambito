@@ -265,8 +265,11 @@ void main() {
       final handle = tester.ensureSemantics();
       final env = await pumpSettingsApp(tester, location: '/settings/data');
       await _scrollTo(tester, find.byKey(const Key('settings.import')));
-      expect(find.bySemanticsLabel('Tus datos'), findsWidgets);
-      expect(find.bySemanticsLabel('Importa lo que llevas en Budge.'), findsOneWidget);
+      expect(find.text('Importar movimientos'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('settings.import'))).hint,
+        'Importa lo que llevas en Budge.',
+      );
       await tester.tap(find.byKey(const Key('settings.import')));
       await tester.pumpAndSettle();
       expect(_location(env), '/import');
@@ -278,8 +281,8 @@ void main() {
       final handle = tester.ensureSemantics();
       final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _scrollTo(tester, find.byKey(const Key('settings.web')));
-      expect(find.bySemanticsLabel('Más en la web'), findsWidgets);
-      expect(find.bySemanticsLabel('La página de Wambito y lo que viene.'), findsOneWidget);
+      expect(find.text('Abrir Wambito en la web'), findsOneWidget);
+      expect(find.text('La página de Wambito y lo que viene.'), findsOneWidget);
       // The card names no page of the app (time and money, the passkeys and the import are cards of the
       // page itself now).
       expect(find.bySemanticsLabel(RegExp('recurrentes')), findsNothing);

@@ -31,6 +31,13 @@ Future<void> _scrollTo(WidgetTester t, String key) async {
   await t.pumpAndSettle();
 }
 
+/// Opens the form from its row in Más.
+Future<void> _openForm(WidgetTester t) async {
+  await _scrollTo(t, 'settings.card.feedback');
+  await t.tap(find.byKey(const Key('settings.card.feedback')));
+  await t.pumpAndSettle();
+}
+
 void main() {
   group('the link', () {
     // The web's tests pin the same strings (apps/web/app/features/settings/feedback.test.ts).
@@ -56,7 +63,7 @@ void main() {
     testWidgets('is the web\'s, the first card of Más', (t) async {
       final handle = t.ensureSemantics();
       await _pump(t);
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       expect(_said('Comentarios e ideas'), findsWidgets);
       expect(
         _said('¿Algo no funciona, o quieres que Wambito haga algo más? Cuéntanos por correo.'),
@@ -73,7 +80,7 @@ void main() {
     testWidgets('is in English, with the web\'s English', (t) async {
       final handle = t.ensureSemantics();
       await _pump(t, locale: const Locale('en'));
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       expect(_said('Feedback and ideas'), findsWidgets);
       expect(find.text('WRITE TO US'), findsOneWidget);
       handle.dispose();
@@ -81,7 +88,7 @@ void main() {
 
     testWidgets('a guest has it too: it needs no account', (t) async {
       final env = await _pump(t, guest: true);
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       await t.tap(find.byKey(const Key('settings.feedback')));
       await t.pumpAndSettle();
       expect(env.opener.opened, hasLength(1));
@@ -93,7 +100,7 @@ void main() {
       'opens the exact mailto: Spanish subject, and only the version and language in the body',
       (t) async {
         final env = await _pump(t);
-        await _scrollTo(t, 'settings.feedback');
+        await _openForm(t);
         await t.tap(find.byKey(const Key('settings.feedback')));
         await t.pumpAndSettle();
         expect(
@@ -113,7 +120,7 @@ void main() {
 
     testWidgets('in English the subject and the body speak English', (t) async {
       final env = await _pump(t, locale: const Locale('en'));
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       await t.tap(find.byKey(const Key('settings.feedback')));
       await t.pumpAndSettle();
       expect(
@@ -130,7 +137,7 @@ void main() {
       );
       env.router.go('/settings/more');
       await t.pumpAndSettle();
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       await t.tap(find.byKey(const Key('settings.feedback')));
       await t.pumpAndSettle();
       expect(
@@ -164,7 +171,7 @@ void main() {
       final handle = t.ensureSemantics();
       final env = await _pump(t);
       env.opener.works = false;
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       await t.tap(find.byKey(const Key('settings.feedback')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('settings.feedback.sheet')), findsOneWidget);
@@ -182,7 +189,7 @@ void main() {
     testWidgets('can be closed without copying', (t) async {
       final env = await _pump(t);
       env.opener.works = false;
-      await _scrollTo(t, 'settings.feedback');
+      await _openForm(t);
       await t.tap(find.byKey(const Key('settings.feedback')));
       await t.pumpAndSettle();
       await t.tap(find.text('CERRAR'));

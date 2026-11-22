@@ -14,6 +14,7 @@ import 'package:wambito/home/widget_pin.dart' show widgetPinProvider;
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/settings_parts.dart' show SettingsRow;
+import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/toast.dart';
 import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
@@ -206,16 +207,25 @@ void main() {
           expect(tester.takeException(), isNull);
           // The light rows keep one line: a long muted line under a switch ends in an ellipsis
           // (the names are whole; spec 2026-11-22), so Captura's lines are not asked to fit.
-          final lines = category == SettingsCategory.capture
-              ? {
-                  l10n.settingsDeleteVoiceHint,
-                  l10n.settingsDueNoticeHint,
-                  l10n.settingsGuestNoticeHint,
-                  l10n.settingsHideAmountHint,
-                  l10n.settingsAddWidgetHint,
-                  l10n.autoCaptureHowLine,
-                }
-              : const <String>{};
+          final lines = switch (category) {
+            SettingsCategory.capture => {
+              l10n.settingsDeleteVoiceHint,
+              l10n.settingsDueNoticeHint,
+              l10n.settingsGuestNoticeHint,
+              l10n.settingsHideAmountHint,
+              l10n.settingsAddWidgetHint,
+              l10n.autoCaptureHowLine,
+            },
+            SettingsCategory.preferences => {l10n.settingsSoundLine, l10n.settingsVibrationLine},
+            SettingsCategory.data => {l10n.settingsImportRowLine, l10n.settingsExportRowLine},
+            // The server's address is its own line, not a word of ours.
+            SettingsCategory.more => {
+              l10n.settingsFeedbackRowLine,
+              l10n.settingsWebHint,
+              'https://app.wambito.com',
+            },
+            _ => const <String>{},
+          };
           final seen = <String>{};
           for (var i = 0; i < 40; i++) {
             _expectWhole(tester, const [], where: 'in ${category.name} (screen $i)', allow: lines);
@@ -353,6 +363,83 @@ void main() {
         }
         expect(tester.takeException(), isNull);
       });
+
+      // Preferencias, Tus datos and Más with every row showing: no exception and every row one
+      // line, 76 px at the most, at 130 % on a 360 px phone.
+      final walks = {
+        'preferences': (
+          '/settings/preferences',
+          false,
+          [
+            'settings.language',
+            'settings.theme',
+            'settings.sound',
+            'settings.vibration',
+            'settings.timezone.change',
+            'settings.currency.row',
+          ],
+        ),
+        'data': ('/settings/data', false, ['settings.import', 'settings.export']),
+        'data (encrypted)': (
+          '/settings/data',
+          true,
+          ['settings.import.comingSoon', 'settings.export.comingSoon'],
+        ),
+        'more': (
+          '/settings/more',
+          false,
+          [
+            'settings.card.feedback',
+            'settings.roadmap',
+            'settings.web',
+            'settings.server',
+            'settings.about',
+            'settings.prfProbe',
+          ],
+        ),
+      };
+      for (final entry in walks.entries) {
+        final (location, preview, names) = entry.value;
+        testWidgets('the ${entry.key} page has rows of one line, every row showing', (
+          tester,
+        ) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await pumpSettingsApp(
+            tester,
+            locale: locale,
+            location: location,
+            overrides: [
+              if (preview) isPreviewProvider.overrideWithValue(true),
+              debugToolsProvider.overrideWithValue(true),
+            ],
+          );
+          tester.view
+            ..physicalSize = const Size(360, 640)
+            ..devicePixelRatio = 1;
+          await tester.pumpAndSettle();
+          final walked = <String>{};
+          for (var i = 0; i < 40; i++) {
+            expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+            for (final element in find.byType(SettingsRow).evaluate()) {
+              final key = element.widget.key;
+              walked.add('$key');
+              final box = element.renderObject! as RenderBox;
+              expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+            }
+            final scrollable = find.byType(Scrollable).first;
+            final before = tester.state<ScrollableState>(scrollable).position.pixels;
+            await tester.drag(scrollable, const Offset(0, -300));
+            await tester.pumpAndSettle();
+            final after = tester.state<ScrollableState>(scrollable).position.pixels;
+            if (after == before) break;
+          }
+          for (final name in names) {
+            expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
 
       testWidgets('the capture sheet keeps its words whole', (tester) async {
         await _pump(tester, locale);

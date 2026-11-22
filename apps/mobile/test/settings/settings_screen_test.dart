@@ -104,8 +104,8 @@ void main() {
       await _scrollTo(tester, 'settings.web');
       // The pages the app has not (the landing, the roadmap): named in the card, with the links.
       // The web's app pages (import, recurring, categories) have their places in the app.
-      expect(find.bySemanticsLabel('Más en la web'), findsWidgets);
-      expect(find.bySemanticsLabel('La página de Wambito y lo que viene.'), findsOneWidget);
+      expect(find.text('Abrir Wambito en la web'), findsOneWidget);
+      expect(find.text('La página de Wambito y lo que viene.'), findsOneWidget);
       expect(find.byKey(const Key('settings.roadmap')), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings.web')));
       await tester.pumpAndSettle();
@@ -118,6 +118,7 @@ void main() {
     ) async {
       final env = await pumpSettingsApp(tester, location: '/settings/preferences');
       // Night is chosen; the right arrow, with the focus on it, picks Día.
+      await _tap(tester, 'settings.theme');
       Focus.of(tester.element(find.byKey(const Key('settings.theme.night')))).requestFocus();
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -322,7 +323,7 @@ void main() {
     testWidgets('in English', (tester) async {
       await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings/preferences');
       expect(find.text('SETTINGS'), findsWidgets);
-      expect(find.text('Sounds'), findsOneWidget);
+      expect(find.text('Sound'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('settings.vibration')),
@@ -407,19 +408,20 @@ void main() {
       }
     });
 
-    testWidgets('a preview account has no switch for the 45-day guest warning, which it never gets', (
-      tester,
-    ) async {
-      await pumpSettingsApp(
-        tester,
-        guest: true,
-        location: '/settings/capture',
-        overrides: [..._previewGuest(), isPreviewProvider.overrideWithValue(true)],
-      );
-      await _scrollTo(tester, 'settings.dueNotice');
-      expect(find.byKey(const Key('settings.guestNotice')), findsNothing);
-      expect(find.text('Si no tienes correo'), findsNothing);
-    });
+    testWidgets(
+      'a preview account has no switch for the 45-day guest warning, which it never gets',
+      (tester) async {
+        await pumpSettingsApp(
+          tester,
+          guest: true,
+          location: '/settings/capture',
+          overrides: [..._previewGuest(), isPreviewProvider.overrideWithValue(true)],
+        );
+        await _scrollTo(tester, 'settings.dueNotice');
+        expect(find.byKey(const Key('settings.guestNotice')), findsNothing);
+        expect(find.text('Si no tienes correo'), findsNothing);
+      },
+    );
 
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
       tester,
@@ -451,16 +453,19 @@ void main() {
       expect(app().themeMode, ThemeMode.dark);
       expect(app().locale, isNull);
 
+      await _tap(tester, 'settings.theme');
       await tester.tap(find.byKey(const Key('settings.theme.day')));
       await tester.pumpAndSettle();
       expect(app().themeMode, ThemeMode.light);
       expect(env.settings.values['setting.theme'], 'light');
 
+      await _tap(tester, 'settings.theme');
       await tester.tap(find.byKey(const Key('settings.theme.system')));
       await tester.pumpAndSettle();
       expect(app().themeMode, ThemeMode.system);
       expect(env.settings.values['setting.theme'], 'system');
 
+      await _tap(tester, 'settings.theme');
       await tester.tap(find.byKey(const Key('settings.theme.night')));
       await tester.pumpAndSettle();
       expect(app().themeMode, ThemeMode.dark);
@@ -473,12 +478,14 @@ void main() {
       final env = await pumpSettingsApp(tester, location: '/settings/preferences');
       expect(find.text('AJUSTES'), findsWidgets);
 
+      await _tap(tester, 'settings.language');
       await tester.tap(find.byKey(const Key('settings.language.en')));
       await tester.pumpAndSettle();
       expect(find.text('SETTINGS'), findsWidgets);
       expect(find.text('AJUSTES'), findsNothing);
       expect(env.settings.values['setting.locale'], 'en');
 
+      await _tap(tester, 'settings.language');
       await tester.tap(find.byKey(const Key('settings.language.auto')));
       await tester.pumpAndSettle();
       expect(find.text('AJUSTES'), findsWidgets);
@@ -491,14 +498,15 @@ void main() {
       tester,
     ) async {
       await pumpSettingsApp(tester, location: '/settings/preferences');
+      await _tap(tester, 'settings.language');
       for (final (key, name) in [
         ('es', 'Español'),
         ('en', 'English'),
         ('it', 'Italiano'),
         ('pt', 'Português'),
       ]) {
-        await _scrollTo(tester, 'settings.language.$key');
         expect(find.text(name), findsOneWidget);
+        expect(find.byKey(Key('settings.language.$key')), findsOneWidget);
       }
     });
 
@@ -508,7 +516,7 @@ void main() {
     ]) {
       testWidgets('picking $code changes every word at once and is kept', (tester) async {
         final env = await pumpSettingsApp(tester, location: '/settings/preferences');
-        await _scrollTo(tester, 'settings.language.$code');
+        await _tap(tester, 'settings.language');
         await tester.tap(find.byKey(Key('settings.language.$code')));
         await tester.pumpAndSettle();
         expect(find.text(settings), findsWidgets);
@@ -519,7 +527,7 @@ void main() {
 
       testWidgets('in $code the web links are the $web landing and roadmap', (tester) async {
         final env = await pumpSettingsApp(tester, location: '/settings/preferences');
-        await _scrollTo(tester, 'settings.language.$code');
+        await _tap(tester, 'settings.language');
         await tester.tap(find.byKey(Key('settings.language.$code')));
         await tester.pumpAndSettle();
         env.router.go('/settings/more');
@@ -883,7 +891,11 @@ void main() {
     testWidgets('the switch names the size, and turning it on downloads canary only', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings/capture',
+        preciseEligible: true,
+      );
       await _scrollTo(tester, 'settings.voicePrecise');
       expect(find.text('Mejorar la precisión'), findsOneWidget);
       expect(find.text('+150 MB · corrige al terminar de hablar'), findsOneWidget);
@@ -897,7 +909,11 @@ void main() {
     });
 
     testWidgets('leaving Settings during the download throws nothing', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings/capture',
+        preciseEligible: true,
+      );
       env.precise.gate = Completer<void>();
       await _scrollTo(tester, 'settings.voicePrecise');
       await tester.tap(find.byKey(const Key('settings.voicePrecise')));
@@ -929,7 +945,11 @@ void main() {
     });
 
     testWidgets('a download that fails says so and leaves the switch off', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings/capture',
+        preciseEligible: true,
+      );
       env.precise.failure = const ModelDownloadFailure();
       await _scrollTo(tester, 'settings.voicePrecise');
       await tester.tap(find.byKey(const Key('settings.voicePrecise')));
@@ -967,7 +987,11 @@ void main() {
     });
 
     testWidgets('with no model downloaded, there is nothing to delete', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings/capture', modelsInstalled: false);
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings/capture',
+        modelsInstalled: false,
+      );
       expect(env.models.installed, isFalse);
       expect(find.byKey(const Key('settings.deleteVoice')), findsNothing);
     });

@@ -30,7 +30,7 @@ import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'feedback.dart';
 import 'profile_settings.dart';
 import 'settings_parts.dart';
-import 'category_cards.dart' show PreferencesCard;
+import 'preferences_screen.dart' show PreferencesGroups;
 import 'leave_guard.dart';
 import 'settings_menu.dart';
 
@@ -152,7 +152,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-          const PreferencesCard(),
+          const PreferencesGroups(),
         ],
       );
     }
