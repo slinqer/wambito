@@ -70,7 +70,13 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   `meta`, `quarantine`; schema version 2 (`vaultSchemaVersion`; `_upgrade` in `db.dart` migrates a
   real user's file in place, never by recreating it: v2 added `bodiless` to the records tables, set
   on every v1 tombstone); a local write updates record and outbox in one SQLite transaction, all
-  operations go through one queue; keys are not in it, they live in secure storage; tests use
+  operations go through one queue; SQLite's own `busy_timeout` is short (`vaultBusyTimeout`, 100 ms) and the
+  store waits up to 5 s in Dart between tries, as on Android every connection of the process shares sqflite's
+  native threads; once that wait fails, the app's store (not a `background` one) asks
+  `closeOrphanVaultConnections` (`sqflite_native.dart`: under the vault lease, rolls back and closes the
+  `singleInstance: false` connections of its vault that a destroyed headless engine left open in sqflite's
+  process-wide map) and tries once more; device test `integration_test/vault_lock_test.dart`; keys are not in
+  it, they live in secure storage; tests use
   `sqflite_common_ffi` in a temp dir via the `directory`/`factory` arguments). `backup.dart` keeps the
   vault folder out of backups: iOS via `excludeFromBackup` on `wambito/device`, Android via
   `res/xml/backup_rules.xml` + `data_extraction_rules.xml` (the `vault` folder and the secure storage
@@ -662,6 +668,9 @@ iOS is the base only (see "iOS" below): no automatic capture, widgets or voice y
   and the widget snapshot belongs to the vault (`writeVaultWidget`, `widget_effect.dart`), never to the `/v1` caches.
 - No `gradlew` is tracked; Kotlin-only runs can skip the Flutter compile with `-x compileFlutterBuildDebug`.
 - Never block on a WorkManager future (`.get()`) in code a Worker runs: deadlocks in tests.
+- sqflite keeps connections in a map for the whole process and never closes them when an engine detaches; its
+  threads take any connection's task. A long `busy_timeout` or a headless engine destroyed mid-transaction
+  blocks the other engine (see `lib/local/sqflite_native.dart`). Raising `androidThreadCount` does not help.
 - `test/tooling/*` reads Android files; `widget_android_test.dart` there pins Dart = Kotlin.
 - `manifest_test` counts `android:host="due"` once (only `wambito://` links).
 - Launch host `signin` is the one `wambito://` link on the exported `MainActivity` (its own BROWSABLE filter, so

@@ -23,7 +23,7 @@ Map<String, Object?> _cat(String name) => {
 };
 
 // Writes per connection. SQLite's lock has no queue: under heavy contention on a slow CI runner one
-// waiter can lose every retry for longer than `busy_timeout` (5 s). A few writes each still make
+// waiter can lose every retry for longer than the store's wait (5 s). A few writes each still make
 // the connections wait on one another, which is what this test is about.
 const _perConnection = 5;
 
@@ -53,9 +53,9 @@ void main() {
   test('concurrent writes on two background connections and the app one do not lock', () async {
     final path = dir.path;
     final app = await open();
-    // The background engines are isolates with their own sqflite worker, as Android gives each
-    // database its own thread: a connection waiting for the file's lock must not stop the one that
-    // holds it from committing (the ffi worker of one isolate serves every connection of it).
+    // The background engines are isolates with their own sqflite worker. On Android every
+    // connection of the process shares sqflite's threads, so a waiter must not hold one for long:
+    // `busy_timeout` is short and the store waits in Dart (`openVault`).
     final others = [
       for (final tag in ['b', 'c'])
         Isolate.run(() async {
@@ -91,9 +91,8 @@ void main() {
   });
 
   test('a write waits for another engine that holds the file for a second and a half', () async {
-    // Under the Dart VM on Linux (the host tests on CI) the signals the VM sends its threads cut
-    // SQLite's own sleeps short, so its busy_timeout of 5 s gave up after about 60 ms. The store
-    // waits in Dart instead.
+    // SQLite itself waits only `vaultBusyTimeout` (and under the Dart VM on Linux, the host tests on
+    // CI, the signals the VM sends its threads cut even that short): the store waits in Dart.
     final path = dir.path;
     final app = await open();
     await app.put(RecordType.category, _id1, _cat('Food'));
@@ -121,6 +120,57 @@ void main() {
     await holder;
     await app.close();
   });
+
+  test('a connection left inside a transaction is recovered, then the app reads again', () async {
+    // A headless engine destroyed mid-transaction: sqflite keeps its connection open, and its
+    // write lock, for the life of the process. The app's store asks [recoverLock] once it gave up.
+    final orphan = await openVault(
+      'ana',
+      directory: dir.path,
+      factory: databaseFactoryFfi,
+      singleInstance: false,
+    );
+    var recovered = 0;
+    final app = await SqliteStore.open(
+      'ana',
+      directory: dir.path,
+      factory: databaseFactoryFfi,
+      recoverLock: () async {
+        recovered++;
+        await orphan.close();
+        return true;
+      },
+    );
+    await orphan.execute('BEGIN IMMEDIATE');
+    expect(await app.list(RecordType.category), isEmpty);
+    expect(recovered, 1);
+    await app.close();
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('without a recovery the read still fails as before', () async {
+    final orphan = await openVault(
+      'ana',
+      directory: dir.path,
+      factory: databaseFactoryFfi,
+      singleInstance: false,
+    );
+    var asked = 0;
+    final app = await SqliteStore.open(
+      'ana',
+      directory: dir.path,
+      factory: databaseFactoryFfi,
+      recoverLock: () async {
+        asked++;
+        return false;
+      },
+    );
+    await orphan.execute('BEGIN IMMEDIATE');
+    await expectLater(app.list(RecordType.category), throwsA(isA<DatabaseException>()));
+    expect(asked, 1);
+    await orphan.execute('ROLLBACK');
+    await orphan.close();
+    await app.close();
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   test('notifyExternalChange tells the subscribers', () async {
     final app = await open();
