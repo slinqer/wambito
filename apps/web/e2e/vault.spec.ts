@@ -131,7 +131,7 @@ const nudgeSync = (page: Page) =>
 /** Settings → Security of an open vault. */
 async function openSecurity(page: Page) {
   await page.goto("/app/settings/account");
-  await expect(page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Seguridad", exact: true })).toBeVisible();
 }
 
 /**
@@ -640,7 +640,7 @@ test("a browser closed while two others are removed opens and shows the data", a
       .getByRole("navigation", { name: "Ajustes" })
       .getByRole("link", { name: /^Cuenta y seguridad/ })
       .click();
-    await expect(first.page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
+    await expect(first.page.getByRole("heading", { name: "Seguridad", exact: true })).toBeVisible();
     await first.page
       .getByRole("button", { name: /^Quitar Chrome/ })
       .first()
