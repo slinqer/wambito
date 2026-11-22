@@ -12,7 +12,7 @@ Transaction detected(
   int amount, {
   String? name,
   String categoryId = 'cat-groceries',
-  TransactionCaptureSourceEnum source = TransactionCaptureSourceEnum.revolut,
+  String source = 'revolut',
 }) => tx(id, date, amount, name: name, categoryId: categoryId).rebuild(
   (b) => b
     ..needsReview = true

@@ -41,13 +41,7 @@ Future<_Env> _pump(
         items ??
         [
           detected('d1', '2026-10-21', -1250000, name: 'Cafe Juan'),
-          detected(
-            'd2',
-            '2026-10-21',
-            -3000000,
-            name: 'Taxi',
-            source: TransactionCaptureSourceEnum.googleWallet,
-          ),
+          detected('d2', '2026-10-21', -3000000, name: 'Taxi', source: 'google_wallet'),
           tx('t1', '2026-10-20', -500000, name: 'Pan'),
         ],
   );
@@ -117,15 +111,23 @@ void main() {
   testWidgets('each read of the inbox keeps only the notifications still waiting', (tester) async {
     final started = DateTime.now();
     final env = await _pump(tester);
-    expect(env.capture.callsNamed('keepOnly').last.split(' ').last.split(',').toSet(), {'d1', 'd2'});
-    expect(env.capture.keepBefore.last.isBefore(started), isFalse, reason: 'the time the read started');
+    expect(env.capture.callsNamed('keepOnly').last.split(' ').last.split(',').toSet(), {
+      'd1',
+      'd2',
+    });
+    expect(
+      env.capture.keepBefore.last.isBefore(started),
+      isFalse,
+      reason: 'the time the read started',
+    );
   });
 
   testWidgets('an inbox read in full pages keeps every notification', (tester) async {
     final env = await _pump(
       tester,
       items: [
-        for (var i = 0; i < reviewPageSize; i++) detected('d$i', '2026-10-21', -100000, name: 'Shop $i'),
+        for (var i = 0; i < reviewPageSize; i++)
+          detected('d$i', '2026-10-21', -100000, name: 'Shop $i'),
       ],
     );
     expect(

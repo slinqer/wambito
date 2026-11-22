@@ -1,4 +1,4 @@
-import { addMonths, movementTotals } from "@wambito/core";
+import { addMonths, isCaptureSource, movementTotals } from "@wambito/core";
 import { z } from "zod";
 import { phrases, quote } from "../text.ts";
 import { defineTool, READ_ONLY } from "../tool.ts";
@@ -203,7 +203,7 @@ export const listTransactions = defineTool({
       p.transactions(items.length, page.nextCursor !== null),
       ...items.map(
         (t) =>
-          `${t.date} ${quote(t.name)} ${t.kind === "expense" ? "-" : "+"}${t.formatted} ${quote(t.category)}${t.status === "pending" ? ` (${p.pending})` : ""}${t.needsReview ? ` (${p.toReview})` : ""}${t.captureSource ? ` (${p.fromSource(t.captureSource)})` : ""} [${t.id}]`,
+          `${t.date} ${quote(t.name)} ${t.kind === "expense" ? "-" : "+"}${t.formatted} ${quote(t.category)}${t.status === "pending" ? ` (${p.pending})` : ""}${t.needsReview ? ` (${p.toReview})` : ""}${isCaptureSource(t.captureSource) ? ` (${p.fromSource(t.captureSource)})` : ""} [${t.id}]`,
       ),
     ];
     return {

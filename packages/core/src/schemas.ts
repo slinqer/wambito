@@ -170,7 +170,13 @@ export const transactionDto = z.object({
   importId: z.uuid().nullable(),
   source: z.enum(["app", "web", "widget", "mcp", "import", "recurrence", "capture"]),
   needsReview: z.boolean(),
-  captureSource: z.enum(CAPTURE_SOURCES).nullable(),
+  // Plain text, not `CAPTURE_SOURCES`: the generated clients must decode a source they do not know.
+  captureSource: z
+    .string()
+    .nullable()
+    .describe(
+      `Where a detected transaction came from: ${CAPTURE_SOURCES.join(", ")}, or a newer source`,
+    ),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

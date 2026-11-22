@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { CAPTURE_SOURCES } from "./capture-sources.ts";
 import { SUPPORTED_CURRENCIES } from "./currencies.ts";
 import { isValidTimeZone } from "./dates.ts";
 import { amountSchema, budgetAmountSchema, isoDateSchema, monthSchema } from "./schemas.ts";
@@ -31,7 +30,8 @@ export const transactionRecord = z
     occurrenceMonth: monthSchema.nullable().default(null),
     source: z.enum(["app", "web", "widget", "mcp", "import", "recurrence", "capture"]),
     needsReview: z.boolean().default(false),
-    captureSource: z.enum(CAPTURE_SOURCES).nullable().default(null),
+    /** Any text, not `CAPTURE_SOURCES`: a source a newer client adds must not quarantine the record. */
+    captureSource: text.nullable().default(null),
     capturedAt: timestamp.nullable().default(null),
     captureMerchantKey: text.nullable().default(null),
     /** An import's dedupe hash (the plaintext row's `external_hash`), kept by the migration. */

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wambito/api/gen/wambito_api.dart';
 
 import '../review/fakes.dart';
 import '../settings/harness.dart';
@@ -41,9 +40,7 @@ void main() {
 
   testWidgets('English and Google Wallet', (tester) async {
     final repo = FakeHomeRepository(
-      items: [
-        detected('d1', '2026-10-21', -1000, source: TransactionCaptureSourceEnum.googleWallet),
-      ],
+      items: [detected('d1', '2026-10-21', -1000, source: 'google_wallet')],
     );
     await pumpHome(tester, repo, locale: const Locale('en'));
     expect(find.text('1 to review'), findsOneWidget);

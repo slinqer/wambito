@@ -3883,7 +3883,7 @@
   "reviewOk": "Bien",
   "reviewChange": "Cambiar",
   "reviewConfirmAll": "Confirmar todos",
-  "reviewMark": "{source, select, revolut{por revisar · de Revolut} google_wallet{por revisar · de Google Wallet} other{por revisar}}",
+  "reviewMark": "{source, select, revolut{por revisar · de Revolut} google_wallet{por revisar · de Google Wallet} apple_wallet{por revisar · de Apple Wallet} other{por revisar}}",
   "reviewEmpty": "Nada por revisar",
   "@homeReviewCount": {
     "placeholders": {

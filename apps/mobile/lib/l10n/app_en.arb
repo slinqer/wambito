@@ -2048,7 +2048,7 @@
   "reviewOk": "OK",
   "reviewChange": "Change",
   "reviewConfirmAll": "Confirm all",
-  "reviewMark": "{source, select, revolut{to review · from Revolut} google_wallet{to review · from Google Wallet} other{to review}}",
+  "reviewMark": "{source, select, revolut{to review · from Revolut} google_wallet{to review · from Google Wallet} apple_wallet{to review · from Apple Wallet} other{to review}}",
   "reviewEmpty": "Nothing to review",
   "searchTitle": "Search",
   "searchPlaceholder": "Search by name or note",

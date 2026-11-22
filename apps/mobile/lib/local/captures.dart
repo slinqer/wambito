@@ -1,6 +1,7 @@
 // The phone's side of apps/api/src/services/captures.ts: the id of a merchant-memory record and
 // the validator of `POST /v1/captures` (`createCaptureSchema` of packages/core/src/capture.ts).
 // The save and the learning themselves run inside the backend's store transaction (backend.dart).
+import '../core/records.dart' show captureSources;
 import '../core/schemas.dart';
 import 'ids.dart';
 
@@ -29,5 +30,5 @@ final createCaptureSchema = ObjectSchema({
   ),
   'merchant': fString(trim: true, min: 1, max: 120),
   'capturedAt': fString(refine: _isDatetime, refineMessage: 'Invalid ISO datetime'),
-  'source': fEnum(['revolut', 'google_wallet']),
+  'source': fEnum(captureSources),
 });

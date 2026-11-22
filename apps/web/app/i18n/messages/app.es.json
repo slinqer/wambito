@@ -51,7 +51,7 @@
     "nudge_import_action": "Traer mi historial",
     "sign_out_failed": "No pudimos cerrar tu sesión. Inténtalo de nuevo.",
     "nudge_budgets_action": "Ir a Categorías",
-    "review_mark": "{source, select, revolut{por revisar · de Revolut} google_wallet{por revisar · de Google Wallet} other{por revisar}}",
+    "review_mark": "{source, select, revolut{por revisar · de Revolut} google_wallet{por revisar · de Google Wallet} apple_wallet{por revisar · de Apple Wallet} other{por revisar}}",
     "review_filter": "Por revisar · {count}",
     "review_ok": "Bien",
     "review_ok_label": "Bien: {name}",

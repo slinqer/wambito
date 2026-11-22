@@ -1,5 +1,7 @@
 import {
+  type CaptureSource,
   type IsoDate,
+  isCaptureSource,
   type MonthSummary,
   NEAR_LIMIT_RATIO,
   type TransactionDto,
@@ -189,9 +191,11 @@ export function overallState(budgetTotal: number, spent: number): "ok" | "near" 
 // -- Detected transactions -----------------------------------------------------------------------
 
 /**
- * Where a transaction to review was detected, as the message's `source` choice (`revolut`,
- * `google_wallet`, or `other` when the API sent none); null when it needs no review.
+ * Where a transaction to review was detected, as the message's `source` choice (a known capture
+ * source, or `other` when there is none or it is one this version does not know); null when it
+ * needs no review.
  */
-export function reviewMark(tx: TransactionDto): "revolut" | "google_wallet" | "other" | null {
-  return tx.needsReview ? (tx.captureSource ?? "other") : null;
+export function reviewMark(tx: TransactionDto): CaptureSource | "other" | null {
+  if (!tx.needsReview) return null;
+  return isCaptureSource(tx.captureSource) ? tx.captureSource : "other";
 }

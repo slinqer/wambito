@@ -10,8 +10,9 @@ import 'schemas.dart';
 
 export 'schemas.dart' show Json;
 
-/// The capture sources (`CAPTURE_SOURCES` of capture-sources.ts).
-const captureSources = ['revolut', 'google_wallet'];
+/// The capture sources (`CAPTURE_SOURCES` of capture-sources.ts). Only a new capture is checked
+/// against them; a stored transaction keeps any source text, as in records.ts.
+const captureSources = ['revolut', 'google_wallet', 'apple_wallet'];
 
 final _text = fString();
 final _timestamp = fString();
@@ -36,7 +37,7 @@ final _transaction = ObjectSchema({
   'occurrenceMonth': _nullableDefaultNull(monthField),
   'source': fEnum(['app', 'web', 'widget', 'mcp', 'import', 'recurrence', 'capture']),
   'needsReview': fDefault(fBool(), false),
-  'captureSource': _nullableDefaultNull(fEnum(captureSources)),
+  'captureSource': _nullableDefaultNull(_text),
   'capturedAt': _nullableDefaultNull(_timestamp),
   'captureMerchantKey': _nullableDefaultNull(_text),
   // An import's dedupe hash (the plaintext row's `external_hash`), kept by the migration.

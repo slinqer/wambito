@@ -3,6 +3,7 @@ import {
   createRecurrenceSchema,
   createTransactionSchema,
   SUPPORTED_CURRENCIES,
+  transactionDto,
   updateProfileSchema,
   updateTransactionSchema,
 } from "../src/index.ts";
@@ -82,4 +83,29 @@ test("the supported currencies are COP, USD and EUR", () => {
   expect([...SUPPORTED_CURRENCIES]).toEqual(["COP", "USD", "EUR"]);
   expect(updateProfileSchema.safeParse({ currency: "MXN" }).success).toBe(false);
   expect(updateProfileSchema.safeParse({ currency: "USD" }).success).toBe(true);
+});
+
+describe("transactionDto", () => {
+  const tx = {
+    id: "0190a8a0-0000-7000-8000-000000000001",
+    name: "Juan Valdez",
+    amount: -18000,
+    currency: "COP",
+    date: "2026-11-22",
+    status: "paid",
+    note: null,
+    categoryId: "0190a8a0-0000-7000-8000-000000000002",
+    recurrenceId: null,
+    importId: null,
+    source: "capture",
+    needsReview: true,
+    createdAt: "2026-11-22T15:00:00.000Z",
+    updatedAt: "2026-11-22T15:00:00.000Z",
+  };
+
+  test("passes any captureSource through, so a newer client's source does not break a list", () => {
+    for (const captureSource of ["google_wallet", "apple_wallet", "some_future_bank", null]) {
+      expect(transactionDto.parse({ ...tx, captureSource }).captureSource).toBe(captureSource);
+    }
+  });
 });

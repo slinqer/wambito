@@ -24,7 +24,7 @@ part 'transaction.g.dart';
 /// * [importId]
 /// * [source_]
 /// * [needsReview]
-/// * [captureSource]
+/// * [captureSource] - Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source
 /// * [createdAt]
 /// * [updatedAt]
 @BuiltValue()
@@ -67,9 +67,9 @@ abstract class Transaction implements Built<Transaction, TransactionBuilder> {
   @BuiltValueField(wireName: r'needsReview')
   bool get needsReview;
 
+  /// Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source
   @BuiltValueField(wireName: r'captureSource')
-  TransactionCaptureSourceEnum? get captureSource;
-  // enum captureSourceEnum {  revolut,  google_wallet,  ,  };
+  String? get captureSource;
 
   @BuiltValueField(wireName: r'createdAt')
   String get createdAt;
@@ -144,7 +144,7 @@ class _$TransactionSerializer implements PrimitiveSerializer<Transaction> {
         ? null
         : serializers.serialize(
             object.captureSource,
-            specifiedType: const FullType.nullable(TransactionCaptureSourceEnum),
+            specifiedType: const FullType.nullable(String),
           );
     yield r'createdAt';
     yield serializers.serialize(object.createdAt, specifiedType: const FullType(String));
@@ -249,8 +249,8 @@ class _$TransactionSerializer implements PrimitiveSerializer<Transaction> {
         case r'captureSource':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType.nullable(TransactionCaptureSourceEnum),
-          ) as TransactionCaptureSourceEnum?;
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
           if (valueDes == null) continue;
           result.captureSource = valueDes;
           break;
@@ -329,21 +329,4 @@ class TransactionSource_Enum extends EnumClass {
 
   static BuiltSet<TransactionSource_Enum> get values => _$transactionSourceEnumValues;
   static TransactionSource_Enum valueOf(String name) => _$transactionSourceEnumValueOf(name);
-}
-
-class TransactionCaptureSourceEnum extends EnumClass {
-  @BuiltValueEnumConst(wireName: r'revolut')
-  static const TransactionCaptureSourceEnum revolut = _$transactionCaptureSourceEnum_revolut;
-  @BuiltValueEnumConst(wireName: r'google_wallet')
-  static const TransactionCaptureSourceEnum googleWallet =
-      _$transactionCaptureSourceEnum_googleWallet;
-
-  static Serializer<TransactionCaptureSourceEnum> get serializer =>
-      _$transactionCaptureSourceEnumSerializer;
-
-  const TransactionCaptureSourceEnum._(String name) : super(name);
-
-  static BuiltSet<TransactionCaptureSourceEnum> get values => _$transactionCaptureSourceEnumValues;
-  static TransactionCaptureSourceEnum valueOf(String name) =>
-      _$transactionCaptureSourceEnumValueOf(name);
 }

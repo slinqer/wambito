@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CAPTURE_SOURCES } from "./capture-sources.ts";
 import { transactionDto } from "./schemas.ts";
 
-export { CAPTURE_SOURCES, type CaptureSource } from "./capture-sources.ts";
+export { CAPTURE_SOURCES, type CaptureSource, isCaptureSource } from "./capture-sources.ts";
 
 // One pattern, not a union with the supported-currency enum: every supported code matches it,
 // and the OpenAPI anyOf a union produces breaks the generated Dart client.
