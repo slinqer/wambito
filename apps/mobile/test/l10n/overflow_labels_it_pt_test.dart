@@ -2,6 +2,8 @@
 // the key labels must not overflow (a RenderFlex error) and must not be cut off with an ellipsis
 // where the web would not cut them (spec §3): the bottom bar, the home tabs, the account menu, the
 // add sheet's buttons, the toast with its undo, the settings rows and the capture sheet.
+import 'package:wambito/settings/category_screen.dart' show settingsCategoryTitle;
+import 'package:wambito/settings/settings_categories.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -170,31 +172,34 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('every settings row is drawn whole, top to bottom', (tester) async {
-        await _pump(tester, locale, location: '/settings');
-        final l10n = _l10n(tester);
-        expect(tester.takeException(), isNull);
-        final seen = <String>{};
-        var scrolled = 0.0;
-        for (var i = 0; i < 40; i++) {
-          _expectWhole(tester, const [], where: 'in settings (screen $i)');
-          seen.addAll(
-            tester
-                .widgetList<Text>(find.byType(Text))
-                .map((text) => text.data ?? text.textSpan?.toPlainText() ?? ''),
+      for (final category in SettingsCategory.values) {
+        testWidgets('every ${category.name} row is drawn whole, top to bottom', (tester) async {
+          await _pump(tester, locale, location: category.path);
+          final l10n = _l10n(tester);
+          expect(tester.takeException(), isNull);
+          final seen = <String>{};
+          for (var i = 0; i < 40; i++) {
+            _expectWhole(tester, const [], where: 'in ${category.name} (screen $i)');
+            seen.addAll(
+              tester
+                  .widgetList<Text>(find.byType(Text))
+                  .map((text) => text.data ?? text.textSpan?.toPlainText() ?? ''),
+            );
+            final scrollable = find.byType(Scrollable).first;
+            final before = tester.state<ScrollableState>(scrollable).position.pixels;
+            await tester.drag(scrollable, const Offset(0, -300));
+            await tester.pumpAndSettle();
+            final after = tester.state<ScrollableState>(scrollable).position.pixels;
+            if (after == before) break;
+          }
+          expect(
+            seen,
+            contains(settingsCategoryTitle(l10n, category)),
+            reason: 'the page was read from its top',
           );
-          final scrollable = find.byType(Scrollable).first;
-          final before = tester.state<ScrollableState>(scrollable).position.pixels;
-          await tester.drag(scrollable, const Offset(0, -300));
-          await tester.pumpAndSettle();
-          final after = tester.state<ScrollableState>(scrollable).position.pixels;
-          scrolled = after;
-          if (after == before) break;
-        }
-        expect(scrolled, greaterThan(300), reason: 'the page was scrolled to its foot');
-        expect(seen, contains(l10n.settingsTitle), reason: 'the page was read from its top');
-        expect(tester.takeException(), isNull);
-      });
+          expect(tester.takeException(), isNull);
+        });
+      }
 
       testWidgets('the capture sheet keeps its words whole', (tester) async {
         await _pump(tester, locale);

@@ -100,7 +100,7 @@ void main() {
       tester,
     ) async {
       final handle = tester.ensureSemantics();
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _scrollTo(tester, 'settings.web');
       // The pages the app has not (the landing, the roadmap): named in the card, with the links.
       // The web's app pages (import, recurring, categories) have their places in the app.
@@ -116,7 +116,7 @@ void main() {
     testWidgets('the choices are the web\'s radios: one chosen, the arrows move it', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/preferences');
       // Night is chosen; the right arrow, with the focus on it, picks Día.
       Focus.of(tester.element(find.byKey(const Key('settings.theme.night')))).requestFocus();
       await tester.pump();
@@ -128,7 +128,7 @@ void main() {
 
     testWidgets('the sound switch says the vibration is its own setting', (tester) async {
       final handle = tester.ensureSemantics();
-      await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings');
+      await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings/preferences');
       expect(
         tester.getSemantics(find.byKey(const Key('settings.sound'))).hint,
         contains('Vibration stays on.'),
@@ -162,11 +162,13 @@ void main() {
     testWidgets('the server is changed in a sheet, and the voice models\' question is one too', (
       tester,
     ) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.server');
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.text('Cambiar de servidor'), findsOneWidget);
       await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      env.router.go('/settings/capture');
       await tester.pumpAndSettle();
       await _tap(tester, 'settings.deleteVoice');
       expect(find.byType(AlertDialog), findsNothing);
@@ -176,7 +178,7 @@ void main() {
     testWidgets('a toast is the web\'s: it says what happened, above the bottom bar', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       env.opener.works = false;
       await _tap(tester, 'settings.web');
       expect(find.byType(SnackBar), findsNothing);
@@ -218,7 +220,7 @@ void main() {
     testWidgets('at text scale 1.3 the sheets have no overflow either', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = 1.3;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await pumpSettingsApp(tester, guest: true, location: '/settings');
+      final env = await pumpSettingsApp(tester, guest: true, location: '/settings');
       tester.view
         ..physicalSize = const Size(360, 640)
         ..devicePixelRatio = 1;
@@ -227,6 +229,8 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('guest.saveInstead')), findsOneWidget);
       await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      env.router.go('/settings/more');
       await tester.pumpAndSettle();
       await _tap(tester, 'settings.server');
       expect(tester.takeException(), isNull);
@@ -247,7 +251,7 @@ void main() {
         await tester.tap(find.byKey(const Key('home.settings')));
         await tester.pumpAndSettle();
         expect(find.text('Ajustes'), findsWidgets);
-        expect(find.byKey(const Key('settings.sound')), findsOneWidget);
+        expect(find.byKey(const Key('settings.menu.preferences')), findsOneWidget);
       },
     );
 
@@ -316,8 +320,8 @@ void main() {
     });
 
     testWidgets('in English', (tester) async {
-      await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings');
-      expect(find.text('Settings'), findsWidgets);
+      await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings/preferences');
+      expect(find.text('SETTINGS'), findsWidgets);
       expect(find.text('Sounds'), findsOneWidget);
       expect(
         find.descendant(
@@ -333,7 +337,7 @@ void main() {
     testWidgets('sounds and vibration start on, and each switch is its own setting', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/preferences');
       expect(
         tester
             .widget<LkSwitch>(
@@ -359,7 +363,7 @@ void main() {
 
     testWidgets('the due notice hint gives the exact hour on Android', (tester) async {
       final handle = tester.ensureSemantics();
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/capture');
       await _scrollTo(tester, 'settings.dueNotice');
       expect(
         tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
@@ -372,7 +376,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       try {
         final handle = tester.ensureSemantics();
-        await pumpSettingsApp(tester, location: '/settings');
+        await pumpSettingsApp(tester, location: '/settings/capture');
         await _scrollTo(tester, 'settings.dueNotice');
         expect(
           tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
@@ -386,7 +390,7 @@ void main() {
     });
 
     testWidgets('the widget\'s amount switch is Android\'s, and iOS has none', (tester) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/capture');
       await _scrollTo(tester, 'settings.guestNotice');
       expect(find.byKey(const Key('settings.hideAmount')), findsOneWidget);
     });
@@ -394,7 +398,7 @@ void main() {
     testWidgets('on iOS there is no widget setting', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       try {
-        await pumpSettingsApp(tester, location: '/settings');
+        await pumpSettingsApp(tester, location: '/settings/capture');
         await _scrollTo(tester, 'settings.guestNotice');
         expect(find.byKey(const Key('settings.hideAmount')), findsNothing);
         expect(find.text('Ocultar el monto en el widget'), findsNothing);
@@ -409,7 +413,7 @@ void main() {
       await pumpSettingsApp(
         tester,
         guest: true,
-        location: '/settings',
+        location: '/settings/capture',
         overrides: [..._previewGuest(), isPreviewProvider.overrideWithValue(true)],
       );
       await _scrollTo(tester, 'settings.dueNotice');
@@ -420,7 +424,7 @@ void main() {
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/capture');
       expect(env.container.read(dueNoticeEnabledProvider), isTrue);
       expect(env.container.read(guestNoticeEnabledProvider), isTrue);
       expect(env.container.read(hideWidgetAmountProvider), isFalse);
@@ -442,7 +446,7 @@ void main() {
     testWidgets('night is the default; Day and System can be picked, and the choice is kept', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/preferences');
       MaterialApp app() => tester.widget<MaterialApp>(find.byType(MaterialApp));
       expect(app().themeMode, ThemeMode.dark);
       expect(app().locale, isNull);
@@ -466,18 +470,18 @@ void main() {
     testWidgets('picking English changes every word at once; Automático goes back to the phone', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
-      expect(find.text('Ajustes'), findsWidgets);
+      final env = await pumpSettingsApp(tester, location: '/settings/preferences');
+      expect(find.text('AJUSTES'), findsWidgets);
 
       await tester.tap(find.byKey(const Key('settings.language.en')));
       await tester.pumpAndSettle();
-      expect(find.text('Settings'), findsWidgets);
-      expect(find.text('Ajustes'), findsNothing);
+      expect(find.text('SETTINGS'), findsWidgets);
+      expect(find.text('AJUSTES'), findsNothing);
       expect(env.settings.values['setting.locale'], 'en');
 
       await tester.tap(find.byKey(const Key('settings.language.auto')));
       await tester.pumpAndSettle();
-      expect(find.text('Ajustes'), findsWidgets);
+      expect(find.text('AJUSTES'), findsWidgets);
       expect(env.settings.values.containsKey('setting.locale'), isFalse);
     });
   });
@@ -486,7 +490,7 @@ void main() {
     testWidgets('the picker lists Español, English, Italiano and Português by their own names', (
       tester,
     ) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/preferences');
       for (final (key, name) in [
         ('es', 'Español'),
         ('en', 'English'),
@@ -499,24 +503,26 @@ void main() {
     });
 
     for (final (code, settings, web) in [
-      ('it', 'Impostazioni', '/it'),
-      ('pt', 'Definições', '/pt'),
+      ('it', 'IMPOSTAZIONI', '/it'),
+      ('pt', 'DEFINIÇÕES', '/pt'),
     ]) {
       testWidgets('picking $code changes every word at once and is kept', (tester) async {
-        final env = await pumpSettingsApp(tester, location: '/settings');
+        final env = await pumpSettingsApp(tester, location: '/settings/preferences');
         await _scrollTo(tester, 'settings.language.$code');
         await tester.tap(find.byKey(Key('settings.language.$code')));
         await tester.pumpAndSettle();
         expect(find.text(settings), findsWidgets);
-        expect(find.text('Ajustes'), findsNothing);
+        expect(find.text('AJUSTES'), findsNothing);
         expect(env.settings.values['setting.locale'], code);
         expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).locale, Locale(code));
       });
 
       testWidgets('in $code the web links are the $web landing and roadmap', (tester) async {
-        final env = await pumpSettingsApp(tester, location: '/settings');
+        final env = await pumpSettingsApp(tester, location: '/settings/preferences');
         await _scrollTo(tester, 'settings.language.$code');
         await tester.tap(find.byKey(Key('settings.language.$code')));
+        await tester.pumpAndSettle();
+        env.router.go('/settings/more');
         await tester.pumpAndSettle();
         await _tap(tester, 'settings.web');
         await _tap(tester, 'settings.roadmap');
@@ -675,7 +681,7 @@ void main() {
     testWidgets('it shows the current server, and an invalid address is refused in the dialog', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _scrollTo(tester, 'settings.server');
       expect(find.text('https://app.wambito.com'), findsOneWidget);
 
@@ -690,7 +696,7 @@ void main() {
     });
 
     testWidgets('changing it signs out and points every call there', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.server');
       await tester.enterText(
         find.byKey(const Key('settings.server.field')),
@@ -710,7 +716,7 @@ void main() {
     ) async {
       final env = await pumpSettingsApp(
         tester,
-        location: '/settings',
+        location: '/settings/more',
         overrides: [vaultSessionProvider.overrideWithValue(_Unsynced(2))],
       );
       Future<void> change() async {
@@ -739,7 +745,7 @@ void main() {
     });
 
     testWidgets('the dev stack\'s http address is accepted', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.server');
       await tester.enterText(
         find.byKey(const Key('settings.server.field')),
@@ -753,7 +759,7 @@ void main() {
     testWidgets('a guest is warned before the server changes; cancelling keeps everything', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, guest: true, location: '/settings');
+      final env = await pumpSettingsApp(tester, guest: true, location: '/settings/more');
       await _tap(tester, 'settings.server');
       await tester.enterText(
         find.byKey(const Key('settings.server.field')),
@@ -774,7 +780,7 @@ void main() {
     testWidgets('a guest who goes ahead anyway moves to the new server, signed out', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, guest: true, location: '/settings');
+      final env = await pumpSettingsApp(tester, guest: true, location: '/settings/more');
       await _tap(tester, 'settings.server');
       await tester.enterText(
         find.byKey(const Key('settings.server.field')),
@@ -793,7 +799,7 @@ void main() {
       final env = await pumpSettingsApp(
         tester,
         guest: true,
-        location: '/settings',
+        location: '/settings/more',
         locale: const Locale('en'),
         overrides: _previewGuest(),
       );
@@ -816,7 +822,7 @@ void main() {
       final env = await pumpSettingsApp(
         tester,
         guest: true,
-        location: '/settings',
+        location: '/settings/more',
         overrides: _previewGuest(passkey: true),
       );
       await _changeServerTo(tester, 'https://my.server.org');
@@ -825,7 +831,7 @@ void main() {
     });
 
     testWidgets('"Usar el de Wambito" puts the default address back in the field', (tester) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.server');
       await tester.enterText(find.byKey(const Key('settings.server.field')), 'https://x.org');
       await tester.tap(find.byKey(const Key('settings.server.default')));
@@ -837,13 +843,13 @@ void main() {
 
   group('Más en la web', () {
     testWidgets('opens the web app at the current server in the browser', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.web');
       expect(env.opener.opened, [defaultServerUrl]);
     });
 
     testWidgets('it says so when there is no browser', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       env.opener.works = false;
       await _tap(tester, 'settings.web');
       expect(find.text('No pudimos abrir el navegador.'), findsOneWidget);
@@ -861,14 +867,14 @@ void main() {
         .value;
 
     testWidgets('a phone that does not qualify has no switch', (tester) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/capture');
       expect(find.byKey(const Key('settings.voicePrecise')), findsNothing);
     });
 
     testWidgets('on iOS the voice model row covers it: no precise switch', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      await pumpSettingsApp(tester, location: '/settings', preciseEligible: true);
+      await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
       await _scrollTo(tester, 'settings.guestNotice');
       expect(find.byKey(const Key('settings.voicePrecise')), findsNothing);
       debugDefaultTargetPlatformOverride = null;
@@ -877,7 +883,7 @@ void main() {
     testWidgets('the switch names the size, and turning it on downloads canary only', (
       tester,
     ) async {
-      final env = await pumpSettingsApp(tester, location: '/settings', preciseEligible: true);
+      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
       await _scrollTo(tester, 'settings.voicePrecise');
       expect(find.bySemanticsLabel('Mejorar la precisión (+150 MB)'), findsOneWidget);
       expect(switchOn(tester), isFalse);
@@ -890,7 +896,7 @@ void main() {
     });
 
     testWidgets('leaving Settings during the download throws nothing', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings', preciseEligible: true);
+      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
       env.precise.gate = Completer<void>();
       await _scrollTo(tester, 'settings.voicePrecise');
       await tester.tap(find.byKey(const Key('settings.voicePrecise')));
@@ -905,7 +911,7 @@ void main() {
     testWidgets('on when installed; turning it off deletes only canary', (tester) async {
       final env = await pumpSettingsApp(
         tester,
-        location: '/settings',
+        location: '/settings/capture',
         preciseEligible: true,
         preciseInstalled: true,
       );
@@ -922,7 +928,7 @@ void main() {
     });
 
     testWidgets('a download that fails says so and leaves the switch off', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings', preciseEligible: true);
+      final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
       env.precise.failure = const ModelDownloadFailure();
       await _scrollTo(tester, 'settings.voicePrecise');
       await tester.tap(find.byKey(const Key('settings.voicePrecise')));
@@ -937,7 +943,7 @@ void main() {
 
   group('the voice models', () {
     testWidgets('a button deletes them, after asking', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/capture');
       await _tap(tester, 'settings.deleteVoice');
       expect(find.text('¿Borrar los modelos de voz?'), findsOneWidget);
       expect(env.models.deletes, 0);
@@ -960,13 +966,13 @@ void main() {
     });
 
     testWidgets('with no model downloaded, there is nothing to delete', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings', modelsInstalled: false);
+      final env = await pumpSettingsApp(tester, location: '/settings/capture', modelsInstalled: false);
       expect(env.models.installed, isFalse);
       expect(find.byKey(const Key('settings.deleteVoice')), findsNothing);
     });
 
     testWidgets('a failed delete says so', (tester) async {
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/capture');
       env.models.deleteFailure = StateError('disk');
       await _tap(tester, 'settings.deleteVoice');
       await tester.tap(find.byKey(const Key('settings.deleteVoice.confirm')));
@@ -982,7 +988,7 @@ void main() {
     testWidgets('the PRF probe row is there with the debug flag on', (tester) async {
       await pumpSettingsApp(
         tester,
-        location: '/settings',
+        location: '/settings/more',
         overrides: [debugToolsProvider.overrideWithValue(true)],
       );
       await tester.scrollUntilVisible(find.byKey(const Key('settings.prfProbe')), 200);
@@ -990,14 +996,14 @@ void main() {
     });
 
     testWidgets('and not with it off', (tester) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/more');
       expect(find.byKey(const Key('settings.prfProbe'), skipOffstage: false), findsNothing);
     });
   });
 
   group('About', () {
     testWidgets('About lists every dependency\'s licence and the model\'s', (tester) async {
-      await pumpSettingsApp(tester, location: '/settings');
+      await pumpSettingsApp(tester, location: '/settings/more');
       await _tap(tester, 'settings.about');
       expect(find.text('Acerca de Wambito'), findsOneWidget);
       expect(find.textContaining('AGPL-3.0'), findsOneWidget);

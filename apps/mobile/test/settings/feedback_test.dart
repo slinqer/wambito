@@ -21,7 +21,7 @@ Future<SettingsEnv> _pump(
     guest: guest,
     overrides: [appVersionProvider.overrideWith((ref) async => '1.2.3')],
   );
-  env.router.go('/settings');
+  env.router.go('/settings/more');
   await t.pumpAndSettle();
   return env;
 }
@@ -53,7 +53,7 @@ void main() {
   });
 
   group('the card', () {
-    testWidgets('is the web\'s, between "Tus datos" and deleting the account', (t) async {
+    testWidgets('is the web\'s, the first card of Más', (t) async {
       final handle = t.ensureSemantics();
       await _pump(t);
       await _scrollTo(t, 'settings.feedback');
@@ -67,10 +67,6 @@ void main() {
         _said('Si no se abre tu correo, escribe a hola@wambito.com.'),
         findsOneWidget,
       );
-      final data = t.getTopLeft(find.byKey(const Key('settings.card.data'))).dy;
-      final feedback = t.getTopLeft(find.byKey(const Key('settings.card.feedback'))).dy;
-      final delete = t.getTopLeft(find.byKey(const Key('settings.card.delete'))).dy;
-      expect(data < feedback && feedback < delete, isTrue);
       handle.dispose();
     });
 
@@ -132,7 +128,7 @@ void main() {
         t,
         overrides: [appVersionProvider.overrideWith((ref) async => throw StateError('no channel'))],
       );
-      env.router.go('/settings');
+      env.router.go('/settings/more');
       await t.pumpAndSettle();
       await _scrollTo(t, 'settings.feedback');
       await t.tap(find.byKey(const Key('settings.feedback')));

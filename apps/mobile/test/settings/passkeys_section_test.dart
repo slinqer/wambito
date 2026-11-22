@@ -40,7 +40,7 @@ Future<SettingsEnv> _pump(
     homeRepo: FakeHomeRepository(timezone: 'America/Bogota'),
     overrides: [clockProvider.overrideWithValue(() => _now), ...overrides],
   );
-  env.container.read(routerProvider).go('/settings');
+  env.container.read(routerProvider).go('/settings/account');
   await t.pumpAndSettle();
   return env;
 }

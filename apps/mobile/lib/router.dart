@@ -23,6 +23,8 @@ import 'search/search_screen.dart';
 import 'settings/about_screen.dart';
 import 'settings/home_actions.dart';
 import 'settings/security/approve_signin_screen.dart';
+import 'settings/category_cards.dart';
+import 'settings/settings_categories.dart';
 import 'settings/settings_screen.dart';
 import 'vault/encryption_mode.dart';
 import 'vault/vault_gate.dart';
@@ -261,6 +263,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
         routes: [
+          // One page per category of the menu: /settings/agents, /account, /preferences, /capture,
+          // /data and /more.
+          for (final category in SettingsCategory.values)
+            GoRoute(
+              path: category.name,
+              builder: (context, state) => SettingsCategoryScreen(category: category),
+            ),
           GoRoute(path: 'about', builder: (context, state) => const AboutScreen()),
           // Approving a web sign-in (phone-first spec 8.1): a `wambito://signin?…` link the system
           // camera opened comes with its QR; Settings → Security opens it from its own row.

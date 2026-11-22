@@ -23,7 +23,7 @@ void main() {
     final fake = FakeAutoCapturePlatform(sources: {'revolut'});
     await pumpSettingsApp(
       t,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [...previewOpen(), autoCapturePlatformProvider.overrideWithValue(fake)],
     );
     await t.scrollUntilVisible(
@@ -44,7 +44,7 @@ void main() {
     final native = _Native();
     await pumpSettingsApp(
       t,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [
         ...previewOpen(),
         autoCapturePlatformProvider.overrideWithValue(fake),
@@ -62,7 +62,7 @@ void main() {
     final fake = FakeAutoCapturePlatform();
     await pumpSettingsApp(
       t,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [autoCapturePlatformProvider.overrideWithValue(fake)],
     );
     await t.scrollUntilVisible(

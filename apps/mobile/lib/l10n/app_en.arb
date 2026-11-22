@@ -937,6 +937,41 @@
       }
     }
   },
+  "settingsMenuAgents": "My agents",
+  "settingsMenuAgentsLine": "ChatGPT · Claude · Lumo+ · Grok",
+  "settingsMenuAccount": "Account and security",
+  "settingsMenuAccountLine": "Passkeys, devices, key",
+  "settingsMenuPreferencesLine": "{language} · {theme} · {currency}",
+  "@settingsMenuPreferencesLine": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      },
+      "theme": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMenuPreferences": "Preferences",
+  "settingsMenuCapture": "Capture",
+  "settingsMenuCaptureLine": "Automatic, voice, notices",
+  "settingsMenuData": "Your data",
+  "settingsMenuDataLine": "Import, export",
+  "settingsMenuMore": "More",
+  "settingsMenuMoreLine": "Feedback, server, about",
+  "settingsMenuBack": "Back to Settings",
+  "settingsMenuBackShort": "Settings",
+  "settingsVersion": "Wambito {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsPhone": "On this phone",
   "settingsSoundHintVibrationOff": "They play when you add and celebrate. Vibration stays off.",
   "settingsWebOpen": "See Wambito's page",

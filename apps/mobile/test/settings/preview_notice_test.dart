@@ -31,7 +31,7 @@ void main() {
       final accounts = FakeAccountRepository();
       await pumpSettingsApp(
         t,
-        location: '/settings',
+        location: '/settings/data',
         overrides: [
           ...previewOpen(),
           accountRepositoryProvider.overrideWithValue(accounts),
@@ -47,7 +47,7 @@ void main() {
     });
 
     testWidgets('a plain account keeps both buttons', (t) async {
-      await pumpAccount(t);
+      await pumpAccount(t, location: '/settings/data');
       await _show(t, 'settings.export.json');
       expect(find.byKey(const Key('settings.export.comingSoon')), findsNothing);
     });
@@ -56,7 +56,7 @@ void main() {
   group('import', () {
     testWidgets('Settings shows the notice in place of the link to the import', (t) async {
       final handle = t.ensureSemantics();
-      await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
+      await pumpSettingsApp(t, location: '/settings/data', overrides: previewOpen());
       await _show(t, 'settings.import.comingSoon');
       expect(said('Próximamente con cifrado'), findsWidgets);
       expect(find.byKey(const Key('settings.import')), findsNothing);
@@ -82,7 +82,7 @@ void main() {
   group('due notice', () {
     testWidgets('Settings shows the "Hoy vence…" switch, computed on the phone', (t) async {
       final handle = t.ensureSemantics();
-      await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
+      await pumpSettingsApp(t, location: '/settings/capture', overrides: previewOpen());
       await _show(t, 'settings.dueNotice');
       expect(find.byKey(const Key('settings.dueNotice.comingSoon')), findsNothing);
       handle.dispose();
@@ -94,7 +94,7 @@ void main() {
       final assistants = FakeAssistantsRepository();
       await pumpSettingsApp(
         t,
-        location: '/settings',
+        location: '/settings/agents',
         overrides: <Override>[
           ...previewOpen(),
           assistantsRepositoryProvider.overrideWithValue(assistants),

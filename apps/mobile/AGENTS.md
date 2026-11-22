@@ -14,6 +14,7 @@ iOS has no automatic capture or widgets (see "iOS" below); its voice is the prec
 - Interface icons: `LkIcon` (`lib/ui/lk_icons.dart`) draws `lib/ui/lk_icon_shapes.dart`, a copy of
   `docs/design/system/project/icons/icons.json` that `test/ui/lk_icon_test.dart` keeps equal to it;
   tests find them with `findIcon` (`test/support/icons.dart`). Brand logos: `LkBrandLogo` (`lib/ui/lk_brand_logo.dart`), a copy of `icons/brands.json` kept equal by `test/ui/lk_brand_logo_test.dart`. Emoji only for categories.
+- `lib/settings/`: `/settings` is a menu (`SettingsScreen` in `settings_screen.dart`: the urgent block, `SettingsMenu` from `settings_menu.dart`, "Cerrar sesión", the version) and each of the six `SettingsCategory`s (`settings_categories.dart`) is a route `/settings/agents|account|preferences|capture|data|more` drawn by `SettingsCategoryScreen` (`category_cards.dart`, its cards) inside `SettingsCategoryPage` (`category_screen.dart`, the frame with back to the menu). `webSectionsOnly` hides Captura and the phone-only cards. The offline first run keeps no menu, only `PreferencesCard`. `leave_guard.dart` `mayLeaveSettings` is the guest warning before sign out and a server change. Tests reach a card through its category path (`pumpSettingsApp(location: '/settings/more')`).
 - `lib/capture_auto/`: Settings → "Captura automática" (switch per source, notification-access
   state, restricted-settings steps). "¿Cómo funciona?" (`how_capture_works.dart`, demos in
   `capture_demos.dart`, twin of `apps/web/app/features/capture/`): five steps in an `LkSheet`

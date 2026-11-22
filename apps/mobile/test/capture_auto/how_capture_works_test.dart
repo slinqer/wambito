@@ -20,7 +20,7 @@ Future<(SettingsEnv, FakeAutoCapturePlatform)> _pump(
   final env = await pumpSettingsApp(
     t,
     locale: locale,
-    location: '/settings',
+    location: '/settings/capture',
     overrides: [autoCapturePlatformProvider.overrideWithValue(fake)],
   );
   return (env, fake);

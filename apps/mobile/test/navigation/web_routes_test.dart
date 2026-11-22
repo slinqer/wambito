@@ -263,7 +263,7 @@ void main() {
   group('Settings\' links', () {
     testWidgets('"Tus datos" leads to the import, as the web\'s Settings does', (tester) async {
       final handle = tester.ensureSemantics();
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/data');
       await _scrollTo(tester, find.byKey(const Key('settings.import')));
       expect(find.bySemanticsLabel('Tus datos'), findsWidgets);
       expect(find.bySemanticsLabel('Importa lo que llevas en Budge.'), findsOneWidget);
@@ -276,7 +276,7 @@ void main() {
 
     testWidgets('"Más en la web" is for the landing and the roadmap only', (tester) async {
       final handle = tester.ensureSemantics();
-      final env = await pumpSettingsApp(tester, location: '/settings');
+      final env = await pumpSettingsApp(tester, location: '/settings/more');
       await _scrollTo(tester, find.byKey(const Key('settings.web')));
       expect(find.bySemanticsLabel('Más en la web'), findsWidgets);
       expect(find.bySemanticsLabel('La página de Wambito y lo que viene.'), findsOneWidget);
@@ -293,7 +293,7 @@ void main() {
     });
 
     testWidgets('in English they are the English pages', (tester) async {
-      final env = await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings');
+      final env = await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings/more');
       await _scrollTo(tester, find.byKey(const Key('settings.web')));
       await tester.tap(find.byKey(const Key('settings.web')));
       await tester.pumpAndSettle();

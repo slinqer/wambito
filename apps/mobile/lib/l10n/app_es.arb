@@ -1367,6 +1367,41 @@
       }
     }
   },
+  "settingsMenuAgents": "Mis agentes",
+  "settingsMenuAgentsLine": "ChatGPT · Claude · Lumo+ · Grok",
+  "settingsMenuAccount": "Cuenta y seguridad",
+  "settingsMenuAccountLine": "Passkeys, dispositivos, clave",
+  "settingsMenuPreferencesLine": "{language} · {theme} · {currency}",
+  "@settingsMenuPreferencesLine": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      },
+      "theme": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMenuPreferences": "Preferencias",
+  "settingsMenuCapture": "Captura",
+  "settingsMenuCaptureLine": "Automática, voz, avisos",
+  "settingsMenuData": "Tus datos",
+  "settingsMenuDataLine": "Importar, exportar",
+  "settingsMenuMore": "Más",
+  "settingsMenuMoreLine": "Comentarios, servidor, acerca de",
+  "settingsMenuBack": "Volver a Ajustes",
+  "settingsMenuBackShort": "Ajustes",
+  "settingsVersion": "Wambito {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsPhone": "En este teléfono",
   "settingsSoundHintVibrationOff": "Suenan al anotar y al celebrar. La vibración sigue igual.",
   "settingsWebOpen": "Ver la página de Wambito",

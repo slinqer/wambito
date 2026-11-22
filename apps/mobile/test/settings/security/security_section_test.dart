@@ -108,7 +108,7 @@ void main() {
       t,
       guest: true,
       locale: const Locale('en'),
-      location: '/settings',
+      location: '/settings/account',
       overrides: [
         isPreviewProvider.overrideWithValue(true),
         securityApiProvider.overrideWithValue(security),

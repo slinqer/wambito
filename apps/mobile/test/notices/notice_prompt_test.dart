@@ -126,7 +126,7 @@ void main() {
     final platform = FakeNoticePlatform();
     final env = await pumpSettingsApp(
       tester,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [
         noticePlatformProvider.overrideWithValue(platform),
         noticeBackendProvider.overrideWithValue(FakeNoticeBackend(hasRecurring: true)),

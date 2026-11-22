@@ -295,6 +295,41 @@
   "settingsWebHint": "A página de Wambito e o que aí vem.",
   "settingsWebFailed": "Não conseguimos abrir o navegador.",
   "settingsSignedInAs": "Entraste como {email}",
+  "settingsMenuAgents": "Os meus agentes",
+  "settingsMenuAgentsLine": "ChatGPT · Claude · Lumo+ · Grok",
+  "settingsMenuAccount": "Conta e segurança",
+  "settingsMenuAccountLine": "Passkeys, dispositivos, chave",
+  "settingsMenuPreferencesLine": "{language} · {theme} · {currency}",
+  "@settingsMenuPreferencesLine": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      },
+      "theme": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMenuPreferences": "Preferências",
+  "settingsMenuCapture": "Captura",
+  "settingsMenuCaptureLine": "Automática, voz, avisos",
+  "settingsMenuData": "Os teus dados",
+  "settingsMenuDataLine": "Importar, exportar",
+  "settingsMenuMore": "Mais",
+  "settingsMenuMoreLine": "Comentários, servidor, acerca de",
+  "settingsMenuBack": "Voltar a Definições",
+  "settingsMenuBackShort": "Definições",
+  "settingsVersion": "Wambito {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsPhone": "Neste telemóvel",
   "settingsSoundHintVibrationOff": "Tocam quando registas e quando celebras. A vibração mantém-se igual.",
   "settingsWebOpen": "Ver a página de Wambito",

@@ -22,7 +22,7 @@ Future<_FakeServer> _pump(WidgetTester tester, {bool pulses = false, _FakeServer
   final fake = server ?? _FakeServer();
   await pumpSettingsApp(
     tester,
-    location: '/settings',
+    location: '/settings/more',
     overrides: [
       serverHealthCheckProvider.overrideWithValue(fake.check),
       serverDotPulsesProvider.overrideWithValue(pulses),

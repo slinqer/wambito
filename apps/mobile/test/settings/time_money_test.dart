@@ -82,7 +82,7 @@ Future<_Env> _pump(
   await t.pumpAndSettle();
   // Settings opens over home, which stays mounted under it.
   settings.container.listen(homeProvider, (_, _) {});
-  settings.container.read(routerProvider).push('/settings');
+  settings.container.read(routerProvider).push('/settings/preferences');
   await t.pumpAndSettle();
   return _Env(settings, home, server, platform, recurring, snapshots);
 }
@@ -456,7 +456,7 @@ void main() {
       // Open Settings again so it asks again.
       env.settings.container.read(routerProvider).go('/');
       await t.pumpAndSettle();
-      env.settings.container.read(routerProvider).go('/settings');
+      env.settings.container.read(routerProvider).go('/settings/preferences');
       await t.pumpAndSettle();
       await _scrollTo(t, 'settings.currency.USD');
       expect(find.byKey(const Key('settings.currency.USD')), findsOneWidget);

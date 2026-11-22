@@ -58,7 +58,7 @@ Future<SettingsEnv> _pump(
       ...overrides,
     ],
   );
-  env.container.read(routerProvider).go('/settings');
+  env.container.read(routerProvider).go('/settings/agents');
   await t.pumpAndSettle();
   return env;
 }
