@@ -1391,6 +1391,10 @@
   "settingsMenuDataLine": "Importar, exportar",
   "settingsMenuMore": "Más",
   "settingsMenuMoreLine": "Comentarios, servidor, acerca de",
+  "settingsMenuMoreWebLine": "Comentarios",
+  "@settingsMenuMoreWebLine": {
+    "description": "Settings menu: the Más row's line where only the web's rows show (the parity pictures, webSectionsOnly): the web's own line."
+  },
   "settingsMenuBack": "Volver a Ajustes",
   "settingsMenuBackShort": "Ajustes",
   "settingsVersion": "Wambito {version}",

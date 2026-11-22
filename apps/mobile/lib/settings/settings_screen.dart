@@ -190,28 +190,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-        SettingsMenu(webSectionsOnly: webOnly),
-        if (!webOnly)
+        if (webOnly)
+          SettingsMenu(webSectionsOnly: webOnly)
+        else
+          // Sign out sits 12px under the rows (not the page's 16): the menu, sign out and the
+          // version still show above the bottom bar at 360 x 740.
           Column(
-            spacing: WambitoTokens.space2,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: WambitoTokens.space3,
             children: [
-              Align(
-                child: PressButton(
-                  key: const Key('settings.signOut'),
-                  tone: PressTone.secondary,
-                  onPressed: _busy ? null : _signOut,
-                  child: Text(
-                    LkText.upperCase(l10n.settingsSignOut),
-                    style: TextStyle(color: colors.over),
+              SettingsMenu(webSectionsOnly: webOnly),
+              Column(
+                spacing: WambitoTokens.space2,
+                children: [
+                  Align(
+                    child: PressButton(
+                      key: const Key('settings.signOut'),
+                      tone: PressTone.secondary,
+                      onPressed: _busy ? null : _signOut,
+                      child: Text(
+                        LkText.upperCase(l10n.settingsSignOut),
+                        style: TextStyle(color: colors.over),
+                      ),
+                    ),
                   ),
-                ),
+                  if (version != null)
+                    Text(
+                      l10n.settingsVersion(version),
+                      textAlign: TextAlign.center,
+                      style: LkText.fieldLabel.copyWith(color: colors.inkMuted),
+                    ),
+                ],
               ),
-              if (version != null)
-                Text(
-                  l10n.settingsVersion(version),
-                  textAlign: TextAlign.center,
-                  style: LkText.fieldLabel.copyWith(color: colors.inkMuted),
-                ),
             ],
           ),
       ],

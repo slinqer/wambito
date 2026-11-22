@@ -322,6 +322,7 @@
   "settingsMenuDataLine": "Importa, esporta",
   "settingsMenuMore": "Altro",
   "settingsMenuMoreLine": "Commenti, server, informazioni",
+  "settingsMenuMoreWebLine": "Commenti",
   "settingsMenuBack": "Torna a Impostazioni",
   "settingsMenuBackShort": "Impostazioni",
   "settingsVersion": "Wambito {version}",

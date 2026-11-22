@@ -964,6 +964,7 @@
   "settingsMenuDataLine": "Import, export",
   "settingsMenuMore": "More",
   "settingsMenuMoreLine": "Feedback, server, about",
+  "settingsMenuMoreWebLine": "Feedback",
   "settingsMenuBack": "Back to Settings",
   "settingsMenuBackShort": "Settings",
   "settingsVersion": "Wambito {version}",

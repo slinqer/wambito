@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
+import '../ui/css_text.dart';
 import '../ui/lk_brand_logo.dart';
 import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
@@ -42,6 +43,16 @@ class SettingsMenuRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final lk = context.lk;
     final colors = lk.colors;
+    final titleStyle = LkText.cardTitle.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: colors.ink,
+    );
+    final lineStyle = LkText.fieldLabel.copyWith(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: colors.inkMuted,
+    );
     return Pressable(
       onPressed: onTap,
       label: title,
@@ -62,9 +73,10 @@ class SettingsMenuRow extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 44),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12 + 2, vertical: 10 + 2),
                 child: Row(
-                  spacing: 12,
+                  // `.lk-rowcard`'s gap.
+                  spacing: 10,
                   children: [
                     ExcludeSemantics(
                       child: DecoratedBox(
@@ -81,24 +93,23 @@ class SettingsMenuRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         spacing: 2,
                         children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: LkText.cardTitle.copyWith(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: colors.ink,
+                          // As tall as CSS makes them (22.5 and 18.75px), not rounded up.
+                          CssLines(
+                            style: titleStyle,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
                             ),
                           ),
-                          Text(
-                            line,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: LkText.fieldLabel.copyWith(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: colors.inkMuted,
+                          CssLines(
+                            style: lineStyle,
+                            child: Text(
+                              line,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: lineStyle,
                             ),
                           ),
                         ],
@@ -192,7 +203,9 @@ class SettingsMenu extends ConsumerWidget {
       SettingsCategory.preferences => _preferencesLine(context, ref, l10n),
       SettingsCategory.capture => l10n.settingsMenuCaptureLine,
       SettingsCategory.data => l10n.settingsMenuDataLine,
-      SettingsCategory.more => l10n.settingsMenuMoreLine,
+      // Only the web's rows (the parity pictures): the web's line, feedback alone.
+      SettingsCategory.more =>
+        webSectionsOnly ? l10n.settingsMenuMoreWebLine : l10n.settingsMenuMoreLine,
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

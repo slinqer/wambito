@@ -630,12 +630,14 @@ class SettingsGroupHead extends StatelessWidget {
                   ),
                 ),
                 if (line != null)
-                  Text(
-                    line,
-                    style: LkText.fieldLabel.copyWith(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.inkMuted,
+                  // One line (`.lk-row-line`: nowrap, ellipsis), 18.75px tall as CSS makes it.
+                  CssLines(
+                    style: SettingsRow._lineStyle(colors),
+                    child: Text(
+                      line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SettingsRow._lineStyle(colors),
                     ),
                   ),
               ],
@@ -653,6 +655,13 @@ class SettingsGroupHead extends StatelessWidget {
 /// first row of a group without a head. Named by its label or its head's title.
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({super.key, this.label, this.head, required this.rows});
+
+  static TextStyle _labelStyle(WambitoColors colors) => LkText.label.copyWith(
+    fontSize: 11.5,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 11.5 * 0.06,
+    color: colors.inkMuted,
+  );
 
   final String? label;
   final SettingsGroupHead? head;
@@ -676,7 +685,9 @@ class SettingsGroup extends StatelessWidget {
           boxShadow: LkSurface.edgeShadow(lk, LkEdge.sm),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          // CSS's border-box: the 2px border is inside the box, before the 10/12 padding; a
+          // Flutter border is painted over the child, so the padding carries it.
+          padding: const EdgeInsets.symmetric(horizontal: 12 + 2, vertical: 10 + 2),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -684,13 +695,16 @@ class SettingsGroup extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
                   child: ExcludeSemantics(
-                    child: Text(
-                      label.toUpperCase(),
-                      style: LkText.label.copyWith(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 11.5 * 0.06,
-                        color: colors.inkMuted,
+                    // 17.25px tall, as CSS makes it, not rounded up.
+                    child: CssLines(
+                      style: _labelStyle(colors),
+                      // See [letterSpacingShift].
+                      child: Transform.translate(
+                        offset: Offset(letterSpacingShift(context, 11.5 * 0.06), 0),
+                        child: BlinkLine(
+                          style: _labelStyle(colors),
+                          child: Text(label.toUpperCase(), style: _labelStyle(colors)),
+                        ),
                       ),
                     ),
                   ),
@@ -746,10 +760,15 @@ class SettingsRow extends StatelessWidget {
   /// line, or of a short chip).
   final String? semanticsHint;
 
+  static TextStyle _lineStyle(WambitoColors colors) => LkText.fieldLabel.copyWith(
+    fontSize: 12.5,
+    fontWeight: FontWeight.w600,
+    color: colors.inkMuted,
+  );
+
   /// A row that is not pressable, with its [semanticsHint] if it has one.
-  Widget _still(Widget body) => semanticsHint == null
-      ? body
-      : Semantics(container: true, hint: semanticsHint, child: body);
+  Widget _still(Widget body) =>
+      semanticsHint == null ? body : Semantics(container: true, hint: semanticsHint, child: body);
 
   Widget _body(BuildContext context, {required Widget? end}) =>
       LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
@@ -788,14 +807,14 @@ class SettingsRow extends StatelessWidget {
                     style: LkText.cardTitle.copyWith(color: danger ? colors.over : colors.ink),
                   ),
                   if (line != null)
-                    Text(
-                      line,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: LkText.fieldLabel.copyWith(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: colors.inkMuted,
+                    // 18.75px tall, as CSS makes it, not rounded up.
+                    CssLines(
+                      style: _lineStyle(colors),
+                      child: Text(
+                        line,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _lineStyle(colors),
                       ),
                     ),
                 ],

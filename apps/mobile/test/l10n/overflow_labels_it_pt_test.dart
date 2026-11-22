@@ -205,8 +205,9 @@ void main() {
           await _pump(tester, locale, location: category.path);
           final l10n = _l10n(tester);
           expect(tester.takeException(), isNull);
-          // The light rows keep one line: a long muted line under a switch ends in an ellipsis
-          // (the names are whole; spec 2026-11-22), so Captura's lines are not asked to fit.
+          // The light rows keep one line: a long muted line under a switch or a group's head ends
+          // in an ellipsis (the names are whole; spec 2026-11-22), so those lines are not asked to
+          // fit.
           final lines = switch (category) {
             SettingsCategory.capture => {
               l10n.settingsDeleteVoiceHint,
@@ -216,6 +217,8 @@ void main() {
               l10n.settingsAddWidgetHint,
               l10n.autoCaptureHowLine,
             },
+            // A group head's line is one line too (the web's `.lk-row-line`).
+            SettingsCategory.account => {l10n.settingsPasskeysLine, l10n.settingsSecurityLead},
             SettingsCategory.preferences => {l10n.settingsSoundLine, l10n.settingsVibrationLine},
             SettingsCategory.data => {l10n.settingsImportRowLine, l10n.settingsExportRowLine},
             // The server's address is its own line, not a word of ours.

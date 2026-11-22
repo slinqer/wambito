@@ -38,8 +38,15 @@ final _passkeysCanBeMadeProvider = FutureProvider.autoDispose<bool>(
 );
 
 /// A day as `2 oct 2026` (es) or `Oct 2, 2026` (en), in the person's time zone.
-String passkeyDay(DateTime at, String locale, String timeZone) =>
-    formatRecurringDate(todayIn(timeZone, at.toUtc()), locale);
+String passkeyDay(DateTime at, String locale, String timeZone) {
+  final day = todayIn(timeZone, at.toUtc());
+  // The web's `dateStyle: "medium"` in pt-PT is 02/10/2026; Dart's pt_PT yMMMd drops the zeros.
+  if (locale.startsWith('pt')) {
+    final p = day.split('-');
+    return '${p[2]}/${p[1]}/${p[0]}';
+  }
+  return formatRecurringDate(day, locale);
+}
 
 class PasskeysSection extends ConsumerStatefulWidget {
   const PasskeysSection({super.key, required this.timeZone, required this.guest});

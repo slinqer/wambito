@@ -51,7 +51,8 @@ class PreferencesGroups extends ConsumerWidget {
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: WambitoTokens.space3,
+      // The category page's `gap-(--space-4)` between its groups.
+      spacing: WambitoTokens.space4,
       children: [
         SettingsGroup(
           label: l10n.settingsAppearance,
@@ -167,7 +168,8 @@ class PreferencesScreen extends ConsumerWidget {
     final profile = ref.watch(settingsProfileProvider).value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: WambitoTokens.space3,
+      // The category page's `gap-(--space-4)` between its groups.
+      spacing: WambitoTokens.space4,
       children: [
         PreferencesGroups(webSectionsOnly: webSectionsOnly),
         if (profile != null) TimeAndMoneySection(profile: profile),

@@ -12,13 +12,15 @@ import '../theme/tokens.g.dart';
 import '../ui/lk_theme.dart';
 import '../ui/offset_underline.dart';
 import '../ui/press_button.dart';
+import '../ui/input_box.dart';
 import '../ui/pressable.dart';
 import '../ui/sheet.dart';
-import '../theme/surfaces.dart';
 import 'agents.dart';
 import 'url_opener.dart';
 
-/// The connector's address, read-only, with "Copiar". [urlKey] and [copyKey] find them (tests).
+/// The connector's address, read-only, with "Copiar" (the web's `AddressField`: a `.lk-input` box
+/// with the address on one line, cut at the box's end, and a secondary button beside it). [urlKey]
+/// and [copyKey] find them (tests).
 class AddressField extends StatelessWidget {
   const AddressField({
     super.key,
@@ -36,29 +38,33 @@ class AddressField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final lk = context.lk;
-    return PressSurface(
-      minSize: 0,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: LkSurface.rowCard(lk),
+    final colors = context.lkColors;
+    // A flex row stretches its items: the box is as tall as the button.
+    return IntrinsicHeight(
       child: Row(
-        spacing: 10,
+        // `gap-(--space-2)`.
+        spacing: WambitoTokens.space2,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            // Plain text: the button copies it.
-            child: Text(
-              url.toString(),
-              key: urlKey,
-              style: LkText.body.copyWith(color: lk.colors.ink),
+            child: InputBox(
+              // Plain text: the button copies it. A read-only input shows its start and clips the rest.
+              child: Text(
+                url.toString(),
+                key: urlKey,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.clip,
+                style: LkText.input.copyWith(color: colors.ink),
+              ),
             ),
           ),
-          PressButton(
+          PressButton.text(
+            l10n.settingsAssistantsCopy,
             key: copyKey,
-            tone: PressTone.ghost,
-            size: PressSize.sm,
+            tone: PressTone.secondary,
             semanticLabel: l10n.settingsAssistantsCopyLabel,
             onPressed: onCopy,
-            child: OffsetUnderline(LkText.upperCase(l10n.settingsAssistantsCopy)),
           ),
         ],
       ),

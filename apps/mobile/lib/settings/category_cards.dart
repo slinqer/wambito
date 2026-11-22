@@ -35,9 +35,8 @@ class SettingsCategoryScreen extends ConsumerWidget {
     final guest = ref.watch(sessionProvider.select((s) => s.isGuest));
     final preview = ref.watch(isPreviewProvider);
     final children = switch (category) {
-      // "Mis agentes" (spec 2026-11-22): the web has it too, but its story is not in the parity
-      // pairs yet, so the web-only pictures leave it out.
-      SettingsCategory.agents => [if (!webOnly) AgentsScreen(timeZone: timeZone, guest: guest)],
+      // "Mis agentes" (spec 2026-11-22): the web has it too (the `settings-agents*` pairs).
+      SettingsCategory.agents => [AgentsScreen(timeZone: timeZone, guest: guest)],
       SettingsCategory.account => [
         AccountScreen(
           timeZone: timeZone,
