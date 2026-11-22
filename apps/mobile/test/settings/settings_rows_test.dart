@@ -113,6 +113,28 @@ void main() {
     expect(t.getSize(find.byType(SettingsRow)).height, lessThanOrEqualTo(76));
   });
 
+  testWidgets('a long chevron value truncates and the row stays one line tall', (t) async {
+    await t.pumpWidget(
+      uiApp(
+        const SettingsRow(
+          icon: _icon,
+          title: 'Lingua',
+          line: 'Cambia la lingua dell app',
+          trailing: RowChevron(value: 'Portoghese (Brasile) e altre lingue'),
+        ),
+        width: 360,
+        textScale: 1.3,
+      ),
+    );
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.byType(SettingsRow)).height, lessThanOrEqualTo(76));
+    final row = t.getRect(find.byType(SettingsRow));
+    final value = t.getRect(find.text('Portoghese (Brasile) e altre lingue'));
+    expect(value.right, lessThanOrEqualTo(row.right));
+    expect(value.width, lessThanOrEqualTo(row.width * 0.5));
+    expect(t.getSize(find.text('Lingua')).width, greaterThan(40));
+  });
+
   testWidgets('a group shows its label and divides its rows', (t) async {
     await t.pumpWidget(
       uiApp(

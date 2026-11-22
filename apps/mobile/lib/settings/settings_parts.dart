@@ -630,7 +630,10 @@ class SettingsRow extends StatelessWidget {
   final VoidCallback? onTap;
   final bool danger;
 
-  Widget _body(BuildContext context, {required Widget? end}) {
+  Widget _body(BuildContext context, {required Widget? end}) =>
+      LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
+
+  Widget _bodyIn(BuildContext context, double width, Widget? end) {
     final colors = context.lkColors;
     final line = this.line;
     final tint = danger ? colors.over : colors.inkMuted;
@@ -677,7 +680,12 @@ class SettingsRow extends StatelessWidget {
                 ],
               ),
             ),
-            ?end,
+            // The end never takes more than 45 % of the row, so the title keeps its room.
+            if (end != null)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: width * 0.45),
+                child: end,
+              ),
           ],
         ),
       ),
@@ -758,9 +766,18 @@ class SettingsRow extends StatelessWidget {
       case RowChevron():
         final value = t.value;
         final end = Row(
+          mainAxisSize: MainAxisSize.min,
           spacing: 6,
           children: [
-            if (value != null) Text(value, style: LkText.label.copyWith(color: colors.inkMuted)),
+            if (value != null)
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: LkText.label.copyWith(color: colors.inkMuted),
+                ),
+              ),
             LkIcon(LkIconName.chevronRight, size: 16, color: colors.inkMuted),
           ],
         );

@@ -1444,12 +1444,20 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
   }
   .lk-row-value {
     font-size: 13px;
     font-weight: 800;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lk-row-end > svg {
+    flex: none;
   }
   .lk-row-chip {
     flex: none;
