@@ -49,9 +49,6 @@ const writesTo = (spy: Spies["onRequest"], prefix: string) =>
 const title = (canvas: Canvas, name = "Ajustes") =>
   canvas.findByRole("heading", { level: 1, name });
 
-const region = async (canvas: Canvas, name: string) =>
-  within(await canvas.findByRole("region", { name }));
-
 const group = async (canvas: Canvas, name: string) =>
   within(await canvas.findByRole("group", { name }));
 
@@ -68,6 +65,12 @@ const toastShown = (text: string | RegExp, role: "status" | "alert" = "status") 
 
 const dialogGone = () =>
   waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 8000 });
+
+/** Opens the sheet a row leads to, by the row's name. */
+const openRow = async (canvas: Canvas, name: string | RegExp) => {
+  await userEvent.click(await canvas.findByRole("button", { name }));
+  return within(await screen.findByRole("dialog"));
+};
 
 const stage = (args: Spies, extra: Partial<Parameters<typeof HomeStage>[0]> = {}) => (
   <HomeStage
@@ -87,23 +90,19 @@ export const Overview: Story = {
     const canvas = within(canvasElement);
     await expect(await title(canvas)).toBeVisible();
     await expect(canvas.getByText("Entraste como ana@example.com")).toBeVisible();
-    for (const name of [
-      "Preferencias",
-      "Hora y moneda",
-      "Tus datos",
-      "La dirección de Wambito",
-      "Comentarios e ideas",
-    ]) {
-      await expect(canvas.getByRole("region", { name })).toBeVisible();
+    await expect(canvas.getByRole("region", { name: "La dirección de Wambito" })).toBeVisible();
+    for (const name of ["Apariencia", "Sonido y tacto", "Hora y moneda", "Entrar con tu huella"]) {
+      await expect(canvas.getByRole("group", { name })).toBeVisible();
     }
-    await expect(canvas.getByRole("group", { name: "Entrar con tu huella" })).toBeVisible();
-    await expect(canvas.getByRole("radio", { name: "Español" })).toBeChecked();
-    await expect(canvas.getByRole("radio", { name: "Noche" })).toBeChecked();
-    await expect(canvas.getByRole("switch", { name: "Sonidos" })).toBeChecked();
-    await expect(canvas.getByRole("link", { name: "Importar desde Budge" })).toHaveAttribute(
+    await expect(canvas.getByRole("button", { name: /^Idioma/ })).toHaveTextContent("Español");
+    await expect(canvas.getByRole("button", { name: /^Tema/ })).toHaveTextContent("Noche");
+    await expect(canvas.getByRole("switch", { name: "Sonido" })).toBeChecked();
+    await expect(canvas.getByRole("link", { name: /^Importar movimientos/ })).toHaveAttribute(
       "href",
       "/app/import",
     );
+    await expect(canvas.getByRole("button", { name: /^Descargar tus datos/ })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Comentarios e ideas/ })).toBeVisible();
     await expectTarget(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
   },
 };
@@ -202,12 +201,12 @@ export const SwitchLanguage: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await expect(canvas.getByRole("group", { name: "Idioma" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("radio", { name: "English" }));
+    const sheet = await openRow(canvas, /^Idioma/);
+    await userEvent.click(sheet.getByRole("radio", { name: "English" }));
     await expect(await title(canvas, "Settings")).toBeVisible();
-    await expect(canvas.getByRole("group", { name: "Language" })).toBeVisible();
-    await expect(canvas.getByRole("radio", { name: "English" })).toBeChecked();
-    await expect(canvas.getByRole("switch", { name: "Sounds" })).toBeVisible();
+    await dialogGone();
+    await expect(canvas.getByRole("button", { name: /^Language/ })).toHaveTextContent("English");
+    await expect(canvas.getByRole("switch", { name: "Sound" })).toBeVisible();
     await expect(document.documentElement.lang).toBe("en");
     await waitFor(() =>
       expect(writesTo(args.onRequest, "PATCH /api/v1/me")).toEqual([
@@ -226,12 +225,19 @@ export const Theme: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("radio", { name: "Día" }));
+    let sheet = await openRow(canvas, /^Tema/);
+    await expect(sheet.getByText("Automático sigue el modo de tu teléfono.")).toBeVisible();
+    await userEvent.click(sheet.getByRole("radio", { name: "Día" }));
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("day"));
     await expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("day");
-    await userEvent.click(canvas.getByRole("radio", { name: "Automático" }));
+    await dialogGone();
+    await expect(canvas.getByRole("button", { name: /^Tema/ })).toHaveTextContent("Día");
+    sheet = await openRow(canvas, /^Tema/);
+    await userEvent.click(sheet.getByRole("radio", { name: "Automático" }));
     await expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("auto");
-    await userEvent.click(canvas.getByRole("radio", { name: "Noche" }));
+    await dialogGone();
+    sheet = await openRow(canvas, /^Tema/);
+    await userEvent.click(sheet.getByRole("radio", { name: "Noche" }));
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("night"));
   },
 };
@@ -243,7 +249,7 @@ export const Sound: Story = {
     localStorage.removeItem(SOUND_STORAGE_KEY);
     const canvas = within(canvasElement);
     await title(canvas);
-    const sound = canvas.getByRole("switch", { name: "Sonidos" });
+    const sound = canvas.getByRole("switch", { name: "Sonido" });
     await expectTarget(sound);
     await userEvent.click(sound);
     await expect(sound).not.toBeChecked();
@@ -260,10 +266,11 @@ export const TimeZone: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const time = await region(canvas, "Hora y moneda");
+    const time = await group(canvas, "Hora y moneda");
     await expect(time.getByText("Madrid")).toBeVisible();
-    await userEvent.click(time.getByRole("button", { name: "Cambiar zona horaria" }));
+    await userEvent.click(time.getByRole("button", { name: /^Zona horaria/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "Elige tu zona horaria" }));
+    await expect(sheet.getByText("Con ella sabemos cuándo empieza tu día y tu mes.")).toBeVisible();
     await userEvent.type(
       sheet.getByRole("searchbox", { name: "Busca tu ciudad o país" }),
       "bogotá",
@@ -286,7 +293,7 @@ export const TimeZoneByCountry: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Cambiar zona horaria" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Zona horaria/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "Elige tu zona horaria" }));
     const search = sheet.getByRole("searchbox", { name: "Busca tu ciudad o país" });
     await userEvent.type(search, "colombia");
@@ -303,7 +310,7 @@ export const TimeZoneNoMatch: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Cambiar zona horaria" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Zona horaria/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "Elige tu zona horaria" }));
     await userEvent.type(sheet.getByRole("searchbox", { name: "Busca tu ciudad o país" }), "zzzz");
     await expect(await sheet.findByText(/No encontramos «zzzz»/)).toBeVisible();
@@ -316,11 +323,13 @@ export const CurrencyOpen: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const time = await region(canvas, "Hora y moneda");
-    const euro = await time.findByRole("radio", { name: /Euro/ });
+    const time = await group(canvas, "Hora y moneda");
+    await expect(time.getByRole("button", { name: /^Moneda/ })).toHaveTextContent("EUR");
+    const sheet = await openRow(canvas, /^Moneda/);
+    const euro = await sheet.findByRole("radio", { name: /Euro/ });
     await expect(euro).toBeChecked();
     await expect(euro).toBeEnabled();
-    const peso = time.getByRole("radio", { name: /Peso colombiano/ });
+    const peso = sheet.getByRole("radio", { name: /Peso colombiano/ });
     await expect(peso).toHaveAccessibleName(/\$50\.000 \(50 lukas\)/);
     await userEvent.click(peso);
     await waitFor(() =>
@@ -329,7 +338,8 @@ export const CurrencyOpen: Story = {
       ]),
     );
     await toastShown("Listo: tu moneda ahora es COP.");
-    await expect(peso).toBeChecked();
+    await dialogGone();
+    await expect(time.getByRole("button", { name: /^Moneda/ })).toHaveTextContent("COP");
   },
 };
 
@@ -339,14 +349,15 @@ export const CurrencyLocked: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const time = await region(canvas, "Hora y moneda");
+    await canvas.findByRole("group", { name: "Hora y moneda" });
+    const sheet = await openRow(canvas, /^Moneda/);
     await expect(
-      await time.findByText(
+      await sheet.findByText(
         "Tu moneda es EUR. Ya tienes movimientos o recurrentes, así que se queda así.",
         {},
       ),
     ).toBeVisible();
-    await expect(time.queryByRole("radio", { name: /Peso colombiano/ })).toBeNull();
+    await expect(sheet.queryByRole("radio", { name: /Peso colombiano/ })).toBeNull();
   },
 };
 
@@ -359,15 +370,15 @@ export const CurrencyLockedByServer: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const time = await region(canvas, "Hora y moneda");
-    await userEvent.click(await time.findByRole("radio", { name: /Dólar estadounidense/ }));
+    const sheet = await openRow(canvas, /^Moneda/);
+    await userEvent.click(await sheet.findByRole("radio", { name: /Dólar estadounidense/ }));
     await expect(
-      await time.findByText(
+      await sheet.findByText(
         "Tu moneda es EUR. Ya tienes movimientos o recurrentes, así que se queda así.",
         {},
       ),
     ).toBeVisible();
-    await expect(time.queryByRole("radio")).toBeNull();
+    await expect(sheet.queryByRole("radio")).toBeNull();
     await expect(writesTo(args.onRequest, "PATCH /api/v1/me")).toHaveLength(1);
   },
 };
@@ -433,13 +444,16 @@ export const Export: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const data = await region(canvas, "Tus datos");
+    const data = await openRow(canvas, /^Descargar tus datos/);
+    await expect(data.getByText(/Todo en JSON, o tus movimientos en CSV/)).toBeVisible();
     await userEvent.click(data.getByRole("button", { name: "Descargar CSV" }));
     await waitFor(() => expect(args.onSave).toHaveBeenCalledTimes(1));
     const [filename, blob] = (args.onSave as ReturnType<typeof fn>).mock.calls[0] as [string, Blob];
     await expect(filename).toBe(`wambito-export-${STORY_TODAY}.csv`);
     await expect(await blob.text()).toMatch(/^date,name,amount/);
-    await userEvent.click(data.getByRole("button", { name: "Descargar JSON" }));
+    await dialogGone();
+    const again = await openRow(canvas, /^Descargar tus datos/);
+    await userEvent.click(again.getByRole("button", { name: "Descargar JSON" }));
     await waitFor(() => expect(args.onSave).toHaveBeenCalledTimes(2));
     await expect((args.onSave as ReturnType<typeof fn>).mock.calls[1]?.[0]).toBe(
       `wambito-export-${STORY_TODAY}.json`,
@@ -453,7 +467,8 @@ export const ExportFails: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Descargar JSON" }));
+    const sheet = await openRow(canvas, /^Descargar tus datos/);
+    await userEvent.click(sheet.getByRole("button", { name: "Descargar JSON" }));
     await toastShown(/Tuvimos un problema de nuestro lado/, "alert");
     await expect(args.onSave).not.toHaveBeenCalled();
     await expect(await title(canvas)).toBeVisible();
@@ -496,7 +511,7 @@ export const Day: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await expect(await canvas.findByRole("radio", { name: /Euro/ })).toBeChecked();
+    await expect(await canvas.findByRole("button", { name: /^Moneda/ })).toHaveTextContent("EUR");
   },
 };
 
@@ -507,7 +522,7 @@ export const English: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Settings");
-    await expect(canvas.getByRole("radio", { name: "English" })).toBeChecked();
+    await expect(canvas.getByRole("button", { name: /^Language/ })).toHaveTextContent("English");
     await expect(canvas.getByRole("button", { name: /^Delete your account/ })).toBeVisible();
   },
 };
@@ -530,7 +545,7 @@ export const AppSections: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await expect(canvas.getByRole("switch", { name: "Sonidos" })).toBeChecked();
+    await expect(canvas.getByRole("switch", { name: "Sonido" })).toBeChecked();
   },
 };
 
@@ -541,7 +556,7 @@ export const AppSectionsDayEnglish: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Settings");
-    await expect(canvas.getByRole("switch", { name: "Sounds" })).toBeChecked();
+    await expect(canvas.getByRole("switch", { name: "Sound" })).toBeChecked();
   },
 };
 
@@ -552,7 +567,7 @@ export const AppSectionsItalian: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Impostazioni");
-    await expect(canvas.getByRole("switch", { name: "Suoni" })).toBeChecked();
+    await expect(canvas.getByRole("switch", { name: "Suono" })).toBeChecked();
   },
 };
 
@@ -562,7 +577,7 @@ export const AppSectionsPortuguese: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Definições");
-    await expect(canvas.getByRole("switch", { name: "Sons" })).toBeChecked();
+    await expect(canvas.getByRole("switch", { name: "Som" })).toBeChecked();
   },
 };
 
@@ -576,7 +591,7 @@ export const AppSectionsSoundOff: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const sound = canvas.getByRole("switch", { name: "Sonidos" });
+    const sound = canvas.getByRole("switch", { name: "Sonido" });
     await userEvent.click(sound);
     await expect(sound).not.toBeChecked();
   },
@@ -588,11 +603,10 @@ export const AppSectionsCurrencyOpen: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const time = await region(canvas, "Hora y moneda");
-    await time.findByRole("radio", { name: /Euro/ });
+    const time = await group(canvas, "Hora y moneda");
     await canvas.findByText(/Aún no tienes ninguna/);
-    // The currency's own options, not the whole card, fill the top of the picture.
-    await scrollTo(time.getByRole("radio", { name: /Euro/ }).closest("fieldset") as HTMLElement);
+    await scrollTo(canvas.getByRole("group", { name: "Hora y moneda" }));
+    await expect(time.getByRole("button", { name: /^Moneda/ })).toHaveTextContent("EUR");
   },
 };
 
@@ -638,7 +652,9 @@ export const AppSectionsData: Story = {
     await title(canvas);
     // The passkeys' list has loaded: the page is as tall as it will be.
     await canvas.findByText(/Aún no tienes ninguna/);
-    await scrollTo(canvas.getByRole("region", { name: "Tus datos" }));
+    await scrollTo(
+      canvas.getByRole("button", { name: /^Descargar tus datos/ }).parentElement as HTMLElement,
+    );
   },
 };
 
@@ -648,7 +664,7 @@ export const TimeZoneSheetOpen: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Cambiar zona horaria" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Zona horaria/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "Elige tu zona horaria" }));
     await userEvent.type(
       sheet.getByRole("searchbox", { name: "Busca tu ciudad o país" }),
@@ -664,7 +680,7 @@ export const TimeZoneSheetCurrent: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Cambiar zona horaria" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Zona horaria/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "Elige tu zona horaria" }));
     await userEvent.type(
       sheet.getByRole("searchbox", { name: "Busca tu ciudad o país" }),
@@ -794,7 +810,8 @@ export const Feedback: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const card = await region(canvas, "Comentarios e ideas");
+    const card = await openRow(canvas, /^Comentarios e ideas/);
+    await expect(card.getByText(/¿Algo no funciona/)).toBeVisible();
     const link = card.getByRole("link", { name: "Escribirnos" });
     await expect(link).toHaveAttribute(
       "href",
@@ -814,7 +831,7 @@ export const FeedbackEnglish: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Settings");
-    const card = await region(canvas, "Feedback and ideas");
+    const card = await openRow(canvas, /^Feedback and ideas/);
     await expect(card.getByRole("link", { name: "Write to us" })).toHaveAttribute(
       "href",
       `mailto:${FEEDBACK_EMAIL}?subject=Wambito%3A%20feedback&body=%0A%0AWambito%20version%3A%20${encodeURIComponent(APP_VERSION)}%0ALanguage%3A%20en`,
@@ -829,6 +846,8 @@ export const AppSectionsFeedback: Story = {
     const canvas = within(canvasElement);
     await title(canvas);
     await canvas.findByText(/Aún no tienes ninguna/);
-    await scrollTo(canvas.getByRole("region", { name: "Comentarios e ideas" }));
+    await scrollTo(
+      canvas.getByRole("button", { name: /^Comentarios e ideas/ }).parentElement as HTMLElement,
+    );
   },
 };

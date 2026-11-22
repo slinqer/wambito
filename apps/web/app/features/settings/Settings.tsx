@@ -1,23 +1,20 @@
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslations } from "use-intl";
 import { useApiMode } from "../../api/ApiProvider.tsx";
 import { useMe } from "../../api/queries.ts";
 import { PageHeader } from "../../ui/PageHeader.tsx";
-import { PressButton } from "../../ui/PressButton.tsx";
-import { PressLink } from "../../ui/PressLink.tsx";
 import { AgentsScreen, type CopyText } from "../assistants/AgentsScreen.tsx";
 import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
 import { useVaultSession } from "../vault/vault-context.ts";
 import { AccountScreen } from "./AccountScreen.tsx";
-import { FeedbackSection } from "./FeedbackSection.tsx";
-import { PreferencesSection } from "./PreferencesSection.tsx";
-import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
+import { DataScreen } from "./DataScreen.tsx";
+import { MoreScreen } from "./MoreScreen.tsx";
+import { PreferencesScreen } from "./PreferencesScreen.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
 import { liveSecurity, type SecurityApi } from "./security.ts";
 import { isSettingsCategory, type SettingsCategory } from "./settings-categories.ts";
-import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
 import { type SaveFile, saveToDisk, useExport } from "./use-export.ts";
 
 export type { SaveFile } from "./use-export.ts";
@@ -66,13 +63,10 @@ export function SettingsCategoryBody({
   const exporter = useExport(save);
   const appPath = useAppPath();
   const mode = useApiMode();
-  const demo = mode === "demo";
   // A preview account's vault: no export or import yet (passkeys, the assistants and deleting
   // the account work: they are the account's, not its finances).
   const local = mode === "local";
   const security = useSettingsSecurity(securityProp);
-  const dataOffId = useId();
-  const dataOff = demo || local ? dataOffId : undefined;
 
   switch (category) {
     case "agents":
@@ -88,54 +82,11 @@ export function SettingsCategoryBody({
         />
       );
     case "preferences":
-      return (
-        <>
-          <PreferencesSection />
-          <TimeAndMoneySection me={me} />
-        </>
-      );
+      return <PreferencesScreen me={me} />;
     case "data":
-      return (
-        <SettingsSection title={t("data.title")}>
-          <div className="flex flex-col gap-(--space-2)">
-            <SettingLabel label={t("data.import_title")} hint={t("data.import_lead")} />
-            {demo || local ? (
-              <PressButton
-                variant="secondary"
-                className="self-start"
-                disabled
-                aria-describedby={dataOff}
-              >
-                {t("data.import_action")}
-              </PressButton>
-            ) : (
-              <PressLink to={appPath("/import")} variant="secondary" className="self-start">
-                {t("data.import_action")}
-              </PressLink>
-            )}
-          </div>
-          <div className="flex flex-col gap-(--space-2)">
-            <SettingLabel label={t("data.export_title")} hint={t("data.export_lead")} />
-            <div className="flex flex-wrap gap-(--space-2)">
-              {(["json", "csv"] as const).map((format) => (
-                <PressButton
-                  key={format}
-                  variant="secondary"
-                  disabled={demo || local || exporter.busy !== null}
-                  aria-describedby={dataOff}
-                  aria-busy={exporter.busy === format || undefined}
-                  onClick={() => void exporter.run(format)}
-                >
-                  {t(format === "json" ? "data.export_json" : "data.export_csv")}
-                </PressButton>
-              ))}
-            </div>
-          </div>
-          {(demo || local) && <DemoOffNote id={dataOffId} local={local} />}
-        </SettingsSection>
-      );
+      return <DataScreen onExport={(format) => exporter.run(format)} exporting={exporter.busy} />;
     case "more":
-      return <FeedbackSection />;
+      return <MoreScreen />;
   }
 }
 

@@ -112,5 +112,14 @@ for (const lang of ["it", "pt"] as const satisfies readonly Lang[]) {
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await expectNoHorizontalOverflow(page, `${lang} settings, its foot`);
     });
+
+    test("preferences, data and more do not overflow", async ({ page }) => {
+      for (const category of ["preferences", "data", "more"]) {
+        await page.goto(`/app/settings/${category}`);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.locator(".lk-group").first()).toBeVisible();
+        await expectNoHorizontalOverflow(page, `${lang} settings ${category}`);
+      }
+    });
   });
 }

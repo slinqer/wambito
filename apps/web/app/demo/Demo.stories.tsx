@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { exposeStoryFetch } from "../../.storybook/parity.ts";
 import { ApiProvider } from "../api/ApiProvider.tsx";
 import { CategoryDetail } from "../features/categories/CategoryDetail.tsx";
@@ -153,10 +153,11 @@ export const SettingsOffByDay: Story = {
     await expect(canvas.queryByText(/Signed in as/)).toBeNull();
     const note = "Not available in the demo. Create your account to use it.";
     await expect(canvas.getAllByText(note)).toHaveLength(3);
-    for (const name of ["Download JSON", "Download CSV", "Import from Budge"]) {
-      const button = canvas.getByRole("button", { name });
-      await expect(button).toBeDisabled();
-      await expect(button).toHaveAccessibleDescription(note);
+    // import and export are rows with no action in the demo, the note under them
+    for (const name of ["Import transactions", "Download your data"]) {
+      await expect(canvas.getByText(name)).toBeVisible();
+      await expect(canvas.queryByRole("button", { name: new RegExp(`^${name}`) })).toBeNull();
+      await expect(canvas.queryByRole("link", { name: new RegExp(`^${name}`) })).toBeNull();
     }
     // the passkey and delete rows have no action in the demo; each carries its note
     await expect(canvas.getByText("Add a fingerprint")).toBeVisible();
@@ -174,7 +175,10 @@ export const SettingsOffByDay: Story = {
       "/demo",
     );
     // The language still switches: the demo's profile changes in memory.
-    await userEvent.click(canvas.getByRole("radio", { name: "Español" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Language/ }));
+    await userEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("radio", { name: "Español" }),
+    );
     await canvas.findByRole("heading", { name: "Ajustes", level: 1 });
   },
 };

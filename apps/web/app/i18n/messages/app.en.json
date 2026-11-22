@@ -835,7 +835,12 @@
       "export_lead": "Everything as JSON, or your transactions as CSV to open in Excel or Google Sheets.",
       "export_json": "Download JSON",
       "export_csv": "Download CSV",
-      "exported": "Done: we downloaded {file}."
+      "exported": "Done: we downloaded {file}.",
+      "import_row": "Import transactions",
+      "import_row_line": "From your bank's CSV",
+      "export_row": "Download your data",
+      "export_row_line": "A CSV with everything you logged",
+      "soon": "Coming soon"
     },
     "feedback": {
       "title": "Feedback and ideas",
@@ -843,7 +848,8 @@
       "action": "Write to us",
       "address": "If your email doesn't open, write to {email}.",
       "mail_subject": "Wambito: feedback",
-      "mail_body": "Wambito version: {version}\nLanguage: {language}"
+      "mail_body": "Wambito version: {version}\nLanguage: {language}",
+      "row_line": "Tell us what to improve"
     },
     "delete": {
       "title": "Delete your account",
@@ -907,6 +913,12 @@
       "help": "Lost? See the step-by-step guide in <link>{company}'s help ↗</link>",
       "done": "Done",
       "now_connected": "{name} is now connected."
+    },
+    "prefs": {
+      "appearance": "Appearance",
+      "sound_touch": "Sound and touch",
+      "sound_title": "Sound",
+      "sound_line": "A short sound when you log"
     }
   },
   "consent": {

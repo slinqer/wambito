@@ -260,10 +260,16 @@ export function SettingsRow({
   onPress,
   href,
   tone,
+  description,
 }: {
   icon: ReactNode;
   title: string;
   line?: string;
+  /**
+   * A longer explanation the one-line row cannot hold, read out with the row (its accessible
+   * description) but not drawn.
+   */
+  description?: string;
   trailing: Trailing;
   onPress?: () => void;
   href?: string;
@@ -271,7 +277,11 @@ export function SettingsRow({
 }) {
   const titleId = useId();
   const lineId = useId();
+  const descriptionId = useId();
   const danger = tone === "danger";
+  const describedBy = [line ? lineId : null, description ? descriptionId : null]
+    .filter(Boolean)
+    .join(" ");
   const lead = (
     <>
       <span
@@ -289,6 +299,11 @@ export function SettingsRow({
             {line}
           </span>
         )}
+        {description && (
+          <span id={descriptionId} hidden>
+            {description}
+          </span>
+        )}
       </span>
     </>
   );
@@ -300,7 +315,7 @@ export function SettingsRow({
         role="switch"
         aria-checked={trailing.checked}
         aria-labelledby={titleId}
-        aria-describedby={line ? lineId : undefined}
+        aria-describedby={describedBy || undefined}
         onClick={() => trailing.onChange(!trailing.checked)}
         className="lk-row lk-switch-row"
       >
@@ -315,18 +330,33 @@ export function SettingsRow({
   const press = (children: ReactNode) => {
     if (href !== undefined) {
       return /^https?:\/\//.test(href) ? (
-        <a href={href} target="_blank" rel="noreferrer" className="lk-row lk-row-press">
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          aria-describedby={description ? descriptionId : undefined}
+          className="lk-row lk-row-press"
+        >
           {children}
         </a>
       ) : (
-        <Link to={href} className="lk-row lk-row-press">
+        <Link
+          to={href}
+          aria-describedby={description ? descriptionId : undefined}
+          className="lk-row lk-row-press"
+        >
           {children}
         </Link>
       );
     }
     if (onPress) {
       return (
-        <button type="button" onClick={onPress} className="lk-row lk-row-press">
+        <button
+          type="button"
+          onClick={onPress}
+          aria-describedby={description ? descriptionId : undefined}
+          className="lk-row lk-row-press"
+        >
           {children}
         </button>
       );

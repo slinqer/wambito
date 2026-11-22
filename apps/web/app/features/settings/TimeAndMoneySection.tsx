@@ -6,6 +6,7 @@ import { ApiProblem, type Translator } from "../../api/errors.ts";
 import { useRecurrences } from "../../api/queries.ts";
 import { formatMoney, lukasHint } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
+import { Icon } from "../../ui/Icon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { Sheet } from "../../ui/Sheet.tsx";
 import { useToast } from "../../ui/Toast.tsx";
@@ -13,7 +14,7 @@ import { currencyName } from "../onboarding/CurrencyStep.tsx";
 import { isSupportedCurrency } from "../onboarding/currency.ts";
 import { type Profile, useHasTransactions } from "../onboarding/onboarding-api.ts";
 import { browserTimeZone } from "../onboarding/timezone.ts";
-import { SettingLabel, SettingsSection } from "./parts.tsx";
+import { SettingLabel, SettingsGroup, SettingsRow } from "./parts.tsx";
 import {
   searchZones,
   zoneCity,
@@ -23,14 +24,17 @@ import {
 } from "./settings-model.ts";
 import { failureMessage, refreshAllButProfile, useSaveProfile } from "./use-profile.ts";
 
-/** The time zone, and the currency while it can still change. */
+/**
+ * "Hora y moneda": the time zone and the currency as two value rows; each opens a sheet with its
+ * picker (the currency's while it can still change, else the line that says why it stays).
+ */
 export function TimeAndMoneySection({ me }: { me: Profile }) {
   const t = useTranslations("settings");
   return (
-    <SettingsSection title={t("time_and_money")}>
+    <SettingsGroup label={t("time_and_money")}>
       <TimeZoneSetting zone={me.timezone} />
       <CurrencySetting currency={me.currency} />
-    </SettingsSection>
+    </SettingsGroup>
   );
 }
 
@@ -49,7 +53,6 @@ function TimeZoneSetting({ zone }: { zone: string }) {
   const qc = useQueryClient();
   const save = useSaveProfile();
   const toast = useToast();
-  const hintId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,29 +91,19 @@ function TimeZoneSetting({ zone }: { zone: string }) {
     deviceZone && deviceZone !== zone && supported.includes(deviceZone) ? deviceZone : null;
 
   return (
-    <div className="flex flex-col gap-(--space-2)">
-      <SettingLabel label={t("label")} hint={t("hint")} hintId={hintId} />
-      <div className="lk-rowcard justify-between">
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate font-display text-[18px] font-bold text-ink">
-            {zoneCity(zone)}
-          </span>
-          <span className="truncate text-[13px] text-ink-muted">
-            {[zoneRegion(zone), offset].filter(Boolean).join(" · ")}
-          </span>
-        </span>
-        <PressButton
-          variant="secondary"
-          size="sm"
-          aria-label={t("change_label")}
-          aria-describedby={hintId}
-          onClick={() => setOpen(true)}
-        >
-          {t("change")}
-        </PressButton>
-      </div>
+    <>
+      <SettingsRow
+        icon={<Icon name="clock" size={20} />}
+        title={t("label")}
+        trailing={{ kind: "chevron", value: zoneCity(zone) }}
+        onPress={() => setOpen(true)}
+      />
       <Sheet open={open} onClose={() => setOpen(false)} title={t("sheet_title")}>
         <div className="flex flex-col gap-(--space-3) pt-(--space-3)" aria-busy={busy || undefined}>
+          <p className="m-0 text-[14px] text-ink-muted">{t("hint")}</p>
+          <p className="m-0 text-[13px] text-ink-muted">
+            {[zoneCity(zone), zoneRegion(zone), offset].filter(Boolean).join(" · ")}
+          </p>
           <label className="flex flex-col gap-(--space-1)">
             <span className="text-[14px] font-bold text-ink">{t("search")}</span>
             <span className="lk-input min-h-11">
@@ -157,7 +150,7 @@ function TimeZoneSetting({ zone }: { zone: string }) {
           )}
         </div>
       </Sheet>
-    </div>
+    </>
   );
 }
 
@@ -215,6 +208,7 @@ function CurrencySetting({ currency }: { currency: string }) {
   const recurrences = useRecurrences();
   const [lockedByServer, setLockedByServer] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const hintId = useId();
 
   const known =
@@ -241,20 +235,12 @@ function CurrencySetting({ currency }: { currency: string }) {
     } finally {
       setBusy(false);
     }
+    setOpen(false);
     void refreshAllButProfile(qc);
     toast.show({ message: t("saved", { currency: next }) });
   };
 
-  if (known && locked) {
-    return (
-      <div className="flex flex-col gap-(--space-1)">
-        <SettingLabel label={t("label")} />
-        <p className="m-0 text-[14px] text-ink-muted">{t("locked", { currency })}</p>
-      </div>
-    );
-  }
-
-  return (
+  const choices = (
     <fieldset
       className="m-0 flex min-w-0 flex-col gap-(--space-2) border-0 p-0"
       disabled={!known}
@@ -292,5 +278,25 @@ function CurrencySetting({ currency }: { currency: string }) {
         );
       })}
     </fieldset>
+  );
+
+  return (
+    <>
+      <SettingsRow
+        icon={<Icon name="coin" size={20} />}
+        title={t("label")}
+        trailing={{ kind: "chevron", value: currency }}
+        onPress={() => setOpen(true)}
+      />
+      <Sheet open={open} onClose={() => setOpen(false)} title={t("label")}>
+        <div className="pt-(--space-3)">
+          {known && locked ? (
+            <p className="m-0 text-[14px] text-ink-muted">{t("locked", { currency })}</p>
+          ) : (
+            choices
+          )}
+        </div>
+      </Sheet>
+    </>
   );
 }

@@ -835,7 +835,12 @@
       "export_lead": "Tudo em JSON, ou os teus movimentos em CSV para os abrires no Excel ou no Google Sheets.",
       "export_json": "Descarregar JSON",
       "export_csv": "Descarregar CSV",
-      "exported": "Pronto: descarregámos {file}."
+      "exported": "Pronto: descarregámos {file}.",
+      "import_row": "Importar movimentos",
+      "import_row_line": "Do CSV do teu banco",
+      "export_row": "Descarrega os teus dados",
+      "export_row_line": "Um CSV com tudo o que registaste",
+      "soon": "Em breve"
     },
     "feedback": {
       "title": "Comentários e ideias",
@@ -843,7 +848,8 @@
       "action": "Escreve-nos",
       "address": "Se o teu email não abrir, escreve para {email}.",
       "mail_subject": "Wambito: comentários",
-      "mail_body": "Versão de Wambito: {version}\nIdioma: {language}"
+      "mail_body": "Versão de Wambito: {version}\nIdioma: {language}",
+      "row_line": "Diz-nos o que melhorar"
     },
     "delete": {
       "title": "Eliminar a tua conta",
@@ -907,6 +913,12 @@
       "help": "Perdeste-te? Vê o guia passo a passo na <link>ajuda de {company} ↗</link>",
       "done": "Concluído",
       "now_connected": "O {name} ficou ligado."
+    },
+    "prefs": {
+      "appearance": "Aparência",
+      "sound_touch": "Som e toque",
+      "sound_title": "Som",
+      "sound_line": "Um som curto ao registar"
     }
   },
   "consent": {

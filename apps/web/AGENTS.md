@@ -471,7 +471,16 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   as `SettingsGroup`s with a `head` (icon tile, title, one line), rows with one line each, the
   device icon from `deviceIconName`, and `DeleteAccount` as one red row; a plain account has only the
   passkeys and the delete row; the long explanations live in the sheets the rows open; copy
-  `settings.passkeys.*`, `settings.security.*`, `settings.delete.*`; stories `Settings/Account`); the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
+  `settings.passkeys.*`, `settings.security.*`, `settings.delete.*`; stories `Settings/Account`);
+  "Preferencias", "Tus datos" and "Más" (`PreferencesScreen.tsx` over `PreferencesSection` and
+  `TimeAndMoneySection`, `DataScreen.tsx`, `MoreScreen.tsx` over `FeedbackSection`): the same
+  groups of one-line rows; Idioma and Tema show their value and open a `ChoiceSheet` (today's
+  `Choices`, closes on pick), Zona horaria and Moneda open their pickers in a `Sheet` (the locked
+  currency's line is shown there), "Descargar tus datos" opens the export choices, Comentarios the
+  form; `SettingsRow`'s `description` is a longer sentence read with the row but not drawn (the
+  sound switch, the import row); copy `settings.prefs.*`, `settings.data.*_row*`,
+  `settings.feedback.row_line`; stories `Settings/Preferences`, `Settings/Data`, `Settings/More`);
+  the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
   stacks every category's cards) until their categories are redrawn.
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
