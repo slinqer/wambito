@@ -7,6 +7,10 @@ Human docs. Live docs are kept current; `superpowers/` is history.
 - `docs/design/system/`: the design system. `docs/design/system/project/tokens.json` is the source
   of all tokens (regenerate: root `AGENTS.md`). `docs/design/system/project/README.md` is the
   brand book; `docs/design/system/project/components/` per-component guidelines and previews.
+  `docs/design/system/project/icons/icons.json` holds the interface icons and `brands.json` beside
+  it the one-colour logos of the AI apps and payment apps Settings shows; the web reads both, the
+  phone keeps a Dart copy of each (`LkBrandLogo`: `apps/mobile/test/ui/lk_brand_logo_test.dart`
+  fails when it drifts from `brands.json`).
 - `docs/brand/`: raster brand art, files `wambi-*`; the app icon and logo as vectors fitted to the
   chosen concept, `wambito-icon.svg` (master, 1024), `-foreground`/`-monochrome` (Android adaptive,
   108 dp), `wambito-logo.svg` and `-logo-dark.svg` (wordmark as outlines), `wambito-icon-preview.png`.

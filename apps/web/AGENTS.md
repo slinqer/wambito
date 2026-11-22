@@ -455,14 +455,18 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `AccountScreen` + `ActionSheet` (`/admin/users/:id`: the account and its actions; a sheet's
   fields live in the component, so a reason survives re-verification). Stories `Admin/*`,
   web-only, not in parity.json.
-- Settings (`/app/settings`, `/demo/settings`; spec 2026-11-22 settings categories): the layout
+- Settings (`/app/settings`, `/demo/settings`; spec 2026-11-22 settings categories): a menu plus one
+  route per category, `/app/settings/<id>` and `/demo/settings/<id>` (`<id>` = agents, account,
+  preferences, data, more; the phone's `/settings/<id>` adds capture), never one long page. The layout
   `routes/app.settings.tsx` (an `Outlet`) holds the menu (`_index`: `features/settings/SettingsMenu.tsx`,
   the protect / add-email block above one `lk-rowcard` row per category, the preferences line live
   from the language, theme and currency) and one page per category (`$category`:
   `SettingsCategoryScreen` in `Settings.tsx`, categories from `settings-categories.ts`; an unknown
   one shows `settings.menu.not_found_*`). Copy under `settings.menu.*`. Stories: `Settings/Menu`;
   "Mis agentes" (`features/assistants/AgentsScreen.tsx`): the four apps of `agents.ts` (`AGENTS`,
-  `agentFor(grant)` by name or domain) with state, "Conectar" (`ConnectAgentSheet.tsx`: Wambi's
+  `agentFor(grant)`: the name holds the app's name as a whole word, else the domain is the app's own
+  or a subdomain of it, matched at a label boundary, never a substring ("box.ai" is not x.ai); "Revocar"
+  revokes every grant of the app, since one app can hold several) with state, "Conectar" (`ConnectAgentSheet.tsx`: Wambi's
   handshake scene `public/wambi/handshake-<id>.webp`, three steps, help link) or "Revocar", other
   grants after them with the `chat` icon, the connector address; the list is read again on window
   focus and a new grant of one of the four toasts once; copy `settings.agents.*`; stories
@@ -474,15 +478,17 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `settings.passkeys.*`, `settings.security.*`, `settings.delete.*`; stories `Settings/Account`);
   "Preferencias", "Tus datos" and "Más" (`PreferencesScreen.tsx` over `PreferencesSection` and
   `TimeAndMoneySection`, `DataScreen.tsx`, `MoreScreen.tsx` over `FeedbackSection`): the same
-  groups of one-line rows; Idioma and Tema show their value and open a `ChoiceSheet` (today's
+  groups of one-line rows (the light rows are `SettingsGroup`, `SettingsGroupHead` and `SettingsRow`
+  in `features/settings/parts.tsx`, shown in `Settings/Rows`); Idioma and Tema show their value and open a `ChoiceSheet` (today's
   `Choices`, closes on pick), Zona horaria and Moneda open their pickers in a `Sheet` (the locked
   currency's line is shown there), "Descargar tus datos" opens the export choices, Comentarios the
   form; `SettingsRow`'s `description` is a longer sentence read with the row but not drawn (the
-  sound switch, the import row); copy `settings.prefs.*`, `settings.data.*_row*`,
+  sound switch, the import row; the phone's twin is `semanticsHint`); copy `settings.prefs.*`, `settings.data.*_row*`,
   `settings.feedback.row_line`; stories `Settings/Preferences`, `Settings/Data`, `Settings/More`);
   `Manage/Settings` and `Settings/Security` open `HomeStage` at `/app/settings/all` (story-only route
   that stacks every category's cards) for their behaviour; `Settings/Parity` (`SettingsParity.stories.tsx`)
-  are the parity stories of the menu and each shared category (`apps/mobile/test/parity/parity.json`
+  are the parity stories of the menu and each shared category, with the logos from `brands.json`
+  (the phone's `LkBrandLogo` copy is held equal by a test) (`apps/mobile/test/parity/parity.json`
   `settings-*`; `HomeStage`'s `agentsOrigin` pins Mis agentes' address for them).
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
