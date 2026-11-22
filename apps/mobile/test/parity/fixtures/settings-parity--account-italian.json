@@ -1,0 +1,516 @@
+{
+  "storyId": "settings-parity--account-italian",
+  "now": "2026-10-21T15:00:00.000Z",
+  "timezone": "Europe/Madrid",
+  "api": true,
+  "responses": {
+    "GET /v1/categories": {
+      "status": 200,
+      "body": [
+        {
+          "id": "cat-groceries",
+          "name": "Supermercado",
+          "kind": "expense",
+          "icon": "🛒",
+          "color": "#ff9f1c",
+          "sortOrder": 0,
+          "archived": false,
+          "currentBudget": 18000
+        },
+        {
+          "id": "cat-restaurant",
+          "name": "Restaurante",
+          "kind": "expense",
+          "icon": "🍽️",
+          "color": "#ff5c7a",
+          "sortOrder": 1,
+          "archived": false,
+          "currentBudget": 30000
+        },
+        {
+          "id": "cat-fun",
+          "name": "Ocio",
+          "kind": "expense",
+          "icon": "⭐",
+          "color": "#a66bff",
+          "sortOrder": 2,
+          "archived": false,
+          "currentBudget": 65000
+        },
+        {
+          "id": "cat-transport",
+          "name": "Transporte",
+          "kind": "expense",
+          "icon": "🚗",
+          "color": "#3fa7ff",
+          "sortOrder": 3,
+          "archived": false,
+          "currentBudget": 9000
+        },
+        {
+          "id": "cat-salary",
+          "name": "Salario",
+          "kind": "income",
+          "icon": "💰",
+          "color": "#2fd388",
+          "sortOrder": 7,
+          "archived": false,
+          "currentBudget": null
+        }
+      ]
+    },
+    "GET /v1/categories?includeArchived=true": {
+      "status": 200,
+      "body": [
+        {
+          "id": "cat-groceries",
+          "name": "Supermercado",
+          "kind": "expense",
+          "icon": "🛒",
+          "color": "#ff9f1c",
+          "sortOrder": 0,
+          "archived": false,
+          "currentBudget": 18000
+        },
+        {
+          "id": "cat-restaurant",
+          "name": "Restaurante",
+          "kind": "expense",
+          "icon": "🍽️",
+          "color": "#ff5c7a",
+          "sortOrder": 1,
+          "archived": false,
+          "currentBudget": 30000
+        },
+        {
+          "id": "cat-fun",
+          "name": "Ocio",
+          "kind": "expense",
+          "icon": "⭐",
+          "color": "#a66bff",
+          "sortOrder": 2,
+          "archived": false,
+          "currentBudget": 65000
+        },
+        {
+          "id": "cat-transport",
+          "name": "Transporte",
+          "kind": "expense",
+          "icon": "🚗",
+          "color": "#3fa7ff",
+          "sortOrder": 3,
+          "archived": false,
+          "currentBudget": 9000
+        },
+        {
+          "id": "cat-salary",
+          "name": "Salario",
+          "kind": "income",
+          "icon": "💰",
+          "color": "#2fd388",
+          "sortOrder": 7,
+          "archived": false,
+          "currentBudget": null
+        }
+      ]
+    },
+    "GET /v1/me": {
+      "status": 200,
+      "body": {
+        "id": "u-ana",
+        "email": "ana@example.com",
+        "timezone": "Europe/Madrid",
+        "locale": "it",
+        "onboardingCompletedAt": "2026-10-01T10:00:00.000Z",
+        "currency": "EUR",
+        "isAnonymous": false
+      }
+    },
+    "GET /v1/recurrences": {
+      "status": 200,
+      "body": [
+        {
+          "id": "rec-spotify",
+          "name": "Spotify",
+          "amount": -353,
+          "categoryId": "cat-fun",
+          "frequency": "monthly",
+          "dayOfMonth": 23,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        {
+          "id": "rec-cineclub",
+          "name": "Cine club",
+          "amount": -1500,
+          "categoryId": "cat-fun",
+          "frequency": "monthly",
+          "dayOfMonth": 12,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        {
+          "id": "rec-salary",
+          "name": "Salario",
+          "amount": 250000,
+          "categoryId": "cat-salary",
+          "frequency": "monthly",
+          "dayOfMonth": 1,
+          "monthOfYear": null,
+          "startDate": "2026-01-01",
+          "endDate": null
+        },
+        {
+          "id": "rec-insurance",
+          "name": "Seguro del carro",
+          "amount": -42000,
+          "categoryId": "cat-transport",
+          "frequency": "yearly",
+          "dayOfMonth": 15,
+          "monthOfYear": 3,
+          "startDate": "2025-03-01",
+          "endDate": null
+        }
+      ]
+    },
+    "GET /v1/summary?month=2026-10": {
+      "status": 200,
+      "body": {
+        "month": "2026-10",
+        "budgetTotal": 122000,
+        "spent": 71887,
+        "remaining": 50113,
+        "income": 250000,
+        "balance": 178113,
+        "categories": [
+          {
+            "categoryId": "cat-groceries",
+            "budget": 18000,
+            "spent": 19412,
+            "remaining": -1412,
+            "ratio": 1.0784444444444445,
+            "state": "over"
+          },
+          {
+            "categoryId": "cat-restaurant",
+            "budget": 30000,
+            "spent": 25842,
+            "remaining": 4158,
+            "ratio": 0.8614,
+            "state": "near"
+          },
+          {
+            "categoryId": "cat-fun",
+            "budget": 65000,
+            "spent": 26633,
+            "remaining": 38367,
+            "ratio": 0.40973846153846155,
+            "state": "ok"
+          },
+          {
+            "categoryId": "cat-transport",
+            "budget": 9000,
+            "spent": 0,
+            "remaining": 9000,
+            "ratio": 0,
+            "state": "ok"
+          }
+        ]
+      }
+    },
+    "GET /v1/transactions/suggestions?q=": {
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "name": "continente",
+            "categoryId": "cat-groceries"
+          },
+          {
+            "name": "pingo doce",
+            "categoryId": "cat-groceries"
+          },
+          {
+            "name": "desayuno",
+            "categoryId": "cat-restaurant"
+          },
+          {
+            "name": "cine",
+            "categoryId": "cat-fun"
+          }
+        ]
+      }
+    },
+    "GET /v1/transactions?category=cat-casa&limit=50&month=2026-10": {
+      "status": 200,
+      "body": {
+        "items": [],
+        "nextCursor": null
+      }
+    },
+    "GET /v1/transactions?category=cat-fun&limit=50&month=2026-10": {
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "name": "Spotify",
+            "amount": -353,
+            "currency": "EUR",
+            "date": "2026-10-23",
+            "status": "pending",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-23T09:00:00.000Z",
+            "updatedAt": "2026-10-23T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000004",
+            "name": "cine",
+            "amount": -26280,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    "GET /v1/transactions?limit=200&month=2026-10": {
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "name": "Spotify",
+            "amount": -353,
+            "currency": "EUR",
+            "date": "2026-10-23",
+            "status": "pending",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-23T09:00:00.000Z",
+            "updatedAt": "2026-10-23T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "desayuno",
+            "amount": -475,
+            "currency": "EUR",
+            "date": "2026-10-21",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-restaurant",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-21T09:00:00.000Z",
+            "updatedAt": "2026-10-21T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "name": "Salario",
+            "amount": 250000,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-salary",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000004",
+            "name": "cine",
+            "amount": -26280,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "cena",
+            "amount": -25367,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-restaurant",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "pingo doce",
+            "amount": -19412,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-groceries",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    "GET /v1/transactions?limit=50&month=2026-10": {
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "name": "Spotify",
+            "amount": -353,
+            "currency": "EUR",
+            "date": "2026-10-23",
+            "status": "pending",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-23T09:00:00.000Z",
+            "updatedAt": "2026-10-23T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "desayuno",
+            "amount": -475,
+            "currency": "EUR",
+            "date": "2026-10-21",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-restaurant",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-21T09:00:00.000Z",
+            "updatedAt": "2026-10-21T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "name": "Salario",
+            "amount": 250000,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-salary",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000004",
+            "name": "cine",
+            "amount": -26280,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-fun",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "cena",
+            "amount": -25367,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-restaurant",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "pingo doce",
+            "amount": -19412,
+            "currency": "EUR",
+            "date": "2026-10-01",
+            "status": "paid",
+            "note": null,
+            "categoryId": "cat-groceries",
+            "recurrenceId": null,
+            "importId": null,
+            "source": "web",
+            "needsReview": false,
+            "captureSource": null,
+            "createdAt": "2026-10-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      }
+    }
+  }
+}

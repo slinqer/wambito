@@ -357,45 +357,35 @@ when the app's picture changes. The web shots are regenerated only when the web 
     passkeys, the account has none (`GET /api/auth/passkey/list-user-passkeys`) and it has not answered on this phone.
     The answer is kept per account on the phone (`passkey.offered`, as the web keeps `wambito.passkey.offered` in
     `localStorage`). Its pairs are the stories' `Offer`, `OfferDayEnglish`, `WaitingForTheFingerprint` and `Failed`.
-- **Settings (`settings-*`).** The web's Settings has six cards, and the app draws them all as the web does (Preferencias,
-  "Hora y moneda", the passkeys, "Tus datos" with its import link to the app's own page and the export's two buttons, "Comentarios
-  e ideas" with its button that writes to the founder, and the danger-bordered card that deletes the account). The app's `SettingsScreen(webSectionsOnly: true)` draws what the stories leave on the page: no "Automático"
-  language (the web has two languages; the app's third follows the phone) and none of the app's own cards.
-  - **Stories.** `manage-settings--app-sections`, `--app-sections-day-english` and `--app-sections-sound-off` are the page from
-    the top. The stories that look at a card further down scroll the page to it (`--app-sections-currency-open`, its options 16px
-    under the top; `--app-sections-passkeys` and `--app-sections-data`, which the page's end stops at); the sheets are
-    `--time-zone-sheet-open` (a country searched), `--time-zone-sheet-current` ("Actual"), `--time-zone-no-match` and
-    `--passkey-remove-sheet-open`. The delete card is `--app-sections-delete` (the page's end), and its sheet is
-    `--delete-sheet-open`, `--delete-sheet-ready` (the email typed in capitals, the button on), `--delete-sheet-failed` (a
-    refused delete: the reason under the field, the focus nowhere: the story lets go of it) and
-    `--delete-sheet-day-english`. The export has no story of its own: its buttons are in `--app-sections-data`; "Comentarios e ideas" is `--app-sections-feedback`. What
-    follows a tap there is the app's own (a sheet that asks to save or share the file, since a phone has no download folder to
-    drop it in), so it has no pair; the widget tests cover it (`test/settings/export_test.dart`).
-  - **Scrolling.** The app's test scrolls as the story did, to a whole pixel (Chrome scrolls to whole pixels); a page that ends
-    on a half pixel is rounded up by Chrome (0.5px more scroll), which the test gives the frame (`_page(roundedUp: true)`). The
-    story that clicks a button below the fold scrolls the browser to centre it: the test centres it too.
-  - **Passkeys** are the story's in-memory list (the web's `storyPasskeys`), not an API answer: the test hands the app the same
-    list (`SettingsPasskeys`). "Este navegador no permite crear huellas" is "Este teléfono…" in the app, so that story has no pair.
-  - **The search field** is `type="search"`: Chrome draws its blue clear button while there is text, which the app does not.
-  - **Lines in a taller box.** A 13px or 15px line in a CSS line box (19.5 and 22.5px) is `CssLines`, with its baseline where Blink
-    puts it (`CssBlinkLines`); the card titles (`SettingsSection`) carry the same shift, which they lacked (a pixel too low).
-  - **The app's own cards** (the guest's "Guarda tu progreso", "En este teléfono": vibration, the two notices and the widget; the
-    voice models, the server, "Más en la web", About, signing out) are drawn with the web's parts and have goldens of their own in
-    `test/settings/goldens` to review by eye, with the sheets the guest's dialogs and the server's address became.
-  - **Copy.** The theme's third choice is the web's "Automático"; the sound hint is the web's, and when the vibration is off the
-    English one says "Vibration stays off." where the web's says "stays on".
-  - **Weights.** The web loads Nunito from 600 up, so a `font-normal` text (the switch's hint) is drawn at 600 by Chrome; the app
-    does the same (`SettingSwitch`).
-  - **Paragraphs** are broken as Blink breaks them (`CssParagraph`): a line that is exactly as wide as its column breaks in a
-    different place when its words are measured whole, as Flutter does.
-  - **Day pairs** sit at 1.8–2.2% of ink: the text is placed to the pixel, and what is left is how Chrome and Flutter draw the same
-    glyphs (Flutter's dark-on-light text is a little heavier). The two pictures that show the most text at once
-    (`settings-currency-open` and `-passkeys`, by day) carry `maxInk: 2.3` in parity.json, which gives
-    that pair that much room (compose never uses it to lower the limit, prints it on the pair's line, and refuses any `maxInk` over 2.5%: a pair that needs more is wrong, not noisy); the picture is
-    still looked at first.
-  - **Delete card.** `.lk-danger-zone` is a 2px border of the danger colour over the stroke's (55/45), inside the card
-    (`border-box`: the padding stays, the content is 2px narrower). The input's `aria-invalid` has no style on the web, so the
-    field keeps its border when the delete is refused.
+- **Settings (`settings-*`).** Settings is a menu with a page per category (spec
+  `docs/superpowers/specs/2026-11-22-settings-categories-design.md`). The pairs are the menu and each category the web shares
+  with the phone, at rest: `settings-menu`, `settings-agents` (Mis agentes), `settings-account` (Cuenta y seguridad),
+  `settings-preferences`, `settings-data` (Tus datos) and `settings-more` (Más), each at night in Spanish, by day in English
+  (`-day-english`), and at night in Italian and Portuguese (`-italian`, `-portuguese`, in `it_pt_parity_test.dart`).
+  - **Stories.** `settings-parity--*` (`apps/web/app/features/settings/SettingsParity.stories.tsx`): `HomeStage` at the
+    category's URL with two assistants (Claude used, ChatGPT not yet) and two passkeys (`PARITY_PASSKEYS`: one synced, one
+    named). The app's side (`test/support/parity_settings.dart`) hands it the same: the passkeys in memory (the web's are not
+    on its API), the assistants from the fixture's `GET /v1/me/assistants`. The behaviour stories (`Settings/Menu`,
+    `Settings/Agents`, `Settings/Account`, `Settings/Preferences`, `Settings/Data`, `Settings/More`, and `Manage/Settings` on the
+    story-only `/app/settings/all`) are web-only.
+  - **What the app leaves out** (`webSectionsOnly`): the menu's Captura row, and under the rows the sign-out and the version;
+    the Más line is the web's ("Comentarios", `settingsMenuMoreWebLine`) instead of the app's "Comentarios, servidor, acerca
+    de"; Preferencias' vibration row and the language's "Automático"; Más' own rows (the server, the roadmap, the web, About).
+    `test/settings/settings_golden_test.dart` has them to review by eye (`test/settings/goldens`: the menu of a guest and of an
+    account with an email, Captura, Más, Preferencias at text scale 1.3, and the sheets the guest dialogs, the server and the
+    voice models became).
+  - **Mis agentes' address.** The web shows its own origin (`window.location.origin` + `/mcp`), which is a random port in the
+    shots: the story pins it (`HomeStage`'s `agentsOrigin`, Settings' `agentsOrigin` prop) to `https://app.wambito.com`, the
+    app's default server. `AddressField` is the web's: a `.lk-input` box (`InputBox`) with the address on one line, clipped,
+    as tall as the secondary "Copiar" beside it (a flex row stretches its items).
+  - **Border-box.** `.lk-group` and `.lk-rowcard` have a 2px border inside their 10/12px padding; a Flutter `BoxDecoration`
+    border is painted over the child, so `SettingsGroup` and `SettingsMenuRow` pad 12/14.
+  - **Lines.** A row's muted line (12.5px at 1.5: 18.75px), the menu row's title and line (22.5px, 18.75px) and a group's label
+    (17.25px) are `CssLines`; the label (letter-spaced 0.06em) also takes `letterSpacingShift` and `BlinkLine`. The dates of a
+    passkey and an agent are the web's `dateStyle: "medium"`: in Portuguese `02/10/2026` (`passkeyDay`).
+  - **Day pairs** sit at 1.5–2.5% of the ink, glyph edges only (Flutter's dark-on-light text is a little heavier). Four carry
+    `maxInk` (agents 2.1, data 2.1, more 2.2, preferences 2.5); `settings-preferences-day-english` is at 2.52%, most of it on
+    its three letter-spaced group labels: the one pair over its room.
 - **Settings → Security** has no pairs yet; its copy follows the web's `settings.security` keys. Removing a device is the
   web's `RemoveDeviceSheet` (title, body, "Quitar", "Quitando…", the toast "{name} ya no tiene acceso."), after the phone's
   screen lock. "Cambiar claves" is the web's "Change keys" (`ChangeKeysSheet`: its body, "Cambiando…", "Tus claves

@@ -141,7 +141,8 @@ void main() {
     expect(await const SecureHomeCacheStore().read(), isNotNull);
     expect(await const HomeWidgetStore().read(widgetSnapshotKey), contains('"signedIn":true'));
 
-    GoRouter.of(tester.element(find.byType(HomeScreen))).go('/settings');
+    // Settings → "Cuenta y seguridad", whose last row deletes the account.
+    GoRouter.of(tester.element(find.byType(HomeScreen))).go('/settings/account');
     await _pumpUntil(tester, find.byKey(const Key('settings.delete')));
     await _tap(tester, 'settings.delete');
     await _pumpUntil(tester, find.byKey(const Key('settings.delete.field')));
