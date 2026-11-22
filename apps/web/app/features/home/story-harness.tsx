@@ -945,6 +945,8 @@ export interface HomeStageProps extends HomeApiOptions {
   security?: SecurityApi;
   /** Settings' "Create account (add an email)" in "Protect your data". */
   onAddEmail?: () => void;
+  /** Where "Mis agentes" says the web is served (the story's own origin by default). */
+  agentsOrigin?: string;
 }
 
 /**
@@ -963,6 +965,7 @@ export function HomeStage({
   mode,
   security,
   onAddEmail,
+  agentsOrigin,
   ...api
 }: HomeStageProps) {
   // The toolbar's language, held here so settings can switch it (the toolbar's provider can't).
@@ -981,6 +984,7 @@ export function HomeStage({
     save: (blob: Blob, filename: string) => onSave(filename, blob),
     copy: onCopy,
     ...(security ? { security } : {}),
+    ...(agentsOrigin ? { agentsOrigin } : {}),
   };
   return (
     <IntlProvider locale={locale} onLocaleChange={setLocale}>

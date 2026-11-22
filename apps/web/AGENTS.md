@@ -480,8 +480,10 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   form; `SettingsRow`'s `description` is a longer sentence read with the row but not drawn (the
   sound switch, the import row); copy `settings.prefs.*`, `settings.data.*_row*`,
   `settings.feedback.row_line`; stories `Settings/Preferences`, `Settings/Data`, `Settings/More`);
-  the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
-  stacks every category's cards) until their categories are redrawn.
+  `Manage/Settings` and `Settings/Security` open `HomeStage` at `/app/settings/all` (story-only route
+  that stacks every category's cards) for their behaviour; `Settings/Parity` (`SettingsParity.stories.tsx`)
+  are the parity stories of the menu and each shared category (`apps/mobile/test/parity/parity.json`
+  `settings-*`; `HomeStage`'s `agentsOrigin` pins Mis agentes' address for them).
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
   automatic capture works. `app/features/capture/`: `CaptureSteps.tsx` (`CAPTURE_STEPS`,

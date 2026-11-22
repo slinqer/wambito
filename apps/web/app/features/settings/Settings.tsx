@@ -28,6 +28,8 @@ export interface SettingsProps {
   save?: SaveFile;
   /** Copies the assistants' address; the browser's clipboard by default. */
   copy?: CopyText;
+  /** Where "Mis agentes" says the web is served; the page's own origin by default (stories pin it). */
+  agentsOrigin?: string;
   /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
   security?: SecurityApi;
   /**
@@ -56,6 +58,7 @@ export function SettingsCategoryBody({
   save = saveToDisk,
   copy,
   security: securityProp,
+  agentsOrigin,
 }: SettingsProps & { category: SettingsCategory }) {
   const t = useTranslations("settings");
   const me = useMe().data;
@@ -70,7 +73,13 @@ export function SettingsCategoryBody({
 
   switch (category) {
     case "agents":
-      return <AgentsScreen timeZone={me.timezone} {...(copy ? { copy } : {})} />;
+      return (
+        <AgentsScreen
+          timeZone={me.timezone}
+          {...(copy ? { copy } : {})}
+          {...(agentsOrigin ? { origin: agentsOrigin } : {})}
+        />
+      );
     case "account":
       return (
         <AccountScreen

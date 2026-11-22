@@ -15,11 +15,12 @@ function ConfirmHarness({
   onConfirm?: () => void;
 }) {
   const t = useTranslations("settings.passkeys");
+  const tx = useTranslations("transaction");
   const [open, setOpen] = useState(initiallyOpen);
   return (
     <>
       <PressButton variant="secondary" onClick={() => setOpen(true)}>
-        {t("remove")}
+        {tx("delete")}
       </PressButton>
       <ConfirmSheet
         open={open}
