@@ -332,6 +332,8 @@ export interface HomeApiOptions {
   failDelete?: boolean;
   /** The assistants connected to the account (`GET /v1/me/assistants`); none by default. */
   assistants?: Assistant[];
+  /** From the second list on, the assistants answer with these (a grant made in another tab). */
+  laterAssistants?: Assistant[];
   /** Revoking an assistant answers 503. */
   failRevoke?: boolean;
   /** The profile is a guest's (`isAnonymous`). */
@@ -404,11 +406,13 @@ function homeFetch({
   failExport = false,
   failDelete = false,
   assistants: initialAssistants = [],
+  laterAssistants,
   failRevoke = false,
   guest = false,
   claim = "ok",
 }: HomeApiOptions): typeof fetch {
   let assistants = [...initialAssistants];
+  let assistantLists = 0;
   let categories: FakeCategory[] =
     data === "no-categories"
       ? []
@@ -536,7 +540,11 @@ function homeFetch({
       return Response.json(profile);
     }
     if (path === "/api/v1/me") return Response.json(profile);
-    if (path === "/api/v1/me/assistants") return Response.json({ items: assistants });
+    if (path === "/api/v1/me/assistants") {
+      assistantLists += 1;
+      if (assistantLists > 1 && laterAssistants) assistants = [...laterAssistants];
+      return Response.json({ items: assistants });
+    }
     const oneAssistant = /^\/api\/v1\/me\/assistants\/(.+)$/.exec(path);
     if (oneAssistant && request.method === "DELETE") {
       if (failRevoke) return Response.json({ code: "internal_error" }, { status: 503 });

@@ -164,12 +164,13 @@ export const SettingsOffByDay: Story = {
       await expect(button).toHaveAccessibleDescription(note);
     }
     await expect(canvas.getByRole("button", { name: /Add a fingerprint/ })).toBeDisabled();
-    // The assistants' address and steps, but no list: the demo asks the API nothing about them.
-    const assistants = within(canvas.getByRole("region", { name: "Connect your assistant" }));
+    // The four apps to connect and the address, but no grants: the demo asks the API nothing.
+    const assistants = within(canvas.getByRole("region", { name: "Wambito's address" }));
     await expect(
       assistants.getByRole("textbox", { name: "The Wambito address for assistants" }),
     ).toHaveValue(`${window.location.origin}/mcp`);
-    await expect(assistants.queryByText("Your assistants")).toBeNull();
+    await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: /^Revoke/ })).toBeNull();
     await expect(canvas.getByRole("link", { name: "Back to home" })).toHaveAttribute(
       "href",
       "/demo",

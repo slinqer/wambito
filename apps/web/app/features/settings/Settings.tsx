@@ -5,7 +5,7 @@ import { useMe } from "../../api/queries.ts";
 import { PageHeader } from "../../ui/PageHeader.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { PressLink } from "../../ui/PressLink.tsx";
-import { AssistantsSection, type CopyText } from "../assistants/AssistantsSection.tsx";
+import { AgentsScreen, type CopyText } from "../assistants/AgentsScreen.tsx";
 import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
@@ -78,7 +78,7 @@ export function SettingsCategoryBody({
 
   switch (category) {
     case "agents":
-      return <AssistantsSection timeZone={me.timezone} {...(copy ? { copy } : {})} />;
+      return <AgentsScreen timeZone={me.timezone} {...(copy ? { copy } : {})} />;
     case "account":
       return (
         <>

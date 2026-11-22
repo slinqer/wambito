@@ -3,7 +3,6 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { expectTarget } from "../../../.storybook/story-utils.ts";
 import { SOUND_STORAGE_KEY } from "../../feedback/feedback.ts";
 import { THEME_STORAGE_KEY } from "../../theme/theme-bootstrap.ts";
-import type { Assistant } from "../assistants/queries.ts";
 import { HomeStage, STORY_TODAY, storyPasskeys } from "../home/story-harness.tsx";
 import { APP_VERSION, FEEDBACK_EMAIL } from "./feedback.ts";
 
@@ -90,7 +89,7 @@ export const Overview: Story = {
       "Hora y moneda",
       "Entrar con tu huella",
       "Tus datos",
-      "Conecta tu asistente",
+      "La dirección de Wambito",
       "Comentarios e ideas",
       "Eliminar tu cuenta",
     ]) {
@@ -827,107 +826,5 @@ export const AppSectionsFeedback: Story = {
     await title(canvas);
     await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
     await scrollTo(canvas.getByRole("region", { name: "Comentarios e ideas" }));
-  },
-};
-
-const CLAUDE: Assistant = {
-  clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
-  name: "Claude",
-  icon: null,
-  uri: "https://claude.ai",
-  domain: "claude.ai",
-  scopes: ["finance:read", "finance:write", "offline_access"],
-  connectedAt: "2026-10-02T09:00:00.000Z",
-  lastUsedAt: "2026-10-20T18:30:00.000Z",
-};
-
-const CHATGPT: Assistant = {
-  clientId: "dcr-chatgpt-1",
-  name: "ChatGPT",
-  icon: null,
-  uri: "https://chatgpt.com",
-  domain: "chatgpt.com",
-  scopes: ["finance:read"],
-  connectedAt: "2026-10-05T09:00:00.000Z",
-  lastUsedAt: null,
-};
-
-/**
- * "Conecta tu asistente": the MCP's address on this origin with "Copiar", the steps for Claude
- * and ChatGPT, two things to ask, and the connected assistants with where each comes from.
- */
-export const Assistants: Story = {
-  render: (args) => stage(args, { assistants: [CLAUDE, CHATGPT] }),
-  play: async ({ canvasElement, args }) => {
-    const canvas = within(canvasElement);
-    await title(canvas);
-    const card = await region(canvas, "Conecta tu asistente");
-    const url = `${window.location.origin}/mcp`;
-    await expect(
-      card.getByRole("textbox", { name: "La dirección de Wambito para asistentes" }),
-    ).toHaveValue(url);
-    const copy = card.getByRole("button", { name: "Copiar la dirección" });
-    await expectTarget(copy);
-    await userEvent.click(copy);
-    await expect(args.onCopy).toHaveBeenCalledWith(url);
-    await toastShown("Listo: copiamos la dirección.");
-    await expect(card.getByText("En Claude")).toBeVisible();
-    await expect(card.getByText(/Settings → Connectors → Add custom connector/)).toBeVisible();
-    await expect(card.getByText("En ChatGPT")).toBeVisible();
-    await expect(card.getByText(/Depende de tu plan de ChatGPT/)).toBeVisible();
-    await expect(card.getByText("anota 18 lukas en almuerzo")).toBeVisible();
-    await expect(card.getByText("¿cómo voy este mes?")).toBeVisible();
-    await expect(await card.findByText("Desde claude.ai")).toBeVisible();
-    await expect(card.getByText("Conectado el 2 oct 2026")).toBeVisible();
-    await expect(card.getByText("Último uso: 20 oct 2026")).toBeVisible();
-    await expect(card.getByText("Desde chatgpt.com")).toBeVisible();
-    await expect(card.getByText("Aún sin usar")).toBeVisible();
-  },
-};
-
-/** Revocar asks first; then the API forgets it, the list is read again and the row is gone. */
-export const AssistantRevoke: Story = {
-  render: (args) => stage(args, { assistants: [CLAUDE, CHATGPT] }),
-  play: async ({ canvasElement, args }) => {
-    const canvas = within(canvasElement);
-    await title(canvas);
-    const card = await region(canvas, "Conecta tu asistente");
-    await userEvent.click(await card.findByRole("button", { name: "Revocar Claude" }));
-    const sheet = within(await screen.findByRole("dialog", { name: "¿Revocar Claude?" }));
-    await expect(writesTo(args.onRequest, "DELETE /api/v1/me/assistants")).toHaveLength(0);
-    await userEvent.click(sheet.getByRole("button", { name: "Sí, revocar" }));
-    await toastShown("Listo: Claude ya no tiene acceso.");
-    await dialogGone();
-    await expect(writesTo(args.onRequest, "DELETE /api/v1/me/assistants")).toEqual([
-      `DELETE /api/v1/me/assistants/${encodeURIComponent(CLAUDE.clientId)}`,
-    ]);
-    await waitFor(() => expect(card.queryByRole("button", { name: "Revocar Claude" })).toBeNull());
-    await expect(card.getByRole("button", { name: "Revocar ChatGPT" })).toBeVisible();
-  },
-};
-
-/** A failed revoke says so, and keeps the sheet open and the row. */
-export const AssistantRevokeFails: Story = {
-  render: (args) => stage(args, { assistants: [CLAUDE], failRevoke: true }),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await title(canvas);
-    const card = await region(canvas, "Conecta tu asistente");
-    await userEvent.click(await card.findByRole("button", { name: "Revocar Claude" }));
-    const dialog = await screen.findByRole("dialog", { name: "¿Revocar Claude?" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Sí, revocar" }));
-    await toastShown("No pudimos revocarlo. Inténtalo otra vez.", "alert");
-    await expect(dialog).toBeVisible();
-  },
-};
-
-/** None connected yet. */
-export const AssistantsEmpty: Story = {
-  render: (args) => stage(args),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await title(canvas);
-    const card = await region(canvas, "Conecta tu asistente");
-    await expect(await card.findByText("Aún no conectas ningún asistente.")).toBeVisible();
   },
 };

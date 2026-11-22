@@ -460,7 +460,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   from the language, theme and currency) and one page per category (`$category`:
   `SettingsCategoryScreen` in `Settings.tsx`, categories from `settings-categories.ts`; an unknown
   one shows `settings.menu.not_found_*`). Copy under `settings.menu.*`. Stories: `Settings/Menu`;
-  the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
+  "Mis agentes" (`features/assistants/AgentsScreen.tsx`): the four apps of `agents.ts` (`AGENTS`,
+  `agentFor(grant)` by name or domain) with state, "Conectar" (`ConnectAgentSheet.tsx`: Wambi's
+  handshake scene `public/wambi/handshake-<id>.webp`, three steps, help link) or "Revocar", other
+  grants after them with the `chat` icon, the connector address; the list is read again on window
+  focus and a new grant of one of the four toasts once; copy `settings.agents.*`; stories
+  `Settings/Agents`; the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
   stacks every category's cards) until their categories are redrawn.
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
