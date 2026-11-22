@@ -72,6 +72,10 @@
         "title": "Cattura automatica delle notifiche della tua banca",
         "body": "Su Android, Wambito legge le notifiche della tua banca e annota spese ed entrate da controllare."
       },
+      "iphone_capture": {
+        "title": "iPhone: annota i tuoi pagamenti con Apple Pay",
+        "body": "Su iPhone, ogni pagamento con Apple Pay viene annotato perché tu lo controlli, senza aprire l'app."
+      },
       "import_others": {
         "title": "Importa da Buddy e da altre app",
         "body": "Più modi per portare il tuo storico."

@@ -422,7 +422,10 @@ describe("the automatic capture copy", () => {
 
   const captureCopy = (locale: (typeof LANGUAGES)[number]) =>
     Object.entries(site[locale]).filter(
-      ([key]) => key.startsWith("landing.capture.") || key.startsWith("roadmap.items.bank_alerts."),
+      ([key]) =>
+        key.startsWith("landing.capture.") ||
+        key.startsWith("roadmap.items.bank_alerts.") ||
+        key.startsWith("roadmap.items.iphone_capture."),
     );
 
   it("the language words match every accented and plural form", () => {

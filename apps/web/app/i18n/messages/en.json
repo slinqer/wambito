@@ -72,6 +72,10 @@
         "title": "Automatic capture of your bank's notifications",
         "body": "On Android, Wambito reads your bank's notifications and logs your expenses and income for you to review."
       },
+      "iphone_capture": {
+        "title": "iPhone: log your Apple Pay payments",
+        "body": "On iPhone, every Apple Pay payment is logged for you to review, without opening the app."
+      },
       "import_others": {
         "title": "Import from Buddy and other apps",
         "body": "More ways to bring your history."
