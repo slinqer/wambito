@@ -50,7 +50,9 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   specs seed plain users), then web `e2e`, `e2e:landing`,
   `e2e:landing-only`, `e2e:landing-only-app`, `e2e:landing-analytics`.
 - `deploy-landing`: push to `main` after `check` + `e2e`; `wrangler deploy` from `deploy/landing`.
-- `mobile` / `mobile-build` (only when mobile paths change): pub get, analyze, tests without
+- `mobile` / `mobile-build` (only when mobile paths change; a change to the web's public catalogs
+  `apps/web/app/i18n/messages/*.json` or the capture scenes runs only `mobile`, the Dart tests that
+  compare with them, never the Android or iOS builds): pub get, analyze, tests without
   goldens and the `stack` tag, tokens and `apps/mobile/lib/api/gen` staleness, release self-tests, `build-native-deps.sh`
   `--abi` and `build-sherpa-onnx.sh` argument tests, F-Droid recipe and lock checks (`check-fdroid-recipe.sh`,
   `check-fdroid-lock.sh`, tested by `test-fdroid-checks.sh`), no-Google check, debug build, Gradle
