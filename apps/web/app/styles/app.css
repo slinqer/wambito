@@ -1400,7 +1400,9 @@
     font-weight: 800;
     color: var(--ink);
   }
-  .lk-row {
+  /* Not the home's and the recurring page's card rows (`lk-rowcard lk-row`), which share the press
+     rule above: this one would take their border, background and padding. */
+  .lk-row:not(.lk-rowcard) {
     display: flex;
     align-items: center;
     gap: 12px;
