@@ -464,8 +464,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `SettingsCategoryScreen` in `Settings.tsx`, categories from `settings-categories.ts`; an unknown
   one shows `settings.menu.not_found_*`). Copy under `settings.menu.*`. Stories: `Settings/Menu`;
   "Mis agentes" (`features/assistants/AgentsScreen.tsx`): the four apps of `agents.ts` (`AGENTS`,
-  `agentFor(grant)`: the name holds the app's name as a whole word, else the domain is the app's own
-  or a subdomain of it, matched at a label boundary, never a substring ("box.ai" is not x.ai); "Revocar"
+  `agentFor(grant)`: a grant with a domain is matched by the domain alone (the app's own or a subdomain,
+  at a label boundary, never a substring: "box.ai" is not x.ai; a foreign domain is "other" whatever the name),
+  the name (a whole word) only when there is no domain; "Revocar"
   revokes every grant of the app, since one app can hold several) with state, "Conectar" (`ConnectAgentSheet.tsx`: Wambi's
   handshake scene `public/wambi/handshake-<id>.webp`, three steps, help link) or "Revocar", other
   grants after them with the `chat` icon, the connector address; the list is read again on window
@@ -479,7 +480,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   "Preferencias", "Tus datos" and "Más" (`PreferencesScreen.tsx` over `PreferencesSection` and
   `TimeAndMoneySection`, `DataScreen.tsx`, `MoreScreen.tsx` over `FeedbackSection`): the same
   groups of one-line rows (the light rows are `SettingsGroup`, `SettingsGroupHead` and `SettingsRow`
-  in `features/settings/parts.tsx`, shown in `Settings/Rows`); Idioma and Tema show their value and open a `ChoiceSheet` (today's
+  in `features/settings/parts.tsx`, shown in `Manage/Settings rows`); Idioma and Tema show their value and open a `ChoiceSheet` (today's
   `Choices`, closes on pick), Zona horaria and Moneda open their pickers in a `Sheet` (the locked
   currency's line is shown there), "Descargar tus datos" opens the export choices, Comentarios the
   form; `SettingsRow`'s `description` is a longer sentence read with the row but not drawn (the

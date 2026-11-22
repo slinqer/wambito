@@ -294,7 +294,9 @@ class _AgentsScreenState extends ConsumerState<AgentsScreen> with WidgetsBinding
       key: Key('settings.agents.row.${grant.clientId}'),
       icon: _tile(context, LkIcon(LkIconName.chat, size: 18, color: context.lkColors.ink)),
       title: grant.name,
-      line: _line(l10n, grant),
+      line: grant.domain == null || grant.domain!.isEmpty
+          ? _line(l10n, grant)
+          : '${l10n.settingsAgentsFrom(grant.domain!)} · ${_line(l10n, grant)}',
       trailing: RowButton(
         label: l10n.settingsAssistantsRevoke,
         semanticLabel: l10n.settingsAssistantsRevokeLabel(grant.name),

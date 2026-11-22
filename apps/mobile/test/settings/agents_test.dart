@@ -117,6 +117,15 @@ void main() {
       expect(agentFor(grant('mcp', 'claude.ai')), Agent.claude);
     });
 
+    test('trusts the domain over the name, and the name only without a domain', () {
+      expect(agentFor(grant('Claude', 'evil.example')), isNull);
+      expect(agentFor(grant('Claude helper', 'evil.example')), isNull);
+      expect(agentFor(grant('Claude', null)), Agent.claude);
+      expect(agentFor(grant('Claude', '')), Agent.claude);
+      expect(agentFor(grant('Claude', 'claude.ai')), Agent.claude);
+      expect(agentFor(grant('Grok', 'claude.ai')), Agent.claude);
+    });
+
     test('is null for any other client', () {
       expect(agentFor(grant('Cursor')), isNull);
       expect(agentFor(grant('Cursor', 'cursor.com')), isNull);
@@ -161,6 +170,31 @@ void main() {
   });
 
   group('the list', () {
+    testPage('a Claude from a foreign domain is its own row, with its domain', (t) async {
+      final evil = ConnectedAssistant(
+        clientId: 'evil-1',
+        name: 'Claude',
+        domain: 'evil.example',
+        connectedAt: DateTime.utc(2026, 10, 9, 15),
+      );
+      await _pump(t, assistants: FakeAssistantsRepository([evil, _claude()]));
+      expect(
+        find.descendant(
+          of: _row('claude'),
+          matching: find.text('Conectado el 2 oct 2026 · usado el 20 oct 2026'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _row('evil-1'),
+          matching: find.text('Desde evil.example · Conectado el 9 oct 2026 · aún sin usar'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.descendant(of: _row('evil-1'), matching: find.byType(LkBrandLogo)), findsNothing);
+    });
+
     testPage('shows the four apps in order, then any other client, with their state', (t) async {
       await _pump(t, assistants: FakeAssistantsRepository([_cursor(), _chatGpt(), _claude()]));
       expect(said('Mis agentes'), findsWidgets);
@@ -202,7 +236,7 @@ void main() {
       expect(
         find.descendant(
           of: _row('cursor-1'),
-          matching: find.text('Conectado el 9 oct 2026 · usado ayer'),
+          matching: find.text('Desde cursor.com · Conectado el 9 oct 2026 · usado ayer'),
         ),
         findsOneWidget,
       );

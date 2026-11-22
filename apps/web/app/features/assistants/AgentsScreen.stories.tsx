@@ -126,6 +126,9 @@ export const List: Story = {
     await expect(grok.getByText("Sin conectar")).toBeVisible();
     await expect(grok.getByRole("button", { name: "Conectar Grok" })).toBeVisible();
     await expect(cursor.getByText("Cursor")).toBeVisible();
+    await expect(
+      cursor.getByText("Desde cursor.com · Conectado el 8 oct 2026 · aún sin usar"),
+    ).toBeVisible();
     await expect(cursor.getByRole("button", { name: "Revocar Cursor" })).toBeVisible();
     // The four brands have their logo; the unknown client the generic chat icon.
     await expect(rows[0]?.querySelector("svg")).not.toBeNull();
@@ -134,6 +137,40 @@ export const List: Story = {
     await expect(
       canvas.getByRole("textbox", { name: "La dirección de Wambito para asistentes" }),
     ).toHaveValue(`${window.location.origin}/mcp`);
+  },
+};
+
+const EVIL_CLAUDE: Assistant = {
+  clientId: "dcr-evil-1",
+  name: "Claude",
+  icon: null,
+  uri: "https://evil.example",
+  domain: "evil.example",
+  scopes: ["finance:read"],
+  connectedAt: "2026-10-09T09:00:00.000Z",
+  lastUsedAt: null,
+};
+
+/** A client named Claude from a foreign domain is its own row with the domain, apart from the real Claude. */
+export const ForeignClaude: Story = {
+  render: (args) => stage(args, { assistants: [EVIL_CLAUDE, CLAUDE] }),
+  play: async ({ canvasElement }) => {
+    await page(canvasElement);
+    await within(canvasElement).findByText("Conectado el 2 oct 2026 · usado el 20 oct 2026");
+    const rows = rowsOf(canvasElement);
+    await expect(rows.map((row) => row.dataset.agent)).toEqual([
+      "claude",
+      "chatgpt",
+      "lumo",
+      "grok",
+      "dcr-evil-1",
+    ]);
+    const [real, , , , other] = rows.map((row) => within(row));
+    await expect(real?.getByText("Conectado el 2 oct 2026 · usado el 20 oct 2026")).toBeVisible();
+    await expect(
+      other?.getByText("Desde evil.example · Conectado el 9 oct 2026 · aún sin usar"),
+    ).toBeVisible();
+    await expect(other?.getByTestId("generic-agent-icon")).toBeVisible();
   },
 };
 

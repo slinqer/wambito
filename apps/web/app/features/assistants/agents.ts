@@ -72,16 +72,20 @@ const DOMAINS: readonly (readonly [AgentId, readonly string[]])[] = [
 ];
 
 /**
- * Which of the four apps an OAuth client is; null for any other. The name must hold the app's name
- * as a whole word; the domain must be the app's own or one of its subdomains (never a substring:
- * "box.ai" is not x.ai).
+ * Which of the four apps an OAuth client is; null for any other. A grant that has a domain is
+ * matched by the domain alone: the app's own or one of its subdomains, at a label boundary (never
+ * a substring: "box.ai" is not x.ai), whatever its name says (clients register themselves, so
+ * "Claude" from evil.example is not Claude). Only a grant with no domain is matched by name, as a
+ * whole word.
  */
 export function agentFor(grant: { name: string; domain?: string | null }): AgentId | null {
-  for (const [id, pattern] of NAMES) if (pattern.test(grant.name)) return id;
   const domain = (grant.domain ?? "").toLowerCase();
-  if (!domain) return null;
-  for (const [id, own] of DOMAINS) {
-    if (own.some((d) => domain === d || domain.endsWith(`.${d}`))) return id;
+  if (domain) {
+    for (const [id, own] of DOMAINS) {
+      if (own.some((d) => domain === d || domain.endsWith(`.${d}`))) return id;
+    }
+    return null;
   }
+  for (const [id, pattern] of NAMES) if (pattern.test(grant.name)) return id;
   return null;
 }

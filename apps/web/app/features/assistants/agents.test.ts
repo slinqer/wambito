@@ -14,6 +14,15 @@ describe("agentFor", () => {
     expect(agentFor({ name: "Lumo", domain: "lumo.proton.me" })).toBe("lumo");
   });
 
+  it("trusts the domain over the name, and the name only without a domain", () => {
+    expect(agentFor({ name: "Claude", domain: "evil.example" })).toBeNull();
+    expect(agentFor({ name: "Claude helper", domain: "evil.example" })).toBeNull();
+    expect(agentFor({ name: "Claude", domain: null })).toBe("claude");
+    expect(agentFor({ name: "Claude", domain: "" })).toBe("claude");
+    expect(agentFor({ name: "Claude", domain: "claude.ai" })).toBe("claude");
+    expect(agentFor({ name: "Grok", domain: "claude.ai" })).toBe("claude");
+  });
+
   it("is null for any other client", () => {
     expect(agentFor({ name: "Cursor" })).toBeNull();
     expect(agentFor({ name: "Cursor", domain: "cursor.com" })).toBeNull();

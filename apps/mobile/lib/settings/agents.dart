@@ -79,19 +79,23 @@ const _domains = <Agent, List<String>>{
   Agent.grok: ['grok.com', 'x.ai'],
 };
 
-/// Which of the four apps an OAuth client is; null for any other. The name must hold the app's name
-/// as a whole word; the domain must be the app's own or one of its subdomains, never a substring
-/// ("box.ai" is not x.ai).
+/// Which of the four apps an OAuth client is; null for any other. A grant that has a domain is
+/// matched by the domain alone: the app's own or one of its subdomains, at a label boundary (never
+/// a substring: "box.ai" is not x.ai), whatever its name says (clients register themselves, so
+/// "Claude" from evil.example is not Claude). Only a grant with no domain is matched by name, as a
+/// whole word.
 Agent? agentFor(ConnectedAssistant grant) {
+  final domain = (grant.domain ?? '').toLowerCase();
+  if (domain.isNotEmpty) {
+    for (final entry in _domains.entries) {
+      for (final own in entry.value) {
+        if (domain == own || domain.endsWith('.$own')) return entry.key;
+      }
+    }
+    return null;
+  }
   for (final entry in _names.entries) {
     if (entry.value.hasMatch(grant.name)) return entry.key;
-  }
-  final domain = (grant.domain ?? '').toLowerCase();
-  if (domain.isEmpty) return null;
-  for (final entry in _domains.entries) {
-    for (final own in entry.value) {
-      if (domain == own || domain.endsWith('.$own')) return entry.key;
-    }
   }
   return null;
 }

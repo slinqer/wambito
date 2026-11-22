@@ -199,7 +199,11 @@ export function AgentsScreen({
                 </span>
               }
               name={grant.name}
-              line={connectedLine(grant)}
+              line={
+                grant.domain
+                  ? `${t("from", { domain: grant.domain })} · ${connectedLine(grant)}`
+                  : connectedLine(grant)
+              }
               action={
                 <RevokeButton name={grant.name} onPress={() => askRevoke(grant.name, [grant])} />
               }
