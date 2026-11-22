@@ -1374,8 +1374,8 @@ export interface components {
             /** @enum {string} */
             source: "app" | "web" | "widget" | "mcp" | "import" | "recurrence" | "capture";
             needsReview: boolean;
-            /** @enum {string|null} */
-            captureSource: "revolut" | "google_wallet" | null;
+            /** @description Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source */
+            captureSource: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -1456,8 +1456,8 @@ export interface components {
                 /** @enum {string} */
                 source: "app" | "web" | "widget" | "mcp" | "import" | "recurrence" | "capture";
                 needsReview: boolean;
-                /** @enum {string|null} */
-                captureSource: "revolut" | "google_wallet" | null;
+                /** @description Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source */
+                captureSource: string | null;
                 createdAt: string;
                 updatedAt: string;
             };
@@ -1475,7 +1475,7 @@ export interface components {
             /** Format: date-time */
             capturedAt: string;
             /** @enum {string} */
-            source: "revolut" | "google_wallet";
+            source: "revolut" | "google_wallet" | "apple_wallet";
         };
         Recurrence: {
             /** Format: uuid */

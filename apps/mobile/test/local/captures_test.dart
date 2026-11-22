@@ -170,6 +170,17 @@ void main() {
       expect(_tx(out)['currency'], 'EUR');
     });
 
+    test('takes a payment from Apple Wallet', () async {
+      final ctx = _setup();
+      final res = await _capture(ctx, {'source': 'apple_wallet', 'amount': 1800});
+      expect(res.status, 201);
+      final stored = await ctx.store.get(
+        RecordType.transaction,
+        _tx(_json(res.body))['id']! as String,
+      );
+      expect(stored?.body, containsPair('captureSource', 'apple_wallet'));
+    });
+
     test('dates by the profile zone', () async {
       final ctx = _setup(timezone: 'America/Bogota');
       final out = await _created(ctx, {'capturedAt': '2026-11-05T03:30:00Z'});

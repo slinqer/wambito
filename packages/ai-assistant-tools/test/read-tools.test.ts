@@ -268,6 +268,32 @@ describe("list_transactions", () => {
     expect(pending.structured.items.map((t: { name: string }) => t.name)).toEqual(["Rappi"]);
   });
 
+  it("names Apple Wallet, and leaves out a source it does not know", async () => {
+    const detected = { source: "capture" as const, needsReview: true };
+    const { ctx } = setup({
+      transactions: (c) => [
+        transaction(c.comida, -1800000, "2026-10-30", {
+          name: "Juan Valdez",
+          captureSource: "apple_wallet",
+          ...detected,
+        }),
+        transaction(c.comida, -900000, "2026-10-29", {
+          name: "Tienda",
+          captureSource: "some_future_bank",
+          ...detected,
+        }),
+      ],
+    });
+    const all = await call("list_transactions", {}, ctx);
+    expect(all.text).toContain("de Apple Wallet");
+    expect(all.text).not.toContain("some_future_bank");
+    expect(all.text).not.toContain("de undefined");
+    expect(all.structured.items[1]).toMatchObject({
+      needsReview: true,
+      captureSource: "some_future_bank",
+    });
+  });
+
   it("words the review mark in the person's language", async () => {
     for (const [locale, review, origin] of [
       ["en", "to review", "from Revolut"],

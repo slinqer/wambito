@@ -76,34 +76,10 @@ final BuiltSet<TransactionSource_Enum> _$transactionSourceEnumValues =
       _$transactionSourceEnum_capture,
     ]);
 
-const TransactionCaptureSourceEnum _$transactionCaptureSourceEnum_revolut =
-    const TransactionCaptureSourceEnum._('revolut');
-const TransactionCaptureSourceEnum _$transactionCaptureSourceEnum_googleWallet =
-    const TransactionCaptureSourceEnum._('googleWallet');
-
-TransactionCaptureSourceEnum _$transactionCaptureSourceEnumValueOf(String name) {
-  switch (name) {
-    case 'revolut':
-      return _$transactionCaptureSourceEnum_revolut;
-    case 'googleWallet':
-      return _$transactionCaptureSourceEnum_googleWallet;
-    default:
-      throw ArgumentError(name);
-  }
-}
-
-final BuiltSet<TransactionCaptureSourceEnum> _$transactionCaptureSourceEnumValues =
-    BuiltSet<TransactionCaptureSourceEnum>(const <TransactionCaptureSourceEnum>[
-      _$transactionCaptureSourceEnum_revolut,
-      _$transactionCaptureSourceEnum_googleWallet,
-    ]);
-
 Serializer<TransactionStatusEnum> _$transactionStatusEnumSerializer =
     _$TransactionStatusEnumSerializer();
 Serializer<TransactionSource_Enum> _$transactionSourceEnumSerializer =
     _$TransactionSource_EnumSerializer();
-Serializer<TransactionCaptureSourceEnum> _$transactionCaptureSourceEnumSerializer =
-    _$TransactionCaptureSourceEnumSerializer();
 
 class _$TransactionStatusEnumSerializer implements PrimitiveSerializer<TransactionStatusEnum> {
   static const Map<String, Object> _toWire = const <String, Object>{
@@ -179,39 +155,6 @@ class _$TransactionSource_EnumSerializer implements PrimitiveSerializer<Transact
   );
 }
 
-class _$TransactionCaptureSourceEnumSerializer
-    implements PrimitiveSerializer<TransactionCaptureSourceEnum> {
-  static const Map<String, Object> _toWire = const <String, Object>{
-    'revolut': 'revolut',
-    'googleWallet': 'google_wallet',
-  };
-  static const Map<Object, String> _fromWire = const <Object, String>{
-    'revolut': 'revolut',
-    'google_wallet': 'googleWallet',
-  };
-
-  @override
-  final Iterable<Type> types = const <Type>[TransactionCaptureSourceEnum];
-  @override
-  final String wireName = 'TransactionCaptureSourceEnum';
-
-  @override
-  Object serialize(
-    Serializers serializers,
-    TransactionCaptureSourceEnum object, {
-    FullType specifiedType = FullType.unspecified,
-  }) => _toWire[object.name] ?? object.name;
-
-  @override
-  TransactionCaptureSourceEnum deserialize(
-    Serializers serializers,
-    Object serialized, {
-    FullType specifiedType = FullType.unspecified,
-  }) => TransactionCaptureSourceEnum.valueOf(
-    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
-  );
-}
-
 class _$Transaction extends Transaction {
   @override
   final String id;
@@ -238,7 +181,7 @@ class _$Transaction extends Transaction {
   @override
   final bool needsReview;
   @override
-  final TransactionCaptureSourceEnum? captureSource;
+  final String? captureSource;
   @override
   final String createdAt;
   @override
@@ -387,10 +330,9 @@ class TransactionBuilder implements Builder<Transaction, TransactionBuilder> {
   bool? get needsReview => _$this._needsReview;
   set needsReview(bool? needsReview) => _$this._needsReview = needsReview;
 
-  TransactionCaptureSourceEnum? _captureSource;
-  TransactionCaptureSourceEnum? get captureSource => _$this._captureSource;
-  set captureSource(TransactionCaptureSourceEnum? captureSource) =>
-      _$this._captureSource = captureSource;
+  String? _captureSource;
+  String? get captureSource => _$this._captureSource;
+  set captureSource(String? captureSource) => _$this._captureSource = captureSource;
 
   String? _createdAt;
   String? get createdAt => _$this._createdAt;

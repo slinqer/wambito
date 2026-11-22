@@ -66,6 +66,12 @@ describe("createCaptureSchema", () => {
     expect(() => createCaptureSchema.parse({ ...valid, amount })).toThrow();
   });
 
+  it("accepts every known source, apple_wallet included", () => {
+    for (const source of ["revolut", "google_wallet", "apple_wallet"]) {
+      expect(createCaptureSchema.parse({ ...valid, source }).source).toBe(source);
+    }
+  });
+
   it("rejects an unknown source", () => {
     expect(() => createCaptureSchema.parse({ ...valid, source: "sms" })).toThrow();
   });

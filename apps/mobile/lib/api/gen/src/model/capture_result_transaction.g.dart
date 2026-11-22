@@ -75,42 +75,10 @@ final BuiltSet<CaptureResultTransactionSource_Enum> _$captureResultTransactionSo
       _$captureResultTransactionSourceEnum_capture,
     ]);
 
-const CaptureResultTransactionCaptureSourceEnum
-_$captureResultTransactionCaptureSourceEnum_revolut =
-    const CaptureResultTransactionCaptureSourceEnum._('revolut');
-const CaptureResultTransactionCaptureSourceEnum
-_$captureResultTransactionCaptureSourceEnum_googleWallet =
-    const CaptureResultTransactionCaptureSourceEnum._('googleWallet');
-
-CaptureResultTransactionCaptureSourceEnum _$captureResultTransactionCaptureSourceEnumValueOf(
-  String name,
-) {
-  switch (name) {
-    case 'revolut':
-      return _$captureResultTransactionCaptureSourceEnum_revolut;
-    case 'googleWallet':
-      return _$captureResultTransactionCaptureSourceEnum_googleWallet;
-    default:
-      throw ArgumentError(name);
-  }
-}
-
-final BuiltSet<CaptureResultTransactionCaptureSourceEnum>
-_$captureResultTransactionCaptureSourceEnumValues =
-    BuiltSet<CaptureResultTransactionCaptureSourceEnum>(
-      const <CaptureResultTransactionCaptureSourceEnum>[
-        _$captureResultTransactionCaptureSourceEnum_revolut,
-        _$captureResultTransactionCaptureSourceEnum_googleWallet,
-      ],
-    );
-
 Serializer<CaptureResultTransactionStatusEnum> _$captureResultTransactionStatusEnumSerializer =
     _$CaptureResultTransactionStatusEnumSerializer();
 Serializer<CaptureResultTransactionSource_Enum> _$captureResultTransactionSourceEnumSerializer =
     _$CaptureResultTransactionSource_EnumSerializer();
-Serializer<CaptureResultTransactionCaptureSourceEnum>
-_$captureResultTransactionCaptureSourceEnumSerializer =
-    _$CaptureResultTransactionCaptureSourceEnumSerializer();
 
 class _$CaptureResultTransactionStatusEnumSerializer
     implements PrimitiveSerializer<CaptureResultTransactionStatusEnum> {
@@ -188,39 +156,6 @@ class _$CaptureResultTransactionSource_EnumSerializer
   );
 }
 
-class _$CaptureResultTransactionCaptureSourceEnumSerializer
-    implements PrimitiveSerializer<CaptureResultTransactionCaptureSourceEnum> {
-  static const Map<String, Object> _toWire = const <String, Object>{
-    'revolut': 'revolut',
-    'googleWallet': 'google_wallet',
-  };
-  static const Map<Object, String> _fromWire = const <Object, String>{
-    'revolut': 'revolut',
-    'google_wallet': 'googleWallet',
-  };
-
-  @override
-  final Iterable<Type> types = const <Type>[CaptureResultTransactionCaptureSourceEnum];
-  @override
-  final String wireName = 'CaptureResultTransactionCaptureSourceEnum';
-
-  @override
-  Object serialize(
-    Serializers serializers,
-    CaptureResultTransactionCaptureSourceEnum object, {
-    FullType specifiedType = FullType.unspecified,
-  }) => _toWire[object.name] ?? object.name;
-
-  @override
-  CaptureResultTransactionCaptureSourceEnum deserialize(
-    Serializers serializers,
-    Object serialized, {
-    FullType specifiedType = FullType.unspecified,
-  }) => CaptureResultTransactionCaptureSourceEnum.valueOf(
-    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
-  );
-}
-
 class _$CaptureResultTransaction extends CaptureResultTransaction {
   @override
   final String id;
@@ -247,7 +182,7 @@ class _$CaptureResultTransaction extends CaptureResultTransaction {
   @override
   final bool needsReview;
   @override
-  final CaptureResultTransactionCaptureSourceEnum? captureSource;
+  final String? captureSource;
   @override
   final String createdAt;
   @override
@@ -397,10 +332,9 @@ class CaptureResultTransactionBuilder
   bool? get needsReview => _$this._needsReview;
   set needsReview(bool? needsReview) => _$this._needsReview = needsReview;
 
-  CaptureResultTransactionCaptureSourceEnum? _captureSource;
-  CaptureResultTransactionCaptureSourceEnum? get captureSource => _$this._captureSource;
-  set captureSource(CaptureResultTransactionCaptureSourceEnum? captureSource) =>
-      _$this._captureSource = captureSource;
+  String? _captureSource;
+  String? get captureSource => _$this._captureSource;
+  set captureSource(String? captureSource) => _$this._captureSource = captureSource;
 
   String? _createdAt;
   String? get createdAt => _$this._createdAt;

@@ -104,6 +104,17 @@ describe("parseRecord", () => {
     ).toBe(false);
   });
 
+  test("a transaction's captureSource is any source text, so a newer client's source survives", () => {
+    for (const captureSource of ["revolut", "apple_wallet", "some_future_bank", null]) {
+      expect(
+        parseRecord("transaction", { ...(valid.transaction as object), captureSource }),
+      ).toMatchObject({ ok: true, value: { captureSource } });
+    }
+    expect(
+      parseRecord("transaction", { ...(valid.transaction as object), captureSource: 7 }).ok,
+    ).toBe(false);
+  });
+
   test("a transaction's updatedAt is optional", () => {
     expect(parseRecord("transaction", valid.transaction).ok).toBe(true);
     expect(

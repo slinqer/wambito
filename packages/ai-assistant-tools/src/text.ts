@@ -1,3 +1,4 @@
+import type { CaptureSource } from "@wambito/core";
 import type { Profile } from "./wambito.ts";
 
 type Locale = Profile["locale"];
@@ -38,7 +39,7 @@ interface Phrases {
   recurringStopped(name: string): string;
   pending: string;
   toReview: string;
-  fromSource(source: "revolut" | "google_wallet"): string;
+  fromSource(source: CaptureSource): string;
 }
 
 const STATES: Record<Locale, Record<State, string>> = {
@@ -48,7 +49,11 @@ const STATES: Record<Locale, Record<State, string>> = {
   pt: { ok: "dentro", near: "perto do limite", over: "ultrapassado" },
 };
 
-const SOURCES = { revolut: "Revolut", google_wallet: "Google Wallet" } as const;
+const SOURCES: Record<CaptureSource, string> = {
+  revolut: "Revolut",
+  google_wallet: "Google Wallet",
+  apple_wallet: "Apple Wallet",
+};
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

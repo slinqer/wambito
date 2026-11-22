@@ -851,7 +851,7 @@
   "reviewOk": "Certo",
   "reviewChange": "Alterar",
   "reviewConfirmAll": "Confirmar tudo",
-  "reviewMark": "{source, select, revolut{por rever · do Revolut} google_wallet{por rever · do Google Wallet} other{por rever}}",
+  "reviewMark": "{source, select, revolut{por rever · do Revolut} google_wallet{por rever · do Google Wallet} apple_wallet{por rever · do Apple Wallet} other{por rever}}",
   "reviewEmpty": "Nada por rever",
   "searchTitle": "Pesquisar",
   "searchPlaceholder": "Pesquisa por nome ou nota",

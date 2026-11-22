@@ -51,7 +51,7 @@
     "nudge_import_action": "Bring my history",
     "sign_out_failed": "We couldn't sign you out. Try again.",
     "nudge_budgets_action": "Go to Categories",
-    "review_mark": "{source, select, revolut{to review · from Revolut} google_wallet{to review · from Google Wallet} other{to review}}",
+    "review_mark": "{source, select, revolut{to review · from Revolut} google_wallet{to review · from Google Wallet} apple_wallet{to review · from Apple Wallet} other{to review}}",
     "review_filter": "To review · {count}",
     "review_ok": "OK",
     "review_ok_label": "OK: {name}",

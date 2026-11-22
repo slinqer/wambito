@@ -38,7 +38,7 @@ abstract class CreateCapture implements Built<CreateCapture, CreateCaptureBuilde
 
   @BuiltValueField(wireName: r'source')
   CreateCaptureSource_Enum get source_;
-  // enum source_Enum {  revolut,  google_wallet,  };
+  // enum source_Enum {  revolut,  google_wallet,  apple_wallet,  };
 
   CreateCapture._();
 
@@ -183,6 +183,8 @@ class CreateCaptureSource_Enum extends EnumClass {
   static const CreateCaptureSource_Enum revolut = _$createCaptureSourceEnum_revolut;
   @BuiltValueEnumConst(wireName: r'google_wallet')
   static const CreateCaptureSource_Enum googleWallet = _$createCaptureSourceEnum_googleWallet;
+  @BuiltValueEnumConst(wireName: r'apple_wallet')
+  static const CreateCaptureSource_Enum appleWallet = _$createCaptureSourceEnum_appleWallet;
 
   static Serializer<CreateCaptureSource_Enum> get serializer => _$createCaptureSourceEnumSerializer;
 

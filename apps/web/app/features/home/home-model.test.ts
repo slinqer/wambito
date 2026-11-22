@@ -293,6 +293,11 @@ describe("reviewMark", () => {
   it("names where a detected transaction came from", () => {
     expect(reviewMark(detected("a", "revolut"))).toBe("revolut");
     expect(reviewMark(detected("b", "google_wallet"))).toBe("google_wallet");
+    expect(reviewMark(detected("d", "apple_wallet"))).toBe("apple_wallet");
+  });
+
+  it("marks one from a source this version does not know with the plain mark", () => {
+    expect(reviewMark(detected("e", "some_future_bank"))).toBe("other");
   });
 
   it("still marks one whose source is unknown", () => {
