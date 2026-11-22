@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart' show PasskeyItem;
 import 'package:wambito/local/keys.dart' show WrapDto;
 import 'package:wambito/settings/security/security_model.dart';
+import 'package:wambito/ui/lk_icon_shapes.dart' show LkIconName;
 
 WrapDto _wrap(String id, String kind, {String? ref, String? label, String? createdAt}) => WrapDto(
   id: id,
@@ -40,6 +41,23 @@ PasskeyItem _passkey(String id, String credentialId) => PasskeyItem(
 );
 
 void main() {
+  test('deviceIconFor: a laptop for computers, a phone otherwise', () {
+    for (final name in [
+      'MacBook',
+      'Chrome on macOS',
+      'Firefox on Linux',
+      'Edge on Windows',
+      'Chromebook Chrome OS',
+      'Mi PC',
+      'Laptop',
+    ]) {
+      expect(deviceIconFor(name), LkIconName.laptop, reason: name);
+    }
+    for (final name in ['Pixel 8', 'Safari on iOS', 'Huella', null]) {
+      expect(deviceIconFor(name), LkIconName.phone, reason: '$name');
+    }
+  });
+
   group('deviceRows', () {
     test("this phone's device is marked and cannot be removed here", () {
       final rows = _rows();

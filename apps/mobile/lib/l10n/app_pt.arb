@@ -535,26 +535,25 @@
   "settingsPasskeysUnsupported": "Este telemóvel não permite criar impressões digitais. Continua a entrar com o teu email.",
   "settingsPasskeysListFailed": "Não conseguimos carregar as tuas impressões digitais. Tenta de novo daqui a um momento.",
   "settingsPasskeysDefaultName": "Impressão digital",
-  "settingsPasskeysCreated": "Criada em {date}",
-  "settingsPasskeysSynced": "Sincronizada",
+  "settingsPasskeysCreated": "Desde {date}",
+  "settingsPasskeysSynced": "sincronizada",
   "settingsPasskeysAdd": "Adicionar uma impressão digital",
   "settingsPasskeysAdding": "À espera da tua impressão digital…",
   "settingsPasskeysGuest": "Primeiro guarda o teu progresso com um email; depois poderás adicionar uma impressão digital.",
   "settingsPasskeysAdded": "Pronto: já podes entrar com a impressão digital.",
   "settingsPasskeysAddFailed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez.",
-  "settingsPasskeysRemove": "Eliminar",
   "settingsPasskeysRemoveLabel": "Eliminar a impressão digital criada em {date}",
-  "settingsPasskeysRemoveNamedLabel": "Eliminar {name}, criada em {date}",
+  "settingsPasskeysRemoveNamedLabel": "Eliminar {name}",
   "settingsPasskeysRemoveTitle": "Eliminar esta impressão digital?",
   "settingsPasskeysRemoveBody": "Já não poderás entrar com ela. O teu email continua a funcionar.",
   "settingsPasskeysRemoveConfirm": "Sim, eliminar",
   "settingsPasskeysRemoved": "Eliminámos a impressão digital.",
   "settingsPasskeysRemoveFailed": "Não conseguimos eliminar a impressão digital. Tenta outra vez.",
-  "settingsSecurityTitle": "Segurança",
-  "settingsSecurityLead": "Os teus dados estão cifrados. Estes dispositivos podem abri-los.",
-  "settingsSecurityThisPhone": "Este telemóvel",
+  "settingsSecurityTitle": "Os teus dispositivos",
+  "settingsSecurityLead": "Podem abrir os teus dados cifrados",
+  "settingsSecurityThisPhone": "Este",
   "settingsSecurityUnnamed": "Dispositivo",
-  "settingsSecurityAdded": "Adicionado em {date}",
+  "settingsSecurityAdded": "Desde {date}",
   "settingsSecurityNotVerified": "Não verificado",
   "settingsSecurityLoadFailed": "Não conseguimos carregar os teus dispositivos. Tenta outra vez daqui a pouco.",
   "settingsSecurityRemove": "Remover",
@@ -564,8 +563,7 @@
   "connectDeviceCodeLabel": "Código do outro dispositivo",
   "connectDeviceBadCode": "Esse código não corresponde a nenhum pedido. Verifica-o, ou começa de novo no outro dispositivo.",
   "settingsSecurityRecoveryTitle": "Chave de recuperação",
-  "settingsSecurityRecoveryLead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto. A anterior deixa de funcionar.",
-  "settingsSecurityNewRecovery": "Nova chave de recuperação",
+  "settingsSecurityRecoveryLead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto.",
   "settingsSecurityUnreadable": "{count, plural, =0{Não foi possível ler {count} elementos} =1{Não foi possível ler {count} elemento} other{Não foi possível ler {count} elementos}}",
   "settingsSecurityUnreadableLead": "Foram guardados com uma chave que este telemóvel não tem. Continuam seguros tal como estão.",
   "settingsSecurityMaybeSaved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",
@@ -591,9 +589,7 @@
   "settingsSecurityNewKeySaved": "A tua chave de recuperação nova ficou guardada. A anterior já não funciona.",
   "settingsSecurityNewKeyRotatedElsewhere": "Entretanto, as tuas chaves mudaram noutro dispositivo. Cria a chave nova outra vez.",
   "settingsSecurityNewKeyFailed": "Não conseguimos guardar a chave nova. Tenta outra vez.",
-  "settingsPasskeysUnlocks": "Abre os teus dados",
   "settingsPasskeysLocked": "Não abre os teus dados",
-  "settingsPasskeysTurnOn": "Ativar",
   "settingsPasskeysTurnOnLabel": "Ativar para os teus dados a impressão digital criada em {date}",
   "settingsPasskeysTurnOnNamedLabel": "Ativar {name} para os teus dados",
   "settingsPasskeysTurnedOn": "Feito: esta impressão digital também abre os teus dados.",
@@ -798,8 +794,6 @@
   "settingsExportSaveFailed": "Não conseguimos guardar o ficheiro. Tenta outra vez.",
   "settingsExportShareFailed": "Não encontrámos uma app para partilhar o ficheiro.",
   "settingsAccountDeleteTitle": "Eliminar a tua conta",
-  "settingsAccountDeleteLead": "Apagamos a tua conta e todos os teus movimentos de imediato. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
-  "settingsAccountDeleteAction": "Eliminar a minha conta",
   "settingsAccountDeleteSheetTitle": "Eliminar a tua conta?",
   "settingsAccountDeleteSheetBody": "São apagados de imediato os teus movimentos, categorias, orçamentos, recorrentes e impressões digitais. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
   "settingsAccountDeleteExportFirst": "Descarrega antes os teus dados",
@@ -1232,5 +1226,25 @@
   "signinNoticeBody": "Se não foste tu, remove esse dispositivo agora.",
   "signinNoticeNotMe": "Não fui eu",
   "signinNoticeOk": "OK",
-  "signinNoticeMore": "{count, plural, =0{Mais {count} dispositivos foram adicionados.} =1{Mais {count} dispositivo foi adicionado.} other{Mais {count} dispositivos foram adicionados.}}"
+  "signinNoticeMore": "{count, plural, =0{Mais {count} dispositivos foram adicionados.} =1{Mais {count} dispositivo foi adicionado.} other{Mais {count} dispositivos foram adicionados.}}",
+  "settingsPasskeysLine": "Sem código, com a tua impressão digital ou a tua cara",
+  "@settingsPasskeysLine": {
+    "description": "Settings: the passkeys group's line under its title."
+  },
+  "settingsSecurityRecoveryLine": "Cria uma nova se a perdeste",
+  "@settingsSecurityRecoveryLine": {
+    "description": "Settings: the recovery key row's line."
+  },
+  "settingsSecurityChangeKeysLine": "Cria novas chaves de cifragem",
+  "@settingsSecurityChangeKeysLine": {
+    "description": "Settings: the change keys row's line."
+  },
+  "settingsAccountDeleteLine": "Apaga conta e movimentos",
+  "@settingsAccountDeleteLine": {
+    "description": "Settings: the delete account row's line."
+  },
+  "settingsSecurityNewKeyContinue": "Continuar",
+  "@settingsSecurityNewKeyContinue": {
+    "description": "Settings: continues to a new recovery key, after what it does."
+  }
 }

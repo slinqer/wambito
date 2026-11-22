@@ -60,6 +60,12 @@ Future<void> tapKey(WidgetTester t, String key) async {
   await t.pumpAndSettle();
 }
 
+/// The "New recovery key" row: it says what it does first, and "Continuar" goes on to the lock.
+Future<void> tapNewKey(WidgetTester t) async {
+  await tapKey(t, 'security.newKey');
+  await tapKey(t, 'security.newKey.continue');
+}
+
 /// Types the four characters the setup screen asks for (positions pinned to 1-4: A, B, C, D).
 Future<void> typeCheck(WidgetTester t) async {
   await tapKey(t, 'vault.saved');
@@ -79,20 +85,20 @@ void main() {
     final security = FakeSecurity();
     await pumpSection(t, security, FakeLock(LockCheck.passed));
     expect(find.text('Pixel 9'), findsOneWidget);
-    expect(find.text('This phone'), findsOneWidget);
+    expect(find.text('This one'), findsOneWidget);
     expect(find.text('Firefox on Linux'), findsOneWidget);
     // only the forged one is "Not verified"
-    expect(find.text('Not verified'), findsOneWidget);
+    expect(find.text('Since Oct 4, 2026 · Not verified'), findsOneWidget);
     expect(find.byKey(const Key('security.remove.$ownId')), findsNothing);
     expect(find.byKey(const Key('security.remove.$laptopId')), findsOneWidget);
     expect(find.byKey(const Key('security.remove.$forgedId')), findsOneWidget);
-    expect(find.text('Added on Oct 3, 2026'), findsOneWidget);
+    expect(find.text('Since Oct 3, 2026'), findsOneWidget);
   });
 
   testWidgets('"N records could not be read" shows when there are some', (t) async {
     final handle = t.ensureSemantics();
     await pumpSection(t, FakeSecurity(snapshotOf(unreadable: 3)), FakeLock(LockCheck.passed));
-    expect(find.bySemanticsLabel('Could not read 3 items'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Could not read 3 items')), findsOneWidget);
     handle.dispose();
   });
 
@@ -135,7 +141,7 @@ void main() {
     t,
   ) async {
     await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
-    expect(find.text('CONNECT ANOTHER DEVICE'), findsOneWidget);
+    expect(find.text('Connect another device'), findsOneWidget);
     expect(find.byKey(const Key('security.connect')), findsOneWidget);
     expect(find.byKey(const Key('security.approve')), findsNothing);
     expect(find.byKey(const Key('security.signinWeb')), findsNothing);
@@ -150,7 +156,7 @@ void main() {
     }
   });
 
-  for (final key in ['security.newKey', 'security.remove.$laptopId', 'security.changeKeys']) {
+  for (final key in ['security.remove.$laptopId', 'security.changeKeys']) {
     testWidgets('a double tap on $key asks the lock once', (t) async {
       final lock = _SlowLock();
       await pumpSection(t, FakeSecurity(), lock);
@@ -161,6 +167,18 @@ void main() {
       expect(lock.asked, 1);
     });
   }
+
+  testWidgets('a double tap on the new key row asks the lock once, after what it does', (t) async {
+    final lock = _SlowLock();
+    await pumpSection(t, FakeSecurity(), lock);
+    await tapKey(t, 'security.newKey');
+    expect(lock.asked, 0, reason: 'the sheet comes first');
+    await t.tap(find.byKey(const Key('security.newKey.continue')));
+    await t.tap(find.byKey(const Key('security.newKey.continue')), warnIfMissed: false);
+    await t.pump();
+    await t.pump();
+    expect(lock.asked, 1);
+  });
 
   testWidgets('"Connect another device" opens its screen, which closes back', (t) async {
     final security = FakeSecurity();
@@ -285,7 +303,7 @@ void main() {
       final security = FakeSecurity();
       final lock = FakeLock(LockCheck.cancelled);
       await pumpSection(t, security, lock);
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       expect(lock.reasons, ["Confirm it's you to make a new recovery key"]);
       expect(security.calls, isEmpty);
     });
@@ -296,6 +314,8 @@ void main() {
       await pumpSection(t, security, lock);
       await t.ensureVisible(find.byKey(const Key('security.newKey')));
       await t.tap(find.byKey(const Key('security.newKey')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('security.newKey.continue')));
       await t.pump();
       expect(security.calls, isEmpty);
       expect(find.text(recoveryKeyText.split('-').first), findsNothing);
@@ -315,7 +335,7 @@ void main() {
         FakeLock(LockCheck.noLock),
         overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
       );
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       expect(find.byKey(const Key('screenLock.key')), findsNothing);
       expect(security.calls, ['newRecoveryKey']);
     });
@@ -330,7 +350,7 @@ void main() {
         FakeLock(LockCheck.noLock),
         overrides: [accountOf(anonymous: false), vaultSessionProvider.overrideWithValue(vault)],
       );
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
       expect(security.calls, isEmpty);
     });
@@ -344,14 +364,14 @@ void main() {
         FakeLock(LockCheck.noLock),
         overrides: [accountOf(), vaultSessionProvider.overrideWithValue(vault)],
       );
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       expect(find.byKey(const Key('screenLock.key')), findsOneWidget);
     });
 
     testWidgets('the key is committed only after the four characters are typed back', (t) async {
       final security = FakeSecurity();
       await pumpSection(t, security, FakeLock(LockCheck.passed));
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       expect(security.calls, ['newRecoveryKey']);
       await typeCheck(t);
       await tapKey(t, 'vault.continue');
@@ -365,7 +385,7 @@ void main() {
     testWidgets('giving up drops the key without committing', (t) async {
       final security = FakeSecurity();
       await pumpSection(t, security, FakeLock(LockCheck.passed));
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       await tapKey(t, 'vault.cancel');
       expect(security.calls, ['newRecoveryKey', 'forget']);
     });
@@ -373,7 +393,7 @@ void main() {
     testWidgets('rotated_elsewhere starts over: the keys and the list are read again', (t) async {
       final security = FakeSecurity()..commitFailures.add(keysError('rotated_elsewhere'));
       await pumpSection(t, security, FakeLock(LockCheck.passed));
-      await tapKey(t, 'security.newKey');
+      await tapNewKey(t);
       await typeCheck(t);
       await tapKey(t, 'vault.continue');
       expect(

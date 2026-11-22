@@ -1476,26 +1476,25 @@
   "settingsPasskeysUnsupported": "This phone can't create fingerprints. Keep signing in with your email.",
   "settingsPasskeysListFailed": "We couldn't load your fingerprints. Try again in a moment.",
   "settingsPasskeysDefaultName": "Fingerprint",
-  "settingsPasskeysCreated": "Created on {date}",
-  "settingsPasskeysSynced": "Synced",
+  "settingsPasskeysCreated": "Since {date}",
+  "settingsPasskeysSynced": "synced",
   "settingsPasskeysAdd": "Add a fingerprint",
   "settingsPasskeysAdding": "Waiting for your fingerprint…",
   "settingsPasskeysGuest": "Save your progress with an email first; then you can add a fingerprint.",
   "settingsPasskeysAdded": "Done: you can now sign in with your fingerprint.",
   "settingsPasskeysAddFailed": "We couldn't save your fingerprint. Try again.",
-  "settingsPasskeysRemove": "Delete",
   "settingsPasskeysRemoveLabel": "Delete the fingerprint created on {date}",
-  "settingsPasskeysRemoveNamedLabel": "Delete {name}, created on {date}",
+  "settingsPasskeysRemoveNamedLabel": "Delete {name}",
   "settingsPasskeysRemoveTitle": "Delete this fingerprint?",
   "settingsPasskeysRemoveBody": "You won't be able to sign in with it anymore. Your email still works.",
   "settingsPasskeysRemoveConfirm": "Yes, delete",
   "settingsPasskeysRemoved": "Fingerprint deleted.",
   "settingsPasskeysRemoveFailed": "We couldn't delete the fingerprint. Try again.",
-  "settingsSecurityTitle": "Security",
-  "settingsSecurityLead": "Your data is encrypted. These devices can open it.",
-  "settingsSecurityThisPhone": "This phone",
+  "settingsSecurityTitle": "Your devices",
+  "settingsSecurityLead": "They can open your encrypted data",
+  "settingsSecurityThisPhone": "This one",
   "settingsSecurityUnnamed": "Device",
-  "settingsSecurityAdded": "Added on {date}",
+  "settingsSecurityAdded": "Since {date}",
   "settingsSecurityNotVerified": "Not verified",
   "settingsSecurityLoadFailed": "We couldn't load your devices. Try again in a moment.",
   "settingsSecurityRemove": "Remove",
@@ -1505,8 +1504,7 @@
   "connectDeviceCodeLabel": "Code from the other device",
   "connectDeviceBadCode": "That code does not match any request. Check it, or start again on the other device.",
   "settingsSecurityRecoveryTitle": "Recovery key",
-  "settingsSecurityRecoveryLead": "Make a new one if you lost it or someone else may have seen it. The old one stops working.",
-  "settingsSecurityNewRecovery": "New recovery key",
+  "settingsSecurityRecoveryLead": "Make a new one if you lost it or someone else may have seen it.",
   "settingsSecurityUnreadable": "{count, plural, =1{Could not read {count} item} other{Could not read {count} items}}",
   "settingsSecurityUnreadableLead": "They were saved with a key this phone does not have. They are kept safe as they are.",
   "settingsSecurityMaybeSaved": "It may have been saved: keep this new key until it says it is done.",
@@ -1532,9 +1530,7 @@
   "settingsSecurityNewKeySaved": "Your new recovery key is saved. The old one no longer works.",
   "settingsSecurityNewKeyRotatedElsewhere": "Your keys changed on another device meanwhile. Make the new key again.",
   "settingsSecurityNewKeyFailed": "We couldn't save the new key. Try again.",
-  "settingsPasskeysUnlocks": "Opens your data",
   "settingsPasskeysLocked": "Does not open your data",
-  "settingsPasskeysTurnOn": "Turn on",
   "settingsPasskeysTurnOnLabel": "Turn on the fingerprint created on {date} for your data",
   "settingsPasskeysTurnOnNamedLabel": "Turn on {name} for your data",
   "settingsPasskeysTurnedOn": "Done: this fingerprint opens your data too.",
@@ -1995,8 +1991,6 @@
   "settingsExportSaveFailed": "We couldn't save the file. Try again.",
   "settingsExportShareFailed": "We couldn't find an app to share the file with.",
   "settingsAccountDeleteTitle": "Delete your account",
-  "settingsAccountDeleteLead": "We delete your account and all your entries right away. Backups that include them delete themselves within 14 days.",
-  "settingsAccountDeleteAction": "Delete my account",
   "settingsAccountDeleteSheetTitle": "Delete your account?",
   "settingsAccountDeleteSheetBody": "Your transactions, categories, budgets, recurring payments and fingerprints are deleted right away. Backups that include them delete themselves within 14 days.",
   "settingsAccountDeleteExportFirst": "Download your data first",
@@ -2429,5 +2423,25 @@
   "signinNoticeBody": "If it wasn't you, remove that device now.",
   "signinNoticeNotMe": "That wasn't me",
   "signinNoticeOk": "OK",
-  "signinNoticeMore": "{count, plural, =1{{count} more device was added too.} other{{count} more devices were added too.}}"
+  "signinNoticeMore": "{count, plural, =1{{count} more device was added too.} other{{count} more devices were added too.}}",
+  "settingsPasskeysLine": "No code, just your fingerprint or face",
+  "@settingsPasskeysLine": {
+    "description": "Settings: the passkeys group's line under its title."
+  },
+  "settingsSecurityRecoveryLine": "Make a new one if you lost it",
+  "@settingsSecurityRecoveryLine": {
+    "description": "Settings: the recovery key row's line."
+  },
+  "settingsSecurityChangeKeysLine": "Make new encryption keys",
+  "@settingsSecurityChangeKeysLine": {
+    "description": "Settings: the change keys row's line."
+  },
+  "settingsAccountDeleteLine": "Deletes your account and your entries",
+  "@settingsAccountDeleteLine": {
+    "description": "Settings: the delete account row's line."
+  },
+  "settingsSecurityNewKeyContinue": "Continue",
+  "@settingsSecurityNewKeyContinue": {
+    "description": "Settings: continues to a new recovery key, after what it does."
+  }
 }

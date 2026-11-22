@@ -854,7 +854,7 @@
       "confirm_hint": "La tua email è {email}.",
       "confirm": "Sì, elimina il mio account",
       "deleting": "Eliminazione…",
-      "line": "Cancella il tuo account e i tuoi movimenti"
+      "line": "Cancella account e movimenti"
     },
     "demo_off": "Nella demo questo non è disponibile. Crea il tuo account per usarlo.",
     "local_off": "Non è ancora disponibile con la crittografia end-to-end. Arriva presto.",

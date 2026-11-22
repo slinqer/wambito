@@ -537,10 +537,13 @@ class RowChip extends RowTrailing {
 
 /// Its own button, named by [label], that removes what the row stands for.
 class RowTrash extends RowTrailing {
-  const RowTrash({required this.label, required this.onTap});
+  const RowTrash({required this.label, required this.onTap, this.buttonKey});
 
   final String label;
   final VoidCallback onTap;
+
+  /// Finds the trash button (tests).
+  final Key? buttonKey;
 }
 
 /// A small button at the end ("Conectar", "Revocar"), named for screen readers by [semanticLabel]:
@@ -569,13 +572,83 @@ class RowNone extends RowTrailing {
   const RowNone();
 }
 
+/// The head of a [SettingsGroup] (the web's `SettingsGroupHead`): a 40px `surface-sunken` tile with
+/// the [icon] in `brand`, the group's [title] and one muted [line] under it.
+class SettingsGroupHead extends StatelessWidget {
+  const SettingsGroupHead({super.key, required this.icon, required this.title, this.line});
+
+  final Widget icon;
+  final String title;
+  final String? line;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lkColors;
+    final line = this.line;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        spacing: 12,
+        children: [
+          ExcludeSemantics(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceSunken,
+                borderRadius: LkSurface.radius(LkRadius.sm),
+              ),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(color: colors.brand),
+                    child: icon,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 2,
+              children: [
+                Text(
+                  title,
+                  style: LkText.cardTitle.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: colors.ink,
+                  ),
+                ),
+                if (line != null)
+                  Text(
+                    line,
+                    style: LkText.fieldLabel.copyWith(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.inkMuted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// A light group of rows (the web's `SettingsGroup`, app.css `.lk-group`): `surface-row` with a 2px
-/// `stroke`, `radius-lg` and `edge-sm`, padding 10/12, an optional small uppercase label and a 2px
-/// `stroke` line between rows, none above the first.
+/// `stroke`, `radius-lg` and `edge-sm`, padding 10/12, an optional small uppercase label or a
+/// [SettingsGroupHead], and a 2px `stroke` line between rows (and under the head), none above the
+/// first row of a group without a head. Named by its label or its head's title.
 class SettingsGroup extends StatelessWidget {
-  const SettingsGroup({super.key, this.label, required this.rows});
+  const SettingsGroup({super.key, this.label, this.head, required this.rows});
 
   final String? label;
+  final SettingsGroupHead? head;
   final List<Widget> rows;
 
   @override
@@ -583,10 +656,11 @@ class SettingsGroup extends StatelessWidget {
     final lk = context.lk;
     final colors = lk.colors;
     final label = this.label;
+    final head = this.head;
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: label,
+      label: label ?? head?.title,
       child: SnappedDecoratedBox(
         decoration: BoxDecoration(
           color: colors.surfaceRow,
@@ -614,13 +688,14 @@ class SettingsGroup extends StatelessWidget {
                     ),
                   ),
                 ),
+              ?head,
               // Each row with its own divider in a column of its own: the dividers share one key
               // (tests find them), and siblings may not.
               for (var i = 0; i < rows.length; i++)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (i > 0)
+                    if (i > 0 || head != null)
                       Container(
                         key: const ValueKey('settings-row-divider'),
                         height: 2,
@@ -762,6 +837,7 @@ class SettingsRow extends StatelessWidget {
           children: [
             Expanded(child: onTap == null ? main : _pressable(context, main)),
             Pressable(
+              key: t.buttonKey,
               onPressed: t.onTap,
               label: t.label,
               builder: (context, state) => RingBox(

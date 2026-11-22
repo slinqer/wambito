@@ -13,16 +13,12 @@ import '../l10n/app_localizations.dart';
 import '../local/keys_error.dart';
 import '../local/prf.dart' show PasskeyPrf;
 import '../recurring/recurring_row.dart' show formatRecurringDate;
-import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
 import '../ui/css_text.dart';
 import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
-import '../ui/offset_underline.dart';
-import '../ui/pressable.dart' show PressSurface;
-import '../ui/press_button.dart';
 import '../ui/toast.dart';
 import 'passkeys_settings.dart';
 import 'security/security_api.dart';
@@ -184,7 +180,6 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
     final colors = context.lkColors;
     final list = ref.watch(settingsPasskeyListProvider);
     final canMake = ref.watch(_passkeysCanBeMadeProvider).value ?? true;
-    final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
     final items = list.value;
     // Only an encrypted account (an open vault) says which passkeys open its data.
     final security = ref.watch(securityApiProvider);
@@ -195,72 +190,61 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
     final addLabel = _adding ? l10n.settingsPasskeysAdding : l10n.settingsPasskeysAdd;
     final guest = widget.guest;
 
-    return SettingsSection(
-      key: const Key('settings.card.passkeys'),
-      title: l10n.settingsPasskeysTitle,
-      lead: l10n.settingsPasskeysLead,
+    final noteStyle = LkText.bodySm.copyWith(color: colors.inkMuted);
+    Widget note(Widget child) =>
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), child: child);
+    final tint = colors.inkMuted;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: WambitoTokens.space3,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space2,
-          children: [
-            if (list.hasError && items == null)
-              CssParagraph(l10n.settingsPasskeysListFailed, style: mutedSm),
-            if (items != null && items.isEmpty)
-              CssParagraph(
-                l10n.settingsPasskeysEmpty,
-                style: LkText.bodySm.copyWith(color: colors.ink),
-              ),
-            if (rows != null && rows.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: WambitoTokens.space2,
-                children: [
-                  for (final row in rows)
-                    _PasskeyRow(
-                      item: row.item,
-                      unlocks: row.unlocks,
-                      day: passkeyDay(row.item.createdAt, l10n.localeName, widget.timeZone),
-                      busy: _turningOn != null,
-                      noPrf: _noPrf == row.item.id,
-                      onRemove: () => unawaited(_remove(row.item)),
-                      onTurnOn: () => unawaited(_turnOn(row.item)),
-                    ),
-                ],
-              ),
-          ],
-        ),
-        if (!canMake)
-          CssParagraph(l10n.settingsPasskeysUnsupported, style: mutedSm)
-        else ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: PressButton(
-              key: const Key('settings.passkeys.add'),
-              tone: PressTone.secondary,
-              onPressed: _adding || guest ? null : () => unawaited(_add()),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: WambitoTokens.space2,
-                children: [
-                  const FingerprintIcon(),
-                  Flexible(child: Text(LkText.upperCase(addLabel))),
-                ],
-              ),
-            ),
+        SettingsGroup(
+          key: const Key('settings.card.passkeys'),
+          head: SettingsGroupHead(
+            icon: LkIcon(LkIconName.fingerprint, size: 22, color: colors.brand),
+            title: l10n.settingsPasskeysTitle,
+            line: l10n.settingsPasskeysLine,
           ),
-          if (guest) CssParagraph(l10n.settingsPasskeysGuest, style: mutedSm),
-        ],
-        if (_addedWithoutPrf)
-          SizedBox(
-            width: double.infinity,
-            child: Semantics(
-              liveRegion: true,
-              container: true,
-              child: DecoratedBox(
-                decoration: LkSurface.rowCard(context.lk),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          rows: [
+            if (list.hasError && items == null)
+              note(CssParagraph(l10n.settingsPasskeysListFailed, style: noteStyle)),
+            if (items != null && items.isEmpty)
+              note(
+                CssParagraph(
+                  '${l10n.settingsPasskeysEmpty} ${l10n.settingsPasskeysLead}',
+                  style: noteStyle,
+                ),
+              ),
+            for (final row in rows ?? const <PasskeyRow>[]) ...[
+              _passkeyRow(l10n, row, tint),
+              if (row.unlocks == false && row.item.credentialId != null)
+                _turnOnRow(l10n, row.item, tint),
+              if (_noPrf == row.item.id)
+                note(
+                  CssParagraph(
+                    l10n.settingsPasskeysTurnOnNoPrf,
+                    style: LkText.bodySm.copyWith(color: colors.over),
+                  ),
+                ),
+            ],
+            if (!canMake)
+              note(CssParagraph(l10n.settingsPasskeysUnsupported, style: noteStyle))
+            else ...[
+              SettingsRow(
+                key: const Key('settings.passkeys.add'),
+                icon: LkIcon(LkIconName.plus, size: 20, color: tint),
+                title: addLabel,
+                trailing: const RowNone(),
+                onTap: _adding || guest ? null : () => unawaited(_add()),
+              ),
+              if (guest) note(CssParagraph(l10n.settingsPasskeysGuest, style: noteStyle)),
+            ],
+            if (_addedWithoutPrf)
+              note(
+                Semantics(
+                  liveRegion: true,
+                  container: true,
                   child: Text(
                     l10n.settingsPasskeysAddNoPrf,
                     key: const Key('settings.passkeys.addNoPrf'),
@@ -268,150 +252,48 @@ class _PasskeysSectionState extends ConsumerState<PasskeysSection> {
                   ),
                 ),
               ),
-            ),
-          ),
+          ],
+        ),
       ],
     );
   }
-}
 
-/// One passkey: `lk-rowcard justify-between`, the fingerprint in `brand-glow`, its name (or
-/// "Huella") over "Creada el…" and "Sincronizada", and its "Eliminar".
-class _PasskeyRow extends StatelessWidget {
-  const _PasskeyRow({
-    required this.item,
-    required this.unlocks,
-    required this.day,
-    required this.busy,
-    required this.noPrf,
-    required this.onRemove,
-    required this.onTurnOn,
-  });
-
-  final PasskeyItem item;
-
-  /// Whether a passkey wrap opens the data with it; null for a plain account (nothing is said).
-  final bool? unlocks;
-  final String day;
-
-  /// A "Turn on" is running: the others wait.
-  final bool busy;
-
-  /// This passkey's provider gives no PRF: it cannot open the data.
-  final bool noPrf;
-  final VoidCallback onRemove;
-  final VoidCallback onTurnOn;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final lk = context.lk;
-    final colors = lk.colors;
+  /// One passkey: a device icon, its name (or "Huella"), "Desde el 2 oct" with " · sincronizada"
+  /// when it syncs, and its trash button, which asks first.
+  Widget _passkeyRow(AppLocalizations l10n, PasskeyRow row, Color tint) {
+    final item = row.item;
+    final day = passkeyDay(item.createdAt, l10n.localeName, widget.timeZone);
     final name = item.name;
-    final removeLabel = name == null
-        ? l10n.settingsPasskeysRemoveLabel(day)
-        : l10n.settingsPasskeysRemoveNamedLabel(name, day);
-    final muted = LkText.fieldLabel.copyWith(color: colors.inkMuted);
-    return PressSurface(
-      minSize: 0,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: LkSurface.rowCard(lk),
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space2,
-          children: [
-            Row(
-              spacing: 10,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    spacing: WambitoTokens.space3,
-                    children: [
-                      DefaultTextStyle.merge(
-                        style: TextStyle(color: colors.brandGlow),
-                        child: const FingerprintIcon(),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CssBlinkLines(
-                              style: LkText.body,
-                              child: Text(
-                                name ?? l10n.settingsPasskeysDefaultName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: LkText.body.copyWith(color: colors.ink),
-                              ),
-                            ),
-                            Wrap(
-                              spacing: WambitoTokens.space2,
-                              children: [
-                                CssBlinkLines(
-                                  style: LkText.fieldLabel,
-                                  child: Text(l10n.settingsPasskeysCreated(day), style: muted),
-                                ),
-                                if (item.synced)
-                                  CssBlinkLines(
-                                    style: LkText.fieldLabel,
-                                    child: Text(l10n.settingsPasskeysSynced, style: muted),
-                                  ),
-                                if (unlocks == true)
-                                  CssBlinkLines(
-                                    style: LkText.fieldLabel,
-                                    child: Text(l10n.settingsPasskeysUnlocks, style: muted),
-                                  ),
-                                if (unlocks == false)
-                                  CssBlinkLines(
-                                    style: LkText.fieldLabel,
-                                    child: Text(
-                                      l10n.settingsPasskeysLocked,
-                                      style: muted.copyWith(
-                                        color: colors.ink,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (unlocks == false && item.credentialId != null)
-                  PressButton.text(
-                    l10n.settingsPasskeysTurnOn,
-                    key: Key('settings.passkeys.turnOn.${item.id}'),
-                    tone: PressTone.secondary,
-                    size: PressSize.sm,
-                    semanticLabel: name == null
-                        ? l10n.settingsPasskeysTurnOnLabel(day)
-                        : l10n.settingsPasskeysTurnOnNamedLabel(name),
-                    onPressed: busy ? null : onTurnOn,
-                  ),
-                PressButton(
-                  key: Key('settings.passkeys.remove.${item.id}'),
-                  tone: PressTone.ghost,
-                  size: PressSize.sm,
-                  semanticLabel: removeLabel,
-                  onPressed: onRemove,
-                  child: OffsetUnderline(LkText.upperCase(l10n.settingsPasskeysRemove)),
-                ),
-              ],
-            ),
-            if (noPrf)
-              CssParagraph(
-                l10n.settingsPasskeysTurnOnNoPrf,
-                style: LkText.bodySm.copyWith(color: colors.over),
-              ),
-          ],
-        ),
+    return SettingsRow(
+      key: Key('settings.passkeys.row.${item.id}'),
+      icon: LkIcon(deviceIconFor(name), size: 20, color: tint),
+      title: name ?? l10n.settingsPasskeysDefaultName,
+      line: item.synced
+          ? '${l10n.settingsPasskeysCreated(day)} · ${l10n.settingsPasskeysSynced}'
+          : l10n.settingsPasskeysCreated(day),
+      trailing: RowTrash(
+        buttonKey: Key('settings.passkeys.remove.${item.id}'),
+        label: name == null
+            ? l10n.settingsPasskeysRemoveLabel(day)
+            : l10n.settingsPasskeysRemoveNamedLabel(name),
+        onTap: () => unawaited(_remove(item)),
       ),
+    );
+  }
+
+  /// A passkey of an encrypted account whose wrap is missing: a row that turns it on for the data.
+  Widget _turnOnRow(AppLocalizations l10n, PasskeyItem item, Color tint) {
+    final day = passkeyDay(item.createdAt, l10n.localeName, widget.timeZone);
+    final name = item.name;
+    return SettingsRow(
+      key: Key('settings.passkeys.turnOn.${item.id}'),
+      icon: LkIcon(LkIconName.key, size: 20, color: tint),
+      title: name == null
+          ? l10n.settingsPasskeysTurnOnLabel(day)
+          : l10n.settingsPasskeysTurnOnNamedLabel(name),
+      line: l10n.settingsPasskeysLocked,
+      trailing: const RowChevron(),
+      onTap: _turningOn != null ? null : () => unawaited(_turnOn(item)),
     );
   }
 }

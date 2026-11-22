@@ -1,4 +1,5 @@
-// Twin of apps/web/app/features/settings/SecuritySection.tsx: Settings → Security for an encrypted
+// Twin of apps/web/app/features/settings/SecuritySection.tsx: Cuenta y seguridad's encrypted part (a
+// "Tus dispositivos" group and a group with the recovery key rows) for an encrypted
 // (`preview`) account, with or without email (the same section for both): this phone and the other
 // devices that open the data (name, added date, "Not verified" when an attestation fails), each
 // other one with "Remove" (its wrap is deleted, the keys stay: `RemoveDeviceSheet`); "Connect
@@ -18,12 +19,12 @@ import '../../protect/protect_actions.dart' show markRecoveryKeySaved;
 import '../../protect/protect_status.dart' show protectStatusProvider, recoveryKeySavedAt;
 import '../../vault/encryption_mode.dart' show currentVaultAccountProvider;
 import '../../security/screen_lock.dart';
-import '../../theme/surfaces.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.g.dart';
+import '../../ui/confirm_sheet.dart';
 import '../../ui/css_text.dart';
+import '../../ui/lk_icons.dart';
 import '../../ui/lk_theme.dart';
-import '../../ui/press_button.dart';
 import '../../ui/toast.dart';
 import '../../vault/vault_providers.dart' show vaultSessionProvider;
 import '../passkeys_section.dart' show passkeyDay;
@@ -141,6 +142,16 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final toasts = ToastHost.of(context);
     setState(() => _busy = true);
     try {
+      // What a new key does comes first (the row has only one line); then the screen lock.
+      final go = await ConfirmSheet.show(
+        context,
+        title: l10n.settingsSecurityNewKeyTitle,
+        body: l10n.settingsSecurityRecoveryLead,
+        confirmLabel: l10n.settingsSecurityNewKeyContinue,
+        confirmKey: const Key('security.newKey.continue'),
+        onConfirm: () async {},
+      );
+      if (!go || !mounted) return;
       final session = ref.read(vaultSessionProvider);
       final noKeyYet = await _noKeyYet();
       if (!mounted) return;
@@ -202,61 +213,27 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
 
   Widget _deviceItem(AppLocalizations l10n, DeviceRow row, SecurityApi security, bool hasPasskeys) {
     final colors = context.lkColors;
-    final lk = context.lk;
     final name = row.label ?? l10n.settingsSecurityUnnamed;
     final created = DateTime.tryParse(row.createdAt ?? '');
-    final muted = LkText.fieldLabel.copyWith(color: colors.inkMuted);
-    final strong = LkText.fieldLabel.copyWith(color: colors.ink, fontWeight: FontWeight.w700);
-    return Container(
+    final line = [
+      if (created != null)
+        l10n.settingsSecurityAdded(passkeyDay(created, l10n.localeName, widget.timeZone)),
+      if (!row.verified) l10n.settingsSecurityNotVerified,
+    ].join(' · ');
+    return SettingsRow(
       key: Key('security.device.${row.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: LkSurface.rowCard(lk),
-      child: Row(
-        spacing: 10,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: LkText.body.copyWith(color: colors.ink),
-                ),
-                Wrap(
-                  spacing: WambitoTokens.space2,
-                  children: [
-                    if (row.thisPhone) Text(l10n.settingsSecurityThisPhone, style: strong),
-                    if (created != null)
-                      Text(
-                        l10n.settingsSecurityAdded(
-                          passkeyDay(created, l10n.localeName, widget.timeZone),
-                        ),
-                        style: muted,
-                      ),
-                    if (!row.verified)
-                      Text(
-                        l10n.settingsSecurityNotVerified,
-                        style: muted.copyWith(color: colors.over, fontWeight: FontWeight.w700),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (row.removable)
-            PressButton.text(
-              l10n.settingsSecurityRemove,
-              key: Key('security.remove.${row.id}'),
-              tone: PressTone.ghost,
-              size: PressSize.sm,
-              semanticLabel: l10n.settingsSecurityRemoveLabel(name),
-              onPressed: () => unawaited(_remove(security, row, hasPasskeys)),
-            ),
-        ],
-      ),
+      icon: LkIcon(deviceIconFor(row.label), size: 20, color: colors.inkMuted),
+      title: name,
+      line: line.isEmpty ? null : line,
+      trailing: row.thisPhone
+          ? RowChip(l10n.settingsSecurityThisPhone)
+          : row.removable
+          ? RowTrash(
+              buttonKey: Key('security.remove.${row.id}'),
+              label: l10n.settingsSecurityRemoveLabel(name),
+              onTap: () => unawaited(_remove(security, row, hasPasskeys)),
+            )
+          : const RowNone(),
     );
   }
 
@@ -267,19 +244,6 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     if (security == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    final connect = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: WambitoTokens.space2,
-      children: [
-        SettingLabel(label: l10n.settingsSecurityConnect, hint: l10n.settingsSecurityConnectLead),
-        PressButton.text(
-          l10n.settingsSecurityConnect,
-          key: const Key('security.connect'),
-          tone: PressTone.secondary,
-          onPressed: () => unawaited(_connect()),
-        ),
-      ],
-    );
     final snapshot = ref.watch(securitySnapshotProvider);
     final data = snapshot.value;
     final rows = data == null
@@ -292,64 +256,67 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
           );
     final hasPasskeys = data != null && anyPasskeyWrap(data.wraps);
     final unreadable = data?.unreadable ?? 0;
-    return SettingsSection(
+    Widget note(Widget child) =>
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), child: child);
+    return Column(
       key: const Key('settings.card.security'),
-      title: l10n.settingsSecurityTitle,
-      lead: l10n.settingsSecurityLead,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: WambitoTokens.space3,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space2,
-          children: [
+        SettingsGroup(
+          head: SettingsGroupHead(
+            icon: LkIcon(LkIconName.phone, size: 22, color: colors.brand),
+            title: l10n.settingsSecurityTitle,
+            line: l10n.settingsSecurityLead,
+          ),
+          rows: [
             if (snapshot.hasError && data == null)
-              CssParagraph(
-                l10n.settingsSecurityLoadFailed,
-                style: LkText.bodySm.copyWith(color: colors.inkMuted),
+              note(
+                CssParagraph(
+                  l10n.settingsSecurityLoadFailed,
+                  style: LkText.bodySm.copyWith(color: colors.inkMuted),
+                ),
               ),
             if (rows != null) ...[
               if (rows.thisPhone != null) _deviceItem(l10n, rows.thisPhone!, security, hasPasskeys),
               for (final row in rows.others) _deviceItem(l10n, row, security, hasPasskeys),
             ],
+            SettingsRow(
+              key: const Key('security.connect'),
+              icon: LkIcon(LkIconName.plus, size: 20, color: colors.inkMuted),
+              title: l10n.settingsSecurityConnect,
+              trailing: const RowNone(),
+              onTap: () => unawaited(_connect()),
+            ),
+            if (unreadable > 0)
+              note(
+                CssParagraph(
+                  '${l10n.settingsSecurityUnreadable(unreadable)}. ${l10n.settingsSecurityUnreadableLead}',
+                  style: LkText.fieldLabel.copyWith(color: colors.inkMuted),
+                ),
+              ),
           ],
         ),
-        connect,
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: WambitoTokens.space2,
-          children: [
-            SettingLabel(
-              label: l10n.settingsSecurityRecoveryTitle,
-              hint: l10n.settingsSecurityRecoveryLead,
-            ),
-            PressButton.text(
-              l10n.settingsSecurityNewRecovery,
+        SettingsGroup(
+          rows: [
+            SettingsRow(
               key: const Key('security.newKey'),
-              tone: PressTone.secondary,
-              onPressed: _busy ? null : () => unawaited(_newKey(security)),
+              icon: LkIcon(LkIconName.key, size: 20, color: colors.inkMuted),
+              title: l10n.settingsSecurityRecoveryTitle,
+              line: l10n.settingsSecurityRecoveryLine,
+              trailing: const RowChevron(),
+              onTap: _busy ? null : () => unawaited(_newKey(security)),
             ),
-          ],
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: WambitoTokens.space2,
-          children: [
-            SettingLabel(
-              label: l10n.settingsSecurityChangeKeys,
-              hint: l10n.settingsSecurityChangeKeysBody,
-            ),
-            PressButton.text(
-              l10n.settingsSecurityChangeKeys,
+            SettingsRow(
               key: const Key('security.changeKeys'),
-              tone: PressTone.secondary,
-              onPressed: _busy ? null : () => unawaited(_changeKeys(security, hasPasskeys)),
+              icon: LkIcon(LkIconName.key, size: 20, color: colors.inkMuted),
+              title: l10n.settingsSecurityChangeKeys,
+              line: l10n.settingsSecurityChangeKeysLine,
+              trailing: const RowChevron(),
+              onTap: _busy ? null : () => unawaited(_changeKeys(security, hasPasskeys)),
             ),
           ],
         ),
-        if (unreadable > 0)
-          SettingLabel(
-            label: l10n.settingsSecurityUnreadable(unreadable),
-            hint: l10n.settingsSecurityUnreadableLead,
-          ),
       ],
     );
   }

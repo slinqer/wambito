@@ -535,26 +535,25 @@
   "settingsPasskeysUnsupported": "Questo telefono non permette di creare impronte. Continua a entrare con la tua email.",
   "settingsPasskeysListFailed": "Non siamo riusciti a caricare le tue impronte. Riprova tra un momento.",
   "settingsPasskeysDefaultName": "Impronta",
-  "settingsPasskeysCreated": "Creata il {date}",
-  "settingsPasskeysSynced": "Sincronizzata",
+  "settingsPasskeysCreated": "Dal {date}",
+  "settingsPasskeysSynced": "sincronizzata",
   "settingsPasskeysAdd": "Aggiungi un'impronta",
   "settingsPasskeysAdding": "In attesa della tua impronta…",
   "settingsPasskeysGuest": "Prima salva i tuoi progressi con un'email; poi potrai aggiungere un'impronta.",
   "settingsPasskeysAdded": "Fatto: ora puoi entrare con l'impronta.",
   "settingsPasskeysAddFailed": "Non siamo riusciti a salvare la tua impronta. Riprova.",
-  "settingsPasskeysRemove": "Elimina",
   "settingsPasskeysRemoveLabel": "Elimina l'impronta creata il {date}",
-  "settingsPasskeysRemoveNamedLabel": "Elimina {name}, creata il {date}",
+  "settingsPasskeysRemoveNamedLabel": "Elimina {name}",
   "settingsPasskeysRemoveTitle": "Eliminare questa impronta?",
   "settingsPasskeysRemoveBody": "Non potrai più entrare con essa. La tua email continua a funzionare.",
   "settingsPasskeysRemoveConfirm": "Sì, elimina",
   "settingsPasskeysRemoved": "Abbiamo eliminato l'impronta.",
   "settingsPasskeysRemoveFailed": "Non siamo riusciti a eliminare l'impronta. Riprova.",
-  "settingsSecurityTitle": "Sicurezza",
-  "settingsSecurityLead": "I tuoi dati sono cifrati. Questi dispositivi possono aprirli.",
-  "settingsSecurityThisPhone": "Questo telefono",
+  "settingsSecurityTitle": "I tuoi dispositivi",
+  "settingsSecurityLead": "Possono aprire i tuoi dati cifrati",
+  "settingsSecurityThisPhone": "Questo",
   "settingsSecurityUnnamed": "Dispositivo",
-  "settingsSecurityAdded": "Aggiunto il {date}",
+  "settingsSecurityAdded": "Dal {date}",
   "settingsSecurityNotVerified": "Non verificato",
   "settingsSecurityLoadFailed": "Non siamo riusciti a caricare i tuoi dispositivi. Riprova tra un momento.",
   "settingsSecurityRemove": "Rimuovi",
@@ -564,8 +563,7 @@
   "connectDeviceCodeLabel": "Codice dell'altro dispositivo",
   "connectDeviceBadCode": "Quel codice non corrisponde a nessuna richiesta. Controllalo, o ricomincia sull'altro dispositivo.",
   "settingsSecurityRecoveryTitle": "Chiave di recupero",
-  "settingsSecurityRecoveryLead": "Creane una nuova se l'hai persa o se qualcun altro potrebbe averla vista. Quella vecchia smette di funzionare.",
-  "settingsSecurityNewRecovery": "Nuova chiave di recupero",
+  "settingsSecurityRecoveryLead": "Creane una nuova se l'hai persa o se qualcun altro potrebbe averla vista.",
   "settingsSecurityUnreadable": "{count, plural, =1{Non è stato possibile leggere {count} elemento} other{Non è stato possibile leggere {count} elementi}}",
   "settingsSecurityUnreadableLead": "Sono stati salvati con una chiave che questo telefono non ha. Restano al sicuro così come sono.",
   "settingsSecurityMaybeSaved": "Potrebbe essere già stata salvata: conserva questa nuova chiave finché non dice che è pronta.",
@@ -591,9 +589,7 @@
   "settingsSecurityNewKeySaved": "La tua nuova chiave di recupero è salvata. Quella vecchia non funziona più.",
   "settingsSecurityNewKeyRotatedElsewhere": "Nel frattempo le tue chiavi sono cambiate su un altro dispositivo. Crea di nuovo la nuova chiave.",
   "settingsSecurityNewKeyFailed": "Non siamo riusciti a salvare la nuova chiave. Riprova.",
-  "settingsPasskeysUnlocks": "Apre i tuoi dati",
   "settingsPasskeysLocked": "Non apre i tuoi dati",
-  "settingsPasskeysTurnOn": "Attiva",
   "settingsPasskeysTurnOnLabel": "Attiva per i tuoi dati l'impronta creata il {date}",
   "settingsPasskeysTurnOnNamedLabel": "Attiva {name} per i tuoi dati",
   "settingsPasskeysTurnedOn": "Fatto: questa impronta apre anche i tuoi dati.",
@@ -798,8 +794,6 @@
   "settingsExportSaveFailed": "Non siamo riusciti a salvare il file. Riprova.",
   "settingsExportShareFailed": "Non abbiamo trovato un'app con cui condividere il file.",
   "settingsAccountDeleteTitle": "Elimina il tuo account",
-  "settingsAccountDeleteLead": "Cancelliamo subito il tuo account e tutti i tuoi movimenti. Le copie di sicurezza che li includono si cancellano da sole entro 14 giorni.",
-  "settingsAccountDeleteAction": "Elimina il mio account",
   "settingsAccountDeleteSheetTitle": "Eliminare il tuo account?",
   "settingsAccountDeleteSheetBody": "Vengono cancellati subito i tuoi movimenti, categorie, budget, ricorrenze e impronte. Le copie di sicurezza che li includono si cancellano da sole entro 14 giorni.",
   "settingsAccountDeleteExportFirst": "Scarica prima i tuoi dati",
@@ -1232,5 +1226,25 @@
   "signinNoticeBody": "Se non sei stato tu, rimuovi subito quel dispositivo.",
   "signinNoticeNotMe": "Non sono stato io",
   "signinNoticeOk": "OK",
-  "signinNoticeMore": "{count, plural, =1{È stato aggiunto anche {count} altro dispositivo.} other{Sono stati aggiunti anche altri {count} dispositivi.}}"
+  "signinNoticeMore": "{count, plural, =1{È stato aggiunto anche {count} altro dispositivo.} other{Sono stati aggiunti anche altri {count} dispositivi.}}",
+  "settingsPasskeysLine": "Senza codice, con la tua impronta o il tuo viso",
+  "@settingsPasskeysLine": {
+    "description": "Settings: the passkeys group's line under its title."
+  },
+  "settingsSecurityRecoveryLine": "Creane una nuova se l'hai persa",
+  "@settingsSecurityRecoveryLine": {
+    "description": "Settings: the recovery key row's line."
+  },
+  "settingsSecurityChangeKeysLine": "Crea nuove chiavi di cifratura",
+  "@settingsSecurityChangeKeysLine": {
+    "description": "Settings: the change keys row's line."
+  },
+  "settingsAccountDeleteLine": "Cancella account e movimenti",
+  "@settingsAccountDeleteLine": {
+    "description": "Settings: the delete account row's line."
+  },
+  "settingsSecurityNewKeyContinue": "Continua",
+  "@settingsSecurityNewKeyContinue": {
+    "description": "Settings: continues to a new recovery key, after what it does."
+  }
 }

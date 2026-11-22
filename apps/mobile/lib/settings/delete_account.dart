@@ -15,6 +15,7 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart' show flexOneRow;
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
 import '../ui/sheet.dart';
@@ -28,7 +29,7 @@ import 'settings_model.dart';
 import 'settings_parts.dart';
 import 'settings_screen.dart' show settingsEmailProvider;
 
-/// The card at the foot of Settings. A guest has no email to confirm with, so the button is off and
+/// The red row at the foot of Cuenta y seguridad. A guest has no email to confirm with, so the row is off and
 /// a line says an email comes first (the same for the export).
 class DeleteAccountCard extends ConsumerWidget {
   const DeleteAccountCard({super.key});
@@ -47,25 +48,24 @@ class DeleteAccountCard extends ConsumerWidget {
         : unknown
         ? l10n.errorNetwork
         : null;
-    return SettingsSection(
+    final enabled = !guest && known != null;
+    return SettingsGroup(
       key: const Key('settings.card.delete'),
-      title: l10n.settingsAccountDeleteTitle,
-      lead: l10n.settingsAccountDeleteLead,
-      danger: true,
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PressButton(
-            key: const Key('settings.delete'),
-            tone: PressTone.secondary,
-            onPressed: guest || known == null ? null : () => unawaited(_open(context, known)),
-            child: Text(
-              LkText.upperCase(l10n.settingsAccountDeleteAction),
-              style: TextStyle(color: colors.over),
-            ),
-          ),
+      rows: [
+        SettingsRow(
+          key: const Key('settings.delete'),
+          danger: true,
+          icon: LkIcon(LkIconName.trash, size: 20, color: colors.over),
+          title: l10n.settingsAccountDeleteTitle,
+          line: l10n.settingsAccountDeleteLine,
+          trailing: const RowChevron(),
+          onTap: enabled ? () => unawaited(_open(context, known)) : null,
         ),
-        if (note != null) CssParagraph(note, style: LkText.bodySm.copyWith(color: colors.inkMuted)),
+        if (note != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: CssParagraph(note, style: LkText.bodySm.copyWith(color: colors.inkMuted)),
+          ),
       ],
     );
   }

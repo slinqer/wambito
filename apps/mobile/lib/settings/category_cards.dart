@@ -34,15 +34,13 @@ import '../vault/preview.dart';
 import '../vault/unsynced_sheet.dart';
 import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'assistants_section.dart';
-import 'delete_account.dart';
+import 'account_screen.dart';
 import 'export_settings.dart';
 import 'feedback.dart';
-import 'passkeys_section.dart';
 import 'server_status.dart';
 import 'locale_resolution.dart';
 import 'preferences.dart';
 import 'profile_settings.dart';
-import 'security/security_section.dart';
 import 'settings_parts.dart';
 import 'time_money_section.dart';
 import 'url_opener.dart';
@@ -269,15 +267,14 @@ class _SettingsCategoryScreenState extends ConsumerState<SettingsCategoryScreen>
         if (!webOnly) AgentsScreen(timeZone: timeZone, guest: guest),
       ],
       SettingsCategory.account => [
-        PasskeysSection(
+        AccountScreen(
           timeZone: timeZone,
           // A `preview` guest adds a passkey here too ("Protect your data" step 2).
-          guest: guest && !webOnly && !preview,
+          passkeysGuest: guest && !webOnly && !preview,
+          // An encrypted account's devices and recovery key, with or without email. Plain accounts
+          // see nothing of it.
+          showSecurity: !webOnly && preview,
         ),
-        // An encrypted account's devices and recovery key, with or without email. Plain accounts
-        // see nothing of it.
-        if (!webOnly && preview) SecuritySection(timeZone: timeZone),
-        const DeleteAccountCard(),
       ],
       SettingsCategory.preferences => [
         PreferencesCard(webSectionsOnly: webOnly),
