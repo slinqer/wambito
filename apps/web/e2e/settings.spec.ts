@@ -49,6 +49,14 @@ async function openCategory(page: Page, row: RegExp, slug: string, heading: stri
   await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
 }
 
+/** Idioma or Tema: the row opens its choice sheet; the pick closes it. */
+async function choose(page: Page, row: RegExp, sheet: string, choice: string) {
+  await page.getByRole("button", { name: row }).click();
+  const dialog = page.getByRole("dialog", { name: sheet });
+  await dialog.getByRole("radio", { name: choice }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 let email: string;
 
 test.beforeEach(async ({ page }) => {
@@ -103,7 +111,7 @@ test("a reload on /app/settings/preferences stays there", async ({ page }) => {
   await page.reload();
   await expect(page).toHaveURL(/\/app\/settings\/preferences$/);
   await expect(page.getByRole("heading", { level: 1, name: "Preferencias" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Español" })).toBeChecked();
+  await expect(page.getByRole("button", { name: /^Idioma/ })).toContainText("Español");
 });
 
 test("switching to English re-renders at once, and home speaks it after a reload", async ({
@@ -111,7 +119,7 @@ test("switching to English re-renders at once, and home speaks it after a reload
 }) => {
   await openSettings(page);
   await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
-  await page.getByRole("radio", { name: "English" }).click();
+  await choose(page, /^Idioma/, "Idioma", "English");
   await expect(page.getByRole("heading", { level: 1, name: "Preferences" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect
@@ -134,13 +142,16 @@ test("the language picker lists the four languages, and Italian and Portuguese r
 }) => {
   await openSettings(page);
   await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
+  await page.getByRole("button", { name: /^Idioma/ }).click();
+  const languages = page.getByRole("dialog", { name: "Idioma" });
   for (const name of ["Español", "English", "Italiano", "Português"]) {
-    await expect(page.getByRole("radio", { name })).toBeVisible();
+    await expect(languages.getByRole("radio", { name })).toBeVisible();
   }
-  await page.getByRole("radio", { name: "Italiano" }).click();
+  await languages.getByRole("radio", { name: "Italiano" }).click();
+  await expect(languages).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "Preferenze" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "it");
-  await page.getByRole("radio", { name: "Português" }).click();
+  await choose(page, /^Lingua/, "Lingua", "Português");
   await expect(page.getByRole("heading", { level: 1, name: "Preferências" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "pt");
   await expect
@@ -155,11 +166,11 @@ test("the day theme applies at once and stays after a reload", async ({ page }) 
   await openSettings(page);
   await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
-  await page.getByRole("radio", { name: "Día" }).click();
+  await choose(page, /^Tema/, "Tema", "Día");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
-  await expect(page.getByRole("radio", { name: "Día" })).toBeChecked();
+  await expect(page.getByRole("button", { name: /^Tema/ })).toContainText("Día");
 });
 
 test("deleting the account signs out to the landing; the same email then starts afresh", async ({
@@ -230,7 +241,8 @@ test("a passkey added from settings is listed, and deleting it empties the list"
 test("the export downloads the server's CSV and JSON under their own names", async ({ page }) => {
   await openSettings(page);
   await openCategory(page, /^Tus datos/, "data", "Tus datos");
-  const data = page.getByRole("region", { name: "Tus datos" });
+  await page.getByRole("button", { name: /^Descargar tus datos/ }).click();
+  const data = page.getByRole("dialog", { name: "Descarga tus datos" });
   const [csv] = await Promise.all([
     page.waitForEvent("download"),
     data.getByRole("button", { name: "Descargar CSV" }).click(),
@@ -239,6 +251,9 @@ test("the export downloads the server's CSV and JSON under their own names", asy
   const text = await (await csv.createReadStream()).toArray();
   expect(Buffer.concat(text).toString("utf8")).toMatch(/^date,name,amount,currency,category/);
 
+  // A download closes the sheet: open it again for the JSON.
+  await expect(data).toHaveCount(0);
+  await page.getByRole("button", { name: /^Descargar tus datos/ }).click();
   const [json] = await Promise.all([
     page.waitForEvent("download"),
     data.getByRole("button", { name: "Descargar JSON" }).click(),

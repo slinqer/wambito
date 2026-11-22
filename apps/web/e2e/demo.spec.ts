@@ -36,9 +36,9 @@ const LANG = {
     home: "Inicio",
     off: "En el demo esto no está disponible. Crea tu cuenta para usarlo.",
     viewing: "Estás viendo el demo de Valentina.",
-    exportJson: "Descargar JSON",
+    exportRow: "Descargar tus datos",
     deleteAccount: "Eliminar tu cuenta",
-    importAction: "Importar desde Budge",
+    importRow: "Importar movimientos",
   },
   en: {
     landing: "/en",
@@ -65,9 +65,9 @@ const LANG = {
     home: "Home",
     off: "Not available in the demo. Create your account to use it.",
     viewing: "You're viewing Valentina's demo.",
-    exportJson: "Download JSON",
+    exportRow: "Download your data",
     deleteAccount: "Delete your account",
-    importAction: "Import from Budge",
+    importRow: "Import transactions",
   },
 } as const;
 
@@ -222,8 +222,11 @@ test("es: every demo screen keeps its links in /demo, and settings turns off wha
   await expect(menu).toHaveCount(5);
   await menu.nth(3).click();
   await expect(page).toHaveURL(/\/demo\/settings\/data$/);
-  await expect(page.getByRole("button", { name: l.exportJson })).toBeDisabled();
-  await expect(page.getByRole("link", { name: l.importAction })).toHaveCount(0);
+  // Both rows are drawn but do nothing in the demo (the note says why).
+  await expect(page.getByText(l.exportRow, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(`^${l.exportRow}`) })).toHaveCount(0);
+  await expect(page.getByText(l.importRow, { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`^${l.importRow}`) })).toHaveCount(0);
   await expect(page.getByText(l.off)).toHaveCount(1);
   await expectLinksStayInDemo(page);
   await page.goBack();
