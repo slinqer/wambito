@@ -57,18 +57,31 @@ export const AGENTS: readonly Agent[] = [
   },
 ];
 
-const MATCHES: readonly (readonly [AgentId, readonly string[]])[] = [
-  ["claude", ["claude", "anthropic"]],
-  ["chatgpt", ["chatgpt", "openai"]],
-  ["lumo", ["lumo", "proton"]],
-  ["grok", ["grok", "x.ai"]],
+const NAMES: readonly (readonly [AgentId, RegExp])[] = [
+  ["claude", /\bclaude\b/i],
+  ["chatgpt", /\bchatgpt\b/i],
+  ["lumo", /\blumo\b/i],
+  ["grok", /\bgrok\b/i],
 ];
 
-/** Which of the four apps an OAuth client is, by its name or domain; null for any other. */
+const DOMAINS: readonly (readonly [AgentId, readonly string[]])[] = [
+  ["claude", ["claude.ai", "anthropic.com"]],
+  ["chatgpt", ["chatgpt.com", "openai.com"]],
+  ["lumo", ["lumo.proton.me"]],
+  ["grok", ["grok.com", "x.ai"]],
+];
+
+/**
+ * Which of the four apps an OAuth client is; null for any other. The name must hold the app's name
+ * as a whole word; the domain must be the app's own or one of its subdomains (never a substring:
+ * "box.ai" is not x.ai).
+ */
 export function agentFor(grant: { name: string; domain?: string | null }): AgentId | null {
-  const text = `${grant.name} ${grant.domain ?? ""}`.toLowerCase();
-  for (const [id, needles] of MATCHES) {
-    if (needles.some((needle) => text.includes(needle))) return id;
+  for (const [id, pattern] of NAMES) if (pattern.test(grant.name)) return id;
+  const domain = (grant.domain ?? "").toLowerCase();
+  if (!domain) return null;
+  for (const [id, own] of DOMAINS) {
+    if (own.some((d) => domain === d || domain.endsWith(`.${d}`))) return id;
   }
   return null;
 }

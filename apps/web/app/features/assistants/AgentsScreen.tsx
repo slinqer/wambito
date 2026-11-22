@@ -44,7 +44,7 @@ function dayKey(date: Date, timeZone: string): string {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The newest grant of a group (the one whose dates the row shows and that "Revocar" ends). */
+/** The newest grant of a group (the one whose dates the row shows; "Revocar" ends every grant of the app). */
 const newest = (grants: Assistant[]): Assistant | undefined =>
   [...grants].sort((a, b) => b.connectedAt.localeCompare(a.connectedAt))[0];
 
@@ -77,7 +77,7 @@ export function AgentsScreen({
   const url = mcpUrl(origin);
   const [connecting, setConnecting] = useState<Agent | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [revoking, setRevoking] = useState<Assistant | null>(null);
+  const [revoking, setRevoking] = useState<{ name: string; ids: string[] } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // The grant ids already seen: null until the first load, so that one never toasts.
@@ -117,7 +117,7 @@ export function AgentsScreen({
   const confirm = async () => {
     if (!revoking) return;
     try {
-      await revoke.mutateAsync(revoking.clientId);
+      await revoke.mutateAsync(revoking.ids);
     } catch (problem) {
       toast.show({ tone: "error", message: a("revoke_failed") });
       throw problem;
@@ -136,8 +136,8 @@ export function AgentsScreen({
   const connectedLine = (grant: Assistant) =>
     t("connected_line", { date: day(grant.connectedAt), used: used(grant) });
 
-  const askRevoke = (grant: Assistant) => {
-    setRevoking(grant);
+  const askRevoke = (name: string, grants: Assistant[]) => {
+    setRevoking({ name, ids: grants.map((item) => item.clientId) });
     setConfirmOpen(true);
   };
 
@@ -159,7 +159,8 @@ export function AgentsScreen({
       {(demo || list.data) && (
         <SettingsGroup>
           {AGENTS.map((agent) => {
-            const grant = newest(grants.filter((item) => agentFor(item) === agent.id));
+            const own = grants.filter((item) => agentFor(item) === agent.id);
+            const grant = newest(own);
             return (
               <AgentRow
                 key={agent.id}
@@ -169,7 +170,7 @@ export function AgentsScreen({
                 line={grant ? connectedLine(grant) : t("not_connected")}
                 action={
                   grant ? (
-                    <RevokeButton name={agent.name} onPress={() => askRevoke(grant)} />
+                    <RevokeButton name={agent.name} onPress={() => askRevoke(agent.name, own)} />
                   ) : (
                     <PressButton
                       variant="secondary"
@@ -199,7 +200,9 @@ export function AgentsScreen({
               }
               name={grant.name}
               line={connectedLine(grant)}
-              action={<RevokeButton name={grant.name} onPress={() => askRevoke(grant)} />}
+              action={
+                <RevokeButton name={grant.name} onPress={() => askRevoke(grant.name, [grant])} />
+              }
             />
           ))}
         </SettingsGroup>

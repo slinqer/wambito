@@ -23,20 +23,24 @@ export function useAssistants({ enabled = true }: { enabled?: boolean } = {}) {
 }
 
 /**
- * Revokes one: the API deletes its consent and tokens, so it loses access within minutes. Then
+ * Revokes these (all of one app's grants): the API deletes its consent and tokens, so it loses access within minutes. Then
  * the list is read again. A 404 (already gone, say from another device) counts as done.
  */
 export function useRevokeAssistant() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (clientId: string) => {
-      try {
-        await api.DELETE("/v1/me/assistants/{clientId}", { params: { path: { clientId } } });
-      } catch (problem) {
-        if (problem instanceof ApiProblem && problem.status === 404) return;
-        throw problem;
-      }
+    mutationFn: async (clientIds: string[]) => {
+      await Promise.all(
+        clientIds.map(async (clientId) => {
+          try {
+            await api.DELETE("/v1/me/assistants/{clientId}", { params: { path: { clientId } } });
+          } catch (problem) {
+            if (problem instanceof ApiProblem && problem.status === 404) return;
+            throw problem;
+          }
+        }),
+      );
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ASSISTANTS_KEY }),
   });

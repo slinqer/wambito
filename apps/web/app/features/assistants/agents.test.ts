@@ -10,13 +10,17 @@ describe("agentFor", () => {
     expect(agentFor({ name: "Lumo" })).toBe("lumo");
     expect(agentFor({ name: "Proton Lumo+" })).toBe("lumo");
     expect(agentFor({ name: "Grok" })).toBe("grok");
-    expect(agentFor({ name: "x", domain: "grok.x.ai" })).toBe("grok");
+    expect(agentFor({ name: "x", domain: "api.x.ai" })).toBe("grok");
+    expect(agentFor({ name: "Lumo", domain: "lumo.proton.me" })).toBe("lumo");
   });
 
   it("is null for any other client", () => {
     expect(agentFor({ name: "Cursor" })).toBeNull();
     expect(agentFor({ name: "Cursor", domain: "cursor.com" })).toBeNull();
     expect(agentFor({ name: "Cursor", domain: null })).toBeNull();
+    expect(agentFor({ name: "Box AI", domain: "box.ai" })).toBeNull();
+    expect(agentFor({ name: "Proton Mail bridge", domain: "proton.me" })).toBeNull();
+    expect(agentFor({ name: "OpenAI Codex" })).toBeNull();
   });
 });
 

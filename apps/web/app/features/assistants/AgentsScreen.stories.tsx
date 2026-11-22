@@ -245,6 +245,30 @@ export const Revoke: Story = {
   },
 };
 
+const CLAUDE_OLD: Assistant = {
+  ...CLAUDE,
+  clientId: "dcr-claude-old",
+  connectedAt: "2026-09-01T09:00:00.000Z",
+};
+
+/** Two grants of one app: Revocar ends both and the app goes back to Conectar. */
+export const RevokeSeveral: Story = {
+  render: (args) => stage(args, { assistants: [CLAUDE_OLD, CLAUDE] }),
+  play: async ({ canvasElement, args }) => {
+    await page(canvasElement);
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Revocar Claude" }));
+    const sheet = within(await screen.findByRole("dialog", { name: "¿Revocar Claude?" }));
+    await userEvent.click(sheet.getByRole("button", { name: "Sí, revocar" }));
+    await canvas.findByRole("button", { name: "Conectar Claude" });
+    await expect(writesTo(args.onRequest, "DELETE /api/v1/me/assistants").sort()).toEqual(
+      [CLAUDE.clientId, CLAUDE_OLD.clientId]
+        .map((id) => `DELETE /api/v1/me/assistants/${encodeURIComponent(id)}`)
+        .sort(),
+    );
+  },
+};
+
 /** A guest sees why an email comes first, and nothing to connect. */
 export const Guest: Story = {
   render: (args) => stage(args, { guest: true }),
