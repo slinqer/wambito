@@ -298,6 +298,7 @@ export const RevokeSeveral: Story = {
     const sheet = within(await screen.findByRole("dialog", { name: "¿Revocar Claude?" }));
     await userEvent.click(sheet.getByRole("button", { name: "Sí, revocar" }));
     await canvas.findByRole("button", { name: "Conectar Claude" });
+    await toastShown("Listo: Claude ya no tiene acceso.");
     await expect(writesTo(args.onRequest, "DELETE /api/v1/me/assistants").sort()).toEqual(
       [CLAUDE.clientId, CLAUDE_OLD.clientId]
         .map((id) => `DELETE /api/v1/me/assistants/${encodeURIComponent(id)}`)

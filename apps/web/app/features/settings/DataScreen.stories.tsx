@@ -27,6 +27,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<Spies>;
 
+/** Waits until the toast saying `text` has fully faded in (so the a11y checks see it settled). */
+const toastShown = (text: string | RegExp) =>
+  waitFor(
+    () => {
+      const toast = screen.getByRole("status").querySelector<HTMLElement>(".lk-toast");
+      expect(toast).toHaveTextContent(text);
+      expect(toast && getComputedStyle(toast).opacity).toBe("1");
+    },
+    { timeout: 8000 },
+  );
+
 /** Import is a link to the import page; export opens the sheet and downloads as it always did. */
 export const ImportAndExport: Story = {
   render: (args) => (
@@ -47,6 +58,7 @@ export const ImportAndExport: Story = {
     await waitFor(() => expect(args.onSave).toHaveBeenCalledTimes(1));
     const [filename] = (args.onSave as ReturnType<typeof fn>).mock.calls[0] as [string, Blob];
     await expect(filename).toBe(`wambito-export-${STORY_TODAY}.csv`);
+    await toastShown(`Listo: descargamos wambito-export-${STORY_TODAY}.csv.`);
   },
 };
 

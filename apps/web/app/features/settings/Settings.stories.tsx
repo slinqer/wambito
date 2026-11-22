@@ -458,6 +458,7 @@ export const Export: Story = {
     await expect((args.onSave as ReturnType<typeof fn>).mock.calls[1]?.[0]).toBe(
       `wambito-export-${STORY_TODAY}.json`,
     );
+    await toastShown(`Listo: descargamos wambito-export-${STORY_TODAY}.json.`);
   },
 };
 
