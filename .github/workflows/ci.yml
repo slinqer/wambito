@@ -176,6 +176,7 @@ jobs:
       pull-requests: read
     outputs:
       mobile: ${{ steps.filter.outputs.mobile }}
+      copy: ${{ steps.filter.outputs.copy }}
       vault: ${{ steps.filter.outputs.vault }}
     steps:
       - uses: actions/checkout@v4
@@ -188,12 +189,16 @@ jobs:
               - 'apps/api/src/**'
               - 'apps/api/package.json'
               - 'apps/web/scripts/gen-api.ts'
-              - 'apps/web/app/i18n/messages/*.json'
-              - 'apps/web/public/wambi/capture-step*.webp'
               - 'docs/design/system/project/tokens.json'
               - 'packages/core/**'
               - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
+            # Web files the phone's Dart tests compare with (capture_copy_test reads the public
+            # catalogs, capture_scenes_test the scenes). They run only the `mobile` job: a landing
+            # or roadmap change needs no Android or iOS build.
+            copy:
+              - 'apps/web/app/i18n/messages/*.json'
+              - 'apps/web/public/wambi/capture-step*.webp'
             # The phone's vault against the real API (mobile-e2e): the app, the whole API, and the
             # packages the API and the Dart port share (crypto, core, db).
             vault:
@@ -209,7 +214,7 @@ jobs:
   # nothing it depends on changed.
   mobile:
     needs: mobile-changes
-    if: needs.mobile-changes.outputs.mobile == 'true'
+    if: needs.mobile-changes.outputs.mobile == 'true' || needs.mobile-changes.outputs.copy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # A new push to a pull request replaces the run in flight; main's runs all finish.
