@@ -683,14 +683,11 @@
     "signed_in_as": "Signed in as {email}",
     "preferences": "Preferences",
     "theme_hint": "Automatic follows your phone's setting.",
-    "sound": "Sounds",
     "sound_hint": "They play when you add and celebrate. Vibration stays on.",
     "time_and_money": "Time and currency",
     "timezone": {
       "label": "Time zone",
       "hint": "It tells us when your day and your month begin.",
-      "change": "Change",
-      "change_label": "Change time zone",
       "sheet_title": "Choose your time zone",
       "search": "Search for your city or country",
       "placeholder": "Bogotá, Colombia, Madrid…",
@@ -785,7 +782,6 @@
       "added": "Since {date}",
       "not_verified": "Not verified",
       "load_failed": "We couldn't load your devices. Try again in a moment.",
-      "remove": "Remove",
       "remove_label": "Remove {name}",
       "removed_done": "{name} no longer has access.",
       "connect": "Connect another device",
@@ -827,10 +823,7 @@
       "change_keys_line": "Make new encryption keys"
     },
     "data": {
-      "title": "Your data",
-      "import_title": "Bring your history",
       "import_lead": "Import what you have in Budge.",
-      "import_action": "Import from Budge",
       "export_title": "Download your data",
       "export_lead": "Everything as JSON, or your transactions as CSV to open in Excel or Google Sheets.",
       "export_json": "Download JSON",

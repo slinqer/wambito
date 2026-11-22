@@ -1237,9 +1237,7 @@
   "@settingsOpenLabel": {
     "description": "Home: the gear that opens Settings."
   },
-  "settingsAccount": "Cuenta",
   "settingsGuestAccount": "Estás usando Wambito sin correo.",
-  "settingsPreferences": "Preferencias",
   "settingsTheme": "Tema",
   "settingsThemeSystem": "Automático",
   "settingsThemeDay": "Día",
@@ -1264,7 +1262,6 @@
     "description": "The language's own name: the same in every catalog."
   },
   "settingsLanguageHint": "Automático usa el idioma de tu teléfono.",
-  "settingsSound": "Sonidos",
   "settingsSoundHint": "Suenan al anotar y al celebrar. La vibración sigue igual.",
   "settingsVibration": "Vibración",
   "settingsVibrationHint": "Un toque suave al anotar, deslizar y deshacer.",
@@ -1359,7 +1356,6 @@
     }
   },
   "settingsAbout": "Acerca de",
-  "settingsWeb": "Más en la web",
   "settingsWebHint": "La página de Wambito y lo que viene.",
   "settingsWebFailed": "No pudimos abrir el navegador.",
   "settingsSignedInAs": "Entraste como {email}",
@@ -1406,8 +1402,6 @@
     }
   },
   "settingsSoundHintVibrationOff": "Suenan al anotar y al celebrar. La vibración sigue igual.",
-  "settingsWebOpen": "Ver la página de Wambito",
-  "settingsAboutOpen": "Licencias y más",
   "aboutBack": "Volver a Ajustes",
   "aboutBackShort": "Ajustes",
   "settingsSignOut": "Cerrar sesión",
@@ -2145,25 +2139,9 @@
   "@importPageLead": {
     "description": "Import: the line under the title."
   },
-  "settingsDataTitle": "Tus datos",
-  "@settingsDataTitle": {
-    "description": "Settings: the card for importing and exporting."
-  },
-  "settingsImportTitle": "Trae tu historial",
-  "@settingsImportTitle": {
-    "description": "Settings: the import setting's name."
-  },
   "settingsImportLead": "Importa lo que llevas en Budge.",
   "@settingsImportLead": {
     "description": "Settings: what the import does."
-  },
-  "settingsImportAction": "Importar desde Budge",
-  "@settingsImportAction": {
-    "description": "Settings: the button that opens the import."
-  },
-  "settingsRoadmapOpen": "Ver lo que viene",
-  "@settingsRoadmapOpen": {
-    "description": "Settings: the link that opens the roadmap page in the browser."
   },
   "settingsTimeAndMoney": "Hora y moneda",
   "@settingsTimeAndMoney": {
@@ -2176,14 +2154,6 @@
   "settingsTimezoneHint": "Con ella sabemos cuándo empieza tu día y tu mes.",
   "@settingsTimezoneHint": {
     "description": "Settings: what the time zone is for."
-  },
-  "settingsTimezoneChange": "Cambiar",
-  "@settingsTimezoneChange": {
-    "description": "Settings: the button that opens the time zone sheet."
-  },
-  "settingsTimezoneChangeLabel": "Cambiar zona horaria",
-  "@settingsTimezoneChangeLabel": {
-    "description": "Settings: the time zone button's name for screen readers."
   },
   "settingsTimezoneSheetTitle": "Elige tu zona horaria",
   "@settingsTimezoneSheetTitle": {

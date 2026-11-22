@@ -683,14 +683,11 @@
     "signed_in_as": "Entraste como {email}",
     "preferences": "Preferências",
     "theme_hint": "Automático segue o modo do teu telemóvel.",
-    "sound": "Sons",
     "sound_hint": "Tocam quando registas e quando celebras. A vibração mantém-se igual.",
     "time_and_money": "Hora e moeda",
     "timezone": {
       "label": "Fuso horário",
       "hint": "Com ele sabemos quando começa o teu dia e o teu mês.",
-      "change": "Mudar",
-      "change_label": "Mudar fuso horário",
       "sheet_title": "Escolhe o teu fuso horário",
       "search": "Procura a tua cidade ou país",
       "placeholder": "Lisboa, Portugal, Porto…",
@@ -785,7 +782,6 @@
       "added": "Desde {date}",
       "not_verified": "Não verificado",
       "load_failed": "Não conseguimos carregar os teus dispositivos. Tenta outra vez daqui a pouco.",
-      "remove": "Remover",
       "remove_label": "Remover {name}",
       "removed_done": "{name} já não tem acesso.",
       "connect": "Ligar outro dispositivo",
@@ -827,10 +823,7 @@
       "change_keys_line": "Cria novas chaves de cifragem"
     },
     "data": {
-      "title": "Os teus dados",
-      "import_title": "Traz o teu histórico",
       "import_lead": "Importa o que tens no Budge.",
-      "import_action": "Importar do Budge",
       "export_title": "Descarrega os teus dados",
       "export_lead": "Tudo em JSON, ou os teus movimentos em CSV para os abrires no Excel ou no Google Sheets.",
       "export_json": "Descarregar JSON",

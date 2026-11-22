@@ -683,14 +683,11 @@
     "signed_in_as": "Hai effettuato l'accesso come {email}",
     "preferences": "Preferenze",
     "theme_hint": "Automatico segue la modalità del tuo telefono.",
-    "sound": "Suoni",
     "sound_hint": "Suonano quando annoti e quando festeggi. La vibrazione resta uguale.",
     "time_and_money": "Ora e valuta",
     "timezone": {
       "label": "Fuso orario",
       "hint": "Con questo sappiamo quando inizia il tuo giorno e il tuo mese.",
-      "change": "Cambia",
-      "change_label": "Cambia fuso orario",
       "sheet_title": "Scegli il tuo fuso orario",
       "search": "Cerca la tua città o il tuo paese",
       "placeholder": "Roma, Italia, Milano…",
@@ -785,7 +782,6 @@
       "added": "Dal {date}",
       "not_verified": "Non verificato",
       "load_failed": "Non siamo riusciti a caricare i tuoi dispositivi. Riprova tra un momento.",
-      "remove": "Rimuovi",
       "remove_label": "Rimuovi {name}",
       "removed_done": "{name} non ha più accesso.",
       "connect": "Collega un altro dispositivo",
@@ -827,10 +823,7 @@
       "change_keys_line": "Crea nuove chiavi di cifratura"
     },
     "data": {
-      "title": "I tuoi dati",
-      "import_title": "Porta il tuo storico",
       "import_lead": "Importa quello che hai su Budge.",
-      "import_action": "Importa da Budge",
       "export_title": "Scarica i tuoi dati",
       "export_lead": "Tutto in JSON, o i tuoi movimenti in CSV per aprirli in Excel o Google Sheets.",
       "export_json": "Scarica JSON",
