@@ -650,7 +650,6 @@ class SettingsRow extends StatelessWidget {
     required this.trailing,
     this.onTap,
     this.danger = false,
-    this.lineLines = 1,
   });
 
   final Widget icon;
@@ -659,9 +658,6 @@ class SettingsRow extends StatelessWidget {
   final RowTrailing trailing;
   final VoidCallback? onTap;
   final bool danger;
-
-  /// How many lines the muted line may take before its ellipsis.
-  final int lineLines;
 
   Widget _body(BuildContext context, {required Widget? end}) =>
       LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
@@ -702,7 +698,7 @@ class SettingsRow extends StatelessWidget {
                   if (line != null)
                     Text(
                       line,
-                      maxLines: lineLines,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: LkText.fieldLabel.copyWith(
                         fontSize: 12.5,

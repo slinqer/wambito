@@ -263,7 +263,6 @@ class _AgentsScreenState extends ConsumerState<AgentsScreen> with WidgetsBinding
       icon: _tile(context, LkBrandLogo(agent.brand, size: 18, color: colors.ink)),
       title: agent.label,
       line: newest == null ? l10n.settingsAgentsNotConnected : _line(l10n, newest),
-      lineLines: 2,
       trailing: newest == null
           ? RowButton(
               label: l10n.settingsAgentsConnect,
@@ -296,7 +295,6 @@ class _AgentsScreenState extends ConsumerState<AgentsScreen> with WidgetsBinding
       icon: _tile(context, LkIcon(LkIconName.chat, size: 18, color: context.lkColors.ink)),
       title: grant.name,
       line: _line(l10n, grant),
-      lineLines: 2,
       trailing: RowButton(
         label: l10n.settingsAssistantsRevoke,
         semanticLabel: l10n.settingsAssistantsRevokeLabel(grant.name),

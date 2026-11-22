@@ -256,6 +256,25 @@ void main() {
       );
     });
 
+    testPage('in Italian at 130 % on 360 px a connected row stays one line, 76 px at most', (
+      t,
+    ) async {
+      t.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _pump(t, locale: const Locale('it'), assistants: FakeAssistantsRepository([_claude()]));
+      t.view.physicalSize = const Size(360, 800);
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: _row('claude'),
+          matching: find.text('Collegato il 2 ott 2026 · usato il 20 ott 2026'),
+        ),
+        findsOneWidget,
+      );
+      expect(t.getSize(_row('claude')).height, lessThanOrEqualTo(76));
+    });
+
     testPage('says when the list cannot be read', (t) async {
       final assistants = FakeAssistantsRepository()..listFailure = const HomeFailure(0);
       await _pump(t, assistants: assistants);
