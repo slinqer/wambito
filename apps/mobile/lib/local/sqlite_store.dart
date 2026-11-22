@@ -7,6 +7,7 @@ import '../core/records.dart' show Json;
 import '../crypto/records.dart' show RecordType;
 import 'backup.dart';
 import 'db.dart';
+import 'sqflite_native.dart';
 import 'store.dart';
 
 export 'db.dart'
@@ -208,34 +209,48 @@ Future<void> _deleteOutbox(DatabaseExecutor db, String id) =>
 /// SQLite's `SQLITE_BUSY` primary result code (`database is locked`).
 const _sqliteBusy = 5;
 
-/// How long a write waits for another connection's lock: `busy_timeout` in `openVault`.
+/// How long a write waits for another connection's lock, in short tries (`openVault`'s
+/// `busy_timeout` is [vaultBusyTimeout]).
 const _busyBudget = Duration(seconds: 5);
 
 class SqliteStore implements FinanceStore {
-  SqliteStore._(this._db);
+  SqliteStore._(this._db, [this._recoverLock]);
 
   /// Opens the vault of [userId] and asks [excludeFromBackup] (once, with the vault's folder) to
   /// keep it out of backups. [directory], [factory] and [excludeFromBackup] are for tests; the app
   /// leaves them out (a test directory is not excluded unless the test passes a callback).
   /// [background] is for a headless engine: it gets its own connection (`singleInstance: false`),
   /// so closing it never closes the app's.
+  ///
+  /// [recoverLock] is asked once a read or write gave up on another connection's lock: true when
+  /// it freed the file (it closed a connection nobody owns), and the store then tries again once.
+  /// The app's store (not [background], on the real factory) uses [closeOrphanVaultConnections]:
+  /// a headless engine destroyed mid-transaction leaves its connection, and the lock, open.
   static Future<SqliteStore> open(
     String userId, {
     String? directory,
     DatabaseFactory? factory,
     Future<void> Function(String path)? excludeFromBackup,
     bool background = false,
+    Future<bool> Function()? recoverLock,
   }) async {
     final dir = directory ?? await defaultVaultDirectory();
     final exclude = excludeFromBackup ?? (directory == null ? excludeVaultFromBackup : null);
     // Before the file exists, so even its first bytes are never in a backup.
     await exclude?.call(dir);
+    final recover =
+        recoverLock ??
+        (background || factory != null
+            ? null
+            : () async => await closeOrphanVaultConnections(userId, directory: dir) > 0);
     return SqliteStore._(
       await openVault(userId, directory: dir, factory: factory, singleInstance: !background),
+      recover,
     );
   }
 
   final Database _db;
+  final Future<bool> Function()? _recoverLock;
   final Set<void Function()> _listeners = {};
   final Set<void Function()> _closedListeners = {};
   Future<void> _queue = Future<void>.value();
@@ -267,13 +282,15 @@ class SqliteStore implements FinanceStore {
 
   /// [_db.transaction] that waits in Dart when another connection holds the file's write lock.
   ///
-  /// `busy_timeout` (5 s, `openVault`) makes SQLite itself wait, but under the Dart VM on Linux (the
-  /// host tests on CI) the signals the VM sends its threads cut SQLite's sleeps short, and it gave
-  /// up after about 60 ms. Only a failed `BEGIN` is retried: nothing of [fn] has run then. A phone's
-  /// SQLite runs on the platform's threads and waits by itself; this then never loops.
+  /// SQLite itself waits only [vaultBusyTimeout] (`openVault`): on Android that sleep holds one of
+  /// sqflite's native threads, which the connection holding the lock may need for its next
+  /// statement. So the wait is here, in Dart, with the thread free between tries (under the Dart VM
+  /// on Linux, the host tests on CI, SQLite's sleeps are cut short anyway). Only a failed `BEGIN` is
+  /// retried: nothing of [fn] has run then.
   Future<T> _txn<T>(Future<T> Function(Transaction txn) fn) async {
     final waited = Stopwatch()..start();
     var pause = const Duration(milliseconds: 10);
+    var recovered = false;
     while (true) {
       var began = false;
       try {
@@ -283,10 +300,26 @@ class SqliteStore implements FinanceStore {
         });
       } on DatabaseException catch (e) {
         final busy = ((e.getResultCode() ?? 0) & 0xff) == _sqliteBusy;
-        if (began || !busy || waited.elapsed >= _busyBudget) rethrow;
+        if (began || !busy) rethrow;
+        if (waited.elapsed >= _busyBudget) {
+          // Still locked after the whole wait: maybe by a connection nobody owns. Once per call.
+          final recover = _recoverLock;
+          if (recovered || recover == null || !await _askRecover(recover)) rethrow;
+          recovered = true;
+          waited.reset();
+          continue;
+        }
       }
       await Future<void>.delayed(pause);
       if (pause < const Duration(milliseconds: 200)) pause *= 2;
+    }
+  }
+
+  static Future<bool> _askRecover(Future<bool> Function() recover) async {
+    try {
+      return await recover();
+    } on Object {
+      return false;
     }
   }
 

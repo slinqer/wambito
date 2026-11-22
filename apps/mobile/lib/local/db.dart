@@ -238,19 +238,28 @@ Future<void> _upgrade(Database db, int from, int to) async {
   }
 }
 
+/// How long SQLite itself waits for the file's write lock before the store's Dart loop tries again.
+const vaultBusyTimeout = Duration(milliseconds: 100);
+
 /// Opens (creating it on the first run) the vault file of [userId]. [directory] and [factory] are
 /// for tests; the app leaves them out.
 ///
 /// [singleInstance] false gives the caller its own connection: a headless engine in the app's
 /// process must not share (and so must not close) the app's (sqflite keeps single-instance
-/// databases in a map shared by every engine of the process). Both kinds wait up to 5 s for the
-/// file's write lock (`busy_timeout`) instead of failing with `database is locked`.
+/// databases in a map shared by every engine of the process).
+///
+/// `busy_timeout` is short ([vaultBusyTimeout]): the store waits for another connection's write
+/// lock in Dart, up to 5 s, between short tries (`SqliteStore`). On Android every connection of the
+/// process runs on sqflite's few native threads, which pick tasks with no regard for whose
+/// transaction holds the lock: a connection sleeping in SQLite's busy handler can hold the thread
+/// the lock's holder needs next. With a 5 s `busy_timeout` a headless run lost 5 s on its next
+/// statement each time the app asked for the vault (`integration_test/vault_lock_test.dart`).
 ///
 /// The file is in WAL mode. SQLite keeps no queue of waiters: whoever asks when the lock is free
-/// gets it, and a waiter backs off up to 100 ms between tries, so one that keeps losing can pass
-/// `busy_timeout`. In the rollback journal a commit holds the lock across several syncs (the
-/// journal, then the file); in WAL across one, so the lock is free far more often (CI saw a
-/// background engine lose for 5 s in the rollback journal).
+/// gets it, so a waiter that keeps losing can pass the store's 5 s wait. In the rollback journal a
+/// commit holds the lock across several syncs (the journal, then the file); in WAL across one, so
+/// the lock is free far more often (CI saw a background engine lose for 5 s in the rollback
+/// journal).
 Future<Database> openVault(
   String userId, {
   String? directory,
@@ -263,7 +272,7 @@ Future<Database> openVault(
     options: OpenDatabaseOptions(
       version: vaultSchemaVersion,
       onConfigure: (db) async {
-        await db.rawQuery('PRAGMA busy_timeout = 5000');
+        await db.rawQuery('PRAGMA busy_timeout = ${vaultBusyTimeout.inMilliseconds}');
         // Kept in the file: set on every open so a file made before it, or a connection that
         // reset it, ends up in WAL too.
         await db.rawQuery('PRAGMA journal_mode = WAL');
