@@ -172,6 +172,16 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      for (final scale in [1.0, 1.3]) {
+        testWidgets('the settings menu has no overflow at text scale $scale', (tester) async {
+          await _pump(tester, locale, location: '/settings');
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          await tester.pumpAndSettle();
+          // Ellipsis on a line is fine; a RenderFlex overflow is not.
+          expect(tester.takeException(), isNull);
+        });
+      }
+
       for (final category in SettingsCategory.values) {
         testWidgets('every ${category.name} row is drawn whole, top to bottom', (tester) async {
           await _pump(tester, locale, location: category.path);

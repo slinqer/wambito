@@ -8,6 +8,7 @@ import 'package:wambito/theme/theme.dart';
 import 'package:wambito/ui/app_shell.dart';
 import 'package:wambito/settings/feedback.dart' show appVersionProvider;
 import 'package:wambito/settings/settings_categories.dart';
+import 'package:wambito/ui/bottom_bar.dart';
 import 'package:wambito/ui/lk_icons.dart';
 
 import '../support/icons.dart';
@@ -73,10 +74,12 @@ void main() {
     await _pump(tester);
     tester.view.physicalSize = const Size(360, 740);
     await tester.pumpAndSettle();
-    final more = tester.getBottomLeft(find.byKey(const Key('settings.menu.more'))).dy;
-    final version = tester.getBottomLeft(find.text('Wambito 1.0.4')).dy;
-    expect(more, lessThan(740));
-    expect(version, lessThan(740));
+    // The bottom bar draws over the content: what shows ends above its top edge.
+    final bar = tester.getRect(find.byType(BottomBar)).top;
+    final more = tester.getRect(find.byKey(const Key('settings.menu.more'))).bottom;
+    final version = tester.getRect(find.text('Wambito 1.0.4')).bottom;
+    expect(more, lessThanOrEqualTo(bar));
+    expect(version, lessThanOrEqualTo(bar));
   });
 
   testWidgets('a row is one pressable with a chevron', (tester) async {
