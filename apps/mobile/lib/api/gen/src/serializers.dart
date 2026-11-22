@@ -21,12 +21,17 @@ import 'package:wambito/api/gen/src/model/admin_delete_user.dart';
 import 'package:wambito/api/gen/src/model/admin_email_change.dart';
 import 'package:wambito/api/gen/src/model/admin_me.dart';
 import 'package:wambito/api/gen/src/model/admin_metrics.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_cohorts_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_daily_active_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_installs_by_platform_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_versions_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_metrics_weekly_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_user.dart';
 import 'package:wambito/api/gen/src/model/admin_user_assistants_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_user_passkeys_inner.dart';
 import 'package:wambito/api/gen/src/model/assistant.dart';
 import 'package:wambito/api/gen/src/model/assistant_list.dart';
+import 'package:wambito/api/gen/src/model/assistant_wrap.dart';
 import 'package:wambito/api/gen/src/model/capture_result.dart';
 import 'package:wambito/api/gen/src/model/capture_result_category.dart';
 import 'package:wambito/api/gen/src/model/capture_result_transaction.dart';
@@ -47,6 +52,8 @@ import 'package:wambito/api/gen/src/model/create_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/delete_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/email_change_confirm.dart';
 import 'package:wambito/api/gen/src/model/file_import.dart';
+import 'package:wambito/api/gen/src/model/finish_migration.dart';
+import 'package:wambito/api/gen/src/model/get_signin200_response.dart';
 import 'package:wambito/api/gen/src/model/import_stats.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_monthly_spending_inner.dart';
 import 'package:wambito/api/gen/src/model/import_stats_average_window.dart';
@@ -54,6 +61,17 @@ import 'package:wambito/api/gen/src/model/import_stats_rejected_inner.dart';
 import 'package:wambito/api/gen/src/model/key_link.dart';
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
+import 'package:wambito/api/gen/src/model/migration_counts.dart';
+import 'package:wambito/api/gen/src/model/migration_problem.dart';
+import 'package:wambito/api/gen/src/model/migration_problem_errors.dart';
+import 'package:wambito/api/gen/src/model/migration_problem_errors_missing_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source.dart';
+import 'package:wambito/api/gen/src/model/migration_source_budgets_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_categories_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_merchants_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_profile.dart';
+import 'package:wambito/api/gen/src/model/migration_source_recurrences_inner.dart';
+import 'package:wambito/api/gen/src/model/migration_source_transactions_inner.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
 import 'package:wambito/api/gen/src/model/pairing_found.dart';
 import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
@@ -76,13 +94,22 @@ import 'package:wambito/api/gen/src/model/push_rejected.dart';
 import 'package:wambito/api/gen/src/model/push_result.dart';
 import 'package:wambito/api/gen/src/model/push_results.dart';
 import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/put_recovery_verifier.dart';
+import 'package:wambito/api/gen/src/model/recovery_sign_in.dart';
+import 'package:wambito/api/gen/src/model/recovery_signed_in.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/rotate_keys.dart';
 import 'package:wambito/api/gen/src/model/rotated_key_wrap.dart';
 import 'package:wambito/api/gen/src/model/seal_pairing.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
+import 'package:wambito/api/gen/src/model/signin_found.dart';
+import 'package:wambito/api/gen/src/model/signin_pickup.dart';
+import 'package:wambito/api/gen/src/model/signin_poll.dart';
+import 'package:wambito/api/gen/src/model/signin_started.dart';
+import 'package:wambito/api/gen/src/model/signin_view.dart';
 import 'package:wambito/api/gen/src/model/start_pairing.dart';
+import 'package:wambito/api/gen/src/model/start_signin.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/summary_categories_inner.dart';
 import 'package:wambito/api/gen/src/model/sync_change.dart';
@@ -110,12 +137,17 @@ part 'serializers.g.dart';
   AdminEmailChange,
   AdminMe,
   AdminMetrics,
+  AdminMetricsCohortsInner,
+  AdminMetricsDailyActiveInner,
+  AdminMetricsInstallsByPlatformInner,
+  AdminMetricsVersionsInner,
   AdminMetricsWeeklyInner,
   AdminUser,
   AdminUserAssistantsInner,
   AdminUserPasskeysInner,
   Assistant,
   AssistantList,
+  AssistantWrap,
   CaptureResult,
   CaptureResultCategory,
   CaptureResultTransaction,
@@ -136,6 +168,8 @@ part 'serializers.g.dart';
   DeleteTransactionsBatch,
   EmailChangeConfirm,
   FileImport,
+  FinishMigration,
+  GetSignin200Response,
   ImportStats,
   ImportStatsAverageMonthlySpendingInner,
   ImportStatsAverageWindow,
@@ -143,6 +177,17 @@ part 'serializers.g.dart';
   KeyLink,
   KeyWrap,
   KeyWraps,
+  MigrationCounts,
+  MigrationProblem,
+  MigrationProblemErrors,
+  MigrationProblemErrorsMissingInner,
+  MigrationSource,
+  MigrationSourceBudgetsInner,
+  MigrationSourceCategoriesInner,
+  MigrationSourceMerchantsInner,
+  MigrationSourceProfile,
+  MigrationSourceRecurrencesInner,
+  MigrationSourceTransactionsInner,
   PairingApprover,
   PairingFound,
   PairingPickup,
@@ -165,13 +210,23 @@ part 'serializers.g.dart';
   PushResult,
   PushResults,
   PutKeyWrap,
+  PutRecoveryVerifier,
+  RecoverySignIn,
+  RecoverySignedIn,
   Recurrence,
   ReviewTransactions,
   RotateKeys,
   RotatedKeyWrap,
   SealPairing,
   SetBudget,
+  SigninFound,
+  $SigninFound,
+  SigninPickup,
+  SigninPoll,
+  SigninStarted,
+  SigninView,
   StartPairing,
+  StartSignin,
   Summary,
   SummaryCategoriesInner,
   SyncChange,
@@ -228,12 +283,28 @@ Serializers serializers =
             () => ListBuilder<CostOfLivingReportCategoriesInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceBudgetsInner)]),
+            () => ListBuilder<MigrationSourceBudgetsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceRecurrencesInner)]),
+            () => ListBuilder<MigrationSourceRecurrencesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceMerchantsInner)]),
+            () => ListBuilder<MigrationSourceMerchantsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(KeyWrap)]),
             () => ListBuilder<KeyWrap>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SyncRecord)]),
             () => ListBuilder<SyncRecord>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsDailyActiveInner)]),
+            () => ListBuilder<AdminMetricsDailyActiveInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(PasskeyRequestOptionsAllowCredentialsInner)]),
@@ -256,16 +327,36 @@ Serializers serializers =
             () => ListBuilder<Recurrence>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsCohortsInner)]),
+            () => ListBuilder<AdminMetricsCohortsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsVersionsInner)]),
+            () => ListBuilder<AdminMetricsVersionsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AdminMetricsWeeklyInner)]),
             () => ListBuilder<AdminMetricsWeeklyInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AdminMetricsInstallsByPlatformInner)]),
+            () => ListBuilder<AdminMetricsInstallsByPlatformInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Category)]),
             () => ListBuilder<Category>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceCategoriesInner)]),
+            () => ListBuilder<MigrationSourceCategoriesInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SummaryCategoriesInner)]),
             () => ListBuilder<SummaryCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationProblemErrorsMissingInner)]),
+            () => ListBuilder<MigrationProblemErrorsMissingInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),
@@ -292,6 +383,10 @@ Serializers serializers =
             () => ListBuilder<ImportStatsRejectedInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(MigrationSourceTransactionsInner)]),
+            () => ListBuilder<MigrationSourceTransactionsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Assistant)]),
             () => ListBuilder<Assistant>(),
           )
@@ -299,6 +394,7 @@ Serializers serializers =
             const FullType(BuiltList, [FullType(ImportStatsAverageMonthlySpendingInner)]),
             () => ListBuilder<ImportStatsAverageMonthlySpendingInner>(),
           )
+          ..add(SigninFound.serializer)
           ..add(const OneOfSerializer())
           ..add(const AnyOfSerializer())
           ..add(const DateSerializer())

@@ -10,17 +10,17 @@ Wambito è il tuo budget, e ti farà piacere prendertene cura: annota una spesa 
 </ul>
 
 <b>Senza email e senza password</b>
-Provala senza email, come ospite, e aggiungi la tua email dopo senza perdere quello che hai annotato. Con l'email entri con un codice di 6 cifre o con un link, e se vuoi con una passkey (la tua impronta o il blocco del telefono; richiede Android 14 o più recente). Senza email, se perdi il telefono o cancelli l'app, perdi i tuoi dati, e un account senza email viene cancellato dopo 60 giorni senza aprire Wambito: l'app ti avvisa al 45º giorno.
+Provala senza email, come ospite, e aggiungi la tua email dopo senza perdere quello che hai annotato. Con l'email entri con un codice di 6 cifre o con un link, e se vuoi con una passkey (la tua impronta o il blocco del telefono; richiede Android 14 o più recente). Senza email, i tuoi dati restano cifrati sul server e solo questo telefono li apre: crea una chiave di recupero o aggiungi una passkey (Wambito te lo ricorda nella schermata iniziale) per recuperarli se perdi il telefono o cancelli l'app; senza nessuna delle due, si perdono. Un account senza email viene cancellato dopo 12 mesi senza aprire Wambito, o 24 se ha una chiave di recupero o una passkey.
 
 <b>Privacy</b>
-Niente pubblicità, niente analisi né segnalazioni automatiche di errori, niente Google Play Services né Firebase. Il dettato (in spagnolo e inglese, e in beta in italiano e portoghese) funziona sul tuo telefono, senza internet, con i modelli vocali liberi Vosk (Apache-2.0): quello che dici non esce dal telefono. Il modello della tua lingua si scarica una sola volta (da 30 a 50 MB circa) e puoi eliminarlo nelle Impostazioni. Chiede solo i permessi che usa: internet, microfono (per il dettato), vibrazione, avvisi, e quello che serve al widget per aggiornarsi (sapere se c'è rete e riprogrammarsi al riavvio del telefono).
+Le tue finanze sono cifrate end-to-end: vengono cifrate sul telefono prima di uscirne, e il server conserva solo testo cifrato che non può leggere. Niente pubblicità, niente analisi né segnalazioni automatiche di errori, niente Google Play Services né Firebase. Il dettato (in spagnolo e inglese, e in beta in italiano e portoghese) funziona sul tuo telefono, senza internet, con i modelli vocali liberi Vosk (Apache-2.0): quello che dici non esce dal telefono. Il modello della tua lingua si scarica una sola volta (da 30 a 50 MB circa) e puoi eliminarlo nelle Impostazioni. Chiede solo i permessi che usa: internet, microfono (per il dettato), vibrazione, avvisi, e quello che serve al widget per aggiornarsi (sapere se c'è rete e riprogrammarsi al riavvio del telefono).
 
-Gli avvisi sono solo due, entrambi locali e che puoi spegnere: «Scade oggi…» alle 9:00 con i pagamenti ricorrenti del giorno, e un avviso se passano 45 giorni senza aprire l'app e il tuo account non ha un'email.
+C'è un solo avviso, locale e che puoi spegnere: «Scade oggi…» alle 9:00 con i pagamenti ricorrenti del giorno.
 
 <b>Serve un server di Wambito</b>
 L'app salva i tuoi dati su un server di Wambito. Di default usa quello dell'autore (app.wambito.com), che per ora è un'installazione personale e può limitare chi aggiunge un'email. Puoi indicare il tuo nelle Impostazioni: anche il server è software libero.
 
 <b>Cosa resta sul web</b>
-Categorie, pagamenti ricorrenti, report, importazione e download dei tuoi dati sono sul web; l'app ti ci porta.
+Categorie, pagamenti ricorrenti e report sono sul web; l'app ti ci porta. Presto potrai di nuovo importare e scaricare i tuoi dati, ora cifrati.
 
 Software libero con licenza AGPL-3.0. Il codice è su https://github.com/slinqer/wambito

@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wambito.app.R
+import com.wambito.app.account.AccountMode
 import com.wambito.app.widget.SecureStorageSession
 import com.wambito.app.widget.ServerSetting
 import com.wambito.app.widget.SessionSource
@@ -70,6 +71,7 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         val context = applicationContext
         val dependencies = NoticeHooks.of(context)
         val settings = NoticeSettings(context)
+        val mode = AccountMode(context)
         var zone = NoticeTimes.zoneOr(settings.zone, ZoneId.systemDefault())
         var outcome = "off"
         var keepGoing = true
@@ -77,6 +79,16 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             val mark = dependencies.session.mark()
             if (mark == null) {
                 outcome = "signed out"
+            } else if (mode.isPreview()) {
+                // A `preview` account's payments live only on the phone: nothing is asked, today's
+                // entry of the list the app handed over is posted.
+                val run = previewRun(context, dependencies, settings, mode, zone)
+                outcome = run.outcome
+                zone = run.zone
+                keepGoing = run.keepGoing
+            } else if (!mode.allowsApi()) {
+                // While the app has not learned the mode yet, tomorrow's run looks again.
+                outcome = "mode unknown"
             } else if (!NoticePoster(context).canPost()) {
                 // Nothing could be said: nothing is asked of the server either.
                 outcome = "not allowed"
@@ -98,6 +110,35 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
             NoticeScheduler.enqueueNextDue(context, zone, dependencies.clock())
         }
         return Result.success(workDataOf(NOTICE_OUTCOME to outcome))
+    }
+
+    /**
+     * A `preview` account's run: today's entry of the [DueList], which carries the account it was
+     * read for. A list that is another account's, or has no owner, or an account whose owner the
+     * app has not told, posts nothing and is cleared, and the run is not scheduled again (the app
+     * hands the list over again, and schedules it, when it knows the account).
+     */
+    private fun previewRun(
+        context: Context,
+        dependencies: NoticeDependencies,
+        settings: NoticeSettings,
+        mode: AccountMode,
+        known: ZoneId,
+    ): Run {
+        val owner = mode.owner
+        if (owner == null || DueList.owner(context) != owner) {
+            DueList.clear(context)
+            return Run("owner mismatch", known, keepGoing = false)
+        }
+        val now = dependencies.clock()
+        if (now.atZone(known).toLocalTime().isBefore(NoticeTimes.DUE_AT)) return Run("before 9", known)
+        val today = LocalDate.ofInstant(now, known)
+        if (settings.lastDueDay == today.toString()) return Run("already today", known)
+        val names = DueList.namesOn(context, today)
+        if (names.isEmpty()) return Run("nothing due today", known)
+        if (!NoticePoster(context).postDue(names, settings.language)) return Run("not allowed", known)
+        settings.lastDueDay = today.toString()
+        return Run("posted", known)
     }
 
     private class Run(val outcome: String, val zone: ZoneId, val keepGoing: Boolean = true)
@@ -146,7 +187,8 @@ class DueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
  * It makes **no call to the server**: any authenticated request is activity there and would move
  * the deletion 60 days on, making the warning false. It decides from what is on the phone: the
  * switch, a session that is still stored, and the guest flag the app keeps next to the token. The
- * app cancels the job when the account claims an email and when the person signs out.
+ * app cancels the job when the account claims an email, when the person signs out and when the
+ * account is `preview` (an encrypted guest is kept for months and never gets it, nor posts it here).
  */
 class GuestWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -156,6 +198,8 @@ class GuestWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val outcome = when {
             !settings.guestEnabled -> "off"
             dependencies.session.mark() == null -> "signed out"
+            // An encrypted guest is kept 12 or 24 months, not 60 days: the warning would be false.
+            AccountMode(context).isPreview() -> "encrypted"
             // A flag that is missing reads as a guest, as in the app: the safe side is to warn.
             dependencies.session.guest() == false -> "has an email"
             NoticePoster(context).postGuestWarning(settings.language) -> "posted"

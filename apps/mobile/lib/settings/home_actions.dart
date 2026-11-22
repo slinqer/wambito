@@ -7,6 +7,7 @@ import '../home/home_header.dart';
 import '../home/home_screen.dart' show HomeView, homeViewRequestProvider;
 import '../l10n/app_localizations.dart';
 import '../theme/tokens.g.dart';
+import '../vault/preview.dart' show isPreviewProvider;
 
 /// What the face button's menu on home holds, as the web's does (`HomeHeader`'s sections):
 /// Recurrentes, Categorías and Ajustes, and, for a guest, "Guarda tu progreso" first. Each closes
@@ -21,7 +22,9 @@ class HomeMenuLinks extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final guest = ref.watch(sessionProvider.select((s) => s.isGuest));
+    // A `preview` guest has the home card and Settings' block instead (ruling 21).
+    final guest =
+        ref.watch(sessionProvider.select((s) => s.isGuest)) && !ref.watch(isPreviewProvider);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

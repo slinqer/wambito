@@ -330,6 +330,12 @@ export interface HomeApiOptions {
   failRevoke?: boolean;
   /** The profile is a guest's (`isAnonymous`). */
   guest?: boolean;
+  /**
+   * `POST /v1/me/claim-email/*` (adding an email to a guest): `taken` refuses every address with
+   * 409 `email_taken`; otherwise the code 123456 claims it (the profile gets the email, no longer
+   * a guest) and any other code is a 400 `invalid_code`.
+   */
+  claim?: "ok" | "taken";
 }
 
 /** One budget amount, from its month on (until a later one), as the API keeps them. */
@@ -394,6 +400,7 @@ function homeFetch({
   assistants: initialAssistants = [],
   failRevoke = false,
   guest = false,
+  claim = "ok",
 }: HomeApiOptions): typeof fetch {
   let assistants = [...initialAssistants];
   let categories: FakeCategory[] =
@@ -510,6 +517,17 @@ function homeFetch({
     if (path === "/api/v1/me" && request.method === "DELETE") {
       if (failDelete) return Response.json({ code: "internal_error" }, { status: 503 });
       return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/me/claim-email/send") {
+      if (claim === "taken") return Response.json({ code: "email_taken" }, { status: 409 });
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/me/claim-email/verify") {
+      const claimed = body as { email: string; code: string };
+      if (claimed.code !== "123456")
+        return Response.json({ code: "invalid_code" }, { status: 400 });
+      profile = { ...profile, email: claimed.email, isAnonymous: false };
+      return Response.json(profile);
     }
     if (path === "/api/v1/me") return Response.json(profile);
     if (path === "/api/v1/me/assistants") return Response.json({ items: assistants });
@@ -805,18 +823,25 @@ function homeFetch({
 
 /**
  * Passkeys kept in memory, standing in for Better Auth and the browser's prompt: `outcome` is what
- * adding one comes to (a new passkey when "added").
+ * adding one comes to (a new passkey when "added"); with `prf`, a new passkey's provider hands its
+ * PRF to the open vault's `keep` (without it, as Proton Pass, nothing is kept and `onNoPrf` is
+ * told); `secondTouchCancelled`: without `prf`, the second touch was cancelled (or failed), so
+ * nothing is kept and nothing is told.
  */
 export function storyPasskeys({
   initial = [],
   supported = true,
   outcome = "added",
   failList = false,
+  prf = false,
+  secondTouchCancelled = false,
 }: {
   initial?: PasskeyItem[];
   supported?: boolean;
   outcome?: PasskeyOutcome;
   failList?: boolean;
+  prf?: boolean;
+  secondTouchCancelled?: boolean;
 } = {}): PasskeysApi {
   let items = [...initial];
   return {
@@ -825,18 +850,28 @@ export function storyPasskeys({
       if (failList) throw new Error("passkeys_unavailable");
       return [...items];
     },
-    add: async () => {
+    add: async (vault) => {
       if (outcome === "added") {
+        const credentialId = `cred-${items.length + 1}`;
         items = [
           ...items,
           {
             id: `pk-${items.length + 1}`,
-            credentialId: `cred-${items.length + 1}`,
+            credentialId,
             name: null,
             createdAt: `${STORY_TODAY}T10:00:00.000Z`,
             synced: true,
           },
         ];
+        if (prf && vault?.keep) {
+          try {
+            await vault.keep({ credentialId, prf: new Uint8Array(32).fill(7) });
+          } catch {
+            // as `addPasskey`: the passkey was added and signs in, it only does not open the data
+          }
+        } else if (!prf && !secondTouchCancelled) {
+          vault?.onNoPrf?.();
+        }
       }
       return outcome;
     },
@@ -861,6 +896,8 @@ export interface HomeStageProps extends HomeApiOptions {
   mode?: ApiMode;
   /** Stands in for the open vault's keys in settings (Security, mode `local`). */
   security?: SecurityApi;
+  /** Settings' "Create account (add an email)" in "Protect your data". */
+  onAddEmail?: () => void;
 }
 
 /**
@@ -878,6 +915,7 @@ export function HomeStage({
   onCopy = async () => {},
   mode,
   security,
+  onAddEmail,
   ...api
 }: HomeStageProps) {
   // The toolbar's language, held here so settings can switch it (the toolbar's provider can't).
@@ -919,6 +957,7 @@ export function HomeStage({
                       save={(blob, filename) => onSave(filename, blob)}
                       copy={onCopy}
                       {...(security ? { security } : {})}
+                      {...(onAddEmail ? { onAddEmail } : {})}
                     />,
                   )}
                 />

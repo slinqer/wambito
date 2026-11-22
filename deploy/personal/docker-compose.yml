@@ -72,6 +72,9 @@ services:
       WEB_URL: https://${PUBLIC_HOSTNAME:-app.wambito.com}
       # The MCP's public URL: the audience of assistants' access tokens.
       MCP_URL: https://${PUBLIC_HOSTNAME:-app.wambito.com}/mcp
+      # The public half of the MCP's key pair (gen-mcp-keys.sh): the API seals an assistant's secret
+      # to it for encrypted accounts. Empty: connecting an assistant to one is refused (503).
+      MCP_WK_PUBLIC_KEY: ${MCP_WK_PUBLIC_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-Wambito <hola@wambito.com>}
       # Exactly one of these two (the API refuses to start otherwise): Proton Bridge on this Mac,
       # or Resend on a server.
@@ -89,6 +92,13 @@ services:
       # allowlist (comma-separated IPs or CIDRs) is off when empty.
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       ADMIN_ALLOWED_IPS: ${ADMIN_ALLOWED_IPS:-}
+      # The switch: true makes every user created from now on end-to-end encrypted (existing users
+      # stay as they are). Off unless set.
+      NEW_USERS_ENCRYPTED: ${NEW_USERS_ENCRYPTED:-false}
+      # The switch day's migration (the web moves a plain account to end-to-end encryption): off
+      # unless MIGRATION_OPEN is true; MIGRATION_OPEN_USER_IDS opens it for those ids only.
+      MIGRATION_OPEN: ${MIGRATION_OPEN:-false}
+      MIGRATION_OPEN_USER_IDS: ${MIGRATION_OPEN_USER_IDS:-}
       # Caddy puts the client address Cloudflare reports into X-Forwarded-For. Only that hop is
       # trusted: Caddy's fixed address in this network.
       CLIENT_IP_HEADER: x-forwarded-for
@@ -110,7 +120,8 @@ services:
       start_period: 15s
 
   # The MCP server: assistants' tools over the API, with each assistant's own access token. It
-  # holds no state and no secret; the API checks every token again.
+  # holds no state, only the private half of its key pair (MCP_WK_PRIVATE_KEY) that opens the
+  # assistant secret of encrypted accounts; the API checks every token again.
   mcp:
     build:
       context: ../..
@@ -125,6 +136,9 @@ services:
       AUTH_ISSUER: https://${PUBLIC_HOSTNAME:-app.wambito.com}/api/auth
       MCP_API_URL: http://api:3000/api
       MCP_PORT: "3001"
+      # The private half (gen-mcp-keys.sh), a JWK as a JSON string. Empty: assistants on encrypted
+      # accounts are asked to connect again; plain accounts work.
+      MCP_WK_PRIVATE_KEY: ${MCP_WK_PRIVATE_KEY:-}
     depends_on:
       api:
         condition: service_healthy

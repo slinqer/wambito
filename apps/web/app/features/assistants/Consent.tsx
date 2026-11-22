@@ -1,12 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
+import { KeysError } from "@wambito/vault";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { useTranslations } from "use-intl";
+import type { DataKeySource } from "../../local/keys.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { FieldError, ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
+import { Unlock, type UnlockError } from "../vault/Unlock.tsx";
+import type { UnlockMeans } from "../vault/vault-gate.ts";
 import { type ConsentApi, ConsentError } from "./consent-api.ts";
 import {
+  AssistantWrapError,
+  allowAssistant,
+  type ConsentKeys,
   type ConsentProblem,
+  firstKeySource,
   oauthQueryOf,
   type Permission,
   parseConsentQuery,
@@ -24,16 +32,107 @@ const leaveTo = (url: string) => window.location.assign(url);
 export interface ConsentProps {
   /** Better Auth's oauth-provider by default; stories stand in for it. */
   api: ConsentApi;
-  /** A guest (no email yet): the API refuses them, so they are asked to save their progress. */
+  /** A guest (no email yet): the API refuses them, so they are asked to add one first. */
   guest: boolean;
   /** Follows the URL the answer returns; a full page load by default. */
   go?: (url: string) => void;
   /** Now, to tell an expired link before asking anything; the clock by default. */
   now?: () => Date;
+  /** An encrypted account: "Allow" gives the assistant its key (spec 2026-11-16 section 5). */
+  keys?: ConsentKeys;
+  /** Whether this browser can use passkeys (WebAuthn); stories stand in for it. */
+  passkeysSupported?: () => boolean;
 }
 
 const problemOf = (error: unknown): ConsentProblem =>
-  error instanceof ConsentError ? error.problem : "generic";
+  error instanceof ConsentError
+    ? error.problem
+    : error instanceof KeysError && error.code === "offline"
+      ? "network"
+      : "generic";
+
+const UNLOCK_ERRORS: ReadonlySet<string> = new Set<UnlockError>([
+  "bad_recovery_key",
+  "wrong_recovery_key",
+  "no_prf",
+  "no_passkey_wrap",
+  "offline",
+  "server",
+]);
+
+/** A failure while the unlock step shows, as Unlock says it under its field or button. */
+function unlockErrorOf(error: unknown): UnlockError {
+  if (error instanceof KeysError && UNLOCK_ERRORS.has(error.code)) return error.code as UnlockError;
+  return problemOf(error) === "network" ? "offline" : "server";
+}
+
+/**
+ * An encrypted account without its vault in this browser: the passkey (its PRF) or the recovery
+ * key opens the data key, only to connect the assistant (nothing is kept, no device is enrolled).
+ * Unlock's pieces, under the consent's title; Cancel goes back to the request.
+ */
+export function ConsentUnlock({
+  onRecovery,
+  onPasskey,
+  onCancel,
+  passkeysSupported,
+  means,
+}: {
+  onRecovery(text: string): Promise<UnlockError | null>;
+  onPasskey(): Promise<UnlockError | null>;
+  onCancel(): void;
+  passkeysSupported?: () => boolean;
+  /** What can open the data here (no pairing on this page): picks Unlock's layout. */
+  means?: UnlockMeans | undefined;
+}) {
+  const t = useTranslations("consent");
+  return (
+    <Unlock
+      title={t("unlock_title")}
+      lead={null}
+      onUnlock={onRecovery}
+      onPasskey={onPasskey}
+      {...(passkeysSupported ? { passkeysSupported } : {})}
+      {...(means ? { means } : {})}
+      onSignOut={onCancel}
+      exitLabel={t("cancel")}
+    />
+  );
+}
+
+/**
+ * The consent went through but the assistant's key was not saved: it could read nothing, so the
+ * browser does not go back to it. "Try again" revokes that consent and gives it again with a new
+ * secret (`allowAssistant` with `again`).
+ */
+export function ConsentWrapFailed({
+  busy,
+  failure,
+  onTryAgain,
+}: {
+  busy: boolean;
+  /** Why the last try failed, when it did before reaching the wrap. */
+  failure?: string | null;
+  onTryAgain(): void;
+}) {
+  const t = useTranslations("consent");
+  return (
+    <SignInScreen mood="worried">
+      <p role="alert" className="m-0 text-center text-[17px] font-bold text-ink">
+        {t("wrap_failed")}
+      </p>
+      {failure && <FieldError id="consent-error">{failure}</FieldError>}
+      <PressButton
+        className="w-full"
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={onTryAgain}
+      >
+        {busy ? t("allowing") : t("try_again")}
+      </PressButton>
+    </SignInScreen>
+  );
+}
 
 /**
  * `/oauth/consent` (spec §6.1): Better Auth sends the browser here, with a signed query, when an
@@ -42,10 +141,18 @@ const problemOf = (error: unknown): ConsentProblem =>
  * what it could do, in plain words per scope. Permitir and Cancelar post the signed query back
  * and follow where Better Auth says (the assistant, with a code or `access_denied`).
  *
- * A guest gets "Guarda tu progreso" instead of Permitir. A link that ran out (ten minutes) or was
+ * A guest gets "Primero agrega un email" (Settings → Protect your data → add an email, in the
+ * app or on the web) instead of Permitir. A link that ran out (ten minutes) or was
  * changed says to start again from the assistant. The heading takes the focus on arrival.
  */
-export function Consent({ api, guest, go = leaveTo, now = () => new Date() }: ConsentProps) {
+export function Consent({
+  api,
+  guest,
+  go = leaveTo,
+  now = () => new Date(),
+  keys,
+  passkeysSupported,
+}: ConsentProps) {
   const t = useTranslations("consent");
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
@@ -66,6 +173,13 @@ export function Consent({ api, guest, go = leaveTo, now = () => new Date() }: Co
   // A ref, not state: two quick taps must not post twice.
   const inFlight = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  /**
+   * An encrypted account's steps after "Allow": `unlock` (no vault here: a passkey or the
+   * recovery key), `wrap_failed` (consented, key not saved), `leaving` (on the way back).
+   */
+  const [step, setStep] = useState<"ask" | "unlock" | "wrap_failed" | "leaving">("ask");
+  // After a wrap that was not saved, every later try revokes the consent first.
+  const again = useRef(false);
 
   const clientProblem = client.isError ? problemOf(client.error) : null;
   const expired = expiredOnArrival || clientProblem === "expired" || problem === "expired";
@@ -79,17 +193,127 @@ export function Consent({ api, guest, go = leaveTo, now = () => new Date() }: Co
 
   async function answer(accept: boolean) {
     if (inFlight.current) return;
+    if (accept && keys) {
+      const source = firstKeySource(keys);
+      if (source) await giveKey(source);
+      else setStep("unlock");
+      return;
+    }
     inFlight.current = true;
     setBusy(accept ? "allow" : "cancel");
     setProblem(null);
     try {
-      go(await api.decide(accept, oauthQueryOf(search)));
+      const oauthQuery = oauthQueryOf(search);
+      go(
+        accept && request
+          ? await allowAssistant({ api, clientId: request.clientId, oauthQuery })
+          : await api.decide(accept, oauthQuery),
+      );
       // Busy until the page is gone: the assistant's address is loading.
     } catch (error) {
       inFlight.current = false;
       setBusy(null);
       setProblem(problemOf(error));
     }
+  }
+
+  /**
+   * An encrypted account's "Allow" with DK from `source` (spec 2026-11-16 section 5). Resolves to
+   * the error the unlock step shows, or null: it went (`leaving`), or moved to another step. The
+   * vault here failing to open (removed, tampered) asks for a passkey or the recovery key instead.
+   */
+  async function giveKey(source: DataKeySource): Promise<UnlockError | null> {
+    if (!keys || !request || inFlight.current) return null;
+    inFlight.current = true;
+    setBusy("allow");
+    setProblem(null);
+    try {
+      const url = await allowAssistant({
+        api,
+        clientId: request.clientId,
+        oauthQuery: oauthQueryOf(search),
+        key: { userId: keys.userId, open: (fn) => keys.open(source, fn) },
+        again: again.current,
+      });
+      setStep("leaving");
+      go(url);
+      return null;
+    } catch (error) {
+      inFlight.current = false;
+      setBusy(null);
+      if (error instanceof AssistantWrapError) {
+        again.current = true;
+        setProblem(error.problem === "network" ? "network" : null);
+        setStep("wrap_failed");
+        return null;
+      }
+      const unopened =
+        error instanceof KeysError &&
+        (error.code === "device_removed" || error.code === "tampered");
+      if ("device" in source && unopened) {
+        setStep("unlock");
+        return null;
+      }
+      const consentProblem = error instanceof ConsentError ? error.problem : null;
+      if (
+        consentProblem === "expired" ||
+        consentProblem === "guest" ||
+        consentProblem === "session_changed"
+      ) {
+        setProblem(consentProblem);
+        setStep("ask");
+        return null;
+      }
+      if (step === "unlock" && !("device" in source)) return unlockErrorOf(error);
+      setProblem(problemOf(error));
+      return null;
+    }
+  }
+
+  /** The unlock step's passkey: a touch for its PRF, which opens DK; the PRF is zeroed after. */
+  async function passkeyKey(): Promise<UnlockError | null> {
+    if (!keys) return null;
+    let touched: Awaited<ReturnType<ConsentKeys["touchPasskey"]>>;
+    try {
+      touched = await keys.touchPasskey();
+    } catch (error) {
+      return unlockErrorOf(error);
+    }
+    if (!touched) return null;
+    try {
+      return await giveKey(touched);
+    } finally {
+      touched.prf.fill(0);
+    }
+  }
+
+  /** "Try again" after a wrap that was not saved: the same way in as the first time. */
+  function tryAgain() {
+    if (!keys) return;
+    const source = firstKeySource(keys);
+    if (source) void giveKey(source);
+    else setStep("unlock");
+  }
+
+  if (step === "leaving") {
+    return (
+      <SignInScreen>
+        <p role="status" className="m-0 text-ink-muted">
+          {t("allowing")}
+        </p>
+      </SignInScreen>
+    );
+  }
+
+  // The cookie now belongs to another account: nothing here may go on for this one.
+  if (problem === "session_changed") {
+    return (
+      <SignInScreen mood="worried">
+        <p role="alert" className="m-0 text-center text-[17px] font-bold text-ink">
+          {tErrors("session_changed")}
+        </p>
+      </SignInScreen>
+    );
   }
 
   if (expired) {
@@ -127,6 +351,22 @@ export function Consent({ api, guest, go = leaveTo, now = () => new Date() }: Co
   const { name, icon, domain } = client.data;
   const failure =
     problem === "network" ? tErrors("network_error") : problem === "generic" ? t("failed") : null;
+
+  if (step === "unlock") {
+    return (
+      <ConsentUnlock
+        onRecovery={(text) => giveKey({ recovery: text })}
+        onPasskey={passkeyKey}
+        onCancel={() => setStep(again.current ? "wrap_failed" : "ask")}
+        {...(passkeysSupported ? { passkeysSupported } : {})}
+        means={keys?.means}
+      />
+    );
+  }
+
+  if (step === "wrap_failed") {
+    return <ConsentWrapFailed busy={busy !== null} failure={failure} onTryAgain={tryAgain} />;
+  }
 
   return (
     <SignInScreen>
@@ -169,6 +409,7 @@ export function Consent({ api, guest, go = leaveTo, now = () => new Date() }: Co
           <p className="m-0 text-[14px] text-ink-muted">{t("revoke_hint")}</p>
         </div>
       )}
+      {keys && !asGuest && <p className="m-0 w-full text-[14px] text-ink">{t("encrypted_note")}</p>}
       {asGuest && (
         <section
           aria-labelledby="consent-guest"

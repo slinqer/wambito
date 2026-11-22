@@ -4,6 +4,9 @@ import { createVaultGate, type VaultGateDeps, type VaultGateState } from "./vaul
 type Keys = { k: string };
 type Session = { id: string };
 
+/** Without the hint and wrap deps: no hint, and an unknown wraps list counts as a passkey wrap. */
+const MEANS = { noPrfHere: false, passkeyWrap: true };
+
 const fail = (code: string) => Object.assign(new Error(code), { code });
 
 /** Lets every pending promise settle. */
@@ -49,8 +52,64 @@ describe("vault gate", () => {
 
     await gate.confirmSetup();
     expect(commit).toHaveBeenCalledTimes(1);
+    expect(gate.getState()).toEqual({ status: "install" });
+    expect(deps.open).not.toHaveBeenCalled();
+    await gate.installDone();
     expect(deps.open).toHaveBeenCalledWith({ k: "new" }, true);
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
+  });
+
+  it("a setup committed here shows install, then ready", async () => {
+    const { gate, seen } = gateWith();
+    gate.start();
+    await settle();
+    await gate.confirmSetup();
+    expect(seen).toContain("install");
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
+    expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
+  });
+
+  it("an unlock, a pairing or a known browser never shows install", async () => {
+    const kept = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
+    kept.gate.start();
+    await settle();
+    expect(kept.seen).not.toContain("install");
+
+    const unlocked = gateWith({
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+    });
+    unlocked.gate.start();
+    await settle();
+    expect(unlocked.gate.getState()).toEqual({ status: "unlock", means: MEANS });
+    await unlocked.gate.unlock("ABCD-EFGH");
+    expect(unlocked.seen).not.toContain("install");
+    expect(unlocked.gate.getState().status).toBe("ready");
+
+    const pairing = {
+      id: "p-1",
+      code: "ABCDEFGH",
+      qr: "wambito://pair?id=p-1&key=k",
+      expiresAt: "2026-11-10T12:10:00Z",
+      number: vi.fn(async () => "123456"),
+      finish: vi.fn(async () => ({ k: "paired" })),
+      cancel: vi.fn(),
+    };
+    const paired = gateWith({
+      prepareAccount: async () => {
+        throw fail("already_set_up");
+      },
+      startPairing: vi.fn(async () => pairing),
+    });
+    paired.gate.start();
+    await settle();
+    await paired.gate.pair();
+    await paired.gate.startPairing();
+    await settle();
+    expect(paired.seen).not.toContain("install");
+    expect(paired.gate.getState()).toEqual({ status: "ready", session: { id: "paired" } });
   });
 
   it("a guest commits at once: there is no key to show", async () => {
@@ -62,6 +121,8 @@ describe("vault gate", () => {
     await settle();
     expect(commit).toHaveBeenCalledTimes(1);
     expect(seen).not.toContain("setup");
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "guest" } });
   });
 
@@ -82,6 +143,8 @@ describe("vault gate", () => {
     await settle();
     expect(commit).toHaveBeenCalledTimes(2);
     expect(prepareAccount).toHaveBeenCalledTimes(1);
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
   });
 
@@ -99,10 +162,10 @@ describe("vault gate", () => {
     });
     gate.start();
     await settle();
-    expect(gate.getState()).toEqual({ status: "unlock" });
+    expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
 
     expect(await gate.unlock("nope")).toBe("wrong_recovery_key");
-    expect(gate.getState()).toEqual({ status: "unlock" });
+    expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     expect(await gate.unlock("nope")).toBe("server");
     expect(await gate.unlock("right")).toBeNull();
     expect(deps.open).toHaveBeenCalledWith({ k: "unlocked" }, true);
@@ -128,6 +191,8 @@ describe("vault gate", () => {
     });
     gate.start();
     await settle();
+    expect(gate.getState()).toEqual({ status: "install" });
+    await gate.installDone();
     expect(gate.getState()).toEqual({ status: "locked", kind: "error", retrying: false });
 
     gate.retry();
@@ -160,42 +225,25 @@ describe("vault gate", () => {
     gate.start();
     await settle();
     await gate.confirmSetup();
-    expect(gate.getState()).toEqual({ status: "unlock" });
+    expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     expect(deps.open).not.toHaveBeenCalled();
     // the prepared data key is gone: nothing commits it again
     await gate.confirmSetup();
     expect(commit).toHaveBeenCalledTimes(1);
   });
 
-  it("a guest whose account has keys elsewhere is locked out here: no recovery key to type", async () => {
+  it("an anonymous account with keys elsewhere gets Unlock, not Locked", async () => {
+    // The gate no longer knows guests: whoever has keys elsewhere unlocks with a key, passkey or device.
     const { gate, deps } = gateWith({
-      guest: true,
       prepareAccount: async () => {
         throw fail("already_set_up");
       },
     });
     gate.start();
     await settle();
-    expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
-    gate.retry();
-    await settle();
-    expect(gate.getState()).toMatchObject({ status: "locked", kind: "guest" });
-    expect(deps.unlockWithRecovery).not.toHaveBeenCalled();
-  });
-
-  it("a guest that loses the setup race is locked out too", async () => {
-    const { gate } = gateWith({
-      guest: true,
-      prepareAccount: async () => ({
-        recoveryKey: null,
-        commit: async () => {
-          throw fail("already_set_up");
-        },
-      }),
-    });
-    gate.start();
-    await settle();
-    expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+    expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
+    expect(await gate.unlock("the-key")).toBeNull();
+    expect(deps.unlockWithRecovery).toHaveBeenCalledWith("the-key");
   });
 
   it("a browser that cannot keep the key safely is locked, with no retry", async () => {
@@ -246,7 +294,7 @@ describe("vault gate", () => {
     kept = null; // another tab signed out and deleted the vault
     gate.closed();
     await settle();
-    expect(gate.getState()).toEqual({ status: "unlock" });
+    expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
   });
 
   it("starts once", async () => {
@@ -313,7 +361,7 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
       who = "someone-else";
       expect(await gate.unlock("KEY")).toBeNull();
       expect(reload).toHaveBeenCalledTimes(1);
@@ -421,7 +469,7 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
       expect(addPasskeyWrap).not.toHaveBeenCalled();
 
       expect(await gate.unlock("ABCD")).toBeNull();
@@ -457,7 +505,7 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
       expect(unlockWithPasskey).not.toHaveBeenCalled();
     });
 
@@ -470,6 +518,7 @@ describe("vault gate", () => {
       expect(addPasskeyWrap).toHaveBeenCalledWith(
         expect.objectContaining({ credentialId: "cred-1" }),
       );
+      await gate.installDone();
       expect(gate.getState()).toEqual({ status: "ready", session: { id: "new" } });
     });
 
@@ -516,10 +565,10 @@ describe("vault gate", () => {
       gate.start();
       await settle();
       expect(await gate.unlockWithPasskey()).toBeNull();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
       expect(await gate.unlockWithPasskey()).toBe("no_prf");
       expect(await gate.unlockWithPasskey()).toBe("no_passkey_wrap");
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     });
 
     it("a pending credential that is not the account's gets no wrap, is zeroed, and the vault opens", async () => {
@@ -634,10 +683,10 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
 
       await gate.pair();
-      expect(gate.getState()).toEqual({ status: "pairing", from: "unlock" });
+      expect(gate.getState()).toEqual({ status: "pairing" });
       expect(await gate.startPairing()).toBe(pairing);
       await settle();
       expect(deps.open).not.toHaveBeenCalled();
@@ -667,7 +716,7 @@ describe("vault gate", () => {
 
       gate.leavePairing();
       expect(second.cancel).toHaveBeenCalledTimes(1);
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     });
 
     it("the latest startPairing wins: an older call resolving last cancels its own request", async () => {
@@ -701,22 +750,6 @@ describe("vault gate", () => {
       expect(gate.getState()).toEqual({ status: "ready", session: { id: "second" } });
     });
 
-    it("a guest locked out pairs from Locked, and back returns to Locked", async () => {
-      const pairing = fakePairing(() => new Promise(() => {}));
-      const { gate } = gateWith({
-        ...elsewhere,
-        guest: true,
-        startPairing: vi.fn(async () => pairing),
-      });
-      gate.start();
-      await settle();
-      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
-      await gate.pair();
-      expect(gate.getState()).toEqual({ status: "pairing", from: "guest" });
-      gate.leavePairing();
-      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
-    });
-
     it("a pairing that fails stays on the pairing screen, which shows why", async () => {
       const pairing = fakePairing(() => Promise.reject(fail("tampered")));
       const { gate, deps } = gateWith({ ...elsewhere, startPairing: vi.fn(async () => pairing) });
@@ -726,7 +759,7 @@ describe("vault gate", () => {
       await gate.startPairing();
       await settle();
       expect(deps.open).not.toHaveBeenCalled();
-      expect(gate.getState()).toEqual({ status: "pairing", from: "unlock" });
+      expect(gate.getState()).toEqual({ status: "pairing" });
     });
 
     it("a finish refused with session_changed reloads for the account signed in now", async () => {
@@ -752,7 +785,7 @@ describe("vault gate", () => {
       expect(reload).toHaveBeenCalled();
     });
 
-    it("pair() does nothing outside Unlock and a guest's Locked", async () => {
+    it("pair() does nothing outside Unlock", async () => {
       const startPairing = vi.fn();
       const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), startPairing });
       gate.start();
@@ -767,8 +800,8 @@ describe("vault gate", () => {
       const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
       gate.start();
       await settle();
-      gate.removed();
-      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      await gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed", means: MEANS });
       // the vault is gone already: nothing is opened or made again
       expect(deps.prepareAccount).not.toHaveBeenCalled();
       expect(deps.open).toHaveBeenCalledTimes(1);
@@ -793,20 +826,12 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      gate.removed();
+      await gate.removed();
       expect(await gate.unlock("nope")).toBe("wrong_recovery_key");
-      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed", means: MEANS });
       await gate.pair();
       gate.leavePairing();
-      expect(gate.getState()).toEqual({ status: "unlock" });
-    });
-
-    it("a removed guest is locked out: it has no recovery key to type", async () => {
-      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), guest: true });
-      gate.start();
-      await settle();
-      gate.removed();
-      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     });
 
     it("a browser removed while closed opens to Unlock with the removed notice", async () => {
@@ -816,18 +841,8 @@ describe("vault gate", () => {
       const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed" });
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed", means: MEANS });
       expect(deps.prepareAccount).not.toHaveBeenCalled();
-    });
-
-    it("a guest removed while closed is Locked guest", async () => {
-      const open = vi.fn(async () => {
-        throw fail("device_removed");
-      });
-      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open, guest: true });
-      gate.start();
-      await settle();
-      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
     });
 
     it("removed() outside the open app does nothing", async () => {
@@ -838,8 +853,8 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      gate.removed();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      await gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
     });
   });
   describe("a new key version this browser cannot verify", () => {
@@ -847,33 +862,21 @@ describe("vault gate", () => {
       const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }) });
       gate.start();
       await settle();
-      gate.unverified();
-      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified" });
+      await gate.unverified();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified", means: MEANS });
       expect(deps.prepareAccount).not.toHaveBeenCalled();
       expect(deps.open).toHaveBeenCalledTimes(1);
     });
 
-    it("an unverified guest goes to its Locked", async () => {
-      const { gate } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), guest: true });
-      gate.start();
-      await settle();
-      gate.unverified();
-      expect(gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
-    });
-
-    it("an opening that fails with key_unverified shows Unlock with the notice; a guest its Locked", async () => {
+    it("an opening that fails with key_unverified shows Unlock with the notice", async () => {
       const open = vi.fn(async () => {
         throw fail("key_unverified");
       });
       const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
       gate.start();
       await settle();
-      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified" });
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "unverified", means: MEANS });
       expect(deps.prepareAccount).not.toHaveBeenCalled();
-      const guest = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open, guest: true });
-      guest.gate.start();
-      await settle();
-      expect(guest.gate.getState()).toEqual({ status: "locked", kind: "guest", retrying: false });
     });
 
     it("the recovery key from unverified unlocks the kept vault and opens it fresh", async () => {
@@ -883,7 +886,7 @@ describe("vault gate", () => {
       const { gate, deps } = gateWith({ loadLocalKeys: async () => ({ k: "kept" }), open });
       gate.start();
       await settle();
-      gate.unverified();
+      await gate.unverified();
       expect(await gate.unlock("ABCD-EFGH")).toBeNull();
       expect(deps.unlockWithRecovery).toHaveBeenCalledWith("ABCD-EFGH");
       expect(deps.prepareAccount).not.toHaveBeenCalled();
@@ -899,8 +902,243 @@ describe("vault gate", () => {
       });
       gate.start();
       await settle();
-      gate.unverified();
-      expect(gate.getState()).toEqual({ status: "unlock" });
+      await gate.unverified();
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
+    });
+  });
+  describe("what can open the data here", () => {
+    const elsewhere = {
+      prepareAccount: vi.fn(async () => {
+        throw fail("already_set_up");
+      }),
+    };
+    const stash = () => ({ credentialId: "cred-1", prf: new Uint8Array(32).fill(7) });
+
+    it("the unlock state carries the hint and the wrap", async () => {
+      const { gate } = gateWith({
+        ...elsewhere,
+        passkeyGaveNoPrf: () => true,
+        hasPasskeyWrap: async () => false,
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        means: { noPrfHere: true, passkeyWrap: false },
+      });
+    });
+
+    it("the notices carry the means too", async () => {
+      const { gate } = gateWith({
+        loadLocalKeys: async () => ({ k: "kept" }),
+        passkeyGaveNoPrf: () => true,
+        hasPasskeyWrap: async () => false,
+        startPairing: vi.fn(),
+      });
+      gate.start();
+      await settle();
+      await gate.removed();
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        notice: "removed",
+        means: { noPrfHere: true, passkeyWrap: false },
+      });
+    });
+
+    it("an unreadable wraps list counts as a passkey wrap", async () => {
+      const { gate } = gateWith({
+        ...elsewhere,
+        hasPasskeyWrap: async () => {
+          throw new Error("offline");
+        },
+      });
+      gate.start();
+      await settle();
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        means: { noPrfHere: false, passkeyWrap: true },
+      });
+    });
+
+    it("a passkey touch without PRF notes the hint", async () => {
+      const notePasskeyWithoutPrf = vi.fn();
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => ["cred-1"],
+        evaluatePrf: vi.fn(async () => {
+          throw fail("no_prf");
+        }),
+        notePasskeyWithoutPrf,
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
+      expect(notePasskeyWithoutPrf).toHaveBeenCalledTimes(1);
+      // The layout under the person's hands does not jump; the next Unlock reads the hint.
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
+    });
+
+    it("a passkey that opens the data clears the hint", async () => {
+      const viaButton = vi.fn();
+      const a = gateWith({
+        ...elsewhere,
+        evaluatePrf: async () => stash(),
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+        notePasskeyOpened: viaButton,
+      });
+      a.gate.start();
+      await settle();
+      await a.gate.unlockWithPasskey();
+      expect(viaButton).toHaveBeenCalledTimes(1);
+
+      const viaSignIn = vi.fn();
+      const b = gateWith({
+        ...elsewhere,
+        takeSignInPrf: stash,
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+        notePasskeyOpened: viaSignIn,
+      });
+      b.gate.start();
+      await settle();
+      expect(viaSignIn).toHaveBeenCalledTimes(1);
+      expect(b.gate.getState()).toEqual({ status: "ready", session: { id: "passkey" } });
+    });
+
+    it("a passkey that opens nothing does not clear the hint", async () => {
+      const notePasskeyOpened = vi.fn();
+      const { gate } = gateWith({
+        ...elsewhere,
+        takeSignInPrf: stash,
+        unlockWithPasskey: async () => {
+          throw fail("no_passkey_wrap");
+        },
+        notePasskeyOpened,
+      });
+      gate.start();
+      await settle();
+      expect(notePasskeyOpened).not.toHaveBeenCalled();
+    });
+
+    it("a touch without PRF notes nothing when the account's passkeys are not known (it may be another account's passkey)", async () => {
+      const notePasskeyWithoutPrf = vi.fn();
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => {
+          throw fail("passkeys_unavailable");
+        },
+        evaluatePrf: vi.fn(async () => {
+          throw fail("no_prf");
+        }),
+        notePasskeyWithoutPrf,
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
+      expect(notePasskeyWithoutPrf).not.toHaveBeenCalled();
+    });
+
+    it("back from pairing after a touch without PRF leads with the recovery key", async () => {
+      const { gate } = gateWith({
+        ...elsewhere,
+        accountPasskeyIds: async () => ["cred-1"],
+        evaluatePrf: vi.fn(async () => {
+          throw fail("no_prf");
+        }),
+        notePasskeyWithoutPrf: vi.fn(),
+        startPairing: vi.fn(),
+      });
+      gate.start();
+      await settle();
+      expect(await gate.unlockWithPasskey()).toBe("no_prf");
+      // The screen under the person's hands keeps its layout...
+      expect(gate.getState()).toEqual({ status: "unlock", means: MEANS });
+      await gate.pair();
+      gate.leavePairing();
+      // ...but coming back to it, Unlock knows this device's passkey gives no PRF.
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        means: { noPrfHere: true, passkeyWrap: true },
+      });
+    });
+
+    it("back to Unlock from an open vault, Unlock shows at once with the last known means, then what is read now", async () => {
+      let resolveWraps!: (value: boolean) => void;
+      let reads = 0;
+      let hint = true;
+      const { gate } = gateWith({
+        ...elsewhere,
+        passkeyGaveNoPrf: () => hint,
+        notePasskeyOpened: () => {
+          hint = false;
+        },
+        hasPasskeyWrap: () => {
+          reads += 1;
+          return reads === 1
+            ? Promise.resolve(false)
+            : new Promise<boolean>((resolve) => (resolveWraps = resolve));
+        },
+        evaluatePrf: async () => stash(),
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      expect(gate.getState()).toEqual({ status: "ready", session: { id: "passkey" } });
+
+      const removing = gate.removed();
+      // Never "ready" while the wraps are read: Unlock at once, with what was known (the passkey
+      // that opened the data cleared the hint).
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        notice: "removed",
+        means: { noPrfHere: false, passkeyWrap: false },
+      });
+      resolveWraps(true);
+      await removing;
+      expect(gate.getState()).toEqual({
+        status: "unlock",
+        notice: "removed",
+        means: { noPrfHere: false, passkeyWrap: true },
+      });
+    });
+
+    it("a 401 on the wraps read after a removal still shows Unlock with the removed notice", async () => {
+      const { gate } = gateWith({
+        loadLocalKeys: async () => ({ k: "kept" }),
+        hasPasskeyWrap: async () => {
+          throw Object.assign(new Error("unauthorized"), { code: "unauthorized", status: 401 });
+        },
+      });
+      gate.start();
+      await settle();
+      await gate.removed();
+      expect(gate.getState()).toEqual({ status: "unlock", notice: "removed", means: MEANS });
+    });
+
+    it("a late wraps read never overwrites a newer state", async () => {
+      let resolveWraps!: (value: boolean) => void;
+      let reads = 0;
+      const { gate } = gateWith({
+        ...elsewhere,
+        hasPasskeyWrap: () => {
+          reads += 1;
+          return reads === 1
+            ? Promise.resolve(true)
+            : new Promise<boolean>((resolve) => (resolveWraps = resolve));
+        },
+        evaluatePrf: async () => stash(),
+        unlockWithPasskey: async () => ({ k: "passkey" }),
+        startPairing: vi.fn(),
+      });
+      gate.start();
+      await settle();
+      await gate.unlockWithPasskey();
+      const unverifying = gate.unverified();
+      await gate.pair();
+      expect(gate.getState()).toEqual({ status: "pairing" });
+      resolveWraps(false);
+      await unverifying;
+      expect(gate.getState()).toEqual({ status: "pairing" });
     });
   });
 });

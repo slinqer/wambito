@@ -25,31 +25,19 @@
   "@wambiWaves": {
     "description": "Screen-reader label of the waving Wambi."
   },
-  "entryGuest": "Probar sin correo",
-  "@entryGuest": {
-    "description": "First run: start as a guest, with no email."
+  "entryStart": "Empezar",
+  "@entryStart": {
+    "description": "First run: the primary button; creates the account in the background, nothing is asked."
   },
-  "entryGuestHint": "Puedes agregar tu correo después.",
-  "@entryGuestHint": {
-    "description": "Under the guest choice."
+  "entryStartBusy": "Preparando tu cuenta…",
+  "@entryStartBusy": {
+    "description": "While the account behind \"Start\" is created."
   },
-  "entryGuestBusy": "Preparando tu cuenta…",
-  "@entryGuestBusy": {
-    "description": "While the guest account is created."
+  "entryHaveAccount": "Ya tengo una cuenta",
+  "@entryHaveAccount": {
+    "description": "First run: a link to the sign-in (email, passkey); no account is created."
   },
-  "entryEmail": "Entrar con mi correo",
-  "@entryEmail": {
-    "description": "First run: sign in with an email code or magic link."
-  },
-  "entryPasskey": "Entrar con huella",
-  "@entryPasskey": {
-    "description": "First run: sign in with a passkey. Shown only when the phone supports passkeys."
-  },
-  "entryPasskeyBusy": "Esperando tu huella…",
-  "@entryPasskeyBusy": {
-    "description": "While the phone's passkey prompt is open."
-  },
-  "emailPasskey": "Usar passkey",
+  "emailPasskey": "Entrar con huella",
   "@emailPasskey": {
     "description": "Email screen: sign in with a passkey stored on the phone (made on the web too). Shown only when the phone supports passkeys."
   },
@@ -1230,6 +1218,10 @@
     "description": "The honest copy for guests (Task 14 brief), shown on Guarda tu progreso."
   },
   "progressEmailBody": "Agrega tu correo y tus movimientos se quedan tal cual, en la misma cuenta. Te mandamos un código para confirmarlo.",
+  "progressPreviewBody": "Tus datos se quedan tal cual, cifrados, en la misma cuenta. Te mandamos un código para confirmar el correo; después, si aún no la tienes, haces tu clave de recuperación.",
+  "@progressPreviewBody": {
+    "description": "Guarda tu progreso for an encrypted (preview) guest: the email keeps the data as it is, and the recovery key comes next."
+  },
   "progressSave": "Guardar con mi correo",
   "progressPasskeyTitle": "O agrega una huella",
   "progressPasskeyBody": "Una huella en este teléfono te deja entrar sin correo, pero si pierdes el teléfono o la huella, pierdes la cuenta. Para usar Wambito en otro dispositivo o con asistentes de IA necesitas un correo.",
@@ -1281,16 +1273,27 @@
   "settingsDueNoticeHint": "A las 9:00, un aviso con los pagos recurrentes que vencen hoy.",
   "settingsDueNoticeHintIos": "Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. iOS decide la hora exacta.",
   "settingsGuestNotice": "Aviso si no tienes correo",
-  "settingsGuestNoticeHint": "Si pasan 45 días sin abrir Wambito y no tienes correo, te avisamos que tus datos se borrarán.",
+  "settingsGuestNoticeHint": "Si pasan 45 días sin abrir Wambito y no tienes correo, te avisamos: a los 60 días sin abrirlo se borran tus datos.",
   "noticeAskTitle": "¿Quieres recibir avisos?",
   "noticeAskDue": "Así Wambito puede avisarte a las 9:00 los días en que vence un pago recurrente.",
   "noticeAskDueIos": "Así Wambito puede avisarte hacia las 9:00 los días en que vence un pago recurrente.",
-  "noticeAskGuest": "Así Wambito puede avisarte si pasan 45 días sin abrirlo y tu cuenta no tiene correo, antes de que se borren tus datos.",
+  "noticeAskGuest": "Así Wambito puede avisarte si pasan 45 días sin abrirlo y tu cuenta no tiene correo: a los 60 días se borran tus datos.",
   "noticeAskLater": "Ahora no",
   "noticeAskAllow": "Permitir avisos",
   "settingsWidget": "Widget",
   "settingsHideAmount": "Ocultar el monto en el widget",
   "settingsHideAmountHint": "Muestra •••• en vez de lo que te queda.",
+  "widgetCardTitle": "Anota sin abrir la app",
+  "widgetCardBody": "Pon a Wambi en tu pantalla de inicio: un toque y anotas el gasto, o díselo en voz alta.",
+  "widgetCardAdd": "Añadir widget",
+  "widgetCardClose": "Ahora no",
+  "widgetStepsTitle": "Así añades el widget",
+  "widgetStep1": "Mantén presionado un espacio vacío de tu pantalla de inicio.",
+  "widgetStep2": "Toca «Widgets».",
+  "widgetStep3": "Busca Wambito y arrástralo a tu pantalla.",
+  "widgetStepsDone": "Entendido",
+  "settingsAddWidget": "Añadir widget",
+  "settingsAddWidgetHint": "Anota desde tu pantalla de inicio",
   "settingsVoice": "Voz",
   "settingsDeleteVoice": "Borrar los modelos de voz",
   "settingsDeleteVoiceHint": "Libera espacio en el teléfono. La próxima vez que dictes, te pedimos descargarlos otra vez.",
@@ -1400,8 +1403,18 @@
   "licenseNoticeOpenBlas": "OpenBLAS (https://github.com/OpenMathLib/OpenBLAS), las rutinas de álgebra lineal que van dentro de la biblioteca nativa de Vosk, bajo la licencia BSD de 3 cláusulas.",
   "licenseNoticeClapack": "CLAPACK (https://www.netlib.org/clapack), la versión en C de LAPACK que va dentro de la biblioteca nativa de Vosk, bajo una licencia BSD. Trae libf2c, cuyo aviso va después de la licencia.",
   "licenseNoticeLibffi": "libffi (https://github.com/libffi/libffi), que va dentro de la biblioteca nativa de JNA, bajo la licencia MIT.",
+  "licenseNoticeLibyuv": "libyuv (https://chromium.googlesource.com/libyuv/libyuv), dentro de la biblioteca nativa de androidx.camera:camera-core {version} (la cámara que lee el QR), bajo la licencia BSD de tres cláusulas.",
+  "@licenseNoticeLibyuv": {
+    "description": "About: the libyuv notice (inside CameraX camera-core).",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "licenseNoticeJna": "Java Native Access (https://github.com/java-native-access/jna), por donde Vosk llega a su biblioteca nativa. Tiene doble licencia: Apache 2.0 o LGPL 2.1. Wambito la usa bajo la licencia Apache 2.0.",
   "licenseNoticeCanary": "El modelo de voz preciso de la captura rápida, Canary-180M flash (https://huggingface.co/nvidia/canary-180m-flash), de NVIDIA, bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0). No viene en la app: se descarga al teléfono si aceptas, y reconoce la voz sin salir de él. Atribución: Canary-180M flash by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. Se usa convertido a ONNX, sin otros cambios de Wambito.",
+  "licenseNoticePlump": "Los iconos de inicio y resumen de la barra de abajo son de Plump Free de Streamline (https://www.streamlinehq.com/icons/plump), bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0). Atribución: Plump Free icons by Streamline, CC BY 4.0. Se usan sin cambios, en el color del tema.",
   "licenseNoticeParakeet": "El modelo de voz preciso de la captura rápida en italiano y portugués, Parakeet TDT 0.6B v3 (https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), de NVIDIA, bajo la licencia Creative Commons Attribution 4.0 (CC BY 4.0). No viene en la app: se descarga al teléfono si aceptas, y reconoce la voz sin salir de él. Atribución: Parakeet TDT 0.6B v3 by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. Se usa convertido a ONNX, sin otros cambios de Wambito.",
   "licenseNoticeSherpa": "sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx), de k2-fsa, bajo la licencia Apache 2.0. Es el motor que ejecuta el modelo preciso en el teléfono. Sus bibliotecas nativas, libsherpa-onnx-jni.so y libonnxruntime.so, llevan dentro las bibliotecas que aparecen aparte, cada una con su licencia.",
   "licenseNoticeOnnxruntime": "ONNX Runtime (https://github.com/microsoft/onnxruntime), de Microsoft, bajo la licencia MIT. Es la biblioteca nativa libonnxruntime.so que viene en el AAR de sherpa-onnx, y hace los cálculos del modelo.",
@@ -2054,6 +2067,10 @@
   "@passkeyOfferAdded": {
     "description": "Passkey offer: the confirmation, shown after the passkey was made."
   },
+  "passkeyOfferContinue": "Seguir",
+  "@passkeyOfferContinue": {
+    "description": "Passkey offer: goes on after the notice that the new passkey does not open the data."
+  },
   "homeMenuRecurring": "Recurrentes",
   "@homeMenuRecurring": {
     "description": "Home menu: the link to the recurring payments."
@@ -2309,6 +2326,157 @@
   "settingsPasskeysRemoveFailed": "No pudimos eliminar la huella. Inténtalo otra vez.",
   "@settingsPasskeysRemoveFailed": {
     "description": "Settings: deleting a passkey failed."
+  },
+  "settingsSecurityTitle": "Seguridad",
+  "@settingsSecurityTitle": {
+    "description": "Settings section for an encrypted account's devices and recovery key."
+  },
+  "settingsSecurityLead": "Tus datos están cifrados. Estos dispositivos pueden abrirlos.",
+  "settingsSecurityThisPhone": "Este teléfono",
+  "settingsSecurityUnnamed": "Dispositivo",
+  "settingsSecurityAdded": "Agregado el {date}",
+  "@settingsSecurityAdded": {
+    "description": "Settings → Security: when a device was added.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityNotVerified": "Sin verificar",
+  "settingsSecurityLoadFailed": "No pudimos cargar tus dispositivos. Inténtalo de nuevo en un momento.",
+  "settingsSecurityRemove": "Quitar",
+  "settingsSecurityRemoveLabel": "Quitar {name}",
+  "@settingsSecurityRemoveLabel": {
+    "description": "Screen-reader label of a device's Remove button.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityConnect": "Conectar otro dispositivo",
+  "@settingsSecurityConnect": {
+    "description": "Settings → Security entry that connects another device: approves a web sign-in or a new device, by its QR or its code."
+  },
+  "settingsSecurityConnectLead": "Escanea el código QR que te muestra tu computador u otro celular, o escribe su código.",
+  "connectDeviceCodeLabel": "Código del otro dispositivo",
+  "@connectDeviceCodeLabel": {
+    "description": "Connect another device: the code field label (a web sign-in's or a new device's code)."
+  },
+  "connectDeviceBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o empieza de nuevo en el otro dispositivo.",
+  "@connectDeviceBadCode": {
+    "description": "Connect another device: the typed code matches no web sign-in and no device to approve."
+  },
+  "settingsSecurityRecoveryTitle": "Clave de recuperación",
+  "settingsSecurityRecoveryLead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
+  "settingsSecurityNewRecovery": "Nueva clave de recuperación",
+  "settingsSecurityUnreadable": "{count, plural, =1{No pudimos leer {count} elemento} other{No pudimos leer {count} elementos}}",
+  "@settingsSecurityUnreadable": {
+    "description": "Settings → Security: how many records could not be read.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsSecurityUnreadableLead": "Se guardaron con una clave que este teléfono no tiene. Siguen a salvo tal como están.",
+  "settingsSecurityMaybeSaved": "Puede que se haya guardado: conserva esta clave nueva hasta que diga que está lista.",
+  "settingsSecurityRemoveTitle": "Quitar {name}",
+  "@settingsSecurityRemoveTitle": {
+    "description": "Remove-device sheet title.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityRemoveBody": "Este dispositivo dejará de entrar a tu cuenta y no recibirá nada nuevo.",
+  "settingsSecurityKeyLabel": "Clave de recuperación",
+  "settingsSecurityRemoving": "Quitando…",
+  "settingsSecurityOrNew": "¿No la tienes? Crea una clave de recuperación nueva",
+  "settingsSecurityRotatedElsewhere": "Otro dispositivo cambió tus claves al mismo tiempo. Espera un momento a que se actualicen aquí e inténtalo otra vez.",
+  "settingsSecurityTampered": "Detente: las claves nuevas no coinciden con las que tiene este teléfono, así que aquí no se cambió nada. Puede que alguien esté interfiriendo. No lo intentes de nuevo.",
+  "settingsSecurityRemoveFailed": "No pudimos quitarlo. Inténtalo otra vez.",
+  "settingsSecurityRemovedDone": "{name} ya no tiene acceso.",
+  "@settingsSecurityRemovedDone": {
+    "description": "Toast (or the done step from the sign-in notice) after a device was removed.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityChangeKeys": "Cambiar claves",
+  "@settingsSecurityChangeKeys": {
+    "description": "Settings → Security: the action, sheet title and button that rotate the encryption keys without removing a device."
+  },
+  "settingsSecurityChangeKeysBody": "Crea claves de cifrado nuevas para tus datos. Tus dispositivos siguen funcionando; los asistentes conectados se desconectan. Escribe tu clave de recuperación para confirmar.",
+  "settingsSecurityChanging": "Cambiando…",
+  "settingsSecurityChangeKeysDone": "Tus claves cambiaron.",
+  "settingsSecurityChangeKeysFailed": "No pudimos cambiar tus claves. Inténtalo otra vez.",
+  "settingsSecurityChangeKeysSuggest": "Si alguien más tuvo tu clave, cámbiala: lo que guardes desde ahora no lo podrá leer.",
+  "@settingsSecurityChangeKeysSuggest": {
+    "description": "Done step of a removal that came from the sign-in notice's \"That wasn't me\": suggests changing the keys."
+  },
+  "settingsSecurityDroppedLead": "También quedaron fuera:",
+  "settingsSecurityDroppedItem": "{name} ({reason, select, revoked {quitado antes} other {sin verificar}})",
+  "@settingsSecurityDroppedItem": {
+    "description": "A device left out of a rotation, with why (revoked, other).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityPasskeysNote": "Las huellas que no usaste ahora ya no abren tus datos: vuelve a activarlas en las huellas.",
+  "settingsSecurityNewKeyTitle": "Crear una clave de recuperación nueva",
+  "settingsSecurityNewKeySaved": "Tu clave de recuperación nueva quedó guardada. La anterior ya no funciona.",
+  "settingsSecurityNewKeyRotatedElsewhere": "Tus claves cambiaron en otro dispositivo mientras tanto. Crea la clave nueva otra vez.",
+  "settingsSecurityNewKeyFailed": "No pudimos guardar la clave nueva. Inténtalo otra vez.",
+  "settingsPasskeysUnlocks": "Abre tus datos",
+  "settingsPasskeysLocked": "No abre tus datos",
+  "settingsPasskeysTurnOn": "Activar",
+  "settingsPasskeysTurnOnLabel": "Activar para tus datos la huella creada el {date}",
+  "@settingsPasskeysTurnOnLabel": {
+    "description": "Screen-reader label: turn on a passkey for the data.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsPasskeysTurnOnNamedLabel": "Activar {name} para tus datos",
+  "@settingsPasskeysTurnOnNamedLabel": {
+    "description": "Screen-reader label: turn on a named passkey for the data.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsPasskeysTurnedOn": "Listo: esta huella también abre tus datos.",
+  "settingsPasskeysTurnOnFailed": "No pudimos activarla. Inténtalo otra vez.",
+  "settingsPasskeysTurnOnNoPrf": "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo.",
+  "settingsPasskeysSecondTouch": "Toca tu llave de acceso una vez más: así también abrirá tus datos cifrados.",
+  "settingsPasskeysAddNoPrf": "Esta huella sirve para entrar, pero tu gestor de contraseñas no le permite abrir tus datos. Guarda tu clave de recuperación: la vas a necesitar en un dispositivo nuevo.",
+  "@settingsPasskeysAddNoPrf": {
+    "description": "A passkey was added on an encrypted account but its password manager gave no PRF: it signs in only. Shown as text that stays."
+  },
+  "settingsSecurityLockRemove": "Confirma que eres tú para quitar un dispositivo",
+  "@settingsSecurityLockRemove": {
+    "description": "Reason shown by the phone's lock before removing a device."
+  },
+  "settingsSecurityLockNewKey": "Confirma que eres tú para crear una clave de recuperación nueva",
+  "@settingsSecurityLockNewKey": {
+    "description": "Reason shown by the phone's lock before a new recovery key."
+  },
+  "settingsSecurityLockChangeKeys": "Confirma que eres tú para cambiar tus claves",
+  "@settingsSecurityLockChangeKeys": {
+    "description": "Reason shown by the phone's lock before changing the keys."
   },
   "categoriesKindLabel": "Tipo",
   "@categoriesKindLabel": {
@@ -3777,6 +3945,847 @@
       },
       "income": {
         "type": "String"
+      }
+    }
+  },
+  "vaultLoading": "Abriendo tus datos…",
+  "@vaultLoading": {
+    "description": "The vault is opening: the loading line under the title."
+  },
+  "vaultSetupTitle": "Guarda tu clave de recuperación",
+  "@vaultSetupTitle": {
+    "description": "Recovery key setup: the title."
+  },
+  "vaultSetupLead": "Es la única forma de volver a tus datos si pierdes todos tus dispositivos y llaves de acceso. Nadie la puede recuperar por ti, ni siquiera Wambito.",
+  "@vaultSetupLead": {
+    "description": "Recovery key setup: why the key matters."
+  },
+  "vaultSetupKeyLabel": "Tu clave de recuperación",
+  "@vaultSetupKeyLabel": {
+    "description": "Recovery key setup: the key group is named this for screen readers."
+  },
+  "vaultSetupCopy": "Copiar",
+  "@vaultSetupCopy": {
+    "description": "Recovery key setup: copies the key."
+  },
+  "vaultSetupCopied": "Copiada",
+  "@vaultSetupCopied": {
+    "description": "Recovery key setup: the copy button after copying."
+  },
+  "vaultSetupShare": "Compartir",
+  "@vaultSetupShare": {
+    "description": "Recovery key setup: opens the share sheet with the key, for a password manager say."
+  },
+  "vaultSetupSaved": "Ya la guardé",
+  "@vaultSetupSaved": {
+    "description": "Recovery key setup: the person kept the key; asks to confirm it."
+  },
+  "vaultSetupFileTitle": "Clave de recuperación de Wambito",
+  "@vaultSetupFileTitle": {
+    "description": "The first line of the file shared with the key."
+  },
+  "vaultSetupFileLine": "Guárdala en un lugar seguro. Sin ella, nadie puede recuperar tus datos.",
+  "@vaultSetupFileLine": {
+    "description": "The file shared with the key: one line on keeping it."
+  },
+  "vaultSetupFileDate": "Creada el {date}",
+  "@vaultSetupFileDate": {
+    "description": "The file shared with the key: the date it was made.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSetupConfirmTitle": "Confirma que la guardaste",
+  "@vaultSetupConfirmTitle": {
+    "description": "Recovery key check: the title."
+  },
+  "vaultSetupConfirmLead": "Escribe estos cuatro caracteres de tu clave. Cada uno dice en qué grupo está y cuál es dentro del grupo.",
+  "@vaultSetupConfirmLead": {
+    "description": "Recovery key check: what to type."
+  },
+  "vaultSetupCharsGroup": "Caracteres a confirmar",
+  "@vaultSetupCharsGroup": {
+    "description": "Recovery key check: the four boxes are named this for screen readers."
+  },
+  "vaultSetupGroup": "Grupo {group}",
+  "@vaultSetupGroup": {
+    "description": "Recovery key check: which group of the key a character is in.",
+    "placeholders": {
+      "group": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupCharInGroup": "carácter {char}",
+  "@vaultSetupCharInGroup": {
+    "description": "Recovery key check: which character within the group.",
+    "placeholders": {
+      "char": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupCharLabel": "Grupo {group}, carácter {char}",
+  "@vaultSetupCharLabel": {
+    "description": "Recovery key check: a box named for screen readers.",
+    "placeholders": {
+      "group": {
+        "type": "int"
+      },
+      "char": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSetupMismatch": "No coinciden. Revisa la clave que guardaste.",
+  "@vaultSetupMismatch": {
+    "description": "Recovery key check: the typed characters are wrong."
+  },
+  "vaultSetupShowAgain": "Ver la clave otra vez",
+  "@vaultSetupShowAgain": {
+    "description": "Recovery key check: goes back to the key."
+  },
+  "vaultSetupContinue": "Continuar",
+  "@vaultSetupContinue": {
+    "description": "Recovery key check: goes on, enabled once the characters match."
+  },
+  "vaultUnlockTitle": "Abre tus datos aquí",
+  "@vaultUnlockTitle": {
+    "description": "Unlock: the title."
+  },
+  "vaultUnlockLead": "Tus datos están cifrados. Escribe tu clave de recuperación para abrirlos en este teléfono.",
+  "@vaultUnlockLead": {
+    "description": "Unlock: asks for the recovery key."
+  },
+  "vaultUnlockLabel": "Clave de recuperación",
+  "@vaultUnlockLabel": {
+    "description": "Unlock: the recovery key field."
+  },
+  "vaultUnlockPlaceholder": "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXX",
+  "@vaultUnlockPlaceholder": {
+    "description": "Unlock: the shape of a recovery key."
+  },
+  "vaultUnlockSubmit": "Abrir mis datos",
+  "@vaultUnlockSubmit": {
+    "description": "Unlock: tries the typed key."
+  },
+  "vaultUnlockBusy": "Abriendo…",
+  "@vaultUnlockBusy": {
+    "description": "Unlock: while the key is tried."
+  },
+  "vaultUnlockErrorBadKey": "Esa clave no tiene el formato correcto. Revisa que la copiaste completa.",
+  "@vaultUnlockErrorBadKey": {
+    "description": "Unlock: the typed text is not a recovery key."
+  },
+  "vaultUnlockErrorWrongKey": "Esa clave no abre esta cuenta",
+  "@vaultUnlockErrorWrongKey": {
+    "description": "Unlock: a recovery key that opens nothing."
+  },
+  "vaultUnlockErrorNoPrf": "Esta huella no puede abrir tus datos: tu gestor de contraseñas no lo permite. Escribe tu clave de recuperación o ábrelos desde otro dispositivo.",
+  "@vaultUnlockErrorNoPrf": {
+    "description": "Unlock: the passkey gives no way to open the data."
+  },
+  "vaultUnlockErrorNoPasskeyWrap": "Esta huella todavía no abre tus datos. Escribe tu clave de recuperación una vez y desde entonces también los abrirá.",
+  "@vaultUnlockErrorNoPasskeyWrap": {
+    "description": "Unlock: the passkey does not open the data yet."
+  },
+  "vaultUnlockErrorOffline": "No hay conexión. Inténtalo de nuevo cuando vuelvas a estar en línea.",
+  "@vaultUnlockErrorOffline": {
+    "description": "Unlock: no network."
+  },
+  "vaultUnlockErrorServer": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+  "@vaultUnlockErrorServer": {
+    "description": "Unlock: the server failed."
+  },
+  "vaultUnlockPasskey": "Abrir con mi huella",
+  "@vaultUnlockPasskey": {
+    "description": "Unlock: opens the data with a passkey."
+  },
+  "vaultUnlockPair": "Añadir este teléfono desde otro dispositivo",
+  "@vaultUnlockPair": {
+    "description": "Unlock and a guest's Locked: opens the pairing screen, where another device approves this phone."
+  },
+  "vaultUnlockLeadOther": "Tus datos están cifrados. Elige cómo abrirlos en este teléfono.",
+  "@vaultUnlockLeadOther": {
+    "description": "Unlock: the lead when the recovery key does not lead (a passkey or another device does)."
+  },
+  "vaultUnlockMore": "Más opciones",
+  "@vaultUnlockMore": {
+    "description": "Unlock: the disclosure that shows the other ways to open the data (the recovery key, another passkey)."
+  },
+  "vaultUnlockNoPrfLine": "Tu huella te deja entrar, pero tu gestor de contraseñas no le permite abrir tus datos.",
+  "@vaultUnlockNoPrfLine": {
+    "description": "Unlock: why the recovery key leads, when this phone's last passkey touch gave no PRF."
+  },
+  "vaultUnlockOtherPasskey": "Usar otra huella",
+  "@vaultUnlockOtherPasskey": {
+    "description": "Unlock: under More options when the recovery key leads, tries a passkey again."
+  },
+  "vaultUnlockPaste": "Pegar",
+  "@vaultUnlockPaste": {
+    "description": "Recovery key field: fills it from the clipboard."
+  },
+  "vaultPairTitle": "Abre tus datos desde otro dispositivo",
+  "@vaultPairTitle": {
+    "description": "Pairing: the title."
+  },
+  "vaultPairLead": "En un dispositivo donde Wambito ya está abierto, ve a Ajustes → Seguridad → Conectar otro dispositivo, y escanea este código o escríbelo.",
+  "@vaultPairLead": {
+    "description": "Pairing: what to do on the other device."
+  },
+  "vaultPairStarting": "Preparando un código…",
+  "@vaultPairStarting": {
+    "description": "Pairing: while the code is made."
+  },
+  "vaultPairCodeLabel": "Código",
+  "@vaultPairCodeLabel": {
+    "description": "Pairing: the caption of the 8-character code."
+  },
+  "vaultPairExpires": "Este código sirve hasta las {time}.",
+  "@vaultPairExpires": {
+    "description": "Pairing: when the code stops working.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "14:05"
+      }
+    }
+  },
+  "vaultPairWaiting": "Esperando a tu otro dispositivo…",
+  "@vaultPairWaiting": {
+    "description": "Pairing: waiting for the other device."
+  },
+  "vaultPairNumberTitle": "Comprueba que las dos pantallas muestran el mismo número",
+  "@vaultPairNumberTitle": {
+    "description": "Pairing: the title over the 6-digit number both screens show."
+  },
+  "vaultPairNumberLead": "Si coinciden, confírmalo en tu otro dispositivo.",
+  "@vaultPairNumberLead": {
+    "description": "Pairing: what to do when the numbers match."
+  },
+  "vaultPairDone": "Listo. Abriendo tus datos…",
+  "@vaultPairDone": {
+    "description": "Pairing: the data key arrived."
+  },
+  "vaultPairExpiredTitle": "Este código caducó",
+  "@vaultPairExpiredTitle": {
+    "description": "Pairing: the code expired."
+  },
+  "vaultPairExpiredLead": "Un código dura 10 minutos. Empieza de nuevo para tener otro.",
+  "@vaultPairExpiredLead": {
+    "description": "Pairing: why, and what to do."
+  },
+  "vaultPairFailedTitle": "No se pudo terminar",
+  "@vaultPairFailedTitle": {
+    "description": "Pairing: the title when it failed."
+  },
+  "vaultPairTampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+  "@vaultPairTampered": {
+    "description": "Pairing: the server relayed something that does not match."
+  },
+  "vaultPairOffline": "No hay conexión. Empieza de nuevo cuando vuelvas a tenerla.",
+  "@vaultPairOffline": {
+    "description": "Pairing: no connection."
+  },
+  "vaultPairServer": "Algo falló de nuestro lado. Empieza de nuevo.",
+  "@vaultPairServer": {
+    "description": "Pairing: the server failed."
+  },
+  "vaultPairRestart": "Empezar de nuevo",
+  "@vaultPairRestart": {
+    "description": "Pairing: asks for a new code."
+  },
+  "vaultPairBack": "Volver",
+  "@vaultPairBack": {
+    "description": "Pairing: goes back to where the person came from."
+  },
+  "vaultApproveTitle": "Aprobar un dispositivo nuevo",
+  "@vaultApproveTitle": {
+    "description": "Approve a device: the screen title (Settings \u2192 Security)."
+  },
+  "vaultApprovePlaceholder": "XXXX XXXX",
+  "@vaultApprovePlaceholder": {
+    "description": "Approve a device: the code field placeholder."
+  },
+  "vaultApproveSubmit": "Continuar",
+  "@vaultApproveSubmit": {
+    "description": "Approve a device: looks the code up."
+  },
+  "vaultApproveFinding": "Buscando…",
+  "@vaultApproveFinding": {
+    "description": "Approve a device: while the code is looked up."
+  },
+  "vaultApproveScan": "Escanear el QR",
+  "@vaultApproveScan": {
+    "description": "Approve a device: opens the camera to scan the QR."
+  },
+  "vaultApproveCameraFailed": "No pudimos usar la cámara. Escribe el código.",
+  "@vaultApproveCameraFailed": {
+    "description": "Approve a device: the camera could not be used."
+  },
+  "vaultApproveWaiting": "Esperando al dispositivo nuevo…",
+  "@vaultApproveWaiting": {
+    "description": "Approve a device: waiting for the number."
+  },
+  "vaultApproveNumberTitle": "Comprueba que las dos pantallas muestran el mismo número",
+  "@vaultApproveNumberTitle": {
+    "description": "Approve a device: the number to compare."
+  },
+  "vaultApproveNumberLead": "Aprueba solo si el número del dispositivo nuevo es exactamente este.",
+  "@vaultApproveNumberLead": {
+    "description": "Approve a device: when to approve."
+  },
+  "vaultApproveMatch": "Coinciden",
+  "@vaultApproveMatch": {
+    "description": "Approve a device: the numbers match, approves."
+  },
+  "vaultApproveApproving": "Aprobando…",
+  "@vaultApproveApproving": {
+    "description": "Approve a device: while approving."
+  },
+  "vaultApproveNoMatch": "No coinciden",
+  "@vaultApproveNoMatch": {
+    "description": "Approve a device: the numbers differ, shares nothing."
+  },
+  "vaultApproveMismatchTitle": "No se compartió nada",
+  "@vaultApproveMismatchTitle": {
+    "description": "Approve a device: nothing was shared (title)."
+  },
+  "vaultApproveMismatchLead": "El dispositivo nuevo no recibió nada. Si querías añadirlo, empieza de nuevo en él.",
+  "@vaultApproveMismatchLead": {
+    "description": "Approve a device: nothing was shared."
+  },
+  "vaultApproveDoneTitle": "Listo",
+  "@vaultApproveDoneTitle": {
+    "description": "Approve a device: done (title)."
+  },
+  "vaultApproveDoneLead": "El dispositivo nuevo ya puede abrir tus datos.",
+  "@vaultApproveDoneLead": {
+    "description": "Approve a device: done."
+  },
+  "vaultApproveExpiredTitle": "La solicitud caducó",
+  "@vaultApproveExpiredTitle": {
+    "description": "Approve a device: the request expired (title)."
+  },
+  "vaultApproveExpiredLead": "Empieza de nuevo en el dispositivo nuevo y escribe el código nuevo.",
+  "@vaultApproveExpiredLead": {
+    "description": "Approve a device: what to do after it expired."
+  },
+  "vaultApproveFailedTitle": "No se pudo aprobar",
+  "@vaultApproveFailedTitle": {
+    "description": "Approve a device: it failed (title)."
+  },
+  "vaultApproveTampered": "Detente: puede que alguien esté interfiriendo. No se compartió nada.",
+  "@vaultApproveTampered": {
+    "description": "Approve a device: the server relayed something that does not match."
+  },
+  "vaultApproveOffline": "No hay conexión. Inténtalo cuando vuelvas a tenerla.",
+  "@vaultApproveOffline": {
+    "description": "Approve a device: no connection."
+  },
+  "vaultApproveServer": "Algo falló de nuestro lado. Inténtalo de nuevo.",
+  "@vaultApproveServer": {
+    "description": "Approve a device: the server failed."
+  },
+  "vaultApproveRestart": "Empezar de nuevo",
+  "@vaultApproveRestart": {
+    "description": "Approve a device: type another code."
+  },
+  "vaultApproveCancel": "Cancelar",
+  "@vaultApproveCancel": {
+    "description": "Approve a device: leaves the screen."
+  },
+  "vaultApproveClose": "Cerrar",
+  "@vaultApproveClose": {
+    "description": "Approve a device: closes the result."
+  },
+  "vaultLockedTitle": "No pudimos abrir tus datos",
+  "@vaultLockedTitle": {
+    "description": "Locked: the title when the vault could not open."
+  },
+  "vaultLockedLead": "Siguen a salvo. Inténtalo de nuevo.",
+  "@vaultLockedLead": {
+    "description": "Locked: it is safe, try again."
+  },
+  "vaultLockedOfflineTitle": "Sin conexión",
+  "@vaultLockedOfflineTitle": {
+    "description": "Locked: the title without a connection."
+  },
+  "vaultLockedOfflineLead": "Necesitamos conexión para abrir tus datos en este teléfono.",
+  "@vaultLockedOfflineLead": {
+    "description": "Locked: a connection is needed."
+  },
+  "vaultLockedRetry": "Reintentar",
+  "@vaultLockedRetry": {
+    "description": "Locked: tries to open again."
+  },
+  "vaultLockedRetrying": "Reintentando…",
+  "@vaultLockedRetrying": {
+    "description": "Locked: while it tries again."
+  },
+  "vaultLockedUnsupportedTitle": "Este teléfono no puede guardar tu clave",
+  "@vaultLockedUnsupportedTitle": {
+    "description": "Locked: this phone cannot keep the key safely."
+  },
+  "vaultLockedUnsupportedLead": "Para cuidar tus datos, Wambito necesita que el teléfono guarde la clave de forma segura. Actualiza el sistema o abre Wambito en otro dispositivo.",
+  "@vaultLockedUnsupportedLead": {
+    "description": "Locked: why, and what to do."
+  },
+  "vaultLockedPlainServerTitle": "Tus datos esperan en este teléfono",
+  "@vaultLockedPlainServerTitle": {
+    "description": "Locked: the account was deleted for inactivity and its data waits to move to a new account, but the server makes new accounts that do not keep data encrypted."
+  },
+  "vaultLockedPlainServerLead": "Para guardarlos en una cuenta nueva necesito un servidor que los mantenga cifrados, y este todavía no lo hace. Siguen a salvo aquí; vuelve a intentarlo más tarde.",
+  "@vaultLockedPlainServerLead": {
+    "description": "Locked: why the data cannot move yet (the server keeps new accounts unencrypted), that it is safe, and to try again later. Wambi speaks."
+  },
+  "vaultRemoved": "Este teléfono se eliminó de tu cuenta desde otro dispositivo. Los cambios que aún no se habían sincronizado aquí se perdieron. Para volver a abrir tus datos, escribe tu clave de recuperación o usa otro dispositivo.",
+  "@vaultRemoved": {
+    "description": "Unlock: this phone was removed from the account by another device."
+  },
+  "vaultUnverified": "Este teléfono no pudo verificar la clave nueva de tu cuenta y dejó de sincronizar. Tus datos aquí están a salvo. Para seguir, usa tu huella o escribe tu clave de recuperación.",
+  "@vaultUnverified": {
+    "description": "Unlock: this phone could not verify the account's new key and stopped syncing."
+  },
+  "vaultUnsyncedChanges": "{count, plural, =1{Tienes 1 cambio sin sincronizar} other{Tienes {count} cambios sin sincronizar}}",
+  "@vaultUnsyncedChanges": {
+    "description": "Sign-out sheet: changes made here and not yet sent.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSyncAndSignOut": "Sincronizar y cerrar sesión",
+  "@vaultSyncAndSignOut": {
+    "description": "Sign-out sheet: sends the changes, then signs out."
+  },
+  "vaultSignOutAnyway": "Cerrar sesión de todos modos",
+  "@vaultSignOutAnyway": {
+    "description": "Sign-out sheet: signs out and gives up the unsent changes."
+  },
+  "comingSoonWithEncryption": "Próximamente con cifrado",
+  "@comingSoonWithEncryption": {
+    "description": "What an encrypted (preview) account sees in place of what is not ported to it yet: automatic capture, the widget, due notices, export, import and assistants."
+  },
+  "screenLockTitle": "Confirma que eres tú",
+  "@screenLockTitle": {
+    "description": "Sensitive operation without a screen lock: the sheet's title."
+  },
+  "screenLockLead": "Este teléfono no tiene bloqueo de pantalla. Escribe tu clave de recuperación actual para continuar.",
+  "@screenLockLead": {
+    "description": "Sensitive operation without a screen lock: asks the current recovery key instead."
+  },
+  "screenLockSubmit": "Confirmar",
+  "@screenLockSubmit": {
+    "description": "Sensitive operation without a screen lock: tries the typed key."
+  },
+  "screenLockBusy": "Comprobando…",
+  "@screenLockBusy": {
+    "description": "Sensitive operation without a screen lock: while the key is tried."
+  },
+  "protectTitle": "Protege tus datos",
+  "@protectTitle": {
+    "description": "Settings: the block that offers ways back to the data for an account without email."
+  },
+  "protectLead": "Tus datos viven cifrados en este teléfono. Si lo pierdes, con esto vuelves a abrirlos.",
+  "@protectLead": {
+    "description": "Settings → Protect your data: what the block is for."
+  },
+  "protectCount": "{done} de 2",
+  "@protectCount": {
+    "description": "Settings → Protect your data: how many of the two ways back are done.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "protectRecoveryTitle": "Clave de recuperación",
+  "@protectRecoveryTitle": {
+    "description": "Settings → Protect your data: step 1."
+  },
+  "protectRecoveryLead": "Una clave que guardas tú. Con ella entras y abres tus datos en cualquier teléfono.",
+  "@protectRecoveryLead": {
+    "description": "Settings → Protect your data: what the recovery key does."
+  },
+  "protectRecoveryGo": "Crear mi clave",
+  "@protectRecoveryGo": {
+    "description": "Settings → Protect your data: makes and shows the recovery key."
+  },
+  "protectPasskeyTitle": "Entrar con tu huella",
+  "@protectPasskeyTitle": {
+    "description": "Settings → Protect your data: step 2."
+  },
+  "protectPasskeyLead": "Tu gestor de contraseñas la guarda. Una huella y vuelves a entrar, con tus datos abiertos.",
+  "@protectPasskeyLead": {
+    "description": "Settings → Protect your data: what the passkey does."
+  },
+  "protectPasskeyGo": "Agregar mi huella",
+  "@protectPasskeyGo": {
+    "description": "Settings → Protect your data: adds a passkey that opens the data."
+  },
+  "protectPasskeyNoPrf": "Esta llave de acceso te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
+  "@protectPasskeyNoPrf": {
+    "description": "Settings → Protect your data: a passkey was added but the password manager gave no PRF (spec 5.2, fixed sentence)."
+  },
+  "protectEmailTitle": "Crear tu cuenta",
+  "@protectEmailTitle": {
+    "description": "Settings → Protect your data: step 3, adding an email."
+  },
+  "protectEmailLead": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque pierdas la huella.",
+  "@protectEmailLead": {
+    "description": "Settings → Protect your data: what an email adds."
+  },
+  "protectEmailGo": "Agregar mi correo",
+  "@protectEmailGo": {
+    "description": "Settings → Protect your data: opens adding an email."
+  },
+  "protectDone": "Listo",
+  "@protectDone": {
+    "description": "Settings → Protect your data: a step that is done."
+  },
+  "protectKeySaved": "Tu clave de recuperación quedó guardada. Guárdala donde no se pierda.",
+  "@protectKeySaved": {
+    "description": "Settings → Protect your data: the first recovery key was saved."
+  },
+  "protectLockReason": "Confirma que eres tú para crear tu clave de recuperación",
+  "@protectLockReason": {
+    "description": "Settings → Protect your data: the screen lock prompt before the recovery key is made."
+  },
+  "protectCardTitle": "Protege tus datos",
+  "@protectCardTitle": {
+    "description": "Home: the nudge card that offers the recovery key."
+  },
+  "protectCardBody": "Tus datos viven solo en este teléfono. Crea una clave de recuperación para no perderlos si lo pierdes.",
+  "@protectCardBody": {
+    "description": "Home: what the protect card says."
+  },
+  "protectCardGo": "Crear mi clave",
+  "@protectCardGo": {
+    "description": "Home: the protect card's button that starts the recovery key."
+  },
+  "protectCardLater": "Ahora no",
+  "@protectCardLater": {
+    "description": "Home: the protect card's dismiss button."
+  },
+  "unprotectedSignOutTitle": "¿Cerrar sesión sin camino de vuelta?",
+  "@unprotectedSignOutTitle": {
+    "description": "Warning before a guest with no recovery key or passkey signs out."
+  },
+  "unprotectedSignOutBody": "No has guardado una clave de recuperación. Si cierras sesión, tus datos se borran de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedSignOutBody": {
+    "description": "Warning before signing out without a way back: the body."
+  },
+  "unprotectedServerTitle": "¿Cambiar de servidor sin camino de vuelta?",
+  "@unprotectedServerTitle": {
+    "description": "Warning before a guest with no recovery key or passkey changes server."
+  },
+  "unprotectedServerBody": "No has guardado una clave de recuperación. Cambiar de servidor cierra tu sesión, borra tus datos de este teléfono y nadie podrá abrirlos de nuevo.",
+  "@unprotectedServerBody": {
+    "description": "Warning before changing server without a way back: the body."
+  },
+  "unprotectedPasskeyUnknown": "No pudimos revisar tus llaves de acceso porque no hay conexión. Si ya agregaste una, con ella puedes volver.",
+  "@unprotectedPasskeyUnknown": {
+    "description": "The leaving warning's note when the passkey wraps could not be read (offline)."
+  },
+  "unprotectedProtectFirst": "Proteger mis datos primero",
+  "@unprotectedProtectFirst": {
+    "description": "The leaving warning's button that opens the recovery key."
+  },
+  "entryUseRecoveryKey": "Entrar con mi clave de recuperación",
+  "@entryUseRecoveryKey": {
+    "description": "Email screen: a link to sign in with the recovery key instead (opens the recovery-key sign-in)."
+  },
+  "recoverySignInTitle": "Entra con tu clave de recuperación",
+  "@recoverySignInTitle": {
+    "description": "Recovery-key sign-in: the title."
+  },
+  "recoverySignInLead": "Escríbela como la guardaste; mayúsculas, espacios y guiones dan igual. Con ella entras y abres tus datos en este teléfono.",
+  "@recoverySignInLead": {
+    "description": "Recovery-key sign-in: the lead."
+  },
+  "recoverySignInSubmit": "Entrar",
+  "@recoverySignInSubmit": {
+    "description": "Recovery-key sign-in: the submit button."
+  },
+  "recoverySignInBusy": "Entrando…",
+  "@recoverySignInBusy": {
+    "description": "Recovery-key sign-in: while signing in."
+  },
+  "recoverySignInUseEmail": "Usar mi correo",
+  "@recoverySignInUseEmail": {
+    "description": "Recovery-key sign-in: back to the email sign-in."
+  },
+  "errorRecoveryKeyInvalid": "Esa clave no abre ninguna cuenta. Revísala e inténtalo de nuevo.",
+  "@errorRecoveryKeyInvalid": {
+    "description": "Recovery-key sign-in: the key signs in to no account (the server's answer is the same whatever the reason)."
+  },
+  "recoverySignInWait": "{minutes, plural, =1{Demasiados intentos. Espera 1 minuto e inténtalo otra vez.} other{Demasiados intentos. Espera {minutes} minutos e inténtalo otra vez.}}",
+  "@recoverySignInWait": {
+    "description": "Recovery-key sign-in: too many tries (429); the minutes the server says to wait.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeOfferQuestion": "Este correo ya tiene una cuenta de Wambito. ¿Traemos a ella los datos de este teléfono?",
+  "@mergeOfferQuestion": {
+    "description": "Merge offer (phone-first spec 7.2): the claimed email already has an account."
+  },
+  "mergeOfferBody": "Entras a {email} con el código que te mandamos y abres sus datos; luego los de este teléfono se suman a ellos.",
+  "@mergeOfferBody": {
+    "description": "Merge offer: what happens next.",
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "ana@correo.com"
+      }
+    }
+  },
+  "mergeOfferKeyNote": "La clave de recuperación de este teléfono deja de servir: desde entonces tus datos los abre la de la cuenta.",
+  "@mergeOfferKeyNote": {
+    "description": "Merge offer: shown before the sign-in (spec 7.2)."
+  },
+  "mergeOfferYes": "Traer mis datos",
+  "@mergeOfferYes": {
+    "description": "Merge offer: the yes button."
+  },
+  "unlockMergeWaiting": "Abre esta cuenta para traer a ella los datos de este teléfono.",
+  "@unlockMergeWaiting": {
+    "description": "Unlock, while a merge waits for the account's data."
+  },
+  "mergeWorking": "Trayendo los datos de este teléfono…",
+  "@mergeWorking": {
+    "description": "Merge: while the phone's data is brought into the account."
+  },
+  "mergeUploadingTitle": "Enviando tus datos a la cuenta",
+  "@mergeUploadingTitle": {
+    "description": "Merge: the data is in the account and is being sent."
+  },
+  "mergeUploadingLead": "{count, plural, =0{Ya casi.} =1{Falta 1 cambio por enviar.} other{Faltan {count} cambios por enviar.}}",
+  "@mergeUploadingLead": {
+    "description": "Merge: changes still to send.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeUploadingNote": "Sin conexión, sigue sola cuando vuelva. Mientras, puedes usar Wambito.",
+  "@mergeUploadingNote": {
+    "description": "Merge: the upload goes on by itself."
+  },
+  "mergeKeepUsing": "Seguir usando Wambito",
+  "@mergeKeepUsing": {
+    "description": "Merge: leave the screen while the upload goes on."
+  },
+  "mergeDoneTitle": "¡Listo! Los datos de este teléfono ya están en tu cuenta.",
+  "@mergeDoneTitle": {
+    "description": "Merge: done."
+  },
+  "mergeDoneGo": "Ir al inicio",
+  "@mergeDoneGo": {
+    "description": "Merge: done, go home."
+  },
+  "mergeCurrencyTitle": "Las monedas no coinciden",
+  "@mergeCurrencyTitle": {
+    "description": "Merge currency stop: the title."
+  },
+  "mergeCurrencyStop": "Tu cuenta usa {account} y este teléfono {phone}.",
+  "@mergeCurrencyStop": {
+    "description": "Merge currency stop (spec 7.2): the account's currency, then the phone's.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "example": "COP"
+      },
+      "phone": {
+        "type": "String",
+        "example": "USD"
+      }
+    }
+  },
+  "mergeCurrencyLead": "No podemos juntar movimientos en monedas distintas. Elige qué hacemos.",
+  "@mergeCurrencyLead": {
+    "description": "Merge currency stop: why, and the choice."
+  },
+  "mergeCancel": "Cancelar y seguir como estaba",
+  "@mergeCancel": {
+    "description": "Merge: cancel; back to this phone's session without email, with its data (ruling 10)."
+  },
+  "mergeKeepAccount": "Quedarme solo con los datos de la cuenta",
+  "@mergeKeepAccount": {
+    "description": "Merge currency stop: keep only the account's data."
+  },
+  "mergeKeepAccountTitle": "¿Borrar los datos de este teléfono?",
+  "@mergeKeepAccountTitle": {
+    "description": "Merge: the confirm before discarding the phone's data."
+  },
+  "mergeKeepAccountBody": "Lo que anotaste en este teléfono sin correo se borra para siempre y te quedas con los datos de la cuenta.",
+  "@mergeKeepAccountBody": {
+    "description": "Merge: what discarding the phone's data means."
+  },
+  "mergeKeepAccountConfirm": "Borrar y seguir",
+  "@mergeKeepAccountConfirm": {
+    "description": "Merge: confirm discarding the phone's data."
+  },
+  "mergeFailedTitle": "No pudimos terminar de traer tus datos",
+  "@mergeFailedTitle": {
+    "description": "Merge: a step failed."
+  },
+  "mergeFailedLead": "Tus datos siguen guardados en este teléfono. Inténtalo otra vez.",
+  "@mergeFailedLead": {
+    "description": "Merge: a step failed; nothing is lost."
+  },
+  "mergeFailedPlain": "Esa cuenta todavía no guarda datos cifrados, así que no podemos traer a ella los de este teléfono.",
+  "@mergeFailedPlain": {
+    "description": "Merge: the email account keeps no encrypted data yet."
+  },
+  "mergeRetry": "Intentar de nuevo",
+  "@mergeRetry": {
+    "description": "Merge: try the failed step again."
+  },
+  "entryNeedsConnection": "Para empezar necesito internet una vez. Conéctate y lo intentamos de nuevo.",
+  "@entryNeedsConnection": {
+    "description": "First run: \"Start\" found no network, and this server is not known to make encrypted users, so nothing was made (Wambi speaks)."
+  },
+  "entryTryAgain": "Intentar de nuevo",
+  "@entryTryAgain": {
+    "description": "First run, under entryNeedsConnection: tries \"Start\" again."
+  },
+  "provisionalWaiting": "Tus datos están en este teléfono. En cuanto haya internet, les creo tu cuenta.",
+  "@provisionalWaiting": {
+    "description": "Settings, on an offline first run: the data waits on the phone for the network to make the account."
+  },
+  "provisionalPlainServer": "Tus datos siguen en este teléfono. Este servidor no guarda los datos cifrados, así que espero a uno que sí lo haga.",
+  "@provisionalPlainServer": {
+    "description": "Settings, on an offline first run whose server made a plain (unencrypted) user: nothing was sent; it waits for a server that keeps data encrypted."
+  },
+  "provisionalNoGuests": "Tus datos siguen en este teléfono. Este servidor no acepta cuentas nuevas sin correo por ahora.",
+  "@provisionalNoGuests": {
+    "description": "Settings, on an offline first run whose server refuses new accounts without email (GUEST_SIGNUP closed)."
+  },
+  "signinApproveTitle": "Iniciar sesión en la web",
+  "@signinApproveTitle": {
+    "description": "Approving a web sign-in: the screen title."
+  },
+  "signinApproveLead": "En el computador, elige “Iniciar sesión”. Luego escanea el código QR que aparece, o escribe su código.",
+  "@signinApproveLead": {
+    "description": "Approving a web sign-in: how to start."
+  },
+  "signinApproveCodeLabel": "Código del computador",
+  "@signinApproveCodeLabel": {
+    "description": "Approving a web sign-in: the typed code's label."
+  },
+  "signinApproveBadCode": "Ese código no coincide con ninguna solicitud. Revísalo, o abre uno nuevo en el computador.",
+  "@signinApproveBadCode": {
+    "description": "Approving a web sign-in: a typed code or a QR that finds nothing."
+  },
+  "signinApproveQuestion": "¿Iniciar sesión en «{label}»?",
+  "@signinApproveQuestion": {
+    "description": "Approving a web sign-in: the question (spec 8.1); {label} is the browser's own name, quoted and muted (it is attacker-chosen), below the host line.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveWarning": "Escanea solo un código que veas en {host}",
+  "@signinApproveWarning": {
+    "description": "Approving a web sign-in: the warning (spec 8.1); {host} is the server's host, shown in bold.",
+    "placeholders": {
+      "host": {
+        "type": "String",
+        "example": "app.wambito.com"
+      }
+    }
+  },
+  "signinApproveApprove": "Aprobar",
+  "@signinApproveApprove": {
+    "description": "Approving a web sign-in: the yes."
+  },
+  "signinApproveWaiting": "Esperando al computador…",
+  "@signinApproveWaiting": {
+    "description": "Approving a web sign-in: after Approve, until the browser answers."
+  },
+  "signinApproveNumberLead": "Aprueba solo si el número del computador es exactamente este.",
+  "@signinApproveNumberLead": {
+    "description": "Approving a web sign-in after a typed code: compare the number."
+  },
+  "signinApproveSealing": "Iniciando sesión…",
+  "@signinApproveSealing": {
+    "description": "Approving a web sign-in: while the data key is sealed and picked up."
+  },
+  "signinApproveDoneLead": "Ya iniciaste sesión en {label}.",
+  "@signinApproveDoneLead": {
+    "description": "Approving a web sign-in: done.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Firefox on Mac"
+      }
+    }
+  },
+  "signinApproveMismatchLead": "El computador no recibió nada. Si querías iniciar sesión, empieza de nuevo allí.",
+  "@signinApproveMismatchLead": {
+    "description": "Approving a web sign-in: the numbers did not match."
+  },
+  "signinApproveExpiredLead": "Abre un código nuevo en el computador y escanéalo otra vez.",
+  "@signinApproveExpiredLead": {
+    "description": "Approving a web sign-in: the 2 minutes passed."
+  },
+  "signinApproveFailedTitle": "No se pudo iniciar sesión",
+  "@signinApproveFailedTitle": {
+    "description": "Approving a web sign-in: failed."
+  },
+  "signinApproveLocked": "Abre primero tus datos en este teléfono.",
+  "@signinApproveLocked": {
+    "description": "Approving a web sign-in with the vault no longer open."
+  },
+  "signinApproveFromLink": "Esto llegó por un enlace: aprueba solo si estás iniciando sesión en un computador que tienes enfrente.",
+  "@signinApproveFromLink": {
+    "description": "Approving a web sign-in opened from a wambito://signin link (not the in-app scanner): the extra warning."
+  },
+  "signinApproveUnconfirmedTitle": "Enviado",
+  "@signinApproveUnconfirmedTitle": {
+    "description": "Approving a web sign-in: the seal went out but the browser's pickup could not be seen."
+  },
+  "signinApproveUnconfirmedLead": "Lo envié, pero no pude ver que el computador lo recibiera. Míralo: si no inició sesión, empieza de nuevo allí.",
+  "@signinApproveUnconfirmedLead": {
+    "description": "Approving a web sign-in: unconfirmed pickup, what to do."
+  },
+  "signinNoticeTitle": "Se abrió una sesión en {label}",
+  "@signinNoticeTitle": {
+    "description": "The sign-in notice: a new device opened a session. The sheet's title.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "signinNoticeBody": "Si no fuiste tú, quita ese dispositivo ahora.",
+  "@signinNoticeBody": {
+    "description": "The sign-in notice: what to do if the person did not open the session."
+  },
+  "signinNoticeNotMe": "No fui yo",
+  "@signinNoticeNotMe": {
+    "description": "The sign-in notice: button that goes to the device's removal."
+  },
+  "signinNoticeOk": "Entendido",
+  "@signinNoticeOk": {
+    "description": "The sign-in notice: button that records the look."
+  },
+  "signinNoticeMore": "{count, plural, =1{Y se agregó {count} dispositivo más.} other{Y se agregaron {count} dispositivos más.}}",
+  "@signinNoticeMore": {
+    "description": "The sign-in notice: how many more new devices there are besides the one named.",
+    "placeholders": {
+      "count": {
+        "type": "int"
       }
     }
   }

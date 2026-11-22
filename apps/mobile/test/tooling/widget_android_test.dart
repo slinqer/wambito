@@ -89,6 +89,18 @@ void main() {
     }
   });
 
+  test('both sides agree on the owner of a snapshot', () {
+    final snapshot = _kotlin('WidgetSnapshot.kt');
+    expect(snapshot, contains('doc.put("owner", owner)'));
+    expect(snapshot, contains('doc.optString("owner", "")'));
+    final account = File('android/app/src/main/kotlin/com/wambito/app/account/AccountMode.kt')
+        .readAsStringSync();
+    expect(account, contains('OWNER_KEY = "wambito.encryption.owner"'));
+    // Dart writes it under the same name as the field Kotlin reads.
+    final dart = File('lib/home/widget_snapshot.dart').readAsStringSync();
+    expect(dart, contains("'owner': ?owner"));
+  });
+
   test('the deep links: wambito://, only through a not-exported alias', () {
     final alias = RegExp(
       r'<activity-alias((?:(?!</activity-alias>).)*)</activity-alias>',
@@ -103,13 +115,18 @@ void main() {
     final aliasSchemes = RegExp(r'android:scheme="([^"]+)"').allMatches(alias).map((m) => m[1]);
     expect(aliasSchemes.toSet(), {'wambito'});
     expect(alias, isNot(contains('BROWSABLE')));
-    // The exported launcher activity takes no wambito:// link: other apps can start it.
+    // The exported launcher activity takes no wambito:// link, since other apps can start it, but
+    // the web sign-in's QR (phone-first ruling 14): the system camera opens it, and it only opens
+    // the approval, where the person still has to approve.
     final main = RegExp(
       r'<activity\s((?:(?!</activity>).)*)</activity>',
       dotAll: true,
     ).firstMatch(_manifest)!.group(1)!;
     expect(main, contains('android:name=".MainActivity"'));
-    expect(main, isNot(contains('android:scheme="wambito"')));
+    final wambito = RegExp(r'<data android:scheme="wambito"[^>]*>')
+        .allMatches(main)
+        .map((m) => m[0]);
+    expect(wambito, ['<data android:scheme="wambito" android:host="signin"/>']);
   });
 
   test('the app is Wambito on the phone', () {
@@ -152,8 +169,14 @@ void main() {
     expect(_manifest, contains('android:icon="@mipmap/ic_launcher"'));
     final adaptive = File('$res/mipmap-anydpi-v26/ic_launcher.xml').readAsStringSync();
     expect(adaptive, contains('<background android:drawable="@color/wambito_icon_bg" />'));
-    expect(adaptive, contains('<foreground android:drawable="@drawable/ic_launcher_foreground" />'));
-    expect(adaptive, contains('<monochrome android:drawable="@drawable/ic_launcher_monochrome" />'));
+    expect(
+      adaptive,
+      contains('<foreground android:drawable="@drawable/ic_launcher_foreground" />'),
+    );
+    expect(
+      adaptive,
+      contains('<monochrome android:drawable="@drawable/ic_launcher_monochrome" />'),
+    );
     final colors = File('$res/values/colors.xml').readAsStringSync();
     final bg = RegExp(r'<color name="wambito_icon_bg">#([0-9A-Fa-f]{6})</color>')
         .firstMatch(colors)!

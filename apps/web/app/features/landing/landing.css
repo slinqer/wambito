@@ -11,7 +11,7 @@
   }
   .lk-landing-wrap {
     width: 100%;
-    max-width: 1120px;
+    max-width: 1240px;
     margin-inline: auto;
     padding-inline: var(--space-4);
   }
@@ -46,6 +46,277 @@
     margin: 0;
   }
   /*
+   * A split section (AutomaticCapture.tsx, AgentDemo.tsx): the text, then a big soft panel with an
+   * illustration; side by side from 900px, the panel stacked under the text on phones.
+   */
+  .lk-landing-split {
+    display: grid;
+    gap: var(--space-5);
+    align-items: center;
+  }
+  .lk-landing-split-text {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-3);
+  }
+  .lk-landing .lk-landing-split-text h2 {
+    margin: 0;
+    font-size: clamp(32px, 7.5vw, 48px);
+    line-height: 1.05;
+  }
+  .lk-landing-split-text p {
+    margin: 0;
+    max-width: 34rem;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--ink-muted);
+  }
+  .lk-landing-eyebrow {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--good);
+  }
+  .lk-landing-panel {
+    display: grid;
+    place-items: center;
+    min-height: 340px;
+    padding: var(--space-5) var(--space-4);
+    border-radius: calc(var(--radius-xl) * 1.5);
+    background: var(--surface-sunken);
+  }
+  /*
+   * Automatic capture plays once as it scrolls in (AutomaticCapture.tsx): nothing, then the
+   * notification drops in from the top of the screen, the arrow pops, and the logged expense rises
+   * in. Each piece keeps its place while hidden, so the panel never jumps. Movement only.
+   */
+  .lk-landing-capture-play[data-phase="idle"]
+  :is(.lk-capture-notif, .lk-capture-arrow, .lk-capture-registered),
+  .lk-landing-capture-play[data-phase="notify"] :is(.lk-capture-arrow, .lk-capture-registered),
+  .lk-landing-capture-play[data-phase="arrow"] .lk-capture-registered {
+    visibility: hidden;
+  }
+  .lk-landing-capture-play .lk-capture-demo {
+    width: min(100%, 420px);
+  }
+  .lk-landing-capture-play[data-phase="notify"] .lk-capture-notif {
+    animation: lk-landing-drop 650ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+  }
+  .lk-landing-capture-play[data-phase="arrow"] .lk-capture-arrow {
+    animation: lk-landing-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .lk-landing-capture-play[data-phase="logged"] .lk-capture-registered {
+    animation: lk-landing-chat-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .lk-landing-agent-cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .lk-landing-agent-note {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-muted);
+  }
+  .lk-landing-agent-logos {
+    display: flex;
+    gap: var(--space-4);
+    padding-top: var(--space-3);
+  }
+  .lk-landing-agent-logo {
+    width: 34px;
+    height: 34px;
+    fill: var(--ink);
+  }
+  /* The chat: the question on the right, Wambito's side on the left, as in a real assistant. */
+  .lk-landing-chat {
+    grid-template-rows: 1fr auto;
+    place-items: stretch;
+    gap: var(--space-4);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  /* The conversation sits at the bottom, as in a chat app, so a longer answer grows upward. */
+  .lk-landing-chat-log {
+    display: grid;
+    align-content: end;
+    gap: var(--space-4);
+    min-height: 360px;
+  }
+  /* Which of the three examples is showing. */
+  .lk-landing-chat-dots {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+  .lk-landing-chat-dots > span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--stroke);
+    transition:
+      width 300ms ease,
+      background-color 300ms ease;
+  }
+  .lk-landing-chat-dots > .is-on {
+    width: 22px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+  }
+  /* "Where did most of my money go?": columns sized against the largest (`--lk-col`, 0..1). */
+  .lk-landing-columns {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: end;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+  }
+  .lk-landing-columns li {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .lk-landing-column {
+    width: 100%;
+    max-width: 44px;
+    height: calc(var(--lk-col) * 110px);
+    min-height: 8px;
+    border-radius: 8px 8px 4px 4px;
+    background: var(--brand-glow);
+    transform-origin: bottom;
+  }
+  .lk-landing-columns li:first-child .lk-landing-column {
+    background: var(--candy);
+  }
+  .lk-landing-column-amount {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .lk-landing-column-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .lk-landing-chat p {
+    margin: 0;
+  }
+  .lk-landing-chat-ask {
+    justify-self: end;
+    max-width: 80%;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+    background: var(--surface-row);
+    border: 2px solid var(--stroke);
+    font-weight: 700;
+  }
+  .lk-landing-chat-ask b,
+  .lk-landing-chat-answer b {
+    font-weight: 900;
+    color: var(--ink);
+  }
+  .lk-landing-chat-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .lk-landing-chat-status img {
+    border-radius: 6px;
+  }
+  .lk-landing-chat-answer {
+    display: grid;
+    gap: var(--space-3);
+    font-weight: 700;
+  }
+  .lk-landing-chat-card {
+    display: grid;
+    gap: var(--space-2);
+    list-style: none;
+    margin: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+  }
+  /* The bars' empty track shows against the answer's card. */
+  .lk-landing-chat-card .lk-bar {
+    background: var(--surface-row);
+  }
+  .lk-landing-chat-date {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  /* "Reading your transactions…": a light passes over the words while Wambito works. */
+  .lk-landing-shimmer {
+    background:
+      linear-gradient(100deg, var(--ink-muted) 35%, var(--ink) 50%, var(--ink-muted) 65%) 0 0 / 250%
+      100%;
+    background-clip: text;
+    color: transparent;
+    animation: lk-landing-shimmer 1.4s linear infinite;
+  }
+  .lk-landing-chat[data-phase="ask"] .lk-landing-chat-ask {
+    animation: lk-landing-chat-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .lk-landing-chat[data-phase="think"] .lk-landing-chat-status {
+    animation: lk-landing-chat-in 400ms ease-out both;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-chat-answer > * {
+    animation: lk-landing-chat-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-chat-answer > :nth-child(2) {
+    animation-delay: 150ms;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-chat-answer > :nth-child(3) {
+    animation-delay: 300ms;
+  }
+  /* The budgets' bars load from empty, one after the other; the columns grow from the floor. */
+  .lk-landing-chat[data-phase="answer"] .lk-bar > span {
+    transform-origin: left center;
+    animation: lk-landing-fill 1200ms cubic-bezier(0.25, 0.7, 0.3, 1) both;
+    animation-delay: calc(500ms + var(--lk-i, 0) * 250ms);
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-budget:nth-child(2) {
+    --lk-i: 1;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-budget:nth-child(3) {
+    --lk-i: 2;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-column {
+    animation: lk-landing-grow 900ms cubic-bezier(0.25, 0.7, 0.3, 1) both;
+    animation-delay: calc(500ms + var(--lk-i, 0) * 150ms);
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-columns li:nth-child(2) {
+    --lk-i: 1;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-columns li:nth-child(3) {
+    --lk-i: 2;
+  }
+  .lk-landing-chat[data-phase="answer"] .lk-landing-columns li:nth-child(4) {
+    --lk-i: 3;
+  }
+  /* A big centered section title, like the hero's: the feature grid's. */
+  .lk-landing-section-head.is-center {
+    text-align: center;
+  }
+  .lk-landing .lk-landing-section-head.is-center h2 {
+    max-width: 16ch;
+    margin-inline: auto;
+    font-size: clamp(34px, 8vw, 56px);
+    line-height: 1.05;
+  }
+  /*
    * Wambi spots: where the traveling Wambi stands, only the hero and the closing (each with its
    * prerendered sprite). Once he is live, the prerendered Wambi in a spot steps aside.
    */
@@ -60,9 +331,54 @@
     line-height: 1.5;
     color: var(--ink-muted);
   }
+  /*
+   * The closing's big button with Wambi sitting in its middle: his picture is a square whose coin
+   * rests at 74% of its height, so the spot rises that far above the button's top edge; his legs
+   * (at 66% of the picture's width) hang a little right of the button's centre (12% of his width),
+   * still over the gap between the label's two halves, the gap exactly in the button's centre
+   * (three columns, the outer two equal). He lets the pointer
+   * through.
+   */
+  .lk-landing-seat {
+    --lk-seat: 160px;
+    position: relative;
+    max-width: 100%;
+    margin-top: calc(var(--lk-seat) * 0.74 - var(--space-3));
+  }
+  /* Phones: a smaller Wambi and label; each half may wrap (the long coming-soon label). */
+  .lk-landing .lk-landing-seat-cta {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 0;
+    max-width: 100%;
+    padding: 18px 18px;
+    font-size: 16px;
+    white-space: normal;
+  }
+  .lk-landing-seat-before {
+    justify-self: end;
+    text-align: end;
+  }
+  .lk-landing-seat-after {
+    justify-self: start;
+    text-align: start;
+  }
+  .lk-landing-seat-gap {
+    width: calc(var(--lk-seat) * 0.52);
+  }
   .lk-landing-spot.is-closing {
-    width: 128px;
-    height: 128px;
+    position: absolute;
+    left: calc(50% - var(--lk-seat) * 0.54);
+    bottom: calc(100% - var(--lk-seat) * 0.26);
+    width: var(--lk-seat);
+    height: var(--lk-seat);
+    pointer-events: none;
+  }
+  .lk-landing-resting {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
   [data-wambi-spot] > .lk-wambi {
     transition:
@@ -208,37 +524,54 @@
     justify-items: center;
     gap: var(--space-3);
   }
-  /* Above the text on phones, beside it on desktop. */
-  .lk-landing-mascot {
-    order: -1;
-    position: relative;
-    width: clamp(190px, 58vw, 250px);
-    aspect-ratio: 1;
-  }
-  /* A soft gold halo behind Wambi, so the coin glows against the night sky. */
-  .lk-landing-mascot::before {
-    content: "";
-    position: absolute;
-    inset: 4%;
-    border-radius: 50%;
-    background: radial-gradient(
-      closest-side,
-      color-mix(in srgb, var(--gold) 34%, transparent),
-      color-mix(in srgb, var(--brand-glow) 14%, transparent) 62%,
-      transparent
-    );
-  }
-  .lk-landing-mascot > * {
-    position: relative;
-  }
   .lk-landing-headline {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 36px;
+    font-size: clamp(44px, 11vw, 64px);
     line-height: 1.05;
     margin: var(--space-2) 0 0;
     color: var(--good);
     text-shadow: 0 0 18px color-mix(in srgb, var(--good) 28%, transparent);
+  }
+  /*
+   * App-icon tiles inside the headline (Wambito's icon, a bank notification), like stickers
+   * between the words: decorative, the headline reads the same without them.
+   */
+  .lk-landing-tile {
+    display: inline-grid;
+    place-items: center;
+    width: 0.86em;
+    height: 0.86em;
+    margin-inline: 0.06em;
+    vertical-align: -0.1em;
+    border-radius: 0.24em;
+    overflow: hidden;
+    background: var(--surface-row);
+    box-shadow:
+      0 0.05em 0 var(--surface-edge),
+      0 0.12em 0.3em color-mix(in srgb, #000 22%, transparent);
+    transform: rotate(var(--lk-tilt, 0deg));
+  }
+  .lk-landing-tile img {
+    width: 100%;
+    height: 100%;
+  }
+  .lk-landing-tile.is-notice {
+    --lk-tilt: 6deg;
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+  .lk-landing-tile.is-app {
+    --lk-tilt: -5deg;
+  }
+  .lk-landing-tile svg {
+    width: 58%;
+    height: 58%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   /*
    * The headline's key word ("lukas" / "money") on a gold marker blob: an irregular rounded
@@ -374,36 +707,6 @@
     text-wrap: balance;
     text-align: center;
   }
-  .lk-landing-perks {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    column-gap: 0.35em;
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--ink-muted);
-  }
-  /* Links inside running text (the perks, an FAQ answer): underlined, in `ink`. */
-  .lk-landing-perks a,
-  .lk-landing-answer a {
-    border-radius: 4px;
-    color: var(--ink);
-    font-weight: 800;
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 3px;
-  }
-  .lk-landing-perks a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-  }
-  .lk-landing-perks a:focus-visible,
-  .lk-landing-answer a:focus-visible {
-    outline: 3px solid var(--focus);
-    outline-offset: 2px;
-  }
 
   /* Cards: static surfaces on a solid edge, like the app's hero card. */
   .lk-landing-cards {
@@ -468,10 +771,47 @@
   .lk-landing-icon.is-good {
     color: var(--good);
   }
-  .lk-landing-with {
-    font-size: 13px;
-    font-weight: 800;
+  /* A brand's logo (UseItYourWay.tsx): a filled mark, in the text color unless toned. */
+  .lk-landing-icon.is-logo svg {
+    fill: currentColor;
+    stroke: none;
+  }
+  /* A bare brand mark inside a button or beside a store's name. */
+  .lk-landing-mark-logo {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    fill: currentColor;
+  }
+  /*
+   * The card's buttons on one line, GitHub then the store, where they fit (tablets, desktop); on
+   * phones they stack, each the card's full width.
+   */
+  .lk-landing-stores {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .lk-landing-stores > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  /* A store that is not there yet: a button's shape, dashed and muted, not pressable. */
+  .lk-landing .lk-landing-store {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    background: transparent;
+    border: 2px dashed var(--control-edge);
+    box-shadow: none;
     color: var(--ink-muted);
+    cursor: default;
+  }
+  .lk-landing-store .lk-landing-soon {
+    padding: 1px 7px;
+    font-size: 10px;
   }
   .lk-landing-card-foot {
     margin-top: auto;
@@ -510,6 +850,123 @@
     padding: 3px 10px;
   }
 
+  /*
+   * The feature grid (HowItWorks.tsx): each card centers its name and line, and its illustration
+   * fills the card's foot, pushed to the bottom so the illustrations line up across a row.
+   */
+  .lk-landing-cards.is-how > .lk-landing-card {
+    text-align: center;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+  .lk-landing-cards.is-how > .lk-landing-card h3 {
+    font-size: 22px;
+  }
+  /* The illustration fills the card under its text, so a row of cards has no empty bands. */
+  .lk-landing-cards.is-how .lk-landing-demo {
+    flex: 1;
+    margin: var(--space-2) 0 0;
+    min-height: 168px;
+    text-align: start;
+  }
+  /* Fixed payments: name and due date stacked, the amount at the end. */
+  .lk-landing-bills {
+    display: grid;
+    gap: var(--space-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  /* Subscriptions: what they cost a month on top, then each with its brand's mark. */
+  .lk-landing-subs {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .lk-landing-subs-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    border-bottom: 2px solid var(--stroke);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .lk-landing-subs-total strong {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .lk-landing-sub-logo img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+  }
+  .lk-landing-bill-name {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .lk-landing-bill-due {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--near);
+  }
+  /*
+   * End-to-end encryption: the expense as the phone shows it, a lock, and the same record as the
+   * server keeps it, noise.
+   */
+  .lk-landing-vault {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+  }
+  .lk-landing-vault-plain {
+    width: 100%;
+  }
+  .lk-landing-vault-where {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .lk-landing-lock {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+  .lk-landing-lock svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .lk-landing-sealed {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    background: var(--surface-row);
+    border: 2px dashed var(--stroke);
+  }
+  .lk-landing-sealed-text {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+  }
+
   /* "How it works" illustrations: decorative, drawn with the app's own pieces. */
   .lk-landing-demo {
     display: flex;
@@ -528,68 +985,69 @@
     align-items: center;
     gap: var(--space-3);
   }
-  .lk-landing-demo-name {
-    flex: 1;
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 800;
-  }
-  .lk-landing-demo-expense {
-    color: var(--over);
-  }
-  .lk-landing-saved {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    align-self: flex-start;
-    padding: 6px 14px;
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 16px;
-    color: var(--good);
-  }
-  .lk-landing-donut {
+  /*
+   * "See where it goes": the app's real insights screen (public/landing/, made by
+   * `pnpm --filter @wambito/web landing-screens`) in a phone rising from the card's foot: its top
+   * and sides framed, the screen fading out below, so it reads as a phone without a full-height
+   * picture. Both themes are in the page; only the one in use shows (and, lazy, loads).
+   */
+  .lk-landing-phone {
     position: relative;
-    width: 96px;
-    height: 96px;
-    flex: none;
-    border-radius: 50%;
-    background: conic-gradient(
-      var(--candy) 0 38%,
-      var(--brand-glow) 0 62%,
-      var(--near) 0 80%,
-      var(--good) 0 100%
-    );
+    width: min(230px, 80%);
+    aspect-ratio: 390 / 560;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 7px solid var(--stroke);
+    border-bottom: 0;
+    border-radius: 34px 34px 0 0;
+    background: var(--bg);
+    box-shadow: var(--edge-sm);
+    mask-image: linear-gradient(#000 80%, transparent);
   }
-  .lk-landing-donut::after {
+  /* The camera's notch. */
+  .lk-landing-phone::before {
     content: "";
     position: absolute;
-    inset: 22px;
-    border-radius: 50%;
-    background: var(--bg);
+    top: 6px;
+    left: 50%;
+    z-index: 1;
+    width: 30%;
+    height: 14px;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: var(--stroke);
   }
-  .lk-landing-legend {
-    display: grid;
-    gap: var(--space-1);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    font-size: 13px;
-    font-weight: 800;
+  /* The phone rises from the bottom edge of the illustration's box. */
+  .lk-landing-cards.is-how .lk-landing-demo:has(.lk-landing-phone) {
+    justify-content: flex-end;
+    padding-bottom: 0;
+    overflow: hidden;
   }
-  .lk-landing-legend li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+  /* The screen, and the donut's ring over it where the app draws it (inline left, top, width). */
+  .lk-landing-screen {
+    position: relative;
   }
-  .lk-landing-legend li::before {
-    content: "";
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--dot);
+  .lk-landing-screen-shot {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .lk-landing-screen-ring {
+    position: absolute;
+    height: auto;
+  }
+  .lk-landing-screen-bars {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: auto;
+  }
+  .lk-landing-screen.is-day,
+  [data-theme="day"] .lk-landing-screen.is-night {
+    display: none;
+  }
+  [data-theme="day"] .lk-landing-screen.is-day {
+    display: block;
   }
   .lk-landing-budget {
     display: grid;
@@ -597,17 +1055,6 @@
   }
   .lk-landing-budget .lk-rowtop {
     font-size: 14px;
-  }
-  .lk-landing-file {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    background: var(--surface-row);
-    border: 2px solid var(--stroke);
-    font-size: 14px;
-    font-weight: 800;
   }
   .lk-landing-arrow {
     width: 28px;
@@ -618,6 +1065,55 @@
     stroke-width: 2.5;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  /* Import: the apps on top, the arrow pointing down, then the count, one under the other. */
+  .lk-landing-cards.is-how .lk-landing-import {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .lk-landing-import .lk-landing-arrow {
+    rotate: 90deg;
+  }
+  /* The apps a history comes from, each tagged as coming soon. */
+  .lk-landing-sources {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .lk-landing-sources li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-row);
+    border: 2px solid var(--stroke);
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .lk-landing-sources li.is-soon {
+    background: none;
+    border-style: dashed;
+    border-color: var(--control-edge);
+    color: var(--ink-muted);
+  }
+  .lk-landing-sources img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+  }
+  /* App icons (Budge, Buddy) keep their rounded-square look at this size. */
+  .lk-landing-sources img[src$=".png"] {
+    border-radius: 5px;
+  }
+  .lk-landing-sources .lk-landing-soon {
+    font-size: 9px;
+    padding: 1px 6px;
+    margin-inline-start: 2px;
   }
   .lk-landing-imported {
     font-family: var(--font-display);
@@ -665,24 +1161,40 @@
   .lk-landing-faq summary::-webkit-details-marker {
     display: none;
   }
-  /* A plus that turns into a cross when the answer is open. */
+  /*
+   * A plus that turns into a cross when the answer is open. Drawn with two bars, not a "+"
+   * glyph: the display font sits its plus off the circle's centre. Even sizes keep both bars
+   * on whole pixels, exactly centred.
+   */
   .lk-landing-faq summary::after {
-    content: "+";
+    content: "";
     flex: none;
-    display: grid;
-    place-items: center;
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--surface-sunken);
     /* Gold at night, deep purple by day (gold has no contrast on lavender). */
     color: var(--focus);
-    font-size: 22px;
-    line-height: 1;
+    background:
+      linear-gradient(currentColor, currentColor) center / 14px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) center / 2px 14px no-repeat,
+      var(--surface-sunken);
     transition: transform var(--sheet) ease;
   }
   .lk-landing-faq details[open] > summary::after {
     transform: rotate(45deg);
+  }
+  /* Links inside an FAQ answer: underlined, in `ink`. */
+  .lk-landing-answer a {
+    border-radius: 4px;
+    color: var(--ink);
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  .lk-landing-answer a:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
   }
   .lk-landing-answer {
     padding: 0 var(--space-4) var(--space-4);
@@ -691,153 +1203,30 @@
     color: var(--ink-muted);
   }
 
-  /*
-   * No more spreadsheet: the heading with Wambi shredding a spreadsheet beside it (at every width),
-   * then three pains of a spreadsheet, each beside how Wambito solves it.
-   */
-  .lk-landing-nosheet {
-    display: grid;
-    gap: var(--space-5);
-  }
-  .lk-landing-nosheet-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .lk-landing-nosheet h2 {
-    margin: 0 0 var(--space-2);
-  }
-  /* Wambi: the still, with the scroll film's poses stacked on it (shown only where the film plays). */
-  .lk-landing-nosheet-art {
-    position: relative;
-    width: clamp(120px, 32vw, 280px);
-  }
-  .lk-landing-nosheet-art img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-  .lk-landing-nosheet-art .lk-landing-nosheet-pose {
-    display: none;
-    position: absolute;
-    inset: 0;
-  }
-  /* The smallest phones: a smaller Wambi and heading, so the text keeps room beside him. */
-  @media (max-width: 359px) {
-    .lk-landing-nosheet-art {
-      width: 96px;
-    }
-    .lk-landing .lk-landing-nosheet h2 {
-      font-size: 22px;
-    }
-  }
-  /* Each pair close together, the pairs further apart, so the eye reads them two by two. */
-  .lk-landing-compare ul {
-    display: grid;
-    gap: var(--space-5);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  /* The column labels only show where the rows are two columns. */
-  .lk-landing-compare-row {
-    display: grid;
-    gap: var(--space-2);
-  }
-  .lk-landing-compare-row p {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-lg);
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.45;
-  }
-  /* The spreadsheet's side: the page color and muted text, a tired dashed edge. */
-  .lk-landing-compare-row .is-before {
-    background: var(--bg);
-    border: 2px dashed var(--stroke);
-    color: var(--ink-muted);
-  }
-  /* Wambito's side: a solid row in the app's own look, edged in green. */
-  .lk-landing-compare-row .is-after {
-    background: var(--surface-row);
-    border: 2px solid var(--good);
-    color: var(--ink);
-  }
-  .lk-landing-mark {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 24px;
-    height: 24px;
-    margin-top: -1px;
-    border-radius: 50%;
-  }
-  .lk-landing-mark svg {
-    width: 16px;
-    height: 16px;
-    fill: none;
-    stroke: var(--surface);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .lk-landing-mark.is-before {
-    background: var(--over);
-  }
-  .lk-landing-mark.is-after {
-    background: var(--good);
-  }
-  @media (min-width: 640px) {
-    .lk-landing-compare-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-3);
-    }
-    .lk-landing-compare ul {
-      gap: var(--space-3);
-    }
-    .lk-landing-compare-row p {
-      align-items: center;
-    }
-  }
-
-  /* Open source: one card with the code icon, a short paragraph and the link to the repository. */
-  .lk-landing-open {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-3);
-  }
-  .lk-landing-open h2 {
-    margin: 0 0 var(--space-2);
-  }
-  .lk-landing-open p {
-    max-width: 40rem;
-    font-size: 16px;
-    line-height: 1.5;
-  }
-
   /* Closing call to action */
+  /* The closing sits on the page itself, no card: only the message and the button. */
   .lk-landing-closing {
     display: grid;
     justify-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     text-align: center;
-    padding: var(--space-5) var(--space-4) var(--space-6);
-    border-radius: var(--radius-xl);
-    background: var(--surface);
-    box-shadow: var(--edge-md);
+    padding-block: var(--space-5) var(--space-6);
   }
-  .lk-landing-closing h2 {
+  .lk-landing .lk-landing-closing h2 {
     margin: 0;
+    max-width: 14ch;
+    font-size: clamp(36px, 9vw, 64px);
+    line-height: 1.05;
   }
   .lk-landing-closing p {
-    max-width: 30rem;
+    max-width: 32rem;
+    margin: 0;
+    font-size: 17px;
     color: var(--ink-muted);
     line-height: 1.5;
+  }
+  .lk-landing-closing .lk-landing-cta-actions {
+    padding-top: var(--space-2);
   }
 
   /* Landing-only release: the coming-soon labels are long, so they wrap (down to 320px). */
@@ -913,19 +1302,220 @@
     color: var(--ink-muted);
     font-weight: 800;
   }
+  /* The footer's "Cookie preferences" is a button that looks like the links beside it. */
+  button.lk-landing-link {
+    border: 0;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
 
+  /*
+   * The cookie banner: a card fixed at the bottom, not a wall (the page stays usable behind it).
+   * Text and the two equal buttons stack on phones; from 900px they sit side by side.
+   */
+  .lk-consent {
+    position: fixed;
+    z-index: 40;
+    inset-inline: var(--space-4);
+    bottom: var(--space-4);
+    max-width: calc(1240px - 2 * var(--space-4));
+    margin-inline: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-5);
+    padding: var(--space-4);
+    border-radius: var(--radius-xl);
+    background: var(--surface);
+    color: var(--ink);
+    border: 2px solid var(--stroke);
+    box-shadow: var(--edge-md);
+    font-family: var(--font-text);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .lk-consent:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .lk-consent-text {
+    flex: 1 1 28rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+  }
+  .lk-consent .lk-consent-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 1.2;
+    margin: 0;
+  }
+  .lk-consent a {
+    color: var(--ink);
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .lk-consent a:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  .lk-consent-current {
+    color: var(--ink-muted);
+    font-weight: 800;
+  }
+  /* Two equal columns: both answers always take the same room. */
+  .lk-consent-actions {
+    flex: 1 1 18rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+  /* Wide screens: a card in the bottom-right corner instead of a bar across the page. */
+  @media (min-width: 900px) {
+    .lk-consent {
+      inset-inline: auto var(--space-5);
+      bottom: var(--space-5);
+      width: 500px;
+      max-width: none;
+      margin-inline: 0;
+    }
+    .lk-consent-text {
+      flex-basis: 100%;
+    }
+    .lk-consent-actions > .lk-btn {
+      white-space: nowrap;
+    }
+  }
+  /*
+   * While the banner is open, `ConsentBanner` sets `--lk-consent-h` (what it covers at the bottom
+   * of the viewport): focus scrolling keeps clear of it, and the footer gets that much room below,
+   * so its last links can scroll above the banner. Unset, both are 0.
+   */
+  html {
+    scroll-padding-bottom: var(--lk-consent-h, 0px);
+  }
+  .lk-landing-site-footer {
+    padding-bottom: var(--lk-consent-h, 0px);
+  }
+
+  /*
+   * Phones and small tablets: the base values above are the tightest the layout allows (320px);
+   * here the page breathes, with more room around the edges, between sections and inside cards.
+   * The desktop block below sets its own values from 900px.
+   */
+  @media (max-width: 899px) {
+    .lk-landing-wrap {
+      padding-inline: 20px;
+    }
+    .lk-landing-header {
+      padding-block: var(--space-4);
+    }
+    /* Each section takes most of a screen, not all of it, its content centred in it. */
+    .lk-landing-section {
+      min-height: 80svh;
+      display: grid;
+      align-content: center;
+      padding-block: calc(var(--space-6) * 1.5);
+    }
+    .lk-landing h2 {
+      margin-bottom: var(--space-5);
+    }
+    .lk-landing-section-head {
+      --lk-head-gap: var(--space-5);
+    }
+    /* The first screen: the hero takes most of the phone's screen below the header, its content
+       centred, leaving the capture's heading in view so it is clear the page goes on. */
+    .lk-landing-hero {
+      min-height: 70svh;
+      align-content: center;
+      gap: var(--space-5);
+      padding-block: var(--space-6) calc(var(--space-6) * 1.5);
+    }
+    .lk-landing-hero-text {
+      gap: var(--space-6);
+    }
+    .lk-landing-cta {
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+    .lk-landing-cta-actions {
+      gap: var(--space-4);
+    }
+    .lk-landing-split {
+      gap: var(--space-6);
+    }
+    .lk-landing-split-text {
+      gap: var(--space-4);
+    }
+    /* Automatic capture shows the notification first, then says what it is (the picture is
+       decorative, aria-hidden, so the reading order still starts with the title). */
+    #capture .lk-landing-capture-play {
+      order: -1;
+    }
+    /* More room above it, so it sits clearly apart from the hero. */
+    #capture.lk-landing-section {
+      padding-top: calc(var(--space-6) * 3);
+    }
+    .lk-landing-agent-logos {
+      padding-top: var(--space-4);
+    }
+    .lk-landing-cards {
+      gap: var(--space-5);
+    }
+    .lk-landing-card {
+      gap: var(--space-3);
+      padding: var(--space-5);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      padding: var(--space-6) var(--space-5) var(--space-5);
+    }
+    .lk-landing-closing {
+      gap: var(--space-5);
+    }
+  }
+  /* The narrowest phones (320px) keep the base edges, so the header still fits one row. */
+  @media (max-width: 359px) {
+    .lk-landing-wrap {
+      padding-inline: var(--space-4);
+    }
+    .lk-landing-card {
+      padding: var(--space-4);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      padding: var(--space-5) var(--space-4) var(--space-4);
+    }
+  }
   @media (min-width: 640px) {
     .lk-landing-cards.is-ways {
-      grid-template-columns: repeat(3, 1fr);
-    }
-    .lk-landing-cards.is-how {
       grid-template-columns: repeat(2, 1fr);
     }
-    .lk-landing-card.is-wide {
-      grid-column: 1 / -1;
+    /* Two across (each card spans two of four columns); the fifth, alone, sits in the middle. */
+    .lk-landing-cards.is-how {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card {
+      grid-column: span 2;
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(5) {
+      grid-column: 2 / span 2;
     }
   }
   @media (min-width: 900px) {
+    /* Three then two (each card spans two of six columns), the two centred under the three. */
+    .lk-landing-cards.is-how {
+      grid-template-columns: repeat(6, 1fr);
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(4) {
+      grid-column: 2 / span 2;
+    }
+    .lk-landing-cards.is-how > .lk-landing-card:nth-child(5) {
+      grid-column: span 2;
+    }
     .lk-landing-wrap {
       padding-inline: var(--space-6);
     }
@@ -936,9 +1526,40 @@
     .lk-landing-section-head {
       --lk-head-gap: var(--space-5);
     }
-    .lk-landing-spot.is-closing {
-      width: 180px;
-      height: 180px;
+    .lk-landing-seat {
+      --lk-seat: 220px;
+    }
+    .lk-landing .lk-landing-seat-cta {
+      padding: 24px 36px;
+      font-size: 20px;
+      white-space: nowrap;
+    }
+    /*
+     * Room to breathe on wide screens: the hero fills the screen down to its actions, leaving a
+     * strip of what comes next (the capture's heading) so it is clear the page goes on; the
+     * features, the agent and the closing each take nearly a screen, their content centred in it.
+     */
+    .lk-landing-hero {
+      min-height: calc(100svh - 200px);
+      align-content: center;
+    }
+    :is(#how, #agent, #closing).lk-landing-section {
+      min-height: min(92svh, 1000px);
+      display: grid;
+      align-content: center;
+      padding-block: calc(var(--space-6) * 2);
+    }
+    .lk-landing .lk-landing-split-text h2 {
+      font-size: 56px;
+    }
+    .lk-landing-split-text p {
+      font-size: 19px;
+    }
+    .lk-landing .lk-landing-closing h2 {
+      font-size: 84px;
+    }
+    .lk-landing-closing p {
+      font-size: 20px;
     }
     .lk-landing-nav-section {
       display: inline-flex;
@@ -947,24 +1568,13 @@
       gap: var(--space-3);
     }
     .lk-landing-hero {
-      grid-template-columns: 1.15fr 1fr;
-      align-items: center;
-      justify-items: start;
-      text-align: start;
-      gap: var(--space-6);
-      padding-block: var(--space-5) var(--space-6);
-    }
-    .lk-landing-hero-text {
-      justify-items: start;
-    }
-    .lk-landing-mascot {
-      order: 0;
-      width: min(400px, 100%);
-      justify-self: center;
+      gap: var(--space-5);
+      padding-block: calc(var(--space-6) * 1.5) var(--space-6);
     }
     .lk-landing-headline {
-      margin-top: var(--space-3);
-      font-size: 56px;
+      max-width: 15ch;
+      font-size: 92px;
+      line-height: 1.02;
     }
     .lk-landing-description {
       font-size: 18px;
@@ -972,32 +1582,13 @@
     .lk-landing-lead {
       font-size: 25px;
     }
-    /* The perks under the action, so neither has to wrap beside the other. */
-    .lk-landing-cta {
-      align-items: flex-start;
-    }
-    .lk-landing-cta-actions {
-      justify-content: flex-start;
-    }
-    .lk-landing-perks {
-      justify-content: flex-start;
-    }
-    /* The heading and Wambi in the middle, not pushed to the card's edges. */
-    .lk-landing-nosheet-head {
-      grid-template-columns: minmax(0, 34rem) auto;
-      justify-content: center;
+    .lk-landing-split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
       gap: var(--space-6);
     }
-    .lk-landing .lk-landing-nosheet h2 {
-      font-size: 40px;
-    }
-    .lk-landing-compare-row p {
-      font-size: 16px;
-    }
-    .lk-landing-open {
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: var(--space-5);
+    .lk-landing-panel {
+      min-height: 520px;
+      padding: var(--space-6);
     }
     .lk-landing-section {
       padding-block: var(--space-6) calc(var(--space-6) * 1.5);
@@ -1025,91 +1616,24 @@
   @media (prefers-reduced-motion: no-preference) {
     .lk-landing-section-head,
     .lk-landing-cards > .lk-landing-card,
-    .lk-landing-open,
-    .lk-landing-faq > li,
-    .lk-landing-nosheet-head,
-    .lk-landing-compare-row > p {
+    .lk-landing-faq > li {
       animation: lk-landing-rise linear both;
       animation-timeline: view();
       animation-range: entry 5% cover 30%;
     }
-    /* Cards side by side enter one after the other, not as one block. */
-    .lk-landing-cards > .lk-landing-card:nth-child(2),
+    /*
+     * FAQ questions enter one after the other. Cards side by side rise together: driven by the
+     * scroll, a staggered row stays out of line wherever the scroll stops.
+     */
     .lk-landing-faq > li:nth-child(even) {
       animation-range: entry 15% cover 35%;
-    }
-    .lk-landing-cards > .lk-landing-card:nth-child(3) {
-      animation-range: entry 25% cover 40%;
-    }
-    .lk-landing-cards > .lk-landing-card:nth-child(4) {
-      animation-range: entry 35% cover 45%;
-    }
-    /* Before / after: the spreadsheet's pain slides in from the left, Wambito's answer from the right, a beat later. */
-    .lk-landing-compare-row > .is-before {
-      animation-name: lk-landing-from-left;
-    }
-    .lk-landing-compare-row > .is-after {
-      animation-name: lk-landing-from-right;
-      animation-range: entry 15% cover 35%;
-    }
-    /*
-     * Wambi's scroll film: the eight poses stack over the still (which keeps its place and its
-     * text), each fading in over the one before it, which then hides, so no two poses blend for
-     * long. A
-     * pose's window starts one step after the previous one's and lasts a step and a half: it fades in
-     * over the first half step and hides when the next one has fully faded in. The first pose shows
-     * from the start; the last one stays. The windows run on the stage's view timeline.
-     */
-    .lk-landing-nosheet-stage {
-      view-timeline: --lk-nosheet block;
-      --lk-film-start: 20%;
-      --lk-film-step: 5%;
-    }
-    .lk-landing-nosheet-art .lk-landing-nosheet-still {
-      opacity: 0;
-    }
-    .lk-landing-nosheet-art .lk-landing-nosheet-pose {
-      display: block;
-      animation: lk-landing-pose linear both;
-      animation-timeline: --lk-nosheet;
-      animation-range-start: cover
-        calc(var(--lk-film-start) + (var(--pose) - 1) * var(--lk-film-step));
-      animation-range-end: cover
-        calc(var(--lk-film-start) + (var(--pose) + 0.5) * var(--lk-film-step));
-    }
-    .lk-landing-nosheet-art .lk-landing-nosheet-pose:nth-child(2) {
-      animation-name: lk-landing-pose-first;
-    }
-    .lk-landing-nosheet-art .lk-landing-nosheet-pose:last-child {
-      animation-name: lk-landing-pose-last;
-    }
-    /*
-     * Phones: Wambi is big, under the heading instead of beside it, and nothing holds still: the
-     * film plays in the page's own scroll, from when Wambi is whole in the lower half of the screen
-     * to when he nears the top, so it ends up high and the rows come right after it.
-     */
-    @media (max-width: 639px) {
-      .lk-landing-nosheet-stage {
-        --lk-film-start: 30%;
-        --lk-film-step: 5%;
-      }
-      .lk-landing-nosheet-stage > .lk-landing-nosheet-head {
-        grid-template-columns: minmax(0, 1fr);
-        justify-items: center;
-        text-align: center;
-      }
-      .lk-landing-nosheet-stage .lk-landing-nosheet-art {
-        width: min(80vw, 46svh, 340px);
-      }
     }
   }
 }
 
 /*
  * Never smaller: whatever has not scrolled in yet sits in its "from" state, so a shrunk start would
- * make buttons and FAQ questions smaller than 44px. The before/after rows slide in from the sides,
- * but only 24px: on a phone they sit 32px from the screen's edge (the page's gutter plus the card's
- * padding), so even their start never sticks out of it.
+ * make buttons and FAQ questions smaller than 44px.
  */
 @keyframes lk-landing-rise {
   from {
@@ -1119,62 +1643,6 @@
     translate: none;
   }
 }
-@keyframes lk-landing-from-left {
-  from {
-    translate: -24px 24px;
-    rotate: -1deg;
-  }
-  to {
-    translate: none;
-    rotate: none;
-  }
-}
-@keyframes lk-landing-from-right {
-  from {
-    translate: 24px 32px;
-    rotate: 1deg;
-  }
-  to {
-    translate: none;
-    rotate: none;
-  }
-}
-/* A pose of Wambi's scroll film: fades in, holds, then hides once the next pose covers it. */
-@keyframes lk-landing-pose {
-  0% {
-    opacity: 0;
-  }
-  33.333% {
-    opacity: 1;
-  }
-  99.99% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-/* The first pose is there from the start. */
-@keyframes lk-landing-pose-first {
-  0%,
-  99.99% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-/* The last pose fades in and stays. */
-@keyframes lk-landing-pose-last {
-  0% {
-    opacity: 0;
-  }
-  33.333%,
-  100% {
-    opacity: 1;
-  }
-}
-
 /*
  * Button hover halo (mouse and pen only: `hover: hover`). A soft light inside the button follows the
  * pointer (`--lk-glow-x/y`, set by pointer-glow.ts; without JavaScript it sits in the middle) and the
@@ -1258,13 +1726,14 @@
 }
 
 /*
- * "How it works" cards come alive under the pointer (on phones, on tap): each illustration plays
- * its small story once per hover, slowly enough to follow, never in a loop.
- * - By voice: the mic pulses, what you said slides in, then the expense, then "saved" bounces.
- * - Where it goes: the donut sweeps in clockwise from the top, as the insights donut does in the
- *   app, and the legend lights up in the order the donut draws it.
- * - Budgets: the bars fill from empty; the one near its limit turns from green to yellow on the
- *   way, and its "left" amount with it.
+ * "How it works" cards play by themselves once on screen, and again every few seconds while they
+ * stay (`data-play`, HowItWorks.tsx; the illustration is remounted each round, so it starts over):
+ * no pointer needed. Before the first round, without JavaScript and under reduced motion they are
+ * the still, final picture.
+ * - Where it goes: the phone with the app's real screen rises into the card's foot, and its
+ *   donut sweeps in clockwise from the top, as the insights donut does in the app.
+ * - Budgets: the phone with the app's real budgets rises in, and its bars grow from the left.
+ * - Encryption: the lock snaps shut, then the record slides down scrambled.
  * - Import: the file pushes the arrow while the count runs from 0 (HowItWorks.tsx), then a check
  *   pops to confirm.
  * Movement and color only (opacity stays 1), and none under reduced motion.
@@ -1274,42 +1743,20 @@
   inherits: false;
   initial-value: 360deg;
 }
-.lk-landing-donut {
+.lk-landing-screen-ring {
   mask: conic-gradient(#000 var(--lk-sweep), transparent 0);
+}
+/* The budgets' fills show up to --lk-wipe from the left: every bar grows from its start. */
+@property --lk-wipe {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+.lk-landing-screen-bars {
+  mask: linear-gradient(to right, #000 var(--lk-wipe), transparent 0);
 }
 .lk-landing-cards.is-how .lk-bar > span {
   transform-origin: left center;
-}
-.lk-landing-voice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.lk-landing-mic {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--brand);
-}
-.lk-landing-mic svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: var(--on-brand);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.lk-landing-said {
-  padding: 6px 12px;
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
-  background: var(--surface);
-  font-size: 14px;
-  font-weight: 800;
-  font-style: italic;
 }
 .lk-landing-imported {
   display: inline-flex;
@@ -1334,88 +1781,79 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* While counting, the check waits. */
-.lk-landing-imported[data-state="counting"] .lk-landing-imported-check {
+/* While counting, the check waits; before that, the whole count waits for the file and the arrow. */
+.lk-landing-imported[data-state="counting"] .lk-landing-imported-check,
+.lk-landing-imported[data-state="waiting"] .lk-landing-imported-check {
+  scale: 0;
+}
+.lk-landing-imported[data-state="waiting"] {
   scale: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* After each count the check pops in (a fresh element each run, so it plays every time). */
-  .lk-landing-imported:not([data-runs="0"]) .lk-landing-imported-check {
+  /* Once the file and the arrow are done, the count pops in, then runs. */
+  .lk-landing-imported[data-counted][data-state="counting"] {
+    animation: lk-landing-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  /* After the count the check pops in. */
+  .lk-landing-imported[data-counted][data-state="done"] .lk-landing-imported-check {
     animation: lk-landing-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
-
-  /* `hover: hover`: a mouse or pen; elsewhere a tap (`:active`) plays it. */
-  @media (hover: hover) {
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-mic {
-      animation: lk-landing-pulse 900ms ease-out;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-said {
-      animation: lk-landing-slide-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 200ms both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-demo-row {
-      animation: lk-landing-slide-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-saved {
-      animation: lk-landing-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) 1200ms both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-donut {
-      animation: lk-landing-sweep 1400ms ease-out;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-legend li::before {
-      animation: lk-landing-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--lk-delay, 0ms) both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-bar > span {
-      animation: lk-landing-fill 1600ms cubic-bezier(0.25, 0.7, 0.3, 1) var(--lk-delay, 0ms) both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-bar.is-near > span {
-      animation-name: lk-landing-fill-near;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-status.is-near {
-      animation: lk-landing-warn 1600ms linear var(--lk-delay, 0ms) both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-file {
-      animation: lk-landing-push 900ms ease-in-out;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:hover .lk-landing-arrow {
-      animation: lk-landing-nudge 900ms ease-in-out 120ms;
-    }
+  .lk-landing-cards.is-how
+    > .lk-landing-card[data-play]
+    .lk-landing-demo-row:not(.lk-landing-vault-plain, .lk-landing-import) {
+    animation: lk-landing-slide-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms both;
   }
-  @media (hover: none) {
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-landing-mic {
-      animation: lk-landing-pulse 900ms ease-out;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-landing-saved,
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-landing-legend li::before {
-      animation: lk-landing-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--lk-delay, 0ms) both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-landing-donut {
-      animation: lk-landing-sweep 1400ms ease-out;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-bar > span {
-      animation: lk-landing-fill 1600ms cubic-bezier(0.25, 0.7, 0.3, 1) var(--lk-delay, 0ms) both;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-bar.is-near > span {
-      animation-name: lk-landing-fill-near;
-    }
-    .lk-landing-cards.is-how > .lk-landing-card:active .lk-landing-arrow {
-      animation: lk-landing-nudge 900ms ease-in-out;
-    }
+  /* The phone rises a little into the card's foot each time the card plays. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-phone {
+    animation: lk-landing-phone-rise 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-screen-ring {
+    animation: lk-landing-sweep 1400ms cubic-bezier(0.3, 0.7, 0.3, 1) 300ms both;
+  }
+  /* Subscriptions slide in one after the other, the total first. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-subs .lk-landing-demo-row {
+    animation: lk-landing-slide-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(200ms + var(--lk-i, 0) * 180ms);
+  }
+  .lk-landing-subs li:nth-child(2) {
+    --lk-i: 1;
+  }
+  .lk-landing-subs li:nth-child(3) {
+    --lk-i: 2;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-screen-bars {
+    animation: lk-landing-wipe 1400ms cubic-bezier(0.25, 0.7, 0.3, 1) 300ms both;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-arrow {
+    animation: lk-landing-nudge 900ms ease-in-out 120ms;
+  }
+  /* The import is stacked (apps, arrow down, count): the apps and the arrow move down. */
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-sources {
+    animation: lk-landing-push-down 900ms ease-in-out;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-import .lk-landing-arrow {
+    animation-name: lk-landing-nudge-down;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-lock {
+    animation: lk-landing-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 500ms both;
+  }
+  .lk-landing-cards.is-how > .lk-landing-card[data-play] .lk-landing-sealed {
+    animation: lk-landing-seal 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 900ms both;
   }
 }
 
-/* The legend lights up in the order the donut draws it; the second budget fills a beat later. */
-.lk-landing-legend li:nth-child(2)::before {
-  --lk-delay: 450ms;
-}
-.lk-landing-legend li:nth-child(3)::before {
-  --lk-delay: 750ms;
-}
-.lk-landing-legend li:nth-child(4)::before {
-  --lk-delay: 1000ms;
-}
-.lk-landing-budget + .lk-landing-budget {
-  --lk-delay: 300ms;
+@keyframes lk-landing-seal {
+  from {
+    translate: 0 -18px;
+    scale: 0.85;
+    filter: blur(3px);
+  }
+  to {
+    translate: none;
+    scale: none;
+    filter: none;
+  }
 }
 
 @keyframes lk-landing-sweep {
@@ -1424,6 +1862,14 @@
   }
   to {
     --lk-sweep: 360deg;
+  }
+}
+@keyframes lk-landing-phone-rise {
+  from {
+    translate: 0 28px;
+  }
+  to {
+    translate: none;
   }
 }
 @keyframes lk-landing-pop {
@@ -1435,19 +1881,6 @@
   }
   100% {
     scale: 1;
-  }
-}
-@keyframes lk-landing-pulse {
-  0% {
-    scale: 1;
-    box-shadow: 0 0 0 0 rgb(139 92 255 / 0.6);
-  }
-  40% {
-    scale: 1.15;
-  }
-  100% {
-    scale: 1;
-    box-shadow: 0 0 0 14px rgb(139 92 255 / 0);
   }
 }
 @keyframes lk-landing-slide-in {
@@ -1468,40 +1901,62 @@
     scale: 1 1;
   }
 }
-/* Green while there is room, yellow once it nears its limit. */
-@keyframes lk-landing-fill-near {
-  0% {
-    scale: 0 1;
-    background-color: var(--good);
+@keyframes lk-landing-wipe {
+  from {
+    --lk-wipe: 0%;
   }
-  55% {
-    background-color: var(--good);
-  }
-  75% {
-    background-color: var(--near);
-  }
-  100% {
-    scale: 1 1;
-    background-color: var(--near);
-  }
-}
-@keyframes lk-landing-warn {
-  0%,
-  55% {
-    color: var(--good);
-  }
-  75%,
-  100% {
-    color: var(--near);
-  }
-}
-@keyframes lk-landing-push {
-  50% {
-    translate: 8px 0;
+  to {
+    --lk-wipe: 100%;
   }
 }
 @keyframes lk-landing-nudge {
   50% {
     translate: 12px 0;
+  }
+}
+@keyframes lk-landing-push-down {
+  50% {
+    translate: 0 6px;
+  }
+}
+@keyframes lk-landing-nudge-down {
+  50% {
+    translate: 0 10px;
+  }
+}
+@keyframes lk-landing-chat-in {
+  from {
+    translate: 0 14px;
+    scale: 0.97;
+  }
+  to {
+    translate: none;
+    scale: none;
+  }
+}
+@keyframes lk-landing-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@keyframes lk-landing-drop {
+  from {
+    translate: 0 -64px;
+    scale: 0.94;
+  }
+  to {
+    translate: none;
+    scale: none;
+  }
+}
+@keyframes lk-landing-grow {
+  from {
+    scale: 1 0;
+  }
+  to {
+    scale: 1 1;
   }
 }

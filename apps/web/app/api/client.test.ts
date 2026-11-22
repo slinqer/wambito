@@ -41,6 +41,15 @@ describe("createApiClient", () => {
     expect(error).toMatchObject({ status: 409, code: "category_name_taken" });
   });
 
+  it("a 426 is update_required, whatever its body (a proxy's page, say)", async () => {
+    const fetch = vi.fn(async () => new Response("<html>Upgrade Required</html>", { status: 426 }));
+    const client = createApiClient({ fetch, baseUrl: BASE, onUnauthorized: vi.fn() });
+    await expect(client.GET("/v1/categories")).rejects.toMatchObject({
+      status: 426,
+      code: "update_required",
+    });
+  });
+
   it("returns data for a 2xx response", async () => {
     const fetch = vi.fn(
       async () => new Response("[]", { headers: { "content-type": "application/json" } }),

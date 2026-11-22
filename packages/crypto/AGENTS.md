@@ -15,7 +15,9 @@ API tests.
 - `src/wraps.ts`: `wrapDataKey` / `unwrapDataKey` (kinds passkey, recovery, assistant; HKDF info
   `wambito/v1/wrap/<kind>`, AAD `wambito/v1/wrap/<kind>/<user id>/<key_v>`), `PRF_SALT`.
 - `src/recovery.ts`: recovery secret, 26 Crockford chars + a Luhn mod 32 check character over the
-  Crockford alphabet, groups of four.
+  Crockford alphabet, groups of four. `recoveryVerifier` (HKDF-SHA256, empty salt, infos
+  `wambito/v1/recovery/lookup` → 16 bytes and `wambito/v1/recovery/auth` → 32 bytes, neither the
+  wrap info) and `verifierHash` (SHA-256; the server stores the hashes of both).
 - `src/devices.ts`: X25519 device keys, `sealToDevice` (optional fixed ephemeral pair) / `openFromDevice` / `openFromPairing` (also checks the
   blob starts with the approver key); WebCrypto X25519 when
   present, `@noble/curves` otherwise (feature-detected at first use).

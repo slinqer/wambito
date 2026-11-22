@@ -20,6 +20,7 @@ part 'profile.g.dart';
 /// * [currency]
 /// * [isAnonymous]
 /// * [encryption]
+/// * [migration]
 @BuiltValue()
 abstract class Profile implements Built<Profile, ProfileBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -46,6 +47,10 @@ abstract class Profile implements Built<Profile, ProfileBuilder> {
   @BuiltValueField(wireName: r'encryption')
   ProfileEncryptionEnum get encryption;
   // enum encryptionEnum {  plain,  preview,  };
+
+  @BuiltValueField(wireName: r'migration')
+  ProfileMigrationEnum? get migration;
+  // enum migrationEnum {  available,  in_progress,  };
 
   Profile._();
 
@@ -94,6 +99,13 @@ class _$ProfileSerializer implements PrimitiveSerializer<Profile> {
       object.encryption,
       specifiedType: const FullType(ProfileEncryptionEnum),
     );
+    if (object.migration != null) {
+      yield r'migration';
+      yield serializers.serialize(
+        object.migration,
+        specifiedType: const FullType(ProfileMigrationEnum),
+      );
+    }
   }
 
   @override
@@ -162,6 +174,14 @@ class _$ProfileSerializer implements PrimitiveSerializer<Profile> {
           ) as ProfileEncryptionEnum;
           result.encryption = valueDes;
           break;
+        case r'migration':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ProfileMigrationEnum),
+          ) as ProfileMigrationEnum?;
+          if (valueDes == null) continue;
+          result.migration = valueDes;
+          break;
         default:
           unhandled.add(key);
           unhandled.add(value);
@@ -203,4 +223,18 @@ class ProfileEncryptionEnum extends EnumClass {
 
   static BuiltSet<ProfileEncryptionEnum> get values => _$profileEncryptionEnumValues;
   static ProfileEncryptionEnum valueOf(String name) => _$profileEncryptionEnumValueOf(name);
+}
+
+class ProfileMigrationEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'available')
+  static const ProfileMigrationEnum available = _$profileMigrationEnum_available;
+  @BuiltValueEnumConst(wireName: r'in_progress')
+  static const ProfileMigrationEnum inProgress = _$profileMigrationEnum_inProgress;
+
+  static Serializer<ProfileMigrationEnum> get serializer => _$profileMigrationEnumSerializer;
+
+  const ProfileMigrationEnum._(String name) : super(name);
+
+  static BuiltSet<ProfileMigrationEnum> get values => _$profileMigrationEnumValues;
+  static ProfileMigrationEnum valueOf(String name) => _$profileMigrationEnumValueOf(name);
 }

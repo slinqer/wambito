@@ -1,0 +1,32 @@
+{
+  "name": "reports_trend",
+  "status": 200,
+  "body": {
+    "months": [
+      {
+        "month": "2026-08",
+        "income": 0,
+        "expenses": 120000000,
+        "budget": 0
+      },
+      {
+        "month": "2026-09",
+        "income": 450000000,
+        "expenses": 125800000,
+        "budget": 250000000
+      },
+      {
+        "month": "2026-10",
+        "income": 450000000,
+        "expenses": 132100000,
+        "budget": 260000000
+      },
+      {
+        "month": "2026-11",
+        "income": 0,
+        "expenses": 120000000,
+        "budget": 260000000
+      }
+    ]
+  }
+}

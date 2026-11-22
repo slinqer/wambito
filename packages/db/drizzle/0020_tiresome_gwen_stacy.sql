@@ -1,0 +1,2 @@
+ALTER TABLE "records" DROP CONSTRAINT "records_deleted_body";--> statement-breakpoint
+ALTER TABLE "records" ADD CONSTRAINT "records_live_body" CHECK ("records"."deleted" or "records"."body" is not null);

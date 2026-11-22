@@ -51,14 +51,16 @@ class WidgetContentTest {
     private fun model(snapshot: WidgetSnapshot?) = widgetModel(context, snapshot, now, zone)
 
     @Test
-    fun `small, signed in with budgets - Te quedan, the amount and ＋ to the add sheet`() =
+    fun `small, signed in with budgets - the amount, ＋ to the add sheet and 🎤 to capture`() =
         runGlanceAppWidgetUnitTest {
             setContext(context)
             provideComposable { SmallWidgetContent(model(snapshot())) }
-            onNode(hasText("Te quedan")).assertExists()
+            onNode(hasText("Te quedan")).assertDoesNotExist()
             onNode(hasText("$1.500.000")).assertExists()
             onNode(hasContentDescription("Agregar gasto"))
                 .assertHasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.ADD))
+            onNode(hasContentDescription("Decir o escribir un gasto"))
+                .assertHasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.CAPTURE))
             onNode(hasText("hace un rato")).assertDoesNotExist()
         }
 
@@ -89,20 +91,36 @@ class WidgetContentTest {
         }
 
     @Test
-    fun `a 2×1 box draws the small layout, whichever widget it is`() =
+    fun `a 150 dp wide box draws the small layout with amount and both buttons, whichever widget it is`() =
         runGlanceAppWidgetUnitTest {
             setContext(context)
-            setAppWidgetSize(DpSize(110.dp, 40.dp))
+            setAppWidgetSize(DpSize(150.dp, 40.dp))
             provideComposable { SizedWidgetContent(model(snapshot())) }
-            onNode(hasText("Te quedan")).assertExists()
-            onNode(hasContentDescription("Decir o escribir un gasto")).assertDoesNotExist()
+            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("Agregar gasto")).assertExists()
+            onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
+            onNode(hasContentDescription("Wambito")).assertDoesNotExist()
+        }
+
+    @Test
+    fun `a 4×1 box draws the row layout with both buttons and no Wambi`() =
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(DpSize(250.dp, 50.dp))
+            provideComposable { SizedWidgetContent(model(snapshot())) }
+            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("Agregar gasto")).assertExists()
+            onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
+            onNode(hasContentDescription("Wambito")).assertDoesNotExist()
         }
 
     @Test
     fun `the layout follows the box - a launcher's rounding still gets the medium one`() {
         assertEquals(WidgetSize.SMALL, widgetSizeFor(DpSize(110.dp, 40.dp)))
         assertEquals(WidgetSize.SMALL, widgetSizeFor(DpSize(180.dp, 110.dp)))
-        assertEquals(WidgetSize.SMALL, widgetSizeFor(DpSize(250.dp, 50.dp)))
+        assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(250.dp, 50.dp)))
+        assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(320.dp, 70.dp)))
+        assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(220.dp, 40.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(230.dp, 104.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(320.dp, 180.dp)))
     }
@@ -119,6 +137,7 @@ class WidgetContentTest {
         val states = listOf(snapshot(), WidgetSnapshot(signedIn = false, locale = "es"))
         for (draw in listOf<@androidx.compose.runtime.Composable (WidgetModel) -> Unit>(
             { SmallWidgetContent(it) },
+            { RowWidgetContent(it) },
             { MediumWidgetContent(it) },
         )) {
             for (state in states) {
@@ -145,12 +164,12 @@ class WidgetContentTest {
         }
 
     @Test
-    fun `small, without budgets - Gastado este mes`() = runGlanceAppWidgetUnitTest {
+    fun `small, without budgets - just the spent amount`() = runGlanceAppWidgetUnitTest {
         setContext(context)
         provideComposable {
             SmallWidgetContent(model(snapshot(remaining = -4200000, spent = 4200000, budgetTotal = 0)))
         }
-        onNode(hasText("Gastado este mes")).assertExists()
+        onNode(hasText("Gastado este mes")).assertDoesNotExist()
         onNode(hasText("$42.000")).assertExists()
     }
 
@@ -158,6 +177,7 @@ class WidgetContentTest {
     fun `signed out - Abre Wambito para empezar, and no amount at all`() {
         for (draw in listOf<@androidx.compose.runtime.Composable (WidgetModel) -> Unit>(
             { SmallWidgetContent(it) },
+            { RowWidgetContent(it) },
             { MediumWidgetContent(it) },
         )) {
             runGlanceAppWidgetUnitTest {
@@ -182,12 +202,53 @@ class WidgetContentTest {
         onNode(hasText("hace un rato")).assertExists()
     }
 
+    private fun offline() =
+        model(snapshot(updatedAt = now.minusSeconds(3600)).copy(refreshFailedAt = now.minusSeconds(60)))
+
+    @Test
+    fun `offline, row - the stale text sits under the amount`() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        provideComposable { RowWidgetContent(offline()) }
+        onNode(hasText("$1.500.000")).assertExists()
+        onNode(hasText("hace un rato")).assertExists()
+    }
+
+    @Test
+    fun `offline, small - the stale text is in the amount's description`() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        provideComposable { SmallWidgetContent(offline()) }
+        onNode(hasContentDescription("$1.500.000, hace un rato")).assertExists()
+        onNode(hasText("hace un rato")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `small below 150 dp wide - only the two buttons, and a tap elsewhere opens home`() =
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(DpSize(110.dp, 40.dp))
+            provideComposable { SizedWidgetContent(model(snapshot())) }
+            onNode(hasText("$1.500.000")).assertDoesNotExist()
+            onNode(hasContentDescription("Agregar gasto")).assertExists()
+            onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
+            onNode(hasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.HOME))).assertExists()
+        }
+
+    @Test
+    fun `small shows its amount from 150 dp wide`() {
+        assertEquals(false, smallShowsAmount(DpSize(110.dp, 40.dp)))
+        assertEquals(false, smallShowsAmount(DpSize(149.dp, 40.dp)))
+        assertEquals(true, smallShowsAmount(DpSize(150.dp, 40.dp)))
+        assertEquals(true, smallShowsAmount(DpSize(180.dp, 110.dp)))
+    }
+
     @Test
     fun `amount hidden - nothing about the money on either size, read aloud as hidden`() {
         val over = snapshot(remaining = -50000000, spent = 250000000, hideAmount = true, mood = "worried")
-        for (draw in listOf<@androidx.compose.runtime.Composable (WidgetModel) -> Unit>(
-            { SmallWidgetContent(it) },
-            { MediumWidgetContent(it) },
+        for ((hasLabel, draw) in listOf<Pair<Boolean, @androidx.compose.runtime.Composable (WidgetModel) -> Unit>>(
+            // Only the medium layout has a label.
+            false to { SmallWidgetContent(it) },
+            false to { RowWidgetContent(it) },
+            true to { MediumWidgetContent(it) },
         )) {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
@@ -197,7 +258,7 @@ class WidgetContentTest {
                 onNode(hasText("$")).assertDoesNotExist()
                 onNode(hasText("Te pasaste")).assertDoesNotExist()
                 onNode(hasText("Te quedan")).assertDoesNotExist()
-                onNode(hasText("Este mes")).assertExists()
+                if (hasLabel) onNode(hasText("Este mes")).assertExists() else onNode(hasText("Este mes")).assertDoesNotExist()
                 onNode(hasContentDescription("del presupuesto")).assertDoesNotExist()
                 onNode(isLinearProgressIndicator(1f)).assertDoesNotExist()
             }
@@ -224,7 +285,7 @@ class WidgetContentTest {
     fun `after sign out the widget never shows the previous figure`() {
         val prefs = WidgetSnapshot.preferences(context)
         prefs.edit().putString(WidgetSnapshot.KEY, snapshot().copy(updatedAt = Instant.now()).toJson()).commit()
-        for (box in listOf(DpSize(110.dp, 40.dp), DpSize(250.dp, 110.dp))) {
+        for (box in listOf(DpSize(150.dp, 40.dp), DpSize(250.dp, 110.dp))) {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
                 setAppWidgetSize(box)
@@ -238,7 +299,7 @@ class WidgetContentTest {
         prefs.edit()
             .putString(WidgetSnapshot.KEY, """{"v":3,"signedIn":false,"hideAmount":false,"theme":"dark","locale":"es"}""")
             .commit()
-        for (box in listOf(DpSize(110.dp, 40.dp), DpSize(250.dp, 110.dp))) {
+        for (box in listOf(DpSize(150.dp, 40.dp), DpSize(250.dp, 110.dp))) {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
                 setAppWidgetSize(box)

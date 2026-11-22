@@ -6,8 +6,8 @@ import type { UnlockError } from "./Unlock.tsx";
  *
  *   checking ─ keys in this browser ──────────────────────────────▶ opening ─▶ ready
  *      │                                                               ▲
- *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing
- *      │     (a guest commits at once, nothing to show)                │
+ *      ├─ account without wraps ─▶ setup (key shown) ─ confirm ─▶ committing ─▶ install ─ done ─▶
+ *      │     (a no-email account commits at once, nothing to show)       opening (never after an unlock)
  *      └─ account with wraps ─┬▶ unlock ─ recovery key or passkey ───┘
  *                              ├─ the sign-in's passkey PRF opens a wrap ─▶ opening
  *                              └─ "From another device" ─▶ pairing ─ finish() ─▶ opening
@@ -19,28 +19,27 @@ import type { UnlockError } from "./Unlock.tsx";
  * for its PRF (`evaluatePrf`); one without a wrap is kept the same way. A known browser zeroes the
  * stash. Every PRF is zeroed once used.
  *
- * Pairing (stage 2b): Unlock's "From another device" (and a guest's Locked, which has nothing
- * else to open with) enters `pairing`. The screen starts a request through `startPairing()` (again
- * for "Start again", which cancels the previous one; only the latest call's request becomes
+ * Pairing (stage 2b): Unlock's "From another device" enters `pairing`. The screen starts a request
+ * through `startPairing()` (again for "Start again", which cancels the previous one; only the latest call's request becomes
  * current, an older one answering later cancels itself); when its `finish()` resolves, the gate opens
  * the vault exactly as after a recovery unlock (pending passkey wrap, then a full sync). A failed
  * pairing stays on its screen, which shows why; `leavePairing()` cancels it and goes back.
  *
  * A browser removed from the account by another device (`removed()`, from the session's
- * `onRemoved`: its vault is already deleted) shows Unlock with the `removed` notice; a guest, which
- * has no recovery key to type, its Locked.
+ * `onRemoved`: its vault is already deleted) shows Unlock with the `removed` notice, at once, with
+ * the last known means (refined once the wraps are read; a late read never overwrites a newer
+ * state). The wraps read may fail (the removal ended the session: a 401): it counts as a wrap.
  *
  * A browser that could not verify a new key version (`unverified()`, from the session's
  * `onUnverified`, or an opening that fails with `key_unverified`) shows Unlock with the
- * `unverified` notice, a guest its Locked. Its vault is still here, unsent changes included: the
+ * `unverified` notice. Its vault is still here, unsent changes included: the
  * unlock (recovery key, passkey or pairing) keeps it and its held key versions, adds the newer
  * ones and opens it fresh, and the first sync pushes what waited.
  *
  * Any failure outside Unlock's own errors lands on `locked`, whose retry repeats the step that
  * failed: a failed commit commits again (the same wraps, the same ids), anything else starts over.
  * A commit that lost the race to another setup (`already_set_up`) drops its keys and shows Unlock.
- * Two locked kinds have no retry: `unsupported` (the browser cannot keep a device key safely) and
- * `guest` (a guest's account has keys made elsewhere, and a guest has no recovery key to type).
+ * `unsupported` (the browser cannot keep a device key safely) has no retry.
  *
  * Another tab may sign in as someone else under this page (one cookie per browser). Before making
  * or unlocking keys, and when the open vault closes or its sync says `session_changed`, the gate
@@ -68,7 +67,7 @@ export interface GatePairing<K = GateKeys> {
   cancel(): void;
 }
 
-/** A prepared new account: the key to show (null for a guest) and the commit that sends it. */
+/** A prepared new account: the key to show (null for an account without email) and the commit that sends it. */
 export interface GatePrepared<K = GateKeys> {
   recoveryKey: string | null;
   commit(): Promise<K>;
@@ -86,8 +85,6 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
    * unlocked, so the first full sync must succeed (a known browser opens on its local data).
    */
   open(keys: K, fresh: boolean): Promise<S>;
-  /** A guest: never shown a recovery key, so an account with keys elsewhere is `locked: guest`. */
-  guest?: boolean;
   /** The account this gate is for. */
   userId?: string;
   /** Who is signed in now (null: no one); throws when it cannot tell (offline). */
@@ -109,22 +106,39 @@ export interface VaultGateDeps<K = GateKeys, S = unknown> {
   accountPasskeyIds?(): Promise<string[]>;
   /** Asks the relay for a pairing request; another unlocked device approves it. */
   startPairing?(): Promise<GatePairing<K>>;
+  /** Whether this device's last passkey touch for this account gave no PRF (a stored hint). */
+  passkeyGaveNoPrf?(): boolean;
+  /** A passkey touch here gave no PRF: remember it. */
+  notePasskeyWithoutPrf?(): void;
+  /** A passkey's PRF opened the data here: forget the hint. */
+  notePasskeyOpened?(): void;
+  /** Whether the account has a passkey wrap (its wraps list); may throw, which counts as true. */
+  hasPasskeyWrap?(): Promise<boolean>;
 }
 
-/** Why the vault is locked; `unsupported` and `guest` have no retry. */
-export type LockedKind = "error" | "offline" | "unsupported" | "guest";
+/** What the Unlock screen needs to know to pick its layout (`unlockLayout`). */
+export interface UnlockMeans {
+  /** This device's last passkey touch gave no PRF. */
+  noPrfHere: boolean;
+  /** The account has a passkey wrap (true when that cannot be told). */
+  passkeyWrap: boolean;
+}
+
+/** Why the vault is locked; `unsupported` has no retry. */
+export type LockedKind = "error" | "offline" | "unsupported";
 
 export type VaultGateState<S = unknown> =
   | { status: "checking" }
   | { status: "setup"; recoveryKey: string }
   | { status: "committing" }
+  /** A setup just committed in this browser: the app is offered once, then the vault opens. */
+  | { status: "install" }
   /**
    * `notice: "removed"`: this browser was removed from the account (its vault is gone).
    * `notice: "unverified"`: a new key version did not verify (its vault is kept).
    */
-  | { status: "unlock"; notice?: "removed" | "unverified" }
-  /** `from`: where back goes, Unlock or a guest's Locked. */
-  | { status: "pairing"; from: "unlock" | "guest" }
+  | { status: "unlock"; notice?: "removed" | "unverified"; means: UnlockMeans }
+  | { status: "pairing" }
   | { status: "opening" }
   | { status: "ready"; session: S }
   | { status: "locked"; kind: LockedKind; retrying: boolean };
@@ -136,18 +150,20 @@ export interface VaultGate<S = unknown, K = GateKeys> {
   start(): void;
   /** The person typed four characters back on the setup screen. */
   confirmSetup(): Promise<void>;
+  /** Install's "Continue": opens the vault with the keys the setup committed. */
+  installDone(): Promise<void>;
   /** The Unlock screen's submit: null when it worked, else why not (the screen shows it). */
   unlock(text: string): Promise<UnlockError | null>;
   /** Unlock's "Use a passkey": null when it worked or was cancelled, else why not. */
   unlockWithPasskey(): Promise<UnlockError | null>;
-  /** Unlock's "From another device", or a guest Locked's "Approve from another device". */
+  /** Unlock's "From another device". */
   pair(): Promise<void>;
   /**
    * The pairing screen asks for a request (again for "Start again": the previous one is
    * cancelled). Its `finish()` opens the vault; its errors are the screen's to show.
    */
   startPairing(): Promise<GatePairing<K>>;
-  /** The pairing screen's back: cancels the request and returns to where it came from. */
+  /** The pairing screen's back: cancels the request and returns to Unlock. */
   leavePairing(): void;
   /** Locked's retry. */
   retry(): void;
@@ -157,14 +173,14 @@ export interface VaultGate<S = unknown, K = GateKeys> {
   sessionChanged(): void;
   /**
    * This browser was removed from the account (`VaultSession.onRemoved`: its device wrap is gone
-   * and the vault was deleted): Unlock with the `removed` notice; a guest's Locked.
+   * and the vault was deleted): Unlock with the `removed` notice.
    */
-  removed(): void;
+  removed(): Promise<void>;
   /**
    * A new key version did not verify (`VaultSession.onUnverified`: the sync stopped, the vault is
-   * kept): Unlock with the `unverified` notice; a guest's Locked.
+   * kept): Unlock with the `unverified` notice.
    */
-  unverified(): void;
+  unverified(): Promise<void>;
 }
 
 const UNLOCK_ERRORS: readonly string[] = [
@@ -189,7 +205,7 @@ const lockedKind = (error: unknown): LockedKind => {
 };
 
 /** Kinds a retry cannot fix. */
-const FINAL: readonly LockedKind[] = ["unsupported", "guest"];
+const FINAL: readonly LockedKind[] = ["unsupported"];
 
 export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K> {
   let state: VaultGateState<S> = { status: "checking" };
@@ -263,6 +279,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     try {
       const keys = await deps.unlockWithPasskey(passkey);
       passkey.prf.fill(0);
+      passkeyOpened();
       return { keys };
     } catch (error) {
       if (codeOf(error) === "no_passkey_wrap") keepPending(passkey);
@@ -271,29 +288,83 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     }
   }
 
+  /** Counts every change of state, so a step that waited can tell whether it is still current. */
+  let changes = 0;
+
   const set = (next: VaultGateState<S>) => {
+    changes++;
     state = next;
     for (const listener of listeners) listener();
   };
 
-  /** The account has keys made elsewhere: Unlock, or Locked for a guest (nothing to type). */
-  const hasKeysElsewhere = () => {
-    prepared = null;
-    if (deps.guest) {
-      // Nothing to unlock with first: a guest has no recovery key to type.
-      keepPending(null);
-      set({ status: "locked", kind: "guest", retrying: false });
-    } else set({ status: "unlock" });
-  };
+  /** What Unlock last showed, for the screen that comes back to it (pairing's back). */
+  let lastMeans: UnlockMeans = { noPrfHere: false, passkeyWrap: true };
 
   /**
-   * Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice, a
-   * guest's Locked.
+   * What can open the data here: the stored hint, and whether the account has a passkey wrap.
+   * An unreadable wraps list (offline, a 5xx, anything) counts as a wrap; never throws.
    */
-  const showNotice = (notice: "removed" | "unverified") => {
+  async function readMeans(): Promise<UnlockMeans> {
+    let noPrfHere = false;
+    try {
+      noPrfHere = deps.passkeyGaveNoPrf?.() ?? false;
+    } catch {
+      noPrfHere = false;
+    }
+    let passkeyWrap = true;
+    try {
+      passkeyWrap = (await deps.hasPasskeyWrap?.()) ?? true;
+    } catch {
+      passkeyWrap = true;
+    }
+    lastMeans = { noPrfHere, passkeyWrap };
+    return lastMeans;
+  }
+
+  const unlockState = (
+    notice: "removed" | "unverified" | undefined,
+    means: UnlockMeans,
+  ): VaultGateState<S> =>
+    notice ? { status: "unlock", notice, means } : { status: "unlock", means };
+
+  /**
+   * Shows Unlock (recovery key, passkey or another device), with what can open the data here.
+   * `now`: shown at once with the last known means and refined once they are read (the gate leaves
+   * an open vault, and must never keep saying it is open meanwhile); else shown once they are
+   * read. A read that comes back after another change of state changes nothing.
+   */
+  async function showUnlock(notice?: "removed" | "unverified", now = false): Promise<void> {
     prepared = null;
-    if (deps.guest) set({ status: "locked", kind: "guest", retrying: false });
-    else set({ status: "unlock", notice });
+    if (now) set(unlockState(notice, lastMeans));
+    const at = changes;
+    const means = await readMeans();
+    if (changes !== at) return;
+    const current = state;
+    if (
+      current.status === "unlock" &&
+      current.notice === notice &&
+      current.means.noPrfHere === means.noPrfHere &&
+      current.means.passkeyWrap === means.passkeyWrap
+    ) {
+      return;
+    }
+    set(unlockState(notice, means));
+  }
+
+  /** The account has keys made elsewhere: Unlock. */
+  const hasKeysElsewhere = () => showUnlock();
+
+  /** Removed (its vault is gone) or unverified (its vault is kept): Unlock with the notice. */
+  const showNotice = (notice: "removed" | "unverified", now = false) => showUnlock(notice, now);
+
+  /** A passkey opened the data here: the "no PRF" hint no longer holds. */
+  const passkeyOpened = () => {
+    lastMeans = { ...lastMeans, noPrfHere: false };
+    try {
+      deps.notePasskeyOpened?.();
+    } catch {
+      // A hint that cannot be cleared only costs a different layout.
+    }
   };
 
   /** Shows Locked; its retry runs `step`. */
@@ -338,11 +409,11 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       else if (code === "device_removed") {
         // Removed while this page was closed: the session deleted the vault, so say so.
         keepPending(null);
-        showNotice("removed");
+        await showNotice("removed");
       } else if (code === "key_unverified") {
         // A new key version did not verify: the vault is kept, an unlock opens it again.
         keepPending(null);
-        showNotice("unverified");
+        await showNotice("unverified");
       } else lock(error, check);
     }
   }
@@ -384,7 +455,7 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
           if ("keys" in tried) return open(tried.keys, true);
           if (codeOf(tried.error) === "session_changed") return changed(tried.error, check);
         }
-        hasKeysElsewhere();
+        await hasKeysElsewhere();
       } else if (codeOf(error) === "session_changed") await changed(error, check);
       else lock(error, check);
       return;
@@ -392,6 +463,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     if (prepared.recoveryKey === null) return commit();
     set({ status: "setup", recoveryKey: prepared.recoveryKey });
   }
+
+  /** The keys a committed setup holds while Install shows. */
+  let installKeys: K | null = null;
 
   async function commit(): Promise<void> {
     const current = prepared;
@@ -402,14 +476,16 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       keys = await current.commit();
     } catch (error) {
       // Another tab or device set the account up first: its data key wins, this one is dropped.
-      if (codeOf(error) === "already_set_up") hasKeysElsewhere();
+      if (codeOf(error) === "already_set_up") await hasKeysElsewhere();
       else if (codeOf(error) === "session_changed") await changed(error, commit);
       else lock(error, commit);
       return;
     }
     prepared = null;
     await wrapPending();
-    return open(keys, true);
+    // Only a setup committed here offers the app; an unlock, a pairing or a known browser never.
+    installKeys = keys;
+    set({ status: "install" });
   }
 
   return {
@@ -424,6 +500,12 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
       void check();
     },
     confirmSetup: () => (state.status === "setup" ? commit() : Promise.resolve()),
+    async installDone() {
+      const keys = installKeys;
+      if (state.status !== "install" || keys === null) return;
+      installKeys = null;
+      await open(keys, true);
+    },
     async unlock(text) {
       if (state.status !== "unlock") return null;
       if (!(await sameSession())) return null;
@@ -464,6 +546,17 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
         passkey = await deps.evaluatePrf(ids);
       } catch (error) {
         const code = codeOf(error);
+        // Noted only when the touch was limited to this account's passkeys: another account's
+        // passkey must never mark this one. The screen keeps its layout (it shows the error); a
+        // later Unlock (pairing's back, a reload) leads with the recovery key.
+        if (code === "no_prf" && ids !== undefined) {
+          lastMeans = { ...lastMeans, noPrfHere: true };
+          try {
+            deps.notePasskeyWithoutPrf?.();
+          } catch {
+            // Not remembered; the error is still shown.
+          }
+        }
         return code && UNLOCK_ERRORS.includes(code) ? (code as UnlockError) : "server";
       }
       if (!passkey) return null;
@@ -490,24 +583,18 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     sessionChanged() {
       if (state.status === "ready") void changed({ code: "session_changed" }, recheck);
     },
-    removed() {
+    async removed() {
       if (state.status !== "ready") return;
-      showNotice("removed");
+      await showNotice("removed", true);
     },
-    unverified() {
+    async unverified() {
       if (state.status !== "ready") return;
-      showNotice("unverified");
+      await showNotice("unverified", true);
     },
     async pair() {
-      const from =
-        state.status === "unlock"
-          ? "unlock"
-          : state.status === "locked" && state.kind === "guest"
-            ? "guest"
-            : null;
-      if (!from || !deps.startPairing) return;
+      if (state.status !== "unlock" || !deps.startPairing) return;
       if (!(await sameSession())) return;
-      set({ status: "pairing", from });
+      set({ status: "pairing" });
     },
     async startPairing() {
       if (state.status !== "pairing" || !deps.startPairing) {
@@ -536,11 +623,9 @@ export function createVaultGate<K, S>(deps: VaultGateDeps<K, S>): VaultGate<S, K
     },
     leavePairing() {
       if (state.status !== "pairing") return;
-      const { from } = state;
       pairingCall++;
       dropPairing();
-      if (from === "guest") set({ status: "locked", kind: "guest", retrying: false });
-      else set({ status: "unlock" });
+      set({ status: "unlock", means: lastMeans });
     },
     retry() {
       if (state.status !== "locked" || state.retrying || FINAL.includes(state.kind)) return;

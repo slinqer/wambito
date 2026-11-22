@@ -12,16 +12,27 @@ import {
   openRecord,
   parseRecoveryKey,
   type RecordKeys,
+  recoveryVerifier,
   sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   wrapDataKey,
 } from "@wambito/crypto";
+import {
+  dedupeKeyName,
+  type Keyring,
+  KeysError,
+  type KeysErrorCode,
+  recordKeyName,
+  uuidv7,
+} from "@wambito/vault";
 import { deleteVault } from "./db.ts";
 import { deviceLabel } from "./device-label.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
+
+export { dedupeKeyName, type Keyring, KeysError, type KeysErrorCode, recordKeyName };
 
 /**
  * Keys on the web (spec 2026-11-08 sections 4.1, 5.2, 7.1, 7.2, 7.4, 7.5). This browser keeps only
@@ -32,46 +43,6 @@ import { uuidv7 } from "./ids.ts";
  * All network goes through an injected `fetch` against `baseUrl` (`/api`).
  */
 
-export type KeysErrorCode =
-  | "already_set_up"
-  | "bad_recovery_key"
-  | "wrong_recovery_key"
-  | "offline"
-  | "server"
-  /** WebCrypto lacks X25519: the device key would be raw bytes, which the web never stores. */
-  | "unsupported_browser"
-  /** The signed-in account is not this vault's (409): the app reloads for the new one. */
-  | "session_changed"
-  /** The server lists no device wrap for this browser (or one sealed to another key): removed. */
-  | "device_removed"
-  /** Another device rotated the data key first (409 `key_version_mismatch`): nothing was kept. */
-  | "rotated_elsewhere"
-  /** The touched passkey gave no PRF output (some password managers): it cannot open a wrap. */
-  | "no_prf"
-  /** No passkey wrap has the touched credential as `ref`, or its PRF does not open it. */
-  | "no_passkey_wrap"
-  /** 422: the credential is not one of the signed-in account's passkeys; no wrap was stored. */
-  | "unknown_passkey"
-  /**
-   * This browser's device wrap holds a data key that is not the one this browser already keeps
-   * for that key version (anyone with its public key can seal one to it), or a newer version
-   * whose links do not lead back to the key this browser holds: refused, every key zeroed.
-   */
-  | "tampered";
-
-export class KeysError extends Error {
-  constructor(
-    readonly code: KeysErrorCode,
-    readonly status?: number,
-  ) {
-    super(code);
-    this.name = "KeysError";
-  }
-}
-
-/** The names under which the vault's `keys` store keeps them: `record:<v>`, `dedupe:<v>`. */
-export const recordKeyName = (keyV: number) => `record:${keyV}`;
-export const dedupeKeyName = (keyV: number) => `dedupe:${keyV}`;
 export const DEVICE_KEY = "device";
 /** Stage 2a's single-version names, read as version `meta.keyV` and renamed on first load. */
 const LEGACY_RECORD_KEY = "record";
@@ -86,12 +57,6 @@ export interface KeysOptions {
   baseUrl?: string;
   /** Makes the device key pair; tests pass the noble fallback's shape. */
   deviceKeyPair?: typeof generateDeviceKeyPair;
-}
-
-/** The record keys this browser holds, by key version; `current` is the account's newest. */
-export interface Keyring {
-  current: number;
-  byVersion: Map<number, RecordKeys>;
 }
 
 export interface LocalKeys {
@@ -200,6 +165,15 @@ export async function listKeys(
 
 export async function listWraps(call: KeysApi): Promise<WrapDto[]> {
   return (await listKeys(call)).wraps;
+}
+
+/**
+ * Whether the account has a passkey wrap (any credential's): the unlock screen leads with a
+ * passkey only when one exists. Readable with a signed-in session before the vault is open; a
+ * failure throws (the vault gate counts that as "yes").
+ */
+export async function hasPasskeyWrap(options: KeysOptions): Promise<boolean> {
+  return (await listWraps(api(options))).some((wrap) => wrap.kind === "passkey");
 }
 
 /** Zeroes every data key in the map. */
@@ -327,6 +301,39 @@ export const putJson = (body: unknown, headers: Record<string, string> = {}): Re
   body: JSON.stringify(body),
 });
 
+/** What `PUT /v2/recovery/verifier` takes: the SHA-256 of the key's `lookup` and of its `auth`. */
+export interface VerifierBody {
+  lookupHash: string;
+  authHash: string;
+}
+
+/** The verifier body of a recovery secret; the raw `lookup` and `auth` are zeroed. */
+export async function verifierBodyOf(secret: Uint8Array): Promise<VerifierBody> {
+  const raw = await recoveryVerifier(secret);
+  try {
+    return {
+      lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+      authHash: toBase64Url(await verifierHash(raw.auth)),
+    };
+  } finally {
+    raw.lookup.fill(0);
+    raw.auth.fill(0);
+  }
+}
+
+/** Stores the verifier that lets this recovery key sign in (replaces any earlier one). */
+export async function putVerifier(options: KeysOptions, body: VerifierBody): Promise<void> {
+  await api(options)("/v2/recovery/verifier", putJson(body));
+}
+
+/**
+ * Stores what lets `secret` sign in (spec 5.2): needs the account's recovery wrap on the server
+ * and replaces the earlier verifier. The caller owns `secret` and zeroes it.
+ */
+export async function putRecoveryVerifier(options: KeysOptions, secret: Uint8Array): Promise<void> {
+  await putVerifier(options, await verifierBodyOf(secret));
+}
+
 /** A device key pair and its wrap of DK, made in memory; nothing sent yet. */
 async function prepareDevice(
   userId: string,
@@ -362,17 +369,21 @@ async function prepareDevice(
  * key under DK, then the derived keys, the private key and the wrap's id and public key kept
  * locally. The caller owns `dataKey` and zeroes it. The end of pairing: DK came authenticated by
  * the number, and the links bring the older versions it reaches (`olderForTrustedKey`; with a vault
- * held here strictly down to its key, else `tampered`).
+ * held here strictly down to its key, else `tampered`). Also the end of a QR sign-in
+ * (`signin.ts`), where `ephemeral: true` (the box unticked) marks the vault's meta `ephemeral`, so
+ * it is wiped once the session cookie is gone; `false` (ticked) deletes that mark, so a vault the
+ * person asked to keep is never swept; absent (pairing) leaves it as it is.
  */
 export async function enrollDevice(
   options: KeysOptions,
   dataKey: Uint8Array,
   keyV: number,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   const { links } = await listKeys(call);
-  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict");
+  return enrollTrusted(call, options.userId, dataKey, keyV, links, pair, "strict", enroll);
 }
 
 /**
@@ -390,13 +401,14 @@ async function enrollTrusted(
   links: Map<number, Uint8Array>,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
   held: HeldVault,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const older = await olderForTrustedKey(userId, { keyV, dataKey }, links, held);
   let local: LocalKeys;
   let previous: string | undefined;
   try {
     previous = await heldDeviceWrapId(userId);
-    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older);
+    local = await enrollWithPair(call, userId, dataKey, keyV, pair, older, enroll);
   } finally {
     zeroKeys(older);
   }
@@ -416,13 +428,55 @@ async function enrollTrusted(
 }
 
 /** The device wrap id a vault held here kept at its enroll, if any. */
-async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
+export async function heldDeviceWrapId(userId: string): Promise<string | undefined> {
   const store = await createEncryptedStore(userId);
   try {
     return await store.getMeta<string>("deviceWrapId");
   } finally {
     store.close();
   }
+}
+
+/**
+ * Links this browser's device wrap to the session the call runs under. A device wrap remembers the
+ * session that first PUT it, and a removal ends only that session: a browser that kept its vault
+ * through an ended session and signed in again would otherwise keep its new session after a
+ * removal. Lists the keys (`GET /v2/keys`); when the wrap whose id the vault kept is listed with
+ * this browser's public key, PUTs it back unchanged (`PUT /v2/keys/{id}`, the row's fields as
+ * listed), which moves the link to this session: `bound`. Not listed (or sealed to another key):
+ * `missing`, it was removed. No wrap id kept (a 2a vault before its first refresh): `unknown`.
+ * Network and server failures reject with `KeysError`s; nothing is written in this browser.
+ */
+export async function bindDeviceWrap(
+  options: KeysOptions,
+): Promise<"bound" | "missing" | "unknown"> {
+  const store = await createEncryptedStore(options.userId);
+  let wrapId: string | undefined;
+  let publicKey: string | undefined;
+  try {
+    wrapId = await store.getMeta<string>("deviceWrapId");
+    publicKey = await store.getMeta<string>("devicePublicKey");
+  } finally {
+    store.close();
+  }
+  if (!wrapId || !publicKey) return "unknown";
+  const call = api(options);
+  const { wraps } = await listKeys(call);
+  const wrap = wraps.find((w) => w.kind === "device" && w.id === wrapId);
+  if (!wrap || wrap.publicKey !== publicKey) return "missing";
+  await call(
+    `/v2/keys/${encodeURIComponent(wrap.id)}`,
+    putJson({
+      kind: wrap.kind,
+      ref: wrap.ref,
+      keyV: wrap.keyV,
+      wrapped: wrap.wrapped,
+      publicKey: wrap.publicKey,
+      attestation: wrap.attestation,
+      label: wrap.label,
+    }),
+  );
+  return "bound";
 }
 
 async function enrollWithPair(
@@ -432,16 +486,17 @@ async function enrollWithPair(
   keyV: number,
   pair: Awaited<ReturnType<typeof generateDeviceKeyPair>>,
   older: Map<number, Uint8Array>,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const device = await prepareDevice(userId, dataKey, keyV, pair);
   await call(`/v2/keys/${device.id}`, putJson(device.body));
-  return keepLocally(userId, dataKey, keyV, device, older);
+  return keepLocally(userId, dataKey, keyV, device, older, enroll);
 }
 
 /**
  * Keeps the derived keys of `keyV` (made current) and of every `older` version the vault does not
  * hold yet (a held version is never replaced), the device private key and its wrap's id and
- * public key. The caller owns and zeroes the data keys.
+ * public key (and meta `ephemeral` when asked). The caller owns and zeroes the data keys.
  */
 async function keepLocally(
   userId: string,
@@ -449,6 +504,7 @@ async function keepLocally(
   keyV: number,
   device: { id: string; privateKey: DevicePrivateKey; body: { publicKey: string } },
   older: Map<number, Uint8Array>,
+  enroll: { ephemeral?: boolean } = {},
 ): Promise<LocalKeys> {
   const derived = new Map<number, RecordKeys>([[keyV, await deriveRecordKeys(dataKey, false)]]);
   for (const [v, key] of older) derived.set(v, await deriveRecordKeys(key, false));
@@ -467,6 +523,9 @@ async function keepLocally(
     await store.setMeta("devicePublicKey", device.body.publicKey);
     await store.setMeta("keyV", keyV);
     await store.setMeta("userId", userId);
+    // unticked: wiped once the session cookie is gone; ticked: a vault the person asked to keep
+    if (enroll.ephemeral) await store.setMeta("ephemeral", true);
+    else if (enroll.ephemeral === false) await store.deleteMeta("ephemeral");
   } finally {
     store.close();
   }
@@ -521,9 +580,12 @@ export async function prepareAccount(
   };
   const device = await prepareDevice(userId, dataKey, FIRST_KEY_V, pair);
   const recoveryKey = guest ? null : formatRecoveryKey(secret);
+  // A shown key signs in; a guest's hidden one never does.
+  const verifier = guest ? null : await verifierBodyOf(secret);
   secret.fill(0);
 
   let recoverySent = false;
+  let verifierSent = false;
   let done: LocalKeys | null = null;
   let running: Promise<LocalKeys> | null = null;
 
@@ -538,6 +600,10 @@ export async function prepareAccount(
         throw error;
       }
       recoverySent = true;
+    }
+    if (verifier && !verifierSent) {
+      await putVerifier(options, verifier);
+      verifierSent = true;
     }
     await call(`/v2/keys/${device.id}`, putJson(device.body));
     done = await keepLocally(userId, dataKey, FIRST_KEY_V, device, new Map());
@@ -569,35 +635,72 @@ export async function unlockWithRecovery(
   options: KeysOptions & { text: string },
 ): Promise<LocalKeys> {
   const { userId, text } = options;
-  let secret: Uint8Array;
-  try {
-    secret = parseRecoveryKey(text);
-  } catch {
-    throw new KeysError("bad_recovery_key");
-  }
+  const secret = parseRecoverySecret(text);
   try {
     const pair = await safeDeviceKeyPair(options);
     const call = api(options);
     const { wraps, links } = await listKeys(call);
-    const wrap = wraps.find((w) => w.kind === "recovery");
-    if (!wrap) throw new KeysError("wrong_recovery_key");
-    let dataKey: Uint8Array;
+    const { dataKey, keyV } = await openRecoveryWrap(wraps, userId, secret);
     try {
-      dataKey = await unwrapDataKey(
-        secret,
-        { kind: "recovery", userId, keyV: wrap.keyV },
-        fromBase64Url(wrap.wrapped),
-      );
-    } catch {
-      throw new KeysError("wrong_recovery_key");
-    }
-    try {
-      return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
+      const keys = await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
+      // Best effort: a typed key that unlocks may be one whose verifier an older client never
+      // stored; a failure here never fails the unlock.
+      await putRecoveryVerifier(options, secret).catch(() => undefined);
+      return keys;
     } finally {
       dataKey.fill(0);
     }
   } finally {
     secret.fill(0);
+  }
+}
+
+/** The recovery key typed as text, as a secret; `bad_recovery_key` when it does not parse. */
+export function parseRecoverySecret(text: string): Uint8Array {
+  try {
+    return parseRecoveryKey(text);
+  } catch {
+    throw new KeysError("bad_recovery_key");
+  }
+}
+
+/** DK and its `keyV` from the account's recovery wrap; `wrong_recovery_key` when it opens nothing. */
+async function openRecoveryWrap(
+  wraps: WrapDto[],
+  userId: string,
+  secret: Uint8Array,
+): Promise<{ dataKey: Uint8Array; keyV: number }> {
+  const wrap = wraps.find((w) => w.kind === "recovery");
+  if (!wrap) throw new KeysError("wrong_recovery_key");
+  try {
+    const dataKey = await unwrapDataKey(
+      secret,
+      { kind: "recovery", userId, keyV: wrap.keyV },
+      fromBase64Url(wrap.wrapped),
+    );
+    return { dataKey, keyV: wrap.keyV };
+  } catch {
+    throw new KeysError("wrong_recovery_key");
+  }
+}
+
+/** DK and its `keyV` from the passkey wrap whose `ref` is the credential; else `no_passkey_wrap`. */
+async function openPasskeyWrap(
+  wraps: WrapDto[],
+  userId: string,
+  { credentialId, prf }: PasskeySecret,
+): Promise<{ dataKey: Uint8Array; keyV: number }> {
+  const wrap = wraps.find((w) => w.kind === "passkey" && w.ref === credentialId);
+  if (!wrap) throw new KeysError("no_passkey_wrap");
+  try {
+    const dataKey = await unwrapDataKey(
+      prf,
+      { kind: "passkey", userId, keyV: wrap.keyV },
+      fromBase64Url(wrap.wrapped),
+    );
+    return { dataKey, keyV: wrap.keyV };
+  } catch {
+    throw new KeysError("no_passkey_wrap");
   }
 }
 
@@ -615,24 +718,13 @@ export interface PasskeySecret {
  * open it (nothing is sent).
  */
 export async function unlockWithPasskey(options: KeysOptions & PasskeySecret): Promise<LocalKeys> {
-  const { userId, credentialId, prf } = options;
+  const { userId } = options;
   const pair = await safeDeviceKeyPair(options);
   const call = api(options);
   const { wraps, links } = await listKeys(call);
-  const wrap = wraps.find((w) => w.kind === "passkey" && w.ref === credentialId);
-  if (!wrap) throw new KeysError("no_passkey_wrap");
-  let dataKey: Uint8Array;
+  const { dataKey, keyV } = await openPasskeyWrap(wraps, userId, options);
   try {
-    dataKey = await unwrapDataKey(
-      prf,
-      { kind: "passkey", userId, keyV: wrap.keyV },
-      fromBase64Url(wrap.wrapped),
-    );
-  } catch {
-    throw new KeysError("no_passkey_wrap");
-  }
-  try {
-    return await enrollTrusted(call, userId, dataKey, wrap.keyV, links, pair, "secret");
+    return await enrollTrusted(call, userId, dataKey, keyV, links, pair, "secret");
   } finally {
     dataKey.fill(0);
   }
@@ -813,6 +905,42 @@ export async function withDataKey<T>(
   fn: (dk: Uint8Array, keyV: number) => Promise<T>,
 ): Promise<T> {
   return withOwnDeviceKey(options, (dk, keyV) => fn(dk, keyV));
+}
+
+/** Where `withDataKeyFrom` opens DK: this browser's device wrap, a passkey's PRF, or the recovery key. */
+export type DataKeySource = { device: true } | PasskeySecret | { recovery: string };
+
+/**
+ * Opens DK for one operation from `source` (spec 2026-11-16 section 5, the consent page):
+ * `device` is `withDataKey`; a passkey (its PRF) or the recovery key (as typed) opens the matching
+ * wrap without enrolling a device, storing or sending anything (a browser that holds nothing for
+ * the account gives its assistant the key this way). `fn` gets DK and the wrap's `keyV`; DK is
+ * zeroed once `fn` settles, and the parsed recovery secret at once. The caller owns the PRF and
+ * zeroes it. Errors as the unlocks: `no_passkey_wrap`, `bad_recovery_key` (nothing sent),
+ * `wrong_recovery_key`; `fn` never runs then.
+ */
+export async function withDataKeyFrom<T>(
+  options: KeysOptions,
+  source: DataKeySource,
+  fn: (dk: Uint8Array, keyV: number) => Promise<T>,
+): Promise<T> {
+  if ("device" in source) return withDataKey(options, fn);
+  let opened: { dataKey: Uint8Array; keyV: number };
+  if ("recovery" in source) {
+    const secret = parseRecoverySecret(source.recovery);
+    try {
+      opened = await openRecoveryWrap(await listWraps(api(options)), options.userId, secret);
+    } finally {
+      secret.fill(0);
+    }
+  } else {
+    opened = await openPasskeyWrap(await listWraps(api(options)), options.userId, source);
+  }
+  try {
+    return await fn(opened.dataKey, opened.keyV);
+  } finally {
+    opened.dataKey.fill(0);
+  }
 }
 
 /**

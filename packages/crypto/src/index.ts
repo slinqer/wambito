@@ -24,9 +24,15 @@ export {
   sealRecord,
 } from "./records.ts";
 export {
+  CROCKFORD,
   formatRecoveryKey,
   newRecoverySecret,
   parseRecoveryKey,
+  RECOVERY_AUTH_INFO,
+  RECOVERY_LOOKUP_INFO,
+  type RecoveryVerifier,
+  recoveryVerifier,
+  verifierHash,
 } from "./recovery.ts";
 export {
   PRF_SALT,

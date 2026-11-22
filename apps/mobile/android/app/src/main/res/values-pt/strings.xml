@@ -24,7 +24,7 @@
     <string name="notice_due_many">Hoje vencem %1$s</string>
     <string name="notice_and">e</string>
     <string name="notice_and_i">e</string>
-    <string name="notice_guest">Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email</string>
+    <string name="notice_guest">Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email. Se apagares a app, perdes os dados na mesma.</string>
     <string name="notice_channel_due">Pagamentos que vencem hoje</string>
     <string name="notice_channel_due_description">Às 9:00, um aviso com os pagamentos recorrentes que vencem nesse dia.</string>
     <string name="notice_channel_guest">Aviso se não tiveres email</string>
@@ -44,4 +44,8 @@
     <string name="capture_change">Alterar</string>
     <string name="capture_channel">Movimentos detetados</string>
     <string name="capture_channel_description">Um aviso por cada despesa ou receita que o Wambito deteta nas tuas apps do banco.</string>
+    <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt, ScannerViewController.swift on iOS):
+         the words of the web's approve-a-device scan. -->
+    <string name="scanner_hint">Aponta a câmara para o QR do dispositivo novo.</string>
+    <string name="scanner_close">Desligar a câmara</string>
 </resources>

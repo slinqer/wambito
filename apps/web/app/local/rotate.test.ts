@@ -10,17 +10,19 @@ import {
   openKeyLink,
   openRecord,
   parseRecoveryKey,
+  recoveryVerifier,
   sealKeyLink,
   sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
 import { describe, expect, it, vi } from "vitest";
 import { createEncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
 
 /** Every secret and data key the crypto hands out, to check that rotation zeroes them. */
 const handed = vi.hoisted(() => ({
@@ -113,6 +115,11 @@ function fakeKeys() {
     /** The next PUT is kept, then its answer is lost (the network stays up). */
     losePutAnswer: false,
     offline: false,
+    /** Every `PUT /v2/recovery/verifier` body kept, in order; `verifier`: the one in force. */
+    verifiers: [] as Array<{ lookupHash: string; authHash: string }>,
+    verifier: null as { lookupHash: string; authHash: string } | null,
+    /** The next verifier PUT fails with a 500. */
+    failVerifier: false,
   };
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -147,6 +154,18 @@ function fakeKeys() {
   const answer = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const method = init?.method ?? "GET";
+    if (url.pathname === "/api/v2/recovery/verifier" && method === "PUT") {
+      if (state.failVerifier) {
+        state.failVerifier = false;
+        return json({ code: "internal" }, 500);
+      }
+      if (!state.wraps.some((w) => w.kind === "recovery")) {
+        return json({ code: "recovery_required" }, 409);
+      }
+      state.verifier = JSON.parse(String(init?.body));
+      state.verifiers.push(state.verifier as never);
+      return new Response(null, { status: 204 });
+    }
     if (url.pathname === "/api/v2/keys" && method === "GET")
       return json({
         wraps: state.wraps,
@@ -173,6 +192,8 @@ function fakeKeys() {
         return toWrap(w.id as string, w);
       });
       state.rotations.push({ keyV: body.keyV, wraps, link: body.link });
+      if (body.wraps.some((w) => w.kind === "recovery" && !state.wraps.some((o) => o.id === w.id)))
+        state.verifier = null;
       if (body.link) state.links.set(body.keyV, body.link);
       state.wraps.splice(0, state.wraps.length, ...wraps);
       return json({ wraps });
@@ -185,6 +206,7 @@ function fakeKeys() {
         return json({ code: "key_version_mismatch" }, 409);
       }
       state.puts.push({ id, kind: body.kind, keyV: body.keyV });
+      if (body.kind === "recovery") state.verifier = null;
       const at = state.wraps.findIndex(
         (w) => w.id === id || (w.kind === "recovery" && body.kind === "recovery"),
       );
@@ -223,6 +245,7 @@ async function account(revokedDevices: string[] = []) {
     timezone: "Europe/Madrid",
     onboardingCompletedAt: null,
     revokedDevices,
+    recoveryKeySavedAt: null,
   });
   store.close();
   clearHanded();
@@ -842,6 +865,57 @@ describe("newRecoveryKey", () => {
     await expect(openRecovery(a.api, a.userId, a.recoveryKey, 1)).rejects.toThrow();
     expect(a.api.rotations).toEqual([]);
     expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+});
+
+/** The verifier hashes the API stores for a recovery key as typed. */
+async function verifierOf(recoveryKey: string) {
+  const raw = await recoveryVerifier(parseRecoveryKey(recoveryKey));
+  return {
+    lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+    authHash: toBase64Url(await verifierHash(raw.auth)),
+  };
+}
+
+describe("the recovery verifier", () => {
+  it("newRecoveryKey puts the new key's verifier after the wrap", async () => {
+    const a = await account();
+    a.api.verifiers.length = 0;
+    const prepared = await newRecoveryKey(a.options);
+    expect(a.api.verifiers).toEqual([]);
+    await prepared.commit();
+    expect(a.api.verifiers).toEqual([await verifierOf(prepared.recoveryKey)]);
+    expect(a.api.verifier).toEqual(await verifierOf(prepared.recoveryKey));
+    expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+
+  it("a rotation with a fresh key puts its verifier; with the typed key it puts none", async () => {
+    const a = await account();
+    a.api.verifiers.length = 0;
+    await (
+      await rotateKeys({ ...a.options, remove: [], recovery: { text: a.recoveryKey } })
+    ).commit();
+    expect(a.api.verifiers).toEqual([]);
+
+    const prepared = await rotateKeys({ ...a.options, remove: [], recovery: { fresh: true } });
+    expect(a.api.verifiers).toEqual([]);
+    await prepared.commit();
+    expect(a.api.verifiers).toEqual([await verifierOf(prepared.recoveryKey as string)]);
+    expect(a.api.verifier).toEqual(await verifierOf(prepared.recoveryKey as string));
+    expect(handed.secrets.every((s) => s.every((x) => x === 0))).toBe(true);
+  });
+
+  it("a failed verifier PUT after the rotation committed leaves the new keyV kept here; the retry puts it", async () => {
+    const a = await account();
+    a.api.verifiers.length = 0;
+    const prepared = await rotateKeys({ ...a.options, remove: [], recovery: { fresh: true } });
+    a.api.failVerifier = true;
+    await expect(prepared.commit()).rejects.toBeInstanceOf(KeysError);
+    expect(a.api.rotations).toHaveLength(1);
+    expect((await loadLocalKeys(a.userId))?.keyring.current).toBe(2);
+    await expect(prepared.commit()).resolves.toMatchObject({ keyV: 2 });
+    expect(a.api.rotations).toHaveLength(1);
+    expect(a.api.verifiers).toEqual([await verifierOf(prepared.recoveryKey as string)]);
   });
 });
 

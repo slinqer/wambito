@@ -45,6 +45,19 @@ data class WidgetSnapshot(
      * reads its own figures. Null (or not a zone): the phone's.
      */
     val timezone: String? = null,
+    /**
+     * Signed out only: a sentence the widget says in place of "Abre Wambito para empezar", in the
+     * app's language. The app no longer writes one (a locked `preview` account gets the usual
+     * sentence); kept so an older snapshot still reads. Never written by [RefreshWorker]. Null: the
+     * usual sentence.
+     */
+    val line: String? = null,
+    /**
+     * Signed in, `preview` accounts only: the user id the figures belong to (the app and the
+     * headless run write it, D10). [RefreshWorker] and the widget draw nothing whose owner is not
+     * [com.wambito.app.account.AccountMode.owner]. Null for a `plain` account.
+     */
+    val owner: String? = null,
 ) {
     /** The profile's zone, or [fallback] (the phone's) without a valid one. */
     fun zone(fallback: ZoneId): ZoneId = timezone?.let {
@@ -62,6 +75,7 @@ data class WidgetSnapshot(
             .put("hideAmount", hideAmount)
             .put("theme", theme)
         if (locale != null) doc.put("locale", locale)
+        if (!signedIn && line != null) doc.put("line", line)
         if (signedIn) {
             doc.put("remaining", remaining)
                 .put("spent", spent)
@@ -72,6 +86,7 @@ data class WidgetSnapshot(
                 .put("updatedAt", updatedAt?.toString())
             if (refreshFailedAt != null) doc.put("refreshFailedAt", refreshFailedAt.toString())
             if (timezone != null) doc.put("timezone", timezone)
+            if (owner != null) doc.put("owner", owner)
         }
         return doc.toString()
     }
@@ -98,6 +113,7 @@ data class WidgetSnapshot(
                 locale = locale,
                 hideAmount = hideAmount,
                 theme = theme,
+                line = doc.optString("line", "").takeIf { it.isNotEmpty() },
             )
             if (!doc.optBoolean("signedIn", false)) return signedOut
             val figures = listOf("remaining", "spent", "budgetTotal", "currency", "month")
@@ -117,6 +133,7 @@ data class WidgetSnapshot(
                     hideAmount = hideAmount,
                     theme = theme,
                     timezone = doc.optString("timezone", "").takeIf { it.isNotEmpty() },
+                    owner = doc.optString("owner", "").takeIf { it.isNotEmpty() },
                 )
             } catch (_: JSONException) {
                 signedOut

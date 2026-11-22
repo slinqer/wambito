@@ -333,13 +333,13 @@ when the app's picture changes. The web shots are regenerated only when the web 
     only `ExpiredDay` stopped at, and only by day in English). The sign-in stories are as they were: the code step has
     the web's 30 second wait before "Reenviar código", counted by the app's own clock (`clockProvider`, pinned like the
     story's), so its pairs show "Reenviar en 30 s".
-  - **The email field's focus.** The app focuses it on opening (the person tapped "Entrar con mi correo", and a Stage
+  - **The email field's focus.** The app focuses it on opening (the person tapped "Ya tengo una cuenta", and a Stage
     3 test pins it); the web leaves it alone so the keyboard does not cover Wambi. The pairs put the focus down
     (`_putFocusDown`) where the story has none.
   - **"Usar passkey" is "Entrar con huella" in the pairs** (`EmailScreen.passkeyLabel`), as the detail's "Editar" is
     in the budget pairs: the email screen's button keeps Stage 3's words and the web's sign-in has the others.
-  - **"Probar sin correo" is in no pair.** It sits on the first screen, which the web has no story for (its sign-in
-    has no guest and no first screen with three ways in), so the entry screen, "Guarda tu progreso" and the magic
+  - **The welcome ("Empezar", "Ya tengo una cuenta") is in no pair.** The web has no story for it (its sign-in has
+    no welcome), so the welcome, "Guarda tu progreso" and the magic
     link that finds a guest signed in have their own goldens in `test/entry/goldens`, to review by eye
     (`test/entry/entry_golden_test.dart`).
   - **The code is one text field with six boxes drawn over it**, where the web has six inputs. The ring is on the
@@ -396,6 +396,16 @@ when the app's picture changes. The web shots are regenerated only when the web 
   - **Delete card.** `.lk-danger-zone` is a 2px border of the danger colour over the stroke's (55/45), inside the card
     (`border-box`: the padding stays, the content is 2px narrower). The input's `aria-invalid` has no style on the web, so the
     field keeps its border when the delete is refused.
+- **Settings → Security** has no pairs yet; its copy follows the web's `settings.security` keys. Removing a device is the
+  web's `RemoveDeviceSheet` (title, body, "Quitar", "Quitando…", the toast "{name} ya no tiene acceso."), after the phone's
+  screen lock. "Cambiar claves" is the web's "Change keys" (`ChangeKeysSheet`: its body, "Cambiando…", "Tus claves
+  cambiaron.", the failure line), plus what only the phone has: the screen lock first, a new recovery key as a second way
+  (the setup screen), and the list of what was left out. After a removal from the sign-in notice's "That wasn't me", the
+  sheet's done step says "Si alguien más tuvo tu clave, cámbiala: …" with a "Cambiar claves" button; the web has no notice.
+  "Conectar otro dispositivo" is the entry on both: on the web it approves a new device (`ApproveDevice`); on the phone the
+  same entry also approves a web sign-in, which the web does not. The phone's screen (one scan for both QRs, or the code,
+  "Código del otro dispositivo") hands over to the approval's own steps, the web's `ApproveDevice` copy ("Aprobar un
+  dispositivo nuevo", the number, "Coinciden", "No coinciden"), or to the sign-in's ("¿Iniciar sesión en …?", its warning).
 - **The confirm sheet (`confirm-sheet-open*`).** `ui-confirmsheet--*` were added (the web had no story of it). A `flex-1`
   button is its own padding and border and an equal share of what is left, so "Cancelar" (8px a side) is narrower than
   the action (24px and a 2px border): `flexOneRow`. The guest's questions (`ChoiceSheet`: sign out, change server, the

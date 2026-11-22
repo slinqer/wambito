@@ -5,6 +5,7 @@ import '../home/home_format.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
+import 'lk_icons.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
 
@@ -39,33 +40,40 @@ class MonthPicker extends StatelessWidget {
     final year = month.substring(0, 4);
     final label = year == max.substring(0, 4) ? name : '$name $year';
     final atMax = month.compareTo(max) >= 0;
+    // The web's `min-[400px]:`: on narrower screens the name gives way (cut with …) and the gaps
+    // shrink, so home's header stays one row down to 320px.
+    final roomy = MediaQuery.sizeOf(context).width >= 400;
 
     return Semantics(
       container: true,
       label: l10n.monthPickerLabel,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: 8,
+        spacing: roomy ? 8 : 4,
         children: [
           StepButton(
-            glyph: '‹',
+            icon: LkIconName.chevronLeft,
             label: l10n.monthPickerPrevious,
             onPressed: () => onChange(addMonths(month, -1)),
           ),
-          // `min-w-[7.5em]` of the 18px name.
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 7.5 * 18),
-            child: Semantics(
-              liveRegion: true,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: LkText.monthName.copyWith(color: context.lkColors.ink),
+          // `min-[400px]:min-w-[7.5em]` of the 18px name.
+          Flexible(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: roomy ? 7.5 * 18 : 0),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: LkText.monthName.copyWith(color: context.lkColors.ink),
+                ),
               ),
             ),
           ),
           StepButton(
-            glyph: '›',
+            icon: LkIconName.chevronRight,
             label: l10n.monthPickerNext,
             onPressed: atMax ? null : () => onChange(addMonths(month, 1)),
           ),
@@ -78,9 +86,9 @@ class MonthPicker extends StatelessWidget {
 /// An arrow (`.lk-step`): a 44px round button that sinks 3px into a 1px edge; disabled it is half
 /// as opaque and does not move. The month picker's ‹ and ›, and the trend's under its chart.
 class StepButton extends StatelessWidget {
-  const StepButton({super.key, required this.glyph, required this.label, required this.onPressed});
+  const StepButton({super.key, required this.icon, required this.label, required this.onPressed});
 
-  final String glyph;
+  final LkIconName icon;
   final String label;
   final VoidCallback? onPressed;
 
@@ -104,9 +112,7 @@ class StepButton extends StatelessWidget {
           ),
           ringRadius: state.focusVisible ? radius : null,
           ringColor: colors.focus,
-          child: ExcludeSemantics(
-            child: Text(glyph, style: LkText.step.copyWith(color: colors.ink)),
-          ),
+          child: LkIcon(icon, size: 16, color: colors.ink),
         );
         return state.enabled ? surface : Opacity(opacity: 0.5, child: surface);
       },

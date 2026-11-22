@@ -68,7 +68,7 @@ void main() {
     await pump(tester, guest: true, hasRecurring: false);
     expect(
       tester.widget<Text>(find.byKey(const Key('notices.askWhy'))).data,
-      'Así Wambito puede avisarte si pasan 45 días sin abrirlo y tu cuenta no tiene correo, antes de que se borren tus datos.',
+      'Así Wambito puede avisarte si pasan 45 días sin abrirlo y tu cuenta no tiene correo: a los 60 días se borran tus datos.',
     );
   });
 

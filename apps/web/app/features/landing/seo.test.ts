@@ -71,8 +71,10 @@ describe("Italian and Portuguese pages", () => {
   it("title and describe each page in its own language, at its own URL and share image", () => {
     const it = landingMeta("it");
     const pt = landingMeta("pt");
-    expect(it).toContainEqual({ title: "Wambito · I tuoi soldi, finalmente chiari" });
-    expect(pt).toContainEqual({ title: "Wambito · O teu dinheiro, finalmente claro" });
+    expect(it).toContainEqual({
+      title: "Wambito · L'app che tiene i conti delle tue spese per te",
+    });
+    expect(pt).toContainEqual({ title: "Wambito · A app que gere as tuas despesas por ti" });
     expect(metaContent(it, "property", "og:url")).toBe(`${SITE_ORIGIN}/it`);
     expect(metaContent(pt, "property", "og:url")).toBe(`${SITE_ORIGIN}/pt`);
     expect(metaContent(it, "property", "og:image")).toBe(`${SITE_ORIGIN}/og-it.png`);

@@ -10,8 +10,10 @@
     "tokens": "tsx scripts/gen-tokens.ts",
     "sounds": "tsx scripts/gen-feedback-sounds.ts",
     "og": "tsx scripts/og/render.ts",
+    "landing-screens": "tsx scripts/landing-screens.ts",
     "api:types": "tsx scripts/gen-api.ts",
     "storybook": "storybook dev --port 6006",
+    "record:local-backend": "tsx scripts/record-local-backend-fixtures.ts",
     "parity:fixtures": "tsx scripts/parity-fixtures.ts",
     "parity:shots": "tsx scripts/parity-shots.ts",
     "parity:insights-geometry": "tsx scripts/insights-geometry.ts",
@@ -20,7 +22,8 @@
     "build:landing": "tsx scripts/build-landing.ts",
     "e2e:landing": "react-router build && playwright test -c playwright.built.config.ts",
     "e2e:landing-only": "VITE_APP_URL= VITE_SITE_URL=https://landing-only.example.test tsx scripts/build-landing.ts && E2E_LANDING_ONLY=true VITE_APP_URL= VITE_SITE_URL=https://landing-only.example.test playwright test -c playwright.built.config.ts",
-    "e2e:landing-only-app": "VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test tsx scripts/build-landing.ts && E2E_LANDING_ONLY=app VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test playwright test -c playwright.built.config.ts"
+    "e2e:landing-only-app": "VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test tsx scripts/build-landing.ts && E2E_LANDING_ONLY=app VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test playwright test -c playwright.built.config.ts",
+    "e2e:landing-analytics": "VITE_POSTHOG_KEY=phc_e2e VITE_POSTHOG_HOST=https://posthog.example.test VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test tsx scripts/build-landing.ts && E2E_LANDING_ONLY=analytics VITE_APP_URL=https://app.example.test VITE_SITE_URL=https://landing-only.example.test playwright test -c playwright.built.config.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.11",
@@ -33,10 +36,12 @@
     "@tanstack/react-query": "^5.104.5",
     "@wambito/core": "workspace:*",
     "@wambito/crypto": "workspace:*",
+    "@wambito/vault": "workspace:*",
     "better-auth": "^1.7.11",
     "isbot": "^5",
     "motion": "^14.4.0",
     "openapi-fetch": "^0.17.0",
+    "posthog-js": "1.447.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router": "^8.5.0",

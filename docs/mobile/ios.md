@@ -73,6 +73,24 @@ job in `ci.yml`. The Android side is `release.md`.
 4. To publish: App Store tab, the version, select the build, fill the listing, Submit for Review.
    Review and release are by hand.
 
+## Background sync, camera and Face ID
+
+- **The `wambito.sync` task.** `Info.plist` lists `wambito.sync` (and `wambito.notice.due`) in
+  `BGTaskSchedulerPermittedIdentifiers`, with `fetch` in `UIBackgroundModes`. For an encrypted
+  (`preview`) account the app schedules a `BGAppRefreshTask` named `wambito.sync` (every 4 hours at
+  the earliest) that runs the sync in a headless Flutter engine for up to 25 seconds, with no
+  capture queue and nothing sent in clear. A plain account schedules none. iOS decides when it runs
+  (it may be hours later, or never on Low Power Mode), so the app also syncs when opened. Removing
+  or renaming the identifier needs a migration: a pending request for a name that is no longer
+  listed makes `BGTaskScheduler` throw.
+- **Camera text.** `NSCameraUsageDescription` (es, en, it, pt in `ios/Runner/*.lproj/InfoPlist.strings`,
+  English in `Info.plist`): the camera is used only while someone scans the QR of a new device to
+  approve it, and nothing it sees is kept or leaves the phone. It is asked at the first scan, not at launch.
+- **Face ID text.** `NSFaceIDUsageDescription` (same files): Face ID confirms it is the person before
+  a sensitive operation (removing a device, making a new recovery key, showing it); the face never leaves
+  the phone. A phone with no screen lock asks the current recovery key instead (`confirmSensitive`).
+  Keep the three texts in step with the App Privacy answers below.
+
 ## Answers App Store Connect asks
 
 - **Encryption (export compliance).** The app sets `ITSAppUsesNonExemptEncryption` to `NO`, so the

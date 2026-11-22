@@ -15,6 +15,8 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   `AppIcon.appiconset`: the 1024 light icon solid plum without alpha, the dark one on transparency,
   the tinted one the monochrome silhouette in white) and
   `drawable/ic_launcher_{foreground,monochrome}.xml`; never hand-edit those (usage in its header).
+  `docs/brand/tools/gen-banner.cjs` writes the root README's `wambi-banner.png` (Wambi waving, the
+  wordmark, the tagline) from the same sources; never hand-edit it.
   `docs/brand/tools/gen-email-images.cjs` writes the emails' `apps/web/public/email/*` (Wambi,
   the wordmark day/night, the fonts) from the landing's sprite and Fredoka; a changed image needs
   a new name (Gmail's proxy caches by URL).
@@ -29,11 +31,21 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   listing images, made the same way; `apps/mobile/tool/store_shots/compose.cjs` uses them
   (`docs/mobile/play.md`).
   `docs/brand/e2e/wambi-e2e-step{1..5}.webp`: the end-to-end encryption scenes (same Codex method,
-  1024 px masters), used by the root `README.md`; `docs/brand/e2e/README.md` lists each scene and a
+  1024 px masters), used by `docs/encryption.md`; `docs/brand/e2e/README.md` lists each scene and a
   Spanish caption for the apps.
+- `docs/development.md`: running the dev stack, the web app and the tests (moved out of the root
+  README). `docs/self-hosting.md`: the public guide to running your own install, with the prompt for
+  a coding agent; it must stay true to `deploy/personal/` (its runbook has the details).
+  `docs/encryption.md`: the end-to-end encryption explainer with the `brand/e2e` scenes.
 - `docs/deploy/`: `personal.md` (private install, short; the runbook is
   `deploy/personal/README.md`), `landing.md` (Cloudflare landing), `api.md` (client addresses,
-  rate limits).
+  rate limits), `switch-day.md` (E2E stage 5: the branch merges on the day, after its policy
+  dates are filled and `scripts/check-switch-dates.sh` passes; the rehearsal on a restored copy,
+  the production flags, the founder's migration (phone and assistant idle first), the rollback to
+  plain from the browser console, deleting the test accounts, the Play data safety
+  form, the later table-drop PR).
+- `docs/privacy-policy.md`: the English draft of the live policy (`legal.privacy` in the web's
+  site catalogs); keep the two saying the same.
 - `docs/admin.md`: the admin panel: who is an admin (`ADMIN_USER_IDS`, `ADMIN_ALLOWED_IPS`), Ley 1581
   deadlines and procedures, the dry run.
 - `docs/mobile/`: `setup.md` (toolchain, JDK 17, emulator, tests), `release.md` (signing, APK

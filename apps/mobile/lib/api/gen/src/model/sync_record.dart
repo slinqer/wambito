@@ -18,7 +18,7 @@ part 'sync_record.g.dart';
 /// * [keyV] - The data key version of `body`
 /// * [encV] - The record format version
 /// * [version]
-/// * [body] - The encrypted record, base64url without padding; null when deleted
+/// * [body] - The encrypted record, base64url without padding. Always present on a live record; on a deleted one, null unless the client sent the sealed body so the record can be restored
 @BuiltValue()
 abstract class SyncRecord implements Built<SyncRecord, SyncRecordBuilder> {
   /// A UUID in lower case
@@ -43,7 +43,7 @@ abstract class SyncRecord implements Built<SyncRecord, SyncRecordBuilder> {
   @BuiltValueField(wireName: r'version')
   int get version;
 
-  /// The encrypted record, base64url without padding; null when deleted
+  /// The encrypted record, base64url without padding. Always present on a live record; on a deleted one, null unless the client sent the sealed body so the record can be restored
   @BuiltValueField(wireName: r'body')
   String? get body;
 

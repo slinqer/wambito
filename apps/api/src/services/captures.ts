@@ -3,10 +3,11 @@ import {
   type CreateCapture,
   FALLBACK_CATEGORY_NAMES,
   merchantKey,
+  merchantKeyPrefixes,
   todayIn,
 } from "@wambito/core";
 import { categories, merchantCategories, type Tx, transactions } from "@wambito/db";
-import { and, eq, gte, isNull, lte, sql } from "@wambito/db/orm";
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from "@wambito/db/orm";
 import { defaultAccount, type TransactionRow, toTransactionDto } from "./transactions.ts";
 
 type Locale = keyof typeof FALLBACK_CATEGORY_NAMES;
@@ -78,20 +79,28 @@ function keyOf(merchant: string): string | null {
   }
 }
 
-/** The category remembered for this merchant key, when it is still active. */
+/**
+ * The category remembered for this merchant key, when it is still active. The key itself wins;
+ * otherwise the longest learned key made of its leading words, so "lidl casal ribeiro" (a branch,
+ * as Google Wallet names it) gets what "lidl" taught (`merchantKeyPrefixes`).
+ */
 async function rememberedCategory(tx: Tx, key: string | null, kind: Kind): Promise<string | null> {
   if (key === null) return null; // nothing to look up: use the fallback
+  const candidates = [key, ...merchantKeyPrefixes(key)];
   const [row] = await tx
     .select({ id: categories.id })
     .from(merchantCategories)
     .innerJoin(categories, eq(categories.id, merchantCategories.categoryId))
     .where(
       and(
-        eq(merchantCategories.merchantKey, key),
+        inArray(merchantCategories.merchantKey, candidates),
         eq(categories.kind, kind),
         isNull(categories.archivedAt),
       ),
-    );
+    )
+    // Every candidate starts the key, so the longest is the closest one.
+    .orderBy(desc(sql`length(${merchantCategories.merchantKey})`))
+    .limit(1);
   return row?.id ?? null;
 }
 

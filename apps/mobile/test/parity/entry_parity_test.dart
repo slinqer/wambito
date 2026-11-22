@@ -25,11 +25,11 @@ import '../support/parity_home.dart' show precacheWambi;
 ///
 /// Storybook pads every story by 16px, so the screens sit in a [ShellFrame] with that padding (and
 /// no 🎤, which only the bar has). The app focuses the email field on opening (the person came by
-/// tapping "Entrar con mi correo", and the keyboard is what they want), where the web leaves it
+/// tapping "Ya tengo una cuenta", and the keyboard is what they want), where the web leaves it
 /// alone so the keyboard does not cover Wambi; the pairs put the focus down again, as the web has
 /// it. The code step's "Reenviar código" waits 30 s as the web's does, counted by the app's clock,
-/// which [parityGolden] pins to the story's (so both sides read "Reenviar en 30 s"). "Usar passkey"
-/// is the web's "Entrar con huella" here, through `EmailScreen.passkeyLabel`.
+/// which [parityGolden] pins to the story's (so both sides read "Reenviar en 30 s"). The passkey
+/// button reads the web's words, "Entrar con huella" (in English through `EmailScreen.passkeyLabel`).
 ///
 /// Update the goldens with `flutter test --update-goldens test/parity`, then compare with
 /// `dart run tool/parity/compose.dart` (docs/mobile/parity.md).

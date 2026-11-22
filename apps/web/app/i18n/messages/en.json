@@ -25,7 +25,7 @@
   "roadmap": {
     "meta": {
       "title": "Wambito · What's next",
-      "description": "What we have planned for Wambito: your AI connected, the iPhone app, end-to-end encryption and more. No dates, and it may change."
+      "description": "What we have planned for Wambito: your AI connected, the iPhone app and more. No dates, and it may change."
     },
     "title": "What's next",
     "intro": "This is what we have planned. It may change over time.",
@@ -53,8 +53,8 @@
         "body": "Say “Spent 15k on lunch and 3k on Uber” and both are logged."
       },
       "import_budge": {
-        "title": "Import your history from Budge",
-        "body": "Upload your CSV file and see a preview before anything comes in."
+        "title": "Import and download your data, encrypted",
+        "body": "Soon you'll be able to import and download your data again, now encrypted."
       },
       "iphone_app": {
         "title": "iPhone app",
@@ -66,7 +66,7 @@
       },
       "e2e_encryption": {
         "title": "End-to-end encryption",
-        "body": "Your data is encrypted on your device: not even the server will be able to read it."
+        "body": "Your data is encrypted on your device: not even the server can read it."
       },
       "bank_alerts": {
         "title": "Automatic capture of your bank's notifications",
@@ -125,8 +125,8 @@
   "landing": {
     "new_tab": "(opens in a new tab)",
     "meta": {
-      "title": "Wambito · Your money, finally clear",
-      "description": "Wambito is your budget, and you'll actually enjoy looking after it: log an expense in seconds and see where your money goes. Free forever, open source, no passwords.",
+      "title": "Wambito · The app that tracks your expenses for you",
+      "description": "It reads your payment notifications and logs each expense automatically. Free and open source.",
       "image_alt": "Wambi, a smiling gold coin, waves next to the title: Your money, finally clear."
     },
     "nav": {
@@ -140,92 +140,91 @@
     },
     "hero": {
       "headline": "Your <mark>money</mark>, finally clear.",
-      "description": "<lead>Wambi keeps you company, so looking after your money feels good.</lead>",
-      "cta": "Get started",
+      "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
+      "cta": "Create account",
       "cta_soon": "Coming soon · Follow on GitHub",
-      "cta_demo": "Try it without an account",
-      "perks": "Free forever · <github>Open source</github> · No passwords",
-      "mascot": "Wambi, a smiling gold coin, waves at you"
-    },
-    "spreadsheet": {
-      "title": "No more expenses in Excel.",
-      "image": "Wambi, pleased, feeds a spreadsheet into a paper shredder",
-      "before": "With a spreadsheet",
-      "after": "With Wambito",
-      "rows": {
-        "open": {
-          "before": "Open the laptop, find the file, scroll down to the last row.",
-          "after": "Log it in seconds, from your phone too."
-        },
-        "formula": {
-          "before": "One broken formula and the total stops adding up.",
-          "after": "The sums do themselves."
-        },
-        "budget": {
-          "before": "You find out you overspent once you already have.",
-          "after": "Your budgets give you a heads-up first."
-        }
-      }
+      "cta_demo": "Demo"
     },
     "ways": {
       "title": "Use it your way",
       "soon": "Soon",
-      "web": {
-        "title": "On the web",
-        "body": "From the browser on your phone or computer. Nothing to install.",
-        "cta": "Start"
-      },
-      "mobile": {
-        "title": "Android & iOS app",
+      "android": {
+        "title": "Android app",
         "body": "With a widget to log an expense without opening the app.",
-        "cta": "Download for Android",
-        "other": "Other versions",
-        "ios": "On iOS, soon."
+        "cta": "From GitHub"
       },
-      "ai": {
-        "title": "With your AI",
-        "with": "Claude / ChatGPT",
-        "body": "“Wambito, how much have I spent on restaurants?” and your assistant answers with your numbers."
+      "ios": {
+        "title": "iOS app",
+        "body": "Wambito on your iPhone. We're finishing it."
       }
     },
     "how": {
-      "title": "How it works",
-      "demo_categories": {
-        "groceries": "Groceries",
-        "going_out": "Going out",
-        "home": "Home",
-        "transport": "Getting around"
-      },
-      "voice": {
-        "title": "Log your expenses by voice",
-        "body": "Tell Wambi “I spent 3 euros on coffee” and it's logged, no typing. From the Android app's widget.",
-        "demo_said": "“I spent 3 euros on coffee”",
-        "demo_name": "Coffee",
-        "demo_saved": "Logged!"
-      },
+      "title": "Your whole month, in one app.",
       "spend": {
         "title": "See where it goes",
-        "body": "Every expense lands in its category. At a glance you know how much went on groceries, going out or getting around, and what living really costs you.",
-        "demo_label": "This month"
+        "body": "Every expense lands in its category, so at a glance you know what living costs you."
       },
       "budgets": {
         "title": "Budgets that give you a heads-up",
-        "body": "Set a limit for each category. The bars fill up with what you spend and change color before you go over, not after.",
-        "demo_remaining": "{amount} left"
+        "body": "The bars change color before you go over, not after."
+      },
+      "subscriptions": {
+        "title": "Your subscriptions, under control",
+        "body": "Netflix, Spotify, the gym: see what you pay each month, with a reminder on the day they're due.",
+        "demo_label": "Subscriptions",
+        "demo_total": "{amount} a month",
+        "demo_due": "{days, plural, one {Due tomorrow} other {Due in # days}}"
+      },
+      "encryption": {
+        "title": "Only you can read your data",
+        "body": "End-to-end encryption: everything is encrypted on your device. No one else can read it, not even Wambito.",
+        "demo_item": "Coffee",
+        "demo_device": "On your phone",
+        "demo_server": "What the server sees"
       },
       "import": {
         "title": "Bring your history",
-        "body": "Import your transactions from other finance apps: Budge today, Buddy and others soon.",
-        "demo_file": "budge.csv",
-        "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}"
+        "body": "You won't have to start from scratch: soon you'll be able to bring your transactions from other apps, now encrypted.",
+        "demo_rows": "{count, plural, one {# transaction ready} other {# transactions ready}}",
+        "soon": "Soon"
+      }
+    },
+    "agent": {
+      "title": "Your agent analyzes your spending.",
+      "body": "Connect Claude or ChatGPT to Wambito and ask it anything about your money. It only sees what you allow.",
+      "cta": "Connect your agent",
+      "note": "Free, from Settings",
+      "demo": {
+        "thinking": "Going through your transactions…",
+        "used": "Checked your transactions in Wambito",
+        "categories": {
+          "restaurants": "Restaurants",
+          "leisure": "Leisure",
+          "subscriptions": "Subscriptions",
+          "groceries": "Groceries",
+          "transport": "Transport"
+        },
+        "uber": {
+          "question": "How much did I spend on <b>Uber</b> this month?",
+          "answer": "This month you've spent <b>{amount}</b> on Uber, over {count} rides: {more} more than last month."
+        },
+        "budgets": {
+          "question": "How are my <b>budgets</b> doing?",
+          "answer": "Leisure is on track. You've used {percent} of <b>restaurants</b> with {days} days to go: {left} left.",
+          "of": "{spent} of {limit}"
+        },
+        "top": {
+          "question": "Where did most of my money go <b>this month</b>?",
+          "answer": "<b>Groceries</b> weigh the most: {amount}, {percent} of your spending. Restaurants come next."
+        }
       }
     },
     "capture": {
       "card": {
         "title": "Wambi logs your expenses for you!",
-        "body": "Reads Revolut and Google Wallet notifications and logs your expenses so you only review them.",
-        "badge": "Soon · Android only",
-        "link": "How does it work?"
+        "body": "Reads notifications from Google Wallet, Apple Wallet and your banks, like Revolut, and logs your expenses so you only review them.",
+        "link": "How does it work?",
+        "eyebrow": "Automatic capture"
       },
       "page": {
         "title": "How does automatic capture work?",
@@ -271,49 +270,56 @@
         "other_income": "Other income"
       }
     },
-    "open_source": {
-      "title": "Open source",
-      "body": "Anyone can read Wambito's code: nothing in it is hidden. It's free software, licensed under the AGPL-3.0.",
-      "cta": "View the code on GitHub"
-    },
     "faq": {
       "title": "Frequently asked questions",
       "what": {
         "q": "What is Wambito?",
-        "a": "An app for your monthly budget that doesn't feel like homework. You log what you spend, see what's left in each category, and Wambi, a gold coin with plenty of personality, keeps you company: it cheers when you log something and gives you a heads-up when a category is filling up."
+        "a": "An app for keeping track of your spending that doesn't feel like homework. You log what you spend, or Wambi logs it for you, and you see where your money goes each month. If you like, you set a limit per category. Wambi, a gold coin with plenty of personality, keeps you company: it cheers when you log something and gives you a heads-up when a category is filling up."
       },
       "import": {
         "q": "Can I bring my history from other apps?",
-        "a": "Yes. Today you can import from Budge: export your transactions as a CSV and upload it when you sign up or later from Settings. Buddy and other apps are coming soon. Before anything is imported you see a preview: how many transactions come in, which ones are duplicates and which categories will be created."
+        "a": "Not yet: with end-to-end encryption, importing is on hold. Soon you'll be able to import and download your data again, now encrypted. Budge comes back first, with its CSV file; Buddy and other apps follow. Before anything is imported you'll see a preview: how many transactions come in, which ones are duplicates and which categories will be created. The file will be read on your device, and what comes in will be encrypted like everything else."
       },
       "passwords": {
         "q": "Why doesn't it ask for a password?",
-        "a": "Because you don't need one. You sign in with a 6-digit code or a link sent to your email and, if you like, with a passkey: your fingerprint, your face or your phone's screen lock. No password to remember."
+        "a": "Because one more password wouldn't make you safer: passwords get forgotten, reused across apps and stolen. You sign in with a 6-digit code or a link sent to your email, or with a passkey: your fingerprint, your face or your phone's screen lock. A passkey is safer than a password: it can't be guessed, it never reaches our servers and it doesn't work on a fake page."
       },
       "privacy": {
         "q": "What do you do with my data?",
-        "a": "Your data travels encrypted, and we never sell it or share it with advertisers. You can export it or delete your account whenever you want. The code is open source: anyone can read the code that handles it. The details are in the <privacy>privacy policy</privacy>."
+        "a": "Your data is end-to-end encrypted: it is encrypted on your device, with a key only you hold, before it leaves it. Our servers only ever receive encrypted text they can't read, except while you have an AI assistant connected: then they open what it asks for in memory, only to answer it. So we couldn't sell your data even if we wanted to: by design, we can't see it. You can delete your account whenever you want. Soon you'll be able to import and download your data again, now encrypted. The code is open source: anyone can check how it is encrypted. The details are in the <privacy>privacy policy</privacy>."
       },
       "free": {
         "q": "Is it free?",
-        "a": "Yes, and it always will be. Wambito is free and open source: all the code is on <github>GitHub</github> for anyone to read. We never ask for a card."
+        "a": "Yes, and it always will be. We never ask for a card."
       },
-      "languages": {
-        "q": "Which languages is it in?",
-        "a": "Spanish, English, Italian and Portuguese. Switch whenever you like in Settings, and amounts and dates follow your language's format."
+      "open": {
+        "q": "Is it open source?",
+        "a": "Yes. Anyone can read Wambito's code on <github>GitHub</github>: nothing in it is hidden. It's free software, licensed under the AGPL-3.0."
       }
     },
     "closing": {
       "title": "Ready when you are.",
-      "body": "Create your account with your email in under a minute. Wambito takes care of making it fun.",
+      "body": "Wambito was born in 2026 out of the frustration of not knowing how much I spent on coffee each month.",
       "body_soon": "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens."
+    },
+    "consent": {
+      "label": "Cookie preferences",
+      "title": "Will you help us improve Wambito?",
+      "body": "With PostHog we see how this page is used, including recordings of the visit, without knowing who you are and without what you type.",
+      "decline": "No, thanks",
+      "accept": "Yes, I want to help",
+      "current_granted": "Right now: you accepted.",
+      "current_denied": "Right now: you declined.",
+      "browser_no": "Your browser asked not to be tracked, so we don't track you.",
+      "close": "Close"
     },
     "footer": {
       "language": "Language",
       "privacy": "Privacy",
       "copyright": "© {year} Wambito",
       "roadmap": "What's next",
-      "delete_account": "Delete account"
+      "delete_account": "Delete account",
+      "cookies": "Cookie preferences"
     },
     "not_found": {
       "title": "This page doesn't exist",
@@ -329,7 +335,7 @@
         "description": "How Wambito handles your data: what it stores, where, who can see it and how to ask us to delete it."
       },
       "title": "Privacy policy",
-      "version": "Version of 5 November 2026",
+      "version": "Version of 20 November 2026",
       "sections": {
         "controller": {
           "title": "Who is responsible for your data",
@@ -337,35 +343,43 @@
         },
         "data": {
           "title": "What we store",
-          "body": "Your email. Your passkeys, only their public part: the private key stays on your device. What you log or import: transactions, categories, budgets and recurring items. Your time zone and language. If you connect an AI assistant, the permission you gave it. And, for security, the IP address and the kind of browser or app of each session, plus a minimal log of visits: when, from which IP, which page and how it answered. That log keeps neither what comes after the “?” in addresses nor the headers."
+          "body": "Your email. Your passkeys, only their public part: the private key stays on your device. What you log or import (transactions, categories, budgets, recurring items, the category you gave each merchant, your currency) is end-to-end encrypted: it is encrypted on your device, with a key only you and your devices hold, and our server keeps it only as encrypted text it can't read. What the server does see: how many records of each kind you have, their approximate size, when they change and which are deleted; your time zone, your language and whether you finished the welcome; the platform and version of your app and the last day you opened it; the names of the devices you connect; and, if you connect an AI assistant, the permission you gave it. For each session, the kind of browser or app, never your IP address. And a minimal log of visits: when, which page and how it answered. That log keeps no IP address, nothing that comes after the “?” in addresses and no headers."
         },
         "purposes": {
           "title": "Why we store it",
-          "body": "Your email, so you can sign in with a code or a link, and so we can answer if you write to us. Passkeys, so you can sign in without a password. Your transactions, categories, budgets and recurring items, to show you your budget: that is what the app is for. The time zone, to know when your day and your month start. The language, to speak yours, in the app and in emails. The IP and sessions, to keep your account safe and stop abuse, such as asking for codes nonstop. Sign-in emails go out through an email delivery service, which only gets your address and the message."
+          "body": "Your email, so you can sign in with a code or a link, and so we can answer if you write to us. Passkeys, so you can sign in without a password. Your transactions, categories, budgets and recurring items, to show you your budget: that is what the app is for, and it happens on your devices, which are the ones that hold the key. The time zone, to know when your day and your month start. The language, to speak yours, in the app and in emails. Sessions, to keep your account safe. Your IP address is used only in memory, to stop abuse such as asking for codes nonstop, and is never stored. Sign-in emails go out through an email delivery service, which only gets your address and the message."
         },
         "storage": {
           "title": "Where it is stored",
-          "body": "On a server in the European Union. Your data travels encrypted between your device and the server. Every day we make a backup on the server and keep another copy, encrypted with age, in Cloudflare R2. No backup lasts more than 14 days: after that it deletes itself. So if you delete your account, it also leaves the backups within 14 days at most."
+          "body": "On a server in the European Union. Your data travels encrypted between your device and the server, and your finances stay there end-to-end encrypted. Every day we make a backup on the server and keep another copy, encrypted with age, in Cloudflare R2. No backup lasts more than 14 days: after that it deletes itself. So if you delete your account, it also leaves the backups within 14 days at most. Accounts created before end-to-end encryption moved to it on 20 November 2026; the backups from before that day still hold those finances in a form we could read, and the last of them deletes itself on 4 December 2026. One limit you should know: on the web, the app's code comes from our server every time you open it, so whoever controlled the server could change it to read your key while the page is open. The Android app doesn't have that weakness: its code is the one you installed."
+        },
+        "analytics": {
+          "title": "Analytics on wambito.com",
+          "body": "Only on wambito.com, and only if you accept in the cookie notice, we use PostHog to see which pages you visit and where you click, and we record the visit without what you type. PostHog Inc. is a US company that processes this data for us on its servers in the European Union, under its data processing agreement, with standard contractual clauses. It stores a random identifier in a cookie and in your browser's local storage, and records the type of browser and device. It does not keep your IP. Events are deleted after {eventsMonths, plural, one {# month} other {# months}} and recordings after {recordingsDays, plural, one {# day} other {# days}}. Nothing from inside the app reaches analytics: PostHog never loads on app.wambito.com or in the phone app. If your browser asks not to be tracked (GPC or Do Not Track), we don't load PostHog. You can withdraw your consent at any time in “Cookie preferences”, at the foot of every page. To have us delete what was already stored, write to <email>privacy@wambito.com</email>."
         },
         "not_done": {
           "title": "What we don't do",
           "body": "No trackers, no analytics, no ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that."
         },
+        "not_done_with_analytics": {
+          "title": "What we don't do",
+          "body": "No ads. We don't sell your data or share it. It only passes through the services we need to run (the server, the backups and email delivery), and only for that. On top of that, on wambito.com and only with your consent, we use PostHog to see how the page is used. Nothing from inside the app ever reaches analytics: PostHog never loads on app.wambito.com or in the phone app."
+        },
         "voice": {
           "title": "Your voice",
-          "body": "In the Android app you can dictate an expense. Your voice is processed on your phone, with Vosk, and the audio never leaves it. The voice models are downloaded once, when you ask for them, from the project's releases on GitHub. Only the transaction you save reaches our server, as if you had typed it."
+          "body": "In the Android app you can dictate an expense. Your voice is processed on your phone, with Vosk, and the audio never leaves it. The voice models are downloaded once, when you ask for them, from the project's releases on GitHub. Only the transaction you save leaves the phone, end-to-end encrypted, as if you had typed it."
         },
         "capture": {
           "title": "Automatic capture",
-          "body": "In the Android app you can turn on automatic capture: it starts off. If you turn it on and give Wambito access to notifications, it reads only those of the apps you choose, Revolut and Google Wallet, and ignores every other one. The notification text is processed on the phone and never leaves your phone: we neither store it nor send it. Only the transaction taken from it reaches our server: the amount and currency, the merchant, the date and time, and the app it came from. It arrives marked “to review”, and you can confirm, change or delete it. To suggest the category, we remember the one you gave each merchant. You can turn it off at any time in Settings → Automatic capture, or remove Wambito's access to notifications in Android's settings."
+          "body": "In the Android app you can turn on automatic capture: it starts off. If you turn it on and give Wambito access to notifications, it reads only those of the apps you choose, Revolut and Google Wallet, and ignores every other one. The notification text is processed on the phone and never leaves your phone: we neither store it nor send it. Only the transaction taken from it leaves the phone, end-to-end encrypted: the amount and currency, the merchant, the date and time, and the app it came from. It arrives marked “to review”, and you can confirm, change or delete it. To suggest the category, the app remembers the one you gave each merchant, encrypted like everything else. You can turn it off at any time in Settings → Automatic capture, or remove Wambito's access to notifications in Android's settings."
         },
         "assistants": {
           "title": "AI assistants",
-          "body": "You can connect an AI assistant to your account. It only gets in if you allow it, on a permission screen (OAuth) that tells you what it will be able to do: read your data, log things for you, or both. You can take its access away whenever you like, in Settings. What the assistant reads is handled by the company that offers it, under its own policy."
+          "body": "You can connect an AI assistant to your account. It only gets in if you allow it, on a permission screen (OAuth) that tells you what it will be able to do: read your data, log things for you, or both. Since your data is end-to-end encrypted, while the assistant is connected our server opens what it asks for in memory, during each request, with a key the assistant carries, only to answer it; it never stores that key or your data unencrypted. You can take its access away whenever you like, in Settings, and it is cut at once. What the assistant reads is handled by the company that offers it, under its own policy."
         },
         "guest": {
           "title": "Without an email: guest mode",
-          "body": "In the Android app you can start without an email. Your data is stored on the server, in a guest account. If you add your email later, you keep it. A guest account left unused for 60 days is deleted with all its data, even if you signed out."
+          "body": "In the Android app you can start without an email. Your data is stored on the server, end-to-end encrypted, in a guest account. If you add your email later, you keep it. A guest account left unused for 12 months is deleted with all its data, even if you signed out; if you protected it with a recovery key or a passkey, after 24 months."
         },
         "self_hosted": {
           "title": "If you use another server",
@@ -373,7 +387,7 @@
         },
         "rights": {
           "title": "Your rights",
-          "body": "Under Ley 1581 de 2012, you can know what data we hold about you, update it, correct it, ask us to delete it and withdraw your consent. To do so, write to <email>privacy@wambito.com</email> from your account's email. Many things you can do without writing to us: download your data in Settings or <link>delete your account</link>. If you are not satisfied with our answer, you can turn to Colombia's Superintendencia de Industria y Comercio."
+          "body": "Under Ley 1581 de 2012, you can know what data we hold about you, update it, correct it, ask us to delete it and withdraw your consent. To do so, write to <email>privacy@wambito.com</email> from your account's email. Your finances are end-to-end encrypted and we can't read them: if you ask for your data, we tell you what data we hold about you and which of it is encrypted. Without writing to us, you can <link>delete your account</link>. If you are not satisfied with our answer, you can turn to Colombia's Superintendencia de Industria y Comercio."
         },
         "changes": {
           "title": "Changes to this policy",
@@ -387,11 +401,11 @@
         "description": "How to delete your Wambito account and the data it holds, from the app or by email."
       },
       "title": "Delete your account",
-      "version": "Version of 4 November 2026",
+      "version": "Version of 20 November 2026",
       "sections": {
         "in_app": {
           "title": "From the app",
-          "body": "On the web or in the Android app, go to Settings and choose “Delete my account”. To confirm, we ask you to type your email. If you like, download your data first: the button is right there. If you use the app as a guest, save your progress with an email first; otherwise your account deletes itself after 60 days unused."
+          "body": "On the web or in the Android app, go to Settings and choose “Delete my account”. To confirm, we ask you to type your email. Downloading your data first isn't possible yet: soon you'll be able to import and download your data again, now encrypted. If you use the app as a guest, save your progress with an email first; otherwise your account deletes itself after 12 months unused."
         },
         "by_email": {
           "title": "By email",

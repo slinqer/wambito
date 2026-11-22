@@ -1,5 +1,6 @@
-import { type ReactNode, useId, useState } from "react";
+import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
+import { useApiMode } from "../../api/ApiProvider.tsx";
 import { intlTag, type Locale } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { ConfirmSheet } from "../../ui/ConfirmSheet.tsx";
@@ -32,20 +33,15 @@ function formatDay(iso: string, locale: Locale, timeZone: string): string {
  * for Claude and ChatGPT (their menus are in English and change: checked when this was built),
  * two things to ask, and the assistants already connected, each with where it comes from, when
  * it was connected and last used, and "Revocar" after asking. In the demo there is no account
- * to connect, so the list is left out and nothing is asked of the API.
+ * to connect, so the list is left out and nothing is asked of the API. An encrypted account
+ * (`local` mode) lists and revokes its assistants as any other (spec 2026-11-16 section 5).
  */
 export function AssistantsSection({
   timeZone,
-  off = false,
-  offNote,
   copy = clipboardCopy,
   origin = typeof window === "undefined" ? "" : window.location.origin,
 }: {
   timeZone: string;
-  /** The demo (and a preview account): the address and the steps only. */
-  off?: boolean;
-  /** Shown instead of the list when `off` (a preview account says why). */
-  offNote?: ReactNode;
   copy?: CopyText;
   /** Where the web is served; the page's own origin by default. */
   origin?: string;
@@ -54,6 +50,8 @@ export function AssistantsSection({
   const urlId = useId();
   const toast = useToast();
   const url = mcpUrl(origin);
+  // The demo has no account behind it: the address and the steps only.
+  const demo = useApiMode() === "demo";
 
   const copyUrl = async () => {
     try {
@@ -105,7 +103,7 @@ export function AssistantsSection({
           ))}
         </ul>
       </div>
-      {off ? offNote : <ConnectedAssistants timeZone={timeZone} />}
+      {!demo && <ConnectedAssistants timeZone={timeZone} />}
     </SettingsSection>
   );
 }

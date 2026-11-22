@@ -92,8 +92,10 @@ class HomeWidgetStore implements WidgetStore {
 ///   "updatedAt": "2026-10-22T15:30:00.000Z",  // UTC, when these figures came from the server
 ///   "hideAmount": false,       // Settings' "Ocultar el monto en el widget": draw "••••"
 ///   "theme": "dark",           // the app's theme choice: "dark" | "light" | "system"
-///   "timezone": "America/Bogota"  // the profile's IANA zone: "this month" and midnight are read
-///                                 // in it, as the app reads its figures (the phone's without one)
+///   "timezone": "America/Bogota",  // the profile's IANA zone: "this month" and midnight are read
+///                                  // in it, as the app reads its figures (the phone's without one)
+///   "owner": "u1"          // `preview` accounts only: the user id the figures belong to (D10); a
+///                          // reader whose `AccountMode.owner` differs draws the signed-out widget
 /// }
 /// ```
 ///
@@ -111,6 +113,7 @@ Map<String, Object?> signedInSnapshot(
   required String theme,
   required DateTime updatedAt,
   required String timezone,
+  String? owner,
 }) {
   final worried = summary.categories.any((c) => c.state != SummaryCategoriesInnerStateEnum.ok);
   return {
@@ -127,22 +130,29 @@ Map<String, Object?> signedInSnapshot(
     'hideAmount': hideAmount,
     'theme': theme,
     'timezone': timezone,
+    'owner': ?owner,
   };
 }
 
 /// What the widget shows with nobody signed in: "Abre Wambito para empezar", in the app's theme
 /// and language. It holds no figure at all, so after a sign-out nothing of the previous person is
 /// left for the widget (or its refresh job) to draw (Review Focus 4).
+///
+/// A `preview` account's figures are drawn from its vault by Dart (`vault_widget.dart`); until the
+/// vault is open (locked, not unlocked yet) it gets this same shape, with no `line`: the usual
+/// "Abre Wambito para empezar".
 Map<String, Object?> signedOutSnapshot({
   required bool hideAmount,
   required String theme,
   String? locale,
+  String? line,
 }) => {
   'v': widgetSnapshotVersion,
   'signedIn': false,
   'hideAmount': hideAmount,
   'theme': theme,
   'locale': ?locale,
+  'line': ?line,
 };
 
 /// The stored snapshot [json] with the person's new choices, its figures and their time

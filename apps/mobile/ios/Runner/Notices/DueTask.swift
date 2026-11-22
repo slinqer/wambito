@@ -66,6 +66,15 @@ enum DueTask {
       return true
     case .token(let read): token = read
     }
+    // A `preview` account's payments live only on the phone: nothing is asked of the server and
+    // the run is not scheduled again. While the app has not learned the mode, tomorrow looks again.
+    switch AccountMode.dueRun(AccountMode.read(defaults)) {
+    case .ask: break
+    case .skipToday:
+      schedule(zone: zone)
+      return true
+    case .stop: return true
+    }
     var keepGoing = true
     var done = true
     let status = await center.notificationSettings().authorizationStatus

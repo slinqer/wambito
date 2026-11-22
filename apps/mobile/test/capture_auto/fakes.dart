@@ -1,3 +1,4 @@
+import 'package:wambito/background/queued_capture.dart';
 import 'package:wambito/capture_auto/capture_platform.dart';
 
 /// Android's side of automatic capture in memory.
@@ -49,17 +50,44 @@ class FakeAutoCapturePlatform implements AutoCapturePlatform {
   Future<void> clearQueue() async => calls.add('clearQueue');
 
   @override
-  Future<void> sendQueued(String userId) async => calls.add('sendQueued $userId');
+  Future<void> sendQueued(String userId, {String? from}) async =>
+      calls.add(from == null ? 'sendQueued $userId' : 'sendQueued $userId from $from');
 
   /// The `before` of each [keepOnlyNotifications], in order.
   final keepBefore = <DateTime>[];
 
   @override
-  Future<void> dismissNotifications(List<String> ids) async => calls.add('dismiss ${ids.join(',')}');
+  Future<void> dismissNotifications(List<String> ids) async =>
+      calls.add('dismiss ${ids.join(',')}');
 
   @override
   Future<void> keepOnlyNotifications(List<String> ids, DateTime before) async {
     calls.add('keepOnly ${ids.join(',')}');
     keepBefore.add(before);
   }
+
+  /// What [takeQueued] hands out.
+  List<QueuedCapture> queuedCaptures = [];
+  List<String> queuedConfirms = [];
+
+  @override
+  Future<({List<QueuedCapture> captures, List<String> confirms})> takeQueued(String userId) async {
+    calls.add('takeQueued $userId');
+    return (captures: [...queuedCaptures], confirms: [...queuedConfirms]);
+  }
+
+  /// What [hasQueued] throws when set (Android could not read the queue).
+  Object? hasQueuedError;
+
+  @override
+  Future<bool> hasQueued(String userId) async {
+    calls.add('hasQueued $userId');
+    final error = hasQueuedError;
+    if (error != null) throw error;
+    return queuedCaptures.isNotEmpty;
+  }
+
+  @override
+  Future<void> ackQueued(List<String> keys, List<String> confirms) async =>
+      calls.add('ackQueued ${keys.join(',')} | ${confirms.join(',')}');
 }

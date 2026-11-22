@@ -1,0 +1,6 @@
+- Os teus dados são cifrados de ponta a ponta: só os teus dispositivos os podem ler.
+- Começa sem email e sem rede; adiciona o teu email quando quiseres.
+- A tua chave de acesso abre os teus dados com um toque, se o teu gestor de palavras-passe o permitir.
+- Entra na web lendo um código QR com o telemóvel.
+- Liga outro dispositivo e remove os que já não usas.
+- Liga e gere os teus assistentes de IA com a conta cifrada.

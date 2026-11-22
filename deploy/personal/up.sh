@@ -57,7 +57,8 @@ if [ "$build_web" = 1 ]; then
     rm -rf apps/web/build-personal
     # `/` redirects to the public landing (Caddyfile), so the app's own links to it leave too.
     VITE_SITE_URL="https://$host" VITE_LANDING_ONLY=false WAMBITO_BUILD_DIR=build-personal \
-      VITE_LANDING_URL="$landing_url" pnpm --filter @wambito/web build
+      VITE_LANDING_URL="$landing_url" VITE_BUILD_ID="$(git -C "$REPO_DIR" rev-parse --short HEAD)" \
+      pnpm --filter @wambito/web build
   )
 fi
 [ -f "$REPO_DIR/apps/web/build-personal/client/index.html" ] ||

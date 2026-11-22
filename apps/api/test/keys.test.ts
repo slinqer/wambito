@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { keyWraps, passkey } from "@wambito/db";
+import { keyWraps, oauthAccessToken, oauthConsent, oauthRefreshToken, passkey } from "@wambito/db";
 import { eq, sql } from "@wambito/db/orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { createTestApp, type TestApp } from "./harness.ts";
@@ -577,7 +577,7 @@ describe("/v2/keys", () => {
         const h = bearer(token.accessToken);
         const res = await t.request("GET", "/v2/keys/assistant", { headers: h });
         expect(res.status).toBe(200);
-        const wrap = (await res.json()) as KeyWrap;
+        const { wrap } = (await res.json()) as { wrap: KeyWrap };
         const expected = token === first ? firstWrap : secondWrap;
         expect(wrap).toMatchObject({
           id: expected.id,
@@ -606,6 +606,82 @@ describe("/v2/keys", () => {
         await expectProblem(res, 403, "insufficient_scope");
       }
       expect(await list(headers)).toHaveLength(3);
+    });
+
+    test("the assistant's wrap comes with the account's links", async () => {
+      const { email, headers } = await person();
+      const token = await t.authorize(email, { headers });
+      await put(headers, recovery(1));
+      await put(headers, { kind: "assistant", ref: token.clientId, keyV: 1, wrapped: bytes(60) });
+      const rotated = await rotateRaw(headers, {
+        keyV: 2,
+        wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(4),
+      });
+      expect(rotated.status).toBe(200);
+      // The rotation disconnected it; the person connects it again and wraps at keyV 2.
+      const again = await t.authorize(email, { headers });
+      await put(headers, { kind: "assistant", ref: again.clientId, keyV: 2, wrapped: bytes(60) });
+      const res = await t.request("GET", "/v2/keys/assistant", {
+        headers: bearer(again.accessToken),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { wrap: KeyWrap; links: { keyV: number; link: string }[] };
+      expect(body.wrap).toMatchObject({ ref: again.clientId, keyV: 2 });
+      expect(body.links).toEqual([{ keyV: 2, link: link(4) }]);
+    });
+
+    test("a rotation carrying an assistant wrap is 422 assistant_wrap_in_rotation", async () => {
+      const { email, headers } = await person();
+      const token = await t.authorize(email, { headers });
+      await put(headers, recovery(1));
+      const kept = await put(headers, device(1));
+      await expectProblem(
+        await rotateRaw(headers, {
+          keyV: 2,
+          wraps: [
+            { id: randomUUID(), ...recovery(2) },
+            {
+              id: randomUUID(),
+              kind: "assistant",
+              ref: token.clientId,
+              keyV: 2,
+              wrapped: bytes(60),
+            },
+          ],
+          link: link(),
+        }),
+        422,
+        "assistant_wrap_in_rotation",
+      );
+      expect((await list(headers)).map((w) => w.id)).toContain(kept.id);
+      expect(await list(headers)).toHaveLength(2);
+    });
+
+    test("a rotation revokes every assistant of the account", async () => {
+      const { email, headers, userId } = await person();
+      const first = await t.authorize(email, { headers });
+      const second = await t.authorize(email, { headers, scope: "finance:write" });
+      await put(headers, recovery(1));
+      await put(headers, { kind: "assistant", ref: first.clientId, keyV: 1, wrapped: bytes(60) });
+      const res = await rotateRaw(headers, {
+        keyV: 2,
+        wraps: [{ id: randomUUID(), ...recovery(2) }],
+        link: link(),
+      });
+      expect(res.status, await res.clone().text()).toBe(200);
+      const assistants = await t.request("GET", "/v1/me/assistants", { headers });
+      expect(((await assistants.json()) as { items: unknown[] }).items).toEqual([]);
+      for (const table of [oauthConsent, oauthAccessToken, oauthRefreshToken]) {
+        expect(await t.admin.select().from(table).where(eq(table.userId, userId))).toEqual([]);
+      }
+      expect((await list(headers)).map((w) => w.kind)).toEqual(["recovery"]);
+      // The access token is still valid for its 15 minutes, but the wrap is gone.
+      await expectProblem(
+        await t.request("GET", "/v2/keys/assistant", { headers: bearer(second.accessToken) }),
+        404,
+        "not_found",
+      );
     });
 
     test("an assistant without a wrap gets 404; a session gets 404", async () => {

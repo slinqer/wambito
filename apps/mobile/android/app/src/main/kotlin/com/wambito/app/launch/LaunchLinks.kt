@@ -16,6 +16,11 @@ import com.wambito.app.widget.ServerSetting
  * They reach the app only through [ALIAS], an activity-alias of `MainActivity` that is not exported
  * (AndroidManifest.xml): the widget and the tile start it as the app itself; no other app can,
  * so none can open the microphone. A link sent to the exported launcher activity is ignored.
+ *
+ * The one exception is [SIGNIN_HOST]: `wambito://signin?id=…&key=…` is the QR a browser shows to be
+ * signed in by this phone (phone-first spec 8.1, ruling 14), and the system camera opens it, so
+ * it comes to the exported `MainActivity` (its own intent filter). It only opens the approval
+ * screen, where the person still has to approve, and only with the vault open (Dart).
  */
 object LaunchLinks {
     /** The scheme of the links the app builds. */
@@ -34,6 +39,9 @@ object LaunchLinks {
     val HOME: Uri = Uri.parse("wambito://home")
     private val HOSTS = setOf("add", "capture", "due", "progress", "home", "review")
 
+    /** A web sign-in's QR, opened by the system camera: the one link any app may send. */
+    const val SIGNIN_HOST = "signin"
+
     /** `wambito://review/<id>` opens a detected transaction's review ("Cambiar" on its notification). */
     val REVIEW: Uri = Uri.parse("wambito://review")
 
@@ -50,14 +58,19 @@ object LaunchLinks {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
     /**
-     * The `wambito://add`, `capture`, `due`, `progress` or `home` link [intent] carries, or null. An activity reopened from recents gets its first
-     * intent again: that one is not acted on twice.
+     * The `wambito://add`, `capture`, `due`, `progress`, `home` or `review/<id>` link [intent] carries
+     * through [ALIAS], or a `wambito://signin?…` from anywhere ([SIGNIN_HOST]); else null. An
+     * activity reopened from recents gets its first intent again: that one is not acted on twice.
      */
     fun linkOf(intent: Intent?): String? {
         if (intent == null || intent.action != Intent.ACTION_VIEW) return null
-        if (intent.component?.className != ALIAS) return null
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
         val data = intent.data ?: return null
+        if (data.scheme == SCHEME && data.host == SIGNIN_HOST) {
+            // No path; Dart reads the id and key (lib/launch/launch_links.dart).
+            return if (data.path.isNullOrEmpty() && !data.query.isNullOrEmpty()) data.toString() else null
+        }
+        if (intent.component?.className != ALIAS) return null
         if (data.scheme != SCHEME || data.host !in HOSTS) return null
         val path = data.path.orEmpty()
         if (data.host == "review") {

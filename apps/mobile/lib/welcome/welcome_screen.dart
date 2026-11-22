@@ -18,6 +18,7 @@ import '../home/screen_error.dart';
 import '../import/budgets_form.dart';
 import '../import/import_flow.dart';
 import '../l10n/app_localizations.dart';
+import '../vault/preview.dart';
 import '../ui/app_shell.dart';
 import 'budgets_step.dart';
 import 'categories_step.dart';
@@ -160,6 +161,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         onBack: onBack,
         busy: state.busy,
         locked: flow.locked,
+        preview: ref.watch(isPreviewProvider),
         onSkip: () => unawaited(
           controller.skipImport().then((left) {
             if (left && mounted) _go(StepId.categories);

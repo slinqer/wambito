@@ -1,9 +1,13 @@
-// The web's inline SVG icons: the fingerprint (apps/web/app/ui/FingerprintIcon.tsx) and the moon and
+// The interface icons (apps/web/app/ui/Icon.tsx, from docs/design/system/project/icons/icons.json:
+// lk_icon_shapes.dart) and the web's other inline SVG icons: the fingerprint (apps/web/app/ui/FingerprintIcon.tsx) and the moon and
 // the sun of the day/night switch (apps/web/app/ui/ThemeToggle.tsx). Each is 22px, drawn from a 24px
 // viewBox in the colour of the text around it (`currentColor`).
 import 'package:flutter/widgets.dart';
 
+import 'lk_icon_shapes.dart';
 import 'svg_path.dart';
+
+export 'lk_icon_shapes.dart' show LkIconName, LkIconVariant;
 
 /// An icon of the web: [paths] in a 24 x 24 box, scaled to [size].
 class _SvgIcon extends StatelessWidget {
@@ -124,4 +128,73 @@ class ThemeIcon extends StatelessWidget {
   Widget build(BuildContext context) => night
       ? _SvgIcon(paths: _moon, fill: true, strokeWidth: 0)
       : _SvgIcon(paths: _sunRays, fill: false, strokeWidth: 2, filledShapes: [_sunDisc]);
+}
+
+/// The parsed paths of every icon shape, made once.
+final _parsed = <LkIconShape, Path>{};
+
+Path _pathOf(LkIconShape shape) => _parsed.putIfAbsent(
+  shape,
+  () =>
+      parseSvgPath(shape.d)..fillType = shape.evenOdd ? PathFillType.evenOdd : PathFillType.nonZero,
+);
+
+/// An interface icon (the web's `Icon`), [size] square, in [color] or the text colour around it.
+/// Hidden from semantics: the button around it carries the name. Emoji stay for categories.
+class LkIcon extends StatelessWidget {
+  const LkIcon(
+    this.name, {
+    super.key,
+    this.variant = LkIconVariant.filled,
+    this.size = 24,
+    this.color,
+  });
+
+  final LkIconName name;
+
+  /// `outline` for an inactive tab.
+  final LkIconVariant variant;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = color ?? DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
+    return ExcludeSemantics(
+      child: CustomPaint(
+        size: Size.square(size),
+        painter: _IconPainter(shapesOf(name, variant), colour),
+      ),
+    );
+  }
+}
+
+class _IconPainter extends CustomPainter {
+  const _IconPainter(this.shapes, this.color);
+
+  final List<LkIconShape> shapes;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 48, size.height / 48);
+    for (final shape in shapes) {
+      final paint = Paint()
+        ..color = color
+        ..isAntiAlias = true;
+      if (shape.fill) {
+        paint.style = PaintingStyle.fill;
+      } else {
+        paint
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = shape.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+      }
+      canvas.drawPath(_pathOf(shape), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_IconPainter old) => old.color != color || old.shapes != shapes;
 }

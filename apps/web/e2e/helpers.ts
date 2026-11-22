@@ -1,7 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, request } from "@playwright/test";
+import { expect, type Page, request, test } from "@playwright/test";
 
 /**
  * Helpers for app flows against the dev stack (`docker compose up`: API, Postgres, Mailpit):
@@ -141,8 +142,14 @@ export async function sessionUser(page: Page): Promise<{ id: string; email: stri
 /**
  * A software authenticator in the page's browser (Chrome's WebAuthn domain over CDP): creates and
  * uses passkeys without a person, verifying the user at once. Call it before the page asks for one.
+ * `prf` gives its passkeys the PRF extension (`hasPrf`), which opens an encrypted account's data;
+ * without it (the default, as Chromium's) a new passkey signs in only, and an encrypted account's
+ * passkey offer says so before going on.
  */
-export async function addVirtualAuthenticator(page: Page): Promise<void> {
+export async function addVirtualAuthenticator(
+  page: Page,
+  { prf = false }: { prf?: boolean } = {},
+): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -152,6 +159,7 @@ export async function addVirtualAuthenticator(page: Page): Promise<void> {
       hasResidentKey: true,
       hasUserVerification: true,
       isUserVerified: true,
+      hasPrf: prf,
       automaticPresenceSimulation: true,
     },
   });
@@ -198,9 +206,15 @@ export async function skipPasskeyOffer(page: Page, { lang = "es" as Lang } = {})
   await expect(page).not.toHaveURL(/\/passkey-offer/);
 }
 
-/** Signs a brand-new user in through the sign-in page; returns their email. Lands on /welcome. */
+/**
+ * Signs a brand-new plain user in through the sign-in page; returns their email. Lands on
+ * /welcome. The e2e stack runs with NEW_USERS_ENCRYPTED on, so a real sign-up would be born
+ * encrypted: the user is seeded plain first (`seedPlainUser`, its categories named in `lang`), and
+ * the email sign-in then finds it.
+ */
 export async function signUpNewUser(page: Page, { lang = "es" as Lang } = {}) {
   const email = freshEmail();
+  seedPlainUser(email, lang);
   await page.goto(`/sign-in?lang=${lang}`);
   const words = SIGN_IN_WORDS[lang];
   await page.getByRole("textbox", { name: words.email }).fill(email);
@@ -296,4 +310,86 @@ export async function expectNoAxeViolations(page: Page, screen = page.url(), tag
     results.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(" ")) })),
     `axe on ${screen}`,
   ).toEqual([]);
+}
+
+/** The recovery key from the setup screen, then the four characters it asks back. */
+export async function setUpRecoveryKey(page: Page): Promise<string> {
+  await expect(
+    page.getByRole("heading", { name: "Guarda tu clave de recuperación" }),
+  ).toBeVisible();
+  const key = (
+    await page.getByRole("group", { name: "Tu clave de recuperación" }).innerText()
+  ).replace(/\s+/g, "-");
+  expect(key).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{3,4})+$/);
+  await page.getByRole("button", { name: "Ya la guardé" }).click();
+  const plain = key.replaceAll("-", "");
+  const boxes = page.getByRole("textbox", { name: /^Grupo \d+, carácter \d+$/ });
+  for (const box of await boxes.all()) {
+    const [, group, char] = /^Grupo (\d+), carácter (\d+)$/.exec(
+      (await box.getAttribute("aria-label")) ?? "",
+    ) ?? ["", "0", "0"];
+    await box.fill(plain[(Number(group) - 1) * 4 + Number(char) - 1] ?? "");
+  }
+  await page.getByRole("button", { name: "Continuar" }).click();
+  return key;
+}
+
+/** The time `seedPlainUser` adds to the running test's timeout. */
+const SEED_SLACK_MS = 15_000;
+
+/**
+ * Inserts a plain user with this email, as a plain web sign-up leaves it before onboarding (email
+ * verified, the default account and the suggested categories, named in `lang`), in the API
+ * container (`seed:e2e-plain-user`). An existing email is left as it is.
+ */
+export function seedPlainUser(email: string, lang: Lang = "es"): void {
+  // A few seconds in the container (tsx starting up): the test gets them on top of its timeout.
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + SEED_SLACK_MS);
+  execFileSync(
+    "docker",
+    [
+      ...["compose", "exec", "-T", "api", "pnpm", "--silent", "--filter", "@wambito/api"],
+      ...["seed:e2e-plain-user", email, lang],
+    ],
+    // Its stderr is kept for the error a failed seed throws.
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+}
+
+/** Makes the preview account again: no records, key wraps, passkeys or finance rows. */
+export function reseed() {
+  execFileSync(
+    "docker",
+    ["compose", "exec", "-T", "api", "pnpm", "--filter", "@wambito/api", "seed:e2e-preview"],
+    { stdio: "inherit" },
+  );
+}
+
+/**
+ * Makes the plain account the migration e2e moves to encrypted again (`migrate-e2e`,
+ * migrate@wambito.test, `seed:e2e-migrate` in the API container): deleted and recreated with
+ * every kind of row (an archived category, budget months, a yearly and a monthly recurrence with a
+ * dismissed month, a deleted transaction, a capture and its merchant rule), in COP.
+ */
+export function seedMigrateUser(): void {
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + SEED_SLACK_MS);
+  execFileSync(
+    "docker",
+    [
+      ...["compose", "exec", "-T", "api", "pnpm", "--silent", "--filter", "@wambito/api"],
+      "seed:e2e-migrate",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+}
+
+/** Runs one SQL statement in the dev stack's database (as its owner); its rows, tab-separated. */
+export function psql(sql: string): string {
+  return execFileSync(
+    "docker",
+    ["compose", "exec", "-T", "postgres", "psql", "-U", "wambito", "-d", "wambito", "-tAc", sql],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  ).trim();
 }

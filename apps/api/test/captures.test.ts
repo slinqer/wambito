@@ -219,6 +219,65 @@ describe("category", () => {
     expect(out.category).toEqual({ name: "Super", fallback: false });
   });
 
+  test("a branch of a learned chain gets the chain's category, the longest learned name first", async () => {
+    const c = await t.signIn("memory-prefix@wambito.test");
+    const [chain, branch] = await t.admin
+      .insert(categories)
+      .values([
+        { userId: c.userId, name: "Super", kind: "expense", icon: "🛒", color: "#fff" },
+        { userId: c.userId, name: "Barrio", kind: "expense", icon: "🏠", color: "#fff" },
+      ])
+      .returning();
+    await t.admin
+      .insert(merchantCategories)
+      .values({ userId: c.userId, merchantKey: "lidl", categoryId: chain?.id as string });
+    const first = await json(
+      await capture({ merchant: "LIDL CASAL RIBEIRO", ...at("2026-11-04T10:00:00Z") }, { user: c }),
+    );
+    expect(first.category).toEqual({ name: "Super", fallback: false });
+
+    await t.admin
+      .insert(merchantCategories)
+      .values({ userId: c.userId, merchantKey: "lidl casal", categoryId: branch?.id as string });
+    const second = await json(
+      await capture(
+        { merchant: "LIDL CASAL RIBEIRO", amount: 4321, ...at("2026-11-05T10:00:00Z") },
+        { user: c },
+      ),
+    );
+    expect(second.category).toEqual({ name: "Barrio", fallback: false });
+  });
+
+  test("an exact learned name wins over its chain", async () => {
+    const c = await t.signIn("memory-exact@wambito.test");
+    const [chain, exact] = await t.admin
+      .insert(categories)
+      .values([
+        { userId: c.userId, name: "Super", kind: "expense", icon: "🛒", color: "#fff" },
+        { userId: c.userId, name: "Gasolina", kind: "expense", icon: "⛽", color: "#fff" },
+      ])
+      .returning();
+    await t.admin.insert(merchantCategories).values([
+      { userId: c.userId, merchantKey: "repsol", categoryId: chain?.id as string },
+      { userId: c.userId, merchantKey: "repsol estacion", categoryId: exact?.id as string },
+    ]);
+    const out = await json(await capture({ merchant: "REPSOL ESTACION" }, { user: c }));
+    expect(out.category).toEqual({ name: "Gasolina", fallback: false });
+  });
+
+  test("a first word under 3 letters never matches by prefix", async () => {
+    const c = await t.signIn("memory-short@wambito.test");
+    const [cat] = await t.admin
+      .insert(categories)
+      .values({ userId: c.userId, name: "Bar", kind: "expense", icon: "🍺", color: "#fff" })
+      .returning();
+    await t.admin
+      .insert(merchantCategories)
+      .values({ userId: c.userId, merchantKey: "el", categoryId: cat?.id as string });
+    const out = await json(await capture({ merchant: "EL CORTE INGLES" }, { user: c }));
+    expect(out.category).toEqual({ name: "Otros gastos", fallback: true });
+  });
+
   test("ignores a remembered category of the other kind", async () => {
     const c = await t.signIn("memory3@wambito.test");
     const [cat] = await t.admin

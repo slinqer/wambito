@@ -1,9 +1,9 @@
 # Deploying a personal install
 
-Wambito can run as a private, single-person install on one machine: its own Docker stack, reached
-through a Cloudflare named tunnel at one hostname, with an optional email allowlist and a daily verified
-backup. It is meant for using the app with real data before (or instead of) a cloud deployment, and
-it moves to a server with its data later.
+Wambito runs as one Docker stack on one machine, at one hostname: served directly with its own
+certificate on a server (how `app.wambito.com` runs), or through a Cloudflare named tunnel from a
+machine at home. It has an optional email allowlist and a daily verified backup. The step-by-step
+guide for running your own is [`docs/self-hosting.md`](../self-hosting.md).
 
 Everything is in [`deploy/personal/`](../../deploy/personal/README.md): the compose stack (Postgres,
 a one-shot migration step, the API, Caddy, cloudflared), the scripts (`up.sh`, `update.sh`,

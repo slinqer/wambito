@@ -24,15 +24,17 @@ import { isPreviewAccount } from "../config.ts";
 import type { AppDeps } from "../deps.ts";
 import { isUniqueViolation } from "../http/db-errors.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
-import { encryptedAccount } from "../http/preview.ts";
+import { updateRequired } from "../http/preview.ts";
 import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
 import { UpdateProfile } from "../http/schemas.ts";
 import { deleteAccount } from "../services/account.ts";
+import { accountEncryption, migrationOf, toEncryption } from "../services/encryption.ts";
+import { endLongSessions } from "../services/sessions.ts";
 import { userToday } from "../services/time.ts";
 import { defaultAccount, toTransactionDto } from "../services/transactions.ts";
 
-const profileDto = z
+export const profileDto = z
   .object({
     id: z.string(),
     email: z.string(),
@@ -44,9 +46,17 @@ const profileDto = z
     isAnonymous: z.boolean(),
     /**
      * `preview`: the account keeps its finances only as end-to-end encrypted records (`/v2`), and
-     * its `/v1` finance routes stay empty; `plain`: every other account.
+     * its `/v1` finance routes answer 426 (listed in `E2E_PREVIEW_USER_IDS`, created while
+     * `NEW_USERS_ENCRYPTED` was on, migrated, or migrating); `plain`: every other account.
      */
     encryption: z.enum(["plain", "preview"]),
+    /**
+     * The move of a plain account to end-to-end encryption (the switch day): `available` when the
+     * web may start it (a plain account with an email, `MIGRATION_OPEN` on or the id in
+     * `MIGRATION_OPEN_USER_IDS`), `in_progress` while it runs (the web resumes it). Absent
+     * otherwise.
+     */
+    migration: z.enum(["available", "in_progress"]).optional(),
   })
   .openapi("Profile");
 
@@ -91,7 +101,7 @@ function requireAllowed(deps: AppDeps, email: string) {
 const csvField = (value: string) =>
   /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 
-async function profile(deps: AppDeps, userId: string) {
+export async function profile(deps: AppDeps, userId: string) {
   // Every profile the API answers with is the same one, so each read stamps (see the function).
   await stampOnboardedIfUsed(deps, userId);
   const [row] = await deps.db
@@ -102,18 +112,29 @@ async function profile(deps: AppDeps, userId: string) {
       locale: user.locale,
       onboardingCompletedAt: user.onboardingCompletedAt,
       isAnonymous: user.isAnonymous,
+      encryption: user.encryption,
     })
     .from(user)
     .where(eq(user.id, userId));
   if (!row) throw new ApiError(401, "unauthenticated", "Sign in to continue");
+  const { encryption: stored, ...fields } = row;
+  const encryption = toEncryption(stored);
+  const migration = migrationOf(deps.config, {
+    id: userId,
+    encryption,
+    isAnonymous: row.isAnonymous,
+  });
   const [account] = await withUser(deps.db, userId, (tx) =>
     tx.select({ currency: accounts.currency }).from(accounts).where(eq(accounts.isDefault, true)),
   );
   return {
-    ...row,
+    ...fields,
     onboardingCompletedAt: row.onboardingCompletedAt?.toISOString() ?? null,
     currency: account?.currency ?? "EUR",
-    encryption: isPreviewAccount(deps.config, userId) ? ("preview" as const) : ("plain" as const),
+    encryption: isPreviewAccount(deps.config, { id: userId, encryption })
+      ? ("preview" as const)
+      : ("plain" as const),
+    ...(migration ? { migration } : {}),
   };
 }
 
@@ -202,15 +223,26 @@ export function meRoutes(deps: AppDeps) {
       path: "/v1/me",
       operationId: "updateMe",
       description:
-        "Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 `encrypted_account`.",
+        "Updates the profile. `currency` is the default account's; an end-to-end encrypted account (preview, or migrating) keeps it in its records, so sending it is 426 `update_required`.",
       request: { body: jsonBody(UpdateProfile) },
-      responses: { 200: jsonResponse(profileDto, "Updated profile"), ...problems(403, 409, 422) },
+      responses: {
+        200: jsonResponse(profileDto, "Updated profile"),
+        ...problems(403, 409, 422, 426),
+      },
     }),
     async (c) => {
       const { onboardingCompleted, currency, ...fields } = c.req.valid("json");
       const userId = c.get("userId");
-      // A preview account's currency lives in its settings record.
-      if (currency && isPreviewAccount(deps.config, userId)) throw encryptedAccount();
+      // A preview (or migrating) account's currency lives in its settings record.
+      if (
+        currency &&
+        isPreviewAccount(deps.config, {
+          id: userId,
+          encryption: await accountEncryption(deps.db, userId),
+        })
+      ) {
+        throw updateRequired();
+      }
       const set = {
         ...fields,
         // Stamp completion once; later calls keep the first timestamp.
@@ -279,15 +311,19 @@ export function meRoutes(deps: AppDeps) {
       if (result !== "ok") throw CLAIM_CODE_PROBLEMS[result]();
       let claimed: { id: string }[];
       try {
-        // One statement in one transaction. A concurrent claim of the same email by another guest
-        // waits on the unique email index and then fails it: that one gets email_taken.
-        claimed = await withUser(deps.db, userId, (tx) =>
-          tx
+        // One transaction. A concurrent claim of the same email by another guest waits on the
+        // unique email index and then fails it: that one gets email_taken. With an email the
+        // person can sign in again: in the same transaction, a 25-month phone session goes back
+        // to 60 days.
+        claimed = await withUser(deps.db, userId, async (tx) => {
+          const rows = await tx
             .update(user)
             .set({ email, emailVerified: true, isAnonymous: false })
             .where(and(eq(user.id, userId), eq(user.isAnonymous, true)))
-            .returning({ id: user.id }),
-        );
+            .returning({ id: user.id });
+          if (rows.length > 0) await endLongSessions(tx, userId, new Date());
+          return rows;
+        });
       } catch (error) {
         if (isUniqueViolation(error)) throw emailTaken();
         throw error;

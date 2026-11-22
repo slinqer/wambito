@@ -27,8 +27,9 @@ serve({ fetch: app.fetch, port: config.PORT }, ({ port }) => {
   console.log(`Wambito API listening on http://localhost:${port}`);
 });
 
-// Guests idle for over 60 days are deleted once a day (spec §4.4). Always the real clock: the
-// pinned E2E clock would misjudge real session times.
+// Once a day: plain guests idle for over 60 days are deleted (spec §4.4), encrypted users without
+// an email after 12 or 24 idle months (spec 2026-11-15 §10), and ended_sessions rows older than 90
+// days are purged. Always the real clock: the pinned E2E clock would misjudge real session times.
 scheduleGuestCleanup({ db });
 // Deleted records older than 180 days are purged once a day (spec 2026-11-08 section 5.1), on the
 // real clock too.

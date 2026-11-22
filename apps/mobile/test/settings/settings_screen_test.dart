@@ -12,11 +12,27 @@ import 'package:wambito/entry/entry_screen.dart';
 import 'package:wambito/settings/licenses.dart';
 import 'package:wambito/settings/preferences.dart';
 import 'package:wambito/settings/settings_parts.dart' show LkSwitch;
+import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/sheet.dart' show LkSheetScope;
 import 'package:wambito/api/server_url.dart';
+import 'package:wambito/local/backend.dart' show LocalBackend, createLocalBackend;
+import 'package:wambito/local/memory_store.dart' show createMemoryStore;
+import 'package:wambito/local/vault_session.dart' show VaultSession;
+import 'package:wambito/vault/vault_providers.dart' show vaultSessionProvider;
+import 'package:wambito/protect/protect_status.dart';
+import 'package:wambito/security/screen_lock.dart' show LockCheck, screenLockProvider;
+import 'package:wambito/settings/security/security_api.dart'
+    show securityApiProvider, securitySnapshotProvider;
+import 'package:flutter_riverpod/misc.dart' show Override;
+
+import '../protect/fakes.dart' show FakeVault;
+
+import 'package:wambito/vault/recovery_key_setup_view.dart' show RecoveryKeySetupView;
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../home/fakes.dart';
 import 'harness.dart';
+import 'security/fake_security.dart' show FakeLock, FakeSecurity, snapshotOf;
 
 const _honestEs = 'Sin correo, si pierdes el teléfono o borras la app, pierdes tus datos.';
 const _honestEn = 'Without an email, losing the phone or deleting the app loses your data.';
@@ -33,6 +49,35 @@ Future<void> _scrollTo(WidgetTester tester, String key) async {
 Future<void> _tap(WidgetTester tester, String key) async {
   await _scrollTo(tester, key);
   await tester.tap(find.byKey(Key(key)));
+  await tester.pumpAndSettle();
+}
+
+/// A `preview` guest's vault and the protect answers around it: [recoveryKey] and [passkey] say
+/// which way back is done; [passkeyReadable] false is the phone being offline.
+List<Override> _previewGuest({
+  bool recoveryKey = false,
+  bool passkey = false,
+  bool passkeyReadable = true,
+}) => [
+  protectStatusProvider.overrideWith(
+    (ref) async => ProtectStatus(
+      recoveryKey: recoveryKey,
+      passkey: passkey,
+      passkeyOffered: true,
+      passkeyWithoutPrf: false,
+    ),
+  ),
+  securityApiProvider.overrideWithValue(FakeSecurity()),
+  securitySnapshotProvider.overrideWith(
+    (ref) async => passkeyReadable ? snapshotOf() : throw StateError('offline'),
+  ),
+  screenLockProvider.overrideWithValue(FakeLock(LockCheck.noLock)),
+];
+
+Future<void> _changeServerTo(WidgetTester tester, String url) async {
+  await _tap(tester, 'settings.server');
+  await tester.enterText(find.byKey(const Key('settings.server.field')), url);
+  await tester.tap(find.byKey(const Key('settings.server.change')));
   await tester.pumpAndSettle();
 }
 
@@ -206,6 +251,19 @@ void main() {
       },
     );
 
+    testWidgets('a preview guest\'s home menu has no Guarda tu progreso (ruling 21)', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        overrides: [isPreviewProvider.overrideWithValue(true)],
+      );
+      await openAccountMenu(tester);
+      expect(find.byKey(const Key('home.settings')), findsOneWidget);
+      expect(find.byKey(const Key('home.saveProgress')), findsNothing);
+    });
+
     testWidgets('someone with an email sees no Guarda tu progreso anywhere', (tester) async {
       await pumpSettingsApp(tester);
       await openAccountMenu(tester);
@@ -224,6 +282,37 @@ void main() {
       await tester.tap(find.byKey(const Key('settings.saveProgress')));
       await tester.pumpAndSettle();
       expect(find.text(_honestEs), findsOneWidget);
+    });
+
+    testWidgets('a plain guest still sees Guarda tu progreso and no Protect block', (tester) async {
+      await pumpSettingsApp(tester, guest: true, location: '/settings');
+      expect(find.byKey(const Key('settings.saveProgress')), findsOneWidget);
+      expect(find.byKey(const Key('protect.block')), findsNothing);
+    });
+
+    testWidgets('a preview guest sees Protect your data at the top instead of Guarda tu progreso', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: [
+          isPreviewProvider.overrideWithValue(true),
+          securityApiProvider.overrideWithValue(FakeSecurity()),
+          protectStatusProvider.overrideWith(
+            (ref) async => const ProtectStatus(
+              recoveryKey: false,
+              passkey: false,
+              passkeyOffered: true,
+              passkeyWithoutPrf: false,
+            ),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('protect.block')), findsOneWidget);
+      expect(find.byKey(const Key('protect.count')), findsOneWidget);
+      expect(find.byKey(const Key('settings.saveProgress')), findsNothing);
     });
 
     testWidgets('in English', (tester) async {
@@ -312,6 +401,20 @@ void main() {
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
+    });
+
+    testWidgets('a preview account has no switch for the 45-day guest warning, which it never gets', (
+      tester,
+    ) async {
+      await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: [..._previewGuest(), isPreviewProvider.overrideWithValue(true)],
+      );
+      await _scrollTo(tester, 'settings.dueNotice');
+      expect(find.byKey(const Key('settings.guestNotice')), findsNothing);
+      expect(find.text('Aviso si no tienes correo'), findsNothing);
     });
 
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
@@ -487,6 +590,85 @@ void main() {
       expect(env.container.read(sessionProvider).status, SessionStatus.signedIn);
       expect(find.byKey(const Key('progress.email')), findsOneWidget);
     });
+
+    testWidgets(
+      'an unprotected preview guest signing out is warned and Protect first opens the key',
+      (tester) async {
+        final vault = FakeVault();
+        await tester.runAsync(() => vault.seeded);
+        final env = await pumpSettingsApp(
+          tester,
+          guest: true,
+          location: '/settings',
+          locale: const Locale('en'),
+          overrides: [..._previewGuest(), vaultSessionProvider.overrideWithValue(vault)],
+        );
+        await _tap(tester, 'settings.signOut');
+
+        expect(find.text('Sign out with no way back?'), findsOneWidget);
+        expect(find.byKey(const Key('guest.saveInstead')), findsNothing);
+        // The passkey state is known: no note about it.
+        expect(find.textContaining('could not check your passkeys'), findsNothing);
+        expect(env.auth.calls.where((c) => c.startsWith('signOut')), isEmpty);
+
+        await tester.tap(find.byKey(const Key('unprotected.protectFirst')));
+        await tester.pumpAndSettle();
+        expect(find.byType(RecoveryKeySetupView), findsOneWidget);
+        expect(env.auth.calls.where((c) => c.startsWith('signOut')), isEmpty);
+        expect(env.container.read(sessionProvider).status, SessionStatus.signedIn);
+      },
+    );
+
+    testWidgets(
+      'offline, the warning says it could not check the passkeys instead of claiming none',
+      (tester) async {
+        await pumpSettingsApp(
+          tester,
+          guest: true,
+          location: '/settings',
+          locale: const Locale('en'),
+          overrides: _previewGuest(passkeyReadable: false),
+        );
+        await _tap(tester, 'settings.signOut');
+        expect(find.text('Sign out with no way back?'), findsOneWidget);
+        expect(find.textContaining('could not check your passkeys'), findsOneWidget);
+      },
+    );
+
+    testWidgets('an unprotected preview guest who leaves anyway is signed out', (tester) async {
+      final env = await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: _previewGuest(),
+      );
+      await _tap(tester, 'settings.signOut');
+      await tester.tap(find.byKey(const Key('unprotected.signOutConfirm')));
+      await tester.pumpAndSettle();
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
+    });
+
+    testWidgets('a protected preview guest signs out without the warning', (tester) async {
+      for (final overrides in [_previewGuest(recoveryKey: true), _previewGuest(passkey: true)]) {
+        final env = await pumpSettingsApp(
+          tester,
+          guest: true,
+          location: '/settings',
+          overrides: overrides,
+        );
+        await _tap(tester, 'settings.signOut');
+        expect(find.byKey(const Key('unprotected.protectFirst')), findsNothing);
+        expect(find.byKey(const Key('guest.saveInstead')), findsNothing);
+        expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
+      }
+    });
+
+    testWidgets('a plain guest still gets warnGuestLeaving', (tester) async {
+      await pumpSettingsApp(tester, guest: true, location: '/settings');
+      await _tap(tester, 'settings.signOut');
+      expect(find.byKey(const Key('guest.saveInstead')), findsOneWidget);
+      expect(find.byKey(const Key('unprotected.protectFirst')), findsNothing);
+    });
   });
 
   group('the server URL', () {
@@ -521,6 +703,39 @@ void main() {
       expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
       expect(env.settings.values['setting.server'], 'https://my.server.org');
       expect(find.byType(EntryScreen), findsOneWidget);
+    });
+
+    testWidgets('a preview account with changes not synced is asked first, as at a sign-out', (
+      tester,
+    ) async {
+      final env = await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [vaultSessionProvider.overrideWithValue(_Unsynced(2))],
+      );
+      Future<void> change() async {
+        await _tap(tester, 'settings.server');
+        await tester.enterText(
+          find.byKey(const Key('settings.server.field')),
+          'https://my.server.org',
+        );
+        await tester.tap(find.byKey(const Key('settings.server.change')));
+        await tester.pumpAndSettle();
+      }
+
+      await change();
+      expect(find.text('Tienes 2 cambios sin sincronizar'), findsOneWidget);
+      // Backing out keeps the server, the session and the vault.
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider), defaultServerUrl);
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedIn);
+
+      await change();
+      await tester.tap(find.byKey(const Key('vault.signOutAnyway')));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider).toString(), 'https://my.server.org');
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
     });
 
     testWidgets('the dev stack\'s http address is accepted', (tester) async {
@@ -572,6 +787,41 @@ void main() {
 
       expect(env.container.read(serverUrlProvider).toString(), 'https://my.server.org');
       expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
+    });
+
+    testWidgets('changing server warns the same', (tester) async {
+      final env = await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        locale: const Locale('en'),
+        overrides: _previewGuest(),
+      );
+      await _changeServerTo(tester, 'https://my.server.org');
+      expect(find.text('Change server with no way back?'), findsOneWidget);
+      expect(find.byKey(const Key('guest.saveInstead')), findsNothing);
+
+      await tester.tap(find.text('CANCEL'));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider), defaultServerUrl);
+
+      await _changeServerTo(tester, 'https://my.server.org');
+      await tester.tap(find.byKey(const Key('unprotected.serverConfirm')));
+      await tester.pumpAndSettle();
+      expect(env.container.read(serverUrlProvider).toString(), 'https://my.server.org');
+      expect(env.container.read(sessionProvider).status, SessionStatus.signedOut);
+    });
+
+    testWidgets('a protected preview guest changes server without the warning', (tester) async {
+      final env = await pumpSettingsApp(
+        tester,
+        guest: true,
+        location: '/settings',
+        overrides: _previewGuest(passkey: true),
+      );
+      await _changeServerTo(tester, 'https://my.server.org');
+      expect(find.byKey(const Key('unprotected.protectFirst')), findsNothing);
+      expect(env.container.read(serverUrlProvider).toString(), 'https://my.server.org');
     });
 
     testWidgets('"Usar el de Wambito" puts the default address back in the field', (tester) async {
@@ -728,6 +978,23 @@ void main() {
     });
   });
 
+  group('Debug tools', () {
+    testWidgets('the PRF probe row is there with the debug flag on', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        location: '/settings',
+        overrides: [debugToolsProvider.overrideWithValue(true)],
+      );
+      await tester.scrollUntilVisible(find.byKey(const Key('settings.prfProbe')), 200);
+      expect(find.byKey(const Key('settings.prfProbe')), findsOneWidget);
+    });
+
+    testWidgets('and not with it off', (tester) async {
+      await pumpSettingsApp(tester, location: '/settings');
+      expect(find.byKey(const Key('settings.prfProbe'), skipOffstage: false), findsNothing);
+    });
+  });
+
   group('About', () {
     testWidgets('About lists every dependency\'s licence and the model\'s', (tester) async {
       await pumpSettingsApp(tester, location: '/settings');
@@ -745,7 +1012,7 @@ void main() {
           .first;
       for (final name in [
         'Wambito feedback sounds',
-        'androidx.core:core 1.15.0',
+        'androidx.core:core 1.18.0',
         'vosk-android 0.3.75',
         'vosk-model-small-en-us-0.15',
         'vosk-model-small-es-0.42',
@@ -760,4 +1027,23 @@ void main() {
       }
     });
   });
+}
+
+/// An open vault with [pending] changes not sent yet.
+class _Unsynced extends Fake implements VaultSession {
+  _Unsynced(this.pending);
+
+  final int pending;
+
+  @override
+  String get userId => 'u1';
+
+  @override
+  LocalBackend get backend => createLocalBackend(store: createMemoryStore(), now: DateTime.now);
+
+  @override
+  void Function() subscribe(void Function() listener) => () {};
+
+  @override
+  Future<int> pendingChanges() async => pending;
 }

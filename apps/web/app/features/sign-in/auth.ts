@@ -9,7 +9,13 @@ import {
   shouldOfferPasskey,
 } from "../../auth/passkey.ts";
 import { detectLocale, isLocale, type Locale } from "../../i18n/format.ts";
+import { KeysError } from "../../local/keys.ts";
 import { keepSignInPrf, prfExtension, readPrf } from "../../local/prf.ts";
+import { signInWithRecoveryKey as liveRecoverySignIn } from "../../local/recovery-signin.ts";
+import { startSignin as liveStartSignin } from "../../local/signin.ts";
+import { deleteStaleVaults } from "../../local/stale-vaults.ts";
+import { notePasskeyWithoutPrf } from "../../local/unlock-hint.ts";
+import { liveSignOut } from "../home/use-sign-out.ts";
 
 /** Good enough to catch typos; the server has the final word. */
 export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -69,7 +75,132 @@ export interface SignInAuth {
   autofillPasskey(): Promise<AuthResult<AuthUser>>;
   /** Whether to offer a passkey right after this user's email sign-in (once per user per device). */
   shouldOfferPasskey(userId: string): Promise<boolean>;
+  /**
+   * Signs in with the typed recovery key and opens the data here with the same text (web plan
+   * ruling 14). A failure after the session exists has signed out already.
+   */
+  signInWithRecoveryKey(text: string): Promise<RecoveryResult>;
+  /**
+   * Opens a sign-in request for the phone (`startSignin`). A `finish()` that fails after the pickup
+   * answered (the session exists) has signed out already.
+   */
+  startQrSignin: typeof liveStartSignin;
 }
+
+/** How someone signed in: only an email sign-in may be offered a passkey. */
+export type SignInMethod = "email" | "passkey" | "qr" | "recovery";
+
+/** Whether to offer a passkey after this sign-in: an email one, not on the way to an assistant. */
+export const offersPasskey = (method: SignInMethod, destination: string): boolean =>
+  method === "email" && !isAssistantConsent(destination);
+
+/** The `KeysError` codes a recovery-key sign-in can end with, for the screen's copy. */
+export type RecoveryErrorCode =
+  | "bad_recovery_key"
+  | "wrong_recovery_key"
+  | "recovery_key_invalid"
+  | "account_suspended"
+  | "too_many_requests"
+  | "offline"
+  | "server";
+
+export type RecoveryResult =
+  | { userId: string }
+  | { error: RecoveryErrorCode; retryAfterS?: number | undefined };
+
+const RECOVERY_CODES: ReadonlySet<string> = new Set<RecoveryErrorCode>([
+  "bad_recovery_key",
+  "wrong_recovery_key",
+  "recovery_key_invalid",
+  "account_suspended",
+  "too_many_requests",
+  "offline",
+]);
+
+/**
+ * A `fetch` that notes when the answer to `path` (a signed-out route whose 200 sets the session
+ * cookie) came back ok.
+ */
+function watchSession(fetchFn: typeof globalThis.fetch, path: RegExp) {
+  let made = false;
+  const watched: typeof globalThis.fetch = async (input, init) => {
+    const response = await fetchFn(input, init);
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (response.ok && path.test(new URL(url, "http://x").pathname)) made = true;
+    return response;
+  };
+  return { fetch: watched, made: () => made };
+}
+
+export interface SessionSafeDeps {
+  signInWithRecoveryKey: typeof liveRecoverySignIn;
+  startSignin: typeof liveStartSignin;
+  /** Ends the session and wipes what this browser holds for it. */
+  signOut(): Promise<unknown>;
+  /** Defaults to the global `fetch`. */
+  fetch?: typeof globalThis.fetch;
+}
+
+/**
+ * The recovery-key and QR sign-ins, never leaving a session without keys (web plan ruling 14, and
+ * the QR's twin): the cookie comes with the 200 of `/v2/recovery/sign-in` or of the pickup, before
+ * this browser opens the data; when the opening or the enroll fails after it, this signs out and
+ * the error goes on to the screen.
+ */
+export function createSessionSafeAuth(
+  deps: SessionSafeDeps,
+): Pick<SignInAuth, "signInWithRecoveryKey" | "startQrSignin"> {
+  const base = () => deps.fetch ?? globalThis.fetch;
+  const signOut = () => deps.signOut().catch(() => {});
+  return {
+    async signInWithRecoveryKey(text) {
+      const session = watchSession(base(), /\/v2\/recovery\/sign-in$/);
+      try {
+        const { userId } = await deps.signInWithRecoveryKey(text, { fetch: session.fetch });
+        return { userId };
+      } catch (error) {
+        if (session.made()) await signOut();
+        if (error instanceof KeysError && RECOVERY_CODES.has(error.code)) {
+          const code = error.code as RecoveryErrorCode;
+          return code === "too_many_requests" && error.retryAfterS !== undefined
+            ? { error: code, retryAfterS: error.retryAfterS }
+            : { error: code };
+        }
+        return { error: "server" };
+      }
+    },
+    async startQrSignin(options) {
+      const session = watchSession(options.fetch ?? base(), /\/v2\/signin\/[^/]+\/pickup$/);
+      const started = await deps.startSignin({ ...options, fetch: session.fetch });
+      let finishing: ReturnType<typeof started.finish> | null = null;
+      return {
+        ...started,
+        number: () => started.number(),
+        ready: () => started.ready(),
+        cancel: () => started.cancel(),
+        finish() {
+          finishing ??= started.finish().catch(async (error: unknown) => {
+            if (session.made()) await signOut();
+            throw error;
+          });
+          return finishing;
+        },
+      };
+    },
+  };
+}
+
+/** The sign-out after a sign-in that failed once the session existed: no vault stays behind. */
+async function signOutAfterFailedSignIn(): Promise<void> {
+  await liveSignOut().catch(() => {});
+  await deleteStaleVaults(null);
+}
+
+const liveSessionSafe = createSessionSafeAuth({
+  signInWithRecoveryKey: liveRecoverySignIn,
+  startSignin: liveStartSignin,
+  signOut: signOutAfterFailedSignIn,
+});
 
 /** The catalog keys sign-in shows for a failure. */
 export type AuthErrorKey =
@@ -252,14 +383,21 @@ interface WithWebAuthn {
  * A passkey sign-in asks for the PRF (`prfExtension`); when the passkey gave one, it waits in
  * memory for the vault gate of that account (`keepSignInPrf`, tied to the user who signed in). A
  * plain account ignores it
- * (the app's loader drops it).
+ * (the app's loader drops it). A successful sign-in without one notes the "no PRF here" hint for
+ * that user (`unlock-hint.ts`), so Unlock leads with the recovery key on this device.
  */
-function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
+export function keepPrfOf<T extends BetterAuthResult<unknown> & WithWebAuthn>(result: T): T {
   const credentialId = result.webauthn?.response?.id;
   const userId = (result.data as { user?: { id?: unknown } } | null)?.user?.id;
   // Read (and so zero the browser's bytes) in every case; keep it only for whoever signed in.
   const prf = readPrf(result.webauthn?.clientExtensionResults);
-  if (!prf) return result;
+  if (!prf) {
+    // A passkey that signed in but gave no PRF: this device's unlock hint, for that user only.
+    if (!result.error && result.webauthn && typeof userId === "string") {
+      notePasskeyWithoutPrf(userId);
+    }
+    return result;
+  }
   if (result.error || !credentialId || typeof userId !== "string") prf.fill(0);
   else keepSignInPrf({ userId, credentialId, prf });
   return result;
@@ -317,4 +455,6 @@ export const liveSignInAuth: SignInAuth = {
     return result;
   },
   shouldOfferPasskey: (userId) => shouldOfferPasskey(userId, liveOfferDeps),
+  signInWithRecoveryKey: liveSessionSafe.signInWithRecoveryKey,
+  startQrSignin: liveSessionSafe.startQrSignin,
 };

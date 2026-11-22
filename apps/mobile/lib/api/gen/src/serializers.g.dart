@@ -8,6 +8,7 @@ part of 'serializers.dart';
 
 Serializers _$serializers =
     (Serializers().toBuilder()
+          ..add($SigninFound.serializer)
           ..add(AdminActionReason.serializer)
           ..add(AdminAuditEntry.serializer)
           ..add(AdminAuditPage.serializer)
@@ -15,12 +16,18 @@ Serializers _$serializers =
           ..add(AdminEmailChange.serializer)
           ..add(AdminMe.serializer)
           ..add(AdminMetrics.serializer)
+          ..add(AdminMetricsCohortsInner.serializer)
+          ..add(AdminMetricsDailyActiveInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInner.serializer)
+          ..add(AdminMetricsInstallsByPlatformInnerPlatformEnum.serializer)
+          ..add(AdminMetricsVersionsInner.serializer)
           ..add(AdminMetricsWeeklyInner.serializer)
           ..add(AdminUser.serializer)
           ..add(AdminUserAssistantsInner.serializer)
           ..add(AdminUserPasskeysInner.serializer)
           ..add(Assistant.serializer)
           ..add(AssistantList.serializer)
+          ..add(AssistantWrap.serializer)
           ..add(CaptureResult.serializer)
           ..add(CaptureResultCategory.serializer)
           ..add(CaptureResultResultEnum.serializer)
@@ -55,6 +62,8 @@ Serializers _$serializers =
           ..add(EmailChangeConfirm.serializer)
           ..add(FileImport.serializer)
           ..add(FileImportStatusEnum.serializer)
+          ..add(FinishMigration.serializer)
+          ..add(GetSignin200Response.serializer)
           ..add(ImportStats.serializer)
           ..add(ImportStatsAverageMonthlySpendingInner.serializer)
           ..add(ImportStatsAverageWindow.serializer)
@@ -63,6 +72,21 @@ Serializers _$serializers =
           ..add(KeyWrap.serializer)
           ..add(KeyWrapKindEnum.serializer)
           ..add(KeyWraps.serializer)
+          ..add(MigrationCounts.serializer)
+          ..add(MigrationProblem.serializer)
+          ..add(MigrationProblemErrors.serializer)
+          ..add(MigrationProblemErrorsMissingInner.serializer)
+          ..add(MigrationSource.serializer)
+          ..add(MigrationSourceBudgetsInner.serializer)
+          ..add(MigrationSourceCategoriesInner.serializer)
+          ..add(MigrationSourceCategoriesInnerKindEnum.serializer)
+          ..add(MigrationSourceMerchantsInner.serializer)
+          ..add(MigrationSourceProfile.serializer)
+          ..add(MigrationSourceRecurrencesInner.serializer)
+          ..add(MigrationSourceRecurrencesInnerFrequencyEnum.serializer)
+          ..add(MigrationSourceTransactionsInner.serializer)
+          ..add(MigrationSourceTransactionsInnerSource_Enum.serializer)
+          ..add(MigrationSourceTransactionsInnerStatusEnum.serializer)
           ..add(PairingApprover.serializer)
           ..add(PairingFound.serializer)
           ..add(PairingPickup.serializer)
@@ -80,6 +104,7 @@ Serializers _$serializers =
           ..add(ProblemErrorsInner.serializer)
           ..add(Profile.serializer)
           ..add(ProfileEncryptionEnum.serializer)
+          ..add(ProfileMigrationEnum.serializer)
           ..add(PulledRecords.serializer)
           ..add(PushApplied.serializer)
           ..add(PushConflict.serializer)
@@ -92,6 +117,9 @@ Serializers _$serializers =
           ..add(PushResults.serializer)
           ..add(PutKeyWrap.serializer)
           ..add(PutKeyWrapKindEnum.serializer)
+          ..add(PutRecoveryVerifier.serializer)
+          ..add(RecoverySignIn.serializer)
+          ..add(RecoverySignedIn.serializer)
           ..add(Recurrence.serializer)
           ..add(RecurrenceFrequencyEnum.serializer)
           ..add(ReviewTransactions.serializer)
@@ -100,7 +128,12 @@ Serializers _$serializers =
           ..add(RotatedKeyWrapKindEnum.serializer)
           ..add(SealPairing.serializer)
           ..add(SetBudget.serializer)
+          ..add(SigninPickup.serializer)
+          ..add(SigninPoll.serializer)
+          ..add(SigninStarted.serializer)
+          ..add(SigninView.serializer)
           ..add(StartPairing.serializer)
+          ..add(StartSignin.serializer)
           ..add(Summary.serializer)
           ..add(SummaryCategoriesInner.serializer)
           ..add(SummaryCategoriesInnerStateEnum.serializer)
@@ -139,6 +172,22 @@ Serializers _$serializers =
             () => ListBuilder<AdminMetricsWeeklyInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsDailyActiveInner)]),
+            () => ListBuilder<AdminMetricsDailyActiveInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsCohortsInner)]),
+            () => ListBuilder<AdminMetricsCohortsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsInstallsByPlatformInner)]),
+            () => ListBuilder<AdminMetricsInstallsByPlatformInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AdminMetricsVersionsInner)]),
+            () => ListBuilder<AdminMetricsVersionsInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AdminUserPasskeysInner)]),
             () => ListBuilder<AdminUserPasskeysInner>(),
           )
@@ -163,12 +212,40 @@ Serializers _$serializers =
             () => ListBuilder<CreateTransaction>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(KeyLink)]),
+            () => ListBuilder<KeyLink>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyWrap)]),
             () => ListBuilder<KeyWrap>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(KeyLink)]),
             () => ListBuilder<KeyLink>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationProblemErrorsMissingInner)]),
+            () => ListBuilder<MigrationProblemErrorsMissingInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceCategoriesInner)]),
+            () => ListBuilder<MigrationSourceCategoriesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceBudgetsInner)]),
+            () => ListBuilder<MigrationSourceBudgetsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceRecurrencesInner)]),
+            () => ListBuilder<MigrationSourceRecurrencesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceTransactionsInner)]),
+            () => ListBuilder<MigrationSourceTransactionsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(MigrationSourceMerchantsInner)]),
+            () => ListBuilder<MigrationSourceMerchantsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,18 @@ import '../home/fakes.dart';
 /// `destinationAfterSignIn`). A new email account has none, so it is sent to /welcome after signing
 /// in, and from every other screen until it finishes. An account that has it never sees the
 /// welcome. A guest keeps its guest start: the web has no guests, and the app's has no welcome.
+/// A server whose `GET /v1/me` answers what it said when asked, only once [hold] completes.
+class _HeldStanding extends FakeAuthApi {
+  final hold = Completer<void>();
+
+  @override
+  Future<AccountStanding> standing(String token, {String? userId}) async {
+    final answer = await super.standing(token, userId: userId);
+    await hold.future;
+    return answer;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -183,6 +197,8 @@ void main() {
     });
 
     test('the start also lets one go that finished it somewhere else', () async {
+      // A plain account: the server's flag is the account's.
+      auth.plainTokens.add('tok');
       mockStorage(token: 'tok', onboarding: true);
       final container = containerWith();
       final controller = container.read(sessionProvider.notifier);
@@ -190,6 +206,62 @@ void main() {
       expect(container.read(sessionProvider).onboardingPending, isTrue);
       await controller.refreshed;
 
+      expect(container.read(sessionProvider).onboardingPending, isFalse);
+    });
+
+    test('a plain account that finishes the welcome while the start asks the server keeps it '
+        'finished', () async {
+      final held = _HeldStanding()..plainTokens.add('tok');
+      auth = held;
+      held.pendingOnboarding['tok'] = true;
+      mockStorage(token: 'tok', onboarding: true);
+      final container = containerWith();
+      final controller = await ready(container);
+      expect(container.read(sessionProvider).onboardingPending, isTrue);
+      // The welcome ends while GET /v1/me is in flight; the answer was read before it ended.
+      await controller.onboardingDone();
+      held.hold.complete();
+      await controller.refreshed;
+      expect(container.read(sessionProvider).onboardingPending, isFalse);
+    });
+
+    test("an encrypted account keeps what its vault said: the server's empty flag never brings "
+        'the welcome back', () async {
+      // The server's copy stays empty for a preview account: it always says "to do".
+      auth.pendingOnboarding['tok'] = true;
+      mockStorage(token: 'tok');
+      await SessionStore().write('tok', guest: false);
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.refreshed;
+      expect(container.read(sessionProvider).onboardingPending, isFalse);
+      expect((await SessionStore().read())?.onboardingPending, isFalse);
+      // The vault says it is still to do (a new account): the welcome.
+      await controller.onboardingFromVault(pending: true);
+      expect(container.read(sessionProvider).onboardingPending, isTrue);
+      expect((await SessionStore().read())?.onboardingPending, isTrue);
+    });
+
+    test('an encrypted account whose welcome the phone does not know yet takes the server\'s '
+        'until its vault says', () async {
+      auth.pendingOnboarding['tok'] = true;
+      mockStorage(token: 'tok');
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.refreshed;
+      expect(container.read(sessionProvider).onboardingPending, isTrue);
+      await controller.onboardingFromVault(pending: false);
+      expect(container.read(sessionProvider).onboardingPending, isFalse);
+      expect(container.read(sessionProvider).onboardingKnown, isTrue);
+    });
+
+    test('a guest has no welcome, whatever its vault says', () async {
+      auth.guests['tok'] = true;
+      mockStorage(token: 'tok', guest: true);
+      final container = containerWith();
+      final controller = await ready(container);
+      await controller.refreshed;
+      await controller.onboardingFromVault(pending: true);
       expect(container.read(sessionProvider).onboardingPending, isFalse);
     });
 

@@ -42,6 +42,50 @@ enum NoticePoster {
     center.add(UNNotificationRequest(identifier: guestId, content: content, trigger: trigger))
   }
 
+  /// A `preview` account's "Hoy vence…": one local notification per day of [days] at 9:00 in [zone]
+  /// ([DueSchedule]), in place of every `wambito.due.` request waiting (the list is replaced whole,
+  /// never merged). Computed on the phone from the vault; the API is never asked. Nothing shows when
+  /// the person has not allowed notices; the system decides at delivery.
+  static func scheduleDueList(
+    zone: TimeZone, language: String?, days: [(date: String, names: [String])],
+    now: Date = Date(), center: UNUserNotificationCenter = .current()
+  ) async {
+    // Pending only: today's notice, already delivered, stays in the notification centre.
+    await removeDueList(delivered: false, center: center)
+    for request in DueSchedule.requests(days: days, zone: zone, now: now) {
+      let body = DueToday.text(
+        request.names,
+        one: text("notice_due_one", language: language),
+        many: text("notice_due_many", language: language),
+        and: text("notice_and", language: language),
+        andI: text("notice_and_i", language: language))
+      guard !body.isEmpty else { continue }
+      let content = UNMutableNotificationContent()
+      content.title = title
+      content.body = body
+      content.sound = .default
+      // Home, with the payments due today.
+      content.userInfo = ["link": "due"]
+      let trigger = UNCalendarNotificationTrigger(dateMatching: request.fire, repeats: false)
+      try? await center.add(
+        UNNotificationRequest(identifier: request.id, content: content, trigger: trigger))
+    }
+  }
+
+  /// Removes every `wambito.due.` request, pending and already delivered: after a sign-out or an
+  /// account change they name the previous person's payments.
+  static func cancelDueList(center: UNUserNotificationCenter = .current()) async {
+    await removeDueList(delivered: true, center: center)
+  }
+
+  private static func removeDueList(delivered: Bool, center: UNUserNotificationCenter) async {
+    let pending = DueSchedule.dueIds(await center.pendingNotificationRequests().map(\.identifier))
+    center.removePendingNotificationRequests(withIdentifiers: pending)
+    guard delivered else { return }
+    let shown = DueSchedule.dueIds(await center.deliveredNotifications().map(\.request.identifier))
+    center.removeDeliveredNotifications(withIdentifiers: shown)
+  }
+
   static func cancelGuest(center: UNUserNotificationCenter = .current()) {
     center.removePendingNotificationRequests(withIdentifiers: [guestId])
     center.removeDeliveredNotifications(withIdentifiers: [guestId])

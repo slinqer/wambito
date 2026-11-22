@@ -1,0 +1,135 @@
+// `/unlock`: the vault gate on screen (the web's VaultGate.tsx switch over its state). A `preview`
+// account is kept here until its vault is open (lib/router.dart): the recovery key to set up,
+// Unlock, Locked, the pairing screen, or a loading line while the gate checks, commits or opens.
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/session.dart';
+import '../entry/sign_in_frame.dart';
+import '../files/files_channel.dart';
+import '../l10n/app_localizations.dart';
+import '../merge/merge_controller.dart';
+import 'encryption_mode.dart';
+import 'locked_view.dart';
+import 'pair_new_device_view.dart';
+import 'recovery_key_setup_view.dart';
+import 'unlock_view.dart';
+import 'unsynced_sheet.dart';
+import 'vault_gate.dart';
+import 'vault_providers.dart';
+
+/// While the vault checks the account's keys, commits a new setup or opens: nothing to press.
+class VaultLoading extends StatelessWidget {
+  const VaultLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return SignInFrame(
+      children: [
+        Semantics(liveRegion: true, container: true, child: EntryTitle(l10n.vaultLoading)),
+      ],
+    );
+  }
+}
+
+class VaultScreen extends ConsumerWidget {
+  /// [positions] pins the characters the recovery key asks back; random otherwise (tests pin them).
+  const VaultScreen({super.key, this.positions});
+
+  final List<int>? positions;
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    // The vault is not open, yet it may be kept with changes not sent (a key version that did not
+    // verify, a failed open): they are counted from its file and asked about, as at Settings'
+    // sign-out, without "Sync and sign out" (nothing can be sent while it is shut). An account without
+    // email is not warned otherwise: a sign-out from here loses only what this sheet counts, and a
+    // held vault (an adoption or a merge waiting) loses nothing: the sign-out keeps it for its own
+    // flow (SessionController._forgetVault).
+    final count = ref.read(unsentChangesProvider);
+    if (!await confirmUnsentSignOut(context, count: count)) return;
+    try {
+      await ref.read(sessionProvider.notifier).signOut(discardGuest: true);
+    } on Object {
+      // The session is forgotten here all the same once the server cannot be told.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gate = ref.watch(vaultGateProvider);
+    final state = ref.watch(vaultGateStateProvider);
+    void signOut() => unawaited(_signOut(context, ref));
+    final merging = ref.watch(mergeControllerProvider) is MergeWaitingUnlock;
+    final offered = ref.watch(unlockPasskeyOfferedProvider);
+    // Not answered yet (an error counts as answered: no passkey button, as before).
+    final offeredLoading = !offered.hasValue && !offered.hasError;
+    if (gate == null || state == null) {
+      // No gate: the mode of the account is not known yet, or could not be learned (an offline
+      // first start with nothing kept). A `plain` account never stays here (the router).
+      final account = ref.watch(vaultAccountProvider);
+      if (account.hasError) {
+        return LockedView(
+          kind: LockedKind.offline,
+          retrying: account.isLoading,
+          // The server is asked again (what was kept is read again too).
+          onRetry: () => ref
+            ..invalidate(keptVaultAccountProvider)
+            ..invalidate(freshVaultAccountProvider),
+          onSignOut: signOut,
+        );
+      }
+      return const VaultLoading();
+    }
+    return switch (state) {
+      Setup(:final recoveryKey) => RecoveryKeySetupView(
+        recoveryKey: recoveryKey,
+        positions: positions,
+        onContinue: () => unawaited(gate.confirmSetup()),
+        onSignOut: signOut,
+        onShare: (name, text) async {
+          await ref.read(filesChannelProvider).shareFile(name, utf8.encode(text), 'text/plain');
+        },
+      ),
+      Unlock(:final notice, :final error, :final noPrfHere, :final passkeyWrap) => UnlockView(
+        // A new passkey, a recovery key typed again: a new notice is a new screen.
+        key: ValueKey((notice, error)),
+        notice: notice,
+        error: error,
+        // What can open the data here picks the layout (spec 2026-11-20 section 1).
+        noPrfHere: noPrfHere,
+        passkeyWrap: passkeyWrap,
+        onUnlock: gate.unlock,
+        // While it is not known yet whether passkeys work here, the passkey's place is kept (its
+        // button waits): the layout never swaps under a thumb once something is tappable.
+        onPasskey: (offered.value ?? offeredLoading) ? gate.unlockWithPasskey : null,
+        passkeysLoading: offeredLoading,
+        onPair: () => unawaited(gate.pair()),
+        merging: merging,
+        // While a merge waits, leaving calls it off: back to this phone's own session and data
+        // (ruling 10), never a held vault left behind.
+        onSignOut: merging
+            ? () => unawaited(
+                ref.read(mergeControllerProvider.notifier).cancel().catchError((Object _) {}),
+              )
+            : signOut,
+      ),
+      Pairing() => PairNewDeviceView(
+        // The gate owns the request: it cancels one when a new one starts and when this is left.
+        start: gate.startPairing,
+        onBack: gate.leavePairing,
+        timeZone: ref.watch(pairingTimeZoneProvider),
+      ),
+      Locked(:final kind, :final retrying) => LockedView(
+        kind: kind,
+        retrying: retrying,
+        onRetry: gate.retry,
+        onSignOut: signOut,
+      ),
+      _ => const VaultLoading(),
+    };
+  }
+}

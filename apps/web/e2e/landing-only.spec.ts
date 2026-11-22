@@ -13,7 +13,7 @@ const ORIGIN = process.env.VITE_SITE_URL ?? "https://landing-only.example.test";
 const GITHUB = "https://github.com/slinqer/wambito";
 const CLIENT = fileURLToPath(new URL("../build/client/", import.meta.url));
 /** Anything that would lead to the app: sign-in, the app itself, the welcome flow, the demo. */
-const APP_PATH = /(^|\/)(sign-in|app|welcome|demo)(\/|\?|#|$)/;
+const APP_PATH = /(^|\/)(sign-in|create-account|app|welcome|demo)(\/|\?|#|$)/;
 
 const LOCALES = [
   {
@@ -23,16 +23,16 @@ const LOCALES = [
     navCta: "Muy pronto",
     newTab: "(se abre en una pestaña nueva)",
     soon: "Pronto",
-    webTitle: "En la web",
-    ways: ["En la web", "App para Android y iOS", "Con tu IA"],
+    ways: ["App para Android", "App para iOS"],
     closingTitle: "Cuando quieras, arrancamos.",
     closingBody:
       "Wambito está en construcción, en abierto. Mira cómo avanza en GitHub y prueba la app en cuanto abra.",
     oldClosing: /Crea tu cuenta/,
-    oldCtas: ["Empieza ahora", "Entrar", "Empezar"],
-    demoCta: "Pruébalo sin cuenta",
+    oldCtas: ["Empieza ahora", "Crear cuenta", "Entrar", "Empezar"],
+    demoCta: "Demo",
     banned: [/\bjueg(o|a)\b/i],
     toggleToDay: "Cambiar a modo día",
+    cookies: "Preferencias de cookies",
   },
   {
     locale: "en",
@@ -41,16 +41,16 @@ const LOCALES = [
     navCta: "Coming soon",
     newTab: "(opens in a new tab)",
     soon: "Soon",
-    webTitle: "On the web",
-    ways: ["On the web", "Android & iOS app", "With your AI"],
+    ways: ["Android app", "iOS app"],
     closingTitle: "Ready when you are.",
     closingBody:
       "Wambito is being built in the open. Follow its progress on GitHub and try the app as soon as it opens.",
     oldClosing: /Create your account/,
-    oldCtas: ["Get started", "Sign in", "Start"],
-    demoCta: "Try it without an account",
+    oldCtas: ["Get started", "Create account", "Sign in", "Start"],
+    demoCta: "Demo",
     banned: [/\bgames?\b/i],
     toggleToDay: "Switch to day mode",
+    cookies: "Cookie preferences",
   },
 ] as const;
 
@@ -289,17 +289,17 @@ for (const l of LOCALES) {
       }
     });
 
-    test("the web card is a coming-soon badge, like the other cards, with no link", async ({
-      page,
-    }) => {
+    test("both apps are coming-soon badges with no link", async ({ page }) => {
       await page.goto(l.path);
-      for (const name of l.ways) {
-        const card = page
+      const card = (name: string) =>
+        page
           .locator("#ways")
           .getByRole("listitem")
           .filter({ has: page.getByRole("heading", { name }) });
-        await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
-        await expect(card.getByRole("link")).toHaveCount(0);
+      const [android, ios] = l.ways;
+      for (const name of [android, ios] as string[]) {
+        await expect(card(name).getByText(l.soon, { exact: true })).toBeVisible();
+        await expect(card(name).getByRole("link")).toHaveCount(0);
       }
     });
 
@@ -311,7 +311,7 @@ for (const l of LOCALES) {
       expect(hrefs.length).toBeGreaterThan(5);
       expect(hrefs.filter((href) => APP_PATH.test(new URL(href, "http://x").pathname))).toEqual([]);
       const html = await (await request.get(l.path)).text();
-      expect(html).not.toMatch(/href="[^"]*\/(sign-in|app|welcome|demo)(["/?#])/);
+      expect(html).not.toMatch(/href="[^"]*\/(sign-in|create-account|app|welcome|demo)(["/?#])/);
     });
 
     test("the closing section tells the truth about the app, and keeps Wambi's spot", async ({
@@ -327,8 +327,8 @@ for (const l of LOCALES) {
       expect(html).not.toMatch(l.oldClosing);
 
       const spot = closing.locator("[data-wambi-spot='closing']");
-      await expect(spot).toHaveAttribute("data-wambi-pose", "celebrate");
-      await expect(spot.locator(".lk-wambi")).toHaveCount(1);
+      await expect(spot).toHaveAttribute("data-wambi-pose", "resting");
+      await expect(spot.locator("img")).toHaveAttribute("src", "/wambi/resting.webp");
     });
 
     test("is called Wambito, in the text and in the share tags", async ({ page }) => {
@@ -347,7 +347,7 @@ for (const l of LOCALES) {
       await page.goto(l.path);
       const text = await page.locator("body").evaluate((body) => body.textContent ?? "");
       for (const pattern of l.banned) expect(text).not.toMatch(pattern);
-      await expect(page.locator("#open-source").getByRole("link")).toHaveAttribute("href", GITHUB);
+      await expect(page.locator("#faq a", { hasText: "GitHub" })).toHaveAttribute("href", GITHUB);
     });
 
     test("canonical, hreflang and Open Graph use the configured origin", async ({ page }) => {
@@ -427,6 +427,31 @@ for (const l of LOCALES) {
         );
         expect(errors).toEqual([]);
       });
+
+      test("has no cookie banner, no cookie preferences and no PostHog without a key", async ({
+        page,
+      }) => {
+        const assets = `${CLIENT}assets/`;
+        // The posthog-js chunk (named after the library's entry file, not "posthog").
+        const posthogChunks = readdirSync(assets).filter(
+          (file) =>
+            file.endsWith(".js") && readFileSync(assets + file, "utf8").includes("posthog-js"),
+        );
+        const loaded: string[] = [];
+        page.on("request", (request) => loaded.push(request.url()));
+        await page.goto(l.path);
+        await page.waitForLoadState("networkidle");
+        // Hydrated: the theme toggle answers.
+        await page.getByRole("banner").getByRole("button", { name: l.toggleToDay }).click();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
+        await expect(page.getByRole("region", { name: l.cookies })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: l.cookies })).toHaveCount(0);
+        await expect(page.getByText(l.cookies)).toHaveCount(0);
+        expect(loaded.filter((url) => /posthog/i.test(new URL(url).hostname))).toEqual([]);
+        expect(
+          loaded.filter((url) => posthogChunks.some((file) => url.endsWith(`/assets/${file}`))),
+        ).toEqual([]);
+      });
     });
   });
 }
@@ -471,7 +496,7 @@ for (const l of LOCALES) {
       expect(hrefs.length).toBeGreaterThan(4);
       expect(hrefs.filter((href) => APP_PATH.test(new URL(href, "http://x").pathname))).toEqual([]);
       const html = await (await request.get(r.path)).text();
-      expect(html).not.toMatch(/href="[^"]*\/(sign-in|app|welcome|demo)(["/?#])/);
+      expect(html).not.toMatch(/href="[^"]*\/(sign-in|create-account|app|welcome|demo)(["/?#])/);
       const text = await page.locator("body").evaluate((body) => body.textContent ?? "");
       expect(text).toContain("Wambito");
       expect(text).not.toMatch(/Luk(?:itas)|\bLuk(?:as)\b/);
@@ -609,6 +634,8 @@ test.describe("landing-only build output", () => {
         "favicon.svg",
         "index.html",
         "it",
+        // The app's real insights screen in the "See where it goes" phone (pnpm landing-screens).
+        "landing",
         "wambi",
         "og-en.png",
         "og-es.png",

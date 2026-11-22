@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'due_list.dart';
+
 /// Whether Android lets the app post notices.
 enum NoticePermission {
   /// Notices can be posted.
@@ -23,6 +25,18 @@ abstract interface class NoticePlatform {
   /// again keeps the job already waiting for the same zone.
   Future<void> scheduleDue({required String zone, required String language});
 
+  /// A `preview` account's "Hoy vence…": the next [days] (computed from the vault, never asked of
+  /// the server) handed to the phone for [owner], the account they were read for, and the daily
+  /// notice scheduled as [scheduleDue] does. Replaces the whole list each time, never merges.
+  /// Native code posts nothing when [owner] is not the account it was last told about.
+  Future<void> scheduleDueList({
+    required String zone,
+    required String language,
+    required String owner,
+    required List<DueDay> days,
+  });
+
+  /// Cancels the notice and clears the due list, on both phones.
   Future<void> cancelDue();
 
   /// Sets the guest warning 44 days from now, in place of any earlier one.
@@ -57,6 +71,19 @@ class ChannelNoticePlatform implements NoticePlatform {
   @override
   Future<void> scheduleDue({required String zone, required String language}) =>
       _call<void>('scheduleDue', {'zone': zone, 'language': language});
+
+  @override
+  Future<void> scheduleDueList({
+    required String zone,
+    required String language,
+    required String owner,
+    required List<DueDay> days,
+  }) => _call<void>('scheduleDueList', {
+    'zone': zone,
+    'language': language,
+    'owner': owner,
+    'days': [for (final d in days) d.toJson()],
+  });
 
   @override
   Future<void> cancelDue() => _call<void>('cancelDue');

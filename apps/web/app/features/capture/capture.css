@@ -67,6 +67,15 @@
     font-weight: 900;
     font-size: 18px;
   }
+  .lk-capture-notif-icon svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .lk-capture-notif-app,
   .lk-capture-notif-time {
     font-size: 12px;
@@ -269,5 +278,86 @@
   .lk-capture-back:focus-visible {
     outline: 3px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  /*
+   * Computers: the page uses the landing's width; each step puts its scene, title and text in one
+   * column and its picture in the other, the sides taking turns down the page. The last step, with
+   * no picture, sits in the middle. Phones keep the single column above.
+   */
+  @media (min-width: 900px) {
+    .lk-capture-page {
+      max-width: 1040px;
+      gap: var(--space-6);
+    }
+    .lk-capture-intro {
+      justify-items: center;
+      text-align: center;
+      padding-top: var(--space-6);
+    }
+    .lk-landing .lk-capture-intro h1 {
+      font-size: 44px;
+    }
+    .lk-capture-intro p {
+      font-size: 18px;
+    }
+    .lk-capture-steps {
+      gap: var(--space-5);
+    }
+    .lk-capture-steps > li {
+      padding: var(--space-6);
+    }
+    .lk-capture-step:has(> .lk-capture-demo) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      grid-template-areas:
+        "scene demo"
+        "title demo"
+        "body demo";
+      grid-template-rows: auto auto 1fr;
+      column-gap: var(--space-6);
+      row-gap: var(--space-2);
+      align-items: start;
+    }
+    .lk-capture-steps > li:nth-child(even) .lk-capture-step:has(> .lk-capture-demo) {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      grid-template-areas:
+        "demo scene"
+        "demo title"
+        "demo body";
+    }
+    .lk-capture-step > .lk-capture-scene {
+      grid-area: scene;
+      justify-self: center;
+    }
+    .lk-capture-step > h2 {
+      grid-area: title;
+      text-align: center;
+    }
+    .lk-capture-step > p {
+      grid-area: body;
+      text-align: center;
+    }
+    .lk-capture-step > .lk-capture-demo {
+      grid-area: demo;
+      align-self: center;
+    }
+    .lk-capture-step > .lk-capture-chips {
+      justify-content: center;
+    }
+    .lk-landing .lk-capture-step h2 {
+      font-size: 26px;
+    }
+    .lk-capture-step p {
+      font-size: 16px;
+    }
+    .lk-capture-step:not(:has(> .lk-capture-demo)) {
+      align-items: center;
+      text-align: center;
+    }
+    .lk-capture-soon,
+    .lk-capture-back {
+      justify-self: center;
+    }
   }
 }

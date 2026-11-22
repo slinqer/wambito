@@ -74,6 +74,10 @@ final class PasskeyChannel: NSObject {
     if let preference = options.userVerification {
       request.userVerificationPreference = .init(rawValue: preference)
     }
+    // The passkey's PRF (iOS 18+); older systems ignore the input and the results carry no `prf`.
+    if #available(iOS 18.0, *), let salt = options.prfInput {
+      request.prf = .inputValues(.saltInput1(salt))
+    }
     return (ASAuthorizationController(authorizationRequests: [request]), immediate)
   }
 
@@ -88,6 +92,9 @@ final class PasskeyChannel: NSObject {
       request.excludedCredentials = options.excludeCredentialIds.map {
         ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
       }
+    }
+    if #available(iOS 18.0, *), let salt = options.prfInput {
+      request.prf = .inputValues(.saltInput1(salt))
     }
     return (ASAuthorizationController(authorizationRequests: [request]), false)
   }
@@ -115,17 +122,27 @@ final class PasskeyChannel: NSObject {
     ) {
       switch authorization.credential {
       case let credential as ASAuthorizationPlatformPublicKeyCredentialAssertion:
+        var prfOutput: Data?
+        if #available(iOS 18.0, *) {
+          prfOutput = credential.prf.map { $0.first.withUnsafeBytes { Data($0) } }
+        }
         finish(WebAuthnJSON.assertionResponse(
           credentialId: credential.credentialID, clientDataJSON: credential.rawClientDataJSON,
           authenticatorData: credential.rawAuthenticatorData, signature: credential.signature,
-          userHandle: credential.userID))
+          userHandle: credential.userID, prfOutput: prfOutput))
       case let credential as ASAuthorizationPlatformPublicKeyCredentialRegistration:
         guard let attestation = credential.rawAttestationObject else {
           return finish(FlutterError(code: "failed", message: "No attestation", details: nil))
         }
+        var prfEnabled = false
+        var prfOutput: Data?
+        if #available(iOS 18.0, *), let prf = credential.prf {
+          prfEnabled = prf.isSupported
+          prfOutput = prf.first.map { $0.withUnsafeBytes { Data($0) } }
+        }
         finish(WebAuthnJSON.registrationResponse(
           credentialId: credential.credentialID, clientDataJSON: credential.rawClientDataJSON,
-          attestationObject: attestation))
+          attestationObject: attestation, prfEnabled: prfEnabled, prfOutput: prfOutput))
       default:
         finish(FlutterError(code: "failed", message: "Not a passkey", details: nil))
       }

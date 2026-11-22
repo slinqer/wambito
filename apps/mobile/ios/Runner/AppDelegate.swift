@@ -12,8 +12,10 @@ import WambitoNative
   private var launchChannel: LaunchChannel?
   private var filesChannel: FilesChannel?
   private var passkeyChannel: PasskeyChannel?
+  private var scannerChannel: ScannerChannel?
   private var noticesChannel: NoticesChannel?
   private var voiceChannel: VoiceChannel?
+  private var backgroundChannel: BackgroundChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
   // The notification centre keeps its delegate weakly too.
@@ -31,6 +33,7 @@ import WambitoNative
     noticeTaps = taps
     UNUserNotificationCenter.current().delegate = taps
     DueTask.register()
+    SyncTask.register()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -53,8 +56,11 @@ import WambitoNative
     launchChannel = LaunchChannel(messenger: messenger)
     filesChannel = FilesChannel(messenger: messenger)
     passkeyChannel = PasskeyChannel(messenger: messenger)
+    scannerChannel = ScannerChannel(messenger: messenger)
     noticesChannel = NoticesChannel(messenger: messenger)
     voiceChannel = VoiceChannel(messenger: messenger)
+    backgroundChannel = BackgroundChannel(messenger: messenger)
+    BackgroundChannel.app = backgroundChannel
     if let url = tappedBeforeChannel, let launchChannel {
       tappedBeforeChannel = nil
       _ = launchChannel.handles(url)

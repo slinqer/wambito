@@ -2,10 +2,13 @@ package com.wambito.app
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -14,6 +17,7 @@ import androidx.work.WorkManager
 import com.wambito.app.files.FilesChannel
 import com.wambito.app.haptics.HapticsChannel
 import com.wambito.app.launch.LaunchLinks
+import com.wambito.app.background.BackgroundChannel
 import com.wambito.app.capture.CaptureChannel
 import com.wambito.app.notices.DueWorker
 import com.wambito.app.notices.GuestWorker
@@ -22,25 +26,30 @@ import com.wambito.app.notices.NoticePoster
 import com.wambito.app.notices.NoticeSettings
 import com.wambito.app.notices.NoticesChannel
 import com.wambito.app.passkeys.PasskeyChannel
+import com.wambito.app.scanner.ScannerChannel
 import com.wambito.app.sounds.SoundChannel
 import com.wambito.app.voice.VoiceChannel
 import com.wambito.app.voice.VoiceModels
 import com.wambito.app.widget.RefreshScheduler
 import com.wambito.app.widget.RefreshWorker
 import com.wambito.app.widget.SecureStorageSession
-import io.flutter.embedding.android.FlutterActivity
+import com.wambito.app.widget.WambitoMediumWidgetReceiver
+import com.wambito.app.widget.WidgetPinning
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.time.ZoneId
 import kotlin.concurrent.thread
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private var voice: VoiceChannel? = null
     private var haptics: HapticsChannel? = null
     private var sounds: SoundChannel? = null
     private var notices: NoticesChannel? = null
     private var capture: CaptureChannel? = null
+    private var background: BackgroundChannel? = null
     private var files: FilesChannel? = null
+    private var scanner: ScannerChannel? = null
     private var launch: MethodChannel? = null
 
     /** The widget's or the tile's `wambito://` link, until Dart takes it (lib/launch/launch_links.dart). */
@@ -122,13 +131,19 @@ class MainActivity : FlutterActivity() {
         sounds = SoundChannel(this, messenger)
 
         // The two local notices (lib/notices): scheduling them, and the notification permission.
-        notices = NoticesChannel(this, messenger)
+        notices = NoticesChannel(this, this, messenger)
+
+        // A headless run changed the vault (wambito/background `vaultChanged`, D7).
+        background = BackgroundChannel(messenger).also { BackgroundChannel.app = it }
 
         // Automatic capture (lib/capture): access, enabled sources, the settings screens.
         capture = CaptureChannel(this, messenger)
 
         // Files in and out (lib/files): the document picker and the share sheet, no storage permission.
         files = FilesChannel(this, messenger)
+
+        // The camera, for the QR of a new device to approve (lib/scanner): opened only by a scan.
+        scanner = ScannerChannel(this, messenger)
 
         // The phone's IANA time zone (lib/api/device.dart): Dart only knows its abbreviation. And
         // the browser, for "Más en la web".
@@ -139,12 +154,45 @@ class MainActivity : FlutterActivity() {
                 // the phone's browser, or a message in its email app, as any link does. True when an
                 // app took it; any other address is refused.
                 "openUrl" -> result.success(openExternal(call.arguments as? String))
+                // The vault stays out of backups (lib/local/backup.dart). Android does it by XML
+                // (res/xml/backup_rules.xml and data_extraction_rules.xml); nothing to do here.
+                "excludeFromBackup" -> result.success(true)
                 // The version the build was given, for the email to the founder.
                 "appVersion" -> result.success(
                     try {
                         packageManager.getPackageInfo(packageName, 0).versionName
                     } catch (_: Exception) {
                         null
+                    },
+                )
+                // The home card that adds the widget (lib/home/widget_pin.dart): is one on a home
+                // screen, can the launcher be asked, and the ask itself (Android 8+).
+                "widgetInstalled" -> result.success(
+                    try {
+                        val manager = AppWidgetManager.getInstance(this)
+                        WidgetPinning.receivers.any {
+                            manager.getAppWidgetIds(ComponentName(this, it)).isNotEmpty()
+                        }
+                    } catch (_: Exception) {
+                        false
+                    },
+                )
+                "widgetPinSupported" -> result.success(
+                    try {
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                            AppWidgetManager.getInstance(this).isRequestPinAppWidgetSupported
+                    } catch (_: Exception) {
+                        false
+                    },
+                )
+                "pinWidget" -> result.success(
+                    try {
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                            AppWidgetManager.getInstance(this).requestPinAppWidget(
+                                ComponentName(this, WambitoMediumWidgetReceiver::class.java), null, null,
+                            )
+                    } catch (_: Exception) {
+                        false
                     },
                 )
                 else -> result.notImplemented()
@@ -326,8 +374,13 @@ class MainActivity : FlutterActivity() {
         notices = null
         capture?.dispose()
         capture = null
+        background?.let { if (BackgroundChannel.app === it) BackgroundChannel.app = null }
+        background?.dispose()
+        background = null
         files?.dispose()
         files = null
+        scanner?.dispose()
+        scanner = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -337,10 +390,12 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
-    @Deprecated("The platform's result callback; FlutterActivity has no ActivityResult API to use instead")
+    @Deprecated("The platform's result callback; the channels still use the request-code API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         // The document picker's answer (files/FilesChannel.kt); anything else is Flutter's or a plugin's.
         if (files?.onActivityResult(requestCode, resultCode, data) == true) return
+        // The scanner's answer (scanner/ScannerChannel.kt).
+        if (scanner?.onActivityResult(requestCode, resultCode, data) == true) return
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -352,6 +407,7 @@ class MainActivity : FlutterActivity() {
     ) {
         if (voice?.onPermissionResult(requestCode, grantResults) == true) return
         if (notices?.onPermissionResult(requestCode, grantResults) == true) return
+        if (scanner?.onPermissionResult(requestCode, grantResults) == true) return
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 }

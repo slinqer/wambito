@@ -1,14 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Navigate } from "react-router";
 import { useTranslations } from "use-intl";
-import { ApiProvider, useApi } from "../../api/ApiProvider.tsx";
+import { ApiProvider } from "../../api/ApiProvider.tsx";
 import { api, unauthorizedRedirect } from "../../api/client.ts";
 import { ApiProblem } from "../../api/errors.ts";
 import { useMe } from "../../api/queries.ts";
 import { authClient } from "../../auth/auth-client.ts";
+import { accountPasskeyIds } from "../../auth/passkey.ts";
 import {
   addPasskeyWrap,
+  hasPasskeyWrap,
   KeysError,
   type LocalKeys,
   loadLocalKeys,
@@ -19,15 +21,20 @@ import {
 import { startPairing } from "../../local/pairing.ts";
 import { clearSignInPrf, evaluatePrf, takeSignInPrf } from "../../local/prf.ts";
 import {
+  notePasskeyOpened,
+  notePasskeyWithoutPrf,
+  passkeyGaveNoPrf,
+} from "../../local/unlock-hint.ts";
+import {
   forgetVault,
   openVaultSession,
   rememberPreviewAccount,
   type VaultProfile,
   type VaultSession,
 } from "../../local/vault-session.ts";
-import { landingLink } from "../../site/config.ts";
-import { liveSignOut, useSignOut } from "../home/use-sign-out.ts";
+import { useSignOut } from "../home/use-sign-out.ts";
 import { ScreenTitle, SignInScreen } from "../sign-in/SignInScreen.tsx";
+import { InstallApp } from "./InstallApp.tsx";
 import { Locked } from "./Locked.tsx";
 import { PairNewDevice } from "./PairNewDevice.tsx";
 import { RecoveryKeySetup } from "./RecoveryKeySetup.tsx";
@@ -68,11 +75,13 @@ async function sessionUserId(): Promise<string | null> {
   }
 }
 
-/** The signed-in account's passkey credential ids (Better Auth's list); throws when unreadable. */
-async function accountPasskeyIds(): Promise<string[]> {
-  const { data, error } = await authClient.passkey.listUserPasskeys();
-  if (error || !Array.isArray(data)) throw new Error("passkeys_unavailable");
-  return data.map((passkey) => passkey.credentialID);
+/**
+ * The id of the session signed in now (Better Auth's `get-session`): a kept vault links its device
+ * wrap to it, so a removal ends this session. Null when it cannot tell.
+ */
+async function liveSessionId(): Promise<string | null> {
+  const { data } = await authClient.getSession();
+  return data?.session?.id ?? null;
 }
 
 /** Another account signed in under this page: load the app again, for them (never the old vault). */
@@ -80,7 +89,8 @@ function reloadApp() {
   window.location.assign("/app");
 }
 
-function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
+/** The live gate of `profile`'s account (exported for its wiring tests). */
+export function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
   const userId = profile.id;
   // Set below: the open session's sync tells the gate when the cookie changed hands.
   let gate: Gate<VaultSession, LocalKeys> | undefined;
@@ -94,6 +104,13 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
     addPasskeyWrap: (passkey) => addPasskeyWrap({ userId, ...passkey }),
     evaluatePrf: (ids) => evaluatePrf(ids),
     accountPasskeyIds,
+    // What can open the data on this device: the "no PRF here" hint and the account's wraps.
+    passkeyGaveNoPrf: () => passkeyGaveNoPrf(userId),
+    notePasskeyWithoutPrf: () => notePasskeyWithoutPrf(userId),
+    notePasskeyOpened: () => notePasskeyOpened(userId),
+    // Never a reason to sign in again: a removal ends the session, and its notice must show.
+    // Any failure (a 401 included) counts as a wrap.
+    hasPasskeyWrap: () => hasPasskeyWrap({ userId }),
     // "From another device": a device that has the data approves this one.
     startPairing: () => signInAgainOn401(startPairing({ userId })),
     open: (keys, fresh) =>
@@ -103,8 +120,8 @@ function gateFor(profile: VaultProfile): Gate<VaultSession, LocalKeys> {
         fresh,
         onUnauthorized: signInAgain,
         onSessionChanged: () => gate?.sessionChanged(),
+        sessionId: liveSessionId,
       }),
-    guest: profile.isAnonymous,
     userId,
     sessionUserId,
     reload: reloadApp,
@@ -147,7 +164,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
   }, [session]);
   // The live sign-out: it wipes this browser's vault (the gate remembered the account).
   const signOut = useSignOut();
-  const deleteAccount = useDeleteLockedAccount();
 
   switch (state.status) {
     case "setup":
@@ -158,10 +174,13 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           onSignOut={() => void signOut()}
         />
       );
+    case "install":
+      return <InstallApp onContinue={() => void gate.installDone()} />;
     case "unlock":
       return (
         <Unlock
           notice={state.notice}
+          means={state.means}
           onUnlock={gate.unlock}
           onPasskey={gate.unlockWithPasskey}
           onPair={() => void gate.pair()}
@@ -183,8 +202,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
           retrying={state.retrying}
           onRetry={gate.retry}
           onSignOut={() => void signOut()}
-          onDeleteAccount={state.kind === "guest" ? deleteAccount : undefined}
-          onPair={state.kind === "guest" ? () => void gate.pair() : undefined}
         />
       );
     case "ready":
@@ -199,31 +216,6 @@ export function VaultGate({ profile, children }: { profile: VaultProfile; childr
     default:
       return <VaultLoading />;
   }
-}
-
-/**
- * A guest locked out of its data (it lives in another browser) can still delete the account: the
- * live `DELETE /v1/me` (the gate is outside the local backend), then the sign-out that wipes this
- * browser's vault, then the landing. Resolves to false when the delete failed.
- */
-function useDeleteLockedAccount(): () => Promise<boolean> {
-  const api = useApi();
-  const navigate = useNavigate();
-  return async () => {
-    try {
-      const { error } = await api.DELETE("/v1/me");
-      if (error) return false;
-    } catch {
-      return false;
-    }
-    await liveSignOut().catch(() => {
-      // The account and its sessions are gone already.
-    });
-    const landing = landingLink();
-    if (landing.external) window.location.replace(landing.href);
-    else navigate(landing.href, { replace: true });
-    return true;
-  };
 }
 
 /** Every commit to the vault (the person's or the sync's) marks the cached reads stale. */

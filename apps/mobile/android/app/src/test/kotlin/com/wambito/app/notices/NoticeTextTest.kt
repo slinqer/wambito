@@ -71,11 +71,11 @@ class NoticeTextTest {
     @Test
     fun `the guest warning`() {
         assertEquals(
-            "Tus datos se borrarán en 15 días si no agregas tu correo",
+            "Tus datos se borrarán en 15 días si no agregas tu correo. Si borras la app, también los pierdes.",
             NoticeText.guestWarning(context, "es"),
         )
         assertEquals(
-            "Your data will be deleted in 15 days if you don't add your email",
+            "Your data will be deleted in 15 days if you don't add your email. If you delete the app, you lose them too.",
             NoticeText.guestWarning(context, "en"),
         )
     }
@@ -83,11 +83,11 @@ class NoticeTextTest {
     @Test
     fun `the guest warning in Italian and Portuguese`() {
         assertEquals(
-            "I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email",
+            "I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email. Se elimini l'app, li perdi comunque.",
             NoticeText.guestWarning(context, "it"),
         )
         assertEquals(
-            "Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email",
+            "Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email. Se apagares a app, perdes os dados na mesma.",
             NoticeText.guestWarning(context, "pt"),
         )
     }

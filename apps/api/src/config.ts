@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { z } from "zod";
+import type { Encryption } from "./services/encryption.ts";
 
 const isCidr = (entry: string) => {
   const [ip, prefix] = entry.split("/");
@@ -24,6 +25,23 @@ function smtpHostIsLocal(smtpUrl: string | undefined): boolean {
   }
 }
 
+/**
+ * A public key `ECDH-ES` can encrypt to: X25519 (`OKP`) with `x`, or P-256 (`EC`) with `x` and `y`,
+ * and no private or symmetric part (`d`, `k`). Anything else would fail only at a token exchange.
+ */
+function isPublicJwk(value: string): boolean {
+  try {
+    const jwk = JSON.parse(value) as Record<string, unknown> | null;
+    if (typeof jwk !== "object" || jwk === null || Array.isArray(jwk)) return false;
+    if ("d" in jwk || "k" in jwk || typeof jwk.x !== "string") return false;
+    if (jwk.kty === "OKP") return jwk.crv === "X25519";
+    if (jwk.kty === "EC") return jwk.crv === "P-256" && typeof jwk.y === "string";
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 /** A certificate's SHA-256 fingerprint as keytool and release.sh print it: 32 hex pairs. */
 const SHA256_FINGERPRINT = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
 
@@ -42,6 +60,24 @@ const configSchema = z
      */
     MCP_URL: z
       .preprocess((v) => (v === "" ? undefined : v), z.string().url().optional())
+      .optional(),
+    /**
+     * The MCP's public key, a JWK as a JSON string (X25519 or P-256, for `ECDH-ES`): the API
+     * encrypts the assistant secret to it in the access token's `wk` claim (spec 2026-11-16 §4).
+     * Blank or unset: a consent that carries `wk` is refused (503 `assistant_keys_missing`). A
+     * private key (`d`) is refused: only the MCP holds that half.
+     */
+    MCP_WK_PUBLIC_KEY: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+        z
+          .string()
+          .refine(
+            isPublicJwk,
+            "MCP_WK_PUBLIC_KEY must be a public X25519 or P-256 JWK (JSON, no `d`)",
+          )
+          .optional(),
+      )
       .optional(),
     MAIL_FROM: z.string().min(3),
     RESEND_API_KEY: z.string().optional(),
@@ -92,6 +128,37 @@ const configSchema = z
         z.enum(["true", "false"]).transform((v) => v === "true"),
       )
       .default(true),
+    /**
+     * The switch (spec 2026-11-15, section 11): while `true`, every user created from now on is
+     * `encrypted` (its finances live only as end-to-end encrypted records under `/v2`); users that
+     * exist keep what they have. Off by default, `"true"` or `"false"`, blank = default.
+     */
+    NEW_USERS_ENCRYPTED: z
+      .preprocess(
+        (v) => (v === "" || v === undefined ? "false" : v),
+        z.enum(["true", "false"]).transform((v) => v === "true"),
+      )
+      .default(false),
+    /**
+     * The switch day's migration (spec 2026-11-19 §1): while `true`, `GET /v1/me` offers every
+     * `plain` account with an email the move to end-to-end encryption (`migration: "available"`).
+     * Off by default, `"true"` or `"false"`, blank = default. Its own flag, not
+     * `NEW_USERS_ENCRYPTED`: the web e2e runs with that one on over plain seeded users.
+     */
+    MIGRATION_OPEN: z
+      .preprocess(
+        (v) => (v === "" || v === undefined ? "false" : v),
+        z.enum(["true", "false"]).transform((v) => v === "true"),
+      )
+      .default(false),
+    /**
+     * Comma-separated user ids offered the migration while `MIGRATION_OPEN` is off (the dev
+     * stack's seeded test user). Unset or blank: nobody.
+     */
+    MIGRATION_OPEN_USER_IDS: z
+      .string()
+      .default("")
+      .transform((v) => csv(v)),
     /**
      * The SHA-256 fingerprints of the certificates the Android app is signed with, comma-separated,
      * as release.sh prints them (AA:BB:…, 32 pairs) — the value the web container writes into
@@ -231,12 +298,16 @@ export function apiPathPrefix(config: Pick<Config, "API_URL">): string {
   return new URL(config.API_URL).pathname.replace(/\/+$/, "");
 }
 
-/** Whether the account keeps its finances only as encrypted records (`E2E_PREVIEW_USER_IDS`). */
+/**
+ * Whether the account keeps its finances only as encrypted records: listed in
+ * `E2E_PREVIEW_USER_IDS`, `encrypted` (born while `NEW_USERS_ENCRYPTED` was on, or migrated), or
+ * `migrating` (its finances are moving into records; old clients must not write `/v1`).
+ */
 export function isPreviewAccount(
   config: Pick<Config, "E2E_PREVIEW_USER_IDS">,
-  userId: string,
+  user: { id: string; encryption: Encryption },
 ): boolean {
-  return config.E2E_PREVIEW_USER_IDS.includes(userId);
+  return user.encryption !== "plain" || config.E2E_PREVIEW_USER_IDS.includes(user.id);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {

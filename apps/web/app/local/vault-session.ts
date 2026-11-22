@@ -1,10 +1,23 @@
 import { SUGGESTED_CATEGORIES } from "@wambito/core";
+import {
+  createLocalBackend,
+  createSyncEngine,
+  SETTINGS_SEED_NAMESPACE,
+  type SyncProblemCode,
+  type UnavailableRoute,
+  uuidv5,
+} from "@wambito/vault";
 import { isLocale, type Locale } from "../i18n/format.ts";
-import { createLocalBackend, type UnavailableRoute } from "./backend.ts";
 import { createEncryptedStore, type EncryptedStore } from "./encrypted-store.ts";
-import { uuidv5 } from "./ids.ts";
-import { forgetDevice, type LocalKeys, loadLocalKeys, refreshKeys } from "./keys.ts";
-import { createSyncEngine, type SyncProblemCode } from "./sync.ts";
+import {
+  api,
+  bindDeviceWrap,
+  forgetDevice,
+  heldDeviceWrapId,
+  type LocalKeys,
+  loadLocalKeys,
+  refreshKeys,
+} from "./keys.ts";
 
 /**
  * A preview account's open vault in this tab (stage 2a): the encrypted store, the local backend the
@@ -48,6 +61,13 @@ export interface VaultSession {
    * now holds, then runs a sync (its upgrade pass re-seals the old records).
    */
   reloadKeys(): Promise<void>;
+  /** A sync now (push the outbox, pull); resolves when it ends, whatever its outcome. */
+  sync(): Promise<void>;
+  /**
+   * Merges `patch` into the settings record: one local write, queued for the sync. Nothing when
+   * the vault has no settings yet.
+   */
+  updateSettings(patch: { recoveryKeySavedAt: string }): Promise<void>;
   close(): void;
 }
 
@@ -55,13 +75,14 @@ export interface VaultSession {
 export const LOCAL_UNAVAILABLE: readonly UnavailableRoute[] = [
   { method: "*", path: "/v1/me/export" },
   { method: "*", path: "/v1/imports", prefix: true },
-  { method: "*", path: "/v1/me/assistants", prefix: true },
 ];
 
 /** The account itself, not its finances: these go to the real API. */
-const LIVE_ROUTES: readonly { method: string; path: string }[] = [
+const LIVE_ROUTES: readonly { method: string; path: string; prefix?: boolean }[] = [
   // Deleting the account; its records and key wraps cascade from the user on the server.
   { method: "DELETE", path: "/v1/me" },
+  // The connected assistants: listed and revoked (with their key wraps) on the server.
+  { method: "*", path: "/v1/me/assistants", prefix: true },
 ];
 
 /** Opening failed; `code` says why (`offline` gets the offline copy). */
@@ -89,6 +110,11 @@ export interface OpenVaultOptions {
   onSessionChanged?: () => void;
   /** The store; tests pass their own. */
   openStore?: (userId: string) => Promise<EncryptedStore>;
+  /**
+   * The id of the session the vault opens under. A kept vault opening under a session its device
+   * wrap is not linked to yet links it first (`bindWrap`); without it, nothing is linked.
+   */
+  sessionId?: () => Promise<string | null | undefined>;
 }
 
 interface Active {
@@ -109,10 +135,13 @@ export function rememberPreviewAccount(userId: string): void {
 }
 
 const isLive = (method: string, pathname: string) =>
-  LIVE_ROUTES.some((r) => r.method === method && pathname.endsWith(`/api${r.path}`));
-
-/** The namespace of the seeded records' ids; the account's own namespace is made from it. */
-const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";
+  LIVE_ROUTES.some((r) => {
+    if (r.method !== "*" && r.method !== method) return false;
+    const at = pathname.indexOf(`/api${r.path}`);
+    if (at < 0) return false;
+    const rest = pathname.slice(at + `/api${r.path}`.length);
+    return rest === "" || (r.prefix === true && rest.startsWith("/"));
+  });
 
 /**
  * Creates the account's first records when it has none after the first sync: the settings (from
@@ -127,7 +156,7 @@ const SEED_NAMESPACE = "6f1f7a4e-0c5b-5e0a-9a3e-2b1d6c8f4a10";
 async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promise<void> {
   if ((await store.list("settings")).length > 0) return;
   const locale: Locale = isLocale(profile.locale) ? profile.locale : "es";
-  const namespace = await uuidv5(SEED_NAMESPACE, profile.id);
+  const namespace = await uuidv5(SETTINGS_SEED_NAMESPACE, profile.id);
   const settingsId = await uuidv5(namespace, "settings");
   const categories = await Promise.all(
     SUGGESTED_CATEGORIES.map(async (suggestion, sortOrder) => ({
@@ -153,6 +182,7 @@ async function seedIfEmpty(store: EncryptedStore, profile: VaultProfile): Promis
       timezone: profile.timezone,
       onboardingCompletedAt: null,
       revokedDevices: [],
+      recoveryKeySavedAt: null,
     });
     for (const { id, body } of categories) await tx.put("category", id, body);
   });
@@ -174,6 +204,36 @@ export function openVaultSession(options: OpenVaultOptions): Promise<VaultSessio
   });
   mine.opening = opening;
   return opening;
+}
+
+/**
+ * Links this browser's device wrap to the session the vault opens under, once per session (its id,
+ * kept as meta `boundSession`). A removal ends the session the wrap is linked to: a browser that
+ * kept its vault through an ended session and signed in again must move the link, or a removal
+ * would end only the dead session. A fresh open needs no call (the unlock or setup just PUT the
+ * wrap under this session). True when the wrap is gone: the open then goes as a removed device's
+ * does. Any failure (offline, a server error, a 401, no session id) is silent: the next open tries
+ * again.
+ */
+async function bindWrap(
+  options: OpenVaultOptions,
+  store: EncryptedStore,
+  network: typeof globalThis.fetch,
+): Promise<boolean> {
+  if (!options.sessionId) return false;
+  try {
+    const id = await options.sessionId();
+    if (!id || (await store.getMeta<string>("boundSession")) === id) return false;
+    if (!options.fresh) {
+      const found = await bindDeviceWrap({ userId: options.profile.id, fetch: network });
+      if (found === "missing") return true;
+      if (found === "unknown") return false;
+    }
+    await store.setMeta("boundSession", id);
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function open(options: OpenVaultOptions): Promise<VaultSession> {
@@ -215,6 +275,12 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         if (problem.code === "key_unverified") unverified?.();
       },
     });
+    // Removed while its wrap was linked to a session that had ended: never syncs.
+    if (await bindWrap(options, store, network)) {
+      store.close();
+      await forgetDevice(profile.id);
+      throw new VaultOpenError("device_removed");
+    }
     const first = await engine.run();
     if (first.problem === "device_removed") {
       store.close();
@@ -268,6 +334,15 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
         if (local) engine.useKeyring(local.keyring);
         await engine.run();
       },
+      async sync() {
+        await engine.run();
+      },
+      async updateSettings(patch) {
+        await store.transaction(async (tx) => {
+          const [settings] = await tx.list("settings");
+          if (settings) await tx.put("settings", settings.id, { ...settings.body, ...patch });
+        });
+      },
       close() {
         closing = true;
         drop();
@@ -306,6 +381,15 @@ async function open(options: OpenVaultOptions): Promise<VaultSession> {
 }
 
 /**
+ * The person saved a recovery key (spec 8.4): one local write of `recoveryKeySavedAt` (ISO UTC) on
+ * the settings record, then a sync, so the phone and the web both stop offering to protect.
+ */
+export async function markRecoveryKeySaved(session: VaultSession, now: Date): Promise<void> {
+  await session.updateSettings({ recoveryKeySavedAt: now.toISOString() });
+  await session.sync();
+}
+
+/**
  * Sign-out (and a lost session): stops the sync, closes the store and deletes this browser's vault
  * of the preview account the tab showed. Nothing for a plain account.
  */
@@ -315,4 +399,36 @@ export async function forgetVault(): Promise<void> {
   active = null;
   current.session?.close();
   await forgetDevice(current.userId);
+}
+
+/**
+ * Right before sign-out: deletes this browser's own device wrap on the server (`DELETE
+ * /v2/keys/{id}`; for the caller's own wrap the session is not ended), so Settings > Devices does
+ * not keep a row for a browser that no longer holds the vault. Only with an open preview vault
+ * whose meta has `deviceWrapId`. Best effort and bounded by `timeoutMs` (default 3 s): it never
+ * rejects, and the sign-out goes on whatever happened.
+ */
+export async function forgetOwnDeviceWrap(
+  options: { timeoutMs?: number; fetch?: typeof globalThis.fetch } = {},
+): Promise<void> {
+  const current = active;
+  if (!current?.session) return;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve();
+    }, options.timeoutMs ?? 3000);
+  });
+  const attempt = (async () => {
+    const id = await heldDeviceWrapId(current.userId);
+    if (!id) return;
+    await api({ userId: current.userId, fetch: options.fetch })(
+      `/v2/keys/${encodeURIComponent(id)}`,
+      { method: "DELETE", signal: controller.signal },
+    );
+  })().catch(() => undefined);
+  await Promise.race([attempt, timeout]);
+  clearTimeout(timer);
 }

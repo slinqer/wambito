@@ -12,6 +12,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:built_value/json_object.dart';
 import 'package:wambito/api/gen/src/api_util.dart';
 import 'package:wambito/api/gen/src/model/assistant_list.dart';
+import 'package:wambito/api/gen/src/model/assistant_wrap.dart';
 import 'package:wambito/api/gen/src/model/capture_result.dart';
 import 'package:wambito/api/gen/src/model/category.dart';
 import 'package:wambito/api/gen/src/model/category_report.dart';
@@ -27,8 +28,13 @@ import 'package:wambito/api/gen/src/model/create_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/delete_transactions_batch.dart';
 import 'package:wambito/api/gen/src/model/email_change_confirm.dart';
 import 'package:wambito/api/gen/src/model/file_import.dart';
+import 'package:wambito/api/gen/src/model/finish_migration.dart';
+import 'package:wambito/api/gen/src/model/get_signin200_response.dart';
 import 'package:wambito/api/gen/src/model/key_wrap.dart';
 import 'package:wambito/api/gen/src/model/key_wraps.dart';
+import 'package:wambito/api/gen/src/model/migration_counts.dart';
+import 'package:wambito/api/gen/src/model/migration_problem.dart';
+import 'package:wambito/api/gen/src/model/migration_source.dart';
 import 'package:wambito/api/gen/src/model/pairing_approver.dart';
 import 'package:wambito/api/gen/src/model/pairing_found.dart';
 import 'package:wambito/api/gen/src/model/pairing_pickup.dart';
@@ -41,12 +47,19 @@ import 'package:wambito/api/gen/src/model/pulled_records.dart';
 import 'package:wambito/api/gen/src/model/push_records.dart';
 import 'package:wambito/api/gen/src/model/push_results.dart';
 import 'package:wambito/api/gen/src/model/put_key_wrap.dart';
+import 'package:wambito/api/gen/src/model/put_recovery_verifier.dart';
+import 'package:wambito/api/gen/src/model/recovery_sign_in.dart';
+import 'package:wambito/api/gen/src/model/recovery_signed_in.dart';
 import 'package:wambito/api/gen/src/model/recurrence.dart';
 import 'package:wambito/api/gen/src/model/review_transactions.dart';
 import 'package:wambito/api/gen/src/model/rotate_keys.dart';
 import 'package:wambito/api/gen/src/model/seal_pairing.dart';
 import 'package:wambito/api/gen/src/model/set_budget.dart';
+import 'package:wambito/api/gen/src/model/signin_found.dart';
+import 'package:wambito/api/gen/src/model/signin_pickup.dart';
+import 'package:wambito/api/gen/src/model/signin_started.dart';
 import 'package:wambito/api/gen/src/model/start_pairing.dart';
+import 'package:wambito/api/gen/src/model/start_signin.dart';
 import 'package:wambito/api/gen/src/model/summary.dart';
 import 'package:wambito/api/gen/src/model/transaction.dart';
 import 'package:wambito/api/gen/src/model/transaction_list.dart';
@@ -64,6 +77,46 @@ class DefaultApi {
   final Serializers _serializers;
 
   const DefaultApi(this._dio, this._serializers);
+
+  /// cancelMigration
+  /// Gives up on the move, from the bound session: deletes the account&#39;s records, keeps its key wraps and makes it plain again.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> cancelMigration({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/migration/cancel';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
 
   /// claimEmailSend
   ///
@@ -1271,8 +1324,167 @@ class DefaultApi {
     );
   }
 
+  /// findSignin
+  /// The phone finds a request by the typed &#x60;code&#x60; (case, dashes, spaces and look-alike letters are forgiven) and gets its &#x60;commitment&#x60; and &#x60;label&#x60;. 404 when expired or once an approver is set.
+  ///
+  /// Parameters:
+  /// * [code]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SigninFound] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SigninFound>> findSignin({
+    required String code,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      r'code': encodeQueryParameter(_serializers, code, const FullType(String)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SigninFound? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(SigninFound))
+                as SigninFound;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SigninFound>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// finishMigration
+  /// Ends the move, from the bound session. Only when the records hold exactly one live &#x60;settings&#x60; record, a record for every row (its type, its id: the server&#39;s, or the derived one of a dismissed month or a merchant rule, and its state), and the same counts as the server and as &#x60;counts&#x60; does it delete the plaintext rows, revoke the assistants and make the account encrypted; else 409 &#x60;count_mismatch&#x60; (with &#x60;errors.server&#x60;, &#x60;errors.records&#x60;, &#x60;errors.client&#x60; and &#x60;errors.missing&#x60;) and nothing changes. 409 &#x60;keys_missing&#x60; without a recovery wrap; 409 &#x60;key_version_mismatch&#x60; when a record is sealed under a key version the current key does not reach (neither the current one nor an older one its key links lead to).
+  ///
+  /// Parameters:
+  /// * [finishMigration]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Profile] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Profile>> finishMigration({
+    required FinishMigration finishMigration,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/migration/finish';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(FinishMigration);
+      _bodyData = _serializers.serialize(finishMigration, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Profile? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(Profile))
+                as Profile;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Profile>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// getAssistantWrap
-  /// For an assistant&#39;s token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session.
+  /// For an assistant&#39;s token: the wrap of that assistant (its OAuth client), marks it used, and &#x60;links&#x60; (as &#x60;GET /v2/keys&#x60;) to open records under older key versions. 404 when the person made none for it (revoking the assistant or rotating the keys deletes it), and for every session.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1282,9 +1494,9 @@ class DefaultApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [KeyWrap] as data
+  /// Returns a [Future] containing a [Response] with a [AssistantWrap] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<KeyWrap>> getAssistantWrap({
+  Future<Response<AssistantWrap>> getAssistantWrap({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1308,14 +1520,14 @@ class DefaultApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    KeyWrap? _responseData;
+    AssistantWrap? _responseData;
 
     try {
       final rawResponse = _response.data;
       _responseData = rawResponse == null
           ? null
-          : _serializers.deserialize(rawResponse, specifiedType: const FullType(KeyWrap))
-                as KeyWrap;
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(AssistantWrap))
+                as AssistantWrap;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1326,7 +1538,7 @@ class DefaultApi {
       );
     }
 
-    return Response<KeyWrap>(
+    return Response<AssistantWrap>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1627,6 +1839,87 @@ class DefaultApi {
     }
 
     return Response<PairingState>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// getSignin
+  /// With &#x60;x-wambito-poll&#x60;, the browser polls: &#x60;approverKey&#x60; (null until the phone approves), &#x60;ready&#x60; (sealed: pick it up) and &#x60;expiresAt&#x60;; 404 for a wrong secret. Without it, the phone reads the request with its session (a scanned QR): &#x60;commitment&#x60;, &#x60;label&#x60;, &#x60;expiresAt&#x60; and the browser&#39;s revealed &#x60;publicKey&#x60; (null until revealed); once approved, 404 for any other user. 404 when expired.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [xWambitoPoll] - The request's `pollSecret`; only the browser that opened it has it
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [GetSignin200Response] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<GetSignin200Response>> getSignin({
+    required String id,
+    String? xWambitoPoll,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        if (xWambitoPoll != null) r'x-wambito-poll': xWambitoPoll,
+        ...?headers,
+      },
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    GetSignin200Response? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(GetSignin200Response),
+            ) as GetSignin200Response;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<GetSignin200Response>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -2278,6 +2571,113 @@ class DefaultApi {
     );
   }
 
+  /// markSeen
+  /// The app was opened by the person. The first call of their local day counts one in the daily activity numbers, which keep no per-person history; later calls the same day count nothing. &#x60;x-wambito-client&#x60; says the platform and &#x60;x-wambito-version&#x60; the app&#39;s version (up to 64 characters). A call with &#x60;x-wambito-background: 1&#x60; changes nothing: background work never calls this. Not for assistants.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> markSeen({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/me/seen';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// migrationSource
+  /// Every finance row of the migrating account, with the server&#39;s ids, for the bound session. 409 &#x60;not_migrating&#x60;, or &#x60;migration_in_progress&#x60; for another session.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [MigrationSource] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<MigrationSource>> migrationSource({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/migration/source';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    MigrationSource? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(MigrationSource))
+                as MigrationSource;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<MigrationSource>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// pickupPairing
   /// The new device takes the sealed data key and its &#x60;keyV&#x60;; the request is deleted in the same transaction, so a second pickup is 404. 409 &#x60;not_ready&#x60; while the approving device has not sealed; 404 when unknown, expired or not the person&#39;s.
   ///
@@ -2341,6 +2741,85 @@ class DefaultApi {
     }
 
     return Response<PairingPickup>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// pickupSignin
+  /// The browser takes the sealed data key, with &#x60;x-wambito-poll&#x60;, and is signed in as the phone&#39;s user: the session travels in the &#x60;set-cookie&#x60; headers. With &#x60;remember&#x60; it is a 60-day session renewed on use; without, a 12-hour one whose cookie has no Max-Age (Better Auth&#39;s \&quot;don&#39;t remember me\&quot;) and is never renewed. The request is deleted, so a second pickup is 404. 409 &#x60;not_ready&#x60; while unsealed; 403 &#x60;account_suspended&#x60;; 404 for a wrong secret or when expired.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [xWambitoPoll] - The request's `pollSecret`; only the browser that opened it has it
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SigninPickup] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SigninPickup>> pickupSignin({
+    required String id,
+    String? xWambitoPoll,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin/{id}/pickup'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xWambitoPoll != null) r'x-wambito-poll': xWambitoPoll,
+        ...?headers,
+      },
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SigninPickup? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(SigninPickup))
+                as SigninPickup;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SigninPickup>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -2614,6 +3093,149 @@ class DefaultApi {
     );
   }
 
+  /// putRecoveryVerifier
+  /// Stores what lets the recovery key sign in: the SHA-256 of its &#x60;lookup&#x60; and of its &#x60;auth&#x60;. Replaces the earlier verifier, so only the newest key signs in; a new recovery wrap with other bytes deletes it too (store the new key&#39;s verifier after it). Needs the account&#39;s recovery wrap (409 &#x60;recovery_required&#x60;); a &#x60;lookupHash&#x60; another account holds is 409 &#x60;verifier_taken&#x60;.
+  ///
+  /// Parameters:
+  /// * [putRecoveryVerifier]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> putRecoveryVerifier({
+    required PutRecoveryVerifier putRecoveryVerifier,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/recovery/verifier';
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(PutRecoveryVerifier);
+      _bodyData = _serializers.serialize(putRecoveryVerifier, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// recoverySignIn
+  /// Signs in with the recovery key: &#x60;lookup&#x60; and &#x60;auth&#x60; are what it derives. On success the session travels in the &#x60;set-cookie&#x60; headers (the web) and the &#x60;set-auth-token&#x60; header (the app&#39;s bearer token); from the app (&#x60;x-wambito-client&#x60;), an encrypted account without an email gets a 25-month session. 401 &#x60;recovery_key_invalid&#x60; for a key that does not sign in, whatever the reason; 403 &#x60;account_suspended&#x60;; 429 after 10 tries per address in 10 minutes.
+  ///
+  /// Parameters:
+  /// * [recoverySignIn]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RecoverySignedIn] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RecoverySignedIn>> recoverySignIn({
+    required RecoverySignIn recoverySignIn,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/recovery/sign-in';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RecoverySignIn);
+      _bodyData = _serializers.serialize(recoverySignIn, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RecoverySignedIn? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(RecoverySignedIn))
+                as RecoverySignedIn;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RecoverySignedIn>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// restoreTransaction
   ///
   ///
@@ -2722,6 +3344,76 @@ class DefaultApi {
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(PairingReveal);
+      _bodyData = _serializers.serialize(pairingReveal, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// revealSignin
+  /// The browser reveals its public key after it sees the approver key, with &#x60;x-wambito-poll&#x60;. 404 for a wrong or missing secret or when expired, 409 &#x60;not_ready&#x60; (no approver yet) or &#x60;already_set&#x60;, 422 &#x60;commitment_mismatch&#x60;.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [pairingReveal]
+  /// * [xWambitoPoll] - The request's `pollSecret`; only the browser that opened it has it
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> revealSignin({
+    required String id,
+    required PairingReveal pairingReveal,
+    String? xWambitoPoll,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin/{id}/reveal'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xWambitoPoll != null) r'x-wambito-poll': xWambitoPoll,
+        ...?headers,
+      },
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
       contentType: 'application/json',
       validateStatus: validateStatus,
@@ -2891,7 +3583,7 @@ class DefaultApi {
   }
 
   /// revokeAssistant
-  /// Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most.
+  /// Deletes the consent and the refresh tokens: the assistant cannot get a new access token, so it loses access within 15 minutes at most. With &#x60;x-wambito-user&#x60; naming another account than the signed-in one, 409 &#x60;session_changed&#x60; and nothing is removed.
   ///
   /// Parameters:
   /// * [clientId]
@@ -3048,6 +3740,71 @@ class DefaultApi {
     ProgressCallback? onReceiveProgress,
   }) async {
     final _path = r'/v2/pairing/{id}/seal'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(SealPairing);
+      _bodyData = _serializers.serialize(sealPairing, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// sealSignin
+  /// The approving phone posts the data key sealed to the browser&#39;s revealed key with the key version, as &#x60;POST /v2/pairing/{id}/seal&#x60;: 409 &#x60;not_ready&#x60;, &#x60;already_sealed&#x60;, &#x60;key_version_mismatch&#x60;, 422 &#x60;approver_mismatch&#x60;. 404 for any other user or when expired.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [sealPairing]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> sealSignin({
+    required String id,
+    required SealPairing sealPairing,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin/{id}/seal'.replaceAll(
       '{'
       r'id'
       '}',
@@ -3244,6 +4001,138 @@ class DefaultApi {
     return _response;
   }
 
+  /// setSigninApprover
+  /// The phone approves: its ephemeral public key, once; the request is bound to the phone&#39;s user. 404 when expired, 409 &#x60;already_set&#x60; for any later call.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [pairingApprover]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> setSigninApprover({
+    required String id,
+    required PairingApprover pairingApprover,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin/{id}/approver'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      encodeQueryParameter(_serializers, id, const FullType(String)).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(PairingApprover);
+      _bodyData = _serializers.serialize(pairingApprover, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// startMigration
+  /// Starts moving a plain account with an email to end-to-end encryption (once the move is open to it) and binds it to this session: while it runs, only this session may push records or write key material (others get 409 &#x60;migration_in_progress&#x60;). On a migrating account it takes the move over for this session. Answers the server&#39;s counts; a retry answers the same. 409 &#x60;not_migratable&#x60; otherwise.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [MigrationCounts] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<MigrationCounts>> startMigration({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/migration/start';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    MigrationCounts? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(MigrationCounts))
+                as MigrationCounts;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<MigrationCounts>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// startPairing
   /// The new device posts a commitment to its public key (SHA-256 with a domain tag) and shows the returned &#x60;code&#x60;. At most 5 unexpired requests per person (429 &#x60;too_many_pairings&#x60;); a request lives 10 minutes.
   ///
@@ -3318,6 +4207,91 @@ class DefaultApi {
     }
 
     return Response<PairingStarted>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// startSignin
+  /// The browser opens a sign-in request, signed out: a commitment to its X25519 public key (SHA-256 with a domain tag), &#x60;remember&#x60; (the \&quot;Keep me signed in\&quot; box) and a &#x60;label&#x60; for the phone to show. It shows the returned &#x60;code&#x60; and a QR of &#x60;id&#x60; and its public key, and keeps &#x60;pollSecret&#x60;. A request lives 2 minutes. 429 &#x60;too_many_requests&#x60; past 30 requests per address in 10 minutes, &#x60;too_many_signins&#x60; past 5 open ones.
+  ///
+  /// Parameters:
+  /// * [startSignin]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SigninStarted] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SigninStarted>> startSignin({
+    required StartSignin startSignin,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/v2/signin';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(StartSignin);
+      _bodyData = _serializers.serialize(startSignin, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SigninStarted? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(rawResponse, specifiedType: const FullType(SigninStarted))
+                as SigninStarted;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SigninStarted>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -3422,7 +4396,7 @@ class DefaultApi {
   }
 
   /// updateMe
-  /// Updates the profile. &#x60;currency&#x60; is the default account&#39;s; an end-to-end encrypted account (preview) keeps it in its records, so sending it is 403 &#x60;encrypted_account&#x60;.
+  /// Updates the profile. &#x60;currency&#x60; is the default account&#39;s; an end-to-end encrypted account (preview, or migrating) keeps it in its records, so sending it is 426 &#x60;update_required&#x60;.
   ///
   /// Parameters:
   /// * [updateProfile]

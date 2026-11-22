@@ -9,7 +9,7 @@
 // line on what it is, and the web's switches and buttons.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,8 +25,14 @@ import '../capture/capture_language.dart' show captureLanguage;
 import '../capture_auto/auto_capture_section.dart';
 import '../feedback/feedback.dart';
 import '../home/shell_navigation.dart';
+import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
+import '../protect/leaving_warning.dart';
+import '../protect/protect_actions.dart' show protectWithRecoveryKey;
+import '../protect/protect_block.dart';
+import '../protect/protect_status.dart' show ProtectStatus, protectStatusProvider;
+import 'security/security_api.dart' show securitySnapshotProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
@@ -35,9 +41,13 @@ import '../ui/manage_page.dart';
 import '../ui/page_header.dart';
 import '../ui/press_button.dart';
 import '../ui/press_link.dart';
+import '../ui/pressable.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import '../ui/web_text_field.dart';
+import '../vault/preview.dart';
+import '../vault/unsynced_sheet.dart';
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'assistants_section.dart';
 import 'delete_account.dart';
 import 'export_settings.dart';
@@ -47,6 +57,7 @@ import 'server_status.dart';
 import 'locale_resolution.dart';
 import 'preferences.dart';
 import 'profile_settings.dart';
+import 'security/security_section.dart';
 import 'settings_parts.dart';
 import 'time_money_section.dart';
 import 'url_opener.dart';
@@ -74,8 +85,13 @@ final settingsEmailProvider = FutureProvider.autoDispose<String?>((ref) async {
 /// Settings (spec section 6.1.6): language, theme, sound, time zone and currency, the passkeys,
 /// "Conecta tu asistente", the import, vibration, the two local notices, hiding the amount in the
 /// widget, the voice models, the server, About, "Más en la web" and sign out.
-/// A guest also finds "Guarda tu progreso" at the top, and is warned before anything that would
-/// leave their account behind (signing out, changing server).
+/// A `plain` guest also finds "Guarda tu progreso" at the top, and a `preview` guest "Protect your
+/// data" (`ProtectBlock`) instead; a guest is warned before anything that would leave their account
+/// behind (signing out, changing server).
+/// Whether Settings shows its debug-only rows (the passkey PRF probe): debug builds only. A provider
+/// so a test can switch it.
+final debugToolsProvider = Provider<bool>((ref) => kDebugMode);
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.webSectionsOnly = false});
 
@@ -89,6 +105,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+/// How long a guest waits for the protect status before the warning shows without it.
+const _statusWait = Duration(seconds: 4);
+
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Signing out or changing server is under way (the old server is told, if it answers).
   bool _busy = false;
@@ -98,16 +117,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // -- sign out ------------------------------------------------------------------------------
 
+  /// Warns a guest before [leaving]; true when it may go on. A `preview` guest is asked about its
+  /// way back ([protectStatusProvider]): with a recovery key or a passkey there is no warning; with
+  /// neither, "Protect first" opens the recovery key and nothing is left. When the passkey cannot
+  /// be read (offline) the sheet says so instead of claiming there is none. A `plain` guest (or a
+  /// vault not open) gets today's [warnGuestLeaving].
+  Future<bool> _mayLeave(GuestLeaving leaving) async {
+    if (!ref.read(sessionProvider).isGuest) return true;
+    // Kept alive while the question is asked, so the passkey wraps it read are not fetched again.
+    final hold = ref.listenManual(protectStatusProvider, (_, _) {});
+    try {
+      ProtectStatus? status;
+      var unreadable = false;
+      try {
+        status = await ref.read(protectStatusProvider.future).timeout(_statusWait);
+      } on TimeoutException {
+        // Offline and slow: nothing is known, so the warning shows with the passkey unknown.
+        unreadable = true;
+      } on Object {
+        status = null;
+      }
+      if (!mounted) return false;
+      if (status != null || unreadable) {
+        if (status != null && status.protected) return true;
+        var passkeyUnknown = unreadable;
+        if (!unreadable) {
+          try {
+            await ref.read(securitySnapshotProvider.future).timeout(_statusWait);
+          } on Object {
+            passkeyUnknown = true;
+          }
+        }
+        if (!mounted) return false;
+        final choice = await warnUnprotectedLeaving(
+          context,
+          leaving,
+          passkeyUnknown: passkeyUnknown,
+        );
+        if (!mounted || choice == null) return false;
+        if (choice == UnprotectedChoice.protectFirst) {
+          await protectWithRecoveryKey(context, ref);
+          return false;
+        }
+        return true;
+      }
+    } finally {
+      hold.close();
+    }
+    final choice = await warnGuestLeaving(context, leaving);
+    if (!mounted || choice == null) return false;
+    if (choice == GuestWarning.saveInstead) {
+      unawaited(context.push('/progress'));
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _signOut() async {
     final session = ref.read(sessionProvider.notifier);
-    if (ref.read(sessionProvider).isGuest) {
-      final choice = await warnGuestLeaving(context, GuestLeaving.signOut);
-      if (!mounted || choice == null) return;
-      if (choice == GuestWarning.saveInstead) {
-        unawaited(context.push('/progress'));
-        return;
-      }
-    }
+    if (!await _mayLeave(GuestLeaving.signOut) || !mounted) return;
+    // A `preview` account with changes not sent yet: sync them first, or sign out anyway.
+    if (!await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await session.signOut(discardGuest: true);
@@ -125,14 +196,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [_ServerForm(current: ref.read(serverUrlProvider))],
     );
     if (!mounted || next == null) return;
-    if (ref.read(sessionProvider).isGuest && next != ref.read(serverUrlProvider)) {
-      final choice = await warnGuestLeaving(context, GuestLeaving.changeServer);
-      if (!mounted || choice == null) return;
-      if (choice == GuestWarning.saveInstead) {
-        unawaited(context.push('/progress'));
-        return;
-      }
+    if (next != ref.read(serverUrlProvider) && !await _mayLeave(GuestLeaving.changeServer)) return;
+    if (!mounted) return;
+    // Another server signs out (and wipes the vault): a `preview` account's changes not sent yet
+    // are asked about first, as at a sign-out.
+    if (next != ref.read(serverUrlProvider) &&
+        !await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) {
+      return;
     }
+    if (!mounted) return;
     final toasts = ToastHost.of(context);
     final l10n = AppLocalizations.of(context);
     setState(() => _busy = true);
@@ -262,6 +334,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final titleStyle = LkText.pageTitle.copyWith(color: colors.ink);
     final signedInStyle = LkText.bodySm.copyWith(color: colors.inkMuted);
 
+    final preferences = SettingsSection(
+      title: l10n.settingsPreferences,
+      children: [
+        Choices<String>(
+          legend: l10n.settingsLanguage,
+          value:
+              locale?.languageCode ??
+              (webOnly ? Localizations.localeOf(context).languageCode : 'auto'),
+          options: [
+            if (!webOnly)
+              Choice('auto', l10n.settingsLanguageAuto, key: const Key('settings.language.auto')),
+            Choice('es', l10n.settingsLanguageEs, key: const Key('settings.language.es')),
+            Choice('en', l10n.settingsLanguageEn, key: const Key('settings.language.en')),
+            Choice('it', l10n.settingsLanguageIt, key: const Key('settings.language.it')),
+            Choice('pt', l10n.settingsLanguagePt, key: const Key('settings.language.pt')),
+          ],
+          onChanged: (code) => unawaited(
+            ref.read(localeOverrideProvider.notifier).set(code == 'auto' ? null : Locale(code)),
+          ),
+        ),
+        Choices<ThemeMode>(
+          legend: l10n.settingsTheme,
+          hint: l10n.settingsThemeHint,
+          value: themeMode,
+          options: [
+            Choice(
+              ThemeMode.system,
+              l10n.settingsThemeSystem,
+              key: const Key('settings.theme.system'),
+            ),
+            Choice(ThemeMode.dark, l10n.settingsThemeNight, key: const Key('settings.theme.night')),
+            Choice(ThemeMode.light, l10n.settingsThemeDay, key: const Key('settings.theme.day')),
+          ],
+          onChanged: (mode) => unawaited(ref.read(themeModeProvider.notifier).set(mode)),
+        ),
+        SettingSwitch(
+          key: const Key('settings.sound'),
+          label: l10n.settingsSound,
+          // The web's line says vibration stays on; here it is a setting of its own.
+          hint: vibration ? l10n.settingsSoundHint : l10n.settingsSoundHintVibrationOff,
+          value: sound,
+          onChanged: (on) => unawaited(ref.read(soundEnabledProvider.notifier).set(on)),
+        ),
+      ],
+    );
+    final provisional = ref.watch(sessionProvider.select((s) => s.isProvisional));
+    final block = ref.watch(sessionProvider.select((s) => s.provisionalBlock));
+    // An offline first run (lib/local/provisional.dart): no account yet, so only this phone's own
+    // preferences and why the account waits; no sign-in, no server, no account card.
+    if (provisional && !webOnly) {
+      return ManagePage(
+        current: 'settings',
+        onAdd: () => unawaited(openAddSheet(context)),
+        onMic: () => unawaited(openCapture(context, listen: true)),
+        onNavigate: (to) => navigateFromShell(context, ref, to, current: 'settings'),
+        header: PageHeader(
+          backLabel: l10n.manageBack,
+          backShort: l10n.manageBackShort,
+          onBack: _back,
+        ),
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: WambitoTokens.space1,
+            children: [
+              Semantics(header: true, child: Text(l10n.settingsTitle, style: titleStyle)),
+              Text(
+                switch (block) {
+                  ProvisionalBlock.plainServer => l10n.provisionalPlainServer,
+                  ProvisionalBlock.noGuests => l10n.provisionalNoGuests,
+                  null => l10n.provisionalWaiting,
+                },
+                key: const Key('settings.provisional'),
+                style: signedInStyle,
+              ),
+            ],
+          ),
+          preferences,
+        ],
+      );
+    }
     return ManagePage(
       current: 'settings',
       onAdd: () => unawaited(openAddSheet(context)),
@@ -281,7 +434,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (signedInAs != null) Text(signedInAs, style: signedInStyle),
           ],
         ),
-        if (guest && !webOnly)
+        // A `preview` account without email: "Protect your data". Only with a status, so other
+        // accounts get no extra gap.
+        if (!webOnly && ref.watch(protectStatusProvider.select((s) => s.value != null)))
+          const ProtectBlock(),
+        // Its block offers adding an email, so "Guarda tu progreso" is for a `plain` guest only.
+        if (guest && !webOnly && !ref.watch(isPreviewProvider))
           SettingsSection(
             title: l10n.progressTitle,
             lead: l10n.progressLead,
@@ -294,68 +452,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-        SettingsSection(
-          title: l10n.settingsPreferences,
-          children: [
-            Choices<String>(
-              legend: l10n.settingsLanguage,
-              value:
-                  locale?.languageCode ??
-                  (webOnly ? Localizations.localeOf(context).languageCode : 'auto'),
-              options: [
-                if (!webOnly)
-                  Choice(
-                    'auto',
-                    l10n.settingsLanguageAuto,
-                    key: const Key('settings.language.auto'),
-                  ),
-                Choice('es', l10n.settingsLanguageEs, key: const Key('settings.language.es')),
-                Choice('en', l10n.settingsLanguageEn, key: const Key('settings.language.en')),
-                Choice('it', l10n.settingsLanguageIt, key: const Key('settings.language.it')),
-                Choice('pt', l10n.settingsLanguagePt, key: const Key('settings.language.pt')),
-              ],
-              onChanged: (code) => unawaited(
-                ref.read(localeOverrideProvider.notifier).set(code == 'auto' ? null : Locale(code)),
-              ),
-            ),
-            Choices<ThemeMode>(
-              legend: l10n.settingsTheme,
-              hint: l10n.settingsThemeHint,
-              value: themeMode,
-              options: [
-                Choice(
-                  ThemeMode.system,
-                  l10n.settingsThemeSystem,
-                  key: const Key('settings.theme.system'),
-                ),
-                Choice(
-                  ThemeMode.dark,
-                  l10n.settingsThemeNight,
-                  key: const Key('settings.theme.night'),
-                ),
-                Choice(
-                  ThemeMode.light,
-                  l10n.settingsThemeDay,
-                  key: const Key('settings.theme.day'),
-                ),
-              ],
-              onChanged: (mode) => unawaited(ref.read(themeModeProvider.notifier).set(mode)),
-            ),
-            SettingSwitch(
-              key: const Key('settings.sound'),
-              label: l10n.settingsSound,
-              // The web's line says vibration stays on; here it is a setting of its own.
-              hint: vibration ? l10n.settingsSoundHint : l10n.settingsSoundHintVibrationOff,
-              value: sound,
-              onChanged: (on) => unawaited(ref.read(soundEnabledProvider.notifier).set(on)),
-            ),
-          ],
-        ),
+        preferences,
         if (profile != null) TimeAndMoneySection(profile: profile),
         PasskeysSection(
           timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
-          guest: guest && !webOnly,
+          // A `preview` guest adds a passkey here too ("Protect your data" step 2).
+          guest: guest && !webOnly && !ref.watch(isPreviewProvider),
         ),
+        // An encrypted account's devices and recovery key (Settings → Security), with or without
+        // email. Plain accounts see nothing of it.
+        if (!webOnly && ref.watch(isPreviewProvider))
+          SecuritySection(timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone),
         // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
         // pairs yet, so the web-only pictures leave it out.
         if (!webOnly)
@@ -374,15 +481,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: WambitoTokens.space2,
               children: [
-                SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
-                _SelfStart(
-                  child: PressLink.text(
-                    l10n.settingsImportAction,
-                    key: const Key('settings.import'),
-                    tone: PressTone.secondary,
-                    onPressed: () => unawaited(context.push<void>('/import')),
+                // An encrypted account's data is on the phone: the server's import waits for encryption.
+                if (ref.watch(isPreviewProvider)) ...[
+                  SettingLabel(label: l10n.settingsImportTitle),
+                  const ComingSoonNotice(key: Key('settings.import.comingSoon')),
+                ] else ...[
+                  SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
+                  _SelfStart(
+                    child: PressLink.text(
+                      l10n.settingsImportAction,
+                      key: const Key('settings.import'),
+                      tone: PressTone.secondary,
+                      onPressed: () => unawaited(context.push<void>('/import')),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             ExportBlock(guest: guest),
@@ -402,6 +515,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: vibration,
                 onChanged: (on) => unawaited(ref.read(vibrationEnabledProvider.notifier).set(on)),
               ),
+              // "Hoy vence…" is computed on the phone for an encrypted account (lib/notices/due_list.dart).
               SettingSwitch(
                 key: const Key('settings.dueNotice'),
                 label: l10n.settingsDueNotice,
@@ -411,14 +525,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: ref.watch(dueNoticeEnabledProvider),
                 onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
               ),
-              SettingSwitch(
-                key: const Key('settings.guestNotice'),
-                label: l10n.settingsGuestNotice,
-                hint: l10n.settingsGuestNoticeHint,
-                value: ref.watch(guestNoticeEnabledProvider),
-                onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
-              ),
+              // The 45-day guest warning is a `plain` guest's: an encrypted guest is kept 12 or 24
+              // months and never gets it (lib/notices/notice_sync.dart).
+              if (!ref.watch(isPreviewProvider))
+                SettingSwitch(
+                  key: const Key('settings.guestNotice'),
+                  label: l10n.settingsGuestNotice,
+                  hint: l10n.settingsGuestNoticeHint,
+                  value: ref.watch(guestNoticeEnabledProvider),
+                  onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
+                ),
               // The widgets are Android's: iOS has none, so no setting about them.
+              if (defaultTargetPlatform == TargetPlatform.android &&
+                  ref.watch(widgetOnHomeProvider).value == false)
+                _AddWidgetRow(key: const Key('settings.addWidget')),
               if (defaultTargetPlatform == TargetPlatform.android)
                 SettingSwitch(
                   key: const Key('settings.hideAmount'),
@@ -506,6 +626,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () => context.push('/settings/about'),
                 ),
               ),
+              if (ref.watch(debugToolsProvider))
+                _SelfStart(
+                  child: PressButton.text(
+                    'PRF probe',
+                    key: const Key('settings.prfProbe'),
+                    tone: PressTone.secondary,
+                    onPressed: () => context.push('/debug/prf'),
+                  ),
+                ),
             ],
           ),
           SettingsSection(
@@ -527,6 +656,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const DeleteAccountCard(),
         ],
       ],
+    );
+  }
+}
+
+/// "Añadir widget": asks the launcher, or shows the steps; there only until a widget is on the home
+/// screen (Android).
+class _AddWidgetRow extends ConsumerWidget {
+  const _AddWidgetRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.lkColors;
+    return Pressable(
+      label: l10n.settingsAddWidget,
+      hint: l10n.settingsAddWidgetHint,
+      onPressed: () => unawaited(addWidget(context, ref)),
+      builder: (context, state) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          spacing: WambitoTokens.space3,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: WambitoTokens.space1,
+                children: [
+                  Text(l10n.settingsAddWidget, style: LkText.body.copyWith(color: colors.ink)),
+                  Text(
+                    l10n.settingsAddWidgetHint,
+                    style: LkText.fieldLabel.copyWith(
+                      color: colors.inkMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ExcludeSemantics(
+              child: Text('›', style: LkText.label.copyWith(color: colors.inkMuted)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

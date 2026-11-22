@@ -98,6 +98,19 @@ class WidgetModelTest {
     }
 
     @Test
+    fun `a signed-out snapshot with a line says that line, with no figure`() {
+        val json = """{"v":3,"signedIn":false,"locale":"es","theme":"dark","hideAmount":false,"line":"Próximamente con cifrado"}"""
+        val parsed = WidgetSnapshot.parse(json)!!
+        assertEquals("Próximamente con cifrado", parsed.line)
+        val model = widgetModel(context, parsed, now, zone)
+        assertEquals("Próximamente con cifrado", (model as WidgetModel.SignedOut).message)
+        // It survives a write and a read, and a signed-in snapshot never carries one.
+        assertEquals("Próximamente con cifrado", WidgetSnapshot.parse(parsed.toJson())!!.line)
+        assertNull(WidgetSnapshot.parse("""{"v":3,"signedIn":false,"line":""}""")!!.line)
+        assertNull(snapshot().copy(line = "x").toJson().let { WidgetSnapshot.parse(it)!!.line })
+    }
+
+    @Test
     fun `hace un rato only after a refresh failed, or after twice the refresh period`() {
         // A late run on a working connection is not "a while ago".
         assertNull(figures(snapshot(updatedAt = now.minusSeconds(4 * 3600))).stale)
@@ -230,6 +243,33 @@ class WidgetModelTest {
         assertEquals(WidgetTheme.NIGHT, widgetModel(context, null, now, zone).theme)
         val signedOut = WidgetSnapshot(signedIn = false, theme = "light")
         assertEquals(WidgetTheme.DAY, widgetModel(context, signedOut, now, zone).theme)
+    }
+
+    @Test
+    fun `figures of another owner than the signed-in account are never drawn`() {
+        androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val mode = com.wambito.app.account.AccountMode(context)
+        val owned = snapshot().copy(owner = "u1")
+        mode.write("preview", "u1")
+        assertEquals("Te quedan", figures(owned).label)
+        mode.write("preview", "u2")
+        assertEquals(true, widgetModel(context, owned, now, zone) is WidgetModel.SignedOut)
+        // Signed out (the mode and owner are cleared): a late write of u1's figures is not drawn.
+        mode.write(null, null)
+        assertEquals(true, widgetModel(context, owned, now, zone) is WidgetModel.SignedOut)
+        // A plain account's snapshot has no owner and is drawn.
+        mode.write("plain", null)
+        assertEquals("Te quedan", figures(snapshot()).label)
+    }
+
+    @Test
+    fun `the owner is read and written, and a signed-out snapshot keeps none`() {
+        val written = snapshot(updatedAt = Instant.parse("2026-10-22T15:30:00Z")).copy(owner = "u1")
+        assertEquals("u1", org.json.JSONObject(written.toJson()).getString("owner"))
+        assertEquals(written, WidgetSnapshot.parse(written.toJson()))
+        assertNull(org.json.JSONObject(snapshot().toJson()).optString("owner", "").takeIf { it.isNotEmpty() })
+        assertNull(WidgetSnapshot.parse(snapshot().toJson())!!.owner)
+        assertNull(WidgetSnapshot(signedIn = false, owner = "u1").let { org.json.JSONObject(it.toJson()).opt("owner") })
     }
 
     @Test

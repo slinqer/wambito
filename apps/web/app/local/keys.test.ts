@@ -8,11 +8,13 @@ import {
   openFromDevice,
   openRecord,
   parseRecoveryKey,
+  recoveryVerifier,
   sealKeyLink,
   sealRecord,
   sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
@@ -52,6 +54,7 @@ import {
   dropKeyVersion,
   enrollDevice,
   forgetDevice,
+  hasPasskeyWrap,
   KeysError,
   type LocalKeys,
   loadLocalKeys,
@@ -60,6 +63,7 @@ import {
   unlockWithPasskey,
   unlockWithRecovery,
   withDataKey,
+  withDataKeyFrom,
 } from "./keys.ts";
 
 /** The record keys of the keyring's current version. */
@@ -92,7 +96,11 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
   const puts: Array<{ id: string; kind: string; ifNoneMatch: string | null }> = [];
   /** Ids of the `DELETE /v2/keys/{id}` calls, in order; `failDeletes`: answered with a 503. */
   const deletes: string[] = [];
-  const state = { failDeletes: false };
+  const state = { failDeletes: false, failVerifier: false };
+  /** `put:<kind>` for every wrap PUT and `verifier` for every verifier PUT, in order. */
+  const events: string[] = [];
+  /** The body of every `PUT /v2/recovery/verifier`. */
+  const verifiers: Array<{ lookupHash: string; authHash: string }> = [];
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://x");
     const json = (body: unknown, status = 200) =>
@@ -100,6 +108,14 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
         status,
         headers: { "content-type": "application/json" },
       });
+    if (url.pathname === "/api/v2/recovery/verifier" && init?.method === "PUT") {
+      events.push("verifier");
+      if (state.failVerifier) return json({ code: "unavailable" }, 503);
+      if (!wraps.some((w) => w.kind === "recovery"))
+        return json({ code: "recovery_required" }, 409);
+      verifiers.push(JSON.parse(String(init.body)));
+      return new Response(null, { status: 204 });
+    }
     if (url.pathname === "/api/v2/keys" && (init?.method ?? "GET") === "GET")
       return json({
         wraps,
@@ -120,6 +136,7 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
       const body = JSON.parse(String(init.body));
       const ifNoneMatch = new Headers(init.headers).get("if-none-match");
       puts.push({ id, kind: body.kind, ifNoneMatch });
+      events.push(`put:${body.kind}`);
       if (ifNoneMatch === "*" && wraps.some((w) => w.id !== id)) {
         return json({ code: "already_set_up" }, 409);
       }
@@ -154,7 +171,16 @@ function fakeKeys(options: { passkeys?: string[] } = {}) {
     }
     return new Response(null, { status: 404 });
   };
-  return { fetch: fetch as typeof globalThis.fetch, wraps, links, puts, deletes, state };
+  return {
+    fetch: fetch as typeof globalThis.fetch,
+    wraps,
+    links,
+    puts,
+    deletes,
+    state,
+    events,
+    verifiers,
+  };
 }
 
 let counter = 0;
@@ -210,6 +236,49 @@ describe("prepareAccount then commit", () => {
     ).toEqual(dk);
     expect(await store.getKey("dk")).toBeUndefined();
     store.close();
+  });
+
+  it("prepareAccount puts the verifier of the shown key after the recovery wrap and before the device wrap", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    expect(api.events).toEqual(["put:recovery", "verifier", "put:device"]);
+    const raw = await recoveryVerifier(parseRecoveryKey(recoveryKey as string));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+  });
+
+  it("a guest's commit sends no verifier", async () => {
+    const api = fakeKeys();
+    await setUpAccount({ userId: newUser(), guest: true, fetch: api.fetch });
+    expect(api.events).toEqual(["put:recovery", "put:device"]);
+    expect(api.verifiers).toEqual([]);
+  });
+
+  it("a retried commit sends the same verifier", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    api.state.failVerifier = true;
+    const prepared = await prepareAccount({ userId, guest: false, fetch: api.fetch });
+    await expect(prepared.commit()).rejects.toBeInstanceOf(KeysError);
+    expect(api.wraps.map((w) => w.kind)).toEqual(["recovery"]);
+    api.state.failVerifier = false;
+    await prepared.commit();
+    api.state.failVerifier = true;
+    // a second success sends nothing more
+    await prepared.commit();
+    const raw = await recoveryVerifier(parseRecoveryKey(prepared.recoveryKey as string));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+    expect(api.events).toEqual(["put:recovery", "verifier", "verifier", "put:device"]);
   });
 
   it("gives a guest keys and wraps but no recovery key", async () => {
@@ -407,6 +476,29 @@ describe("unlockWithRecovery", () => {
     expect(
       await openRecord(currentKeys(await loadLocalKeys(userId)), CTX(userId, REC), sealed),
     ).toEqual({ s: 1 });
+  });
+
+  it("unlockWithRecovery puts the verifier and still unlocks when that PUT fails", async () => {
+    const { api, userId, recoveryKey } = await accountWithKey();
+    api.events.length = 0;
+    api.verifiers.length = 0;
+    await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    const raw = await recoveryVerifier(parseRecoveryKey(recoveryKey));
+    expect(api.verifiers).toEqual([
+      {
+        lookupHash: toBase64Url(await verifierHash(raw.lookup)),
+        authHash: toBase64Url(await verifierHash(raw.auth)),
+      },
+    ]);
+
+    await forgetDevice(userId);
+    api.verifiers.length = 0;
+    api.state.failVerifier = true;
+    const keys = await unlockWithRecovery({ userId, text: recoveryKey, fetch: api.fetch });
+    expect(keys.keyring.current).toBe(1);
+    expect(api.events.filter((e) => e === "verifier")).toHaveLength(2);
+    expect(api.verifiers).toEqual([]);
+    expect(await loadLocalKeys(userId)).not.toBeNull();
   });
 
   it("rejects a malformed key with bad_recovery_key before any request", async () => {
@@ -935,6 +1027,24 @@ describe("passkey wraps", () => {
     ).toEqual({ s: 1 });
   });
 
+  it("hasPasskeyWrap says whether the account has a passkey wrap, and throws when the list fails", async () => {
+    const { api, userId } = await accountInAnotherBrowser();
+    expect(await hasPasskeyWrap({ userId, fetch: api.fetch })).toBe(false);
+    api.wraps.push({
+      id: "01930000-0000-7000-8000-0000000000c1",
+      kind: "passkey",
+      ref: CRED,
+      keyV: 1,
+      wrapped: "AAAA",
+      publicKey: null,
+      attestation: null,
+      label: null,
+    });
+    expect(await hasPasskeyWrap({ userId, fetch: api.fetch })).toBe(true);
+    const down = vi.fn(async () => new Response("{}", { status: 503 }));
+    await expect(hasPasskeyWrap({ userId, fetch: down })).rejects.toThrow();
+  });
+
   it("unlockWithPasskey with an unknown credential is no_passkey_wrap", async () => {
     const { api, userId } = await accountInAnotherBrowser();
     const before = api.puts.length;
@@ -1237,5 +1347,88 @@ describe("unlocking an account that rotated", () => {
     );
     expect(api.puts.length).toBe(puts);
     expect(await stored(userId)).toEqual(before);
+  });
+});
+
+describe("withDataKeyFrom", () => {
+  const CRED = "cHJmLWNyZWRlbnRpYWw";
+
+  it("withDataKeyFrom opens DK from a passkey and from the recovery key without enrolling", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    const { recoveryKey } = await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const recovery = api.wraps.find((w) => w.kind === "recovery")!;
+    const dk = await unwrapDataKey(
+      parseRecoveryKey(recoveryKey as string),
+      { kind: "recovery", userId, keyV: 1 },
+      fromBase64Url(recovery.wrapped),
+    );
+    const prf = new Uint8Array(32).fill(7);
+    api.wraps.push({
+      id: "01930000-0000-7000-8000-0000000000c1",
+      kind: "passkey",
+      ref: CRED,
+      keyV: 1,
+      wrapped: toBase64Url(await wrapDataKey(prf, { kind: "passkey", userId, keyV: 1 }, dk)),
+      publicKey: null,
+      attestation: null,
+      label: null,
+    });
+    // A browser that holds nothing for this account.
+    await forgetDevice(userId);
+    const putsBefore = api.puts.length;
+
+    const seen: Array<{ dk: Uint8Array; copy: Uint8Array; keyV: number }> = [];
+    const fn = async (key: Uint8Array, keyV: number) => {
+      seen.push({ dk: key, copy: key.slice(), keyV });
+      return "done";
+    };
+    expect(
+      await withDataKeyFrom({ userId, fetch: api.fetch }, { credentialId: CRED, prf }, fn),
+    ).toBe("done");
+    expect(
+      await withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: recoveryKey as string }, fn),
+    ).toBe("done");
+
+    for (const entry of seen) {
+      expect(entry.copy).toEqual(dk);
+      expect(entry.keyV).toBe(1);
+      // zeroed once fn settled
+      expect(entry.dk.every((b) => b === 0)).toBe(true);
+    }
+    // nothing enrolled, sent or kept
+    expect(api.puts.length).toBe(putsBefore);
+    expect(await loadLocalKeys(userId)).toBeNull();
+    expect(api.wraps.filter((w) => w.kind === "device")).toHaveLength(1);
+
+    // the wrong secrets open nothing, and fn never runs
+    const never = vi.fn(fn);
+    await expect(
+      withDataKeyFrom(
+        { userId, fetch: api.fetch },
+        { credentialId: CRED, prf: new Uint8Array(32).fill(8) },
+        never,
+      ),
+    ).rejects.toEqual(new KeysError("no_passkey_wrap"));
+    await expect(
+      withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: "nope" }, never),
+    ).rejects.toEqual(new KeysError("bad_recovery_key"));
+    const other = formatRecoveryKey(crypto.getRandomValues(new Uint8Array(16)));
+    await expect(
+      withDataKeyFrom({ userId, fetch: api.fetch }, { recovery: other }, never),
+    ).rejects.toEqual(new KeysError("wrong_recovery_key"));
+    expect(never).not.toHaveBeenCalled();
+  });
+
+  it("withDataKeyFrom with device is this browser's own device wrap", async () => {
+    const api = fakeKeys();
+    const userId = newUser();
+    await setUpAccount({ userId, guest: false, fetch: api.fetch });
+    const keyV = await withDataKeyFrom(
+      { userId, fetch: api.fetch },
+      { device: true },
+      async (_dk, v) => v,
+    );
+    expect(keyV).toBe(1);
   });
 });

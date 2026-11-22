@@ -516,7 +516,7 @@
     color: var(--ink);
   }
   .lk-tab .lk-tab-ico {
-    font-size: 18px;
+    display: block;
   }
   .lk-plus {
     width: 58px;
@@ -530,6 +530,8 @@
     margin-top: -28px;
     box-shadow: var(--edge-brand);
     cursor: pointer;
+    display: grid;
+    place-items: center;
   }
 
   /* Wambi speech bubble */
@@ -1063,7 +1065,7 @@
     border-radius: var(--radius-pill);
     background: var(--surface-row);
     box-shadow: var(--edge-sm);
-    font-size: 20px;
+    color: var(--ink);
     cursor: pointer;
     transition:
       transform var(--press) ease,

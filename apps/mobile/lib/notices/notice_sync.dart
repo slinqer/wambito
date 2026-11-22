@@ -5,8 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/session.dart';
 import '../feedback/stored_flag.dart';
+import '../home/home_controller.dart' show clockProvider;
 import '../home/widget_sync.dart';
 import '../settings/preferences.dart';
+import '../vault/encryption_mode.dart';
+import '../local/vault_session.dart' show VaultSession;
+import '../vault/vault_providers.dart' show vaultSessionProvider;
+import 'due_list.dart';
 import 'notice_backend.dart';
 import 'notice_platform.dart';
 import 'notice_prompt.dart';
@@ -17,11 +22,14 @@ import 'notice_prompt.dart';
 ///    its switch is on, they have a recurring payment still running **and** notifications are
 ///    allowed (a guest included); otherwise it is cancelled, so the phone never wakes up, nor
 ///    asks the server anything, for a notice that cannot be posted. Offline, with nothing known,
-///    the job is left as it is.
-///  * **The guest warning** is set 44 days ahead, again at every opening of the app on a guest
-///    account **that the server accepted a request from** (that is when its own 60-day clock
+///    the job is left as it is. For a `preview` account the payments are read from the open vault
+///    ([dueListOf]) and handed over as days and names (`scheduleDueList`), again after every commit
+///    to the vault; the server is never asked.
+///  * **The guest warning** is set 44 days ahead, again at every opening of the app on a `plain`
+///    guest account **that the server accepted a request from** (that is when its own 60-day clock
 ///    restarts; an opening offline leaves the job as it was), and cancelled when the account
-///    stops being a guest (a claimed email, a sign-out) or its switch goes off.
+///    stops being a guest (a claimed email, a sign-out), its switch goes off, or the account is
+///    `preview` (an encrypted guest is kept 12 or 24 months: it never gets the warning).
 ///  * **The notification permission** (Android 13+) is asked in the app, with one sentence on why,
 ///    the first time a notice is relevant while the app is open: a recurring payment and the due
 ///    switch on, or a guest account and the guest switch on. It is asked once, whatever the
@@ -46,9 +54,14 @@ class NoticeSync with WidgetsBindingObserver {
     await _asking;
   }
 
-  /// Asks for a pass.
+  var _waiting = false;
+
+  /// Asks for a pass. Asks made while one is already waiting its turn share it.
   void request() {
+    if (_waiting) return;
+    _waiting = true;
     _queue = _queue.then((_) async {
+      _waiting = false;
       try {
         await _pass();
       } on Object {
@@ -77,6 +90,18 @@ class NoticeSync with WidgetsBindingObserver {
       _facts = null;
       await platform.cancelDue();
       await platform.cancelGuest();
+      return;
+    }
+    // A `preview` account's payments live only in the vault on this phone: nothing is asked of the
+    // server for them (no recurrence list). "Hoy vence…" is computed in Dart from the open vault
+    // and handed to the phone as a list of days and names ([_previewDue]). The guest warning is
+    // never set: the server keeps an encrypted guest for 12 or 24 months, not 60 days, so "se
+    // borrarán en 15 días" would be false. A job left from before is cancelled.
+    final account = _ref.read(currentVaultAccountProvider);
+    if (account?.mode == EncryptionMode.preview) {
+      _facts = null;
+      await platform.cancelGuest();
+      await _previewDue(platform, permission, account!.profile.id);
       return;
     }
     final due = _ref.read(dueNoticeEnabledProvider.notifier);
@@ -135,6 +160,43 @@ class NoticeSync with WidgetsBindingObserver {
     }
   }
 
+  /// "Hoy vence…" for a `preview` account: the list is read from the open vault and replaces the
+  /// phone's whole list; the switch off, or notices not allowed, cancels it. A vault that is not open
+  /// (locked, still opening) leaves the list as it was: a pass runs again when it opens.
+  Future<void> _previewDue(
+    NoticePlatform platform,
+    NoticePermission permission,
+    String userId,
+  ) async {
+    final due = _ref.read(dueNoticeEnabledProvider.notifier);
+    await due.ready;
+    if (!_ref.read(dueNoticeEnabledProvider)) {
+      await platform.cancelDue();
+      return;
+    }
+    final vault = _ref.read(vaultSessionProvider);
+    if (vault == null || vault.userId != userId) return;
+    final list = await dueListOf(vault.backend, now: _ref.read(clockProvider)());
+    // The account or the session may have changed while the vault was read: a later pass is queued.
+    if (list == null ||
+        _ref.read(sessionProvider).status != SessionStatus.signedIn ||
+        _ref.read(vaultSessionProvider)?.userId != userId) {
+      return;
+    }
+    if (permission == NoticePermission.granted) {
+      await platform.scheduleDueList(
+        zone: list.zone,
+        language: widgetLanguage(_ref),
+        owner: userId,
+        days: list.days,
+      );
+    } else {
+      await platform.cancelDue();
+    }
+    // Only a payment coming up is worth the question.
+    if (list.days.isNotEmpty) _ask(NoticeReason.due);
+  }
+
   void _ask(NoticeReason reason) {
     if (_askingNow) return;
     _askingNow = true;
@@ -187,6 +249,23 @@ final noticeSyncProvider = Provider<NoticeSync>((ref) {
   ref.listen(localeOverrideProvider, (previous, next) {
     if (previous != next) sync.request();
   });
+  // The account turning out to be `preview`: "Hoy vence…" is cancelled and the server asked nothing.
+  // (`plain` needs no pass of its own: until the mode is known the guard holds every finance call.)
+  ref.listen(currentVaultAccountProvider.select((a) => a?.mode), (previous, next) {
+    if (next == EncryptionMode.preview && previous != next) sync.request();
+  });
+  // A `preview` account's list follows its vault: a rule or a payment changed locally, a sync, a
+  // background run.
+  void Function()? unsubscribe;
+  void follow(VaultSession? vault) {
+    unsubscribe?.call();
+    unsubscribe = vault?.subscribe(sync.request);
+    if (vault != null) sync.request();
+  }
+
+  follow(ref.read(vaultSessionProvider));
+  ref.listen(vaultSessionProvider, (_, vault) => follow(vault));
+  ref.onDispose(() => unsubscribe?.call());
   // While the stored session is being read the listener above asks as soon as it is known.
   if (ref.read(sessionProvider).status != SessionStatus.loading) sync.request();
   return sync;

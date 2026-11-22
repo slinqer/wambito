@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/add/save_outcome.dart' show canRetrySave;
 import 'package:wambito/add/add_repository.dart';
 import 'package:wambito/api/gen/wambito_api.dart';
 import 'package:wambito/capture/capture_repository.dart';
@@ -117,6 +118,26 @@ void main() {
     expect(env.server.items.map((t) => t.name), ['Leche']);
     expect(notices.first.refused!.name, 'Pan');
     expect(notices.last.sent, 1);
+  });
+
+  test('a save refused because the vault is not open yet (423 vault_locked) waits, never dropped',
+      () async {
+    final env = _env();
+    env.add.failures['create'] = const HomeFailure(423, code: 'vault_locked');
+    await env.queue.add(PendingSave(key: 'k1', items: [_input('Pan', -300000)], batch: false));
+    await env.queue.send();
+    expect(env.state.saves, hasLength(1));
+    expect(env.state.notice?.refused, isNull);
+    // The vault opened.
+    await env.queue.send();
+    expect(env.state.saves, isEmpty);
+    expect(env.server.items.single.name, 'Pan');
+  });
+
+  test('canRetrySave: 423 vault_locked can work again, another 423 or a 4xx cannot', () {
+    expect(canRetrySave(const HomeFailure(423, code: 'vault_locked')), isTrue);
+    expect(canRetrySave(const HomeFailure(423, code: 'locked')), isFalse);
+    expect(canRetrySave(const HomeFailure(422, code: 'category_not_found')), isFalse);
   });
 
   test('a refused save alone says which it was', () async {

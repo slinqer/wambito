@@ -24,7 +24,7 @@
     <string name="notice_due_many">%1$s are due today</string>
     <string name="notice_and">and</string>
     <string name="notice_and_i">and</string>
-    <string name="notice_guest">Your data will be deleted in 15 days if you don\'t add your email</string>
+    <string name="notice_guest">Your data will be deleted in 15 days if you don\'t add your email. If you delete the app, you lose them too.</string>
     <string name="notice_channel_due">Payments due today</string>
     <string name="notice_channel_due_description">At 9:00, one notice with the recurring payments due that day.</string>
     <string name="notice_channel_guest">Warning if you have no email</string>
@@ -44,4 +44,8 @@
     <string name="capture_change">Change</string>
     <string name="capture_channel">Detected transactions</string>
     <string name="capture_channel_description">One notice for each expense or income Wambito detects in your bank apps.</string>
+    <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt, ScannerViewController.swift on iOS):
+         the words of the web's approve-a-device scan. -->
+    <string name="scanner_hint">Point the camera at the QR on the new device.</string>
+    <string name="scanner_close">Turn off the camera</string>
 </resources>

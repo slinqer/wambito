@@ -122,7 +122,8 @@ export const SyncRecord = z
     ...recordFields,
     version: z.int().min(1),
     body: z.string().nullable().openapi({
-      description: "The encrypted record, base64url without padding; null when deleted",
+      description:
+        "The encrypted record, base64url without padding. Always present on a live record; on a deleted one, null unless the client sent the sealed body so the record can be restored",
     }),
   })
   .openapi("SyncRecord");
@@ -145,11 +146,11 @@ export const SyncChange = z
       })
       .nullable()
       .openapi({
-        description: `The encrypted record, base64url without padding, ${MIN_RECORD_BODY}–${MAX_RECORD_BODY} bytes decoded (at least a nonce and a tag); null exactly when deleted`,
+        description: `The encrypted record, base64url without padding, ${MIN_RECORD_BODY}–${MAX_RECORD_BODY} bytes decoded (at least a nonce and a tag). Always present on a live record; on a deleted one, null unless the client sends the sealed body so the record can be restored`,
       }),
   })
-  .refine((change) => change.deleted === (change.body === null), {
-    message: "A deleted record has no body, and a live one has one",
+  .refine((change) => change.deleted || change.body !== null, {
+    message: "A live record has a body",
     path: ["body"],
   })
   .openapi("SyncChange");
@@ -425,3 +426,90 @@ export const PairingPickup = z
     keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
   })
   .openapi("PairingPickup");
+
+export const StartSignin = z
+  .object({
+    commitment: pairingKey(
+      'SHA-256("wambito/v1/pairing-commit" || the browser\'s X25519 public key), 32 bytes, base64url',
+    ),
+    remember: z.boolean().openapi({
+      description:
+        "Keep me signed in on this browser: true gives a 60-day session renewed on use, false a 12-hour session whose cookie has no Max-Age",
+    }),
+    label: z.string().min(1).max(64).openapi({
+      description: 'What the phone shows, made from the user agent ("Firefox on Mac")',
+    }),
+  })
+  .openapi("StartSignin");
+
+export const SigninStarted = z
+  .object({
+    id: z.uuid(),
+    code: z
+      .string()
+      .openapi({ description: "8 Crockford base32 characters, shown under the QR code" }),
+    pollSecret: z.string().openapi({
+      description:
+        "32 random bytes, base64url; only the browser holds it and sends it as `x-wambito-poll`",
+    }),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninStarted");
+
+export const SigninFound = z
+  .object({
+    id: z.uuid(),
+    commitment: z.string().openapi({ description: "base64url without padding" }),
+    label: z.string(),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninFound");
+
+export const SigninView = SigninFound.extend({
+  publicKey: nullableB64,
+}).openapi("SigninView");
+
+export const SigninPoll = z
+  .object({
+    approverKey: nullableB64,
+    ready: z.boolean().openapi({ description: "The phone sealed the key: pick it up" }),
+    expiresAt: z.string(),
+  })
+  .openapi("SigninPoll");
+
+export const SigninPickup = z
+  .object({
+    sealed: z.string().openapi({ description: "base64url" }),
+    keyV: z.int().openapi({ description: "The data key version the seal is bound to" }),
+    userId: z.string().openapi({ description: "The account signed in to" }),
+  })
+  .openapi("SigninPickup");
+
+/** The recovery key's lookup bytes (HKDF, `wambito/v1/recovery/lookup`). */
+export const RECOVERY_LOOKUP_BYTES = 16;
+/** The recovery key's auth bytes (HKDF, `wambito/v1/recovery/auth`), and every SHA-256. */
+export const RECOVERY_AUTH_BYTES = 32;
+
+const sha256Of = (what: string) =>
+  base64urlBytes(32, 32).openapi({
+    description: `SHA-256 of the recovery key's ${what} bytes, 32 bytes, base64url`,
+  });
+
+export const PutRecoveryVerifier = z
+  .object({ lookupHash: sha256Of("lookup"), authHash: sha256Of("auth") })
+  .openapi("PutRecoveryVerifier");
+
+export const RecoverySignIn = z
+  .object({
+    lookup: base64urlBytes(RECOVERY_LOOKUP_BYTES, RECOVERY_LOOKUP_BYTES).openapi({
+      description: `HKDF-SHA256 of the recovery secret under \`wambito/v1/recovery/lookup\`, ${RECOVERY_LOOKUP_BYTES} bytes, base64url`,
+    }),
+    auth: base64urlBytes(RECOVERY_AUTH_BYTES, RECOVERY_AUTH_BYTES).openapi({
+      description: `HKDF-SHA256 of the recovery secret under \`wambito/v1/recovery/auth\`, ${RECOVERY_AUTH_BYTES} bytes, base64url`,
+    }),
+  })
+  .openapi("RecoverySignIn");
+
+export const RecoverySignedIn = z
+  .object({ userId: z.string().openapi({ description: "The account signed in to" }) })
+  .openapi("RecoverySignedIn");

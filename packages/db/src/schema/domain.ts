@@ -294,7 +294,7 @@ export const records = pgTable(
   },
   (t) => [
     index("records_user_version").on(t.userId, t.version),
-    check("records_deleted_body", sql`${t.deleted} = (${t.body} is null)`),
+    check("records_live_body", sql`${t.deleted} or ${t.body} is not null`),
   ],
 );
 
@@ -372,6 +372,43 @@ export const pairingRequests = pgTable(
   ],
 );
 
+/**
+ * A browser waiting to be signed in by the phone (spec 2026-11-15 section 8): the same relay as
+ * `pairing_requests`, opened with no session. `poll_hash` is the SHA-256 of the poll secret only
+ * the browser holds; `user_id` is bound by the phone's approval. No row-level security: it is read
+ * before the user is known, by `code` or by `id` and `poll_hash`.
+ */
+export const signinRequests = pgTable(
+  "signin_requests",
+  {
+    id: id(),
+    code: text("code").notNull().unique(),
+    commitment: bytea("commitment").notNull(),
+    pollHash: bytea("poll_hash").notNull(),
+    label: text("label").notNull(),
+    remember: boolean("remember").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    approverKey: bytea("approver_key"),
+    publicKey: bytea("public_key"),
+    keyV: smallint("key_v"),
+    sealed: bytea("sealed"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check("signin_requests_commitment_len", sql`octet_length(${t.commitment}) = 32`),
+    check("signin_requests_poll_hash_len", sql`octet_length(${t.pollHash}) = 32`),
+    check("signin_requests_label_len", sql`char_length(${t.label}) between 1 and 64`),
+    check(
+      "signin_requests_approver_key_len",
+      sql`${t.approverKey} is null or octet_length(${t.approverKey}) = 32`,
+    ),
+    check(
+      "signin_requests_public_key_len",
+      sql`${t.publicKey} is null or octet_length(${t.publicKey}) = 32`,
+    ),
+  ],
+);
+
 /** Highest record version whose tombstones were purged, per person: older clients must resync. */
 export const recordPurges = pgTable("record_purges", {
   userId: text("user_id")
@@ -379,6 +416,79 @@ export const recordPurges = pgTable("record_purges", {
     .references(() => user.id, { onDelete: "cascade" }),
   throughVersion: bigint("through_version", { mode: "number" }).notNull(),
 });
+
+/**
+ * What lets a recovery key sign in (spec 2026-11-15): the SHA-256 of the key's lookup and auth
+ * bytes (HKDF of the recovery secret, `recoveryVerifier` in @wambito/crypto), one per person. No
+ * row-level security: it is read before the user is known, by `lookup_hash`.
+ */
+export const recoveryVerifiers = pgTable(
+  "recovery_verifiers",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    lookupHash: bytea("lookup_hash").notNull().unique(),
+    authHash: bytea("auth_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("recovery_verifiers_lookup_hash_len", sql`octet_length(${t.lookupHash}) = 32`),
+    check("recovery_verifiers_auth_hash_len", sql`octet_length(${t.authHash}) = 32`),
+  ],
+);
+
+/**
+ * The count of people active per local day (spec 2026-11-15 §9): an aggregate with no user id, so
+ * it keeps no per-person history. `cohort_week` is the Monday (UTC) of the user's `created_at`;
+ * `app_version` is `''` when the app sent none. No row-level security (plan decision 4): it has no
+ * user to filter on, and only `markSeen` and the admin metrics touch it.
+ */
+export const activityDaily = pgTable(
+  "activity_daily",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    platform: text("platform").notNull(),
+    appVersion: text("app_version").notNull().default(""),
+    cohortWeek: date("cohort_week", { mode: "string" }).notNull(),
+    hasEmail: boolean("has_email").notNull(),
+    count: integer("count").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.platform, t.appVersion, t.cohortWeek, t.hasEmail] })],
+);
+
+/**
+ * Sessions the server ended on purpose (spec 2026-11-15 §10): the SHA-256 of the session token
+ * (a 401 has only the token), so the phone hears why (`device_removed`) instead of a bare 401.
+ * Purged after 90 days (`purgeEndedSessions`). No row-level security (plan decision 4): it is read
+ * before the user is known, and holds no user id.
+ */
+export const endedSessions = pgTable(
+  "ended_sessions",
+  {
+    sessionHash: bytea("session_hash").primaryKey(),
+    reason: text("reason").notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("ended_sessions_session_hash_len", sql`octet_length(${t.sessionHash}) = 32`),
+    check("ended_sessions_reason", sql`${t.reason} = 'device_removed'`),
+  ],
+);
+
+/**
+ * Users the inactivity cleanup deleted: the SHA-256 of the user id, nothing else, kept for good
+ * (plan decision 2), so a phone that comes back hears `user_deleted`. No row-level security (plan
+ * decision 4): it is read before the user is known.
+ */
+export const deletedUsers = pgTable(
+  "deleted_users",
+  {
+    userHash: bytea("user_hash").primaryKey(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("deleted_users_user_hash_len", sql`octet_length(${t.userHash}) = 32`)],
+);
 
 /** Tables protected by row-level security on `user_id`. */
 export const RLS_TABLES = [

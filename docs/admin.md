@@ -48,8 +48,10 @@ Every action asks for a reason (1 to 300 characters, no personal data) and is wr
 log together with the action.
 
 - **Consultation.** Answer with the categories of data Wambito stores (the list in
-  `docs/privacy-policy.md`). The person downloads their own data from the app's settings. The admin
-  exports nothing.
+  `docs/privacy-policy.md`), saying which are end-to-end encrypted: the finances open only on the
+  person's devices, so the admin cannot read or send them. Downloading their data from the app is
+  not available yet with end-to-end encryption (a later stage brings it back); say it is coming
+  back soon. The admin exports nothing.
 - **Deletion.** Check the request comes from the email address of the account. Delete the account in
   the panel and write the request as the reason. In the answer, say that backups age out within 14
   days.
@@ -63,6 +65,21 @@ log together with the action.
   screen. Suspend blocks sign-in and ends sessions and assistants until you reactivate it.
 
 An admin cannot delete or suspend their own account from the panel.
+
+## Numbers
+
+The home screen shows aggregates only: no person's row, IP address or finance data is read.
+
+- **Guests** (`guests`): people without an email. The name stays for compatibility.
+- **Installs by platform:** users by the platform their app reported (`android`, `ios`, `web`);
+  `unknown` are accounts made before the platform was recorded.
+- **Daily actives** (90 days, UTC): the sum of the daily count the app adds the first time it is
+  open each local day (`/v2/me/seen`). The count has no user id, so one person is counted once per
+  day, never across days.
+- **Cohorts:** people grouped by the ISO week they signed up (last 12 weeks). Week 1, 4 and 12 show
+  the cohort's highest daily active count during that week after sign-up, so read it as "at least"
+  that many came back; empty while that week has not ended.
+- **Versions:** people seen in the last 30 days by platform and app version, most people first.
 
 ## Dry run
 

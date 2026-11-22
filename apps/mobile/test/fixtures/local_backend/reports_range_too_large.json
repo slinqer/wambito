@@ -1,0 +1,11 @@
+{
+  "name": "reports_range_too_large",
+  "status": 422,
+  "body": {
+    "type": "about:blank",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "code": "range_too_large",
+    "detail": "Ranges are limited to 36 months"
+  }
+}

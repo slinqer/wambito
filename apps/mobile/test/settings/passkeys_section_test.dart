@@ -4,10 +4,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart';
 import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/router.dart';
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../entry/fakes.dart';
 import '../home/fakes.dart';
@@ -25,6 +27,7 @@ Future<SettingsEnv> _pump(
   bool guest = false,
   Locale locale = const Locale('es'),
   Object? listFailure,
+  List<Override> overrides = const [],
 }) async {
   final auth = FakeAuthApi()..passkeyItems.addAll(keys);
   if (listFailure != null) auth.failures['listPasskeys'] = listFailure;
@@ -35,7 +38,7 @@ Future<SettingsEnv> _pump(
     locale: locale,
     passkeysSupported: supported,
     homeRepo: FakeHomeRepository(timezone: 'America/Bogota'),
-    overrides: [clockProvider.overrideWithValue(() => _now)],
+    overrides: [clockProvider.overrideWithValue(() => _now), ...overrides],
   );
   env.container.read(routerProvider).go('/settings');
   await t.pumpAndSettle();
@@ -213,6 +216,23 @@ void main() {
       await t.pumpAndSettle();
       expect(env.passkeys.calls.where((c) => c.startsWith('create')), isEmpty);
       expect(env.auth.calls.where((c) => c.startsWith('passkeyRegister')), isEmpty);
+    });
+
+    testPage('a preview guest may add one: no line, and the button works', (t) async {
+      // "Protect your data" step 2 offers a passkey to a guest of an encrypted account.
+      final env = await _pump(
+        t,
+        guest: true,
+        overrides: [isPreviewProvider.overrideWithValue(true)],
+      );
+      await _scrollTo(t, 'settings.passkeys.add');
+      expect(
+        said('Primero guarda tu progreso con un correo; después podrás agregar una huella.'),
+        findsNothing,
+      );
+      await t.tap(find.byKey(const Key('settings.passkeys.add')));
+      await t.pumpAndSettle();
+      expect(env.auth.calls.where((c) => c.startsWith('passkeyRegister')), isNotEmpty);
     });
 
     testPage('a guest still sees the passkeys already made on the account', (t) async {

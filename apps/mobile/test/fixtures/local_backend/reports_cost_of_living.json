@@ -1,0 +1,27 @@
+{
+  "name": "reports_cost_of_living",
+  "status": 200,
+  "body": {
+    "months": 2,
+    "total": 122900000,
+    "fixed": 120000000,
+    "variable": 2900000,
+    "categories": [
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000103",
+        "average": 120000000,
+        "type": "fixed"
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "average": 2400000,
+        "type": "variable"
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000104",
+        "average": 500000,
+        "type": "variable"
+      }
+    ]
+  }
+}

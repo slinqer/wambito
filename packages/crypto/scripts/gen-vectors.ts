@@ -9,12 +9,15 @@ import {
   deriveRecordKeys,
   deviceAttestation,
   formatRecoveryKey,
+  fromBase64Url,
   importDevicePrivateKey,
   pairingCommitment,
   pairingNumber,
+  recoveryVerifier,
   sealKeyLink,
   sealRecord,
   sealToDevice,
+  verifierHash,
   wrapDataKey,
 } from "../src/index.ts";
 import { dedupeTag } from "../src/records.ts";
@@ -124,6 +127,19 @@ const recovery = [
   new Uint8Array(16),
   new Uint8Array(16).fill(255),
 ].map((secret) => ({ secret: b64(secret), text: formatRecoveryKey(secret) }));
+
+const recoveryVerifiers = [];
+for (const r of recovery) {
+  const secret = fromBase64Url(r.secret);
+  const v = await recoveryVerifier(secret);
+  recoveryVerifiers.push({
+    secret: r.secret,
+    lookup: b64(v.lookup),
+    auth: b64(v.auth),
+    lookupHash: b64(await verifierHash(v.lookup)),
+    authHash: b64(await verifierHash(v.auth)),
+  });
+}
 
 // Same format as sealToDevice (ephemeral public key || nonce || GCM), with a fixed ephemeral.
 const deviceInputs = [
@@ -306,6 +322,12 @@ const rejects = [
     code: "bad_input",
   },
   {
+    name: "recovery verifier of a 15-byte secret",
+    op: "recoveryVerifier",
+    secret: b64(fixed(0x50, 15)),
+    code: "bad_input",
+  },
+  {
     name: "pairing blob sealed with a different ephemeral key than the approver key",
     op: "openFromPairing",
     privateKey: approvals[0]?.newPrivateKey,
@@ -324,12 +346,45 @@ const rejects = [
   },
 ];
 
+// A low-order public key (32 zero bytes) gives an all-zero shared secret, which every
+// implementation must refuse. The blob below is what an attacker would build: sealed under
+// HKDF(zeros), so it opens only where the zero secret is accepted.
+const zeroKey = new Uint8Array(32);
+const lowOrderCtx = { kind: "device", userId: USER, keyV: 1 } as const;
+const lowOrderInner = await gcmSeal(
+  await deriveWrapKey(zeroKey, "device"),
+  wrapAssociatedData(lowOrderCtx),
+  dataKeyA,
+  fixed(0x33, 12),
+);
+const lowOrderSealed = new Uint8Array(32 + lowOrderInner.length);
+lowOrderSealed.set(lowOrderInner, 32);
+rejects.push(
+  {
+    name: "seal to a low-order (all-zero) device public key",
+    op: "sealToDevice",
+    publicKey: b64(zeroKey),
+    ctx: lowOrderCtx,
+    dataKey: b64(dataKeyA),
+    code: "bad_input",
+  },
+  {
+    name: "device blob whose ephemeral key is low-order (all-zero shared secret)",
+    op: "openFromDevice",
+    privateKey: devices[0]?.privateKey,
+    ctx: lowOrderCtx,
+    sealed: b64(lowOrderSealed),
+    code: "cannot_open",
+  },
+);
+
 const out = {
   _about:
     "Shared test vectors for packages/crypto (bytes are base64url). The Dart port must pass them byte for byte. Never edit by hand: regenerate with `pnpm --filter @wambito/crypto vectors`.",
   records,
   wraps,
   recovery,
+  recoveryVerifiers,
   devices,
   pairing,
   approvals,

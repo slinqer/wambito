@@ -1,6 +1,6 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslations } from "use-intl";
-import { useApiMode } from "../../api/ApiProvider.tsx";
+import { useApi, useApiMode } from "../../api/ApiProvider.tsx";
 import { useMe } from "../../api/queries.ts";
 import { PageHeader } from "../../ui/PageHeader.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
@@ -10,12 +10,16 @@ import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
 import { useVaultSession } from "../vault/vault-context.ts";
+import { AddEmail } from "./AddEmail.tsx";
+import { claimEmail } from "./add-email.ts";
 import { DeleteAccount } from "./DeleteAccount.tsx";
 import { FeedbackSection } from "./FeedbackSection.tsx";
 import { PasskeysSection } from "./PasskeysSection.tsx";
 import { PreferencesSection } from "./PreferencesSection.tsx";
+import { ProtectSection } from "./ProtectSection.tsx";
 import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
+import { Takeover } from "./RemoveDeviceSheet.tsx";
 import { SecuritySection } from "./SecuritySection.tsx";
 import { liveSecurity, type SecurityApi } from "./security.ts";
 import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
@@ -34,6 +38,11 @@ export interface SettingsProps {
   copy?: CopyText;
   /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
   security?: SecurityApi;
+  /**
+   * Stands in for "Protect your data"'s step 3, "Create account (add an email)", which opens
+   * `AddEmail` here by default; stories use it to watch the tap.
+   */
+  onAddEmail?: () => void;
 }
 
 /**
@@ -43,9 +52,10 @@ export interface SettingsProps {
  * email to the founder); and deleting the account. Reached from the avatar menu (phones) and the sidebar (wide screens). In the demo
  * (`/demo/settings`, spec §2.6b) passkeys, import, export and deleting the account are off, each
  * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
- * steps there, and lists nothing. A preview account (`local` mode) has import, export and the
- * assistants' list off with a "not available yet" note; passkeys and deleting the account work,
- * and Security lists the devices that open the data (not for a guest, who has no recovery key).
+ * steps there, and lists nothing. A preview account (`local` mode) has import and export off
+ * with a "not available yet" note; passkeys, the assistants and deleting the account work, and
+ * Security lists the devices that open the data; an account without an email (`isAnonymous`) gets
+ * "Protect your data" (`ProtectSection`) above them.
  */
 export function Settings({
   passkeys = livePasskeys,
@@ -53,6 +63,7 @@ export function Settings({
   save = saveToDisk,
   copy,
   security: securityProp,
+  onAddEmail,
 }: SettingsProps) {
   const t = useTranslations("settings");
   const tManage = useTranslations("manage");
@@ -62,17 +73,17 @@ export function Settings({
   const appPath = useAppPath();
   const mode = useApiMode();
   const demo = mode === "demo";
-  // A preview account's vault: no export, import or assistants yet (passkeys and deleting the
-  // account work: they are the account's, not its finances).
+  // A preview account's vault: no export or import yet (passkeys, the assistants and deleting
+  // the account work: they are the account's, not its finances).
   const local = mode === "local";
   const session = useVaultSession();
   const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
-  // An encrypted account's devices and keys. A guest (Ruling 8: no recovery key) gets only
-  // "Approve a new device", so its other device has somewhere to approve a pairing.
-  const vaultKeys = local ? (securityProp ?? vaultSecurity) : null;
-  const security = me.isAnonymous ? null : vaultKeys;
+  // An encrypted account's devices and keys (every one, an anonymous account made by the phone too).
+  const security = local ? (securityProp ?? vaultSecurity) : null;
+  const api = useApi();
+  const claim = useMemo(() => claimEmail(api), [api]);
+  const [addingEmail, setAddingEmail] = useState(false);
   const dataOffId = useId();
-  const assistantsOffId = useId();
   const dataOff = demo || local ? dataOffId : undefined;
 
   return (
@@ -88,6 +99,15 @@ export function Settings({
         </div>
         <PreferencesSection />
         <TimeAndMoneySection me={me} />
+        {security && me.isAnonymous && (
+          // An account without an email: its checklist first (spec 2026-11-15 section 5.2).
+          <ProtectSection
+            security={security}
+            passkeys={passkeys}
+            profile={me}
+            onAddEmail={onAddEmail ?? (() => setAddingEmail(true))}
+          />
+        )}
         <PasskeysSection
           passkeys={passkeys}
           timeZone={me.timezone}
@@ -95,13 +115,17 @@ export function Settings({
           vaultUserId={local ? me.id : undefined}
           security={security ?? undefined}
         />
-        {vaultKeys && (
-          <SecuritySection
-            security={vaultKeys}
-            passkeys={passkeys}
-            timeZone={me.timezone}
-            guest={me.isAnonymous}
-          />
+        {security && (
+          <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
+        )}
+        {addingEmail && (
+          <Takeover label={t("add_email.title")}>
+            <AddEmail
+              claim={claim}
+              security={security ?? undefined}
+              onDone={() => setAddingEmail(false)}
+            />
+          </Takeover>
         )}
         <SettingsSection title={t("data.title")}>
           <div className="flex flex-col gap-(--space-2)">
@@ -140,15 +164,11 @@ export function Settings({
           </div>
           {(demo || local) && <DemoOffNote id={dataOffId} local={local} />}
         </SettingsSection>
-        <AssistantsSection
-          timeZone={me.timezone}
-          off={demo || local}
-          offNote={local ? <DemoOffNote id={assistantsOffId} local /> : undefined}
-          {...(copy ? { copy } : {})}
-        />
+        <AssistantsSection timeZone={me.timezone} {...(copy ? { copy } : {})} />
         <FeedbackSection />
         <DeleteAccount
           email={me.email}
+          {...(demo ? {} : { userId: me.id })}
           signOut={signOut}
           onExport={(format) => void exporter.run(format)}
           exporting={exporter.busy !== null}

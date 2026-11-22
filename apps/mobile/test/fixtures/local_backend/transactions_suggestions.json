@@ -1,0 +1,12 @@
+{
+  "name": "transactions_suggestions",
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "name": "Almuerzo",
+        "categoryId": "01930000-0000-7000-8000-000000000100"
+      }
+    ]
+  }
+}

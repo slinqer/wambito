@@ -8,6 +8,7 @@ import { formatMoney } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { CategoryChip } from "../../ui/CategoryChip.tsx";
 import { categoryLook } from "../../ui/category-look.ts";
+import { Icon } from "../../ui/Icon.tsx";
 import { PageHeader } from "../../ui/PageHeader.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { SegmentedControl } from "../../ui/SegmentedControl.tsx";
@@ -101,7 +102,7 @@ export function Search() {
       <main className="flex flex-col gap-(--space-3)">
         <h1 className="m-0 font-display text-[28px] font-bold text-ink">{t("title")}</h1>
         <div className="lk-input min-h-11">
-          <span aria-hidden="true">🔍</span>
+          <Icon name="search" size={18} className="flex-none text-ink-muted" />
           <input
             type="search"
             value={text}

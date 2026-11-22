@@ -10,16 +10,20 @@ import 'package:wambito/feedback/feedback.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_repository.dart';
+import 'package:wambito/home/widget_pin.dart';
 import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/recurring/recurring_repository.dart';
 import 'package:wambito/review/review_repository.dart';
 import 'package:wambito/router.dart';
 import 'package:wambito/settings/assistants_repository.dart';
 import 'package:wambito/settings/server_status.dart';
+import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/settings/settings_store.dart';
 import 'package:wambito/settings/url_opener.dart';
 
 import '../capture/fakes.dart';
+import '../support/seen_ping.dart';
+import '../support/plain_account.dart';
 import '../entry/fakes.dart';
 import '../feedback/fakes.dart';
 import '../home/fakes.dart';
@@ -128,8 +132,13 @@ Future<SettingsEnv> pumpSettingsApp(
   addTearDown(tester.view.reset);
   // What the whole app is faked with; a test's own override of the same provider replaces it.
   final defaults = <Override>[
+    // The account is `plain`: the vault's screens are test/vault's business, not these.
+    plainAccount(),
+    quietSeenPing(),
     // The tests settle the frames: a running time bar would wait the toast's life out.
     toastBarAnimatesProvider.overrideWithValue(false),
+    // The debug-only rows are off, as in a release build.
+    debugToolsProvider.overrideWithValue(false),
     // The server answers, with a version; its green dot holds still so the frames settle.
     serverHealthCheckProvider.overrideWithValue(
       (server) async => const ServerHealth(online: true, version: '0.0.0-dev.abc1234'),
@@ -152,6 +161,8 @@ Future<SettingsEnv> pumpSettingsApp(
       FakeRecurringRepository(homeRepo ?? FakeHomeRepository()),
     ),
     widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
+    // A widget is already on the home screen unless a test says otherwise.
+    widgetPinProvider.overrideWithValue(FakeWidgetPin()),
     homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
     assistantsRepositoryProvider.overrideWithValue(FakeAssistantsRepository()),
     widgetSnapshotWriterProvider.overrideWithValue(

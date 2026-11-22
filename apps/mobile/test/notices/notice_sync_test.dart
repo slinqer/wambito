@@ -4,13 +4,21 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/device.dart';
 import 'package:wambito/api/session.dart';
+import 'package:wambito/home/home_controller.dart' show clockProvider;
+import 'package:wambito/local/backend.dart';
+import 'package:wambito/local/memory_store.dart';
+import 'package:wambito/local/vault_session.dart' show VaultSession;
+import 'package:wambito/vault/vault_gate.dart';
+import 'package:wambito/vault/vault_providers.dart';
 import 'package:wambito/notices/notice_backend.dart';
 import 'package:wambito/notices/notice_platform.dart';
 import 'package:wambito/notices/notice_prompt.dart';
 import 'package:wambito/notices/notice_sync.dart';
 import 'package:wambito/settings/preferences.dart';
+import 'package:wambito/settings/security/security_api.dart' show securityApiProvider;
 
 import '../settings/harness.dart';
+import '../support/preview_account.dart';
 import 'fakes.dart';
 
 /// The permission prompt in memory: what it was asked for, and what the person answers.
@@ -90,7 +98,216 @@ FakeNoticePlatform allowed() => FakeNoticePlatform(permissionState: NoticePermis
 FakeNoticeBackend withRule({String timezone = 'America/Bogota'}) =>
     FakeNoticeBackend(timezone: timezone, hasRecurring: true);
 
+/// The open vault of a `preview` account for the notices: its backend, and the commits it announces.
+class _Vault implements VaultSession {
+  _Vault(this.backend);
+
+  @override
+  final LocalBackend backend;
+  final listeners = <void Function()>[];
+
+  @override
+  String get userId => 'user-1';
+
+  @override
+  void Function() subscribe(void Function() listener) {
+    listeners.add(listener);
+    return () => listeners.remove(listener);
+  }
+
+  /// A commit to the vault.
+  void commit() {
+    for (final l in [...listeners]) {
+      l();
+    }
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+final _now = DateTime.utc(2026, 10, 28, 15);
+
+/// A vault of account `user-1` with rent due on the 30th and a gym fee on the 3rd.
+Future<(LocalBackend, Future<void> Function(String))> _vaultBackend() async {
+  final backend = createLocalBackend(
+    store: createMemoryStore(),
+    now: () => _now,
+    timezone: 'America/Bogota',
+    profile: const LocalProfile(id: 'user-1', encryption: 'preview'),
+  );
+  Future<Map<Object?, Object?>> call(String method, String path, [Object? body]) async {
+    final res = await backend.handle(method, path, const {}, body);
+    return ((res!.body ?? const {}) as Map).cast<Object?, Object?>();
+  }
+
+  await call('PATCH', '/v1/me', {
+    'currency': 'COP',
+    'locale': 'es',
+    'timezone': 'America/Bogota',
+    'onboardingCompleted': true,
+  });
+  final food =
+      (await call('POST', '/v1/categories', {
+            'name': 'Food',
+            'kind': 'expense',
+            'icon': 'fork',
+            'color': '#f90',
+          }))['id']!
+          as String;
+  final ids = <String, String>{};
+  for (final (name, day) in [('Arriendo', 30), ('Gym', 3)]) {
+    ids[name] =
+        (await call('POST', '/v1/recurrences', {
+              'name': name,
+              'amount': -50000000,
+              'categoryId': food,
+              'frequency': 'monthly',
+              'dayOfMonth': day,
+              'startDate': '2026-09-01',
+            }))['id']!
+            as String;
+  }
+  return (backend, (String name) => call('DELETE', '/v1/recurrences/${ids[name]}'));
+}
+
+/// A `preview` account whose vault is open (answering from [vault]).
+List<Override> _previewWith(_Vault vault) => [
+  previewAccount(),
+  vaultGateStateProvider.overrideWithValue(Ready<VaultSession>(vault)),
+  vaultSessionProvider.overrideWithValue(vault),
+  // Settings' Security card would read the keys from the network: not what these tests are about.
+  securityApiProvider.overrideWithValue(null),
+  clockProvider.overrideWithValue(() => _now),
+];
+
 void main() {
+  group('a preview account (its payments live only in the vault on the phone)', () {
+    testWidgets(
+      'with the vault locked, the list is left as it was and the server is asked nothing',
+      (tester) async {
+        final env = await _pump(
+          tester,
+          platform: allowed(),
+          backend: withRule(),
+          overrides: previewOpen(),
+        );
+        expect(env.backend.calls, 0);
+        expect(env.platform.callsNamed('scheduleDue'), isEmpty);
+        expect(env.platform.callsNamed('scheduleDueList'), isEmpty);
+        expect(env.platform.callsNamed('cancelDue'), isEmpty);
+        expect(env.prompt.reasons, isEmpty);
+      },
+    );
+
+    testWidgets('the list from the vault goes to the phone, never scheduleDue, never the server', (
+      tester,
+    ) async {
+      final (backend, _) = await _vaultBackend();
+      final env = await _pump(
+        tester,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: _previewWith(_Vault(backend)),
+      );
+      expect(env.backend.calls, 0);
+      expect(env.platform.callsNamed('scheduleDue'), isEmpty);
+      expect(env.platform.callsNamed('scheduleDueList').toSet(), {
+        'scheduleDueList America/Bogota es user-1',
+      });
+      expect(
+        [for (final d in env.platform.dueLists.last) d.toJson()],
+        [
+          {
+            'date': '2026-10-30',
+            'names': ['Arriendo'],
+          },
+          {
+            'date': '2026-11-03',
+            'names': ['Gym'],
+          },
+        ],
+      );
+    });
+
+    testWidgets('after a local write that deletes the rule, the next list lacks it', (
+      tester,
+    ) async {
+      final (backend, delete) = await _vaultBackend();
+      final vault = _Vault(backend);
+      final env = await _pump(
+        tester,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: _previewWith(vault),
+      );
+      await delete('Arriendo');
+      vault.commit();
+      await env.idle();
+      // The widget's own wait after a commit, which runs out.
+      await tester.pump(const Duration(seconds: 3));
+      expect(env.platform.dueLists.length, greaterThan(1));
+      expect(env.platform.dueLists.last.expand((d) => d.names), ['Gym']);
+    });
+
+    testWidgets('the switch off cancels it', (tester) async {
+      final (backend, _) = await _vaultBackend();
+      final env = await _pump(
+        tester,
+        platform: allowed(),
+        location: '/settings',
+        overrides: _previewWith(_Vault(backend)),
+      );
+      env.platform.clear();
+      await _tap(tester, 'settings.dueNotice');
+      await env.idle();
+      expect(env.platform.callsNamed('cancelDue'), isNotEmpty);
+      expect(env.platform.callsNamed('scheduleDueList'), isEmpty);
+    });
+
+    testWidgets('a guest on a preview account is not asked either', (tester) async {
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: previewOpen(),
+      );
+      expect(env.backend.calls, 0);
+      expect(env.platform.callsNamed('scheduleDue'), isEmpty);
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+    });
+
+    // The server keeps an encrypted guest for 12 or 24 months, not 60 days: the warning would be
+    // false. A job left from before (a plain guest on this phone) is cancelled.
+    testWidgets('a preview guest never gets the 45-day warning, with the vault locked', (tester) async {
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: previewOpen(),
+      );
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+      expect(env.platform.callsNamed('cancelGuest'), isNotEmpty);
+      expect(env.prompt.reasons, isNot(contains(NoticeReason.guest)));
+    });
+
+    testWidgets('a preview guest never gets the 45-day warning, with the vault open', (tester) async {
+      final (backend, _) = await _vaultBackend();
+      final env = await _pump(
+        tester,
+        guest: true,
+        platform: allowed(),
+        backend: withRule(),
+        overrides: _previewWith(_Vault(backend)),
+      );
+      expect(env.platform.callsNamed('scheduleGuest'), isEmpty);
+      expect(env.platform.callsNamed('cancelGuest'), isNotEmpty);
+      expect(env.prompt.reasons, isNot(contains(NoticeReason.guest)));
+    });
+  });
+
   group('Hoy vence… at 9:00', () {
     testWidgets('it is scheduled for the profile\'s zone, in the app\'s language, for someone with a recurring payment who allowed notices', (
       tester,

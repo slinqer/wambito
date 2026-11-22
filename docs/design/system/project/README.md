@@ -6,7 +6,7 @@ Use this system for the landing page, the web app and the mobile app (Android an
 
 - **Spanish is the default language, English the second.** Write Spanish first, then translate; never ship one without the other. Address the person as **tú** (`te quedan`, `te pasaste`), never usted.
 - **Positioning:** Wambito is your budget, and looking after it feels good. Playful, never a game: don't call it one ("un juego", "feels like a game"), even though the interface is arcade-bright.
-- **Free forever, open source, and honest about it.** Never imply a later payment (no "Empieza gratis", no "free trial") and never mention or promise a business model. Claim only what exists: imports come "from other apps" (Budge today; others "soon"), the mobile app is Android and iOS ("soon"). Privacy copy says only what is true today: data travels encrypted (HTTPS), is never sold or shared with advertisers, can be exported or deleted, and the open code lets anyone check; no "can't leak", no end-to-end or at-rest encryption claims.
+- **Free forever, open source, and honest about it.** Never imply a later payment (no "Empieza gratis", no "free trial") and never mention or promise a business model. Claim only what exists: imports come "from other apps" (Budge today; others "soon"), the mobile app is Android and iOS ("soon"). Privacy copy says only what is true: data is end-to-end encrypted on the person's device (Wambito launches with it; not even Wambito can read it), is never sold or shared with advertisers, can be exported or deleted, and the open code lets anyone check how; no "can't leak", "we can't see" or at-rest encryption claims.
 - **Talk about money the way friends do.** "Lukas" means money in Colombia; use the slang in brand moments ("Tus lukas, por fin claras."), not in every label. Labels stay plain: `Supermercado`, `Agregar gasto`, `Presupuestos`.
 - **Say what happened with the number in it.** Status lines are sentences with the amount: `Quedan 46,33 €`, `Te pasaste 14,12 €`. Never a bare percentage, never a negative percentage.
 - **Wambi speaks in short, warm, specific lines**, generated from rules with the real figures: `¡Vas bien! Te quedan 11 días y aún tienes margen.` · `Ojo: ya te pasaste 20,20 € en Supermercado.` · `¡Anotado!`. One sentence, at most one exclamation, no guilt.
@@ -60,6 +60,8 @@ Use this system for the landing page, the web app and the mobile app (Android an
 
 ## Iconography
 
-- Category glyphs are emoji inside a 34px `lk-tile` (44px `lk-chip-tile` in the picker) on a tinted ground. They read on both themes and need no icon font.
-- Interface icons (back, menu, settings) are not settled yet; until then use plain text buttons or the tab-bar glyphs shown in `BottomBar`.
-- There is no logo mark yet: the wordmark is the word **Wambito** in `logo` style with the gold → candy gradient.
+- Emoji are for categories only: category glyphs are emoji inside a 34px `lk-tile` (44px `lk-chip-tile` in the picker) on a tinted ground. They read on both themes and need no icon font.
+- Interface icons live in `icons/icons.json`: SVG path data on a 48 grid in `currentColor`, read by the web's `Icon` (`apps/web/app/ui/Icon.tsx`) and copied for the phone's `LkIcon` (`apps/mobile/lib/ui/lk_icon_shapes.dart`, checked against the JSON by `test/ui/lk_icon_test.dart`). Our own are thick round strokes (5–8 units, round caps and joins): search, user, plus, close, the two chevrons, mic, check, cloud-off. Home and chart are Plump Free by Streamline (CC BY 4.0, credited in the phone's About and the root README).
+- The bottom bar's current tab shows its icon `filled` and its label in `ink`; the others `outline` in `ink-muted`. Every other icon is `filled`. No gold on the tabs.
+- Add an icon in the JSON first (draw it in the same strokes), then in the Dart copy.
+- There is no logo mark yet: the wordmark is the word **Wambito** in `logo` style with the gold → candy gradient. It stays on the sign-in, onboarding and the desktop sidebar; home's header has none (the month and two icon buttons on one row).

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,10 +14,13 @@ import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/widget_snapshot.dart';
+import 'package:wambito/local/prf.dart' show withPrfExtension;
 import 'package:wambito/review/review_repository.dart';
 
 import '../home/fakes.dart';
 import '../review/fakes.dart' show FakeReviewRepository;
+import '../support/seen_ping.dart';
+import '../support/plain_account.dart';
 
 /// An auth server in memory: records every call, answers with made-up tokens, and fails a call
 /// when told to.
@@ -40,6 +44,9 @@ class FakeAuthApi implements AuthApi {
 
   /// Who `GET /v1/me` says every token is, and how many passkeys the server lists for them.
   String account = 'user-1';
+
+  /// Who `GET /v1/me` says these tokens are, instead of [account].
+  final accounts = <String, String>{};
   int passkeysOnAccount = 0;
 
   /// Whether the passkey signs in a guest (a guest can add one, spec section 4.3).
@@ -52,6 +59,9 @@ class FakeAuthApi implements AuthApi {
     final failure = failures.remove(name);
     if (failure != null) throw failure;
   }
+
+  /// How many times `POST /auth/sign-in/anonymous` was called.
+  int get signInAsGuestCalls => calls.where((c) => c == 'signInAsGuest').length;
 
   @override
   Future<String> signInAsGuest() async {
@@ -85,16 +95,24 @@ class FakeAuthApi implements AuthApi {
     return guests[token] ?? false;
   }
 
+  /// The `x-wambito-user` each `GET /v1/me` of [standing] named, in order (null: none).
+  final standingUsers = <String?>[];
+
+  /// Tokens whose account `GET /v1/me` says is `plain`; every other one is `preview`.
+  final plainTokens = <String>{};
+
   @override
-  Future<AccountStanding> standing(String token) async {
+  Future<AccountStanding> standing(String token, {String? userId}) async {
     calls.add('isGuest $token');
+    standingUsers.add(userId);
     _fail('isGuest');
     final guest = guests[token] ?? false;
     return AccountStanding(
       guest: guest,
       // Like the API's profile: a guest has no welcome to finish.
       onboardingPending: !guest && (pendingOnboarding[token] ?? false),
-      userId: account,
+      userId: accounts[token] ?? account,
+      encrypted: !plainTokens.contains(token),
     );
   }
 
@@ -206,6 +224,22 @@ class FakeAuthApi implements AuthApi {
   /// When a passkey registered through [passkeyRegister] counts as made.
   DateTime? registeredAt;
 
+  /// What `POST /v2/recovery/sign-in` received, copied (the session zeroes its own bytes).
+  final recoverySignIns = <({Uint8List lookup, Uint8List auth})>[];
+
+  /// Whether the account the recovery key signs in to is one without an email.
+  bool recoveryBelongsToGuest = false;
+
+  @override
+  Future<RecoverySignedInAs> recoverySignIn(Uint8List lookup, Uint8List auth) async {
+    calls.add('recoverySignIn');
+    recoverySignIns.add((lookup: Uint8List.fromList(lookup), auth: Uint8List.fromList(auth)));
+    _fail('recoverySignIn');
+    final token = _newToken('recovery');
+    guests[token] = recoveryBelongsToGuest;
+    return (token: token, userId: account);
+  }
+
   @override
   Future<void> signOut(String token) async {
     calls.add('signOut $token');
@@ -216,9 +250,42 @@ class FakeAuthApi implements AuthApi {
 
   /// While set, signOut waits for it (a server that accepts the connection and then says nothing).
   Completer<void>? holdSignOut;
+
+  @override
+  Future<void> deleteDeviceWrap(
+    String token, {
+    required String userId,
+    required String wrapId,
+  }) async {
+    calls.add('deleteDeviceWrap $token $userId $wrapId');
+    _fail('deleteDeviceWrap');
+    final hold = holdDeleteDeviceWrap;
+    if (hold != null) await hold.future;
+  }
+
+  /// While set, deleteDeviceWrap waits for it (a server that says nothing).
+  Completer<void>? holdDeleteDeviceWrap;
+
+  /// Called by `deleteUser` before it answers (a test looks at the phone at that moment).
+  Future<void> Function()? onDeleteUser;
+
+  @override
+  Future<void> deleteUser(String token) async {
+    calls.add('deleteUser $token');
+    await onDeleteUser?.call();
+    try {
+      _fail('deleteUser');
+    } on AuthFailure catch (failure) {
+      // As the real one: a 401 (the user or its session already gone) counts as done.
+      if (failure.status != 401) rethrow;
+    }
+  }
 }
 
 /// The phone's passkey prompt, answered at once.
+/// The options a passkey sign-in hands the phone: the fake server's, with the PRF extension.
+final signInOptionsWithPrf = withPrfExtension('{"challenge":"sign-in"}');
+
 class FakePasskeys implements Passkeys {
   FakePasskeys({this.isSupported = true, this.hasPasskey = false});
 
@@ -236,16 +303,27 @@ class FakePasskeys implements Passkeys {
   /// While set, `create` waits for it (the person has the prompt open).
   Completer<void>? holdCreate;
 
+  /// What `create` answers (the attestation JSON), and what `get` answers (the assertion JSON).
+  String createJson = '{"attestation":true}';
+  String getJson = '{"assertion":true}';
+
+  /// What `getAvailable` answers (the assertion JSON).
+  String availableJson = '{"assertion":true}';
+
+  /// Thrown by `get` only (not `create`), then cleared.
+  Object? getFailure;
+
   @override
   Future<bool> supported() async => isSupported;
 
   @override
   Future<String> get(String optionsJson) async {
     calls.add('get $optionsJson');
-    final error = failure;
+    final error = getFailure ?? failure;
+    getFailure = null;
     failure = null;
     if (error != null) throw error;
-    return '{"assertion":true}';
+    return getJson;
   }
 
   @override
@@ -255,7 +333,7 @@ class FakePasskeys implements Passkeys {
     failure = null;
     if (error != null) throw error;
     if (!hasPasskey) throw const AuthFailure(code: 'NO_CREDENTIAL', status: 400);
-    return '{"assertion":true}';
+    return availableJson;
   }
 
   @override
@@ -265,7 +343,7 @@ class FakePasskeys implements Passkeys {
     final error = failure;
     failure = null;
     if (error != null) throw error;
-    return '{"attestation":true}';
+    return createJson;
   }
 }
 
@@ -287,11 +365,18 @@ Future<ProviderContainer> pumpApp(
   FakePasskeys? passkeys,
   Locale locale = const Locale('es'),
   List<Override> overrides = const [],
+  bool plain = true,
+  HomeCacheStore? homeCache,
+  // False for a screen that animates for ever (the welcome): one frame, and the test pumps on.
+  bool settle = true,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   final container = ProviderContainer(
     overrides: [
+      // The account is `plain`: the vault's screens are test/vault's business, not these.
+      if (plain) plainAccount(),
+      quietSeenPing(),
       // The tests settle the frames: a running time bar would wait a toast's life out.
       toastBarAnimatesProvider.overrideWithValue(false),
       authApiProvider.overrideWithValue(auth),
@@ -300,7 +385,7 @@ Future<ProviderContainer> pumpApp(
       homeRepositoryProvider.overrideWithValue(FakeHomeRepository()),
       reviewRepositoryProvider.overrideWithValue(FakeReviewRepository(FakeHomeRepository())),
       widgetStoreProvider.overrideWithValue(FakeWidgetStore()),
-      homeCacheStoreProvider.overrideWithValue(FakeCacheStore()),
+      homeCacheStoreProvider.overrideWithValue(homeCache ?? FakeCacheStore()),
       widgetSnapshotWriterProvider.overrideWithValue(
         (summary, {required currency, required locale, required timezone}) async {},
       ),
@@ -311,6 +396,10 @@ Future<ProviderContainer> pumpApp(
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const WambitoApp()),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
   return container;
 }

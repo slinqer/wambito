@@ -17,6 +17,8 @@ enum AuthError {
   emailTaken,
   tooManySignInAttempts,
   passkeyFailed,
+  recoveryKeyInvalid,
+  badRecoveryKey,
   networkError,
   internalError,
   generic,
@@ -39,6 +41,10 @@ const _codes = {
   'account_suspended': AuthError.accountSuspended,
   'guest_signup_disabled': AuthError.guestSignupDisabled,
   'email_taken': AuthError.emailTaken,
+  // The recovery-key sign-in: a key that signs in nothing (the server's one answer, whatever the
+  // reason, a `plain` account's key included), and one that does not parse (nothing was sent).
+  'recovery_key_invalid': AuthError.recoveryKeyInvalid,
+  'bad_recovery_key': AuthError.badRecoveryKey,
 };
 
 /// Errors that trying the same thing again (after a short wait) can fix.
@@ -116,6 +122,8 @@ extension AuthErrorMessage on AuthError {
     AuthError.emailTaken => l10n.errorEmailTaken,
     AuthError.tooManySignInAttempts => l10n.errorTooManySignInAttempts,
     AuthError.passkeyFailed => l10n.errorPasskeyFailed,
+    AuthError.recoveryKeyInvalid => l10n.errorRecoveryKeyInvalid,
+    AuthError.badRecoveryKey => l10n.vaultUnlockErrorBadKey,
     AuthError.networkError => l10n.errorNetwork,
     AuthError.internalError => l10n.errorInternal,
     AuthError.generic => l10n.errorGeneric,

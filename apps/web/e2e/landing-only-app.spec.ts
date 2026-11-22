@@ -14,7 +14,7 @@ const SITE = process.env.VITE_SITE_URL ?? "https://landing-only.example.test";
 const APP = process.env.VITE_APP_URL ?? "https://app.example.test";
 /** The Android download: the arm64 APK of the mobile release. */
 const ANDROID_APK_HREF =
-  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.1/wambito-1.0.1-arm64-v8a.apk";
+  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.4/wambito-1.0.4-arm64-v8a.apk";
 
 const CLIENT = fileURLToPath(new URL("../build/client/", import.meta.url));
 
@@ -22,34 +22,30 @@ const LOCALES = [
   {
     locale: "es",
     path: "/",
-    cta: "Empieza ahora",
-    demoCta: "Pruébalo sin cuenta",
+    cta: "Crear cuenta",
+    demoCta: "Demo",
     navCta: "Entrar",
-    webCta: "Empezar",
-    webTitle: "En la web",
     soon: "Pronto",
-    androidTitle: "App para Android y iOS",
-    androidCta: "Descargar para Android",
-    others: ["Con tu IA"],
+    androidTitle: "App para Android",
+    androidCta: "Desde GitHub",
+    others: ["App para iOS"],
     closingBody:
-      "Crea tu cuenta con tu correo en menos de un minuto. Wambito se encarga de que sea divertido.",
+      "Wambito nació en 2026 con la frustración de no saber cuánto gastaba en cafés al mes.",
     comingSoon: [/Muy pronto/, /Síguelo en GitHub/, /en construcción/],
     banned: [/\bjueg(o|a)\b/i],
   },
   {
     locale: "en",
     path: "/en",
-    cta: "Get started",
-    demoCta: "Try it without an account",
+    cta: "Create account",
+    demoCta: "Demo",
     navCta: "Sign in",
-    webCta: "Start",
-    webTitle: "On the web",
     soon: "Soon",
-    androidTitle: "Android & iOS app",
-    androidCta: "Download for Android",
-    others: ["With your AI"],
+    androidTitle: "Android app",
+    androidCta: "From GitHub",
+    others: ["iOS app"],
     closingBody:
-      "Create your account with your email in under a minute. Wambito takes care of making it fun.",
+      "Wambito was born in 2026 out of the frustration of not knowing how much I spent on coffee each month.",
     comingSoon: [/Coming soon/, /Follow on GitHub/, /being built in the open/],
     banned: [/\bgames?\b/i],
   },
@@ -66,9 +62,13 @@ async function expectNoA11yViolations(page: Page) {
   ).toEqual([]);
 }
 
-/** A link to the live app: its sign-in, in the page's language, in the same tab. */
-async function expectAppLink(link: ReturnType<Page["locator"]>, locale: string) {
-  await expect(link).toHaveAttribute("href", `${APP}/sign-in?lang=${locale}`);
+/** A link to a door of the live app, in the page's language, in the same tab. */
+async function expectAppLink(
+  link: ReturnType<Page["locator"]>,
+  locale: string,
+  door: "sign-in" | "create-account",
+) {
+  await expect(link).toHaveAttribute("href", `${APP}/${door}?lang=${locale}`);
   await expect(link).not.toHaveAttribute("target", /.+/);
   await expect(link.locator(".sr-only")).toHaveCount(0);
   expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
@@ -76,9 +76,7 @@ async function expectAppLink(link: ReturnType<Page["locator"]>, locale: string) 
 
 for (const l of LOCALES) {
   test.describe(`landing-only with the app (${l.locale})`, () => {
-    test("the hero's \"try it without an account\" opens the demo on the app's origin", async ({
-      page,
-    }) => {
+    test("the hero's \"Demo\" opens the demo on the app's origin", async ({ page }) => {
       await page.goto(l.path);
       const demo = page.locator("#hero").getByRole("link", { name: l.demoCta, exact: true });
       await expect(demo).toHaveAttribute("href", `${APP}/demo?lang=${l.locale}`);
@@ -94,11 +92,13 @@ for (const l of LOCALES) {
       ]);
     });
 
-    test("the hero and closing calls to action open the app's sign-in", async ({ page }) => {
+    test("the hero and closing calls to action open the app's create-account page", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       for (const section of ["#hero", "#closing"]) {
         const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-        await expectAppLink(link, l.locale);
+        await expectAppLink(link, l.locale, "create-account");
         await expect(link).toHaveClass(/lk-btn-primary/);
         await expect(link).not.toHaveClass(/is-soon/);
       }
@@ -108,21 +108,17 @@ for (const l of LOCALES) {
       await page.goto(l.path);
       const nav = page.getByRole("banner").getByRole("navigation");
       const link = nav.getByRole("link", { name: l.navCta, exact: true });
-      await expectAppLink(link, l.locale);
+      await expectAppLink(link, l.locale, "sign-in");
       await expect(link).toHaveClass(/lk-btn-secondary/);
       // The language switch, then the day/night switch.
       await expect(nav.getByRole("button")).toHaveCount(2);
       await expect(nav.getByRole("button").last()).toBeVisible();
     });
 
-    test("the web card is a link to the app, not a badge; Android downloads the APK, the AI card stays soon", async ({
-      page,
-    }) => {
+    test("Android downloads the APK; iOS stays soon; no web or agent card", async ({ page }) => {
       await page.goto(l.path);
       const ways = page.locator("#ways").getByRole("listitem");
-      const web = ways.filter({ has: page.getByRole("heading", { name: l.webTitle }) });
-      await expectAppLink(web.getByRole("link", { name: l.webCta, exact: true }), l.locale);
-      await expect(web.getByText(l.soon, { exact: true })).toHaveCount(0);
+      await expect(ways).toHaveCount(2);
       for (const name of l.others) {
         const card = ways.filter({ has: page.getByRole("heading", { name }) });
         await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
@@ -133,7 +129,9 @@ for (const l of LOCALES) {
         "href",
         ANDROID_APK_HREF,
       );
-      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(0);
+      // Its one "soon" is Google Play's: the GitHub download is live.
+      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(1);
+      await expect(android.locator(".lk-landing-store")).toHaveText(`Google Play${l.soon}`);
     });
 
     test("nothing still says coming soon, and no link points at GitHub's 'follow' CTA", async ({
@@ -151,14 +149,21 @@ for (const l of LOCALES) {
       expect(text).not.toMatch(/Luk(?:itas)|\bLuk(?:as)\b/);
     });
 
-    test("every link to sign-in leaves for the app origin; none is relative", async ({ page }) => {
+    test("every link to a door leaves for the app origin; none is relative", async ({ page }) => {
       await page.goto(l.path);
       const hrefs = await page
         .locator("a[href]")
         .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
-      const toApp = hrefs.filter((href) => /(^|\/)(sign-in|app|welcome)(\/|\?|#|$)/.test(href));
-      // Hero, header, web card and closing.
-      expect(toApp).toEqual(Array(4).fill(`${APP}/sign-in?lang=${l.locale}`));
+      const toApp = hrefs.filter((href) =>
+        /(^|\/)(sign-in|create-account|app|welcome)(\/|\?|#|$)/.test(href),
+      );
+      // Hero, the agent's "connect" and closing create an account; the header signs in.
+      expect(toApp.sort()).toEqual(
+        [
+          ...Array(3).fill(`${APP}/create-account?lang=${l.locale}`),
+          `${APP}/sign-in?lang=${l.locale}`,
+        ].sort(),
+      );
     });
 
     test("the closing section is honest: anyone can create an account", async ({ page }) => {
@@ -179,7 +184,11 @@ for (const l of LOCALES) {
     test("the roadmap's header opens the app too", async ({ page }) => {
       await page.goto(ROADMAP_PATH[l.locale]);
       const nav = page.getByRole("banner").getByRole("navigation");
-      await expectAppLink(nav.getByRole("link", { name: l.navCta, exact: true }), l.locale);
+      await expectAppLink(
+        nav.getByRole("link", { name: l.navCta, exact: true }),
+        l.locale,
+        "sign-in",
+      );
     });
 
     test.describe(() => {
@@ -240,7 +249,7 @@ for (const l of LOCALES) {
         await expectNoA11yViolations(page);
         for (const section of ["#hero", "#closing"]) {
           const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-          await expect(link).toHaveAttribute("href", `${APP}/sign-in?lang=${l.locale}`);
+          await expect(link).toHaveAttribute("href", `${APP}/create-account?lang=${l.locale}`);
         }
         expect(errors).toEqual([]);
       });

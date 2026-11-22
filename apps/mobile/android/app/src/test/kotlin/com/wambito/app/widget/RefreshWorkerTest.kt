@@ -86,8 +86,16 @@ class RefreshWorkerTest {
         }
     }
 
+    /** The sync that is asked finds the vault busy and is retried later: it is never finished. */
+    private fun busyHeadlessRun() {
+        com.wambito.app.background.HeadlessHooks.runner = { _, _ ->
+            com.wambito.app.background.HeadlessResult("busy", emptyList())
+        }
+    }
+
     @After
     fun tearDown() {
+        com.wambito.app.background.HeadlessHooks.runner = null
         RefreshWorker.dependencies = null
         server.stop()
         WidgetSnapshot.preferences(context).edit().clear().commit()
@@ -142,6 +150,86 @@ class RefreshWorkerTest {
             ),
             stored(),
         )
+    }
+
+    @Test
+    fun `a preview account is never asked, the headless sync is, and the snapshot stays`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        busyHeadlessRun()
+        com.wambito.app.account.AccountMode(context).write("preview", "u1")
+        val figures = earlier.copy(owner = "u1")
+        store(figures)
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("sync asked", outcome.getString(RefreshWorker.OUTCOME))
+        assertTrue(requests.isEmpty())
+        assertEquals(figures, stored())
+        val asked = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(com.wambito.app.background.SyncScheduler.NOW).get()
+        assertEquals(asked.map { it.state }.toString(), 1, asked.count { !it.state.isFinished })
+    }
+
+    @Test
+    fun `asking for the sync again while one waits keeps the one that waits`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        busyHeadlessRun()
+        com.wambito.app.account.AccountMode(context).write("preview", "u1")
+        store(earlier.copy(owner = "u1"))
+        runWorker()
+        val first = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(com.wambito.app.background.SyncScheduler.NOW).get().single()
+        runWorker()
+        val after = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(com.wambito.app.background.SyncScheduler.NOW).get()
+        assertEquals(listOf(first.id), after.map { it.id })
+    }
+
+    @Test
+    fun `a snapshot of another account is never drawn, the signed-out one replaces it`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        com.wambito.app.account.AccountMode(context).write("preview", "u2")
+        store(earlier.copy(owner = "u1"))
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("owner mismatch", outcome.getString(RefreshWorker.OUTCOME))
+        assertTrue(requests.isEmpty())
+        assertEquals(WidgetSnapshot(signedIn = false, locale = "es", hideAmount = true, theme = "light"), stored())
+    }
+
+    @Test
+    fun `a preview mode with no owner keeps no unowned figured snapshot`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        com.wambito.app.account.AccountMode(context).write("preview", null)
+        store(earlier)
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("owner mismatch", outcome.getString(RefreshWorker.OUTCOME))
+        assertEquals(false, stored()!!.signedIn)
+    }
+
+    @Test
+    fun `a preview snapshot with no owner is not drawn either`() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        com.wambito.app.account.AccountMode(context).write("preview", "u1")
+        store(earlier)
+
+        val outcome = runWorker().let { (it as androidx.work.ListenableWorker.Result.Success).outputData }
+
+        assertEquals("owner mismatch", outcome.getString(RefreshWorker.OUTCOME))
+        assertEquals(false, stored()!!.signedIn)
+    }
+
+    @Test
+    fun `a mode the app has not learned yet is not asked either`() {
+        com.wambito.app.account.AccountMode(context).value = "unknown"
+        store(earlier)
+        val outcome = (runWorker() as androidx.work.ListenableWorker.Result.Success).outputData
+        assertEquals("mode unknown", outcome.getString(RefreshWorker.OUTCOME))
+        assertTrue(requests.isEmpty())
+        assertEquals(earlier, stored())
     }
 
     @Test

@@ -54,11 +54,11 @@ Future<void> _pumpUntil(
 Future<void> _startAsGuest(WidgetTester tester) async {
   await SessionStore().clear();
   await tester.pumpWidget(await app.bootstrap());
-  await _pumpUntil(tester, find.byKey(const Key('entry.guest')));
+  await _pumpUntil(tester, find.byKey(const Key('entry.start')));
   // The API limits new guests from one address to a few in a row: wait and try again.
   for (var attempt = 0; find.byType(HomeScreen).evaluate().isEmpty; attempt++) {
     if (attempt == 8) throw TestFailure('Could not start a guest');
-    await tester.tap(find.byKey(const Key('entry.guest')));
+    await tester.tap(find.byKey(const Key('entry.start')));
     final end = DateTime.now().add(const Duration(seconds: 8));
     while (DateTime.now().isBefore(end) && find.byType(HomeScreen).evaluate().isEmpty) {
       await tester.pump(const Duration(milliseconds: 100));

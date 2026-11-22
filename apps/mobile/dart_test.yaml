@@ -4,3 +4,6 @@ tags:
     # job runs on Linux, where text and shadows rasterize a little differently, so it skips them
     # with `flutter test --exclude-tags golden`. Update them locally with
     # `flutter test --update-goldens --tags golden`.
+  stack:
+    # The phone's vault against the real dev stack (test_stack/, scripts/run-vault-e2e.sh). It lives
+    # outside test/, so `flutter test` never picks it up; run it with `--tags stack`.

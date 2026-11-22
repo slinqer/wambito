@@ -16,8 +16,8 @@ import {
   verifyDeviceAttestation,
   wrapDataKey,
 } from "@wambito/crypto";
+import { uuidv7 } from "@wambito/vault";
 import { createEncryptedStore } from "./encrypted-store.ts";
-import { uuidv7 } from "./ids.ts";
 import {
   api,
   dedupeKeyName,
@@ -26,16 +26,20 @@ import {
   listWraps,
   migrateLegacyKeys,
   putJson,
+  putVerifier,
   recordKeyName,
   refreshKeys,
+  type VerifierBody,
+  verifierBodyOf,
   type WrapDto,
   withDataKey,
 } from "./keys.ts";
 
 /**
- * Removing a device rotates the data key (spec 2026-11-08 section 7.5, addendum 2026-11-08-e2e-
- * stage-1b section 2, stage 2b Rulings 1, 2 and 7), and a new recovery key replaces the recovery
- * wrap. Both are two steps, like `prepareAccount`: everything is made in memory first (DK from
+ * Rotating the data key now serves "Change keys" (spec 2026-11-08 section 7.5, addendum
+ * 2026-11-08-e2e-stage-1b section 2, stage 2b Rulings 1, 2 and 7; removing a device no longer
+ * rotates: one `DELETE /v2/keys/{id}`, spec 2026-11-18), and a new recovery key replaces the
+ * recovery wrap. Both are two steps, like `prepareAccount`: everything is made in memory first (DK from
  * this browser's own device wrap, the new DK and the recovery secret are zeroed before the first
  * step returns: only the sealed wraps and the derived non-extractable record keys are kept), and
  * nothing reaches the server until `commit()`.
@@ -161,7 +165,8 @@ export async function checkRecoveryKey(options: KeysOptions & { text: string }):
  *    server lists (reported in `dropped`, with a forged attestation as `attestation`);
  * 3. a new DK at `keyV + 1`, and its wraps: one recovery, the kept devices (same id, ref and
  *    label, sealed to their public keys with fresh attestations; this browser's own with the
- *    public key it kept), the touched passkey. Assistants have no web wraps yet (stage 4).
+ *    public key it kept), the touched passkey. A rotation carries no assistant wraps: the server refuses them and revokes
+ *    every assistant of the account (stage 4), which then connects again.
  *
  * `commit()` then `POST /v2/keys/rotate`s them with the key link (the old DK sealed under the new one) (409 `key_version_mismatch` = `rotated_elsewhere`:
  * another device rotated first, nothing is kept), keeps the new version's record and dedupe keys
@@ -189,6 +194,9 @@ export async function rotateKeys(
     }
     const recoveryKey = "fresh" in options.recovery ? formatRecoveryKey(secret) : null;
     const recoverySecret = secret;
+    // A new key's verifier follows its wrap (the server deleted the old one with the old wrap);
+    // the typed key keeps the one it has.
+    const verifier = recoveryKey === null ? null : await verifierBodyOf(secret);
     const revoked = new Set([...(await revokedDevices(userId)), ...options.remove]);
     // Holds every version up to the account's current one first: `withDataKey` alone would accept
     // a verified wrap above the held current without keeping the versions in between.
@@ -295,6 +303,7 @@ export async function rotateKeys(
     }
 
     let posted = false;
+    let verifierSent = false;
     let done: RotateResult | null = null;
     let running: Promise<RotateResult> | null = null;
 
@@ -316,7 +325,13 @@ export async function rotateKeys(
         }
         posted = true;
       }
+      // Kept here before the verifier: a failed PUT never leaves this browser without the new
+      // version the server already holds. A retry keeps again (idempotent) and puts it again.
       await keepRotated(userId, prepared.keyV, prepared.keys, options.remove);
+      if (verifier && !verifierSent) {
+        await putVerifier(options, verifier);
+        verifierSent = true;
+      }
       done = { keyV: prepared.keyV, dropped: prepared.dropped };
       return done;
     }
@@ -410,6 +425,7 @@ export async function newRecoveryKey(
   const secret = newRecoverySecret();
   try {
     const recoveryKey = formatRecoveryKey(secret);
+    const verifier: VerifierBody = await verifierBodyOf(secret);
     const body = await withDataKey(options, async (dataKey, keyV) => ({
       kind: "recovery",
       keyV,
@@ -434,11 +450,19 @@ export async function newRecoveryKey(
         if (refused || !(await landed())) throw error;
       }
     }
+    let wrapSent = false;
     let sent: Promise<void> | null = null;
     return {
       recoveryKey,
       commit() {
-        sent ??= send().catch((error) => {
+        sent ??= (async () => {
+          if (!wrapSent) {
+            await send();
+            wrapSent = true;
+          }
+          // After the wrap: the server deleted the old key's verifier with the old wrap.
+          await putVerifier(options, verifier);
+        })().catch((error) => {
           sent = null;
           throw error;
         });

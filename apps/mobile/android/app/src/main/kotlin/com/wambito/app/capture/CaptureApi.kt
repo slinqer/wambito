@@ -30,6 +30,29 @@ data class CaptureAnswer(
 )
 
 /**
+ * Reads the answer of a capture (`{result, transaction, category}`): the server's `POST /v1/captures`
+ * and the phone's own local route say the same. Null when it is not that shape.
+ */
+fun parseCaptureAnswer(json: String): CaptureAnswer? = try {
+    val doc = JSONObject(json)
+    val transaction = doc.getJSONObject("transaction")
+    val category = doc.getJSONObject("category")
+    CaptureAnswer(
+        merged = doc.getString("result") == "merged",
+        id = transaction.getString("id"),
+        amountCents = transaction.getLong("amount"),
+        currency = transaction.getString("currency"),
+        name = transaction.getString("name"),
+        categoryName = category.getString("name"),
+        isFallback = category.getBoolean("fallback"),
+        // A server that does not say is asked again, as before the field existed.
+        needsReview = transaction.optBoolean("needsReview", true),
+    )
+} catch (_: JSONException) {
+    null
+}
+
+/**
  * The two calls a capture makes, as [com.wambito.app.notices.NoticeApi] makes its reads: `<server>/api`,
  * the bearer token, the phone's zone and language, `x-wambito-background: 1` (a job the person did
  * not start is not activity). With the platform's HttpURLConnection: no HTTP library.
@@ -50,26 +73,7 @@ class CaptureApi(
         val body = item.capture.toJson()
         val answer = call(server, token, "POST", "/v1/captures", body.toString(), item.key, endpointMayBeMissing = true)
         return when (answer) {
-            is ApiResult.Ok -> try {
-                val doc = JSONObject(answer.value)
-                val transaction = doc.getJSONObject("transaction")
-                val category = doc.getJSONObject("category")
-                ApiResult.Ok(
-                    CaptureAnswer(
-                        merged = doc.getString("result") == "merged",
-                        id = transaction.getString("id"),
-                        amountCents = transaction.getLong("amount"),
-                        currency = transaction.getString("currency"),
-                        name = transaction.getString("name"),
-                        categoryName = category.getString("name"),
-                        isFallback = category.getBoolean("fallback"),
-                        // A server that does not say is asked again, as before the field existed.
-                        needsReview = transaction.optBoolean("needsReview", true),
-                    ),
-                )
-            } catch (_: JSONException) {
-                ApiResult.Failed
-            }
+            is ApiResult.Ok -> parseCaptureAnswer(answer.value)?.let { ApiResult.Ok(it) } ?: ApiResult.Failed
             ApiResult.Unauthorized -> ApiResult.Unauthorized
             ApiResult.Failed -> ApiResult.Failed
             ApiResult.Rejected -> ApiResult.Rejected
@@ -133,6 +137,10 @@ class CaptureApi(
                 // For a capture, 403 and 404 are a server that lacks the endpoint (a phone updated
                 // before its server): the capture waits for it instead of being lost.
                 403, 404 -> if (endpointMayBeMissing) ApiResult.Failed else ApiResult.Rejected
+                // 426: the account moved to end-to-end encryption and this request predates it.
+                // The capture or the confirm waits: once the app opens, it learns the account is
+                // `preview` and the queue goes to the vault.
+                426 -> ApiResult.Failed
                 in 400..499 -> ApiResult.Rejected
                 else -> ApiResult.Failed
             }

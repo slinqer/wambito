@@ -1,0 +1,654 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
+import '../api/unauthorized.dart';
+import '../core/schemas.dart' show supportedLocales;
+import '../core/suggested_categories.dart';
+import '../crypto/records.dart' show RecordType;
+import 'backend.dart';
+import 'backend_interceptor.dart';
+import 'ids.dart';
+import 'keys.dart';
+import 'sqlite_store.dart';
+import 'store.dart' show FinanceStore;
+import 'sync.dart';
+import 'vault_lock.dart';
+
+export '../api/unauthorized.dart' show Unauthorized;
+
+/// A preview account's open vault on this phone: the Dart twin of
+/// `apps/web/app/local/vault-session.ts`. It ties the store, the keys, the local backend the
+/// screens' requests go to (through [VaultSession.interceptor]) and the sync engine into one
+/// session, one per account in the process, until sign-out, a 401 or a removal ends it.
+///
+/// Phone differences: the session hands out a Dio [Interceptor] instead of a `fetch`, its keys live
+/// in [KeyStorage], [forgetVault] takes the account (the web's uses the tab's), and the vault file
+/// is deleted by [forgetVault] (the web's `forgetDevice` deletes its IndexedDB vault). There is one
+/// `SqliteStore` per account in the process: an open waits for the previous store of the same
+/// account to finish closing.
+
+/// What the server says about the account; the vault's profile and its first settings.
+class VaultProfile {
+  const VaultProfile({
+    required this.id,
+    required this.email,
+    required this.isAnonymous,
+    required this.locale,
+    required this.timezone,
+  });
+
+  final String id;
+  final String email;
+  final bool isAnonymous;
+  final String locale;
+  final String timezone;
+}
+
+/// Opening failed; [code] says why (`offline` gets the offline copy).
+class VaultOpenError implements Exception {
+  const VaultOpenError(this.code);
+
+  final SyncProblemCode code;
+
+  @override
+  String toString() => 'VaultOpenError(${code.wire})';
+}
+
+class OpenVaultOptions {
+  const OpenVaultOptions({
+    required this.profile,
+    required this.keys,
+    required this.fresh,
+    required this.network,
+    required this.storage,
+    this.now,
+    this.onUnauthorized,
+    this.onSessionChanged,
+    this.openStore,
+    this.deleteStore,
+    this.syncDebounce = const Duration(seconds: 1),
+    this.refreshKeys,
+    this.lease,
+    this.seed = true,
+    this.sessionOwner,
+  });
+
+  final VaultProfile profile;
+  final LocalKeys keys;
+
+  /// The keys were just made or unlocked: the first full sync must succeed.
+  final bool fresh;
+
+  /// The network (base `<server>/api`, without the local interceptor), for `/v2` and the live
+  /// routes.
+  final Dio network;
+  final KeyStorage storage;
+  final DateTime Function()? now;
+
+  /// The session is gone (a 401 from sync), and why ([Unauthorized], from its code): the caller
+  /// ends the session (`SessionController.sessionEnded`), which keeps, wipes or adopts the vault.
+  /// A `device_removed` 401 also removes the vault here, as a wrap gone does.
+  final void Function(Unauthorized kind)? onUnauthorized;
+
+  /// The session now belongs to another account (409 `session_changed` from sync): the session has
+  /// stopped and closed; the caller checks who is signed in.
+  final void Function()? onSessionChanged;
+
+  /// The store and its deletion; tests pass their own (a temp folder). Default: the app's vault.
+  final Future<SqliteStore> Function(String userId)? openStore;
+  final Future<void> Function(String userId)? deleteStore;
+
+  /// The wait between a local write and its sync.
+  final Duration syncDebounce;
+
+  /// `keys.dart`'s `refreshKeys`; tests pass their own to hold or fail a refresh.
+  final Future<LocalKeys> Function(KeysOptions options)? refreshKeys;
+
+  /// The lease a sync run takes (vault_lock.dart). Default: the app's ([appLease], a short wait)
+  /// on the real vault folder; none when a test passes its own `openStore`.
+  final Future<VaultLease?> Function()? lease;
+
+  /// Seed the account's first records ([seedIfEmpty]) after a complete first sync. False when a
+  /// carry (merge.dart) fills the new vault instead.
+  final bool seed;
+
+  /// The session the vault opens under, as a hash of its token (`sessionOwnerOf`). A kept vault
+  /// opening under a session its device wrap is not linked to yet links it first ([_bindWrap]);
+  /// null skips that.
+  final String? sessionOwner;
+}
+
+/// How long an app sync (the opening one, every later one, pull-to-refresh) waits for the vault's
+/// lease before it reports `busy` and is retried like `offline`: a headless engine may hold it for
+/// minutes, and the person must never wait on it.
+const appLeaseWait = Duration(seconds: 2);
+
+/// The app's lease for one sync run; [directory] is for tests.
+Future<VaultLease?> appLease(String userId, {String? directory}) =>
+    waitLease(userId, holder: 'app', wait: appLeaseWait, directory: directory);
+
+/// The open vault of one account.
+class VaultSession {
+  VaultSession._(
+    this.userId,
+    this.interceptor,
+    this.backend,
+    this._store,
+    this._engine,
+    this._storage,
+  );
+
+  final String userId;
+
+  /// The `/v1/*` the screens use: answered by the local backend (`GET` and `PATCH /v1/me`
+  /// included); deleting the account and everything outside `/v1` go on to the network. Its
+  /// local writes start a sync.
+  final Interceptor interceptor;
+
+  /// The local backend behind [interceptor], for what reads the vault without a request: the home
+  /// widget ([writeVaultWidget]).
+  final LocalBackend backend;
+  final SqliteStore _store;
+  final SyncEngine _engine;
+  final KeyStorage _storage;
+  final Set<void Function()> _closedListeners = {};
+  final Set<void Function()> _removedListeners = {};
+  final Set<void Function()> _unverifiedListeners = {};
+  bool _closing = false;
+  late final void Function() _drop;
+
+  /// The vault's store, for what changes the keys on this phone ([rotateKeys] writes
+  /// `settings.revokedDevices` through it) and Settings → Security's reads.
+  FinanceStore get store => _store;
+
+  /// How many records the sync could not open (the quarantine), for Settings → Security.
+  Future<int> unreadableCount() => _store.quarantineCount();
+
+  /// Called after every commit to the store (the screens refetch). Returns the unsubscribe.
+  void Function() subscribe(void Function() listener) => _store.subscribe(listener);
+
+  /// Called once if the vault closes under the session: the sync has stopped and the session is
+  /// gone; the gate checks again.
+  void Function() onClosed(void Function() listener) {
+    _closedListeners.add(listener);
+    return () => _closedListeners.remove(listener);
+  }
+
+  /// Called once if this phone was removed from the account (its device wrap is gone): the sync
+  /// has stopped, the vault and the keys are deleted and the session is gone; the gate shows
+  /// Unlock.
+  void Function() onRemoved(void Function() listener) {
+    _removedListeners.add(listener);
+    return () => _removedListeners.remove(listener);
+  }
+
+  /// Called once if a new key version did not verify: the sync has stopped and the session is
+  /// gone, but the vault and its unsent changes are kept; the gate shows Unlock.
+  void Function() onUnverified(void Function() listener) {
+    _unverifiedListeners.add(listener);
+    return () => _unverifiedListeners.remove(listener);
+  }
+
+  /// A headless engine changed the vault file: the subscribers refetch, then a sync is scheduled.
+  void externalChange() {
+    _store.notifyExternalChange();
+    _engine.afterLocalWrite();
+  }
+
+  /// A sync now (pull-to-refresh). Shares a run in flight.
+  Future<SyncResult> sync() => _engine.run();
+
+  /// After a rotation committed on this phone: gives the sync the keyring storage now holds, then
+  /// runs a sync (its upgrade pass re-seals the old records).
+  Future<void> reloadKeys() async {
+    final local = await loadLocalKeys(userId, _storage);
+    if (local != null) _engine.useKeyring(local.keyring);
+    await _engine.run();
+  }
+
+  /// The person's changes not pushed yet (re-seals and given-up changes are not counted): the
+  /// sign-out sheet's "You have N changes not synced yet".
+  Future<int> pendingChanges() async =>
+      (await _store.readOutbox(_all)).where((e) => !e.reseal && !e.abandoned).length;
+
+  /// The server's version of a record (0 until the server took it); null without the record.
+  Future<int?> serverVersion(RecordType type, String id) async =>
+      (await _store.rawRecord(type, id))?.version;
+
+  /// Stops the sync and closes the store; completes once the file is released.
+  Future<void> close() {
+    _closing = true;
+    _drop();
+    return _closeStore(userId, _store);
+  }
+}
+
+const _all = 9007199254740991;
+
+class _Active {
+  _Active(this.userId);
+
+  final String userId;
+  VaultSession? session;
+
+  /// An open in flight, shared by a second caller.
+  Future<VaultSession>? opening;
+
+  /// The store of the open in flight, so a sign-out during it can close it.
+  SqliteStore? store;
+  Future<void> Function(String userId)? deleteStore;
+
+  /// Signed out: a late run must not leave anything behind.
+  bool forgotten = false;
+}
+
+/// The account whose vault is open (or opening) in this process.
+_Active? _active;
+
+/// Whether the vault of [userId] is open or opening in this process (a sweep leaves it alone).
+bool vaultInUse(String userId) => _active?.userId == userId;
+
+/// Stores closing, by account: the next open of the same account waits for the file.
+final Map<String, Future<void>> _closings = {};
+
+/// Closes a store: [SqliteStore.close]. A test seam (a close that never finishes); production code
+/// never changes it.
+@visibleForTesting
+Future<void> Function(SqliteStore store) vaultCloseStore = defaultVaultCloseStore;
+
+@visibleForTesting
+Future<void> defaultVaultCloseStore(SqliteStore store) => store.close();
+
+/// The most a sign-out waits for the vault to close before it deletes the file and the keys anyway
+/// (as `SessionController.signOutWait` for the server).
+const vaultCloseWait = Duration(seconds: 10);
+
+Future<void> _closeStore(String userId, SqliteStore store) {
+  final closing = vaultCloseStore(store);
+  _closings[userId] = closing;
+  unawaited(
+    closing
+        .whenComplete(() {
+          if (identical(_closings[userId], closing)) _closings.remove(userId);
+        })
+        .catchError((Object _) {}),
+  );
+  return closing;
+}
+
+Future<void> _defaultDelete(String userId) => deleteVault(userId);
+
+/// Whether a wipe by account id (the vault file, the keys) still belongs to [mine]: no newer open
+/// of the same account exists in the process.
+bool _mayWipe(_Active mine) {
+  final current = _active;
+  return current == null || identical(current, mine) || current.userId != mine.userId;
+}
+
+/// What [KeyStorage] holds for an account before a key refresh.
+typedef _KeySnapshot = ({List<int> versions, int? current, String? deviceWrapId});
+
+Future<_KeySnapshot> _keySnapshot(String userId, KeyStorage storage) async => (
+  versions: await storage.versions(userId),
+  current: await storage.current(userId),
+  deviceWrapId: await storage.deviceWrapId(userId),
+);
+
+/// After a sign-out, deletes what a refresh that succeeded meanwhile wrote: the versions of its
+/// keyring that [before] lacked, and `current` only while it is still the refresh's version (and
+/// was not before). Nothing when another device wrap is kept now: an unlock of a new sign-in
+/// enrolled since the sign-out's wipe, and the keys are its own, whatever their versions (a refresh
+/// never writes the device wrap).
+Future<void> _forgetRefreshed(
+  String userId,
+  KeyStorage storage,
+  _KeySnapshot before,
+  LocalKeys refreshed,
+) async {
+  final wrapId = await storage.deviceWrapId(userId);
+  if (wrapId != null && wrapId != before.deviceWrapId) return;
+  final keyV = refreshed.keyring.current;
+  for (final v in refreshed.keyring.byVersion.keys) {
+    if (!before.versions.contains(v)) await storage.deleteDataKey(userId, v);
+  }
+  if (before.current != keyV && await storage.current(userId) == keyV) {
+    await storage.deleteCurrent(userId);
+  }
+}
+
+/// Creates the account's first records when it has none after the first sync: the settings (from
+/// the server's profile, the web's default currency EUR) and the suggested categories in the
+/// person's language. The ids are UUID v5 of the account and the record's name, and the content
+/// comes from the profile only, so two devices seeding at once write the same records.
+Future<void> seedIfEmpty(FinanceStore store, VaultProfile profile) async {
+  if ((await store.list(RecordType.settings)).isNotEmpty) return;
+  final locale = supportedLocales.contains(profile.locale) ? profile.locale : 'es';
+  final names = SuggestionLocale.values.byName(locale);
+  final namespace = uuidv5(seedNamespace, profile.id);
+  final settingsId = uuidv5(namespace, 'settings');
+  final categories = [
+    for (final (i, s) in suggestedCategories.indexed)
+      (
+        id: uuidv5(namespace, 'category:${s.key}'),
+        body: <String, Object?>{
+          's': 1,
+          'name': s.names[names],
+          'kind': s.kind.name,
+          'icon': s.glyph,
+          'color': s.tint,
+          'sortOrder': i,
+          'archivedAt': null,
+          'systemKey': null,
+        },
+      ),
+  ];
+  await store.transaction((tx) async {
+    await tx.put(RecordType.settings, settingsId, <String, Object?>{
+      's': 1,
+      'name': null,
+      'currency': 'EUR',
+      'locale': locale,
+      'timezone': profile.timezone,
+      'onboardingCompletedAt': null,
+      'revokedDevices': <Object?>[],
+      'recoveryKeySavedAt': null,
+    });
+    for (final (:id, :body) in categories) {
+      await tx.put(RecordType.category, id, body);
+    }
+  });
+}
+
+/// Links this phone's device wrap to the session the vault opens under, once per session
+/// ([OpenVaultOptions.sessionOwner], kept as `boundSession`). A removal ends the session the wrap
+/// is linked to: a phone that kept its vault through an expired session and signed in again must
+/// move the link, or a removal would end only the dead session. A fresh open needs no call (the
+/// unlock or setup just PUT the wrap under this session). True when the wrap is gone: the open
+/// then goes as a removed device's does. A held vault is never wiped by it, and any failure
+/// (offline, a server error, a 401) is silent: the next open tries again.
+Future<bool> _bindWrap(OpenVaultOptions options, SqliteStore store) async {
+  final owner = options.sessionOwner;
+  if (owner == null) return false;
+  final userId = options.profile.id;
+  final storage = options.storage;
+  try {
+    if (await storage.boundSession(userId) == owner) return false;
+    if (options.fresh) {
+      await storage.setBoundSession(userId, owner);
+      return false;
+    }
+    final found = await bindDeviceWrap(
+      KeysOptions(userId: userId, dio: options.network, storage: storage),
+    );
+    if (found == WrapBinding.bound) {
+      await storage.setBoundSession(userId, owner);
+      return false;
+    }
+    // A held vault (a merge, say) may be the only copy of its data: only its own flow forgets it.
+    return await store.hold() == null;
+  } on Object {
+    return false;
+  }
+}
+
+/// Opens (or reuses) the account's vault session: the store, a full sync (required when `fresh`;
+/// a known phone opens on its local data when offline), the first records if the account has
+/// none, then the sync's triggers.
+Future<VaultSession> openVaultSession(OpenVaultOptions options) {
+  final id = options.profile.id;
+  final current = _active;
+  if (current != null && current.userId == id && !current.forgotten) {
+    final session = current.session;
+    if (session != null) return Future.value(session);
+    final opening = current.opening;
+    if (opening != null) return opening;
+  }
+  if (current == null || current.userId != id || current.forgotten) {
+    final previous = current?.session;
+    if (previous != null) unawaited(previous.close());
+    _active = _Active(id);
+  }
+  final mine = _active!..deleteStore = options.deleteStore;
+  late final Future<VaultSession> opening;
+  opening = _open(options, mine).whenComplete(() {
+    if (identical(mine.opening, opening)) mine.opening = null;
+  });
+  mine.opening = opening;
+  return opening;
+}
+
+Future<VaultSession> _open(OpenVaultOptions options, _Active mine) async {
+  final profile = options.profile;
+  final userId = profile.id;
+  final storage = options.storage;
+  final network = options.network;
+  final deleteStore = options.deleteStore ?? _defaultDelete;
+  await _closings[userId];
+  final store = await (options.openStore ?? SqliteStore.open)(userId);
+  mine.store = store;
+  if (mine.forgotten) {
+    // Signed out while the file was opening: it goes again.
+    await _closeStore(userId, store);
+    await deleteStore(userId);
+    throw const VaultOpenError(SyncProblemCode.closed);
+  }
+  try {
+    final backend = createLocalBackend(
+      store: store,
+      now: options.now ?? DateTime.now,
+      unavailable: localUnavailable,
+      timezone: profile.timezone,
+      profile: LocalProfile(
+        id: profile.id,
+        email: profile.email,
+        isAnonymous: profile.isAnonymous,
+        encryption: 'preview',
+      ),
+    );
+    // Set once open: a later 409 `session_changed` closes it, `device_removed` removes it,
+    // `key_unverified` closes it and keeps the vault.
+    VaultSession? opened;
+    void Function()? removed;
+    void Function()? unverified;
+    final engine = createSyncEngine(
+      SyncEngineOptions(
+        store: store,
+        dio: network,
+        userId: userId,
+        keyring: options.keys.keyring,
+        refreshKeys: () async {
+          if (mine.forgotten) throw const VaultClosedError();
+          // What storage held before, to tell later what this refresh itself wrote.
+          final before = await _keySnapshot(userId, storage);
+          final LocalKeys local;
+          try {
+            local = await (options.refreshKeys ?? refreshKeys)(
+              KeysOptions(userId: userId, dio: network, storage: storage),
+            );
+          } on Object {
+            // Signed out while it ran: its failure is the old session's, never reported.
+            if (mine.forgotten) throw const VaultClosedError();
+            rethrow;
+          }
+          if (mine.forgotten) {
+            // Signed out while the refresh ran: whatever it kept goes too, unless the account is
+            // open (or opening) again, whose keys these now are. Only what it wrote: a new sign-in
+            // may already have unlocked (and kept its keys) before its vault opens, which
+            // `_mayWipe` cannot see.
+            if (_mayWipe(mine)) await _forgetRefreshed(userId, storage, before, local);
+            throw const VaultClosedError();
+          }
+          return local.keyring;
+        },
+        dropKeyVersion: (v) => dropKeyVersion(userId, v, storage),
+        lease: options.lease ?? (options.openStore == null ? () => appLease(userId) : null),
+        debounce: options.syncDebounce,
+        onError: (problem) {
+          // A signed-out or closing session tells nobody anything (a late run of it ends here).
+          if (mine.forgotten || (opened?._closing ?? false)) return;
+          switch (problem.code) {
+            case SyncProblemCode.unauthorized:
+              options.onUnauthorized?.call(Unauthorized.expired);
+            case SyncProblemCode.userDeleted:
+              options.onUnauthorized?.call(Unauthorized.userDeleted);
+            case SyncProblemCode.sessionChanged:
+              final session = opened;
+              if (session != null) {
+                unawaited(session.close());
+                options.onSessionChanged?.call();
+              }
+            case SyncProblemCode.deviceRemoved:
+              removed?.call();
+              // The server says the session went with the device: it ends too.
+              if (problem.status == 401) options.onUnauthorized?.call(Unauthorized.deviceRemoved);
+            case SyncProblemCode.keyUnverified:
+              unverified?.call();
+            default:
+              break;
+          }
+        },
+      ),
+    );
+    // This phone was removed: the vault and its keys go, the gate says so.
+    Future<Never> removedOnOpen() async {
+      await _closeStore(userId, store);
+      if (_mayWipe(mine)) {
+        await deleteStore(userId);
+        await forgetDevice(userId, storage);
+      }
+      throw const VaultOpenError(SyncProblemCode.deviceRemoved);
+    }
+
+    // Removed while its wrap was linked to a session that had ended: never syncs.
+    if (await _bindWrap(options, store)) await removedOnOpen();
+    final first = await engine.run();
+    if (first.problem == SyncProblemCode.deviceRemoved) await removedOnOpen();
+    // Never opened on a key version that did not verify; the vault stays (the catch closes it).
+    if (first.problem == SyncProblemCode.keyUnverified) {
+      throw const VaultOpenError(SyncProblemCode.keyUnverified);
+    }
+    final fatal =
+        first.error == SyncProblemCode.unauthorized ||
+        first.error == SyncProblemCode.userDeleted ||
+        first.error == SyncProblemCode.sessionChanged;
+    // `busy` (a headless engine holds the lease) is reported within [appLeaseWait]: a known phone
+    // opens on its local data and the sync is retried; a fresh vault, which must not seed before its
+    // first download, fails like `offline` and the gate offers to try again.
+    if (!first.ok && (options.fresh || fatal)) {
+      throw VaultOpenError(first.error ?? SyncProblemCode.server);
+    }
+    if (mine.forgotten || store.isClosed) throw const VaultOpenError(SyncProblemCode.closed);
+    // Only on a complete first sync: an empty-looking vault may just be one not downloaded yet
+    // (offline, or a resync whose set-aside changes still wait for their download).
+    final waiting = (await store.readOutbox(_all)).any((e) => e.setAside != null);
+    if (options.seed && first.ok && !waiting) await seedIfEmpty(store, profile);
+
+    final session = VaultSession._(
+      userId,
+      LocalBackendInterceptor(backend, afterWrite: engine.afterLocalWrite),
+      backend,
+      store,
+      engine,
+      storage,
+    );
+    session._drop = () {
+      engine.stop();
+      if (identical(_active?.session, session)) _active!.session = null;
+    };
+    // Every store op now throws `VaultClosedError`: stop, forget the session, tell the gate.
+    store.onClosed(() {
+      if (session._closing) return;
+      session._drop();
+      for (final listener in List.of(session._closedListeners)) {
+        listener();
+      }
+    });
+    // This phone's device wrap is gone: stop, delete the vault and its keys, tell the gate.
+    removed = () {
+      removed = null;
+      unawaited(() async {
+        try {
+          await session.close();
+        } on Object {
+          // closed or not, the vault goes and the gate is told
+        }
+        try {
+          // Only while the vault is still this session's (a sign-out may have come first).
+          if (_mayWipe(mine)) {
+            await deleteStore(userId);
+            await forgetDevice(userId, storage);
+          }
+        } on Object {
+          // the gate still shows Unlock; sign-out deletes them again
+        }
+        for (final listener in List.of(session._removedListeners)) {
+          listener();
+        }
+      }());
+    };
+    // A new key version did not verify: stop and close, keep the vault (never forget the keys).
+    unverified = () {
+      unverified = null;
+      unawaited(session.close());
+      for (final listener in List.of(session._unverifiedListeners)) {
+        listener();
+      }
+    };
+    if (identical(_active, mine)) mine.session = session;
+    opened = session;
+    engine.start();
+    return session;
+  } on Object {
+    await _closeStore(userId, store);
+    rethrow;
+  }
+}
+
+/// Sign-out (and a stale vault swept): stops the sync, closes the store (waiting at most
+/// [closeWait] in all), deletes the vault file of [userId] and every one of its keys. A run still in
+/// flight ends `closed` and writes nothing.
+/// [deleteStore] is for tests (default: the open session's, else the app's vault).
+Future<void> forgetVault(
+  String userId,
+  KeyStorage storage, {
+  Future<void> Function(String userId)? deleteStore,
+  Duration closeWait = vaultCloseWait,
+}) async {
+  var delete = deleteStore;
+  // One deadline for the whole close: the session's close, then the store's closing, share it.
+  final watch = Stopwatch()..start();
+  Duration left() {
+    final rest = closeWait - watch.elapsed;
+    return rest.isNegative ? Duration.zero : rest;
+  }
+
+  final current = _active;
+  if (current != null && current.userId == userId) {
+    _active = null;
+    current.forgotten = true;
+    delete ??= current.deleteStore;
+    final session = current.session;
+    final store = current.store;
+    try {
+      if (session != null) {
+        await session.close().timeout(left());
+      } else if (store != null) {
+        await _closeStore(userId, store).timeout(left());
+      }
+    } on TimeoutException {
+      // A close that hangs never keeps the vault: the file and the keys go below all the same.
+    }
+  }
+  final closing = _closings[userId];
+  if (closing != null) {
+    try {
+      await closing.timeout(left());
+    } on TimeoutException {
+      // See above.
+    }
+  }
+  await (delete ?? _defaultDelete)(userId);
+  await forgetDevice(userId, storage);
+}

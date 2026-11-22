@@ -8,15 +8,24 @@ import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/home_screen.dart' show HomeView;
 import 'package:wambito/home/home_widgets.dart' show HomeTabsStrip;
 import 'package:wambito/ui/segmented_control.dart';
+import 'package:wambito/ui/lk_icons.dart';
 
 import '../support/page_gradient.dart';
 import 'fakes.dart';
 import 'fixtures.dart';
 import 'home_harness.dart';
+import '../support/icons.dart';
 
 /// A swipe: the finger down on [row], moved by [dx] over [ms] (a flick is fast).
 Future<void> swipe(WidgetTester tester, Finder row, double dx, {int ms = 300}) async {
   await tester.timedDrag(row, Offset(dx, 0), Duration(milliseconds: ms));
+  await tester.pumpAndSettle();
+}
+
+/// A delete: swipe [row] left, then tap Borrar (a swipe alone only opens it).
+Future<void> swipeDelete(WidgetTester tester, Finder row) async {
+  await swipe(tester, row, -250);
+  await tester.tap(find.text('BORRAR'));
   await tester.pumpAndSettle();
 }
 
@@ -183,12 +192,7 @@ void main() {
       final gate = Completer<void>();
       repo.holdSummary = gate;
 
-      await tester.timedDrag(
-        find.text('Café'),
-        const Offset(-250, 0),
-        const Duration(milliseconds: 300),
-      );
-      await tester.pumpAndSettle();
+      await swipeDelete(tester, find.text('Café'));
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       expect(find.text('Eliminado: Café'), findsOneWidget);
       expect(find.text('Deshacer'), findsOneWidget);
@@ -205,7 +209,7 @@ void main() {
       await pumpHome(tester, repo);
       final top = tester.getTopLeft(find.text('Café')).dy;
 
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsNothing);
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       expect(find.text('Eliminado: Café'), findsOneWidget);
@@ -227,7 +231,7 @@ void main() {
     testWidgets('after 8 s Deshacer is gone', (tester) async {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Deshacer'), findsOneWidget);
       await tester.pump(const Duration(seconds: 7));
       expect(find.text('Deshacer'), findsOneWidget);
@@ -241,7 +245,7 @@ void main() {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
       repo.failures['delete'] = const HomeFailure(500);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsOneWidget);
       expect(find.text('Algo salió mal. Inténtalo de nuevo en un momento.'), findsOneWidget);
       expect(find.text('Deshacer'), findsNothing);
@@ -352,11 +356,12 @@ void main() {
       expect(find.text('Café'), findsNothing);
     });
 
-    testWidgets('a flick deletes even after a short distance', (tester) async {
+    testWidgets('a flick left only opens Borrar, it deletes nothing', (tester) async {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
       await swipe(tester, find.text('Café'), -60, ms: 40);
-      expect(repo.deleted.map((t) => t.id), ['coffee']);
+      expect(find.text('BORRAR'), findsOneWidget);
+      expect(repo.deleted, isEmpty);
     });
 
     testWidgets('a swipe that is too small closes again', (tester) async {
@@ -375,7 +380,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
       final repo = monthWithBudgets();
       await pumpHome(tester, repo);
-      await swipe(tester, find.text('Café'), -250);
+      await swipeDelete(tester, find.text('Café'));
       expect(find.text('Café'), findsNothing);
       expect(repo.deleted.map((t) => t.id), ['coffee']);
       await tester.tap(find.text('Deshacer'));
@@ -435,19 +440,31 @@ void main() {
       ],
     );
 
-    testWidgets('the header shows the Wambito wordmark and the face button', (tester) async {
+    testWidgets('the header is one row: the month, the magnifier and the account button', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       await pumpHome(tester, monthWithBudgets());
-      expect(find.text('Wambito'), findsOneWidget, reason: 'the wordmark');
+      expect(find.text('Wambito'), findsNothing, reason: 'no wordmark');
       final face = find.byKey(const Key('home.account'));
       expect(face, findsOneWidget);
-      expect(find.text('🙂'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: face,
+          matching: find.byWidgetPredicate((w) => w is LkIcon && w.name == LkIconName.user),
+        ),
+        findsOneWidget,
+      );
       expect(tester.getSemantics(face).label, 'Tu cuenta');
       // 44px round button, as `.lk-avatar`.
       expect(tester.getSize(face), const Size(44, 44));
-      // Under 400px the wordmark and the face share the first row, and the month has its own.
-      expect(tester.getCenter(find.text('Wambito')).dy, closeTo(tester.getCenter(face).dy, 1));
-      expect(tester.getCenter(find.text('Octubre')).dy, greaterThan(tester.getCenter(face).dy));
+      // The month shares the row with the buttons, on their left.
+      final month = find.text('Octubre');
+      expect(tester.getCenter(month).dy, closeTo(tester.getCenter(face).dy, 1));
+      expect(
+        tester.getCenter(month).dx,
+        lessThan(tester.getCenter(find.byKey(const Key('home.search'))).dx),
+      );
       handle.dispose();
     });
 
@@ -486,7 +503,7 @@ void main() {
       expect(find.text('Octubre'), findsOneWidget);
       expect(find.text('Café'), findsOneWidget);
 
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.text('Septiembre'), findsOneWidget);
       expect(find.text('Octubre'), findsNothing);
@@ -503,7 +520,7 @@ void main() {
       // Wambi talks about the month that closed.
       expect(find.textContaining('septiembre'), findsWidgets);
 
-      await tester.tap(find.text('›'));
+      await tester.tap(findIcon(LkIconName.chevronRight));
       await tester.pumpAndSettle();
       expect(find.text('Octubre'), findsOneWidget);
       expect(find.text('Café'), findsOneWidget);
@@ -520,7 +537,7 @@ void main() {
       expect(next, findsOneWidget);
       expect(tester.getSemantics(next).flagsCollection.isEnabled, Tristate.isFalse);
       final before = repo.calls.length;
-      await tester.tap(find.text('›'), warnIfMissed: false);
+      await tester.tap(findIcon(LkIconName.chevronRight), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(repo.calls.length, before, reason: 'nothing was asked');
       expect(find.text('Octubre'), findsOneWidget);
@@ -542,9 +559,9 @@ void main() {
     testWidgets('a month with no movements shows the web\'s empty state', (tester) async {
       final repo = threeMonths();
       await pumpHome(tester, repo);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.text('Agosto'), findsOneWidget);
       expect(
@@ -564,7 +581,7 @@ void main() {
       expect(find.text('Café'), findsOneWidget);
 
       repo.failures['summary'] = const HomeFailure(0);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
 
       expect(find.text('Septiembre'), findsOneWidget, reason: 'the month asked for');
@@ -594,7 +611,7 @@ void main() {
       await pumpHome(tester, repo);
       final gate = Completer<void>();
       repo.holdSummary = gate;
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.text('Septiembre'), findsOneWidget);
@@ -610,14 +627,14 @@ void main() {
       (tester) async {
         final repo = threeMonths();
         await pumpHome(tester, repo);
-        await tester.tap(find.text('‹'));
+        await tester.tap(findIcon(LkIconName.chevronLeft));
         await tester.pumpAndSettle();
         expect(find.text('Septiembre'), findsOneWidget);
-        await swipe(tester, find.text('Zapatos'), -250);
+        await swipeDelete(tester, find.text('Zapatos'));
         expect(find.text('Eliminado: Zapatos'), findsOneWidget);
 
         // The toast outlives the month: go on to August, and press Deshacer there.
-        await tester.tap(find.text('‹'));
+        await tester.tap(findIcon(LkIconName.chevronLeft));
         await tester.pumpAndSettle();
         expect(find.text('Agosto'), findsOneWidget);
         await tester.tap(find.text('Deshacer'));
@@ -626,7 +643,7 @@ void main() {
         expect(find.text('Zapatos'), findsNothing, reason: 'not a September row in August');
         expect(find.textContaining('Aún no hay movimientos en Agosto'), findsOneWidget);
 
-        await tester.tap(find.text('›'));
+        await tester.tap(findIcon(LkIconName.chevronRight));
         await tester.pumpAndSettle();
         expect(find.text('Septiembre'), findsOneWidget);
         expect(find.text('Zapatos'), findsOneWidget);
@@ -660,7 +677,7 @@ void main() {
       await pumpHome(tester, repo, size: tallPhone);
       await swipe(tester, find.text('Arriendo'), 250);
       expect(find.textContaining('Pagaste «Arriendo»'), findsOneWidget);
-      await tester.tap(find.text('‹'));
+      await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();
       expect(find.text('Septiembre'), findsOneWidget);
       expect(find.textContaining('Pagaste «Arriendo»'), findsNothing);
@@ -800,7 +817,7 @@ void main() {
       await pumpHome(tester, repo, size: const Size(360, 640), textScale: 1.3);
       expect(tester.takeException(), isNull);
       // The header, the hero and the first row are all there.
-      expect(find.text('Wambito'), findsOneWidget);
+      expect(find.byKey(const Key('home.account')), findsOneWidget);
       expect(find.textContaining('Te pasaste'), findsOneWidget);
       expect(find.text('Café'), findsOneWidget);
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
@@ -821,55 +838,28 @@ void main() {
       expect(find.textContaining(r'$1.500.000.000'), findsWidgets);
     });
 
-    testWidgets('a narrow phone (under 400px) puts the month on a row of its own', (tester) async {
-      await pumpHome(tester, monthWithBudgets(), size: const Size(360, 740));
-      expect(tester.takeException(), isNull);
-      final month = tester.getCenter(find.text('Octubre'));
-      final face = tester.getCenter(find.byKey(const Key('home.account')));
-      expect(month.dy, greaterThan(face.dy), reason: 'under the wordmark and the face');
-      expect(month.dx, closeTo(360 / 2, 1), reason: 'centred');
-    });
-
-    // 412px (Samsung, Pixel) and up to 480px: the wordmark, the month and the two buttons do not fit
-    // on one row, and the buttons must never wrap to a row of their own under the wordmark; the
-    // month takes the second row instead.
-    for (final width in [412.0, 430.0, 470.0]) {
-      testWidgets(
-        'a ${width.toInt()}px phone keeps the face beside the wordmark, the month under them',
-        (tester) async {
-          await pumpHome(tester, monthWithBudgets(), size: Size(width, 900));
-          expect(tester.takeException(), isNull);
-          final wordmark = tester.getCenter(find.text('Wambito'));
-          final face = tester.getCenter(find.byKey(const Key('home.account')));
-          final month = tester.getCenter(find.text('Octubre'));
-          expect(face.dy, closeTo(wordmark.dy, 1), reason: 'the face on the wordmark row');
-          expect(month.dy, greaterThan(face.dy), reason: 'the month on the next row');
-          expect(month.dx, closeTo(width / 2, 1), reason: 'centred');
-        },
-      );
+    // One row at every width: the month on the left, the two buttons on the right. On a narrow
+    // phone a long month name gives way (cut with …), never the buttons.
+    for (final (width, scale) in [
+      (320.0, 1.0),
+      (360.0, 1.0),
+      (412.0, 1.0),
+      (480.0, 1.0),
+      (360.0, 1.3),
+    ]) {
+      testWidgets('at ${width.toInt()}px and ${scale}x text the header is one row', (tester) async {
+        await pumpHome(tester, monthWithBudgets(), size: Size(width, 900), textScale: scale);
+        expect(tester.takeException(), isNull);
+        final face = tester.getRect(find.byKey(const Key('home.account')));
+        final search = tester.getRect(find.byKey(const Key('home.search')));
+        final next = tester.getRect(findIcon(LkIconName.chevronRight));
+        final month = tester.getCenter(find.text('Octubre'));
+        expect(month.dy, closeTo(face.center.dy, 1), reason: 'the month on the buttons\' row');
+        expect(search.center.dy, closeTo(face.center.dy, 1));
+        expect(next.right, lessThanOrEqualTo(search.left), reason: 'the month left of the buttons');
+        expect(face.right, lessThanOrEqualTo(width), reason: 'the account button on screen');
+      });
     }
-
-    testWidgets('a wide screen (480px and up) has the three on one row', (tester) async {
-      await pumpHome(tester, monthWithBudgets(), size: const Size(480, 900));
-      expect(tester.takeException(), isNull);
-      final wordmark = tester.getCenter(find.text('Wambito'));
-      final face = tester.getCenter(find.byKey(const Key('home.account')));
-      final month = tester.getCenter(find.text('Octubre'));
-      expect(face.dy, closeTo(wordmark.dy, 1));
-      expect(month.dy, closeTo(wordmark.dy, 1));
-    });
-
-    testWidgets('large text moves the month to its own row before the face would wrap', (
-      tester,
-    ) async {
-      await pumpHome(tester, monthWithBudgets(), size: const Size(560, 900), textScale: 1.3);
-      expect(tester.takeException(), isNull);
-      final wordmark = tester.getCenter(find.text('Wambito'));
-      final face = tester.getCenter(find.byKey(const Key('home.account')));
-      final month = tester.getCenter(find.text('Octubre'));
-      expect(face.dy, closeTo(wordmark.dy, 1), reason: 'the face on the wordmark row');
-      expect(month.dy, greaterThan(face.dy), reason: 'the month on the next row');
-    });
   });
 
   group('offline and errors', () {

@@ -1,0 +1,46 @@
+{
+  "name": "summary_month",
+  "status": 200,
+  "body": {
+    "month": "2026-09",
+    "budgetTotal": 250000000,
+    "spent": 125800000,
+    "remaining": 124200000,
+    "income": 450000000,
+    "balance": 324200000,
+    "categories": [
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000100",
+        "budget": 80000000,
+        "spent": 4800000,
+        "remaining": 75200000,
+        "ratio": 0.06,
+        "state": "ok"
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000101",
+        "budget": 20000000,
+        "spent": 0,
+        "remaining": 20000000,
+        "ratio": 0,
+        "state": "ok"
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000103",
+        "budget": 150000000,
+        "spent": 120000000,
+        "remaining": 30000000,
+        "ratio": 0.8,
+        "state": "near"
+      },
+      {
+        "categoryId": "01930000-0000-7000-8000-000000000104",
+        "budget": null,
+        "spent": 1000000,
+        "remaining": null,
+        "ratio": null,
+        "state": "ok"
+      }
+    ]
+  }
+}

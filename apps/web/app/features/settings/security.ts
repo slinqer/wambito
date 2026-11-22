@@ -1,5 +1,13 @@
+import type { SettingsRecord } from "@wambito/core";
 import { createEncryptedStore } from "../../local/encrypted-store.ts";
-import { addPasskeyWrap, api, type KeysOptions, listWraps, withDataKey } from "../../local/keys.ts";
+import {
+  addPasskeyWrap,
+  api,
+  KeysError,
+  type KeysOptions,
+  listWraps,
+  withDataKey,
+} from "../../local/keys.ts";
 import {
   type ApproverPairing,
   findPairing as findRealPairing,
@@ -14,11 +22,17 @@ import {
   revokedDevices,
   rotateKeys,
 } from "../../local/rotate.ts";
-import type { VaultSession } from "../../local/vault-session.ts";
+import { markRecoveryKeySaved, type VaultSession } from "../../local/vault-session.ts";
 import type { SecurityWrap } from "./security-model.ts";
 
 /** The react-query key of `SecurityApi.load()` (Security and the passkeys' "Unlocks" share it). */
 export const SECURITY_KEY = ["security"] as const;
+
+/**
+ * The react-query key of `SecurityApi.settings()` (what Protect reads of the settings record), per
+ * user: another account signed in on this tab never sees the last one's mark.
+ */
+export const protectSettingsKey = (userId: string) => ["protect-settings", userId] as const;
 
 /** What Settings → Security reads: the wraps, this browser's, the revoked list, the checks. */
 export interface SecuritySnapshot {
@@ -52,12 +66,21 @@ export interface SecurityApi {
   /** Resolves when `text` opens the current recovery wrap (`bad_` / `wrong_recovery_key`). */
   checkRecoveryKey(text: string): Promise<void>;
   newRecoveryKey(): Promise<{ recoveryKey: string; commit(): Promise<void> }>;
+  /**
+   * Removes a device: deletes its wrap (`DELETE /v2/keys/{id}`), which ends its session. The keys
+   * do not change. A 404 resolves (already gone); rejects with `{ code: "offline" | "failed" }`.
+   */
+  removeDevice(id: string): Promise<void>;
   /** After a rotation committed: the sync takes the new keyring. */
   reloadKeys(): Promise<void>;
   /** A passkey touch for its PRF: null when cancelled; `{ code: "no_prf" }` without one. */
   evaluatePrf(credentialIds?: string[]): Promise<PasskeyPrf | null>;
   /** The touched passkey's wrap, from this browser's device wrap. The caller zeroes the PRF. */
   addPasskeyWrap(passkey: PasskeyPrf): Promise<void>;
+  /** The vault's settings record (what Protect reads), null before the vault has one. */
+  settings(): Promise<Pick<SettingsRecord, "recoveryKeySavedAt"> | null>;
+  /** A recovery key was shown and typed back: `settings.recoveryKeySavedAt`, then a sync. */
+  markRecoveryKeySaved(): Promise<void>;
   /** Approving a new device (`ApproveDevice`). */
   pairing: PairingOptions;
   findPairing?: (
@@ -93,15 +116,52 @@ export function liveSecurity(session: VaultSession): SecurityApi {
       }
       return { wraps, ownId, revoked, verified, unreadable };
     },
+    async removeDevice(id) {
+      try {
+        await api(options)(`/v2/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+      } catch (error) {
+        if (error instanceof KeysError) {
+          if (error.status === 404) return;
+          if (error.code === "offline") throw error;
+        }
+        throw Object.assign(new Error("failed"), { code: "failed" });
+      }
+    },
     rotate: (request) => rotateKeys({ ...options, ...request }),
     checkRecoveryKey: (text) => checkRecoveryKey({ ...options, text }),
     newRecoveryKey: () => newRecoveryKey(options),
     reloadKeys: () => session.reloadKeys(),
     evaluatePrf: (ids) => evaluatePrf(ids),
     addPasskeyWrap: (passkey) => addPasskeyWrap({ ...options, ...passkey }),
+    async settings() {
+      const store = await createEncryptedStore(session.userId);
+      try {
+        const [row] = await store.list("settings");
+        return row ? { recoveryKeySavedAt: row.body.recoveryKeySavedAt ?? null } : null;
+      } finally {
+        store.close();
+      }
+    },
+    markRecoveryKeySaved: () => markRecoveryKeySaved(session, new Date()),
     pairing: options,
     findPairing: findRealPairing,
   };
+}
+
+/**
+ * "Change keys": a rotation that removes no device, confirmed with the typed recovery key. Like
+ * removing a device it commits and then has the sync take the new keys (a failed reload is kept:
+ * the sync tries again on its own). It disconnects every connected assistant (the server's rule).
+ */
+export async function changeKeys(security: SecurityApi, text: string): Promise<RotateResult> {
+  const prepared = await security.rotate({ remove: [], recovery: { text } });
+  const result = await prepared.commit();
+  try {
+    await security.reloadKeys();
+  } catch {
+    // The sync tries again on its own; the rotation is kept.
+  }
+  return result;
 }
 
 export const codeOf = (error: unknown): string | undefined =>

@@ -3,7 +3,15 @@ import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { expectTarget } from "../../../.storybook/story-utils.ts";
 import { detectLocale } from "../../i18n/format.ts";
 import type { CodeHints } from "./auth.ts";
-import { fail, fakeAuth, GOOD_CODE, ONBOARDED_USER, ok, SignInStage } from "./story-harness.tsx";
+import {
+  fail,
+  fakeAuth,
+  GOOD_CODE,
+  liveQr,
+  ONBOARDED_USER,
+  ok,
+  SignInStage,
+} from "./story-harness.tsx";
 
 const meta = {
   title: "Sign-in/SignIn",
@@ -282,7 +290,8 @@ export const NoFingerprintButtonYet: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { level: 1, name: "Entra a Wambito" })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Entrar con huella" })).toBeNull();
-    await expect(canvas.queryByText("o con tu correo")).toBeNull();
+    // the line still parts the recovery key from the email form
+    await expect(canvas.getByText("o con tu correo")).toBeVisible();
     await expect(canvas.getByRole("textbox", { name: "Tu correo" })).toHaveAttribute(
       "autocomplete",
       "username webauthn",
@@ -467,5 +476,157 @@ export const BrowserLanguage: Story = {
       locale: detectLocale(navigator.language),
       next: null,
     });
+  },
+};
+
+/** The screen as wide as a computer's (the layout reads the screen's width, ruling 12). */
+const atWidth = (width: number) => (Story: () => React.ReactNode) => (
+  <div style={{ width }}>
+    <Story />
+  </div>
+);
+
+const topOf = (element: Element) => element.getBoundingClientRect().top;
+const leftOf = (element: Element) => element.getBoundingClientRect().left;
+
+/**
+ * `/sign-in` on a computer: the QR panel for the phone first, its box ticked, then "Other ways to
+ * sign in" with the email form, both on the page.
+ */
+export const PhoneFirst: Story = {
+  name: "Phone first",
+  decorators: [atWidth(1024)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 1, name: "Entra a Wambito" })).toBeVisible();
+    const qr = await canvas.findByRole("img", { name: "ABCDEFGH" });
+    await expect(qr).toBeVisible();
+    await expect(
+      canvas.getByRole("checkbox", { name: "Mantener la sesión abierta en este navegador" }),
+    ).toBeChecked();
+    const email = canvas.getByRole("textbox", { name: "Tu correo" });
+    await expect(email).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Otras formas de entrar" })).toBeVisible();
+    // the QR comes first: beside the other ways, on their left
+    await expect(leftOf(qr)).toBeLessThan(leftOf(email));
+    await expect(canvas.getByRole("button", { name: "Más opciones" })).toBeVisible();
+  },
+};
+
+/**
+ * The recovery key waits under "More options" (closed by default); opening shows its field at
+ * once; a key the server does not know reads `recovery_key_invalid`.
+ */
+export const RecoveryKey: Story = {
+  name: "Recovery key",
+  args: {
+    auth: fakeAuth({
+      signInWithRecoveryKey: fn(async (_text: string) => ({
+        error: "recovery_key_invalid" as const,
+      })),
+    }),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const open = canvas.getByRole("button", { name: "Más opciones" });
+    await expect(open).toHaveAttribute("aria-expanded", "false");
+    await expect(canvas.queryByRole("textbox", { name: "Tu clave de recuperación" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Clave de recuperación" })).toBeNull();
+    await userEvent.click(open);
+    const field = await canvas.findByRole("textbox", { name: "Tu clave de recuperación" });
+    await expect(field).toHaveFocus();
+    await expect(open).toHaveAttribute("aria-expanded", "true");
+    const submit = canvas.getByRole("button", { name: "Entrar con la clave" });
+    // The field groups what is typed; the button waits for the whole key.
+    await userEvent.type(field, "abcd efgh jkmn pqrs tvwx yz01 23");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-23");
+    await expect(submit).toBeDisabled();
+    await userEvent.type(field, "4");
+    await expect(field).toHaveValue("ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234");
+    await expect(submit).toBeEnabled();
+    await userEvent.click(submit);
+    await expect(args.auth.signInWithRecoveryKey).toHaveBeenCalledWith(
+      "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234",
+    );
+    await expect(await canvas.findByRole("alert")).toHaveTextContent(
+      "Esta clave de recuperación no inicia sesión. Revísala e inténtalo de nuevo.",
+    );
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(currentPage(canvas)).toHaveTextContent("/sign-in");
+  },
+};
+
+/** A recovery key that signs in lands in the app; never the passkey offer. */
+export const RecoveryKeySignsIn: Story = {
+  name: "Recovery key signs in",
+  args: {
+    auth: fakeAuth({
+      signInWithRecoveryKey: fn(async (_text: string) => ({ userId: ONBOARDED_USER.id })),
+      shouldOfferPasskey: fn(async () => true),
+    }),
+    profileUser: ONBOARDED_USER,
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Más opciones" }));
+    await userEvent.type(
+      await canvas.findByRole("textbox", { name: "Tu clave de recuperación" }),
+      "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-234",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Entrar con la clave" }));
+    await waitFor(() => expect(currentPage(canvas)).toHaveTextContent("/app"));
+    await expect(args.auth.shouldOfferPasskey).not.toHaveBeenCalled();
+  },
+};
+
+/** `/create-account`: the email code form under "Create your account"; no QR, no other ways. */
+export const CreateAccount: Story = {
+  name: "Create account",
+  args: { initialEntry: "/create-account?lang=es", qr: fn(() => liveQr()) },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 1, name: "Crea tu cuenta" })).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "Tu correo" })).toBeVisible();
+    await expect(canvas.queryByRole("img", { name: "ABCDEFGH" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Más opciones" })).toBeNull();
+    await expect(args.qr).not.toHaveBeenCalled();
+    await expect(canvas.getByRole("link", { name: "Entra" })).toHaveAttribute(
+      "href",
+      "/sign-in?lang=es",
+    );
+  },
+};
+
+/** A phone: the other ways come first; the QR follows, for signing in on a computer. */
+export const Phone: Story = {
+  name: "Phone",
+  decorators: [atWidth(375)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const email = canvas.getByRole("textbox", { name: "Tu correo" });
+    const onComputer = canvas.getByText("¿Entras en un computador? Escanéalo con tu celular.");
+    await expect(topOf(email)).toBeLessThan(topOf(onComputer));
+    // the QR's request opens once the panel is on screen
+    onComputer.scrollIntoView();
+    const qrTitle = await canvas.findByRole("heading", { name: "Entra con tu celular" });
+    await expect(topOf(email)).toBeLessThan(topOf(qrTitle));
+    await expect(await canvas.findByRole("img", { name: "ABCDEFGH" })).toBeVisible();
+  },
+};
+
+/** `/create-account` asks the browser for no passkey: it is for someone who has none yet. */
+export const CreateAccountNoAutofill: Story = {
+  name: "Create account, no passkey autofill",
+  args: {
+    initialEntry: "/create-account?lang=es",
+    auth: fakeAuth({ passkeysAvailable: () => true, passkeyUsedHere: () => true }),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { level: 1, name: "Crea tu cuenta" })).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "Tu correo" })).toBeVisible();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await expect(args.auth.autofillPasskey).not.toHaveBeenCalled();
+    await expect(canvas.queryByRole("button", { name: "Entrar con huella" })).toBeNull();
   },
 };

@@ -5,15 +5,20 @@ import 'package:go_router/go_router.dart';
 import '../api/auth_api.dart';
 import '../api/session.dart';
 import '../l10n/app_localizations.dart';
-import '../theme/tokens.g.dart';
-import '../ui/lk_icons.dart';
 import '../ui/press_button.dart';
 import 'auth_errors.dart';
+import 'needs_connection.dart';
 import 'sign_in_frame.dart';
 
-/// First run (spec section 6.1): Wambi on the web's sign-in frame, and three ways in: "Probar sin correo" (a guest),
-/// "Entrar con mi correo" (a code or magic link) and "Entrar con huella" (a passkey), the last only
-/// when the phone supports passkeys.
+/// The welcome (phone-first accounts, spec section 4): Wambi on the web's sign-in frame, "Start"
+/// (primary) and "I already have an account" (a link). "Start" signs in anonymously
+/// (`POST /auth/sign-in/anonymous`) and lands home; nothing else is asked. On a server that makes
+/// encrypted new users the vault gate then sets the account up without a recovery key; on one that
+/// makes `plain` users it is today's guest. "I already have an account" opens the sign-in (email code
+/// or magic link, and the passkey) without making any account. A brand-new person has no passkey,
+/// so it lives on that step. Without network, "Start" opens a provisional vault where new users
+/// are known to be encrypted (`SessionController.startGuest`); elsewhere [NeedsConnection] says it
+/// needs a connection, with "Try again".
 class EntryScreen extends ConsumerStatefulWidget {
   const EntryScreen({super.key});
 
@@ -21,11 +26,14 @@ class EntryScreen extends ConsumerStatefulWidget {
   ConsumerState<EntryScreen> createState() => _EntryScreenState();
 }
 
-enum _Busy { none, guest, passkey }
+enum _Busy { none, start }
 
 class _EntryScreenState extends ConsumerState<EntryScreen> {
   _Busy _busy = _Busy.none;
   AuthError? _error;
+
+  /// The last "Start" found no network (and could not start offline): [NeedsConnection] says so.
+  bool _offline = false;
 
   Future<void> _run(
     _Busy busy,
@@ -38,33 +46,37 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
     });
     try {
       await action();
-    } on AuthFailure catch (failure) {
-      if (mounted) setState(() => _error = onFail(failure));
-    } catch (error) {
-      // Never an unhandled error with a busy button: a message, and the buttons work again.
-      if (mounted) {
-        setState(() {
-          _error = busy == _Busy.passkey
-              ? unexpectedPasskeyErrorFor(error)
-              : unexpectedErrorFor(error);
-        });
+      if (mounted) setState(() => _offline = false);
+    } on Object catch (error) {
+      // No network, on a server not known to make encrypted users: nothing was made, and the
+      // welcome says it needs a connection (ruling 8).
+      if (isOfflineError(error)) {
+        if (mounted) setState(() => _offline = true);
+      } else if (error is AuthFailure) {
+        if (mounted) {
+          setState(() {
+            _offline = false;
+            _error = onFail(error);
+          });
+        }
+      } else {
+        // Never an unhandled error with a busy button: a message, and the buttons work again.
+        if (mounted) {
+          setState(() {
+            _offline = false;
+            _error = unexpectedErrorFor(error);
+          });
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = _Busy.none);
     }
   }
 
-  void _startGuest() => _run(
-    _Busy.guest,
+  void _start() => _run(
+    _Busy.start,
     () => ref.read(sessionProvider.notifier).startGuest(),
     (failure) => authErrorFor(failure, AuthAction.signIn),
-  );
-
-  // Signed out here, so no guest stands in the way.
-  void _passkey() => _run(
-    _Busy.passkey,
-    () => ref.read(sessionProvider.notifier).signInWithPasskey(),
-    passkeyErrorFor,
   );
 
   /// The web's `w-full`.
@@ -73,7 +85,6 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final passkeys = ref.watch(passkeysSupportedProvider).value ?? false;
     final busy = _busy != _Busy.none;
     final error = _error;
 
@@ -81,48 +92,24 @@ class _EntryScreenState extends ConsumerState<EntryScreen> {
       children: [
         EntryTitle(l10n.appName),
         EntryLead(l10n.entryLead),
-        // The way in with the least to give up, first: the web's secondary button.
+        // Nothing to fill and nothing to choose: start, or say you already have an account.
         _full(
           PressButton.text(
-            _busy == _Busy.guest ? l10n.entryGuestBusy : l10n.entryGuest,
-            key: const Key('entry.guest'),
-            tone: PressTone.secondary,
-            onPressed: busy ? null : _startGuest,
+            _busy == _Busy.start ? l10n.entryStartBusy : l10n.entryStart,
+            key: const Key('entry.start'),
+            onPressed: busy ? null : _start,
           ),
         ),
-        EntryNote(l10n.entryGuestHint),
         _full(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: WambitoTokens.space3,
-            children: [
-              PressButton.text(
-                l10n.entryEmail,
-                key: const Key('entry.withEmail'),
-                onPressed: busy ? null : () => context.push('/entry/email'),
-              ),
-              if (passkeys)
-                PressButton(
-                  key: const Key('entry.passkey'),
-                  tone: PressTone.secondary,
-                  onPressed: busy ? null : _passkey,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: WambitoTokens.space2,
-                    children: [
-                      const FingerprintIcon(),
-                      Flexible(
-                        child: Text(
-                          (_busy == _Busy.passkey ? l10n.entryPasskeyBusy : l10n.entryPasskey)
-                              .toUpperCase(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+          PressButton.text(
+            l10n.entryHaveAccount,
+            key: const Key('entry.haveAccount'),
+            tone: PressTone.ghost,
+            link: true,
+            onPressed: busy ? null : () => context.push('/entry/email'),
           ),
         ),
+        if (_offline) NeedsConnection(onTryAgain: busy ? null : _start),
         if (error != null) FieldError(error.message(l10n), textAlign: TextAlign.center),
       ],
     );

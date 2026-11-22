@@ -3,7 +3,11 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:wambito/api/gen/src/model/admin_metrics_daily_active_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_installs_by_platform_inner.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_cohorts_inner.dart';
+import 'package:wambito/api/gen/src/model/admin_metrics_versions_inner.dart';
 import 'package:wambito/api/gen/src/model/admin_metrics_weekly_inner.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -21,6 +25,10 @@ part 'admin_metrics.g.dart';
 /// * [signups7d]
 /// * [signupsPrev7d]
 /// * [weekly]
+/// * [dailyActive]
+/// * [cohorts]
+/// * [installsByPlatform]
+/// * [versions]
 @BuiltValue()
 abstract class AdminMetrics implements Built<AdminMetrics, AdminMetricsBuilder> {
   @BuiltValueField(wireName: r'total')
@@ -46,6 +54,18 @@ abstract class AdminMetrics implements Built<AdminMetrics, AdminMetricsBuilder> 
 
   @BuiltValueField(wireName: r'weekly')
   BuiltList<AdminMetricsWeeklyInner> get weekly;
+
+  @BuiltValueField(wireName: r'dailyActive')
+  BuiltList<AdminMetricsDailyActiveInner> get dailyActive;
+
+  @BuiltValueField(wireName: r'cohorts')
+  BuiltList<AdminMetricsCohortsInner> get cohorts;
+
+  @BuiltValueField(wireName: r'installsByPlatform')
+  BuiltList<AdminMetricsInstallsByPlatformInner> get installsByPlatform;
+
+  @BuiltValueField(wireName: r'versions')
+  BuiltList<AdminMetricsVersionsInner> get versions;
 
   AdminMetrics._();
 
@@ -88,6 +108,26 @@ class _$AdminMetricsSerializer implements PrimitiveSerializer<AdminMetrics> {
     yield serializers.serialize(
       object.weekly,
       specifiedType: const FullType(BuiltList, [FullType(AdminMetricsWeeklyInner)]),
+    );
+    yield r'dailyActive';
+    yield serializers.serialize(
+      object.dailyActive,
+      specifiedType: const FullType(BuiltList, [FullType(AdminMetricsDailyActiveInner)]),
+    );
+    yield r'cohorts';
+    yield serializers.serialize(
+      object.cohorts,
+      specifiedType: const FullType(BuiltList, [FullType(AdminMetricsCohortsInner)]),
+    );
+    yield r'installsByPlatform';
+    yield serializers.serialize(
+      object.installsByPlatform,
+      specifiedType: const FullType(BuiltList, [FullType(AdminMetricsInstallsByPlatformInner)]),
+    );
+    yield r'versions';
+    yield serializers.serialize(
+      object.versions,
+      specifiedType: const FullType(BuiltList, [FullType(AdminMetricsVersionsInner)]),
     );
   }
 
@@ -153,6 +193,36 @@ class _$AdminMetricsSerializer implements PrimitiveSerializer<AdminMetrics> {
             specifiedType: const FullType(BuiltList, [FullType(AdminMetricsWeeklyInner)]),
           ) as BuiltList<AdminMetricsWeeklyInner>;
           result.weekly.replace(valueDes);
+          break;
+        case r'dailyActive':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(AdminMetricsDailyActiveInner)]),
+          ) as BuiltList<AdminMetricsDailyActiveInner>;
+          result.dailyActive.replace(valueDes);
+          break;
+        case r'cohorts':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(AdminMetricsCohortsInner)]),
+          ) as BuiltList<AdminMetricsCohortsInner>;
+          result.cohorts.replace(valueDes);
+          break;
+        case r'installsByPlatform':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [
+              FullType(AdminMetricsInstallsByPlatformInner),
+            ]),
+          ) as BuiltList<AdminMetricsInstallsByPlatformInner>;
+          result.installsByPlatform.replace(valueDes);
+          break;
+        case r'versions':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(AdminMetricsVersionsInner)]),
+          ) as BuiltList<AdminMetricsVersionsInner>;
+          result.versions.replace(valueDes);
           break;
         default:
           unhandled.add(key);

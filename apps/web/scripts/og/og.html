@@ -75,11 +75,17 @@
         text-shadow: none;
         transform: rotate(-2deg);
       }
-      .perks {
-        margin: 26px 0 0;
-        font-size: 22px;
+      /* The hero's one line about what Wambito does (landing.hero.description). */
+      .description {
+        margin: 28px 0 0;
+        max-width: 600px;
+        font-size: 26px;
+        line-height: 1.35;
         font-weight: 800;
         color: var(--ink-muted);
+      }
+      .rich-lead {
+        color: var(--ink);
       }
       .mascot {
         position: relative;
@@ -112,7 +118,7 @@
       <div>
         <div class="logo">Wambito</div>
         <div class="headline" data-copy="hero.headline"></div>
-        <div class="perks" data-copy="hero.perks"></div>
+        <div class="description" data-copy="hero.description"></div>
       </div>
       <div class="mascot"></div>
     </div>

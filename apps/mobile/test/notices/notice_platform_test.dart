@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/notices/due_list.dart';
 import 'package:wambito/notices/notice_platform.dart';
 
 void main() {
@@ -34,6 +35,30 @@ void main() {
     expect(calls[0].arguments, {'zone': 'America/Bogota', 'language': 'es'});
     expect(calls[1].arguments, {'zone': 'Asia/Tokyo', 'language': 'en'});
     expect(calls[3].arguments, {'language': 'en'});
+  });
+
+  test('the due list goes whole, with its owner, as days and names', () async {
+    const platform = ChannelNoticePlatform();
+    await platform.scheduleDueList(
+      zone: 'America/Bogota',
+      language: 'es',
+      owner: 'u1',
+      days: const [
+        DueDay('2026-11-17', ['Arriendo', 'Gym']),
+      ],
+    );
+    expect(calls.single.method, 'scheduleDueList');
+    expect(calls.single.arguments, {
+      'zone': 'America/Bogota',
+      'language': 'es',
+      'owner': 'u1',
+      'days': [
+        {
+          'date': '2026-11-17',
+          'names': ['Arriendo', 'Gym'],
+        },
+      ],
+    });
   });
 
   test('the permission, as Android says it', () async {

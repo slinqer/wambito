@@ -131,6 +131,36 @@
       "text": "ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZW0"
     }
   ],
+  "recoveryVerifiers": [
+    {
+      "secret": "AAECAwQFBgcICQoLDA0ODw",
+      "lookup": "ZCs-lpMED2TRfYOjz3R77A",
+      "auth": "Ymr0yHT2bDEI3u7U2XWzvVJteCzJnroKrP1XwdhqvXc",
+      "lookupHash": "y82rnJhKySyvRdknj_PfcYi03MY90j2TtAl4lkIE6Vc",
+      "authHash": "kYrvWfDgm84s5ANVdVAb5gk5WMKTq2lKUt0YO0f0Aiw"
+    },
+    {
+      "secret": "8PHy8_T19vf4-fr7_P3-_w",
+      "lookup": "lM_YpUnMdBfeODWx9TL7Xw",
+      "auth": "BV1ohtvFbw2lsD74C8X0x37gEo1pvvUbCHphV_5fPjc",
+      "lookupHash": "10VqHySecsYw0bmbgSWYeW5A83gA3DieLk6csfOrOp0",
+      "authHash": "VP6mrt4H2nxx8dOCCzK66NAhbO9VYFvxTROGjW6ov6Y"
+    },
+    {
+      "secret": "AAAAAAAAAAAAAAAAAAAAAA",
+      "lookup": "9yCVD5GKzQSQAi6ixf9MTA",
+      "auth": "ub-d1TdbGbm2M_aUCtKgIQHb7JgUPZ8CLklrv1SN8WA",
+      "lookupHash": "GqGPBCLtoK-YiY6G-GhhcxmaD5jwZHzIVtVCAwqRNOo",
+      "authHash": "L23QV9MpHJVE0PXgBDyn1HV5iC1PEP3pBa55yI5hEMA"
+    },
+    {
+      "secret": "_____________________w",
+      "lookup": "t5S29ve4RmFQMmbAcuS-aQ",
+      "auth": "85i_-Lp5g-KmdQ1-rfgMtWM_md5fpU6rFVK34SitptY",
+      "lookupHash": "N3gEv9VWviXiSUSdLEmIYzB2zfFRimMVjreTUvwmF7s",
+      "authHash": "7w5c9uDtPlOU-63tkYlggZH8BT33a0TNsRVo3KJ63m4"
+    }
+  ],
   "devices": [
     {
       "privateKey": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8",
@@ -317,6 +347,12 @@
       "code": "bad_input"
     },
     {
+      "name": "recovery verifier of a 15-byte secret",
+      "op": "recoveryVerifier",
+      "secret": "UFFSU1RVVldYWVpbXF1e",
+      "code": "bad_input"
+    },
+    {
       "name": "pairing blob sealed with a different ephemeral key than the approver key",
       "op": "openFromPairing",
       "privateKey": "0NHS09TV1tfY2drb3N3e3-Dh4uPk5ebn6Onq6-zt7u8",
@@ -338,6 +374,30 @@
         "keyV": 3
       },
       "link": "BgcICQoLDA0ODxARGrlngpUq8GlTyjCT5Kaky_eJijjtQXxrvzjV2HW9XAhPOVsX6DyT-7BUX95TqPK6",
+      "code": "cannot_open"
+    },
+    {
+      "name": "seal to a low-order (all-zero) device public key",
+      "op": "sealToDevice",
+      "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "ctx": {
+        "kind": "device",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "dataKey": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "code": "bad_input"
+    },
+    {
+      "name": "device blob whose ephemeral key is low-order (all-zero shared secret)",
+      "op": "openFromDevice",
+      "privateKey": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8",
+      "ctx": {
+        "kind": "device",
+        "userId": "kX3mQ9vTz2LpR8wYb5NcHd7JfA1sUe4B",
+        "keyV": 1
+      },
+      "sealed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzNDU2Nzg5Ojs8PT4tDi6XZ9W_KCSyEg2CwpF_pNyCAn_5FC_6gX-R0yzCFSzPfxYRERpMzsuODeJ2Cuw",
       "code": "cannot_open"
     }
   ]

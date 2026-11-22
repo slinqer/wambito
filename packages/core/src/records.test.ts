@@ -91,6 +91,19 @@ describe("parseRecord", () => {
     expect(parseRecord("recurrence", { ...(valid.recurrence as object), rev: -1 }).ok).toBe(false);
   });
 
+  test("a transaction's externalHash (an import's dedupe hash) is optional, a string or null", () => {
+    const plain = parseRecord("transaction", valid.transaction);
+    expect(plain.ok && "externalHash" in plain.value).toBe(false);
+    for (const externalHash of ["9f2c0a", null]) {
+      expect(
+        parseRecord("transaction", { ...(valid.transaction as object), externalHash }),
+      ).toMatchObject({ ok: true, value: { externalHash } });
+    }
+    expect(
+      parseRecord("transaction", { ...(valid.transaction as object), externalHash: 7 }).ok,
+    ).toBe(false);
+  });
+
   test("a transaction's updatedAt is optional", () => {
     expect(parseRecord("transaction", valid.transaction).ok).toBe(true);
     expect(
@@ -122,5 +135,22 @@ describe("settings revokedDevices", () => {
 
   test("a non-uuid in revokedDevices fails", () => {
     expect(parseRecord("settings", { ...settings, revokedDevices: ["nope"] }).ok).toBe(false);
+  });
+});
+
+describe("settings recoveryKeySavedAt", () => {
+  const settings = { s: 1, currency: "COP", locale: "es", timezone: "America/Bogota" };
+
+  test("settings without recoveryKeySavedAt parses to null", () => {
+    expect(parseRecord("settings", settings)).toMatchObject({
+      ok: true,
+      value: { recoveryKeySavedAt: null },
+    });
+  });
+
+  test("a timestamp is kept", () => {
+    expect(
+      parseRecord("settings", { ...settings, recoveryKeySavedAt: "2026-11-18T10:00:00.000Z" }),
+    ).toMatchObject({ ok: true, value: { recoveryKeySavedAt: "2026-11-18T10:00:00.000Z" } });
   });
 });

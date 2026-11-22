@@ -7,10 +7,48 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 
 - `src/server.ts` starts it; `src/app.ts` builds the app (routes, OpenAPI).
 - `src/config.ts`: zod env schema (`WAMBITO_VERSION` included); `.env.example` at the repo root.
+  `MCP_WK_PUBLIC_KEY` (a public JWK as JSON; the VPS pair comes from `deploy/personal/gen-mcp-keys.sh`).
 - `src/auth.ts`: Better Auth: email OTP + magic link, anonymous guests, passkeys (`rpName`
-  "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP.
+  "Wambito", rpID = WEB_URL host), jwt + oauthProvider for the MCP. Sessions carry a `lifetime`
+  (`src/services/sessions.ts`): `standard` (60 days, slid by Better Auth at most once a day),
+  `long` (760 days: an encrypted user without an email on the phone, `lifetimeFor`), `short`
+  (12 hours); the session create hook keeps the lifetime `createServerSession` gives (any of
+  the three, so no client header changes it), else picks it and sets `expiresAt` (constants `SESSION_SECONDS`, `LONG_SESSION_SECONDS`, `SHORT_SESSION_SECONDS`).
+  Better Auth never refreshes a `long` session, so `requireUser` slides it (`slideLongSession`, at
+  most once a day or when `expires_at` is short of 759 days, only while the user is encrypted
+  without an email, stamping activity); claiming an email ends it (`endLongSessions`, in the
+  claim's transaction). Every
+  user's activity is stamped on `user.lastActiveAt` (`stampActivity`, services/guest-cleanup.ts).
+- `src/services/guest-cleanup.ts` (`scheduleGuestCleanup`, daily from `server.ts`, real clock):
+  `cleanupInactiveGuests` deletes `plain` guests idle over 60 days; `cleanupInactiveEncrypted`
+  deletes `encrypted` users without an email idle over 365 days (`UNPROTECTED_IDLE_DAYS`), or 730
+  (`PROTECTED_IDLE_DAYS`) when they have a `recovery_verifiers` row or a `passkey` key wrap (read
+  through `withUser`: `key_wraps` has forced RLS); a recovery wrap alone or a passkey without a
+  wrap does not protect. Idle = the later of `lastActiveAt` and the latest `session.updatedAt`.
+  Batches of 500 under one advisory lock, the encrypted tier walked by id; its delete and
+  `recordDeletedUsers` (`src/services/ended.ts`, SHA-256 of the id in `deleted_users`) share a
+  transaction. Then `purgeEndedSessions` drops `ended_sessions` rows older than 90 days. Users
+  with an email are never deleted for inactivity.
 - `src/http/session.ts`: `requireUser` (cookie or bearer session, or an OAuth JWT with `aud` =
-  MCP_URL). `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+  MCP_URL). Without one, its 401 code comes from `missingSessionCode`: `device_removed` when the
+  presented token (`presentedSessionToken`: a non-JWT bearer, else the session cookie, without its
+  signature) has its SHA-256 in `ended_sessions`, else `user_deleted` when a token was presented
+  and `x-wambito-user`'s SHA-256 is in `deleted_users`, else `unauthenticated`. `src/http/scopes.ts`: OAuth scopes (`finance:read`, …), enforced here, not in the MCP.
+- `src/http/assistant-secret.ts` (`assistantSecret`, spec 2026-11-16 §4): a wrapper on
+  `/auth/oauth2/*`, mounted before `/auth/*`, that carries the assistant secret `S` (32 bytes,
+  base64url) of an encrypted account (`isPreviewAccount`, but never a `migrating` one: its
+  assistants keep the plain path) in its tokens. Authorize: adds
+  `prompt=consent` for such an account. Consent: takes `wk` out of the JSON (400 `invalid_request`
+  if not 32 bytes; 503 `assistant_keys_missing` without `MCP_WK_PUBLIC_KEY`), keeps `code → S` in
+  process memory (10 min; a restart loses it). Token: runs Better Auth inside an AsyncLocalStorage
+  with `S` (`assistantSecretClaims`, the oauthProvider's `customAccessTokenClaims`, adds `wk`: a
+  compact JWE `ECDH-ES` + `A256GCM` to `MCP_WK_PUBLIC_KEY`, plaintext `S` as text), appends `.S`
+  to the refresh token and strips it from a presented one (split on the last `.`; Better Auth's
+  own tokens have none); tokens issued without `S` for an encrypted account are refused (400
+  `invalid_grant`) and `revokeAssistant` runs for that client. Revoke and introspect: strip the
+  suffix. Better Auth and `auth.ts`'s refresh hook only ever see the plain token. `S` is never
+  stored, logged or put in an error; a new Better Auth endpoint that takes a refresh token needs
+  the same strip. Tests: `forgetPendingSecrets()` empties the map.
 - `src/http/client-headers.ts`: `clientHeader`. `src/routes/*.ts`: the routes.
   `src/services/`: domain services. `src/emails/sign-in.ts`: sign-in mail copy (es/en/it/pt);
   `src/emails/layout.ts`: the frame every email shares (Wambi, wordmark image, card, footer; day
@@ -36,9 +74,12 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `deleteAccount`. An email change refuses a new address `SIGN_IN_ALLOWLIST` does not list (409
   `sign_in_not_allowed`, at request and confirm) or under `.invalid` (422). A suspend of a
   suspended account, or a reactivate of an active one, is a 204 no-op: no audit row, no mail.
+  `GET /v1/admin/metrics` (`services/admin/metrics.ts`) is SQL aggregates over `user`, `session` and
+  `activity_daily` (`dailyActive`, `cohorts`, `installsByPlatform`, `versions`); no user row leaves
+  the database, no IP or finance field is read; `guests` means "without an email".
 - `src/routes/email-change.ts`: public `POST /v1/email-change/confirm` (mounted before
-  `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP in the
-  `rate_limit` table (key `email-change-confirm|<ip>`).
+  `requireUser`), the person's end of an admin's email change; 10 per 10 min per client IP, kept
+  in memory (`src/http/ip-limit.ts`: `IpWindowLimit`, and `IpOpenCount` for open-request counts).
 - `GET`/`POST /v2/sync` (`src/routes/sync.ts`, `src/services/sync.ts`; spec
   `docs/superpowers/specs/2026-11-08-end-to-end-encryption-design.md` §5–6): opaque encrypted
   records, never read or logged. A push holds `pg_advisory_xact_lock(hashtextextended('records:'
@@ -58,8 +99,10 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   Passkey wraps' `ref` is the passkey's `credentialID`; `auth.ts` hooks on
   `/passkey/delete-passkey` (before: read the credential id; after, on success: delete the wrap; two
   statements, not one transaction). Assistant wraps' `ref` is the OAuth client id (needs an
-  `oauth_consent` row). Known follow-up: revoking an assistant does not delete its wrap yet (stage
-  4, rotation). Tokens reach only `GET /v2/keys/assistant` (`http/scopes.ts`), which sets
+  `oauth_consent` row). Revoking an assistant (`revokeAssistant`, `revokeAllAssistants` in
+  `services/account.ts`) deletes its wrap; a rotation refuses `assistant` wraps (422
+  `assistant_wrap_in_rotation`) and revokes every assistant. Tokens reach only
+  `GET /v2/keys/assistant` (`http/scopes.ts`), which answers `{ wrap, links }` and sets
   `last_used_at`; sessions get 404 there. A `device` wrap also carries a 32-byte `attestation`
   (HMAC under a key derived from the data key, `deviceAttestation` in `@wambito/crypto`); the
   server cannot verify it, only requires it (422 `attestation_required`, checked before the DB;
@@ -68,7 +111,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   for OAuth grants): deleting it, or a rotation that leaves its `ref` out, deletes that session in
   the same transaction, never the caller's own nor one a remaining device wrap still references
   (a browser that enrolled again under the same session); a kept device's new row copies the old
-  `session_id`.
+  `session_id`. For an encrypted account, the ended sessions' token hashes go in `ended_sessions`
+  in that transaction (`recordEndedSessions`), so the removed device hears 401 `device_removed`.
   `PUT /v2/keys/{id}` with `If-None-Match: *` (`onlyFirst`): stored only while the account has no wrap but `id` (a retry of
   the same PUT), else 409 `already_set_up`, checked under the lock; the web's first setup sends its
   recovery wrap with it, so two setups at once cannot make two data keys.
@@ -76,7 +120,8 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   the server): stored in `key_links` in the rotation's transaction; 422 `link_required` (account
   has a version), `link_unexpected` (first version), `invalid_link` (not 60 bytes). `GET /v2/keys`
   and the rotate answer are `{ wraps, links }` (`listKeys`), links ordered by `keyV`.
-- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`; stage 1b spec §1): relay for
+- `/v2/pairing` (`src/routes/pairing.ts`, `src/services/pairing.ts`, its checks in
+  `src/services/relay.ts`; stage 1b spec §1): relay for
   approving a new device with a key commitment; opaque bytes, never read or logged. Flow: `POST`
   `{commitment}` (new device, commits first) -> `GET ?code=` (approver; 404 once an approver key is
   set) -> `POST /{id}/approver` (once, 409 `already_set`) -> `POST /{id}/reveal` (new device's key;
@@ -92,34 +137,123 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
   `pg_advisory_xact_lock(hashtextextended('pairing_requests:' || user_id, 0))`.
   `purgeExpiredPairings` runs with the daily tombstone purge (`scheduleTombstonePurge`). Assistant
   tokens get 403 (not in `ASSISTANT_PATHS`).
+- `/v2/signin` (`src/routes/signin.ts`, `src/services/signin.ts`; spec 2026-11-15 §8): the web
+  signs in through the phone, the same relay as `/v2/pairing` (checks shared in
+  `src/services/relay.ts`), in `signin_requests` (no RLS). Mounted before `/v2/*`'s `requireUser`:
+  the browser is signed out and proves itself with the poll secret (`x-wambito-poll`, read with
+  `clientHeader`; the row keeps its SHA-256; missing or wrong is 404); the phone's routes (find,
+  view, approver, seal) run `requireUser` themselves. `POST` opens (2-minute TTL by `deps.now`;
+  per IP, `SIGNIN_OPEN_LIMIT` 30 per 10 min by real time, then `IpOpenCount` 5 open, both in
+  memory) -> `GET ?code=` (404 once approved) -> `POST /{id}/approver` (binds `user_id`, once) ->
+  `GET /{id}` with the poll secret (`{ approverKey, ready }`) -> `POST /{id}/reveal` -> `POST
+  /{id}/seal` (the bound user only) -> `POST /{id}/pickup` (`takeSignin`: one `delete … returning`
+  of a sealed row, so of two pickups one wins and the other is 404; closes the IP slot; then
+  `signInAs` with `remember ? "standard" : "short"`). A bearer JWT (an assistant) is 403
+  `insufficient_scope` on every route. `purgeExpiredSignins` runs with the daily tombstone purge.
+  A `short` session is never refreshed on any path: the `wambitoSessions` plugin's before hook
+  looks up the presented token (bearer or cookie) and sets Better Auth's
+  `setShouldSkipSessionRefresh` for a `short` one, since the `dont_remember` cookie alone does
+  not cover a bearer token or a cookie header without it.
+- `/v2/recovery` (`src/routes/recovery.ts`, `src/services/recovery.ts`; spec 2026-11-15): the
+  recovery key's verifier, `recovery_verifiers` (SHA-256 of the key's 16-byte lookup and 32-byte
+  auth, `recoveryVerifier` in `@wambito/crypto`; one per person, no RLS). `PUT /v2/recovery/verifier`
+  replaces it (409 `recovery_required` without a recovery wrap, `verifier_taken` for another
+  user's lookup hash; under the `key_wraps` lock). `putKeyWrap` deletes it when a recovery wrap is
+  replaced with other `wrapped` bytes (a new recovery key); a retry of the same PUT and a rotation
+  keep it. `POST /v2/recovery/sign-in` is public (`recoverySignInRoutes`, mounted before
+  `requireUser`): per-IP limit first (`RECOVERY_SIGNIN_LIMIT`, 10 per 10 min, in memory), then
+  `findVerifiedUser` (constant-time auth compare; one 401 `recovery_key_invalid` for every miss),
+  then `signInAs` with `lifetimeFor(user, platformOf(headers))`.
+- Sessions made by our routes: `signInAs(auth, c, userId, lifetime)` (`src/http/sign-in-response.ts`)
+  calls the server-only Better Auth endpoint `createServerSession` (`src/auth-sessions.ts`, plugin
+  `wambitoSessions`, `POST /wambito/server-session` with `metadata: { SERVER_ONLY: true }`, so the
+  router never serves it) and copies its `set-cookie` and `set-auth-token` onto the response. The
+  session hooks apply (a suspended account: 403 `account_suspended`); `short` is Better Auth's
+  `dont_remember` (no `Max-Age`).
 - `/v2` rules: record and key-wrap ids are lower-case UUIDs (`lowerCaseUuid` in `http/schemas.ts`,
   the `@wambito/crypto` rule; never lower-cased, upper case is 422); a live record body is at least
   28 bytes (nonce + tag); an account's first wrap is `recovery` (422 `recovery_required`). Every
   statement in `services/keys.ts`, `sync.ts` and `pairing.ts` also filters on the user id, on top
   of RLS.
-- End-to-end encryption preview (stage 2a): `E2E_PREVIEW_USER_IDS` (comma-separated user ids,
-  unset by default; `isPreviewAccount` in `config.ts`). `GET /v1/me` (every profile answer) says
-  `encryption: "preview" | "plain"`. A preview account's finances live only as records under
+- End-to-end encryption preview (stage 2a): an account is a preview account when its `user.encryption`
+  is `encrypted` (born while `NEW_USERS_ENCRYPTED` is `true`, default off; set by the user-create
+  hook, which also records `user.platform` through `platformOf`: `x-wambito-client` `android` or
+  `ios`, else `web`) or its id is in `E2E_PREVIEW_USER_IDS` (comma-separated, unset by default).
+  `isPreviewAccount(config, { id, encryption })` in `config.ts` (also true for `migrating`);
+  `accountEncryption(db, userId)` and `toEncryption` (unknown → `plain`) in
+  `services/encryption.ts`. `GET /v1/me` (every profile answer) says
+  `encryption: "preview" | "plain"`.
+  Switch day (spec 2026-11-19 §1): `user.encryption` is `plain` | `migrating` | `encrypted`, and
+  `user.migration_session_id` is the session that started the migration. `GET /v1/me` `migration`
+  (`migrationOf`, `services/encryption.ts`): `available` for a non-anonymous `plain` user while
+  `MIGRATION_OPEN` is on or its id is in `MIGRATION_OPEN_USER_IDS` (root compose: `migrate-e2e`),
+  `in_progress` while `migrating`, absent otherwise. A `migrating` account is `preview` for the
+  426 and plain everywhere else: session lifetime (`lifetimeFor`, `slideLongSession`), the cleanup
+  tiers (the 60-day plain tier takes a `migrating` guest; the encrypted tier does not), the 401
+  codes (`deleteSessions` in `services/keys.ts`) and recovery sign-in. A preview account's finances live only as records under
   `/v2`; the user-create hook in `auth.ts` seeds no default account or categories for it (the web
   creates them as records), so its `/v1` finance tables stay empty.
-  `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 403 `encrypted_account` on the `/v1` finance
+  `previewOnlyV2` (`src/http/preview.ts`, after `requireUser` and the scopes on `/v1/*`) answers 426 `update_required` (`updateRequired()`, title "Upgrade Required") on the `/v1` finance
   routes (transactions, categories, recurrences, summary, reports, captures, imports,
   `/v1/me/export`) for a preview account's sessions and tokens; `PATCH /v1/me` with `currency` is
-  403 too (the currency lives in the settings record). `DELETE /v1/me` still works:
-  `records`, `key_wraps`, `record_purges` and `pairing_requests` cascade from `user`.
+  426 too (the currency lives in the settings record). Exception: a background request
+  (`x-wambito-background: 1`) to `POST /v1/captures` or `POST /v1/transactions/review` answers
+  the old retryable 403 `encrypted_account` (`encryptedAccount()`), since Android v1.0.3 drops a
+  queued capture on any other 4xx. `DELETE /v1/me` still works:
+  `records`, `key_wraps`, `record_purges`, `pairing_requests`, `recovery_verifiers` and bound
+  `signin_requests` cascade from `user`.
+- `/v2/migration/*` (`src/routes/migration.ts`, `src/services/migration.ts`; spec 2026-11-19 §2):
+  the web moves a plain account into records. `start` (gate `migrationOf`: `available`, or
+  `in_progress` for a takeover) sets `migrating` and `migration_session_id` = the calling session,
+  under the records and wraps locks, and answers `MigrationCounts` (`serverCounts`: live rows per
+  table; `deletedTransaction` = every soft-deleted transaction, dismissed months included: there is
+  no restore window, and a dismissal left out would come back in the vault). `source` (bound session
+  only) answers every row as the DB holds it (`MigrationSource` of `@wambito/vault`); never logged.
+  `finish` takes `lockRecords` (exported from `services/sync.ts`) then `lockWraps`, locks the user
+  row, needs a `recovery` wrap (409 `keys_missing`) and every record with a body under the current
+  key version or one its `key_links` reach (409 `key_version_mismatch`), then compares the records (live per type,
+  deleted `transaction` with a body apart, exactly one live `settings`) with the server's and the
+  client's counts, and checks every row by id (`missingRecords`: a record of its type and state
+  under the id `recordsFromSource` gives it, the server id, or for a dismissed month and a
+  merchant rule the derived one, from `@wambito/vault`'s `uuidv5` and `merchantRecordId`, so a
+  missing record cannot hide behind a stray one): a mismatch is 409 `count_mismatch` with
+  `errors: {server, records, client, missing}` (`missing` at most 20 `{type, id}`;
+  `ApiError.errors` may be an object for that) and changes nothing; a match deletes
+  `transactions` first (they reference the rest), then merchant rules, budgets, recurrences,
+  categories, imports, accounts and idempotency keys, `revokeAllAssistants`, and sets `encrypted`.
+  `cancel` deletes `records` and `record_purges`, keeps the wraps, sets `plain`. The write rule
+  (`src/http/migration-lock.ts`, `migrationWriteRule`, after the scopes on `/v2/sync`,
+  `/v2/keys*`, `/v2/pairing*` and `/v2/recovery/verifier`): a non-GET from any grant but the
+  bound session of a `migrating` account is 409 `migration_in_progress`. It runs before the write's
+  own lock: a write it lets through just before a takeover is one the previous bound session could
+  make anyway, and any change it makes to the records shows in `finish`'s counts or id check.
 - `src/scripts/seed.ts`: creates `dev@wambito.test`.
 - `src/scripts/seed-admin.ts` (`seed:admin`): upserts the admin `dev-admin` (`admin@wambito.test`,
   onboarded, default account and categories) through `DATABASE_ADMIN_URL` and clears its email
   throttle; the root compose lists it in `ADMIN_USER_IDS`. CI runs it before the web e2e.
+- `src/scripts/seed-e2e-plain-user.ts` (`seed:e2e-plain-user <email> [es|en|it|pt]`): inserts a
+  plain web user (email verified, not onboarded) with `giveStarterData` (`src/services/starter-data.ts`,
+  the default account and suggested categories the user-create hook gives a plain sign-up); an
+  existing email is left alone. The web e2e (stack with `NEW_USERS_ENCRYPTED=true`) seeds its
+  plain users with it.
 
 ## Talks to
 
+- `POST /v2/me/seen` (`src/routes/activity.ts`, `src/services/activity.ts`; spec 2026-11-15 §9): the
+  app says it is open. `markSeen` is ONE statement: it moves `user.last_seen_day` (text
+  `YYYY-MM-DD`, the person's local day by `userToday`) only when null or earlier, and in that same
+  statement upserts `count + 1` into `activity_daily` (day, platform from `platformOf`, version or
+  `''`, the user's cohort Monday, has email; no user id, no RLS), so two concurrent first calls of
+  a day count once and a zone where today is earlier neither counts nor moves the day back. It sets
+  `user.app_version` from `x-wambito-version` (trimmed, `[0-9A-Za-z.+_-]{1,64}`, else ignored) and
+  always `stampActivity`s. A `background: 1` call is a 204 that changes nothing: background work
+  never calls it. Assistants get 403 (not in `ASSISTANT_PATHS`).
 - Mounted under API_URL's path (`/api` behind the web origin / Caddy, so auth cookies are
   first-party). Web and mobile call it; the MCP forwards the assistant's OAuth token.
-- Client headers `x-wambito-{locale,next,timezone,client,background,user}`, always read via
+- Client headers `x-wambito-{locale,next,timezone,client,background,user,poll,version}`, always read via
   `clientHeader`, never `headers.get("x-…")`. A timezone header means "from the device"; `background: 1` reads the
-  session with `disableRefresh` (not counted as activity); `user` on `/v2/*` is the account the
-  client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
+  session with `disableRefresh` and never slides a `long` one (not counted as activity); `user` on `/v2/*` and `/v1/me/assistants/*` (revoke) is the
+  account the client means: another signed-in account gets 409 `session_changed` (`expectedUser` in
   `src/http/expected-user.ts`, after `requireUser`, before the scopes; sessions and tokens alike).
 - DB: connects as the runtime role (RLS); migrations run as admin (`packages/db`).
 
@@ -128,6 +262,11 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - Services: `docker compose up -d postgres mailpit`; then `pnpm --filter @wambito/api dev`,
   seed with `pnpm --filter @wambito/api seed`. Mail lands in Mailpit (http://localhost:8025).
 - Tests: `pnpm vitest run apps/api`, one file `pnpm vitest run apps/api/test/auth.test.ts`.
+  Assistants: `t.connectAssistant(email, { wk })` (`wk`: `newAssistantSecret()`) connects with the
+  secret, as the web does for an encrypted account; `t.authorize` connects without it;
+  `consentCode` + `exchangeCode` split the flow. Each test app has its own MCP key pair
+  (`t.wkPrivateKey` opens the `wk` claim). `t.tablesHolding(needles)` scans every public table's
+  rows as text (the "no plain text in the database" check; used by `apps/mcp/test/vault-end-to-end.test.ts`).
   Each file starts a Postgres testcontainer via `test/harness.ts` (`createTestApp`): Docker must
   run, or set `WAMBITO_TEST_DB=local`.
 - After changing a route or schema, regenerate the clients' types (root `AGENTS.md`); CI diffs them.
@@ -138,4 +277,7 @@ Hono + Better Auth + Drizzle (`@wambito/db`), OpenAPI document "Wambito API". Ev
 - See root `AGENTS.md`: secrets.
 - Better Auth tables: `pnpm --filter @wambito/api auth:generate` writes
   `packages/db/src/schema/auth.ts`; then add a migration in `packages/db`.
-- Rate limits trust one X-Forwarded-For hop set by Caddy: `docs/deploy/api.md`.
+- Rate limits trust one X-Forwarded-For hop set by Caddy: `docs/deploy/api.md`. No IP address is
+  stored: Better Auth's `rateLimit.storage` is `memory`, sessions drop `ipAddress` in the create hook
+  (never `disableIpTracking`: it also turns off Better Auth's per-IP limits), and our own per-IP
+  limits use `ip-limit.ts`.

@@ -53,3 +53,17 @@ export function merchantKey(merchant: string): string {
   if (key === "") throw new Error("Merchant has no letters");
   return key;
 }
+
+/**
+ * The shorter keys a learned merchant may have been saved under, longest first: the leading words
+ * of [key] ("lidl casal ribeiro" -> "lidl casal", "lidl"), so a chain named with its branch still
+ * matches the chain. None when the first word is under 3 letters, where a short word ("el", "la")
+ * would catch unrelated merchants.
+ */
+export function merchantKeyPrefixes(key: string): string[] {
+  const words = key.split(" ");
+  if ((words[0]?.length ?? 0) < 3) return [];
+  const prefixes: string[] = [];
+  for (let n = words.length - 1; n >= 1; n--) prefixes.push(words.slice(0, n).join(" "));
+  return prefixes;
+}

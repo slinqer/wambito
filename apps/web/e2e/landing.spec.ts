@@ -3,8 +3,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 /** The Android download: the arm64 APK of the mobile release, and the release page. */
 const ANDROID_APK_HREF =
-  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.1/wambito-1.0.1-arm64-v8a.apk";
-const ANDROID_RELEASE_HREF = "https://github.com/slinqer/wambito/releases/tag/mobile-v1.0.1";
+  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.4/wambito-1.0.4-arm64-v8a.apk";
 
 /**
  * The landing page as shipped: prerendered HTML served statically (playwright.built.config.ts,
@@ -22,30 +21,31 @@ const LOCALES = [
     headline: "Tus lukas, por fin claras.",
     highlight: "lukas🇨🇴",
     annotation: "¡Gratis, y siempre lo será!",
-    lead: "Wambi te acompaña para que cuidar tu plata dé gusto.",
+    lead: "Deja de anotar a mano: Wambi lee tus pagos y lleva la cuenta por ti.",
+    oldLead: "Wambi te acompaña para que cuidar tu plata dé gusto.",
     removedDescription: "Anota un gasto en segundos y mira en qué se va cada luka.",
     newTab: "(se abre en una pestaña nueva)",
     perks: "Gratis para siempre · Código abierto · Sin contraseñas",
     openSourcePerk: "Código abierto",
     removedQuestions: ["¿En qué se me va la plata?", "¿Cuánto me cuesta vivir?"],
-    cta: "Empieza ahora",
-    demoCta: "Pruébalo sin cuenta",
-    webCta: "Empezar",
+    cta: "Crear cuenta",
+    demoCta: "Demo",
     soon: "Pronto",
-    ways: ["En la web", "App para Android y iOS", "Con tu IA"],
-    android: { cta: "Descargar para Android", other: "Otras versiones", ios: "En iOS, pronto." },
+    ways: ["App para Android", "App para iOS"],
+    android: { cta: "Desde GitHub" },
     importStep: "Trae tu historial",
     importQuestion: "¿Puedo traer mi historial de otras apps?",
     freeQuestion: "¿Es gratis?",
     freeAnswer: "Sí, y lo será siempre.",
-    openSource: { title: "Código abierto", cta: "Ver el código en GitHub" },
-    metaDescription: [/Gratis para siempre/, /código abierto/],
+    openQuestion: "¿Es de código abierto?",
+    metaDescription: [/notificaciones de tus pagos/, /código abierto/],
     banned: [/mejor amigo/i, /\bjueg(o|a)\b/i, /Empieza gratis/i],
-    // Privacy copy claims only what Wambito does today: no "can't leak", no end-to-end encryption,
-    // no encryption at rest.
-    overclaims: [/se pueda filtrar/i, /extremo a extremo/i, /no podemos ver/i, /en reposo/i],
+    // Privacy copy claims only what Wambito does: no "can't leak", no encryption at rest. End-to-end
+    // encryption is a feature (Wambito launches with it: the feature grid's card says so), so the
+    // FAQ may say the data can't be seen by Wambito, by design.
+    overclaims: [/se pueda filtrar/i, /en reposo/i],
     privacyAnswer:
-      "Tus datos viajan cifrados y nunca los vendemos ni los compartimos con anunciantes.",
+      "Por eso no podríamos vender tus datos aunque quisiéramos: por diseño, no podemos verlos.",
     faq: "Preguntas frecuentes",
     signIn: "Entrar",
     toggleToDay: "Cambiar a modo día",
@@ -54,7 +54,7 @@ const LOCALES = [
     how: "Cómo funciona",
     questions: "Preguntas",
     other: { name: "English", path: "/en", lang: "en" },
-    titlePart: "Tus lukas, por fin claras",
+    titlePart: "La app que lleva tus gastos por ti",
   },
   {
     locale: "en",
@@ -62,28 +62,28 @@ const LOCALES = [
     headline: "Your money, finally clear.",
     highlight: "money",
     annotation: "Free, and it always will be!",
-    lead: "Wambi keeps you company, so looking after your money feels good.",
+    lead: "Stop logging by hand: Wambi reads your payments and keeps count for you.",
+    oldLead: "Wambi keeps you company, so looking after your money feels good.",
     removedDescription: "Log an expense in seconds and see where every buck goes.",
     newTab: "(opens in a new tab)",
     perks: "Free forever · Open source · No passwords",
     openSourcePerk: "Open source",
     removedQuestions: ["Where does all my money go?", "How much does living cost me?"],
-    cta: "Get started",
-    demoCta: "Try it without an account",
-    webCta: "Start",
+    cta: "Create account",
+    demoCta: "Demo",
     soon: "Soon",
-    ways: ["On the web", "Android & iOS app", "With your AI"],
-    android: { cta: "Download for Android", other: "Other versions", ios: "On iOS, soon." },
+    ways: ["Android app", "iOS app"],
+    android: { cta: "From GitHub" },
     importStep: "Bring your history",
     importQuestion: "Can I bring my history from other apps?",
     freeQuestion: "Is it free?",
     freeAnswer: "Yes, and it always will be.",
-    openSource: { title: "Open source", cta: "View the code on GitHub" },
-    metaDescription: [/Free forever/, /open source/],
+    openQuestion: "Is it open source?",
+    metaDescription: [/payment notifications/, /open source/],
     banned: [/best friend/i, /\bgames?\b/i, /Start free/i],
-    overclaims: [/nothing to leak/i, /end-to-end/i, /can(no|')t see/i, /at rest/i],
+    overclaims: [/nothing to leak/i, /at rest/i],
     privacyAnswer:
-      "Your data travels encrypted, and we never sell it or share it with advertisers.",
+      "So we couldn't sell your data even if we wanted to: by design, we can't see it.",
     faq: "Frequently asked questions",
     signIn: "Sign in",
     toggleToDay: "Switch to day mode",
@@ -92,7 +92,7 @@ const LOCALES = [
     how: "How it works",
     questions: "Questions",
     other: { name: "Español", path: "/", lang: "es" },
-    titlePart: "Your money, finally clear",
+    titlePart: "The app that tracks your expenses for you",
   },
   {
     locale: "it",
@@ -100,33 +100,28 @@ const LOCALES = [
     headline: "I tuoi soldi, finalmente chiari.",
     highlight: "soldi",
     annotation: "Gratis, e lo sarà sempre!",
-    lead: "Wambi ti fa compagnia, così prenderti cura dei tuoi soldi è un piacere.",
+    lead: "Basta annotare a mano: Wambi legge i tuoi pagamenti e tiene il conto per te.",
+    oldLead: "Wambi ti fa compagnia, così prenderti cura dei tuoi soldi è un piacere.",
     removedDescription: "Annota una spesa in pochi secondi e guarda dove va ogni centesimo.",
     newTab: "(si apre in una nuova scheda)",
     perks: "Gratis per sempre · Open source · Senza password",
     openSourcePerk: "Open source",
     removedQuestions: ["Dove se ne vanno tutti i miei soldi?", "Quanto mi costa vivere?"],
-    cta: "Inizia ora",
-    demoCta: "Provala senza account",
-    webCta: "Inizia",
+    cta: "Crea un account",
+    demoCta: "Demo",
     soon: "Presto",
-    ways: ["Sul web", "App per Android e iOS", "Con la tua IA"],
-    android: { cta: "Scarica per Android", other: "Altre versioni", ios: "Su iOS, presto." },
+    ways: ["App per Android", "App per iOS"],
+    android: { cta: "Da GitHub" },
     importStep: "Porta il tuo storico",
     importQuestion: "Posso portare il mio storico da altre app?",
     freeQuestion: "È gratis?",
     freeAnswer: "Sì, e lo sarà sempre.",
-    openSource: { title: "Open source", cta: "Vedi il codice su GitHub" },
-    metaDescription: [/Gratis per sempre/, /open source/],
+    openQuestion: "È open source?",
+    metaDescription: [/notifiche dei tuoi pagamenti/, /open source/],
     banned: [/migliore amico/i, /\bgioc(o|hi)\b/i, /Inizia gratis/i],
-    overclaims: [
-      /non possa trapelare/i,
-      /end-to-end|da un capo all'altro/i,
-      /non possiamo vedere/i,
-      /a riposo/i,
-    ],
+    overclaims: [/non possa trapelare/i, /a riposo/i],
     privacyAnswer:
-      "I tuoi dati viaggiano cifrati e non li vendiamo né li condividiamo mai con gli inserzionisti.",
+      "Per questo non potremmo vendere i tuoi dati nemmeno se volessimo: per come è progettato Wambito, non possiamo vederli.",
     faq: "Domande frequenti",
     signIn: "Entra",
     toggleToDay: "Passa alla modalità giorno",
@@ -135,7 +130,7 @@ const LOCALES = [
     how: "Come funziona",
     questions: "Domande",
     other: { name: "Português", path: "/pt", lang: "pt" },
-    titlePart: "I tuoi soldi, finalmente chiari",
+    titlePart: "L'app che tiene i conti delle tue spese per te",
   },
   {
     locale: "pt",
@@ -143,28 +138,28 @@ const LOCALES = [
     headline: "O teu dinheiro, finalmente claro.",
     highlight: "dinheiro",
     annotation: "Grátis, e vai ser sempre!",
-    lead: "O Wambi faz-te companhia para que cuidar do teu dinheiro seja um prazer.",
+    lead: "Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.",
+    oldLead: "O Wambi faz-te companhia para que cuidar do teu dinheiro seja um prazer.",
     removedDescription: "Regista uma despesa em segundos e vê para onde vai cada cêntimo.",
     newTab: "(abre num novo separador)",
     perks: "Grátis para sempre · Código aberto · Sem palavras-passe",
     openSourcePerk: "Código aberto",
     removedQuestions: ["Para onde vai todo o meu dinheiro?", "Quanto me custa viver?"],
-    cta: "Começa agora",
-    demoCta: "Experimenta sem conta",
-    webCta: "Começar",
+    cta: "Criar conta",
+    demoCta: "Demo",
     soon: "Em breve",
-    ways: ["Na web", "App para Android e iOS", "Com a tua IA"],
-    android: { cta: "Descarregar para Android", other: "Outras versões", ios: "No iOS, em breve." },
+    ways: ["App para Android", "App para iOS"],
+    android: { cta: "Do GitHub" },
     importStep: "Traz o teu histórico",
     importQuestion: "Posso trazer o meu histórico de outras apps?",
     freeQuestion: "É grátis?",
     freeAnswer: "Sim, e vai ser sempre.",
-    openSource: { title: "Código aberto", cta: "Ver o código no GitHub" },
-    metaDescription: [/Grátis para sempre/, /código aberto/],
+    openQuestion: "É de código aberto?",
+    metaDescription: [/notificações dos teus pagamentos/, /código aberto/],
     banned: [/melhor amigo/i, /\bjogos?\b/i, /Começa grátis/i],
-    overclaims: [/não possa vazar/i, /ponta a ponta/i, /não podemos ver/i, /em repouso/i],
+    overclaims: [/não possa vazar/i, /em repouso/i],
     privacyAnswer:
-      "Os teus dados viajam cifrados e nunca os vendemos nem os partilhamos com anunciantes.",
+      "Por isso, não podíamos vender os teus dados nem que quiséssemos: pela forma como o Wambito é feito, não os conseguimos ver.",
     faq: "Perguntas frequentes",
     signIn: "Entrar",
     toggleToDay: "Mudar para o modo dia",
@@ -173,7 +168,7 @@ const LOCALES = [
     how: "Como funciona",
     questions: "Perguntas",
     other: { name: "Italiano", path: "/it", lang: "it" },
-    titlePart: "O teu dinheiro, finalmente claro",
+    titlePart: "A app que gere as tuas despesas por ti",
   },
 ] as const;
 
@@ -228,17 +223,13 @@ const ROADMAP = {
     columns: [
       {
         label: "En construcción",
-        items: [
-          "Captura automática de las notificaciones de tu banco",
-          "En F-Droid y Google Play",
-          "Importa desde Buddy y otras apps",
-        ],
+        items: ["Captura automática de las notificaciones de tu banco", "En F-Droid y Google Play"],
       },
       {
         label: "Próximo",
         items: [
+          "Importa y descarga tus datos, cifrados",
           "App para iPhone",
-          "Cifrado de punta a punta",
           "Conecta tu IA en un clic",
           "Apoya a Wambito",
         ],
@@ -246,6 +237,7 @@ const ROADMAP = {
       {
         label: "Más adelante",
         items: [
+          "Importa desde Buddy y otras apps",
           "Sin servidor central",
           "Anota por WhatsApp",
           "Tu resumen del mes con IA en tu teléfono",
@@ -258,13 +250,13 @@ const ROADMAP = {
           "Pruébalo sin cuenta",
           "App para Android",
           "Android: widget con micrófono",
-          "Importa tu historial de Budge",
           "Funciona sin conexión",
           "Sin contraseñas",
           "Pagos recurrentes con avisos",
           "En cuatro idiomas",
           "Instálalo en tu propio servidor",
           "Conecta tu IA",
+          "Cifrado de punta a punta",
         ],
       },
     ],
@@ -281,17 +273,13 @@ const ROADMAP = {
     columns: [
       {
         label: "Being built",
-        items: [
-          "Automatic capture of your bank's notifications",
-          "On F-Droid and Google Play",
-          "Import from Buddy and other apps",
-        ],
+        items: ["Automatic capture of your bank's notifications", "On F-Droid and Google Play"],
       },
       {
         label: "Next",
         items: [
+          "Import and download your data, encrypted",
           "iPhone app",
-          "End-to-end encryption",
           "Connect your AI in one click",
           "Support Wambito",
         ],
@@ -299,6 +287,7 @@ const ROADMAP = {
       {
         label: "Later",
         items: [
+          "Import from Buddy and other apps",
           "No central server",
           "Log it on WhatsApp",
           "Your monthly recap with AI on your phone",
@@ -311,13 +300,13 @@ const ROADMAP = {
           "Try it without an account",
           "Android app",
           "Android: widget with a microphone",
-          "Import your history from Budge",
           "Works offline",
           "No passwords",
           "Recurring payments with reminders",
           "In four languages",
           "Run it on your own server",
           "Connect your AI",
+          "End-to-end encryption",
         ],
       },
     ],
@@ -334,17 +323,13 @@ const ROADMAP = {
     columns: [
       {
         label: "In costruzione",
-        items: [
-          "Cattura automatica delle notifiche della tua banca",
-          "Su F-Droid e Google Play",
-          "Importa da Buddy e da altre app",
-        ],
+        items: ["Cattura automatica delle notifiche della tua banca", "Su F-Droid e Google Play"],
       },
       {
         label: "Prossimo",
         items: [
+          "Importa e scarica i tuoi dati, cifrati",
           "App per iPhone",
-          "Crittografia end-to-end",
           "Collega la tua IA in un clic",
           "Sostieni Wambito",
         ],
@@ -352,6 +337,7 @@ const ROADMAP = {
       {
         label: "Più avanti",
         items: [
+          "Importa da Buddy e da altre app",
           "Senza server centrale",
           "Annota su WhatsApp",
           "Il riepilogo del mese con l'IA sul telefono",
@@ -364,13 +350,13 @@ const ROADMAP = {
           "Provala senza account",
           "App per Android",
           "Android: widget con microfono",
-          "Importa il tuo storico da Budge",
           "Funziona offline",
           "Senza password",
           "Pagamenti ricorrenti con avvisi",
           "In quattro lingue",
           "Installalo sul tuo server",
           "Collega la tua IA",
+          "Crittografia end-to-end",
         ],
       },
     ],
@@ -387,17 +373,13 @@ const ROADMAP = {
     columns: [
       {
         label: "Em construção",
-        items: [
-          "Captura automática das notificações do teu banco",
-          "No F-Droid e no Google Play",
-          "Importa do Buddy e de outras apps",
-        ],
+        items: ["Captura automática das notificações do teu banco", "No F-Droid e no Google Play"],
       },
       {
         label: "A seguir",
         items: [
+          "Importa e descarrega os teus dados, encriptados",
           "App para iPhone",
-          "Encriptação ponta a ponta",
           "Liga a tua IA num clique",
           "Apoia o Wambito",
         ],
@@ -405,6 +387,7 @@ const ROADMAP = {
       {
         label: "Mais à frente",
         items: [
+          "Importa do Buddy e de outras apps",
           "Sem servidor central",
           "Regista pelo WhatsApp",
           "O resumo do mês com IA no teu telemóvel",
@@ -417,13 +400,13 @@ const ROADMAP = {
           "Experimenta sem conta",
           "App para Android",
           "Android: widget com microfone",
-          "Importa o teu histórico do Budge",
           "Funciona sem ligação",
           "Sem palavras-passe",
           "Pagamentos recorrentes com avisos",
           "Em quatro línguas",
           "Instala-o no teu próprio servidor",
           "Liga a tua IA",
+          "Encriptação ponta a ponta",
         ],
       },
     ],
@@ -728,7 +711,7 @@ for (const l of LOCALES) {
       ).toEqual(["lk-landing-headline", "lk-landing-description", "lk-landing-cta"]);
     });
 
-    test("the hero: the highlighted word, the lead and the perks", async ({ page }) => {
+    test("the hero: the highlighted word and the lead, with no perks line", async ({ page }) => {
       await page.goto(l.path);
       const hero = page.locator("#hero");
       const headline = hero.getByRole("heading", { level: 1 });
@@ -737,20 +720,15 @@ for (const l of LOCALES) {
       );
 
       const description = hero.locator(".lk-landing-description");
-      // One sentence that introduces Wambi; the old second sentence is gone.
+      // One sentence about what Wambito does (no more manual logging); the old lines are gone.
       await expect(description).toHaveText(l.lead);
+      await expect(hero).not.toContainText(l.oldLead);
       await expect(description.locator(".lk-landing-lead")).toHaveText(l.lead);
       await expect(hero).not.toContainText(l.removedDescription);
 
-      // The visible text is the perks; the link to GitHub adds a hidden "opens in a new tab".
-      await expect(hero.locator(".lk-landing-perks")).toHaveText(
-        l.perks.replace(l.openSourcePerk, `${l.openSourcePerk} ${l.newTab}`),
-      );
-      const github = hero.getByRole("link", { name: l.openSourcePerk });
-      await expect(github.locator(".sr-only")).toHaveText(l.newTab);
-      await expect(github).toHaveAttribute("href", GITHUB);
-      await expect(github).toHaveAttribute("target", "_blank");
-      await expect(github).toHaveAttribute("rel", "noopener");
+      // No perks line under the actions any more: more room, less going on.
+      await expect(hero.locator(".lk-landing-perks")).toHaveCount(0);
+      await expect(hero).not.toContainText(l.perks);
 
       // Beside it, the demo without an account, in this language, as the secondary action.
       const demo = hero.getByRole("link", { name: l.demoCta });
@@ -878,44 +856,64 @@ for (const l of LOCALES) {
       );
     });
 
-    test("one primary action: get started → sign-in in this language", async ({ page }) => {
+    test("one primary action: create account → /create-account in this language", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       const hero = page.locator("#hero");
       const cta = hero.getByRole("link", { name: l.cta });
-      await expect(cta).toHaveAttribute("href", `/sign-in?lang=${l.locale}`);
+      await expect(cta).toHaveAttribute("href", `/create-account?lang=${l.locale}`);
       await expect(cta).toHaveClass(/lk-btn-primary/);
       const box = await cta.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(44);
     });
 
-    test("use it your way: web is live, Android downloads the APK, AI is coming soon", async ({
+    test("use it your way: Android downloads the APK, iOS is coming soon; no web or agent card", async ({
       page,
     }) => {
       await page.goto(l.path);
-      const [web, mobile, ai] = l.ways.map((name) =>
+      await expect(page.locator("#ways h3")).toHaveText([...l.ways]);
+      const [android, ios] = l.ways.map((name) =>
         page.getByRole("listitem").filter({ has: page.getByRole("heading", { name }) }),
-      ) as [ReturnType<Page["locator"]>, ReturnType<Page["locator"]>, ReturnType<Page["locator"]>];
-      await expect(web.getByRole("link", { name: l.webCta, exact: true })).toHaveAttribute(
-        "href",
-        `/sign-in?lang=${l.locale}`,
-      );
-      await expect(web.getByText(l.soon, { exact: true })).toHaveCount(0);
-      await expect(mobile.getByRole("link", { name: l.android.cta, exact: true })).toHaveAttribute(
+      ) as [ReturnType<Page["locator"]>, ReturnType<Page["locator"]>];
+      await expect(android.getByRole("link", { name: l.android.cta, exact: true })).toHaveAttribute(
         "href",
         ANDROID_APK_HREF,
       );
-      const other = mobile.getByRole("link", { name: new RegExp(`^${l.android.other}`) });
-      await expect(other).toHaveAttribute("href", ANDROID_RELEASE_HREF);
-      await expect(other).toHaveAttribute("target", "_blank");
-      await expect(mobile.getByText(l.android.ios, { exact: true })).toBeVisible();
-      await expect(mobile.getByText(l.soon, { exact: true })).toHaveCount(0);
-      await expect(ai.getByText(l.soon, { exact: true })).toBeVisible();
-      await expect(ai.getByRole("link")).toHaveCount(0);
-      await expect(ai).toContainText("Claude");
-      await expect(ai).toContainText("ChatGPT");
+      // No "other versions" link any more: GitHub and Google Play side by side, as buttons.
+      await expect(android.getByRole("link")).toHaveCount(1);
+      await expect(android.locator(".lk-landing-store")).toHaveClass(/lk-btn/);
+      await expect(ios.locator(".lk-landing-store")).toHaveClass(/lk-btn/);
+      const [github, play] = [
+        await android.getByRole("link", { name: l.android.cta }).boundingBox(),
+        await android.locator(".lk-landing-store").boundingBox(),
+      ];
+      // Side by side where they fit; stacked, full width, on phones.
+      const wide = (page.viewportSize()?.width ?? 0) >= 640;
+      expect(github && play && Math.abs(github.y - play.y) < 4).toBe(wide);
+      // Its one "soon" is Google Play's: the GitHub download is live.
+      await expect(android.getByText(l.soon, { exact: true })).toHaveCount(1);
+      await expect(android.locator(".lk-landing-store")).toHaveText(`Google Play${l.soon}`);
+      await expect(ios.getByText(l.soon, { exact: true })).toBeVisible();
+      await expect(ios.locator(".lk-landing-store")).toHaveText(`App Store${l.soon}`);
+      await expect(ios.getByRole("link")).toHaveCount(0);
+      // The agent has its own section (#agent), not a card here.
+      await expect(page.locator("#ways [data-logo='claude']")).toHaveCount(0);
     });
 
-    test("imports come from other apps: Budge today, Buddy soon", async ({ page }) => {
+    test("the agent's chat shows its Uber answer without JavaScript, and no Excel section is left", async ({
+      page,
+    }) => {
+      await page.goto(l.path);
+      const chat = page.locator("#agent .lk-landing-chat");
+      await expect(chat).toHaveAttribute("data-phase", "done");
+      await expect(chat).toContainText("Uber");
+      await expect(chat.locator(".lk-landing-chat-card li")).toHaveCount(3);
+      await expect(page.locator("#agent [data-logo]")).toHaveCount(2);
+      await expect(page.locator("#spreadsheet")).toHaveCount(0);
+    });
+
+    test("imports come from other apps, soon: Budge first, then Buddy", async ({ page }) => {
       await page.goto(l.path);
       const step = page
         .locator("#how")
@@ -930,7 +928,7 @@ for (const l of LOCALES) {
       await expect(answer).toContainText("Buddy");
     });
 
-    test("free forever and open source: the FAQ and the section link to the code", async ({
+    test("free forever and open source: both in the FAQ, no section of its own", async ({
       page,
     }) => {
       await page.goto(l.path);
@@ -939,18 +937,19 @@ for (const l of LOCALES) {
         .filter({ has: page.getByText(l.freeQuestion, { exact: true }) });
       await free.locator("summary").click();
       await expect(free).toContainText(l.freeAnswer);
-      await expect(free.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", GITHUB);
 
-      const section = page.locator("#open-source");
-      await expect(section.getByRole("heading", { level: 2 })).toHaveText(l.openSource.title);
-      await expect(section).toContainText("AGPL-3.0");
-      const code = section.getByRole("link", { name: l.openSource.cta });
+      const open = page
+        .locator("#faq details")
+        .filter({ has: page.getByText(l.openQuestion, { exact: true }) });
+      await open.locator("summary").click();
+      await expect(open).toContainText("AGPL-3.0");
+      const code = open.getByRole("link", { name: "GitHub" });
       await expect(code).toHaveAttribute("href", GITHUB);
       await expect(code).toHaveAttribute("target", "_blank");
       await expect(code).toHaveAttribute("rel", "noopener");
       await expect(code.locator(".sr-only")).toHaveText(l.newTab);
-      // Then the FAQ: no "what's next" section between them.
-      expect(await section.evaluate((el) => el.nextElementSibling?.id)).toBe("faq");
+
+      await expect(page.locator("#open-source")).toHaveCount(0);
     });
 
     test("no what's next section: the header and the footer lead to the roadmap", async ({
@@ -1092,53 +1091,168 @@ for (const l of LOCALES) {
       await expectFitsTheViewport(page);
     });
 
-    test("shows Wambi waving, and still under reduced motion", async ({ page }) => {
+    test("shows no Wambi in the hero or by the feature grid's title", async ({ page }) => {
       await page.goto(l.path);
-      const mascot = page.locator("#hero [data-slot='hero-mascot']");
-      await expect(mascot).toHaveAttribute("role", "img");
-      await expect(mascot).toHaveAttribute("aria-label", /Wambi/);
-      const sprite = mascot.locator(".lk-wambi-sprite");
-      await expect(sprite).toHaveCSS("background-image", /\/wambi\/wave\.webp/);
-      expect(await sprite.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
-      // He waves once, then rests on his first frame: one pass of the sheet, not a loop.
-      await expect(sprite).toHaveClass(/is-once/);
-      expect(await sprite.evaluate((el) => getComputedStyle(el).animationIterationCount)).toBe(
-        "2, 1",
-      );
-      await expect
-        .poll(() => sprite.evaluate((el) => el.getAnimations().length), { timeout: 5000 })
-        .toBe(0);
-      await expect(sprite).toHaveCSS("background-position", "0% 0%");
-
-      await page.emulateMedia({ reducedMotion: "reduce" });
-      expect(await sprite.evaluate((el) => el.getAnimations().length)).toBe(0);
+      await expect(page.locator("#hero .lk-wambi")).toHaveCount(0);
+      await expect(page.locator("#how .lk-wambi, #how [data-wambi-spot]")).toHaveCount(0);
     });
 
-    test("keeps Wambi only in the hero and the closing, where he celebrates once", async ({
-      page,
-    }) => {
+    test("keeps Wambi only in the closing, standing still", async ({ page }) => {
       await page.goto(l.path);
-      // Two spots, and no other Wambi anywhere in the page (not even in the demo chips).
+      // One spot, and no other Wambi anywhere in the page (not even in the demo chips).
       expect(
         await page
           .locator("[data-wambi-spot]")
           .evaluateAll((spots) => spots.map((spot) => (spot as HTMLElement).dataset.wambiSpot)),
-      ).toEqual(["hero", "closing"]);
-      await expect(page.locator("main .lk-wambi")).toHaveCount(2);
-      await expect(page.locator("#how .lk-landing-saved")).toBeVisible();
-      // The closing celebrates in one pass, then rests on frame 4 (fists up): nothing loops.
-      const closing = page.locator("[data-wambi-spot='closing'] .lk-wambi-sprite");
-      await expect(closing).toHaveClass(/is-once/);
-      await expect
-        .poll(() => closing.evaluate((el) => el.getAnimations().length), { timeout: 5000 })
-        .toBe(0);
-      await expect(closing).toHaveCSS("background-position", "0% 100%");
+      ).toEqual(["closing"]);
+      // Only the closing's resting picture: no sprite anywhere.
+      await expect(page.locator("main .lk-wambi")).toHaveCount(0);
+      await expect(page.locator("#capture .lk-capture-notif").first()).toBeVisible();
+      // The closing shows him resting, eyes closed: one still picture.
+      const closing = page.locator("[data-wambi-spot='closing'] img");
+      await expect(closing).toHaveAttribute("src", "/wambi/resting.webp");
+      await expect(closing).toHaveAttribute("alt", "");
+      // No traveling Wambi: nothing rolls in, follows the scroll or reacts to the pointer.
+      await expect(page.locator("[data-wambi-traveler]")).toHaveCount(0);
+      // He sits in the middle of the closing's one big button (his coin on its top edge, his legs
+      // between the label's two halves), and the button stays pressable under him, named as it
+      // reads; no demo button there.
+      const cta = page.locator("#closing .lk-landing-seat-cta");
+      await cta.scrollIntoViewIfNeeded();
+      await expect(page.locator("#closing a")).toHaveCount(1);
+      await expect(cta).toHaveAccessibleName(new RegExp(`^${l.cta}`));
+      const [seat, wambi] = [await cta.boundingBox(), await closing.boundingBox()];
+      if (!seat || !wambi) throw new Error("no closing seat");
+      // Big enough to read as the page's sign-off: at least 150px, even on a phone.
+      expect(wambi.width).toBeGreaterThanOrEqual(150);
+      expect(wambi.y).toBeLessThan(seat.y);
+      expect(wambi.y + wambi.height).toBeGreaterThan(seat.y);
+      // His legs sit a little right of the button's centre (12% of his width), still over the gap.
+      const legs = wambi.x + wambi.width * 0.66;
+      expect(Math.abs(legs - (seat.x + seat.width / 2 + wambi.width * 0.12))).toBeLessThan(4);
+      expect(
+        await cta.evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          const under = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return el.contains(under);
+        }),
+      ).toBe(true);
     });
   });
 }
 
 test.describe("landing with JavaScript", () => {
   test.use({ javaScriptEnabled: true });
+
+  for (const width of [375, 1280]) {
+    test(`bring your history at ${width}px: the apps, an arrow down, then the count, one after the other`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/");
+      const card = page.locator("#how .lk-landing-cards > li", {
+        has: page.locator(".lk-landing-sources"),
+      });
+      const [file, arrow, count] = [
+        card.locator(".lk-landing-sources"),
+        card.locator(".lk-landing-arrow"),
+        card.locator(".lk-landing-imported"),
+      ];
+      await card.scrollIntoViewIfNeeded();
+      // The count waits for the apps and the arrow before it shows up and runs.
+      await expect(count).toHaveAttribute("data-state", "waiting");
+      await expect(count).toHaveAttribute("data-state", "done", { timeout: 6000 });
+      // Stacked and centred: the apps on top, the arrow below them, pointing down, the count under it.
+      const [a, b, c] = [
+        await file.boundingBox(),
+        await arrow.boundingBox(),
+        await count.boundingBox(),
+      ];
+      if (!a || !b || !c) throw new Error("no import illustration");
+      expect(b.y).toBeGreaterThanOrEqual(a.y + a.height - 1);
+      expect(c.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+      expect(Math.abs(a.x + a.width / 2 - (c.x + c.width / 2))).toBeLessThan(4);
+      expect(await arrow.evaluate((el) => getComputedStyle(el).rotate)).toBe("90deg");
+    });
+  }
+
+  test("at 1280px every feature card's illustration fills the card under its text, so a row lines up", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/");
+    const cards = page.locator("#how .lk-landing-cards > li");
+    await expect(cards).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
+      const card = cards.nth(i);
+      const [box, text, demo] = [
+        await card.boundingBox(),
+        await card.locator("> p").boundingBox(),
+        await card.locator(".lk-landing-demo").boundingBox(),
+      ];
+      if (!box || !text || !demo) throw new Error(`no card ${i}`);
+      // No empty band: the illustration's box starts right under the text and ends at the foot.
+      expect(demo.y - (text.y + text.height)).toBeLessThan(40);
+      expect(box.y + box.height - (demo.y + demo.height)).toBeLessThan(40);
+    }
+    // Wherever the scroll stops, the cards of a row sit at the same height (they rise together).
+    for (const row of [
+      [0, 1, 2],
+      [3, 4],
+    ]) {
+      await cards.nth(row[0] ?? 0).evaluate((el) => el.scrollIntoView({ block: "end" }));
+      await page.waitForTimeout(100);
+      const tops = await Promise.all(
+        row.map(async (i) => (await cards.nth(i).boundingBox())?.y ?? 0),
+      );
+      expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
+    }
+    // Five cards: the second row's two sit in the middle, under the gaps of the first row.
+    const [a, c, d, e] = await Promise.all([0, 2, 3, 4].map((i) => cards.nth(i).boundingBox()));
+    if (!a || !c || !d || !e) throw new Error("no cards");
+    const middle = (a.x + c.x + c.width) / 2;
+    expect(Math.abs((d.x + e.x + e.width) / 2 - middle)).toBeLessThan(2);
+  });
+
+  for (const theme of ["night", "day"] as const) {
+    test(`two cards show real app screens in phones: insights and budgets (${theme})`, async ({
+      page,
+    }) => {
+      await page.addInitScript((value) => localStorage.setItem("wambito.theme", value), theme);
+      await page.goto("/");
+      const phones = page.locator("#how .lk-landing-phone");
+      await expect(phones).toHaveCount(2);
+      for (const [index, shot, layer] of [
+        [0, "insights", ".lk-landing-screen-ring"],
+        [1, "budgets", ".lk-landing-screen-bars"],
+      ] as const) {
+        const phone = phones.nth(index);
+        await phone.scrollIntoViewIfNeeded();
+        // Only the theme in use is shown, and it loads: the screen and what moves over it.
+        const screen = phone.locator(`.lk-landing-screen.is-${theme}`);
+        await expect(screen).toBeVisible();
+        await expect(phone.locator(".lk-landing-screen:visible")).toHaveCount(1);
+        for (const img of await screen.locator("img").all()) {
+          await expect
+            .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+            .toBeGreaterThan(0);
+        }
+        await expect(screen.locator(".lk-landing-screen-shot")).toHaveAttribute(
+          "src",
+          `/landing/${shot}-es-${theme}.webp`,
+        );
+        // The moving layer sits inside the screen.
+        const [base, over] = [
+          await screen.locator(".lk-landing-screen-shot").boundingBox(),
+          await screen.locator(layer).boundingBox(),
+        ];
+        if (!base || !over) throw new Error(`no ${shot} screen or layer`);
+        expect(over.x).toBeGreaterThanOrEqual(base.x);
+        expect(over.x + over.width).toBeLessThanOrEqual(base.x + base.width + 1);
+        expect(over.y).toBeGreaterThanOrEqual(base.y);
+      }
+    });
+  }
 
   test("the header's language switch opens the same page in another language", async ({ page }) => {
     await page.goto("/");
@@ -1265,7 +1379,7 @@ test.describe("landing with JavaScript", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Your money, finally clear.",
     );
-    await expect(page).toHaveTitle(/Your money, finally clear/);
+    await expect(page).toHaveTitle(/The app that tracks your expenses for you/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${ORIGIN}/en`);
     expect(errors).toEqual([]);
@@ -1680,7 +1794,6 @@ const CAPTURE = {
   es: {
     path: "/automatic-capture",
     card: "¡Wambi anota los gastos por ti!",
-    badge: "Pronto · Solo en Android",
     link: "¿Cómo funciona?",
     title: "¿Cómo funciona la captura automática?",
     soon: "Pronto en la app de Android.",
@@ -1688,7 +1801,6 @@ const CAPTURE = {
   en: {
     path: "/en/automatic-capture",
     card: "Wambi logs your expenses for you!",
-    badge: "Soon · Android only",
     link: "How does it work?",
     title: "How does automatic capture work?",
     soon: "Soon in the Android app.",
@@ -1696,7 +1808,6 @@ const CAPTURE = {
   it: {
     path: "/it/automatic-capture",
     card: "Wambi annota le spese per te!",
-    badge: "Presto · Solo su Android",
     link: "Come funziona?",
     title: "Come funziona la cattura automatica?",
     soon: "Presto nell’app Android.",
@@ -1704,7 +1815,6 @@ const CAPTURE = {
   pt: {
     path: "/pt/automatic-capture",
     card: "O Wambi regista as despesas por ti!",
-    badge: "Em breve · Só no Android",
     link: "Como funciona?",
     title: "Como funciona a captura automática?",
     soon: "Em breve na app Android.",
@@ -1715,16 +1825,20 @@ for (const l of LOCALES) {
   const c = CAPTURE[l.locale];
 
   test.describe(`automatic capture (${l.locale})`, () => {
-    test("the landing's #how holds the card as its fifth item, with a real link to the page", async ({
+    test("the landing leads with it right under the hero, no badge, and a real link to the page", async ({
       page,
     }) => {
       await page.goto(l.path);
-      const items = page.locator("#how ul.is-how > li");
-      await expect(items).toHaveCount(5);
-      const card = items.nth(4);
-      await expect(card.getByRole("heading", { name: c.card })).toBeVisible();
-      await expect(card.getByText(c.badge, { exact: true })).toBeVisible();
-      await expect(card.getByRole("link", { name: c.link })).toHaveAttribute("href", c.path);
+      const sections = await page
+        .locator("main > section")
+        .evaluateAll((nodes) => nodes.map((node) => node.id));
+      expect(sections.slice(0, 4)).toEqual(["hero", "capture", "how", "agent"]);
+      const section = page.locator("#capture");
+      await expect(section.getByRole("heading", { level: 2, name: c.card })).toBeVisible();
+      await expect(section.locator(".lk-landing-soon")).toHaveCount(0);
+      await expect(section.getByRole("link", { name: c.link })).toHaveAttribute("href", c.path);
+      // The feature grid holds five cards: none of them the capture, nor signing in (the FAQ's).
+      await expect(page.locator("#how ul.is-how > li")).toHaveCount(5);
     });
 
     test("the page works without JavaScript: five steps, five scenes, the soon line", async ({
@@ -1744,6 +1858,40 @@ for (const l of LOCALES) {
       ).toHaveAttribute("href", CAPTURE[l.other.lang].path);
     });
 
+    test("the how-it-works page on a computer: each step's text beside its picture, sides taking turns", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(c.path);
+      await expectFitsTheViewport(page);
+      const steps = page.locator(".lk-capture-steps > li");
+      await expect(steps).toHaveCount(5);
+      const sides: string[] = [];
+      for (const i of [0, 1, 2, 3]) {
+        const step = steps.nth(i);
+        const [title, demo] = [
+          await step.locator("h2").boundingBox(),
+          await step.locator(".lk-capture-demo").boundingBox(),
+        ];
+        if (!title || !demo) throw new Error(`no step ${i}`);
+        // Side by side: they overlap in height, not in width.
+        expect(demo.y).toBeLessThan(title.y + title.height);
+        const textLeft = title.x < demo.x;
+        expect(textLeft ? title.x + title.width <= demo.x : demo.x + demo.width <= title.x).toBe(
+          true,
+        );
+        sides.push(textLeft ? "text-left" : "text-right");
+      }
+      expect(sides).toEqual(["text-left", "text-right", "text-left", "text-right"]);
+      // The last step has no picture of its own: its text sits in the middle.
+      const last = steps.nth(4);
+      const [card, lastTitle] = [await last.boundingBox(), await last.locator("h2").boundingBox()];
+      if (!card || !lastTitle) throw new Error("no last step");
+      expect(Math.abs(lastTitle.x + lastTitle.width / 2 - (card.x + card.width / 2))).toBeLessThan(
+        4,
+      );
+    });
+
     test.describe("at 320px", () => {
       test.use({ viewport: { width: 320, height: 700 } });
 
@@ -1753,6 +1901,26 @@ for (const l of LOCALES) {
         await page.goto(l.path);
         await expectFitsTheViewport(page);
       });
+    });
+
+    test("on a phone the picture comes first, then the title; on a desktop, side by side", async ({
+      page,
+    }) => {
+      const top = async () => {
+        const [picture, title] = [
+          await page.locator("#capture .lk-landing-capture-play").boundingBox(),
+          await page.locator("#capture h2").boundingBox(),
+        ];
+        if (!picture || !title) throw new Error("no capture picture or title");
+        return { picture, title };
+      };
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto(l.path);
+      const phone = await top();
+      expect(phone.picture.y + phone.picture.height).toBeLessThanOrEqual(phone.title.y);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const desktop = await top();
+      expect(desktop.title.x).toBeLessThan(desktop.picture.x);
     });
   });
 }

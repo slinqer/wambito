@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,18 +7,28 @@ import 'api/session.dart';
 import 'entry/email_screen.dart';
 import 'entry/passkey_offer_page.dart';
 import 'entry/entry_screen.dart';
+import 'entry/recovery_sign_in_screen.dart';
 import 'entry/verify_link_screen.dart';
 import 'budgets/category_detail_screen.dart';
+import 'debug/prf_probe_screen.dart';
 import 'home/home_screen.dart';
 import 'import/import_screen.dart';
 import 'insights/insights_screen.dart';
+import 'merge/merge_controller.dart';
+import 'merge/merge_screen.dart';
 import 'progress/progress_screen.dart';
 import 'recurring/recurring_screen.dart';
 import 'review/review_screen.dart';
 import 'search/search_screen.dart';
 import 'settings/about_screen.dart';
 import 'settings/home_actions.dart';
+import 'settings/security/approve_signin_screen.dart';
 import 'settings/settings_screen.dart';
+import 'vault/encryption_mode.dart';
+import 'vault/vault_gate.dart';
+import 'vault/vault_onboarding.dart';
+import 'vault/vault_providers.dart';
+import 'vault/vault_screen.dart';
 import 'welcome/welcome_screen.dart';
 
 const _offerPath = '/entry/passkey-offer';
@@ -25,26 +36,103 @@ const _offerPath = '/entry/passkey-offer';
 /// Where a person with the offer pending is sent from: the sign-in screens and home.
 const _offerFirst = {'/', '/loading', '/entry', '/entry/email'};
 
+/// Where the signed-in account's vault stands for the router (the gate of lib/vault):
+/// - `open`: the account is `plain`, or its vault is open: every screen is for it;
+/// - `locked`: a `preview` account whose vault is not open, or one whose mode nobody could tell
+///   (an offline first start): `/unlock` is all it gets, and says what to do;
+/// - `loading`: the mode of the account is still being learned: the loading route, so a screen
+///   never treats a possibly-`preview` account as `plain`; and a `preview` account's open vault
+///   until its welcome flag is in the session (`vaultOnboardingProvider`).
+enum VaultRoute { open, locked, loading }
+
+/// The vault's standing for the session signed in now. Reads [currentVaultAccountProvider], never
+/// the mode provider's value (which keeps the previous session's while it loads): `vaultAccountProvider`
+/// only decides between "still asking" and "could not ask" once the account is unknown.
+VaultRoute vaultRouteOf(Ref ref) {
+  if (ref.read(sessionProvider).status != SessionStatus.signedIn) return VaultRoute.open;
+  final account = ref.read(currentVaultAccountProvider);
+  if (account == null) {
+    final asked = ref.read(vaultAccountProvider);
+    // A retry after an error keeps the Locked view (retrying) instead of flashing a blank route.
+    return asked.hasError ? VaultRoute.locked : VaultRoute.loading;
+  }
+  if (account.mode == EncryptionMode.plain) return VaultRoute.open;
+  if (ref.read(vaultGateStateProvider) is! Ready) return VaultRoute.locked;
+  // Its welcome is the vault's to say (lib/vault/vault_onboarding.dart): until that answer is in
+  // the session, the loading route, so an account that finished it never sees the welcome flash.
+  return ref.read(vaultOnboardingProvider) == null ? VaultRoute.loading : VaultRoute.open;
+}
+
 /// Where the session sends a [location], or null to stay:
 /// - the magic link (`/auth/verify`) always opens: it decides for itself, guests included;
 /// - while the stored session is read, a blank screen;
-/// - signed out, only the entry screens;
-/// - signed in, never the first-run screen, and the email screen and "Guarda tu progreso" only for
+/// - signed out, only the entry screens (the recovery-key sign-in too);
+/// - provisional (an offline first run, lib/local/provisional.dart), an open vault: every screen
+///   but the sign-in ones, the welcome, Unlock, the merge and "Guarda tu progreso", which go home;
+/// - signed in, never the first-run screen nor the recovery-key sign-in, and the email screen and "Guarda tu progreso" only for
 ///   a guest (to save their progress, or to sign in as another account after a warning);
 /// - signed in with the welcome to do (an account with no `onboardingCompletedAt`), the welcome from
 ///   every other screen, as the web's `requireOnboarded`; and nothing else but the welcome, which
 ///   an account that finished it, and a guest, never see;
 /// - right after an email sign-in that is due the passkey offer, the offer comes first, wherever the
-///   person was going from the sign-in screens; its address is for that moment only.
-String? sessionRedirect(SessionState session, Uri location) {
+///   person was going from the sign-in screens; its address is for that moment only;
+/// - signed in with a `preview` account (the [vault]): every screen but the magic link, the entry
+///   screens and the debug ones goes to `/unlock` until its vault is open, and `/unlock` goes home
+///   once it is; while the mode is unknown, or the open vault's welcome flag is being read (the
+///   welcome of a `preview` account follows its vault, never the server's empty copy), the
+///   loading route;
+/// - while a `preview` guest's claim finishes ([finishingClaim]: its recovery key, then the passkey
+///   offer), the email screen (and "Guarda tu progreso" under it) stay although the account has an
+///   email now;
+/// - while a merge needs the person or must not be left ([merge], `mergeBlocksAppProvider`), every
+///   such screen is `/merge` once the vault is open.
+String? sessionRedirect(
+  SessionState session,
+  Uri location, {
+  VaultRoute vault = VaultRoute.open,
+  bool merge = false,
+  bool finishingClaim = false,
+}) {
   final path = location.path;
+  // An offline first run is an open vault with no account: home and its screens, never a sign-in
+  // (the magic link included), the welcome, Unlock, a merge or "Guarda tu progreso".
+  if (session.status == SessionStatus.provisional) {
+    final blocked =
+        path == '/auth/verify' ||
+        path == '/entry' ||
+        path.startsWith('/entry/') ||
+        path == '/loading' ||
+        path == '/unlock' ||
+        path == '/merge' ||
+        path == '/progress' ||
+        path == '/welcome' ||
+        path.startsWith('/welcome/');
+    return blocked ? '/' : null;
+  }
   if (path == '/auth/verify') return null;
   switch (session.status) {
     case SessionStatus.loading:
       return path == '/loading' ? null : '/loading';
+    case SessionStatus.provisional:
+      return null; // Above.
     case SessionStatus.signedOut:
-      return path == '/entry' || path == '/entry/email' ? null : '/entry';
+      return path == '/entry' || path == '/entry/email' || path == '/entry/recovery'
+          ? null
+          : '/entry';
     case SessionStatus.signedIn:
+      final vaultOnly =
+          !(path == '/entry' || path.startsWith('/entry/') || path.startsWith('/debug/'));
+      if (vaultOnly) {
+        switch (vault) {
+          case VaultRoute.loading:
+            return path == '/loading' ? null : '/loading';
+          case VaultRoute.locked:
+            return path == '/unlock' ? null : '/unlock';
+          case VaultRoute.open:
+            if (merge) return path == '/merge' ? null : '/merge';
+            if (path == '/unlock') return '/';
+        }
+      }
       if (session.offerPasskeyFor != null && _offerFirst.contains(path)) return _offerPath;
       if (path == _offerPath && session.offerPasskeyFor == null) {
         return session.onboardingPending ? '/welcome' : '/';
@@ -57,8 +145,10 @@ String? sessionRedirect(SessionState session, Uri location) {
         return inWelcome ? null : '/welcome';
       }
       if (inWelcome) return '/';
-      if (path == '/loading' || path == '/entry') return '/';
-      if ((path == '/entry/email' || path == '/progress') && !session.isGuest) return '/';
+      if (path == '/loading' || path == '/entry' || path == '/entry/recovery') return '/';
+      if ((path == '/entry/email' || path == '/progress') && !session.isGuest && !finishingClaim) {
+        return '/';
+      }
       return null;
   }
 }
@@ -66,13 +156,41 @@ String? sessionRedirect(SessionState session, Uri location) {
 /// The app's routes. Screens join here as they are built.
 final routerProvider = Provider<GoRouter>((ref) {
   final session = ValueNotifier<SessionState>(ref.read(sessionProvider));
-  ref.listen(sessionProvider, (_, next) => session.value = next);
+  // The vault's standing, with the session: either changing sends the redirect round again.
+  final vault = ValueNotifier<VaultRoute>(vaultRouteOf(ref));
+  final merge = ValueNotifier<bool>(ref.read(mergeBlocksAppProvider));
+  final refresh = _Refresh();
+  void update() {
+    vault.value = vaultRouteOf(ref);
+    refresh.notify();
+  }
+
+  ref.listen(sessionProvider, (_, next) {
+    session.value = next;
+    update();
+  });
+  ref.listen(vaultAccountProvider, (_, _) => update());
+  ref.listen(currentVaultAccountProvider, (_, _) => update());
+  ref.listen(vaultGateStateProvider, (_, _) => update());
+  ref.listen(vaultOnboardingProvider, (_, _) => update());
+  ref.listen(mergeBlocksAppProvider, (_, next) {
+    merge.value = next;
+    update();
+  });
   final router = GoRouter(
-    refreshListenable: session,
+    refreshListenable: refresh,
     // A location no route has (an address Android hands over that is not one of the app's, such as
     // the `glance-action:/CALLBACK?...` a tap on the widget carried) is home, never "Page Not Found".
     onException: (context, state, router) => router.go('/'),
-    redirect: (context, state) => sessionRedirect(session.value, state.uri),
+    redirect: (context, state) => sessionRedirect(
+      session.value,
+      state.uri,
+      vault: vault.value,
+      merge: merge.value,
+      // Read, not listened to: clearing it sends nobody anywhere; the email screen goes on by
+      // itself once its claim is finished (`context.go('/')`, or the passkey offer's redirect).
+      finishingClaim: ref.read(claimFinishingProvider),
+    ),
     routes: [
       GoRoute(
         path: '/',
@@ -142,9 +260,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
-        routes: [GoRoute(path: 'about', builder: (context, state) => const AboutScreen())],
+        routes: [
+          GoRoute(path: 'about', builder: (context, state) => const AboutScreen()),
+          // Approving a web sign-in (phone-first spec 8.1): a `wambito://signin?…` link the system
+          // camera opened comes with its QR; Settings → Security opens it from its own row.
+          GoRoute(
+            path: 'signin',
+            builder: (context, state) => ApproveSigninScreen(
+              key: ValueKey(state.uri.query),
+              qr: state.uri.queryParameters['qr'],
+            ),
+          ),
+        ],
       ),
       GoRoute(path: '/loading', builder: (context, state) => const Scaffold()),
+      // A `preview` account's vault: the recovery key, Unlock or Locked, until it is open.
+      GoRoute(path: '/unlock', builder: (context, state) => const VaultScreen()),
+      // A merge into an email account: its progress and its currency stop.
+      GoRoute(path: '/merge', builder: (context, state) => const MergeScreen()),
       GoRoute(path: '/entry', builder: (context, state) => const EntryScreen()),
       GoRoute(
         path: '/entry/email',
@@ -153,7 +286,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           claim: state.uri.queryParameters['claim'] == '1',
         ),
       ),
+      // The recovery-key sign-in: signed out only.
+      GoRoute(path: '/entry/recovery', builder: (context, state) => const RecoverySignInScreen()),
       GoRoute(path: _offerPath, builder: (context, state) => const PasskeyOfferPage()),
+      // The passkey PRF probe: debug builds only.
+      if (kDebugMode)
+        GoRoute(path: '/debug/prf', builder: (context, state) => const PrfProbeScreen()),
       GoRoute(
         path: '/auth/verify',
         builder: (context, state) => VerifyLinkScreen(
@@ -168,6 +306,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(() {
     router.dispose();
     session.dispose();
+    vault.dispose();
+    merge.dispose();
+    refresh.dispose();
   });
   return router;
 });
+
+/// Tells the router to run its redirect again.
+class _Refresh extends ChangeNotifier {
+  void notify() => notifyListeners();
+}

@@ -97,6 +97,29 @@ class CaptureQueueTest {
     }
 
     @Test
+    fun `adopting from the account it takes over re-tags its captures and keeps its confirms`() {
+        val queue = CaptureQueue(context)
+        queue.add(sampleCapture("Nobody's"))
+        queue.adopt("anon")
+        val phone = queue.add(sampleCapture("Phone's"))
+        queue.addConfirm("tx-1")
+        queue.adopt("other")
+        queue.adopt("anon")
+        val again = queue.add(sampleCapture("Phone's again"))
+        queue.addConfirm("tx-2")
+
+        queue.adopt("email", from = "anon")
+
+        assertEquals(listOf(again.copy(userId = "email")), queue.all())
+        assertEquals(listOf("tx-2"), queue.confirms())
+        assertEquals("email", queue.owner())
+        // A later plain adopt of the same account keeps them.
+        queue.adopt("email")
+        assertEquals(listOf(again.key), queue.all().map { it.key })
+        assertTrue(phone.key !in queue.all().map { it.key })
+    }
+
+    @Test
     fun `adopting the same account again keeps its captures`() {
         val queue = CaptureQueue(context)
         queue.adopt("user-a")
@@ -135,5 +158,61 @@ class CaptureQueueTest {
         assertEquals(CaptureSource.REVOLUT, CaptureSource.forPackage("com.revolut.revolut"))
         assertEquals(CaptureSource.GOOGLE_WALLET, CaptureSource.forPackage("com.google.android.apps.walletnfcrel"))
         assertEquals(null, CaptureSource.forPackage("com.example.other"))
+    }
+
+    @Test
+    fun `confirms are kept without repeats, with their own store, and ack takes them out`() {
+        val queue = CaptureQueue(context)
+        queue.adopt("user-a")
+        val item = queue.add(sampleCapture())
+        queue.addConfirm("t-1")
+        queue.addConfirm("t-2")
+        queue.addConfirm("t-1")
+        assertEquals(listOf("t-1", "t-2"), CaptureQueue(context).confirms())
+
+        queue.ack(listOf(item.key), listOf("t-1"))
+
+        assertTrue(queue.all().isEmpty())
+        assertEquals(listOf("t-2"), queue.confirms())
+    }
+
+    @Test
+    fun `confirms of another account are dropped at adopt and all of them at clear`() {
+        val queue = CaptureQueue(context)
+        queue.adopt("user-a")
+        queue.addConfirm("t-1")
+        queue.adopt("user-a")
+        assertEquals(listOf("t-1"), queue.confirms())
+        queue.adopt("user-b")
+        assertTrue(queue.confirms().isEmpty())
+        queue.addConfirm("t-2")
+        queue.clear()
+        assertTrue(queue.confirms().isEmpty())
+    }
+
+    @Test
+    fun `refuse counts per item and drops one at the limit, leaving the others`() {
+        val queue = CaptureQueue(context)
+        queue.adopt("user-a")
+        val a = queue.add(sampleCapture("A"))
+        val b = queue.add(sampleCapture("B"))
+        repeat(2) { assertTrue(queue.refuse(listOf(a.key), 3).isEmpty()) }
+        assertTrue(queue.refuse(listOf(b.key), 3).isEmpty())
+        assertEquals(listOf(a.key), queue.refuse(listOf(a.key), 3))
+        assertEquals(listOf(b.key), queue.all().map { it.key })
+        // The count is stored apart: the item keeps only its own fields and the key.
+        val raw = context.getSharedPreferences("wambito.capture.queue", Context.MODE_PRIVATE).getString("items", null)!!
+        assertTrue(!raw.contains("refus"))
+    }
+
+    @Test
+    fun `a key acked or removed forgets its refusals`() {
+        val queue = CaptureQueue(context)
+        queue.adopt("user-a")
+        val a = queue.add(sampleCapture("A"))
+        queue.refuse(listOf(a.key), 2)
+        queue.ack(listOf(a.key), emptyList())
+        val again = queue.add(sampleCapture("A"))
+        assertTrue(queue.refuse(listOf(again.key), 2).isEmpty())
     }
 }

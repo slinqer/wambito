@@ -1,4 +1,4 @@
-import { emailThrottle, transactions, user, verification } from "@wambito/db";
+import { emailThrottle, session, transactions, user, verification } from "@wambito/db";
 import { eq, sql } from "@wambito/db/orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { codeFrom, createTestApp, type TestApp } from "./harness.ts";
@@ -333,5 +333,66 @@ describe("a guest claims an email in place", () => {
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ code: "too_many_requests" });
     expect(t.mailer.sent).toHaveLength(before);
+  });
+});
+
+describe("an encrypted guest claims an email (NEW_USERS_ENCRYPTED on)", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const PHONE = { "x-wambito-client": "android" };
+  let t: TestApp;
+  beforeAll(async () => {
+    t = await createTestApp({
+      NEW_USERS_ENCRYPTED: true,
+      SIGN_IN_ALLOWLIST: ["vault@wambito.test", "back@wambito.test", "owned@wambito.test"],
+    });
+  });
+  afterAll(() => t?.stop());
+
+  const sessionsOf = (userId: string) =>
+    t.admin.select().from(session).where(eq(session.userId, userId));
+
+  test("an encrypted guest claims an email in place: same id, encryption stays encrypted, /v1/me preview", async () => {
+    const g = await guest(t, PHONE);
+    const code = await sendAndRead(t, g, "vault@wambito.test");
+    const res = await verify(t, g, "vault@wambito.test", code);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: g.userId,
+      email: "vault@wambito.test",
+      isAnonymous: false,
+      encryption: "preview",
+    });
+    const [stored] = await t.admin.select().from(user).where(eq(user.id, g.userId));
+    expect(stored?.encryption).toBe("encrypted");
+    expect(await me(t, g.headers)).toMatchObject({ id: g.userId, encryption: "preview" });
+  });
+
+  test("claiming brings the phone's long session back to 60 days", async () => {
+    const g = await guest(t, PHONE);
+    const [before] = await sessionsOf(g.userId);
+    expect(before?.lifetime).toBe("long");
+
+    const code = await sendAndRead(t, g, "back@wambito.test");
+    expect((await verify(t, g, "back@wambito.test", code)).status).toBe(200);
+
+    const [after] = await sessionsOf(g.userId);
+    expect(after?.lifetime).toBe("standard");
+    expect(after?.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 60 * DAY);
+    // The session still works.
+    expect((await me(t, g.headers)).isAnonymous).toBe(false);
+  });
+
+  test("an email that already has an account answers 409 email_taken and the guest is unchanged", async () => {
+    await t.signIn("owned@wambito.test");
+    const g = await guest(t, PHONE);
+    const profileBefore = await me(t, g.headers);
+    const res = await send(t, g, "owned@wambito.test");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "email_taken" });
+    expect(await me(t, g.headers)).toEqual(profileBefore);
+    const [stored] = await t.admin.select().from(user).where(eq(user.id, g.userId));
+    expect(stored).toMatchObject({ isAnonymous: true, encryption: "encrypted" });
+    const [kept] = await sessionsOf(g.userId);
+    expect(kept?.lifetime).toBe("long");
   });
 });

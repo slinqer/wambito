@@ -80,6 +80,30 @@ class CaptureListenerTest {
     }
 
     @Test
+    fun `a preview account queues its captures for the vault`() {
+        CaptureSettings(context).setEnabled(CaptureSource.REVOLUT, true)
+        val capture = sampleCapture()
+        BankParsers.parsers = listOf(RecordingParser(CaptureSource.REVOLUT, capture))
+        com.wambito.app.account.AccountMode(context).value = "preview"
+
+        CaptureListener.handle(context, revolut, "title", "text", postedAt)
+
+        assertEquals(listOf(capture), CaptureQueue(context).all().map { it.capture })
+        assertEquals(1, WorkManager.getInstance(context).getWorkInfosForUniqueWork(CaptureScheduler.SEND).get().size)
+    }
+
+    @Test
+    fun `a mode not learned yet still queues and waits`() {
+        CaptureSettings(context).setEnabled(CaptureSource.REVOLUT, true)
+        BankParsers.parsers = listOf(RecordingParser(CaptureSource.REVOLUT, sampleCapture()))
+        com.wambito.app.account.AccountMode(context).value = "unknown"
+
+        CaptureListener.handle(context, revolut, "title", "text", postedAt)
+
+        assertEquals(1, CaptureQueue(context).all().size)
+    }
+
+    @Test
     fun `drops unparsed`() {
         CaptureSettings(context).setEnabled(CaptureSource.REVOLUT, true)
         BankParsers.parsers = listOf(RecordingParser(CaptureSource.REVOLUT, null))

@@ -6,6 +6,7 @@ import {
   passkeysSupported,
 } from "../../auth/passkey.ts";
 import { addPasskeyWrap } from "../../local/keys.ts";
+import type { PasskeyPrf } from "../../local/prf.ts";
 
 /** One of the person's passkeys, as settings lists it. */
 export interface PasskeyItem {
@@ -24,6 +25,13 @@ export interface PasskeyItem {
 export interface VaultPasskeyHooks {
   userId: string;
   explainSecondTouch(): void;
+  /**
+   * Adds the new passkey's wrap (Protect passes `SecurityApi.addPasskeyWrap`); `keys.ts`
+   * `addPasskeyWrap` by default. The PRF is zeroed after it either way.
+   */
+  keep?(passkey: PasskeyPrf): Promise<void>;
+  /** The new passkey gave no PRF (`PasskeyPrfUse.onNoPrf`): not for a cancelled second touch. */
+  onNoPrf?(): void;
 }
 
 /** What settings does with passkeys, as a prop so stories can stand in for Better Auth and WebAuthn. */
@@ -63,9 +71,12 @@ export const livePasskeys: PasskeysApi = {
       vault && {
         wantsPrf: async () => true,
         explainSecondTouch: vault.explainSecondTouch,
+        ...(vault.onNoPrf ? { onNoPrf: vault.onNoPrf } : {}),
         keep: async (passkey) => {
           try {
-            await addPasskeyWrap({ userId: vault.userId, ...passkey });
+            await (vault.keep
+              ? vault.keep(passkey)
+              : addPasskeyWrap({ userId: vault.userId, ...passkey }));
           } finally {
             passkey.prf.fill(0);
           }

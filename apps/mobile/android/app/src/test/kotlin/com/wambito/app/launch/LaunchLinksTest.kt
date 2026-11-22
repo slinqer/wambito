@@ -210,4 +210,28 @@ class LaunchLinksTest {
         val resolved = context.packageManager.resolveActivity(fromBrowser(), 0)
         assertEquals(MainActivity::class.java.name, resolved?.activityInfo?.name)
     }
+
+    // --- The web sign-in's QR (phone-first spec 8.1) ---------------------------------------------
+
+    private val signin =
+        "wambito://signin?id=0a1b2c3d-0000-4000-8000-0123456789ab&key=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ"
+
+    @Test
+    fun `the sign-in QR is taken from the exported activity, the system camera's way in`() {
+        assertEquals(signin, LaunchLinks.linkOf(view(signin)))
+        assertEquals(signin, LaunchLinks.linkOf(Intent(Intent.ACTION_VIEW, Uri.parse(signin))))
+        // only with its query, never with a path, and not again from recents
+        assertNull(LaunchLinks.linkOf(view("wambito://signin")))
+        assertNull(LaunchLinks.linkOf(view("wambito://signin/x?id=1")))
+        assertNull(LaunchLinks.linkOf(view(signin).addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)))
+        // the other hosts still come through the alias only
+        assertNull(LaunchLinks.linkOf(view("wambito://capture?id=1")))
+    }
+
+    @Test
+    fun `Android resolves the sign-in QR to MainActivity`() {
+        val camera = Intent(Intent.ACTION_VIEW, Uri.parse(signin)).addCategory(Intent.CATEGORY_BROWSABLE)
+        val resolved = context.packageManager.resolveActivity(camera, 0)
+        assertEquals(MainActivity::class.java.name, resolved?.activityInfo?.name)
+    }
 }

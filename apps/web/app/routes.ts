@@ -40,6 +40,8 @@ export default [
     : [
         layout("routes/app-layout.tsx", [
           route("sign-in", "routes/sign-in.tsx"),
+          // The landing's "Create account": the email code form under its own title.
+          route("create-account", "routes/create-account.tsx"),
           route("auth/verify", "routes/auth.verify.tsx"),
           // The link of an email change (admin panel spec §5.2): works signed in or not.
           route("confirm-email", "routes/confirm-email.tsx"),

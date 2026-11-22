@@ -5,6 +5,7 @@ import { ApiError } from "../http/problem.ts";
 import type { RECORD_TYPES } from "../http/schemas.ts";
 import { currentKeyV } from "./keys.ts";
 import { purgeExpiredPairings } from "./pairing.ts";
+import { purgeExpiredSignins } from "./signin.ts";
 
 type RecordType = (typeof RECORD_TYPES)[number];
 
@@ -18,7 +19,7 @@ const PURGE_PAGE = 500;
 
 type RecordRow = typeof records.$inferSelect;
 
-/** A record as it travels: `body` is base64url, null once deleted. */
+/** A record as it travels: `body` is base64url; null on a tombstone that carries none. */
 export interface SyncRecordDto {
   id: string;
   type: RecordType;
@@ -68,7 +69,7 @@ export function toSyncRecord(row: RecordRow): SyncRecordDto {
  * never committed after a higher one of the same person, and a device that pulled up to `latest`
  * cannot miss a record committed later with a lower version.
  */
-async function lockRecords(tx: Tx, userId: string): Promise<void> {
+export async function lockRecords(tx: Tx, userId: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`records:${userId}`}, 0))`);
 }
 
@@ -264,9 +265,11 @@ async function applyChange(
     return { id, conflict: toSyncRecord(current) };
   }
 
+  // A tombstone written over a tombstone (a reseal, a conflict's re-delete) keeps its delete time:
+  // the 180-day purge counts from the delete, not from the last write.
   const [updated] = await tx
     .update(records)
-    .set(fields)
+    .set(current.deleted && change.deleted ? { ...fields, updatedAt: current.updatedAt } : fields)
     .where(and(eq(records.userId, userId), eq(records.id, id)))
     .returning({ version: records.version });
   if (current.deleted !== change.deleted) addLive(change.deleted ? -1 : 1);
@@ -297,7 +300,7 @@ async function existsHidden(tx: Tx, id: string, userId: string): Promise<boolean
 }
 
 /**
- * Deletes every tombstone (deleted record) last written more than 180 days before `now`, and
+ * Deletes every tombstone (deleted record) deleted more than 180 days before `now`, and
  * returns how many it deleted. Live records are never touched.
  *
  * `records` is under forced row-level security and the API's role has no way around it, so the
@@ -355,6 +358,8 @@ export interface TombstonePurgeDeps {
   purge?: (db: Db, now: Date) => Promise<number>;
   /** Replaces `purgeExpiredPairings`; for tests. */
   purgePairings?: (db: Db, now: Date) => Promise<number>;
+  /** Replaces `purgeExpiredSignins`; for tests. */
+  purgeSignins?: (db: Db, now: Date) => Promise<number>;
   log?: (message: string) => void;
   logError?: (message: string, error: unknown) => void;
 }
@@ -366,16 +371,22 @@ export interface TombstonePurgeDeps {
 export function scheduleTombstonePurge(deps: TombstonePurgeDeps): () => void {
   const purge = deps.purge ?? purgeTombstones;
   const purgePairings = deps.purgePairings ?? purgeExpiredPairings;
+  const purgeSignins = deps.purgeSignins ?? purgeExpiredSignins;
   const log = deps.log ?? ((message) => console.log(message));
   const logError = deps.logError ?? ((message, error) => console.error(message, error));
 
   const run = async () => {
-    // Expired pairing requests go with the daily purge (spec 2026-11-08 section 7.3); each purge
-    // has its own try so a failure of one does not skip the other.
+    // Expired pairing and sign-in requests go with the daily purge (spec 2026-11-08 section 7.3,
+    // spec 2026-11-15 section 8); each purge has its own try so a failure of one skips no other.
     try {
       await purgePairings(deps.db, new Date());
     } catch (error) {
       logError("Pairing purge failed", error);
+    }
+    try {
+      await purgeSignins(deps.db, new Date());
+    } catch (error) {
+      logError("Sign-in request purge failed", error);
     }
     try {
       const count = await purge(deps.db, new Date());

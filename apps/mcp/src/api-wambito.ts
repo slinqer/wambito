@@ -4,15 +4,28 @@ import type { paths } from "./api/schema.d.ts";
 
 type ApiClient = ReturnType<typeof createClient<paths>>;
 
-interface Problem {
+export interface Problem {
   code?: string;
   title?: string;
   detail?: string;
   errors?: { path: string; message: string }[];
 }
 
-/** What the API's answer means for the model: its problem code and words, or a plain failure. */
-function toToolError(status: number, problem: Problem | undefined): ToolError {
+/** What the person must do when the assistant's access is gone: connect it again. */
+export const RECONNECT_MESSAGE =
+  "This assistant was disconnected from Wambito. Connect it again to keep going.";
+
+export const reconnectError = () => new ToolError("reconnect", RECONNECT_MESSAGE);
+
+/**
+ * What the API's answer means for the model: its problem code and words, or a plain failure. A
+ * token the API no longer takes (401), or an old connection to an encrypted (or migrating) account
+ * reaching `/v1` (426 `update_required`), asks the person to connect the assistant again.
+ */
+export function toToolError(status: number, problem: Problem | undefined): ToolError {
+  if (status === 401 || (status === 426 && problem?.code === "update_required")) {
+    return reconnectError();
+  }
   const code = problem?.code ?? (status === 404 ? "not_found" : `http_${status}`);
   const message = problem?.detail ?? problem?.title ?? `Wambito answered ${status}`;
   return new ToolError(code, message, problem?.errors ? { errors: problem.errors } : undefined);

@@ -3,6 +3,7 @@ package com.wambito.app.widget
 import android.content.Context
 import android.content.res.Configuration
 import com.wambito.app.AppLanguages
+import com.wambito.app.account.AccountMode
 import com.wambito.app.R
 import java.time.Duration
 import java.time.Instant
@@ -86,8 +87,11 @@ private fun monthName(month: YearMonth, language: String): String {
 fun widgetModel(context: Context, snapshot: WidgetSnapshot?, now: Instant, zone: ZoneId): WidgetModel {
     val theme = themeOf(snapshot?.theme)
     val strings = snapshot?.locale?.let { localized(context, it) } ?: context
-    if (snapshot == null || !snapshot.signedIn) {
-        return WidgetModel.SignedOut(strings.getString(R.string.widget_signed_out), theme)
+    // D10: figures of another account than the signed-in one (or of nobody: the mode and owner are
+    // cleared at sign-out) are never drawn, whoever wrote them last.
+    val foreign = snapshot?.owner != null && snapshot.owner != AccountMode(context).owner
+    if (snapshot == null || !snapshot.signedIn || foreign) {
+        return WidgetModel.SignedOut(snapshot?.line ?: strings.getString(R.string.widget_signed_out), theme)
     }
     val language = snapshot.locale ?: Locale.getDefault().language.takeIf { it in AppLanguages.ALL } ?: "es"
     val month = try {

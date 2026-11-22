@@ -17,10 +17,13 @@ import {
   pairingNumber,
   parseRecoveryKey,
   type RecordContext,
+  recoveryVerifier,
   sealKeyLink,
   sealRecord,
+  sealToDevice,
   toBase64Url,
   unwrapDataKey,
+  verifierHash,
   verifyDeviceAttestation,
   type WrapContext,
   wrapDataKey,
@@ -46,6 +49,13 @@ const vectors = JSON.parse(
     wrapped: string;
   }[];
   recovery: { secret: string; text: string }[];
+  recoveryVerifiers: {
+    secret: string;
+    lookup: string;
+    auth: string;
+    lookupHash: string;
+    authHash: string;
+  }[];
   devices: {
     privateKey: string;
     publicKey: string;
@@ -89,6 +99,7 @@ describe("shared test vectors", () => {
     expect(new Set(vectors.wraps.map((w) => w.ctx.kind))).toEqual(
       new Set(["passkey", "recovery", "assistant"]),
     );
+    expect(vectors.recoveryVerifiers.length).toBe(4);
     expect(vectors.devices.length).toBeGreaterThanOrEqual(2);
     expect(vectors.rejects.length).toBeGreaterThanOrEqual(4);
   });
@@ -115,6 +126,16 @@ describe("shared test vectors", () => {
     for (const r of vectors.recovery) {
       expect(parseRecoveryKey(r.text)).toEqual(b(r.secret));
       expect(formatRecoveryKey(b(r.secret))).toBe(r.text);
+    }
+  });
+
+  it("recoveryVerifiers: lookup, auth and both hashes are exact", async () => {
+    for (const v of vectors.recoveryVerifiers) {
+      const got = await recoveryVerifier(b(v.secret));
+      expect(toBase64Url(got.lookup)).toBe(v.lookup);
+      expect(toBase64Url(got.auth)).toBe(v.auth);
+      expect(toBase64Url(await verifierHash(got.lookup))).toBe(v.lookupHash);
+      expect(toBase64Url(await verifierHash(got.auth))).toBe(v.authHash);
     }
   });
 
@@ -178,8 +199,14 @@ describe("shared test vectors", () => {
             b(r.sealed),
             b(r.approverKey),
           );
+        } else if (r.op === "sealToDevice") {
+          await sealToDevice(b(r.publicKey), r.ctx, b(r.dataKey));
+        } else if (r.op === "openFromDevice") {
+          await openFromDevice(await importDevicePrivateKey(b(r.privateKey)), r.ctx, b(r.sealed));
         } else if (r.op === "openKeyLink") {
           await openKeyLink(b(r.newKey), r.ctx, b(r.link));
+        } else if (r.op === "recoveryVerifier") {
+          await recoveryVerifier(b(r.secret));
         } else if (r.op === "parseRecoveryKey") {
           parseRecoveryKey(r.text);
         } else {

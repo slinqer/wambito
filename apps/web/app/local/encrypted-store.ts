@@ -1,150 +1,37 @@
 import type { RecordBodies, RecordType } from "@wambito/core";
 import { RECORD_TYPES } from "@wambito/core";
 import {
+  changedKeys,
+  type EncryptedStore,
+  type OutboxEntry,
+  type OutboxPark,
+  type QuarantineEntry,
+  type RawRecord,
+  type ReadOptions,
+  type SetAsideOutcome,
+  type StoredRecord,
+  type StoreOps,
+  VaultClosedError,
+  type WriteOptions,
+} from "@wambito/vault";
+import {
   committed,
   DATA_STORES,
   KEYS,
   META,
   OUTBOX,
-  type OutboxEntry,
-  type OutboxPark,
   openVault,
   QUARANTINE,
-  type QuarantineEntry,
   request,
   type StoredRow,
 } from "./db.ts";
-import type { FinanceStore, ReadOptions, StoredRecord, StoreOps, WriteOptions } from "./store.ts";
 
-/** What the sync engine reads about a record: the plaintext and its envelope. */
-export interface RawRecord<T extends RecordType = RecordType> {
-  id: string;
-  body: RecordBodies[T];
-  deleted: boolean;
-  version: number;
-  keyV: number;
-}
-
-/**
- * Thrown by every operation once the store is closed: by `close()`, or because another tab
- * deleted or upgraded the vault (`versionchange`). The session must reopen or sign out.
- */
-export class VaultClosedError extends Error {
-  readonly code = "vault_closed";
-  constructor() {
-    super("The vault is closed");
-    this.name = "VaultClosedError";
-  }
-}
-
-/** What `restoreSetAside` does with one set-aside change. */
-export type SetAsideOutcome =
-  /** Write `put` as a local write: the outbox entry pushes it as an edit of the fresh copy. */
-  | { put: unknown }
-  /** Delete the record as a local write. */
-  | { delete: true }
-  /** Forget the change. */
-  | { drop: true };
+export { changedKeys, type EncryptedStore, type RawRecord, type SetAsideOutcome, VaultClosedError };
 
 /** The BroadcastChannel a vault's stores tell each other about commits on. */
 export const vaultChannelName = (userId: string) => `wambito-vault-${userId}`;
 
-/** A `FinanceStore` over IndexedDB, plus what the sync engine and the key setup need. */
-export interface EncryptedStore extends FinanceStore {
-  /** The record with its server version and key version (tombstones included). */
-  getRaw<T extends RecordType>(type: T, id: string): Promise<RawRecord<T> | undefined>;
-  /** The pending changes, oldest first. */
-  readOutbox(limit: number): Promise<OutboxEntry[]>;
-  /**
-   * The server accepted the change read as `seq` and gave it `version` (sealed under `keyV`, when
-   * given). Records them, and clears the entry only if there was no newer local write since;
-   * otherwise the entry stays, now based on `version`.
-   */
-  ackOutbox(id: string, version: number, seq: number, keyV?: number): Promise<void>;
-  /**
-   * The upgrade pass: adds a `reseal` outbox entry (no body change, based on the record's version)
-   * for records the server has (version above 0, not deleted) sealed under a key version below
-   * `current` and with no outbox entry, until `limit` reseal entries are pending (those already
-   * pending count). Returns how many it added. Notifies nobody (the engine's own write).
-   */
-  queueReseal(current: number, limit: number): Promise<number>;
-  /**
-   * The key versions the server copies of the local records (not deleted, pushed) are under, and
-   * those of quarantined records (they may still be retried).
-   */
-  keyVersionsInUse(): Promise<Set<number>>;
-  /**
-   * The engine gives up on the change read as `seq` for now: stores `park` on it. A no-op when a
-   * newer local write replaced it (that write is pushed normally).
-   */
-  parkOutbox(id: string, seq: number, park: OutboxPark): Promise<void>;
-  /**
-   * The engine gives up on the change read as `seq` for good: stores `park` and `abandoned`, so it
-   * is never pushed again and remote writes of the id go through (and remove the entry). A no-op
-   * when a newer local write replaced it.
-   */
-  abandonOutbox(id: string, seq: number, park: OutboxPark): Promise<void>;
-  /**
-   * A create (pushed as `seq`) lost to the server's copy of the same id. Without a newer local
-   * write, the server's copy replaces the record and the entry goes. With one, the server's copy
-   * becomes the base and `rebase(localBody)` says what to keep: the body and the fields the person
-   * changed after the create (`touched`; none: the entry goes). One commit; notifies subscribers.
-   */
-  adoptServerCopy(
-    type: RecordType,
-    id: string,
-    seq: number,
-    server: { version: number; keyV: number; body: unknown },
-    rebase: (local: unknown) => { body: unknown; touched: string[] },
-  ): Promise<void>;
-  getMeta<T = unknown>(key: string): Promise<T | undefined>;
-  setMeta(key: string, value: unknown): Promise<void>;
-  /** Keeps a record that could not be opened; a later remote write of the id clears its rows. */
-  quarantine(entry: QuarantineEntry): Promise<void>;
-  /** Every quarantine row (the sync retries the `unknown_key_version` ones after a refresh). */
-  quarantined(): Promise<QuarantineEntry[]>;
-  quarantineCount(): Promise<number>;
-  /**
-   * The server asked for a resync: forgets every record, the quarantine and the `latest` and
-   * `base` cursors. Keys, `keyV`, `userId` and the outbox stay; in the same commit every outbox
-   * entry is set aside with its current body (`setAside`), so no pending change (another tab's
-   * included) is lost if the download fails. Notifies subscribers.
-   */
-  wipeRecords(): Promise<void>;
-  /**
-   * After the full download: for each set-aside change, `resolve` (synchronous) gets the entry and
-   * the fresh record (if any) and says what to write. All of it in one commit; the entries come
-   * back as ordinary pending changes based on the fresh version, or are removed.
-   */
-  restoreSetAside(
-    resolve: (entry: OutboxEntry, fresh: RawRecord | undefined) => SetAsideOutcome,
-  ): Promise<void>;
-  /** The CryptoKeys and the device private key (`keys` store), by name. */
-  getKey<T = unknown>(name: string): Promise<T | undefined>;
-  putKey(name: string, key: unknown): Promise<void>;
-  deleteKey(name: string): Promise<void>;
-  /** The names in the `keys` store (`record:<v>`, `dedupe:<v>`, `device`). */
-  keyNames(): Promise<string[]>;
-  /** Closes the database; every later operation rejects with `VaultClosedError`. */
-  close(): void;
-  isClosed(): boolean;
-  /** Called once when the store closes (`close()` or another tab's `versionchange`). */
-  onClosed(listener: () => void): () => void;
-}
-
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-
-/** The fields whose value differs between two bodies (all of the new body's when there is no old). */
-export function changedKeys(prev: unknown, next: unknown): string[] {
-  const a = (prev ?? {}) as Record<string, unknown>;
-  const b = (next ?? {}) as Record<string, unknown>;
-  const out: string[] = [];
-  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-    if (!prev || !same(a[key], b[key])) out.push(key);
-  }
-  return out;
-}
-
+/** The IndexedDB `EncryptedStore`: one database per account. */
 export async function createEncryptedStore(userId: string): Promise<EncryptedStore> {
   const db = await openVault(userId);
   const listeners = new Set<() => void>();
@@ -298,19 +185,43 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       async delete(type: RecordType, id: string, opts?: WriteOptions) {
         const prev = await raw(type, id);
         const remote = opts?.origin === "remote";
+        const hasBody = remote && opts?.tombstoneBody !== undefined;
         if (!prev) {
-          // A tombstone of a record this browser never opened: its quarantine rows go.
-          if (remote) await clearAbandoned(type, id);
+          if (remote) {
+            if (await remoteBlocked(id, opts)) return;
+            if (hasBody) {
+              // A tombstone of a record this browser never had, with its body: a tombstone row.
+              await request(
+                store(type).put({
+                  id,
+                  body: opts?.tombstoneBody,
+                  deleted: true,
+                  version: opts?.version ?? 0,
+                  keyV: opts?.keyV ?? 1,
+                  n: await nextSeq(),
+                } satisfies StoredRow),
+              );
+              wrote.value = true;
+            }
+            // Its quarantine rows go.
+            await clearAbandoned(type, id);
+          }
           return;
         }
         if (!remote && prev.deleted) return;
         if (remote && (await remoteBlocked(id, opts))) return;
+        const { bodiless: _, ...rest } = prev;
         await request(
           store(type).put({
-            ...prev,
+            ...rest,
+            ...(hasBody ? { body: opts?.tombstoneBody } : {}),
             deleted: true,
             version: remote ? (opts?.version ?? prev.version) : prev.version,
             keyV: remote ? (opts?.keyV ?? prev.keyV) : prev.keyV,
+            // A remote delete without a body keeps the stale local copy, which is not the server's.
+            ...(remote && !hasBody && (!prev.deleted || prev.bodiless)
+              ? { bodiless: true as const }
+              : {}),
           } satisfies StoredRow),
         );
         wrote.value = true;
@@ -438,6 +349,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         deleted: row.deleted,
         version: row.version,
         keyV: row.keyV,
+        ...(row.deleted && row.bodiless ? { bodiless: true as const } : {}),
       } as RawRecord<T>;
     },
     async readOutbox(limit) {
@@ -446,14 +358,24 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       });
       return all.sort((x, y) => x.seq - y.seq).slice(0, limit);
     },
-    ackOutbox: (id, version, seq, keyV) =>
+    ackOutbox: (id, version, seq, keyV, bodySent) =>
       short([...RECORD_TYPES, OUTBOX], "readwrite", async (tx) => {
         const outbox = tx.objectStore(OUTBOX);
         const entry = (await request(outbox.get(id))) as OutboxEntry | undefined;
         if (!entry) return;
         const records = tx.objectStore(entry.type);
         const row = (await request(records.get(id))) as StoredRow | undefined;
-        if (row) await request(records.put({ ...row, version, keyV: keyV ?? row.keyV }));
+        if (row) {
+          // A tombstone pushed with its body: the server's copy holds it now.
+          const { bodiless: _, ...rest } = row;
+          await request(
+            records.put({
+              ...(row.deleted && bodySent ? rest : row),
+              version,
+              keyV: keyV ?? row.keyV,
+            }),
+          );
+        }
         if (entry.seq === seq) await request(outbox.delete(id));
         else await request(outbox.put({ ...entry, baseVersion: version }));
       }),
@@ -469,14 +391,19 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
           if (room <= 0) break;
           for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
             if (room <= 0) break;
-            if (row.deleted || row.version === 0 || row.keyV >= current || pending.has(row.id)) {
+            if (
+              (row.deleted && row.bodiless) ||
+              row.version === 0 ||
+              row.keyV >= current ||
+              pending.has(row.id)
+            ) {
               continue;
             }
             const entry: OutboxEntry = {
               id: row.id,
               type,
               baseVersion: row.version,
-              deleted: false,
+              deleted: row.deleted,
               touched: [],
               seq: ++seq,
               reseal: true,
@@ -494,7 +421,7 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
         const versions = new Set<number>();
         for (const type of RECORD_TYPES) {
           for (const row of (await request(tx.objectStore(type).getAll())) as StoredRow[]) {
-            if (!row.deleted && row.version > 0) versions.add(row.keyV);
+            if (!(row.deleted && row.bodiless) && row.version > 0) versions.add(row.keyV);
           }
         }
         // A quarantined record may be retried under its version: keep that version's keys.
@@ -551,6 +478,10 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
       short([META], "readwrite", async (tx) => {
         await request(tx.objectStore(META).put(value, key));
       }),
+    deleteMeta: (key) =>
+      short([META], "readwrite", async (tx) => {
+        await request(tx.objectStore(META).delete(key));
+      }),
     quarantine: (entry) =>
       short([QUARANTINE], "readwrite", async (tx) => {
         await request(tx.objectStore(QUARANTINE).put(entry));
@@ -576,6 +507,17 @@ export async function createEncryptedStore(userId: string): Promise<EncryptedSto
           await request(outbox.put({ ...entry, setAside: { body: row?.body ?? null } }));
         }
         for (const name of [...RECORD_TYPES, QUARANTINE]) {
+          await request(tx.objectStore(name).clear());
+        }
+        await request(tx.objectStore(META).delete("latest"));
+        await request(tx.objectStore(META).delete("base"));
+      });
+      notify();
+    },
+    async resetAll() {
+      await transaction(async () => undefined);
+      await short(DATA_STORES, "readwrite", async (tx) => {
+        for (const name of [...RECORD_TYPES, QUARANTINE, OUTBOX]) {
           await request(tx.objectStore(name).clear());
         }
         await request(tx.objectStore(META).delete("latest"));

@@ -4,7 +4,14 @@ import type { Grant } from "../env.ts";
 import { jsonBody, jsonResponse, problems } from "../http/openapi.ts";
 import { ApiError } from "../http/problem.ts";
 import { router } from "../http/router.ts";
-import { KeyWrap, KeyWraps, lowerCaseUuid, PutKeyWrap, RotateKeys } from "../http/schemas.ts";
+import {
+  KeyLink,
+  KeyWrap,
+  KeyWraps,
+  lowerCaseUuid,
+  PutKeyWrap,
+  RotateKeys,
+} from "../http/schemas.ts";
 import {
   deleteKeyWrap,
   listKeys,
@@ -15,6 +22,10 @@ import {
 
 /** The caller's session id; null for an assistant's OAuth grant. */
 const sessionIdOf = (grant: Grant) => (grant.kind === "session" ? grant.sessionId : null);
+
+const AssistantWrap = z
+  .object({ wrap: KeyWrap, links: z.array(KeyLink).openapi({ description: "Ordered by `keyV`" }) })
+  .openapi("AssistantWrap");
 
 const idParam = z.object({ id: lowerCaseUuid() });
 const firstWrapHeader = z.object({
@@ -39,15 +50,18 @@ export function keyRoutes(deps: AppDeps) {
       path: "/v2/keys/assistant",
       operationId: "getAssistantWrap",
       description:
-        "For an assistant's token: the wrap of that assistant (its OAuth client), and marks it used. 404 when the person made none for it, and for every session.",
-      responses: { 200: jsonResponse(KeyWrap, "The assistant's wrap"), ...problems(404) },
+        "For an assistant's token: the wrap of that assistant (its OAuth client), marks it used, and `links` (as `GET /v2/keys`) to open records under older key versions. 404 when the person made none for it (revoking the assistant or rotating the keys deletes it), and for every session.",
+      responses: {
+        200: jsonResponse(AssistantWrap, "The assistant's wrap and the links"),
+        ...problems(404),
+      },
     }),
     async (c) => {
       const grant = c.get("grant");
       if (grant.kind !== "oauth") throw new ApiError(404, "not_found");
-      const wrap = await useAssistantWrap(deps.db, c.get("userId"), grant.clientId);
-      if (!wrap) throw new ApiError(404, "not_found");
-      return c.json(wrap, 200);
+      const found = await useAssistantWrap(deps.db, c.get("userId"), grant.clientId);
+      if (!found) throw new ApiError(404, "not_found");
+      return c.json(found, 200);
     },
   );
 

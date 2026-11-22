@@ -1,0 +1,399 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../core/records.dart' show Json;
+import '../crypto/records.dart' show RecordType;
+
+/// The SQLite file of the encrypted vault: the Dart twin of `apps/web/app/local/db.ts`. Everything
+/// the vault keeps for one account lives in `wambito-vault-<userId>.db`. The keys are not in it
+/// (the web's `keys` store): the phone keeps them in secure storage.
+
+const outboxTable = 'outbox';
+const metaTable = 'meta';
+const quarantineTable = 'quarantine';
+
+String vaultFileName(String userId) => 'wambito-vault-$userId.db';
+
+/// The table of a record type. `transaction` is an SQL keyword, so names are always quoted.
+String recordTable(RecordType type) => type.name;
+
+String quoted(String name) => '"$name"';
+
+/// A local change waiting to be pushed: one entry per record id. Same fields as `db.ts`.
+class OutboxEntry {
+  const OutboxEntry({
+    required this.id,
+    required this.type,
+    required this.baseVersion,
+    required this.deleted,
+    required this.touched,
+    required this.seq,
+    this.park,
+    this.abandoned = false,
+    this.setAside,
+    this.reseal = false,
+  });
+
+  final String id;
+  final RecordType type;
+
+  /// The server version the change is based on; null for a record the server has never seen.
+  final int? baseVersion;
+  final bool deleted;
+
+  /// Body fields changed since the last push (the union over merged writes).
+  final List<String> touched;
+
+  /// Bumped by every local write: the engine acks only the write it read.
+  final int seq;
+
+  /// Set by the engine when this write keeps failing: not pushed again before `park.until`. Any
+  /// local write of the id clears it.
+  final OutboxPark? park;
+
+  /// Set when the engine gave up on this write: never pushed again, the server's copy replaces it.
+  final bool abandoned;
+
+  /// Set by a resync's wipe: the local body at that moment, to be written again onto the fresh
+  /// server copy after the full download.
+  final SetAside? setAside;
+
+  /// Added by the upgrade pass: the record's unchanged body, to be sealed under the current key
+  /// version. A local write of the id turns it into an ordinary edit.
+  final bool reseal;
+
+  OutboxEntry copyWith({
+    int? baseVersion,
+    List<String>? touched,
+    OutboxPark? park,
+    bool? abandoned,
+    SetAside? setAside,
+  }) => OutboxEntry(
+    id: id,
+    type: type,
+    baseVersion: baseVersion ?? this.baseVersion,
+    deleted: deleted,
+    touched: touched ?? this.touched,
+    seq: seq,
+    park: park ?? this.park,
+    abandoned: abandoned ?? this.abandoned,
+    setAside: setAside ?? this.setAside,
+    reseal: reseal,
+  );
+}
+
+class OutboxPark {
+  const OutboxPark({required this.attempts, required this.lastError, required this.until});
+
+  final int attempts;
+
+  /// A short code (`rejected_422`, `conflict_unreadable`, ...), never a body.
+  final String lastError;
+
+  /// Epoch ms before which the engine does not push it again.
+  final int until;
+
+  Json toJson() => {'attempts': attempts, 'lastError': lastError, 'until': until};
+
+  static OutboxPark fromJson(Json j) => OutboxPark(
+    attempts: j['attempts']! as int,
+    lastError: j['lastError']! as String,
+    until: j['until']! as int,
+  );
+}
+
+/// The body a change had when a resync set it aside; null when the record had no row.
+class SetAside {
+  const SetAside(this.body);
+
+  final Json? body;
+}
+
+/// A record that failed to open or validate: counted, never shown, never overwritten.
+class QuarantineEntry {
+  const QuarantineEntry({
+    required this.id,
+    required this.type,
+    required this.version,
+    required this.reason,
+    this.keyV,
+  });
+
+  final String id;
+  final RecordType type;
+  final int version;
+  final String reason;
+
+  /// The key version it was sealed under.
+  final int? keyV;
+}
+
+/// What the sync engine reads about a record: the plaintext and its envelope.
+class RawRecord {
+  const RawRecord({
+    required this.id,
+    required this.body,
+    required this.deleted,
+    required this.version,
+    required this.keyV,
+    this.bodiless = false,
+  });
+
+  final String id;
+  final Json body;
+  final bool deleted;
+
+  /// The server's version; 0 until the record has been pushed.
+  final int version;
+
+  /// The key version the server copy was sealed under.
+  final int keyV;
+
+  /// A tombstone whose server copy has no body as far as this device knows (the local body is a
+  /// stale copy): a server body arriving for it replaces it. Always false for a live record.
+  final bool bodiless;
+}
+
+/// The folder the vault files live in: `vault` in the app's private support folder (Android
+/// `files/vault`). One folder of its own, so the backup rules (Android XML) and the iOS exclusion
+/// cover the file and its SQLite side files (`-journal`, `-wal`, `-shm`) by naming it.
+Future<String> defaultVaultDirectory() async {
+  final dir = Directory(p.join((await getApplicationSupportDirectory()).path, vaultDirectoryName));
+  await dir.create(recursive: true);
+  return dir.path;
+}
+
+/// The vault folder's name under the support folder; `res/xml/backup_rules.xml` names it too.
+const vaultDirectoryName = 'vault';
+
+Future<String> _path(String userId, String? directory) async =>
+    p.join(directory ?? await defaultVaultDirectory(), vaultFileName(userId));
+
+const _recordColumns = '''
+  id TEXT PRIMARY KEY,
+  seq INTEGER NOT NULL,
+  body TEXT NOT NULL,
+  deleted INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  key_v INTEGER NOT NULL,
+  bodiless INTEGER NOT NULL DEFAULT 0''';
+
+/// The schema version of the file. 2 adds `bodiless` to the records tables.
+const vaultSchemaVersion = 2;
+
+Future<void> _create(Database db, int version) async {
+  for (final type in RecordType.values) {
+    final extra = type == RecordType.transaction
+        ? ',\n  date TEXT,\n  category_id TEXT,\n  amount INTEGER'
+        : '';
+    await db.execute('CREATE TABLE ${quoted(recordTable(type))} (\n$_recordColumns$extra)');
+  }
+  await db.execute('CREATE INDEX transaction_date ON "transaction" (date)');
+  await db.execute('CREATE INDEX transaction_category ON "transaction" (category_id)');
+  await db.execute('CREATE INDEX transaction_amount ON "transaction" (amount)');
+  await db.execute('''
+CREATE TABLE $outboxTable (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  base_version INTEGER,
+  deleted INTEGER NOT NULL,
+  touched TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  park TEXT,
+  abandoned INTEGER NOT NULL,
+  set_aside TEXT,
+  reseal INTEGER NOT NULL)''');
+  await db.execute('CREATE INDEX outbox_seq ON $outboxTable (seq)');
+  await db.execute('CREATE TABLE $metaTable (key TEXT PRIMARY KEY, value TEXT)');
+  await db.execute('''
+CREATE TABLE $quarantineTable (
+  type TEXT NOT NULL,
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  key_v INTEGER,
+  PRIMARY KEY (type, id, version))''');
+}
+
+/// From version 1: every records table gets `bodiless` (the server's copy of the tombstone has no
+/// body, as far as this device knows). No server tombstone held a body before, so every tombstone
+/// in the file is marked. Nothing else changes. sqflite runs this under `BEGIN EXCLUSIVE` and reads
+/// the version again inside it, so two connections never both upgrade; the column check is only
+/// defensive: a file a version 1 build reopened (its version set back to 1) has the column already.
+/// The marking still runs then, as that build's tombstones were written without the flag; it is
+/// idempotent.
+Future<void> _upgrade(Database db, int from, int to) async {
+  if (from >= 2) return;
+  for (final type in RecordType.values) {
+    final table = quoted(recordTable(type));
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (!columns.any((c) => c['name'] == 'bodiless')) {
+      await db.execute('ALTER TABLE $table ADD COLUMN bodiless INTEGER NOT NULL DEFAULT 0');
+    }
+    await db.rawUpdate('UPDATE $table SET bodiless = 1 WHERE deleted = 1');
+  }
+}
+
+/// Opens (creating it on the first run) the vault file of [userId]. [directory] and [factory] are
+/// for tests; the app leaves them out.
+///
+/// [singleInstance] false gives the caller its own connection: a headless engine in the app's
+/// process must not share (and so must not close) the app's (sqflite keeps single-instance
+/// databases in a map shared by every engine of the process). Both kinds wait up to 5 s for the
+/// file's write lock (`busy_timeout`) instead of failing with `database is locked`.
+///
+/// The file is in WAL mode. SQLite keeps no queue of waiters: whoever asks when the lock is free
+/// gets it, and a waiter backs off up to 100 ms between tries, so one that keeps losing can pass
+/// `busy_timeout`. In the rollback journal a commit holds the lock across several syncs (the
+/// journal, then the file); in WAL across one, so the lock is free far more often (CI saw a
+/// background engine lose for 5 s in the rollback journal).
+Future<Database> openVault(
+  String userId, {
+  String? directory,
+  DatabaseFactory? factory,
+  bool singleInstance = true,
+}) async {
+  final path = await _path(userId, directory);
+  return (factory ?? databaseFactory).openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: vaultSchemaVersion,
+      onConfigure: (db) async {
+        await db.rawQuery('PRAGMA busy_timeout = 5000');
+        // Kept in the file: set on every open so a file made before it, or a connection that
+        // reset it, ends up in WAL too.
+        await db.rawQuery('PRAGMA journal_mode = WAL');
+      },
+      onCreate: _create,
+      onUpgrade: _upgrade,
+      singleInstance: singleInstance,
+    ),
+  );
+}
+
+/// Signing out: removes the file, the records and the outbox in it, and the lock file. Close the store first.
+Future<void> deleteVault(String userId, {String? directory, DatabaseFactory? factory}) async {
+  final path = await _path(userId, directory);
+  await (factory ?? databaseFactory).deleteDatabase(path);
+  // The lease file of the vault (vault_lock.dart) goes with it.
+  final lock = File('$path-lock');
+  if (lock.existsSync()) lock.deleteSync();
+}
+
+/// The person's changes not sent yet in [userId]'s vault file, read without opening the vault (no
+/// keys needed): what Unlock and Locked count before a sign-out, when a kept vault (a key version
+/// that did not verify, a failed open) may still hold some. Re-seals and given-up changes are not
+/// counted (as `VaultSession.pendingChanges`). 0 when there is no file; throws when it cannot be
+/// read.
+Future<int> pendingChangesInVault(
+  String userId, {
+  String? directory,
+  DatabaseFactory? factory,
+}) async {
+  final path = await _path(userId, directory);
+  if (!File(path).existsSync()) return 0;
+  final db = await (factory ?? databaseFactory).openDatabase(
+    path,
+    options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+  );
+  try {
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM $outboxTable WHERE reseal = 0 AND abandoned = 0',
+    );
+    return (rows.first['n'] as int?) ?? 0;
+  } finally {
+    await db.close();
+  }
+}
+
+/// Why a vault is kept by the stale-vault sweep (`meta.hold`): a vault being merged into an
+/// account, adopted, or made before its account exists must not be swept away.
+enum VaultHoldKind { provisional, orphaned, merging }
+
+class VaultHold {
+  const VaultHold(this.kind, {this.target, required this.since});
+
+  final VaultHoldKind kind;
+
+  /// The new user id for `orphaned`, the email for `merging`.
+  final String? target;
+
+  /// When the hold was made (an ISO instant).
+  final String since;
+
+  Map<String, Object?> toJson() => {'kind': kind.name, 'target': target, 'since': since};
+
+  /// Null for anything that is not a hold.
+  static VaultHold? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final kind = VaultHoldKind.values.where((k) => k.name == json['kind']).firstOrNull;
+    final since = json['since'];
+    final target = json['target'];
+    if (kind == null || since is! String || (target != null && target is! String)) return null;
+    return VaultHold(kind, target: target as String?, since: since);
+  }
+}
+
+Future<T> _readOnly<T>(
+  String path,
+  DatabaseFactory? factory,
+  Future<T> Function(Database db) read,
+) async {
+  final db = await (factory ?? databaseFactory).openDatabase(
+    path,
+    options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+  );
+  try {
+    return await read(db);
+  } finally {
+    await db.close();
+  }
+}
+
+Future<VaultHold?> _holdIn(Database db) async {
+  final rows = await db.query(metaTable, where: 'key = ?', whereArgs: ['hold']);
+  if (rows.isEmpty) return null;
+  final hold = VaultHold.fromJson(jsonDecode(rows.first['value']! as String));
+  if (hold == null) throw const FormatException('unreadable vault hold');
+  return hold;
+}
+
+/// The hold of [userId]'s vault, read without opening the vault (no keys; works while the store
+/// is open elsewhere). Null without a file or a hold; throws when the file cannot be read.
+Future<VaultHold?> vaultHoldOf(String userId, {String? directory, DatabaseFactory? factory}) async {
+  final path = await _path(userId, directory);
+  if (!File(path).existsSync()) return null;
+  return _readOnly(path, factory, _holdIn);
+}
+
+final _vaultFileName = RegExp(r'^wambito-vault-([A-Za-z0-9_-]{1,128})\.db$');
+
+/// Every vault file in the folder that carries a hold. `userId` is the file's id: the anonymous
+/// id for `merging` (which also names `wambito.vault.<userId>.mergeToken`), the old id for
+/// `orphaned`, the local id for `provisional`. A file whose hold cannot be read (corrupt file,
+/// malformed hold) is not dropped: its id is in `unreadable`, so a resume can tell "no holds" from
+/// "a hold I cannot read" (and must leave that vault alone).
+Future<({List<({String userId, VaultHold hold})> holds, List<String> unreadable})> listVaultHolds({
+  String? directory,
+  DatabaseFactory? factory,
+}) async {
+  final folder = Directory(directory ?? await defaultVaultDirectory());
+  final holds = <({String userId, VaultHold hold})>[];
+  final unreadable = <String>[];
+  if (!folder.existsSync()) return (holds: holds, unreadable: unreadable);
+  for (final entry in folder.listSync()) {
+    final id = _vaultFileName.firstMatch(p.basename(entry.path))?.group(1);
+    if (id == null) continue;
+    try {
+      final hold = await vaultHoldOf(id, directory: folder.path, factory: factory);
+      if (hold != null) holds.add((userId: id, hold: hold));
+    } on Object {
+      unreadable.add(id);
+    }
+  }
+  return (holds: holds, unreadable: unreadable);
+}

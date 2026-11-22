@@ -10,6 +10,7 @@ import '../add/add_repository.dart' show TransactionPatch;
 import '../add/add_sheet.dart';
 import '../add/save_outcome.dart' show deleteUnsent, uploadedRow;
 import '../api/gen/wambito_api.dart';
+import '../api/session.dart' show sessionProvider;
 import '../budgets/category_detail_screen.dart' show detailFromCategories;
 import '../budgets/categories_tab.dart';
 import '../capture/capture_sheet.dart';
@@ -34,6 +35,9 @@ import '../ui/toast.dart';
 import '../ui/transaction_row.dart';
 import 'category_look.dart';
 import 'day_groups.dart';
+import '../protect/protect_actions.dart' show resumeKeyAfterClaim;
+import '../protect/protect_card.dart';
+import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'home_controller.dart';
 import 'home_format.dart';
 import 'home_header.dart';
@@ -42,6 +46,7 @@ import 'home_widgets.dart';
 import 'wambi_line.dart';
 import 'wambi_face.dart';
 import 'nudges.dart';
+import 'widget_card.dart';
 import 'screen_error.dart';
 import 'shell_navigation.dart';
 
@@ -81,8 +86,8 @@ final homeViewRequestProvider = NotifierProvider<HomeViewRequest, HomeView?>(Hom
 /// header (the wordmark, the month with ‹ ›, the face button), Wambi's line, "Te quedan" (or,
 /// without budgets, "Gastado este mes") in large type, a card or two for an account that skipped
 /// the setup, and under the Movimientos | Categorías tabs the movements by day, with the web's
-/// gestures: swipe left deletes (with an 8 s Deshacer), swipe right edits, or marks a pending row
-/// paid. Wambi names a save or a payment for 10 s, then goes back to the month's line. The last
+/// gestures: swipe left opens Borrar (a tap on it deletes, with an 8 s Deshacer), swipe right edits, or
+/// marks a pending row paid. Wambi names a save or a payment for 10 s, then goes back to the month's line. The last
 /// figures stay on screen while offline. The bottom bar has Inicio, ＋ (the add sheet), the 🎤
 /// (quick capture, listening) and Análisis.
 class HomeScreen extends ConsumerStatefulWidget {
@@ -152,6 +157,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // Asked for a tab before home was here (from a screen over it, then back).
     final requested = ref.read(homeViewRequestProvider);
     if (requested != null) scheduleMicrotask(() => _takeRequest(requested));
+    // A claim whose recovery key is still owed (killed on its page, or it could not be made): the
+    // page comes back whenever the vault opens with home here (lib/protect/protect_actions.dart).
+    // (Only with a session read: home shown on its own, as tests do, has no vault to look at.)
+    if (ref.exists(sessionProvider)) {
+      ref.listenManual(vaultSessionProvider, (_, next) {
+        if (next != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _resumeKeyAfterClaim());
+        }
+      }, fireImmediately: true);
+    }
+  }
+
+  var _keyResuming = false;
+
+  Future<void> _resumeKeyAfterClaim() async {
+    if (!mounted || _keyResuming) return;
+    _keyResuming = true;
+    try {
+      await resumeKeyAfterClaim(context, ref);
+    } on Object {
+      // Nothing could be read: the next time the vault opens asks again.
+    } finally {
+      _keyResuming = false;
+    }
   }
 
   /// The import card's button. Back from the import the account may have movements now.
@@ -539,6 +568,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             reviewProvider.select((s) => (s.value ?? const []).isNotEmpty),
                           ))
                             const ReviewHomeRow(),
+                          // After the first movement, until a widget exists or it is put away.
+                          // The account's first movement, in any month; asked only when the card could show.
+                          // "Protect your data" comes first, and the widget card waits while it shows.
+                          if (ref.watch(protectCardProvider.select((s) => s.value ?? false)))
+                            const ProtectCard(key: Key('home.protectCard'))
+                          else if (ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
+                              (data.items.isNotEmpty ||
+                                  ref.watch(hasTransactionsProvider).value == true))
+                            const WidgetCard(key: Key('home.widgetCard')),
                           ?_nudges(shown, l10n),
                         ] else
                           const HomeHeroPlaceholder(),

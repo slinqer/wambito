@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
 import { useApi } from "../../api/ApiProvider.tsx";
 import type { Translator } from "../../api/errors.ts";
+import { forgetUnlockHint } from "../../local/unlock-hint.ts";
 import { landingLink } from "../../site/config.ts";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { Sheet } from "../../ui/Sheet.tsx";
@@ -22,6 +23,7 @@ import { failureMessage } from "./use-profile.ts";
  */
 export function DeleteAccount({
   email,
+  userId,
   signOut,
   onExport,
   exporting,
@@ -29,6 +31,8 @@ export function DeleteAccount({
   canExport = true,
 }: {
   email: string;
+  /** The account's id: its "no PRF here" unlock hint goes with the account. */
+  userId?: string;
   signOut: SignOutRequest;
   onExport(format: ExportFormat): void;
   exporting: boolean;
@@ -76,6 +80,7 @@ export function DeleteAccount({
       setBusy(false);
       return;
     }
+    if (userId) forgetUnlockHint(userId);
     try {
       await signOut();
     } catch {

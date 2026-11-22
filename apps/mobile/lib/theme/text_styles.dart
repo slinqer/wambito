@@ -285,24 +285,6 @@ abstract final class LkText {
     leadingDistribution: TextLeadingDistribution.even,
   );
 
-  /// A bottom bar tab's icon: app.css `.lk-tab .lk-tab-ico`, 18px.
-  static const tabIcon = TextStyle(
-    fontFamily: textFamily,
-    fontSize: 18,
-    fontWeight: FontWeight.w800,
-    height: _inherited,
-    leadingDistribution: TextLeadingDistribution.even,
-  );
-
-  /// The ＋ of the bottom bar: app.css `.lk-plus`, 30px 700.
-  static const plus = TextStyle(
-    fontFamily: textFamily,
-    fontSize: 30,
-    fontWeight: FontWeight.w700,
-    height: _inherited,
-    leadingDistribution: TextLeadingDistribution.even,
-  );
-
   /// The wordmark: app.css `.lk-logo`, Fredoka 22px 700, line height 1. The web paints it with a
   /// gold to candy gradient clipped to the text (`LkWordmark` in home_header.dart does that).
   static const logo = TextStyle(
@@ -355,15 +337,6 @@ abstract final class LkText {
   static const cardLead = TextStyle(
     fontFamily: textFamily,
     fontSize: 12,
-    fontWeight: FontWeight.w700,
-    height: _inherited,
-    leadingDistribution: TextLeadingDistribution.even,
-  );
-
-  /// The face on the avatar button: app.css `.lk-avatar`, 20px.
-  static const avatarGlyph = TextStyle(
-    fontFamily: textFamily,
-    fontSize: 20,
     fontWeight: FontWeight.w700,
     height: _inherited,
     leadingDistribution: TextLeadingDistribution.even,

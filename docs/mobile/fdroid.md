@@ -111,6 +111,10 @@ Not yet measured: a different machine or Linux, which is what F-Droid runs. The 
 | `libdartjni.so` | the `jni` pub package (via `flutter_secure_storage`), built by CMake in the build |
 | `libonnxruntime.so`, `libsherpa-onnx-jni.so` | `arm64-v8a` only: onnxruntime and sherpa-onnx, built by `scripts/build-sherpa-onnx.sh` |
 
+## The QR scanner (CameraX and ZXing)
+
+Approving a new device scans its QR (`lib/scanner/`, Kotlin `scanner/`). It uses `androidx.camera:camera-camera2` and `camera-lifecycle` 1.6.2 (Apache-2.0; no `camera-view`, which would bring media3 and Guava) and `com.google.zxing:core` 3.5.4 (Apache-2.0, plain Java). Both resolve like the other dependencies and are pinned in `gradle.lockfile` and `gradle-fdroid.lockfile` (`android/app`) (`check-gradle-locks.sh`, `check-fdroid-lock.sh`). Whether F-Droid's build server accepts CameraX's prebuilt AARs (not built from source, as Vosk and JNA are) is untested until the recipe is resubmitted. Nothing of ML Kit or Play Services is involved (`camera-mlkit-vision` and `mobile_scanner` are what `check-no-google.sh` refuses). camera-core bundles libyuv (BSD-3), whose notice is in About. The `CAMERA` permission is asked only when someone taps Scan (`check-permissions.sh`), and nothing the camera sees is kept.
+
 ## Voice models and the server
 
 - The voice models are not in the APK. They are downloaded on first use, after an opt-in that shows the size: Vosk small models for Spanish, English, Italian and Portuguese (30 to 50 MB each; Apache-2.0), SHA-256 checked before they are unzipped (`lib/capture/models_download.dart`). They are data, not code. They come from the `voice-models-v1` GitHub release of this repository.

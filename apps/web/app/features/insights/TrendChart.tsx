@@ -4,6 +4,7 @@ import { useTranslations } from "use-intl";
 import type { TrendReport } from "../../api/queries.ts";
 import { formatMoney } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
+import { Icon } from "../../ui/Icon.tsx";
 import { durationToken, useReducedMotionPreference } from "../../ui/motion-tokens.ts";
 import { TREND_MARGIN, X_AXIS_HEIGHT, Y_AXIS_WIDTH } from "./chart-geometry.ts";
 import type { TrendPoint } from "./charts.tsx";
@@ -133,7 +134,7 @@ export function TrendChart({ data, stale, period, current, currency, order }: Tr
               disabled={selected <= 0}
               onClick={() => select(selected - 1)}
             >
-              <span aria-hidden="true">‹</span>
+              <Icon name="chevron-left" size={16} />
             </button>
             <div
               data-testid="trend-readout"
@@ -166,7 +167,7 @@ export function TrendChart({ data, stale, period, current, currency, order }: Tr
               disabled={selected >= months.length - 1}
               onClick={() => select(selected + 1)}
             >
-              <span aria-hidden="true">›</span>
+              <Icon name="chevron-right" size={16} />
             </button>
           </div>
 

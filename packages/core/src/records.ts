@@ -34,6 +34,8 @@ export const transactionRecord = z
     captureSource: z.enum(CAPTURE_SOURCES).nullable().default(null),
     capturedAt: timestamp.nullable().default(null),
     captureMerchantKey: text.nullable().default(null),
+    /** An import's dedupe hash (the plaintext row's `external_hash`), kept by the migration. */
+    externalHash: text.nullable().optional(),
     createdAt: timestamp.optional(),
     /** Set on create and on every edit; an older record has none (read `createdAt`). */
     updatedAt: timestamp.optional(),
@@ -104,6 +106,8 @@ export const settingsRecord = z
     onboardingCompletedAt: timestamp.nullable().default(null),
     /** Wrap ids of the devices removed from the vault; every rotation leaves them out. */
     revokedDevices: z.array(z.uuid()).default([]),
+    /** When a recovery key the person saw was saved (null: none shown yet). */
+    recoveryKeySavedAt: timestamp.nullable().default(null),
   })
   .loose();
 
