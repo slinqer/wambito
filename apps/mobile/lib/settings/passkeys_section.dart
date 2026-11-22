@@ -37,10 +37,12 @@ final _passkeysCanBeMadeProvider = FutureProvider.autoDispose<bool>(
   (ref) => ref.watch(settingsPasskeysProvider).supported(),
 );
 
-/// A day as `2 oct 2026` (es) or `Oct 2, 2026` (en), in the person's time zone.
+/// A day as the web's `dateStyle: "medium"` writes it, in the person's time zone: `2 oct 2026`
+/// (es), `Oct 2, 2026` (en), `2 ott 2026` (it), `02/10/2026` (pt). Passkeys, devices and the
+/// assistants' grants are dated with it.
 String passkeyDay(DateTime at, String locale, String timeZone) {
   final day = todayIn(timeZone, at.toUtc());
-  // The web's `dateStyle: "medium"` in pt-PT is 02/10/2026; Dart's pt_PT yMMMd drops the zeros.
+  // pt-PT's medium date is numeric, day and month in two digits; Dart's pt_PT yMMMd drops zeros.
   if (locale.startsWith('pt')) {
     final p = day.split('-');
     return '${p[2]}/${p[1]}/${p[0]}';
