@@ -6,17 +6,21 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../home/home_cache.dart' show sessionOwnerOf;
 import '../storage/secure_storage.dart';
+import '../ui/lk_brand_logo.dart' show LkBrand;
 
 import '../background/queued_capture.dart';
 
 /// The sources automatic capture reads, by the wire name the Android side uses.
 enum CaptureSource {
-  revolut('revolut', 'Revolut'),
-  googleWallet('google_wallet', 'Google Wallet');
+  revolut('revolut', 'Revolut', LkBrand.revolut),
+  googleWallet('google_wallet', 'Google Wallet', LkBrand.googleWallet);
 
-  const CaptureSource(this.wire, this.label);
+  const CaptureSource(this.wire, this.label, this.brand);
 
   final String wire;
+
+  /// Its logo.
+  final LkBrand brand;
 
   /// The app's own name: the same in every language.
   final String label;

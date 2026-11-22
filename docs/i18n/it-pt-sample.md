@@ -155,7 +155,7 @@ The app's own words, which the web does not have: the capture sheet, guest accou
 | `settingsDeleteVoice` | Borrar los modelos de voz | Elimina i modelli vocali | Apagar os modelos de voz |
 | `settingsDeleteVoiceBody` | No podrás dictar hasta descargarlos de nuevo. Lo que ya anotaste no cambia. | Non potrai dettare finché non li scarichi di nuovo. Quello che hai già annotato non cambia. | Não poderás ditar até os descarregares de novo. O que já registaste não muda. |
 | `settingsServerLead` | Otro servidor es otra cuenta: al cambiar, cierras sesión aquí. | Un altro server è un altro account: se lo cambi, esci da qui. | Outro servidor é outra conta: ao mudares, terminas a sessão aqui. |
-| `settingsHideAmount` | Ocultar el monto en el widget | Nascondi l'importo nel widget | Ocultar o valor no widget |
+| `settingsHideAmount` | Ocultar el monto | Nascondi l'importo | Ocultar o valor |
 
 ### Widget, tile and notices
 

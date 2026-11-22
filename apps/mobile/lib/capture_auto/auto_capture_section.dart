@@ -1,5 +1,6 @@
-// "Captura automática" in Settings (spec sections 2.1 and 4): one switch per source, the state of
-// Android's notification access and, when it is missing, how to grant it. Android only: where the
+// "Captura automática" in Settings (spec sections 2.1 and 4): one switch row per source (its logo,
+// "Activa" / "Apagada"), the state of Android's notification access and, when it is missing, how to
+// grant it (the light `SettingsGroup`, spec 2026-11-22). Android only: where the
 // `wambito/capture` channel does not exist the section is not drawn.
 import 'dart:async';
 
@@ -12,9 +13,10 @@ import '../settings/settings_parts.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_brand_logo.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
-import '../ui/press_link.dart';
 import '../ui/sheet.dart';
 import 'capture_platform.dart';
 import 'how_capture_works.dart';
@@ -125,65 +127,59 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
     if (status == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
+    final tint = colors.inkMuted;
     final missing = status.anyOn && !status.access;
-    return SettingsSection(
+    return SettingsGroup(
       key: const Key('settings.card.autoCapture'),
-      title: l10n.autoCaptureTitle,
-      lead: l10n.autoCaptureLead,
-      children: [
+      head: SettingsGroupHead(
+        icon: LkIcon(LkIconName.wand, size: 22, color: colors.brand),
+        title: l10n.autoCaptureTitle,
+        line: l10n.autoCaptureLead,
+      ),
+      rows: [
         for (final source in CaptureSource.values)
-          SettingSwitch(
+          SettingsRow(
             key: Key('autoCapture.${source.wire}'),
-            label: source.label,
-            value: status.isOn(source),
-            onChanged: (on) => unawaited(_toggle(source, on)),
+            icon: LkBrandLogo(source.brand, size: 20, color: tint),
+            title: source.label,
+            line: status.isOn(source) ? l10n.autoCaptureActive : l10n.autoCaptureOff,
+            trailing: RowSwitch(
+              value: status.isOn(source),
+              onChanged: (on) => unawaited(_toggle(source, on)),
+            ),
           ),
-        if (missing)
-          Column(
+        if (missing) ...[
+          SettingsRow(
             key: const Key('autoCapture.missing'),
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: WambitoTokens.space2,
-            children: [
-              CssParagraph(
-                l10n.autoCaptureMissing,
-                style: LkText.body.copyWith(color: colors.over),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: PressButton.text(
-                  l10n.autoCaptureGrant,
-                  key: const Key('autoCapture.grant'),
-                  tone: PressTone.secondary,
-                  onPressed: () => unawaited(_openAccess()),
-                ),
-              ),
-              if (_tried)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: PressLink.text(
-                    l10n.autoCaptureStuck,
-                    key: const Key('autoCapture.stuck'),
-                    tone: PressTone.secondary,
-                    onPressed: () => unawaited(_showSteps()),
-                  ),
-                ),
-            ],
-          )
-        else if (status.anyOn)
-          CssParagraph(
-            l10n.autoCaptureActive,
-            key: const Key('autoCapture.active'),
-            style: LkText.bodySm.copyWith(color: colors.inkMuted),
+            icon: LkIcon(LkIconName.info, size: 20, color: colors.over),
+            title: l10n.autoCaptureMissing,
+            danger: true,
+            trailing: const RowNone(),
+          ),
+          SettingsRow(
+            key: const Key('autoCapture.grant'),
+            icon: LkIcon(LkIconName.plus, size: 20, color: tint),
+            title: l10n.autoCaptureGrant,
+            trailing: const RowChevron(),
+            onTap: () => unawaited(_openAccess()),
+          ),
+        ],
+        if (missing && _tried)
+          SettingsRow(
+            key: const Key('autoCapture.stuck'),
+            icon: LkIcon(LkIconName.info, size: 20, color: tint),
+            title: l10n.autoCaptureStuck,
+            trailing: const RowChevron(),
+            onTap: () => unawaited(_showSteps()),
           ),
         // Under the apps it reads: what they do, step by step.
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PressLink.text(
-            l10n.autoCaptureHowLink,
-            key: const Key('autoCapture.how'),
-            tone: PressTone.secondary,
-            onPressed: () => unawaited(showHowCaptureWorks(context, askAccess: false)),
-          ),
+        SettingsRow(
+          key: const Key('autoCapture.how'),
+          icon: LkIcon(LkIconName.info, size: 20, color: tint),
+          title: l10n.autoCaptureHowLink,
+          line: l10n.autoCaptureHowLine,
+          trailing: const RowChevron(),
+          onTap: () => unawaited(showHowCaptureWorks(context, askAccess: false)),
         ),
       ],
     );

@@ -367,7 +367,7 @@ void main() {
       await _scrollTo(tester, 'settings.dueNotice');
       expect(
         tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
-        'A las 9:00, un aviso con los pagos recurrentes que vencen hoy.',
+        'A las 9:00, los pagos que vencen hoy',
       );
       handle.dispose();
     });
@@ -380,8 +380,7 @@ void main() {
         await _scrollTo(tester, 'settings.dueNotice');
         expect(
           tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
-          'Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. '
-          'iOS decide la hora exacta.',
+          'Hacia las 9:00, los pagos que vencen hoy',
         );
         handle.dispose();
       } finally {
@@ -401,7 +400,7 @@ void main() {
         await pumpSettingsApp(tester, location: '/settings/capture');
         await _scrollTo(tester, 'settings.guestNotice');
         expect(find.byKey(const Key('settings.hideAmount')), findsNothing);
-        expect(find.text('Ocultar el monto en el widget'), findsNothing);
+        expect(find.text('Ocultar el monto'), findsNothing);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -418,7 +417,7 @@ void main() {
       );
       await _scrollTo(tester, 'settings.dueNotice');
       expect(find.byKey(const Key('settings.guestNotice')), findsNothing);
-      expect(find.text('Aviso si no tienes correo'), findsNothing);
+      expect(find.text('Si no tienes correo'), findsNothing);
     });
 
     testWidgets('the two notices are on, and the widget\'s amount is shown, until chosen', (
@@ -885,7 +884,8 @@ void main() {
     ) async {
       final env = await pumpSettingsApp(tester, location: '/settings/capture', preciseEligible: true);
       await _scrollTo(tester, 'settings.voicePrecise');
-      expect(find.bySemanticsLabel('Mejorar la precisión (+150 MB)'), findsOneWidget);
+      expect(find.text('Mejorar la precisión'), findsOneWidget);
+      expect(find.text('+150 MB · corrige al terminar de hablar'), findsOneWidget);
       expect(switchOn(tester), isFalse);
       await tester.tap(find.byKey(const Key('settings.voicePrecise')));
       await tester.pumpAndSettle();

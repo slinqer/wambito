@@ -9,6 +9,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/auth_api.dart' show PasskeyItem;
 import 'package:wambito/l10n/app_localizations.dart';
+import 'package:wambito/capture_auto/capture_platform.dart' show autoCapturePlatformProvider;
+import 'package:wambito/home/widget_pin.dart' show widgetPinProvider;
 import 'package:wambito/security/screen_lock.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/settings/settings_parts.dart' show SettingsRow;
@@ -16,7 +18,9 @@ import 'package:wambito/ui/toast.dart';
 import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../add/fakes.dart';
+import '../capture_auto/fakes.dart' show FakeAutoCapturePlatform;
 import '../entry/fakes.dart';
+import '../home/fakes.dart' show FakeWidgetPin;
 import '../home/home_harness.dart';
 import '../settings/harness.dart';
 import '../settings/security/fake_security.dart';
@@ -25,12 +29,13 @@ import '../settings/security/fake_security.dart';
 const _data = {'Supermercado', 'Hogar', 'Arriendo'};
 
 /// The text of every paragraph on screen that was cut off (ellipsis or clip) by its `maxLines`.
-List<String> _cutOff(WidgetTester tester) {
+List<String> _cutOff(WidgetTester tester, {Set<String> allow = const {}}) {
   final cut = <String>[];
   void visit(RenderObject object) {
     if (object is RenderParagraph &&
         object.didExceedMaxLines &&
-        !_data.contains(object.text.toPlainText())) {
+        !_data.contains(object.text.toPlainText()) &&
+        !allow.contains(object.text.toPlainText())) {
       cut.add(object.text.toPlainText());
     }
     object.visitChildren(visit);
@@ -54,7 +59,12 @@ List<RenderParagraph> _paragraphs(WidgetTester tester) {
 
 /// No layout error was reported, and none of [labels] is cut off where it is drawn (buttons draw
 /// their label in capitals, as the web's CSS does, so the match ignores case).
-void _expectWhole(WidgetTester tester, List<String> labels, {String? where}) {
+void _expectWhole(
+  WidgetTester tester,
+  List<String> labels, {
+  String? where,
+  Set<String> allow = const {},
+}) {
   expect(tester.takeException(), isNull, reason: where);
   final paragraphs = _paragraphs(tester);
   for (final label in labels) {
@@ -66,7 +76,7 @@ void _expectWhole(WidgetTester tester, List<String> labels, {String? where}) {
       expect(p.didExceedMaxLines, isFalse, reason: '"$label" is cut off ${where ?? ''}');
     }
   }
-  expect(_cutOff(tester), isEmpty, reason: 'text cut off ${where ?? ''}');
+  expect(_cutOff(tester, allow: allow), isEmpty, reason: 'text cut off ${where ?? ''}');
 }
 
 Future<SettingsEnv> _pump(WidgetTester tester, Locale locale, {String? location}) async {
@@ -194,9 +204,21 @@ void main() {
           await _pump(tester, locale, location: category.path);
           final l10n = _l10n(tester);
           expect(tester.takeException(), isNull);
+          // The light rows keep one line: a long muted line under a switch ends in an ellipsis
+          // (the names are whole; spec 2026-11-22), so Captura's lines are not asked to fit.
+          final lines = category == SettingsCategory.capture
+              ? {
+                  l10n.settingsDeleteVoiceHint,
+                  l10n.settingsDueNoticeHint,
+                  l10n.settingsGuestNoticeHint,
+                  l10n.settingsHideAmountHint,
+                  l10n.settingsAddWidgetHint,
+                  l10n.autoCaptureHowLine,
+                }
+              : const <String>{};
           final seen = <String>{};
           for (var i = 0; i < 40; i++) {
-            _expectWhole(tester, const [], where: 'in ${category.name} (screen $i)');
+            _expectWhole(tester, const [], where: 'in ${category.name} (screen $i)', allow: lines);
             seen.addAll(
               tester
                   .widgetList<Text>(find.byType(Text))
@@ -272,6 +294,60 @@ void main() {
           'security.changeKeys',
           'settings.passkeys.turnOn.pk-1',
           'settings.delete',
+        ]) {
+          expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+        }
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the capture page has no overflow and rows of one line, every group showing', (
+        tester,
+      ) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await pumpSettingsApp(
+          tester,
+          locale: locale,
+          location: '/settings/capture',
+          preciseEligible: true,
+          overrides: [
+            // a source on without the access, so the missing row shows too
+            autoCapturePlatformProvider.overrideWithValue(
+              FakeAutoCapturePlatform(sources: {'revolut'}),
+            ),
+            widgetPinProvider.overrideWithValue(FakeWidgetPin(isInstalled: false)),
+          ],
+        );
+        tester.view
+          ..physicalSize = const Size(360, 640)
+          ..devicePixelRatio = 1;
+        await tester.pumpAndSettle();
+        final walked = <String>{};
+        for (var i = 0; i < 40; i++) {
+          expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+          for (final element in find.byType(SettingsRow).evaluate()) {
+            final key = element.widget.key;
+            walked.add('$key');
+            final box = element.renderObject! as RenderBox;
+            expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+          }
+          final scrollable = find.byType(Scrollable).first;
+          final before = tester.state<ScrollableState>(scrollable).position.pixels;
+          await tester.drag(scrollable, const Offset(0, -300));
+          await tester.pumpAndSettle();
+          final after = tester.state<ScrollableState>(scrollable).position.pixels;
+          if (after == before) break;
+        }
+        for (final name in [
+          'autoCapture.revolut',
+          'autoCapture.missing',
+          'autoCapture.how',
+          'settings.voicePrecise',
+          'settings.deleteVoice',
+          'settings.dueNotice',
+          'settings.guestNotice',
+          'settings.addWidget',
+          'settings.hideAmount',
         ]) {
           expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
         }

@@ -1,4 +1,4 @@
-// "Captura automática" in Settings: the steps ("¿Cómo funciona?") before the first switch on, the missing-permission
+// "Captura automática" in Settings (rows in a light group): the steps ("¿Cómo funciona?") before the first switch on, the missing-permission
 // row and the restricted-settings steps, the status read again when the app resumes, and no section
 // where there is no Android side.
 import 'package:flutter/material.dart';
@@ -120,10 +120,12 @@ void main() {
     expect(fake.callsNamed('openAppInfo'), hasLength(1));
   });
 
-  testWidgets('with access granted the section says it is active', (t) async {
+  testWidgets('with access granted the source says Activa and nothing is missing', (t) async {
     await _pump(t, platform: FakeAutoCapturePlatform(access: true, sources: {'google_wallet'}));
-    await _show(t, const Key('autoCapture.active'));
+    await _show(t, const Key('autoCapture.google_wallet'));
 
+    expect(find.text('Activa'), findsOneWidget);
+    expect(find.text('Apagada'), findsOneWidget);
     expect(find.byKey(const Key('autoCapture.missing')), findsNothing);
   });
 
@@ -139,7 +141,7 @@ void main() {
 
     expect(fake.callsNamed('status').length, before + 1);
     expect(find.byKey(const Key('autoCapture.missing')), findsNothing);
-    expect(find.byKey(const Key('autoCapture.active')), findsOneWidget);
+    expect(find.text('Activa'), findsOneWidget);
   });
 
   testWidgets('without an Android side the section is not drawn', (t) async {

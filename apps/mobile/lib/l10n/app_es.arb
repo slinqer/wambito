@@ -1269,11 +1269,12 @@
   "settingsVibration": "Vibración",
   "settingsVibrationHint": "Un toque suave al anotar, deslizar y deshacer.",
   "settingsNotices": "Avisos",
+  "settingsNoticesLine": "Lo que Wambito te recuerda",
   "settingsDueNotice": "Hoy vence…",
-  "settingsDueNoticeHint": "A las 9:00, un aviso con los pagos recurrentes que vencen hoy.",
-  "settingsDueNoticeHintIos": "Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. iOS decide la hora exacta.",
-  "settingsGuestNotice": "Aviso si no tienes correo",
-  "settingsGuestNoticeHint": "Si pasan 45 días sin abrir Wambito y no tienes correo, te avisamos: a los 60 días sin abrirlo se borran tus datos.",
+  "settingsDueNoticeHint": "A las 9:00, los pagos que vencen hoy",
+  "settingsDueNoticeHintIos": "Hacia las 9:00, los pagos que vencen hoy",
+  "settingsGuestNotice": "Si no tienes correo",
+  "settingsGuestNoticeHint": "Antes de que se borren tus datos",
   "noticeAskTitle": "¿Quieres recibir avisos?",
   "noticeAskDue": "Así Wambito puede avisarte a las 9:00 los días en que vence un pago recurrente.",
   "noticeAskDueIos": "Así Wambito puede avisarte hacia las 9:00 los días en que vence un pago recurrente.",
@@ -1281,8 +1282,9 @@
   "noticeAskLater": "Ahora no",
   "noticeAskAllow": "Permitir avisos",
   "settingsWidget": "Widget",
-  "settingsHideAmount": "Ocultar el monto en el widget",
-  "settingsHideAmountHint": "Muestra •••• en vez de lo que te queda.",
+  "settingsWidgetLine": "Anota desde tu pantalla de inicio",
+  "settingsHideAmount": "Ocultar el monto",
+  "settingsHideAmountHint": "Muestra •••• en vez de lo que te queda",
   "widgetCardTitle": "Anota sin abrir la app",
   "widgetCardBody": "Pon a Wambi en tu pantalla de inicio: un toque y anotas el gasto, o díselo en voz alta.",
   "widgetCardAdd": "Añadir widget",
@@ -1293,22 +1295,20 @@
   "widgetStep3": "Busca Wambito y arrástralo a tu pantalla.",
   "widgetStepsDone": "Entendido",
   "settingsAddWidget": "Añadir widget",
-  "settingsAddWidgetHint": "Anota desde tu pantalla de inicio",
+  "settingsAddWidgetHint": "Ponlo en tu pantalla de inicio",
   "settingsVoice": "Voz",
+  "settingsVoiceLine": "Dictar sin internet",
   "settingsDeleteVoice": "Borrar los modelos de voz",
-  "settingsDeleteVoiceHint": "Libera espacio en el teléfono. La próxima vez que dictes, te pedimos descargarlos otra vez.",
-  "settingsVoicePrecise": "Mejorar la precisión (+{megabytes} MB)",
-  "@settingsVoicePrecise": {
-    "description": "Settings, voice: the switch that downloads or deletes the precise model.",
+  "settingsDeleteVoiceHint": "Libera espacio; se descargan al dictar",
+  "settingsVoicePrecise": "Mejorar la precisión",
+  "settingsVoicePreciseLine": "+{megabytes} MB · corrige al terminar de hablar",
+  "@settingsVoicePreciseLine": {
+    "description": "Settings, voice: the precise model's line: its size and what it does.",
     "placeholders": {
       "megabytes": {
         "type": "int"
       }
     }
-  },
-  "settingsVoicePreciseHint": "Un modelo más preciso corrige lo que dices al terminar. Funciona sin internet.",
-  "@settingsVoicePreciseHint": {
-    "description": "Settings, voice: what the precise model does."
   },
   "settingsVoicePreciseFailed": "No pudimos descargar el modelo preciso. Inténtalo otra vez.",
   "@settingsVoicePreciseFailed": {
@@ -1402,7 +1402,6 @@
       }
     }
   },
-  "settingsPhone": "En este teléfono",
   "settingsSoundHintVibrationOff": "Suenan al anotar y al celebrar. La vibración sigue igual.",
   "settingsWebOpen": "Ver la página de Wambito",
   "settingsAboutOpen": "Licencias y más",
@@ -3851,7 +3850,7 @@
   "@autoCaptureTitle": {
     "description": "Settings: the automatic capture card's title, also the how it works sheet's on the first switch on."
   },
-  "autoCaptureLead": "Anota tus gastos e ingresos a partir de las notificaciones de Revolut y Google Wallet.",
+  "autoCaptureLead": "Desde las notificaciones de tus apps",
   "@autoCaptureLead": {
     "description": "Settings: what automatic capture is for."
   },
@@ -3859,10 +3858,12 @@
   "@autoCaptureActive": {
     "description": "Settings: automatic capture is on and has access."
   },
+  "autoCaptureOff": "Apagada",
   "autoCaptureHowLink": "¿Cómo funciona?",
   "@autoCaptureHowLink": {
     "description": "Settings: link that opens the how it works screen of automatic capture."
   },
+  "autoCaptureHowLine": "Qué lee Wambito y qué sale del teléfono",
   "autoCaptureHowNext": "Siguiente",
   "@autoCaptureHowNext": {
     "description": "How it works: button to the next step."
@@ -3972,7 +3973,7 @@
   "@autoCaptureMissing": {
     "description": "Settings: a source is on but Android's notification access is missing."
   },
-  "autoCaptureGrant": "Activar",
+  "autoCaptureGrant": "Dar acceso",
   "@autoCaptureGrant": {
     "description": "Settings: opens Android's notification access screen."
   },
@@ -3984,7 +3985,7 @@
   "@autoCaptureStepsTitle": {
     "description": "The title of the restricted-settings steps sheet."
   },
-  "autoCaptureSteps": "1. Toca Abrir información de la app.\n2. Toca ⋮ arriba a la derecha y elige Permitir ajustes restringidos.\n3. Vuelve aquí y toca Activar.",
+  "autoCaptureSteps": "1. Toca Abrir información de la app.\n2. Toca ⋮ arriba a la derecha y elige Permitir ajustes restringidos.\n3. Vuelve aquí y toca Dar acceso.",
   "@autoCaptureSteps": {
     "description": "Android 13+ APK installs: the steps to allow restricted settings, one per line."
   },
