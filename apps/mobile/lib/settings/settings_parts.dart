@@ -725,6 +725,7 @@ class SettingsRow extends StatelessWidget {
     required this.trailing,
     this.onTap,
     this.danger = false,
+    this.semanticsHint,
   });
 
   final Widget icon;
@@ -733,6 +734,10 @@ class SettingsRow extends StatelessWidget {
   final RowTrailing trailing;
   final VoidCallback? onTap;
   final bool danger;
+
+  /// What a screen reader hears under a switch row's name instead of [line] (the full wording of a
+  /// short line).
+  final String? semanticsHint;
 
   Widget _body(BuildContext context, {required Widget? end}) =>
       LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
@@ -819,7 +824,7 @@ class SettingsRow extends StatelessWidget {
           onPressed: () => t.onChanged(!t.value),
           toggled: t.value,
           label: title,
-          hint: line,
+          hint: semanticsHint ?? line,
           builder: (context, state) => RingBox(
             radius: state.focusVisible ? LkSurface.radius(LkRadius.md) : null,
             color: colors.focus,

@@ -187,4 +187,35 @@ void main() {
     await _show(t, const Key('settings.hideAmount'));
     expect(find.byKey(const Key('settings.addWidget')), findsNothing);
   });
+
+  testWidgets('the notice switches say the full sentence to a screen reader', (t) async {
+    final handle = t.ensureSemantics();
+    await _pump(t);
+    await _show(t, const Key('settings.guestNotice'));
+    expect(
+      t.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
+      'A las 9:00, un aviso con los pagos recurrentes que vencen hoy.',
+    );
+    expect(
+      t.getSemantics(find.byKey(const Key('settings.guestNotice'))).hint,
+      'Si pasan 45 días sin abrir Wambito y no tienes correo, te avisamos: a los 60 días sin '
+      'abrirlo se borran tus datos.',
+    );
+    handle.dispose();
+  });
+
+  testWidgets('iOS: the due switch says around 9:00 and that iOS picks the time', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final handle = t.ensureSemantics();
+    await _pump(t, platform: FakeAutoCapturePlatform(available: false));
+    await _show(t, const Key('settings.dueNotice'));
+    expect(
+      t.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
+      'Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. '
+      'iOS decide la hora exacta.',
+    );
+    handle.dispose();
+    debugDefaultTargetPlatformOverride = null;
+  });
 }

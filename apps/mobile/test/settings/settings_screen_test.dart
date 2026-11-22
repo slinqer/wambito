@@ -367,7 +367,7 @@ void main() {
       await _scrollTo(tester, 'settings.dueNotice');
       expect(
         tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
-        'A las 9:00, los pagos que vencen hoy',
+        'A las 9:00, un aviso con los pagos recurrentes que vencen hoy.',
       );
       handle.dispose();
     });
@@ -380,7 +380,8 @@ void main() {
         await _scrollTo(tester, 'settings.dueNotice');
         expect(
           tester.getSemantics(find.byKey(const Key('settings.dueNotice'))).hint,
-          'Hacia las 9:00, los pagos que vencen hoy',
+          'Hacia las 9:00, un aviso con los pagos recurrentes que vencen hoy. '
+          'iOS decide la hora exacta.',
         );
         handle.dispose();
       } finally {

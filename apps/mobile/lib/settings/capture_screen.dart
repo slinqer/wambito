@@ -169,6 +169,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               line: defaultTargetPlatform == TargetPlatform.iOS
                   ? l10n.settingsDueNoticeHintIos
                   : l10n.settingsDueNoticeHint,
+              semanticsHint: defaultTargetPlatform == TargetPlatform.iOS
+                  ? l10n.settingsDueNoticeFullIos
+                  : l10n.settingsDueNoticeFull,
               trailing: RowSwitch(
                 value: ref.watch(dueNoticeEnabledProvider),
                 onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
@@ -182,6 +185,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 icon: LkIcon(LkIconName.info, size: 20, color: tint),
                 title: l10n.settingsGuestNotice,
                 line: l10n.settingsGuestNoticeHint,
+                semanticsHint: l10n.settingsGuestNoticeFull,
                 trailing: RowSwitch(
                   value: ref.watch(guestNoticeEnabledProvider),
                   onChanged: (on) =>
