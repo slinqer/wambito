@@ -10,13 +10,11 @@ import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
 import { useVaultSession } from "../vault/vault-context.ts";
-import { DeleteAccount } from "./DeleteAccount.tsx";
+import { AccountScreen } from "./AccountScreen.tsx";
 import { FeedbackSection } from "./FeedbackSection.tsx";
-import { PasskeysSection } from "./PasskeysSection.tsx";
 import { PreferencesSection } from "./PreferencesSection.tsx";
 import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
-import { SecuritySection } from "./SecuritySection.tsx";
 import { liveSecurity, type SecurityApi } from "./security.ts";
 import { isSettingsCategory, type SettingsCategory } from "./settings-categories.ts";
 import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
@@ -81,27 +79,13 @@ export function SettingsCategoryBody({
       return <AgentsScreen timeZone={me.timezone} {...(copy ? { copy } : {})} />;
     case "account":
       return (
-        <>
-          <PasskeysSection
-            passkeys={passkeys}
-            timeZone={me.timezone}
-            off={demo}
-            vaultUserId={local ? me.id : undefined}
-            security={security ?? undefined}
-          />
-          {security && (
-            <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
-          )}
-          <DeleteAccount
-            email={me.email}
-            {...(demo ? {} : { userId: me.id })}
-            signOut={signOut}
-            onExport={(format) => void exporter.run(format)}
-            exporting={exporter.busy !== null}
-            off={demo}
-            canExport={!local}
-          />
-        </>
+        <AccountScreen
+          passkeys={passkeys}
+          security={security}
+          signOut={signOut}
+          onExport={(format) => void exporter.run(format)}
+          exporting={exporter.busy !== null}
+        />
       );
     case "preferences":
       return (

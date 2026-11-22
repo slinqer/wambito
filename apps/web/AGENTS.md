@@ -414,8 +414,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   keeps the shared `Takeover`, `RecoveryKeyField`, `PasskeyList`, `keyErrorOf` and `problemOf`); the
   web's "Change keys" (`ChangeKeysSheet`) still rotates; a
   `Takeover` makes the rest of the page `inert`); `PasskeysSection` with
-  `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
-  then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
+  `security` adds, under a passkey whose wrap is missing, a row "Activar <name> para tus datos"
+  ("Does not open your data"; `evaluatePrf([id])` then `addPasskeyWrap`; `no_prf` names the
+  recovery key and another device). Stories
   `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.
   "Protect your data" (spec 2026-11-15 section 5.2; `ProtectSection.tsx`, above the passkeys,
   only for a `local` account whose profile `isAnonymous`): `protect-model.ts` `protectStatus({
@@ -465,7 +466,12 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   handshake scene `public/wambi/handshake-<id>.webp`, three steps, help link) or "Revocar", other
   grants after them with the `chat` icon, the connector address; the list is read again on window
   focus and a new grant of one of the four toasts once; copy `settings.agents.*`; stories
-  `Settings/Agents`; the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
+  `Settings/Agents`;
+  "Cuenta y seguridad" (`AccountScreen.tsx`: the email, then `PasskeysSection` and `SecuritySection`
+  as `SettingsGroup`s with a `head` (icon tile, title, one line), rows with one line each, the
+  device icon from `deviceIconName`, and `DeleteAccount` as one red row; a plain account has only the
+  passkeys and the delete row; the long explanations live in the sheets the rows open; copy
+  `settings.passkeys.*`, `settings.security.*`, `settings.delete.*`; stories `Settings/Account`); the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
   stacks every category's cards) until their categories are redrawn.
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how

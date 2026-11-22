@@ -171,7 +171,7 @@ test("deleting the account signs out to the landing; the same email then starts 
 
   await openSettings(page);
   await openCategory(page, /^Cuenta y seguridad/, "account", "Cuenta y seguridad");
-  await page.getByRole("button", { name: "Eliminar mi cuenta" }).click();
+  await page.getByRole("button", { name: /^Eliminar tu cuenta/ }).click();
   const sheet = page.getByRole("dialog", { name: "¿Eliminar tu cuenta?" });
   const confirm = sheet.getByRole("button", { name: "Sí, eliminar mi cuenta" });
   await expect(confirm).toBeDisabled();
@@ -207,20 +207,21 @@ test("a passkey added from settings is listed, and deleting it empties the list"
   await addVirtualAuthenticator(page);
   await openSettings(page);
   await openCategory(page, /^Cuenta y seguridad/, "account", "Cuenta y seguridad");
-  const keys = page.getByRole("region", { name: "Entrar con tu huella" });
+  const keys = page.getByRole("group", { name: "Entrar con tu huella" });
   await expect(keys).toContainText("Aún no tienes ninguna");
   await keys.getByRole("button", { name: "Agregar una huella" }).click();
   await expect(page.getByRole("status")).toContainText("Listo: ya puedes entrar con tu huella.");
-  await expect(keys.getByRole("listitem")).toHaveCount(1);
+  const trash = keys.getByRole("button", { name: /^Eliminar / });
+  await expect(trash).toHaveCount(1);
   // Dated by the server's clock (the page's is pinned).
-  await expect(keys.getByRole("listitem")).toContainText(/Creada el \d{1,2} \w{3} \d{4}/);
+  await expect(keys).toContainText(/Desde el \d{1,2} \w{3} \d{4}/);
 
-  await keys.getByRole("button", { name: /^Eliminar / }).click();
+  await trash.click();
   await page
     .getByRole("dialog", { name: "¿Eliminar esta huella?" })
     .getByRole("button", { name: "Sí, eliminar" })
     .click();
-  await expect(keys.getByRole("listitem")).toHaveCount(0);
+  await expect(trash).toHaveCount(0);
   await expect(keys).toContainText("Aún no tienes ninguna");
   // With no passkey left, the sign-in screen no longer offers the fingerprint here.
   expect(await page.evaluate(() => localStorage.getItem("wambito.passkey.used"))).toBe("0");

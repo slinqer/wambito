@@ -37,7 +37,7 @@ const LANG = {
     off: "En el demo esto no está disponible. Crea tu cuenta para usarlo.",
     viewing: "Estás viendo el demo de Valentina.",
     exportJson: "Descargar JSON",
-    deleteAccount: "Eliminar mi cuenta",
+    deleteAccount: "Eliminar tu cuenta",
     importAction: "Importar desde Budge",
   },
   en: {
@@ -66,7 +66,7 @@ const LANG = {
     off: "Not available in the demo. Create your account to use it.",
     viewing: "You're viewing Valentina's demo.",
     exportJson: "Download JSON",
-    deleteAccount: "Delete my account",
+    deleteAccount: "Delete your account",
     importAction: "Import from Budge",
   },
 } as const;
@@ -230,7 +230,9 @@ test("es: every demo screen keeps its links in /demo, and settings turns off wha
   await expect(page).toHaveURL(/\/demo\/settings$/);
   await menu.nth(1).click();
   await expect(page).toHaveURL(/\/demo\/settings\/account$/);
-  await expect(page.getByRole("button", { name: l.deleteAccount })).toBeDisabled();
+  // the row has no action in the demo (a note says why)
+  await expect(page.getByRole("button", { name: l.deleteAccount })).toHaveCount(0);
+  await expect(page.getByText(l.deleteAccount, { exact: true })).toBeVisible();
   await expect(page.getByText(l.off)).toHaveCount(2);
   await expectLinksStayInDemo(page);
   await expectNoAxeViolations(page);

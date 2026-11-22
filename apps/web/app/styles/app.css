@@ -1385,8 +1385,20 @@
     text-transform: uppercase;
     color: var(--ink-muted);
   }
-  .lk-group > :is(.lk-row, .lk-row-split) + :is(.lk-row, .lk-row-split) {
+  .lk-group > :is(.lk-row, .lk-row-split) + :is(.lk-row, .lk-row-split),
+  .lk-group > .lk-group-head + :is(.lk-row, .lk-row-split) {
     border-top: 2px solid var(--stroke);
+  }
+  .lk-group-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+  .lk-group-head-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink);
   }
   .lk-row {
     display: flex;

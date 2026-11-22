@@ -6,10 +6,11 @@ import { useApi } from "../../api/ApiProvider.tsx";
 import type { Translator } from "../../api/errors.ts";
 import { forgetUnlockHint } from "../../local/unlock-hint.ts";
 import { landingLink } from "../../site/config.ts";
+import { Icon } from "../../ui/Icon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { Sheet } from "../../ui/Sheet.tsx";
 import type { SignOutRequest } from "../home/use-sign-out.ts";
-import { DemoOffNote, SettingsSection } from "./parts.tsx";
+import { DemoOffNote, SettingsGroup, SettingsRow } from "./parts.tsx";
 import { emailMatches } from "./settings-model.ts";
 import type { ExportFormat } from "./use-export.ts";
 import { failureMessage } from "./use-profile.ts";
@@ -96,16 +97,15 @@ export function DeleteAccount({
   };
 
   return (
-    <SettingsSection title={t("title")} lead={t("lead")} tone="danger">
-      <PressButton
-        variant="secondary"
-        className="self-start text-over"
-        disabled={off}
-        aria-describedby={off ? offId : undefined}
-        onClick={() => setOpen(true)}
-      >
-        {t("action")}
-      </PressButton>
+    <SettingsGroup>
+      <SettingsRow
+        tone="danger"
+        icon={<Icon name="trash" size={20} />}
+        title={t("title")}
+        line={t("line")}
+        trailing={{ kind: "chevron" }}
+        {...(off ? {} : { onPress: () => setOpen(true) })}
+      />
       {off && <DemoOffNote id={offId} />}
       <Sheet open={open} onClose={close} title={t("sheet_title")}>
         <div className="flex flex-col gap-(--space-4) pt-(--space-3)">
@@ -168,6 +168,6 @@ export function DeleteAccount({
           </div>
         </div>
       </Sheet>
-    </SettingsSection>
+    </SettingsGroup>
   );
 }

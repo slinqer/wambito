@@ -190,18 +190,58 @@ export type Trailing =
   | { kind: "none" };
 
 /**
- * A light group of rows (a settings category's list): `surface-row` with a 2px stroke, an optional
- * small uppercase label, rows divided by a 2px line. Named by its label when it has one.
+ * The head of a [SettingsGroup]: a 40 px icon tile, the group's title and one muted line. `id` is
+ * what the group's `aria-labelledby` points at.
  */
-export function SettingsGroup({ label, children }: { label?: string; children: ReactNode }) {
+export function SettingsGroupHead({
+  icon,
+  title,
+  line,
+  id,
+}: {
+  icon: ReactNode;
+  title: string;
+  line?: string;
+  id?: string;
+}) {
+  return (
+    <div className="lk-group-head">
+      <span className="lk-menutile" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="lk-row-text">
+        <span id={id} className="lk-group-head-title">
+          {title}
+        </span>
+        {line && <span className="lk-row-line text-ink-muted">{line}</span>}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A light group of rows (a settings category's list): `surface-row` with a 2px stroke, an optional
+ * small uppercase label or a [SettingsGroupHead] (`head`), rows divided by a 2px line. Named by
+ * its label or head title when it has one.
+ */
+export function SettingsGroup({
+  label,
+  head,
+  children,
+}: {
+  label?: string;
+  head?: { icon: ReactNode; title: string; line?: string };
+  children: ReactNode;
+}) {
   const id = useId();
   return (
-    <div role="group" aria-labelledby={label ? id : undefined} className="lk-group">
+    <div role="group" aria-labelledby={label || head ? id : undefined} className="lk-group">
       {label && (
         <div id={id} className="lk-group-label">
           {label}
         </div>
       )}
+      {head && <SettingsGroupHead id={id} {...head} />}
       {children}
     </div>
   );

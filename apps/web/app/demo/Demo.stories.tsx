@@ -149,21 +149,19 @@ export const SettingsOffByDay: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { name: "Settings", level: 1 });
     // No sign-in happened: the line says whose made-up account this is.
-    await expect(canvas.getByText("You're viewing Valentina's demo.")).toBeVisible();
+    await expect(canvas.getAllByText("You're viewing Valentina's demo.")[0]).toBeVisible();
     await expect(canvas.queryByText(/Signed in as/)).toBeNull();
     const note = "Not available in the demo. Create your account to use it.";
     await expect(canvas.getAllByText(note)).toHaveLength(3);
-    for (const name of [
-      "Download JSON",
-      "Download CSV",
-      "Import from Budge",
-      "Delete my account",
-    ]) {
+    for (const name of ["Download JSON", "Download CSV", "Import from Budge"]) {
       const button = canvas.getByRole("button", { name });
       await expect(button).toBeDisabled();
       await expect(button).toHaveAccessibleDescription(note);
     }
-    await expect(canvas.getByRole("button", { name: /Add a fingerprint/ })).toBeDisabled();
+    // the passkey and delete rows have no action in the demo; each carries its note
+    await expect(canvas.getByText("Add a fingerprint")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: /Add a fingerprint/ })).toBeNull();
+    await expect(canvas.getByText("Deletes your account and your entries")).toBeVisible();
     // The four apps to connect and the address, but no grants: the demo asks the API nothing.
     const assistants = within(canvas.getByRole("region", { name: "Wambito's address" }));
     await expect(

@@ -78,3 +78,8 @@ export function passkeyRows(
     unlocks: refs ? refs.has(item.credentialId) : null,
   }));
 }
+
+/** `laptop` when a passkey or device name looks like a computer, else `phone`. */
+export function deviceIconName(name: string | null | undefined): "laptop" | "phone" {
+  return /mac|windows|linux|chrome ?os|\bpc\b|laptop/i.test(name ?? "") ? "laptop" : "phone";
+}

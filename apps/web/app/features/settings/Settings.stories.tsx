@@ -52,6 +52,9 @@ const title = (canvas: Canvas, name = "Ajustes") =>
 const region = async (canvas: Canvas, name: string) =>
   within(await canvas.findByRole("region", { name }));
 
+const group = async (canvas: Canvas, name: string) =>
+  within(await canvas.findByRole("group", { name }));
+
 /** Waits until a toast saying `text` has fully faded in (so the a11y checks see it settled). */
 const toastShown = (text: string | RegExp, role: "status" | "alert" = "status") =>
   waitFor(
@@ -87,14 +90,13 @@ export const Overview: Story = {
     for (const name of [
       "Preferencias",
       "Hora y moneda",
-      "Entrar con tu huella",
       "Tus datos",
       "La dirección de Wambito",
       "Comentarios e ideas",
-      "Eliminar tu cuenta",
     ]) {
       await expect(canvas.getByRole("region", { name })).toBeVisible();
     }
+    await expect(canvas.getByRole("group", { name: "Entrar con tu huella" })).toBeVisible();
     await expect(canvas.getByRole("radio", { name: "Español" })).toBeChecked();
     await expect(canvas.getByRole("radio", { name: "Noche" })).toBeChecked();
     await expect(canvas.getByRole("switch", { name: "Sonidos" })).toBeChecked();
@@ -102,7 +104,7 @@ export const Overview: Story = {
       "href",
       "/app/import",
     );
-    await expectTarget(canvas.getByRole("button", { name: "Eliminar mi cuenta" }));
+    await expectTarget(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
   },
 };
 
@@ -115,7 +117,7 @@ export const DeleteNeedsExactEmail: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Eliminar mi cuenta" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "¿Eliminar tu cuenta?" }));
     const confirm = sheet.getByRole("button", { name: "Sí, eliminar mi cuenta" });
     const email = sheet.getByRole("textbox", { name: "Escribe tu correo para confirmar" });
@@ -146,7 +148,7 @@ export const DeleteWithEnter: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Eliminar mi cuenta" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
     const sheet = within(await screen.findByRole("dialog", { name: "¿Eliminar tu cuenta?" }));
     const email = sheet.getByRole("textbox", { name: "Escribe tu correo para confirmar" });
     await userEvent.type(email, "ana@example.co{Enter}");
@@ -169,7 +171,7 @@ export const DeleteOffersExportAndSurvivesFailure: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await userEvent.click(canvas.getByRole("button", { name: "Eliminar mi cuenta" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
     const dialog = await screen.findByRole("dialog", { name: "¿Eliminar tu cuenta?" });
     const sheet = within(dialog);
     await userEvent.click(sheet.getByRole("button", { name: "Descarga tus datos antes" }));
@@ -389,11 +391,13 @@ export const Passkeys: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const keys = await region(canvas, "Entrar con tu huella");
-    await expect(await keys.findByText("Creada el 2 oct 2026")).toBeVisible();
+    const keys = await group(canvas, "Entrar con tu huella");
+    await expect(await keys.findByText("Desde el 2 oct 2026 · sincronizada")).toBeVisible();
     await userEvent.click(keys.getByRole("button", { name: "Agregar una huella" }));
     await toastShown("Listo: ya puedes entrar con tu huella.");
-    await waitFor(() => expect(keys.getAllByRole("listitem")).toHaveLength(2));
+    await waitFor(() =>
+      expect(keys.getAllByRole("button", { name: /^Eliminar / })).toHaveLength(2),
+    );
 
     await userEvent.click(
       keys.getByRole("button", { name: "Eliminar la huella creada el 2 oct 2026" }),
@@ -401,7 +405,9 @@ export const Passkeys: Story = {
     const sheet = within(await screen.findByRole("dialog", { name: "¿Eliminar esta huella?" }));
     await userEvent.click(sheet.getByRole("button", { name: "Sí, eliminar" }));
     await dialogGone();
-    await waitFor(() => expect(keys.getAllByRole("listitem")).toHaveLength(1));
+    await waitFor(() =>
+      expect(keys.getAllByRole("button", { name: /^Eliminar / })).toHaveLength(1),
+    );
     await toastShown("Eliminamos la huella.");
   },
 };
@@ -412,10 +418,8 @@ export const PasskeysUnsupported: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const keys = await region(canvas, "Entrar con tu huella");
-    await expect(
-      await keys.findByText("Aún no tienes ninguna: entras con el código de tu correo."),
-    ).toBeVisible();
+    const keys = await group(canvas, "Entrar con tu huella");
+    await expect(await keys.findByText(/Aún no tienes ninguna/)).toBeVisible();
     await expect(
       keys.getByText("Este navegador no permite crear huellas. Sigue entrando con tu correo."),
     ).toBeVisible();
@@ -504,7 +508,7 @@ export const English: Story = {
     const canvas = within(canvasElement);
     await title(canvas, "Settings");
     await expect(canvas.getByRole("radio", { name: "English" })).toBeChecked();
-    await expect(canvas.getByRole("button", { name: "Delete my account" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Delete your account/ })).toBeVisible();
   },
 };
 
@@ -586,7 +590,7 @@ export const AppSectionsCurrencyOpen: Story = {
     await title(canvas);
     const time = await region(canvas, "Hora y moneda");
     await time.findByRole("radio", { name: /Euro/ });
-    await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
+    await canvas.findByText(/Aún no tienes ninguna/);
     // The currency's own options, not the whole card, fill the top of the picture.
     await scrollTo(time.getByRole("radio", { name: /Euro/ }).closest("fieldset") as HTMLElement);
   },
@@ -620,9 +624,9 @@ export const AppSectionsPasskeys: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const keys = await region(canvas, "Entrar con tu huella");
-    await keys.findByText("Creada el 2 oct 2026");
-    await scrollTo(canvas.getByRole("region", { name: "Entrar con tu huella" }));
+    const keys = await group(canvas, "Entrar con tu huella");
+    await keys.findByText("Desde el 2 oct 2026 · sincronizada");
+    await scrollTo(canvas.getByRole("group", { name: "Entrar con tu huella" }));
   },
 };
 
@@ -633,7 +637,7 @@ export const AppSectionsData: Story = {
     const canvas = within(canvasElement);
     await title(canvas);
     // The passkeys' list has loaded: the page is as tall as it will be.
-    await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
+    await canvas.findByText(/Aún no tienes ninguna/);
     await scrollTo(canvas.getByRole("region", { name: "Tus datos" }));
   },
 };
@@ -689,7 +693,7 @@ export const PasskeyRemoveSheetOpen: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    const keys = await region(canvas, "Entrar con tu huella");
+    const keys = await group(canvas, "Entrar con tu huella");
     await userEvent.click(
       await keys.findByRole("button", { name: "Eliminar la huella creada el 2 oct 2026" }),
     );
@@ -706,18 +710,18 @@ export const AppSectionsDelete: Story = {
     const canvas = within(canvasElement);
     await title(canvas);
     // The passkeys' list has loaded: the page is as tall as it will be.
-    await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
-    await scrollTo(canvas.getByRole("region", { name: "Eliminar tu cuenta" }));
+    await canvas.findByText(/Aún no tienes ninguna/);
+    await scrollTo(canvas.getByRole("button", { name: /^Eliminar tu cuenta/ }));
   },
 };
 
 /** Opens the deletion sheet from the card, scrolled into view first as the phone's test does. */
 async function openDeleteSheet(canvas: Canvas) {
   await title(canvas);
-  await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
-  const card = canvas.getByRole("region", { name: "Eliminar tu cuenta" });
-  await scrollTo(card);
-  await userEvent.click(within(card).getByRole("button", { name: "Eliminar mi cuenta" }));
+  await canvas.findByText(/Aún no tienes ninguna/);
+  const row = canvas.getByRole("button", { name: /^Eliminar tu cuenta/ });
+  await scrollTo(row);
+  await userEvent.click(row);
   const dialog = await screen.findByRole("dialog", { name: "¿Eliminar tu cuenta?" });
   return { dialog, sheet: within(dialog) };
 }
@@ -773,10 +777,10 @@ export const DeleteSheetDayEnglish: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas, "Settings");
-    await canvas.findByText("You don't have one yet: you sign in with the code in your email.");
-    const card = canvas.getByRole("region", { name: "Delete your account" });
-    await scrollTo(card);
-    await userEvent.click(within(card).getByRole("button", { name: "Delete my account" }));
+    await canvas.findByText(/You don't have one yet/);
+    const row = canvas.getByRole("button", { name: /^Delete your account/ });
+    await scrollTo(row);
+    await userEvent.click(row);
     await expect(await screen.findByRole("dialog", { name: "Delete your account?" })).toBeVisible();
   },
 };
@@ -824,7 +828,7 @@ export const AppSectionsFeedback: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await title(canvas);
-    await canvas.findByText("Aún no tienes ninguna: entras con el código de tu correo.");
+    await canvas.findByText(/Aún no tienes ninguna/);
     await scrollTo(canvas.getByRole("region", { name: "Comentarios e ideas" }));
   },
 };
