@@ -823,31 +823,170 @@
   "unsentUploaded": "Abbiamo caricato {count, plural, =1{il movimento} other{i {count} movimenti}} annotati offline.",
   "unsentRefused": "Non siamo riusciti a salvare «{name}». Annotalo di nuovo.",
   "unsentLabel": "Non caricato",
-  "settingsAssistantsTitle": "Collega il tuo assistente",
-  "settingsAssistantsLead": "Usa Wambito da Claude o ChatGPT: annota i tuoi movimenti e chiedi come stai andando, chiacchierando.",
-  "settingsAssistantsUrl": "L'indirizzo del connettore",
-  "settingsAssistantsUrlHint": "È uguale per tutti: quando ti colleghi, entri con il tuo account.",
   "settingsAssistantsCopy": "Copia",
   "settingsAssistantsCopyLabel": "Copia l'indirizzo del connettore",
   "settingsAssistantsCopied": "Abbiamo copiato l'indirizzo.",
-  "settingsAssistantsClaude": "In Claude: Impostazioni → Connettori → Aggiungi connettore personalizzato, e incolla l'indirizzo.",
-  "settingsAssistantsChatGpt": "In ChatGPT: Impostazioni → Connettori, se il tuo piano lo consente; creane uno con questo indirizzo.",
   "settingsAssistantsExamples": "Poi chiedigli, per esempio:",
   "settingsAssistantsExampleAdd": "«segna 18 per il pranzo»",
   "settingsAssistantsExampleAsk": "«come sto andando questo mese?»",
-  "settingsAssistantsConnected": "Assistenti collegati",
-  "settingsAssistantsEmpty": "Non hai ancora collegato nessun assistente.",
   "settingsAssistantsListFailed": "Non siamo riusciti a caricare i tuoi assistenti. Riprova tra un momento.",
   "settingsAssistantsGuest": "Prima salva i tuoi progressi con un'email; poi potrai collegare un assistente.",
-  "settingsAssistantsConnectedOn": "Collegato il {date}",
-  "settingsAssistantsLastUsed": "Ultimo uso il {date}",
-  "settingsAssistantsNeverUsed": "Non ancora usato",
   "settingsAssistantsRevoke": "Revoca",
   "settingsAssistantsRevokeLabel": "Revoca {name}",
   "settingsAssistantsRevokeTitle": "Revocare {name}?",
   "settingsAssistantsRevokeBody": "Entro pochi minuti non potrà più vedere né annotare nei tuoi conti. Puoi collegarlo di nuovo quando vuoi.",
   "settingsAssistantsRevokeConfirm": "Sì, revoca",
   "settingsAssistantsRevoked": "Abbiamo revocato {name}.",
+  "settingsAgentsLead": "Usa Wambito dal tuo assistente IA: annota i movimenti e chiedi come stai andando senza aprire l'app.",
+  "@settingsAgentsLead": {
+    "description": "Mis agentes: what connecting an AI app is for."
+  },
+  "settingsAgentsNotConnected": "Non collegato",
+  "@settingsAgentsNotConnected": {
+    "description": "Mis agentes: an app that is not connected."
+  },
+  "settingsAgentsConnect": "Collega",
+  "@settingsAgentsConnect": {
+    "description": "Mis agentes: the button that opens an app's connect sheet."
+  },
+  "settingsAgentsConnectLabel": "Collega {name}",
+  "@settingsAgentsConnectLabel": {
+    "description": "Mis agentes: an app's Connect button for screen readers.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsConnectedLine": "Collegato il {date} · {used}",
+  "@settingsAgentsConnectedLine": {
+    "description": "Mis agentes: when an app was connected and last used.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsUsedToday": "usato oggi",
+  "@settingsAgentsUsedToday": {
+    "description": "Mis agentes: used today."
+  },
+  "settingsAgentsUsedYesterday": "usato ieri",
+  "@settingsAgentsUsedYesterday": {
+    "description": "Mis agentes: used yesterday."
+  },
+  "settingsAgentsUsedOn": "usato il {date}",
+  "@settingsAgentsUsedOn": {
+    "description": "Mis agentes: used on a day.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsNeverUsed": "non ancora usato",
+  "@settingsAgentsNeverUsed": {
+    "description": "Mis agentes: connected but not used yet."
+  },
+  "settingsAgentsAddressTitle": "L'indirizzo di Wambito",
+  "@settingsAgentsAddressTitle": {
+    "description": "Mis agentes: the heading over the connector address."
+  },
+  "settingsAgentsGuestTitle": "Prima aggiungi un'email",
+  "@settingsAgentsGuestTitle": {
+    "description": "Mis agentes: a guest must add an email first."
+  },
+  "settingsAgentsConnectTitle": "Collega {name}",
+  "@settingsAgentsConnectTitle": {
+    "description": "Mis agentes: the connect sheet's title.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsStep1": "Copia l'indirizzo del connettore",
+  "@settingsAgentsStep1": {
+    "description": "Connect sheet: step 1, copy the address."
+  },
+  "settingsAgentsStep2Claude": "In Claude, vai su Impostazioni → Connettori → <b>Aggiungi connettore personalizzato</b> e incolla l'indirizzo.",
+  "@settingsAgentsStep2Claude": {
+    "description": "Connect sheet: step 2 for Claude (<b> marks bold)."
+  },
+  "settingsAgentsStep2Chatgpt": "Su <b>chatgpt.com/plugins</b>, tocca <b>+</b> → <b>Add custom MCP server</b>, incolla l'indirizzo, scegli OAuth e tocca <b>Create as a plugin</b>.",
+  "@settingsAgentsStep2Chatgpt": {
+    "description": "Connect sheet: step 2 for ChatGPT (<b> marks bold)."
+  },
+  "settingsAgentsStep2Lumo": "Nell'app desktop di Lumo, vai su Settings → Desktop App → Connectors → <b>Add MCP server</b> e incolla l'indirizzo.",
+  "@settingsAgentsStep2Lumo": {
+    "description": "Connect sheet: step 2 for Lumo+ (<b> marks bold)."
+  },
+  "settingsAgentsStep2Grok": "Su grok.com, vai su Connettori → <b>Nuovo connettore</b> → Personalizzato, e incolla l'indirizzo.",
+  "@settingsAgentsStep2Grok": {
+    "description": "Connect sheet: step 2 for Grok (<b> marks bold)."
+  },
+  "settingsAgentsStep3": "{name} ti chiederà di accedere: usa il tuo account Wambito e accetta il permesso.",
+  "@settingsAgentsStep3": {
+    "description": "Connect sheet: step 3, sign in.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsOpenClaude": "Apri Claude ↗",
+  "@settingsAgentsOpenClaude": {
+    "description": "Connect sheet: opens Claude."
+  },
+  "settingsAgentsOpenChatgpt": "Apri chatgpt.com ↗",
+  "@settingsAgentsOpenChatgpt": {
+    "description": "Connect sheet: opens chatgpt.com."
+  },
+  "settingsAgentsOpenLumo": "Scarica Lumo ↗",
+  "@settingsAgentsOpenLumo": {
+    "description": "Connect sheet: downloads Lumo."
+  },
+  "settingsAgentsOpenGrok": "Apri Grok ↗",
+  "@settingsAgentsOpenGrok": {
+    "description": "Connect sheet: opens Grok."
+  },
+  "settingsAgentsNotePlan": "Si aggiunge dal sito di ChatGPT, non dalla sua app mobile; poi lo usi anche sul telefono. Dipende dal tuo piano, e in ogni nuova chat si attiva dal menu +.",
+  "@settingsAgentsNotePlan": {
+    "description": "Connect sheet: a note for ChatGPT."
+  },
+  "settingsAgentsNoteDesktop": "Solo dall'app desktop di Lumo (macOS, Windows o Linux).",
+  "@settingsAgentsNoteDesktop": {
+    "description": "Connect sheet: a note for Lumo+."
+  },
+  "settingsAgentsNotePaid": "I connettori personalizzati sono nei piani a pagamento di Grok.",
+  "@settingsAgentsNotePaid": {
+    "description": "Connect sheet: a note for Grok."
+  },
+  "settingsAgentsHelp": "Ti sei perso? Guarda la guida passo passo nell'<link>aiuto di {company} ↗</link>",
+  "@settingsAgentsHelp": {
+    "description": "Connect sheet: the guide's link (<link> marks it).",
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsDone": "Fatto",
+  "@settingsAgentsDone": {
+    "description": "Connect sheet: closes it."
+  },
+  "settingsAgentsNowConnected": "{name} è stato collegato.",
+  "@settingsAgentsNowConnected": {
+    "description": "Mis agentes: toast when an app got connected.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "autoCaptureTitle": "Cattura automatica",
   "autoCaptureLead": "Annota le tue spese ed entrate dalle notifiche di Revolut e Google Wallet.",
   "autoCaptureActive": "Attiva",

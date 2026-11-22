@@ -1,10 +1,11 @@
-// "Conecta tu asistente" in Settings (spec §6.2): the MCP's address with a button to copy it, where
-// Claude and ChatGPT take it, two things to ask, and the assistants the person let in, each with
-// when it was connected, when it was last used and its own "Revocar" after asking. Connecting
-// happens in the assistant and on the web's consent screen; the app only reads and revokes.
-// A guest's account cannot be connected: they save their progress with an email first. An
-// encrypted (`preview`) account sees the same: the server's MCP opens its data once the person
-// opens it on the consent page.
+// "Mis agentes" in Settings (spec 2026-11-22, the twin of the web's AgentsScreen): the four AI apps
+// (Claude, ChatGPT, Lumo+, Grok) with their state, each with "Conectar" (a sheet with Wambi's
+// handshake and the steps) or, once connected, when it was connected and last used with "Revocar"
+// (which ends every grant of the app); any other client that was let in after them; and the
+// connector's address. Back in the app the list is read again, and a new grant of one of the four
+// says so once. Connecting happens in the app and on the web's consent screen; the phone only
+// reads and revokes. A guest is told to add an email first. An encrypted (`preview`) account sees
+// the same: the server's MCP opens its data once the person opens it on the consent page.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,47 +14,100 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/server_url.dart';
 import '../api/session.dart';
+import '../capture/parser/dates.dart' show todayIn;
+import '../home/home_controller.dart' show clockProvider;
 import '../home/home_repository.dart';
 import '../l10n/app_localizations.dart';
-import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/confirm_sheet.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_brand_logo.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
-import '../ui/offset_underline.dart';
-import '../ui/pressable.dart' show PressSurface;
-import '../ui/press_button.dart';
+import '../ui/press_button.dart' show PressTone;
 import '../ui/toast.dart';
 import '../vault/vault_providers.dart' show vaultGateProvider;
+import 'agents.dart';
 import 'assistants_repository.dart';
+import 'connect_agent_sheet.dart';
 import 'passkeys_section.dart' show passkeyDay;
 import 'profile_settings.dart' show profileFailureMessage;
 import 'settings_parts.dart';
+import 'url_opener.dart';
 
-/// The connected assistants, read when Settings opens; a revoked one leaves the list at once.
+/// The connected assistants, read when Settings opens and again on coming back to the app.
 final settingsAssistantListProvider = FutureProvider.autoDispose<List<ConnectedAssistant>>(
   (ref) => ref.watch(assistantsRepositoryProvider).list(),
-  // The card says it could not load them; opening Settings again asks again.
+  // The page says it could not load them; opening Settings again asks again.
   retry: (_, _) => null,
 );
 
-class AssistantsSection extends ConsumerStatefulWidget {
-  const AssistantsSection({super.key, required this.timeZone, required this.guest});
+class AgentsScreen extends ConsumerStatefulWidget {
+  const AgentsScreen({super.key, required this.timeZone, required this.guest});
 
   /// The profile's zone: the dates are in it.
   final String timeZone;
 
-  /// A guest sees how to connect, and that they save their progress first, instead of the list.
+  /// A guest is told to add an email first instead of seeing the list.
   final bool guest;
 
   @override
-  ConsumerState<AssistantsSection> createState() => _AssistantsSectionState();
+  ConsumerState<AgentsScreen> createState() => _AgentsScreenState();
 }
 
-class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
-  /// Revoked here: gone from the list without reading it again.
+class _AgentsScreenState extends ConsumerState<AgentsScreen> with WidgetsBindingObserver {
+  /// Revoked here: gone from the list until it is read again.
   final _revoked = <String>{};
+
+  /// The grant ids already seen: null until the first load, so that one never says anything.
+  Set<String>? _seen;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from connecting in the other app.
+    if (state == AppLifecycleState.resumed && !widget.guest) {
+      ref.invalidate(settingsAssistantListProvider);
+    }
+  }
+
+  /// Reads the list again; what was revoked here is then really gone from it.
+  Future<void> _refresh() async {
+    ref.invalidate(settingsAssistantListProvider);
+    try {
+      await ref.read(settingsAssistantListProvider.future);
+    } on Object {
+      // The page says it could not load them.
+    }
+    if (mounted && _revoked.isNotEmpty) setState(_revoked.clear);
+  }
+
+  void _onList(AsyncValue<List<ConnectedAssistant>> next) {
+    if (next case AsyncData(:final value)) {
+      final before = _seen;
+      _seen = {for (final item in value) item.clientId};
+      if (before == null) return;
+      final l10n = AppLocalizations.of(context);
+      final toasts = ToastHost.of(context);
+      for (final item in value) {
+        if (before.contains(item.clientId)) continue;
+        final agent = agentFor(item);
+        if (agent != null) toasts.say(l10n.settingsAgentsNowConnected(agent.label));
+      }
+    }
+  }
 
   Future<void> _copy(Uri url) async {
     final l10n = AppLocalizations.of(context);
@@ -62,18 +116,21 @@ class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
     toasts.say(l10n.settingsAssistantsCopied);
   }
 
-  Future<void> _revoke(ConnectedAssistant item) async {
+  Future<void> _revoke(String name, List<ConnectedAssistant> grants) async {
     final l10n = AppLocalizations.of(context);
     final toasts = ToastHost.of(context);
     final revoked = await ConfirmSheet.show(
       context,
-      title: l10n.settingsAssistantsRevokeTitle(item.name),
+      title: l10n.settingsAssistantsRevokeTitle(name),
       body: l10n.settingsAssistantsRevokeBody,
       confirmLabel: l10n.settingsAssistantsRevokeConfirm,
       confirmKey: const Key('settings.assistants.revoke.confirm'),
       onConfirm: () async {
         try {
-          await ref.read(assistantsRepositoryProvider).revoke(item.clientId);
+          // Every grant of the app: one that is left would keep it connected.
+          for (final grant in grants) {
+            await ref.read(assistantsRepositoryProvider).revoke(grant.clientId);
+          }
         } on Object catch (error) {
           final failure = error is HomeFailure ? error : const HomeFailure(0);
           // The server no longer knows the session: signed out, as every other call ends it.
@@ -85,229 +142,167 @@ class _AssistantsSectionState extends ConsumerState<AssistantsSection> {
           if (failure.status == 409 && failure.code == 'session_changed') {
             ref.read(vaultGateProvider)?.sessionChanged();
           }
-          // The sheet stays for another try, and says why.
+          // The sheet stays for another try, and says why; the list shows what did go.
           toasts.say(profileFailureMessage(l10n, failure), error: true);
+          unawaited(_refresh());
           rethrow;
         }
-        toasts.say(l10n.settingsAssistantsRevoked(item.name));
+        toasts.say(l10n.settingsAssistantsRevoked(name));
       },
     );
-    if (revoked && mounted) setState(() => _revoked.add(item.clientId));
+    if (revoked && mounted) {
+      setState(() => _revoked.addAll(grants.map((grant) => grant.clientId)));
+      unawaited(_refresh());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final lk = context.lk;
-    final colors = lk.colors;
-    final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
-    final inkSm = LkText.bodySm.copyWith(color: colors.ink);
-    final url = mcpUrl(ref.watch(serverUrlProvider));
-    final guest = widget.guest;
-
-    return SettingsSection(
-      key: const Key('settings.card.assistants'),
-      title: l10n.settingsAssistantsTitle,
-      lead: l10n.settingsAssistantsLead,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space2,
-          children: [
-            SettingLabel(label: l10n.settingsAssistantsUrl, hint: l10n.settingsAssistantsUrlHint),
-            PressSurface(
-              minSize: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: LkSurface.rowCard(lk),
-              child: Row(
-                spacing: 10,
-                children: [
-                  Expanded(
-                    // Plain text: the button copies it (a SelectableText would also listen to the
-                    // app's lifecycle, as every text field does).
-                    child: Text(
-                      url.toString(),
-                      key: const Key('settings.assistants.url'),
-                      style: LkText.body.copyWith(color: colors.ink),
-                    ),
-                  ),
-                  PressButton(
-                    key: const Key('settings.assistants.copy'),
-                    tone: PressTone.ghost,
-                    size: PressSize.sm,
-                    semanticLabel: l10n.settingsAssistantsCopyLabel,
-                    onPressed: () => unawaited(_copy(url)),
-                    child: OffsetUnderline(LkText.upperCase(l10n.settingsAssistantsCopy)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space2,
-          children: [
-            CssParagraph(l10n.settingsAssistantsClaude, style: inkSm),
-            CssParagraph(l10n.settingsAssistantsChatGpt, style: inkSm),
-          ],
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: WambitoTokens.space1,
-          children: [
-            CssParagraph(l10n.settingsAssistantsExamples, style: mutedSm),
-            CssParagraph(l10n.settingsAssistantsExampleAdd, style: inkSm),
-            CssParagraph(l10n.settingsAssistantsExampleAsk, style: inkSm),
-          ],
-        ),
-        if (guest)
-          CssParagraph(l10n.settingsAssistantsGuest, style: mutedSm)
-        else
-          _Connected(
-            timeZone: widget.timeZone,
-            revoked: _revoked,
-            onRevoke: (item) => unawaited(_revoke(item)),
+    if (widget.guest) {
+      return SettingsSection(
+        key: const Key('settings.card.assistants'),
+        title: l10n.settingsAgentsGuestTitle,
+        children: [
+          CssParagraph(
+            l10n.settingsAssistantsGuest,
+            style: LkText.bodySm.copyWith(color: context.lkColors.ink),
           ),
-      ],
-    );
-  }
-}
-
-/// "Asistentes conectados": the list, or that there are none, or that it could not be read.
-class _Connected extends ConsumerWidget {
-  const _Connected({required this.timeZone, required this.revoked, required this.onRevoke});
-
-  final String timeZone;
-  final Set<String> revoked;
-  final void Function(ConnectedAssistant item) onRevoke;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
+        ],
+      );
+    }
+    ref.listen(settingsAssistantListProvider, (_, next) => _onList(next));
     final colors = context.lkColors;
     final list = ref.watch(settingsAssistantListProvider);
-    final items = list.value?.where((a) => !revoked.contains(a.clientId)).toList();
+    final grants = list.value?.where((item) => !_revoked.contains(item.clientId)).toList();
+    final url = mcpUrl(ref.watch(serverUrlProvider));
     final mutedSm = LkText.bodySm.copyWith(color: colors.inkMuted);
-    String day(DateTime at) => passkeyDay(at, l10n.localeName, timeZone);
+    final opener = ref.read(urlOpenerProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: WambitoTokens.space2,
+      spacing: WambitoTokens.space4,
       children: [
-        SettingLabel(label: l10n.settingsAssistantsConnected),
-        if (list.hasError && items == null)
+        CssParagraph(l10n.settingsAgentsLead, style: mutedSm),
+        if (list.hasError && grants == null)
           CssParagraph(l10n.settingsAssistantsListFailed, style: mutedSm),
-        if (items != null && items.isEmpty)
-          CssParagraph(
-            l10n.settingsAssistantsEmpty,
-            style: LkText.bodySm.copyWith(color: colors.ink),
+        if (grants != null)
+          SettingsGroup(
+            rows: [
+              for (final agent in Agent.values)
+                _agentRow(
+                  context,
+                  agent,
+                  grants.where((item) => agentFor(item) == agent).toList(),
+                  url,
+                  opener,
+                ),
+              for (final grant in grants.where((item) => agentFor(item) == null))
+                _otherRow(context, grant),
+            ],
           ),
-        if (items != null)
-          for (final item in items)
-            _AssistantRow(
-              key: Key('settings.assistants.row.${item.clientId}'),
-              item: item,
-              connected: day(item.connectedAt),
-              lastUsed: switch (item.lastUsedAt) {
-                final at? => day(at),
-                null => null,
-              },
-              onRevoke: () => onRevoke(item),
-            ),
-      ],
-    );
-  }
-}
-
-/// One assistant: `lk-rowcard justify-between`, its name and where it comes from over when it was
-/// connected and last used, and its "Revocar".
-class _AssistantRow extends StatelessWidget {
-  const _AssistantRow({
-    super.key,
-    required this.item,
-    required this.connected,
-    required this.lastUsed,
-    required this.onRevoke,
-  });
-
-  final ConnectedAssistant item;
-  final String connected;
-  final String? lastUsed;
-  final VoidCallback onRevoke;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final lk = context.lk;
-    final colors = lk.colors;
-    final muted = LkText.fieldLabel.copyWith(color: colors.inkMuted);
-    final domain = item.domain;
-    final lastUsed = this.lastUsed;
-    return PressSurface(
-      minSize: 0,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: LkSurface.rowCard(lk),
-      child: SizedBox(
-        width: double.infinity,
-        child: Row(
-          spacing: 10,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        SettingsSection(
+          key: const Key('settings.card.assistants'),
+          title: l10n.settingsAgentsAddressTitle,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CssBlinkLines(
-                    style: LkText.body,
-                    child: Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: LkText.body.copyWith(color: colors.ink),
-                    ),
-                  ),
-                  if (domain != null)
-                    CssBlinkLines(
-                      style: LkText.fieldLabel,
-                      child: Text(
-                        domain,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: muted,
-                      ),
-                    ),
-                  Wrap(
-                    spacing: WambitoTokens.space2,
-                    children: [
-                      CssBlinkLines(
-                        style: LkText.fieldLabel,
-                        child: Text(l10n.settingsAssistantsConnectedOn(connected), style: muted),
-                      ),
-                      CssBlinkLines(
-                        style: LkText.fieldLabel,
-                        child: Text(
-                          lastUsed == null
-                              ? l10n.settingsAssistantsNeverUsed
-                              : l10n.settingsAssistantsLastUsed(lastUsed),
-                          style: muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            PressButton(
-              key: Key('settings.assistants.revoke.${item.clientId}'),
-              tone: PressTone.ghost,
-              size: PressSize.sm,
-              semanticLabel: l10n.settingsAssistantsRevokeLabel(item.name),
-              onPressed: onRevoke,
-              child: OffsetUnderline(LkText.upperCase(l10n.settingsAssistantsRevoke)),
+            AddressField(
+              url: url,
+              onCopy: () => unawaited(_copy(url)),
+              urlKey: const Key('settings.assistants.url'),
+              copyKey: const Key('settings.assistants.copy'),
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  /// What a row's muted line says of a grant: when it was connected and last used.
+  String _line(AppLocalizations l10n, ConnectedAssistant grant) {
+    String day(DateTime at) => passkeyDay(at, l10n.localeName, widget.timeZone);
+    final at = grant.lastUsedAt;
+    final String used;
+    if (at == null) {
+      used = l10n.settingsAgentsNeverUsed;
+    } else {
+      final now = ref.read(clockProvider)().toUtc();
+      final key = todayIn(widget.timeZone, at.toUtc());
+      if (key == todayIn(widget.timeZone, now)) {
+        used = l10n.settingsAgentsUsedToday;
+      } else if (key == todayIn(widget.timeZone, now.subtract(const Duration(days: 1)))) {
+        used = l10n.settingsAgentsUsedYesterday;
+      } else {
+        used = l10n.settingsAgentsUsedOn(day(at));
+      }
+    }
+    return l10n.settingsAgentsConnectedLine(day(grant.connectedAt), used);
+  }
+
+  Widget _tile(BuildContext context, Widget icon) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: context.lkColors.surfaceSunken,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Center(child: icon),
+  );
+
+  Widget _agentRow(
+    BuildContext context,
+    Agent agent,
+    List<ConnectedAssistant> own,
+    Uri url,
+    UrlOpener opener,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.lkColors;
+    final newest = own.isEmpty
+        ? null
+        : own.reduce((a, b) => b.connectedAt.isAfter(a.connectedAt) ? b : a);
+    return SettingsRow(
+      key: Key('settings.agents.row.${agent.name}'),
+      icon: _tile(context, LkBrandLogo(agent.brand, size: 18, color: colors.ink)),
+      title: agent.label,
+      line: newest == null ? l10n.settingsAgentsNotConnected : _line(l10n, newest),
+      lineLines: 2,
+      trailing: newest == null
+          ? RowButton(
+              label: l10n.settingsAgentsConnect,
+              semanticLabel: l10n.settingsAgentsConnectLabel(agent.label),
+              buttonKey: Key('settings.agents.connect.${agent.name}'),
+              onPressed: () => unawaited(
+                showConnectAgentSheet(
+                  context,
+                  agent: agent,
+                  url: url,
+                  onCopy: () => unawaited(_copy(url)),
+                  opener: opener,
+                ),
+              ),
+            )
+          : RowButton(
+              label: l10n.settingsAssistantsRevoke,
+              semanticLabel: l10n.settingsAssistantsRevokeLabel(agent.label),
+              tone: PressTone.ghost,
+              buttonKey: Key('settings.agents.revoke.${agent.name}'),
+              onPressed: () => unawaited(_revoke(agent.label, own)),
+            ),
+    );
+  }
+
+  Widget _otherRow(BuildContext context, ConnectedAssistant grant) {
+    final l10n = AppLocalizations.of(context);
+    return SettingsRow(
+      key: Key('settings.agents.row.${grant.clientId}'),
+      icon: _tile(context, LkIcon(LkIconName.chat, size: 18, color: context.lkColors.ink)),
+      title: grant.name,
+      line: _line(l10n, grant),
+      lineLines: 2,
+      trailing: RowButton(
+        label: l10n.settingsAssistantsRevoke,
+        semanticLabel: l10n.settingsAssistantsRevokeLabel(grant.name),
+        tone: PressTone.ghost,
+        buttonKey: Key('settings.agents.revoke.${grant.clientId}'),
+        onPressed: () => unawaited(_revoke(grant.name, [grant])),
       ),
     );
   }

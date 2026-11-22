@@ -263,10 +263,10 @@ class _SettingsCategoryScreenState extends ConsumerState<SettingsCategoryScreen>
     final guest = ref.watch(sessionProvider.select((s) => s.isGuest));
     final preview = ref.watch(isPreviewProvider);
     final children = switch (widget.category) {
-      // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
+      // "Mis agentes" (spec 2026-11-22): the web has it too, but its story is not in the parity
       // pairs yet, so the web-only pictures leave it out.
       SettingsCategory.agents => [
-        if (!webOnly) AssistantsSection(timeZone: timeZone, guest: guest),
+        if (!webOnly) AgentsScreen(timeZone: timeZone, guest: guest),
       ],
       SettingsCategory.account => [
         PasskeysSection(

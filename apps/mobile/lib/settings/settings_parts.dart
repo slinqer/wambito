@@ -11,7 +11,9 @@ import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
 import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
+import '../ui/offset_underline.dart';
 import '../ui/pixel_snap.dart';
+import '../ui/press_button.dart';
 import '../ui/pressable.dart';
 
 /// A card of settings named by its heading (`SettingsSection`): `lk-hero`, 16px between what is in
@@ -541,6 +543,27 @@ class RowTrash extends RowTrailing {
   final VoidCallback onTap;
 }
 
+/// A small button at the end ("Conectar", "Revocar"), named for screen readers by [semanticLabel]:
+/// `secondary` for an action, `ghost` (underlined) for a quiet one. The rest of the row is not a
+/// button.
+class RowButton extends RowTrailing {
+  const RowButton({
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    this.tone = PressTone.secondary,
+    this.buttonKey,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+  final PressTone tone;
+
+  /// Finds the button (tests).
+  final Key? buttonKey;
+}
+
 /// Nothing at the end.
 class RowNone extends RowTrailing {
   const RowNone();
@@ -591,15 +614,21 @@ class SettingsGroup extends StatelessWidget {
                     ),
                   ),
                 ),
-              for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0)
-                  Container(
-                    key: const ValueKey('settings-row-divider'),
-                    height: 2,
-                    color: colors.stroke,
-                  ),
-                rows[i],
-              ],
+              // Each row with its own divider in a column of its own: the dividers share one key
+              // (tests find them), and siblings may not.
+              for (var i = 0; i < rows.length; i++)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (i > 0)
+                      Container(
+                        key: const ValueKey('settings-row-divider'),
+                        height: 2,
+                        color: colors.stroke,
+                      ),
+                    rows[i],
+                  ],
+                ),
             ],
           ),
         ),
@@ -621,6 +650,7 @@ class SettingsRow extends StatelessWidget {
     required this.trailing,
     this.onTap,
     this.danger = false,
+    this.lineLines = 1,
   });
 
   final Widget icon;
@@ -629,6 +659,9 @@ class SettingsRow extends StatelessWidget {
   final RowTrailing trailing;
   final VoidCallback? onTap;
   final bool danger;
+
+  /// How many lines the muted line may take before its ellipsis.
+  final int lineLines;
 
   Widget _body(BuildContext context, {required Widget? end}) =>
       LayoutBuilder(builder: (context, constraints) => _bodyIn(context, constraints.maxWidth, end));
@@ -669,7 +702,7 @@ class SettingsRow extends StatelessWidget {
                   if (line != null)
                     Text(
                       line,
-                      maxLines: 1,
+                      maxLines: lineLines,
                       overflow: TextOverflow.ellipsis,
                       style: LkText.fieldLabel.copyWith(
                         fontSize: 12.5,
@@ -793,6 +826,18 @@ class SettingsRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Text(t.text, style: LkText.label.copyWith(fontSize: 11, color: colors.inkMuted)),
           ),
+        );
+        final body = _body(context, end: end);
+        return onTap == null ? body : _pressable(context, body);
+      case RowButton():
+        final text = LkText.upperCase(t.label);
+        final end = PressButton(
+          key: t.buttonKey,
+          tone: t.tone,
+          size: PressSize.sm,
+          semanticLabel: t.semanticLabel,
+          onPressed: t.onPressed,
+          child: t.tone == PressTone.ghost ? OffsetUnderline(text) : Text(text),
         );
         final body = _body(context, end: end);
         return onTap == null ? body : _pressable(context, body);
