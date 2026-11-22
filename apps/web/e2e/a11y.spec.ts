@@ -175,6 +175,11 @@ test.describe("signed in, with the sample imported", () => {
       ["/app/recurring", "Recurrentes"],
       ["/app/insights", "Análisis"],
       ["/app/settings", "Ajustes"],
+      ["/app/settings/agents", "Mis agentes"],
+      ["/app/settings/account", "Cuenta y seguridad"],
+      ["/app/settings/preferences", "Preferencias"],
+      ["/app/settings/data", "Tus datos"],
+      ["/app/settings/more", "Más"],
       ["/app/import", /.+/],
     ] as const) {
       await page.goto(path);

@@ -70,6 +70,7 @@ GoRouter _router() => GoRouter(
   routes: [
     GoRoute(path: '/', builder: (c, s) => const SizedBox()),
     GoRoute(path: '/settings', builder: (c, s) => const Text('settings page')),
+    GoRoute(path: '/settings/account', builder: (c, s) => const Text('account page')),
   ],
 );
 
@@ -274,7 +275,7 @@ void main() {
     expect(find.text('1 more device was added too.'), findsOneWidget);
     await t.tap(find.byKey(const Key('signinNotice.notMe')));
     await t.pumpAndSettle();
-    expect(router.state.uri.path, '/settings');
+    expect(router.state.uri.path, '/settings/account');
     expect(find.textContaining('Remove '), findsNothing);
   });
 

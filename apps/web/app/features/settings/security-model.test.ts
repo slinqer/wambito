@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { PasskeyItem } from "./passkeys.ts";
-import { deviceRows, passkeyRows, type SecurityWrap } from "./security-model.ts";
+import { deviceIconName, deviceRows, passkeyRows, type SecurityWrap } from "./security-model.ts";
+
+describe("deviceIconName", () => {
+  it("is a laptop for computers and a phone otherwise", () => {
+    for (const name of [
+      "MacBook",
+      "Chrome on macOS",
+      "Firefox on Linux",
+      "Edge on Windows",
+      "Chromebook Chrome OS",
+      "Mi PC",
+      "Laptop",
+    ]) {
+      expect(deviceIconName(name)).toBe("laptop");
+    }
+    for (const name of ["Pixel 8", "Safari on iOS", "Huella", null, undefined]) {
+      expect(deviceIconName(name)).toBe("phone");
+    }
+  });
+});
 
 const wrap = (over: Partial<SecurityWrap> & { id: string; kind: string }): SecurityWrap => ({
   ref: null,

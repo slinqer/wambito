@@ -2,26 +2,41 @@
 // the key labels must not overflow (a RenderFlex error) and must not be cut off with an ellipsis
 // where the web would not cut them (spec §3): the bottom bar, the home tabs, the account menu, the
 // add sheet's buttons, the toast with its undo, the settings rows and the capture sheet.
+import 'package:wambito/settings/category_screen.dart' show settingsCategoryTitle;
+import 'package:wambito/settings/settings_categories.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/api/auth_api.dart' show PasskeyItem;
 import 'package:wambito/l10n/app_localizations.dart';
+import 'package:wambito/capture_auto/capture_platform.dart' show autoCapturePlatformProvider;
+import 'package:wambito/home/widget_pin.dart' show widgetPinProvider;
+import 'package:wambito/security/screen_lock.dart';
+import 'package:wambito/settings/security/security_api.dart';
+import 'package:wambito/settings/settings_parts.dart' show SettingsRow;
+import 'package:wambito/settings/settings_screen.dart' show debugToolsProvider;
 import 'package:wambito/ui/toast.dart';
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../add/fakes.dart';
+import '../capture_auto/fakes.dart' show FakeAutoCapturePlatform;
+import '../entry/fakes.dart';
+import '../home/fakes.dart' show FakeWidgetPin;
 import '../home/home_harness.dart';
 import '../settings/harness.dart';
+import '../settings/security/fake_security.dart';
 
 /// Words a person typed (the fakes' category names), which are cut off in every language.
 const _data = {'Supermercado', 'Hogar', 'Arriendo'};
 
 /// The text of every paragraph on screen that was cut off (ellipsis or clip) by its `maxLines`.
-List<String> _cutOff(WidgetTester tester) {
+List<String> _cutOff(WidgetTester tester, {Set<String> allow = const {}}) {
   final cut = <String>[];
   void visit(RenderObject object) {
     if (object is RenderParagraph &&
         object.didExceedMaxLines &&
-        !_data.contains(object.text.toPlainText())) {
+        !_data.contains(object.text.toPlainText()) &&
+        !allow.contains(object.text.toPlainText())) {
       cut.add(object.text.toPlainText());
     }
     object.visitChildren(visit);
@@ -45,7 +60,12 @@ List<RenderParagraph> _paragraphs(WidgetTester tester) {
 
 /// No layout error was reported, and none of [labels] is cut off where it is drawn (buttons draw
 /// their label in capitals, as the web's CSS does, so the match ignores case).
-void _expectWhole(WidgetTester tester, List<String> labels, {String? where}) {
+void _expectWhole(
+  WidgetTester tester,
+  List<String> labels, {
+  String? where,
+  Set<String> allow = const {},
+}) {
   expect(tester.takeException(), isNull, reason: where);
   final paragraphs = _paragraphs(tester);
   for (final label in labels) {
@@ -57,7 +77,7 @@ void _expectWhole(WidgetTester tester, List<String> labels, {String? where}) {
       expect(p.didExceedMaxLines, isFalse, reason: '"$label" is cut off ${where ?? ''}');
     }
   }
-  expect(_cutOff(tester), isEmpty, reason: 'text cut off ${where ?? ''}');
+  expect(_cutOff(tester, allow: allow), isEmpty, reason: 'text cut off ${where ?? ''}');
 }
 
 Future<SettingsEnv> _pump(WidgetTester tester, Locale locale, {String? location}) async {
@@ -170,31 +190,259 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('every settings row is drawn whole, top to bottom', (tester) async {
-        await _pump(tester, locale, location: '/settings');
-        final l10n = _l10n(tester);
-        expect(tester.takeException(), isNull);
-        final seen = <String>{};
-        var scrolled = 0.0;
-        for (var i = 0; i < 40; i++) {
-          _expectWhole(tester, const [], where: 'in settings (screen $i)');
-          seen.addAll(
-            tester
-                .widgetList<Text>(find.byType(Text))
-                .map((text) => text.data ?? text.textSpan?.toPlainText() ?? ''),
+      for (final scale in [1.0, 1.3]) {
+        testWidgets('the settings menu has no overflow at text scale $scale', (tester) async {
+          await _pump(tester, locale, location: '/settings');
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          await tester.pumpAndSettle();
+          // Ellipsis on a line is fine; a RenderFlex overflow is not.
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      for (final category in SettingsCategory.values) {
+        testWidgets('every ${category.name} row is drawn whole, top to bottom', (tester) async {
+          await _pump(tester, locale, location: category.path);
+          final l10n = _l10n(tester);
+          expect(tester.takeException(), isNull);
+          // The light rows keep one line: a long muted line under a switch or a group's head ends
+          // in an ellipsis (the names are whole; spec 2026-11-22), so those lines are not asked to
+          // fit.
+          final lines = switch (category) {
+            SettingsCategory.capture => {
+              l10n.settingsDeleteVoiceHint,
+              l10n.settingsDueNoticeHint,
+              l10n.settingsGuestNoticeHint,
+              l10n.settingsHideAmountHint,
+              l10n.settingsAddWidgetHint,
+              l10n.autoCaptureHowLine,
+            },
+            // A group head's line is one line too (the web's `.lk-row-line`).
+            SettingsCategory.account => {l10n.settingsPasskeysLine, l10n.settingsSecurityLead},
+            SettingsCategory.preferences => {l10n.settingsSoundLine, l10n.settingsVibrationLine},
+            SettingsCategory.data => {l10n.settingsImportRowLine, l10n.settingsExportRowLine},
+            // The server's address is its own line, not a word of ours.
+            SettingsCategory.more => {
+              l10n.settingsFeedbackRowLine,
+              l10n.settingsWebHint,
+              'https://app.wambito.com',
+            },
+            _ => const <String>{},
+          };
+          final seen = <String>{};
+          for (var i = 0; i < 40; i++) {
+            _expectWhole(tester, const [], where: 'in ${category.name} (screen $i)', allow: lines);
+            seen.addAll(
+              tester
+                  .widgetList<Text>(find.byType(Text))
+                  .map((text) => text.data ?? text.textSpan?.toPlainText() ?? ''),
+            );
+            final scrollable = find.byType(Scrollable).first;
+            final before = tester.state<ScrollableState>(scrollable).position.pixels;
+            await tester.drag(scrollable, const Offset(0, -300));
+            await tester.pumpAndSettle();
+            final after = tester.state<ScrollableState>(scrollable).position.pixels;
+            if (after == before) break;
+          }
+          expect(
+            seen,
+            contains(settingsCategoryTitle(l10n, category)),
+            reason: 'the page was read from its top',
           );
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      testWidgets('an encrypted account\'s account page has no overflow and rows of one line', (
+        tester,
+      ) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final auth = FakeAuthApi()
+          ..passkeyItems.add(
+            PasskeyItem(
+              id: 'pk-1',
+              credentialId: 'cred-2',
+              name: 'Pixel 8',
+              createdAt: DateTime.utc(2026, 11, 3),
+              synced: true,
+            ),
+          );
+        await pumpSettingsApp(
+          tester,
+          locale: locale,
+          location: '/settings/account',
+          auth: auth,
+          passkeysSupported: true,
+          overrides: [
+            isPreviewProvider.overrideWithValue(true),
+            // the passkey has no wrap, so its "Turn on" row shows too
+            securityApiProvider.overrideWithValue(FakeSecurity(snapshotOf(unreadable: 3))),
+            screenLockProvider.overrideWithValue(FakeLock(LockCheck.passed)),
+          ],
+        );
+        tester.view
+          ..physicalSize = const Size(360, 640)
+          ..devicePixelRatio = 1;
+        await tester.pumpAndSettle();
+        final walked = <String>{};
+        for (var i = 0; i < 40; i++) {
+          expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+          for (final element in find.byType(SettingsRow).evaluate()) {
+            final key = element.widget.key;
+            walked.add('$key');
+            final box = element.renderObject! as RenderBox;
+            expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+          }
           final scrollable = find.byType(Scrollable).first;
           final before = tester.state<ScrollableState>(scrollable).position.pixels;
           await tester.drag(scrollable, const Offset(0, -300));
           await tester.pumpAndSettle();
           final after = tester.state<ScrollableState>(scrollable).position.pixels;
-          scrolled = after;
           if (after == before) break;
         }
-        expect(scrolled, greaterThan(300), reason: 'the page was scrolled to its foot');
-        expect(seen, contains(l10n.settingsTitle), reason: 'the page was read from its top');
+        for (final name in [
+          'security.connect',
+          'security.newKey',
+          'security.changeKeys',
+          'settings.passkeys.turnOn.pk-1',
+          'settings.delete',
+        ]) {
+          expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+        }
         expect(tester.takeException(), isNull);
       });
+
+      testWidgets('the capture page has no overflow and rows of one line, every group showing', (
+        tester,
+      ) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await pumpSettingsApp(
+          tester,
+          locale: locale,
+          location: '/settings/capture',
+          preciseEligible: true,
+          overrides: [
+            // a source on without the access, so the missing row shows too
+            autoCapturePlatformProvider.overrideWithValue(
+              FakeAutoCapturePlatform(sources: {'revolut'}),
+            ),
+            widgetPinProvider.overrideWithValue(FakeWidgetPin(isInstalled: false)),
+          ],
+        );
+        tester.view
+          ..physicalSize = const Size(360, 640)
+          ..devicePixelRatio = 1;
+        await tester.pumpAndSettle();
+        final walked = <String>{};
+        for (var i = 0; i < 40; i++) {
+          expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+          for (final element in find.byType(SettingsRow).evaluate()) {
+            final key = element.widget.key;
+            walked.add('$key');
+            final box = element.renderObject! as RenderBox;
+            expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+          }
+          final scrollable = find.byType(Scrollable).first;
+          final before = tester.state<ScrollableState>(scrollable).position.pixels;
+          await tester.drag(scrollable, const Offset(0, -300));
+          await tester.pumpAndSettle();
+          final after = tester.state<ScrollableState>(scrollable).position.pixels;
+          if (after == before) break;
+        }
+        for (final name in [
+          'autoCapture.revolut',
+          'autoCapture.missing',
+          'autoCapture.how',
+          'settings.voicePrecise',
+          'settings.deleteVoice',
+          'settings.dueNotice',
+          'settings.guestNotice',
+          'settings.addWidget',
+          'settings.hideAmount',
+        ]) {
+          expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+        }
+        expect(tester.takeException(), isNull);
+      });
+
+      // Preferencias, Tus datos and Más with every row showing: no exception and every row one
+      // line, 76 px at the most, at 130 % on a 360 px phone.
+      final walks = {
+        'preferences': (
+          '/settings/preferences',
+          false,
+          [
+            'settings.language',
+            'settings.theme',
+            'settings.sound',
+            'settings.vibration',
+            'settings.timezone.change',
+            'settings.currency.row',
+          ],
+        ),
+        'data': ('/settings/data', false, ['settings.import', 'settings.export']),
+        'data (encrypted)': (
+          '/settings/data',
+          true,
+          ['settings.import.comingSoon', 'settings.export.comingSoon'],
+        ),
+        'more': (
+          '/settings/more',
+          false,
+          [
+            'settings.card.feedback',
+            'settings.roadmap',
+            'settings.web',
+            'settings.server',
+            'settings.about',
+            'settings.prfProbe',
+          ],
+        ),
+      };
+      for (final entry in walks.entries) {
+        final (location, preview, names) = entry.value;
+        testWidgets('the ${entry.key} page has rows of one line, every row showing', (
+          tester,
+        ) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await pumpSettingsApp(
+            tester,
+            locale: locale,
+            location: location,
+            overrides: [
+              if (preview) isPreviewProvider.overrideWithValue(true),
+              debugToolsProvider.overrideWithValue(true),
+            ],
+          );
+          tester.view
+            ..physicalSize = const Size(360, 640)
+            ..devicePixelRatio = 1;
+          await tester.pumpAndSettle();
+          final walked = <String>{};
+          for (var i = 0; i < 40; i++) {
+            expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+            for (final element in find.byType(SettingsRow).evaluate()) {
+              final key = element.widget.key;
+              walked.add('$key');
+              final box = element.renderObject! as RenderBox;
+              expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+            }
+            final scrollable = find.byType(Scrollable).first;
+            final before = tester.state<ScrollableState>(scrollable).position.pixels;
+            await tester.drag(scrollable, const Offset(0, -300));
+            await tester.pumpAndSettle();
+            final after = tester.state<ScrollableState>(scrollable).position.pixels;
+            if (after == before) break;
+          }
+          for (final name in names) {
+            expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
 
       testWidgets('the capture sheet keeps its words whole', (tester) async {
         await _pump(tester, locale);

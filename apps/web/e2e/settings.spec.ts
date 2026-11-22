@@ -42,6 +42,21 @@ async function openSettings(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Ajustes" })).toBeVisible();
 }
 
+/** One category's page from the menu: its row, then its own URL and heading. */
+async function openCategory(page: Page, row: RegExp, slug: string, heading: string) {
+  await page.getByRole("navigation", { name: "Ajustes" }).getByRole("link", { name: row }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/settings/${slug}$`));
+  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+}
+
+/** Idioma or Tema: the row opens its choice sheet; the pick closes it. */
+async function choose(page: Page, row: RegExp, sheet: string, choice: string) {
+  await page.getByRole("button", { name: row }).click();
+  const dialog = page.getByRole("dialog", { name: sheet });
+  await dialog.getByRole("radio", { name: choice }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 let email: string;
 
 test.beforeEach(async ({ page }) => {
@@ -50,12 +65,62 @@ test.beforeEach(async ({ page }) => {
   await onboardWithSample(page, "Europe/Madrid");
 });
 
+test("settings opens on the menu of five categories, each with its line", async ({ page }) => {
+  await openSettings(page);
+  const menu = page.getByRole("navigation", { name: "Ajustes" });
+  const rows = [
+    ["Mis agentes", "ChatGPT · Claude · Lumo+ · Grok"],
+    ["Cuenta y seguridad", "Passkeys, dispositivos, clave"],
+    ["Preferencias", "Español · Noche · EUR"],
+    ["Tus datos", "Importar, exportar"],
+    ["Más", "Comentarios"],
+  ] as const;
+  await expect(menu.getByRole("link")).toHaveCount(rows.length);
+  for (const [title, line] of rows) {
+    await expect(menu.getByRole("link", { name: `${title} ${line}` })).toBeVisible();
+  }
+  // The cards live in their categories, not on the menu.
+  await expect(page.getByRole("radio", { name: "English" })).toHaveCount(0);
+});
+
+test("each category opens on its own URL and back returns to the menu", async ({ page }) => {
+  await openSettings(page);
+  const pages = [
+    [/^Mis agentes/, "agents", "Mis agentes"],
+    [/^Cuenta y seguridad/, "account", "Cuenta y seguridad"],
+    [/^Preferencias/, "preferences", "Preferencias"],
+    [/^Tus datos/, "data", "Tus datos"],
+    [/^Más/, "more", "Más"],
+  ] as const;
+  for (const [row, slug, heading] of pages) {
+    await openCategory(page, row, slug, heading);
+    await page.getByRole("link", { name: "Volver a Ajustes" }).click();
+    await expect(page).toHaveURL(/\/app\/settings$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Ajustes" })).toBeVisible();
+  }
+  // An address that is no category says so.
+  await page.goto("/app/settings/nope");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "No encontramos esa sección" }),
+  ).toBeVisible();
+});
+
+test("a reload on /app/settings/preferences stays there", async ({ page }) => {
+  await openSettings(page);
+  await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
+  await page.reload();
+  await expect(page).toHaveURL(/\/app\/settings\/preferences$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Preferencias" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Idioma/ })).toContainText("Español");
+});
+
 test("switching to English re-renders at once, and home speaks it after a reload", async ({
   page,
 }) => {
   await openSettings(page);
-  await page.getByRole("radio", { name: "English" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
+  await choose(page, /^Idioma/, "Idioma", "English");
+  await expect(page.getByRole("heading", { level: 1, name: "Preferences" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect
     .poll(
@@ -64,6 +129,8 @@ test("switching to English re-renders at once, and home speaks it after a reload
     )
     .toBe("en");
 
+  await page.getByRole("link", { name: "Back to Settings" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: "Back to home" }).click();
   await expect(page.getByRole("region", { name: "Left this month" })).toBeVisible();
   await page.reload();
@@ -74,14 +141,18 @@ test("the language picker lists the four languages, and Italian and Portuguese r
   page,
 }) => {
   await openSettings(page);
+  await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
+  await page.getByRole("button", { name: /^Idioma/ }).click();
+  const languages = page.getByRole("dialog", { name: "Idioma" });
   for (const name of ["Español", "English", "Italiano", "Português"]) {
-    await expect(page.getByRole("radio", { name })).toBeVisible();
+    await expect(languages.getByRole("radio", { name })).toBeVisible();
   }
-  await page.getByRole("radio", { name: "Italiano" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Impostazioni" })).toBeVisible();
+  await languages.getByRole("radio", { name: "Italiano" }).click();
+  await expect(languages).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Preferenze" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "it");
-  await page.getByRole("radio", { name: "Português" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Definições" })).toBeVisible();
+  await choose(page, /^Lingua/, "Lingua", "Português");
+  await expect(page.getByRole("heading", { level: 1, name: "Preferências" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "pt");
   await expect
     .poll(
@@ -93,12 +164,13 @@ test("the language picker lists the four languages, and Italian and Portuguese r
 
 test("the day theme applies at once and stays after a reload", async ({ page }) => {
   await openSettings(page);
+  await openCategory(page, /^Preferencias/, "preferences", "Preferencias");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
-  await page.getByRole("radio", { name: "Día" }).click();
+  await choose(page, /^Tema/, "Tema", "Día");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
-  await expect(page.getByRole("radio", { name: "Día" })).toBeChecked();
+  await expect(page.getByRole("button", { name: /^Tema/ })).toContainText("Día");
 });
 
 test("deleting the account signs out to the landing; the same email then starts afresh", async ({
@@ -109,7 +181,8 @@ test("deleting the account signs out to the landing; the same email then starts 
   const firstMail = await readSignInMail(email);
 
   await openSettings(page);
-  await page.getByRole("button", { name: "Eliminar mi cuenta" }).click();
+  await openCategory(page, /^Cuenta y seguridad/, "account", "Cuenta y seguridad");
+  await page.getByRole("button", { name: /^Eliminar tu cuenta/ }).click();
   const sheet = page.getByRole("dialog", { name: "¿Eliminar tu cuenta?" });
   const confirm = sheet.getByRole("button", { name: "Sí, eliminar mi cuenta" });
   await expect(confirm).toBeDisabled();
@@ -144,20 +217,22 @@ test("a passkey added from settings is listed, and deleting it empties the list"
 }) => {
   await addVirtualAuthenticator(page);
   await openSettings(page);
-  const keys = page.getByRole("region", { name: "Entrar con tu huella" });
+  await openCategory(page, /^Cuenta y seguridad/, "account", "Cuenta y seguridad");
+  const keys = page.getByRole("group", { name: "Entrar con tu huella" });
   await expect(keys).toContainText("Aún no tienes ninguna");
   await keys.getByRole("button", { name: "Agregar una huella" }).click();
   await expect(page.getByRole("status")).toContainText("Listo: ya puedes entrar con tu huella.");
-  await expect(keys.getByRole("listitem")).toHaveCount(1);
+  const trash = keys.getByRole("button", { name: /^Eliminar / });
+  await expect(trash).toHaveCount(1);
   // Dated by the server's clock (the page's is pinned).
-  await expect(keys.getByRole("listitem")).toContainText(/Creada el \d{1,2} \w{3} \d{4}/);
+  await expect(keys).toContainText(/Desde el \d{1,2} \w{3} \d{4}/);
 
-  await keys.getByRole("button", { name: /^Eliminar / }).click();
+  await trash.click();
   await page
     .getByRole("dialog", { name: "¿Eliminar esta huella?" })
     .getByRole("button", { name: "Sí, eliminar" })
     .click();
-  await expect(keys.getByRole("listitem")).toHaveCount(0);
+  await expect(trash).toHaveCount(0);
   await expect(keys).toContainText("Aún no tienes ninguna");
   // With no passkey left, the sign-in screen no longer offers the fingerprint here.
   expect(await page.evaluate(() => localStorage.getItem("wambito.passkey.used"))).toBe("0");
@@ -165,7 +240,9 @@ test("a passkey added from settings is listed, and deleting it empties the list"
 
 test("the export downloads the server's CSV and JSON under their own names", async ({ page }) => {
   await openSettings(page);
-  const data = page.getByRole("region", { name: "Tus datos" });
+  await openCategory(page, /^Tus datos/, "data", "Tus datos");
+  await page.getByRole("button", { name: /^Descargar tus datos/ }).click();
+  const data = page.getByRole("dialog", { name: "Descarga tus datos" });
   const [csv] = await Promise.all([
     page.waitForEvent("download"),
     data.getByRole("button", { name: "Descargar CSV" }).click(),
@@ -174,6 +251,9 @@ test("the export downloads the server's CSV and JSON under their own names", asy
   const text = await (await csv.createReadStream()).toArray();
   expect(Buffer.concat(text).toString("utf8")).toMatch(/^date,name,amount,currency,category/);
 
+  // A download closes the sheet: open it again for the JSON.
+  await expect(data).toHaveCount(0);
+  await page.getByRole("button", { name: /^Descargar tus datos/ }).click();
   const [json] = await Promise.all([
     page.waitForEvent("download"),
     data.getByRole("button", { name: "Descargar JSON" }).click(),
@@ -187,5 +267,5 @@ test("the export downloads the server's CSV and JSON under their own names", asy
   };
   expect(body.user.email).toBe(email);
   expect(body.transactions.length).toBeGreaterThan(0);
-  await expect(page).toHaveURL(/\/app\/settings$/);
+  await expect(page).toHaveURL(/\/app\/settings\/data$/);
 });

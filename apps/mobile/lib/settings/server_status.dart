@@ -60,7 +60,11 @@ const serverHealthEvery = Duration(seconds: 30);
 /// The dot and the line beside it: Comprobando… (grey), En línea · Versión … (green, blinking)
 /// or No responde (red). The line is a live region, so a change is read out once.
 class ServerStatus extends ConsumerStatefulWidget {
-  const ServerStatus({super.key});
+  const ServerStatus({super.key, this.compact = false});
+
+  /// The row's value in Más: "Conectado" for a server that answers (its version stays in what a
+  /// screen reader hears), on one line with an ellipsis.
+  final bool compact;
 
   @override
   ConsumerState<ServerStatus> createState() => _ServerStatusState();
@@ -104,7 +108,7 @@ class _ServerStatusState extends ConsumerState<ServerStatus> {
     final colors = context.lkColors;
     final health = _health;
     final version = health?.version;
-    final (color, label) = switch (health) {
+    final (color, full) = switch (health) {
       null => (colors.inkMuted, l10n.settingsServerChecking),
       ServerHealth(online: true) => (
         colors.good,
@@ -114,6 +118,7 @@ class _ServerStatusState extends ConsumerState<ServerStatus> {
       ),
       _ => (colors.over, l10n.settingsServerOffline),
     };
+    final label = widget.compact && health?.online == true ? l10n.settingsServerConnected : full;
     final pulses =
         health?.online == true &&
         ref.watch(serverDotPulsesProvider) &&
@@ -128,7 +133,16 @@ class _ServerStatusState extends ConsumerState<ServerStatus> {
         Flexible(
           child: Semantics(
             liveRegion: true,
-            child: Text(label, style: LkText.bodySm.copyWith(color: colors.ink)),
+            label: widget.compact ? full : null,
+            child: ExcludeSemantics(
+              excluding: widget.compact,
+              child: Text(
+                label,
+                maxLines: widget.compact ? 1 : null,
+                overflow: widget.compact ? TextOverflow.ellipsis : null,
+                style: LkText.bodySm.copyWith(color: colors.ink),
+              ),
+            ),
           ),
         ),
       ],

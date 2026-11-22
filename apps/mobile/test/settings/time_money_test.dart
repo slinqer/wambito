@@ -82,7 +82,7 @@ Future<_Env> _pump(
   await t.pumpAndSettle();
   // Settings opens over home, which stays mounted under it.
   settings.container.listen(homeProvider, (_, _) {});
-  settings.container.read(routerProvider).push('/settings');
+  settings.container.read(routerProvider).push('/settings/preferences');
   await t.pumpAndSettle();
   return _Env(settings, home, server, platform, recurring, snapshots);
 }
@@ -104,6 +104,13 @@ Future<void> _scrollTo(WidgetTester t, String key) async {
   await t.pumpAndSettle();
 }
 
+/// Opens the sheet of the currency row.
+Future<void> _openCurrency(WidgetTester t) async {
+  await _scrollTo(t, 'settings.currency.row');
+  await t.tap(find.byKey(const Key('settings.currency.row')));
+  await t.pumpAndSettle();
+}
+
 Future<void> _openZones(WidgetTester t) async {
   await _scrollTo(t, 'settings.timezone.change');
   await t.tap(find.byKey(const Key('settings.timezone.change')));
@@ -117,22 +124,24 @@ Future<void> _search(WidgetTester t, String query) async {
 
 void main() {
   group('the time zone', () {
-    testPage('shows the profile\'s: its city, and under it the region and the offset', (t) async {
+    testPage('its row shows the profile\'s city; the sheet has the hint, the region and offset', (
+      t,
+    ) async {
       await _pump(t);
       await _scrollTo(t, 'settings.timezone.change');
       expect(said('Hora y moneda'), findsWidgets);
-      expect(said('Zona horaria'), findsOneWidget);
-      expect(said('Con ella sabemos cuándo empieza tu día y tu mes.'), findsOneWidget);
+      expect(find.text('Zona horaria'), findsOneWidget);
       expect(find.text('Bogota'), findsOneWidget);
+      await _openZones(t);
+      expect(said('Con ella sabemos cuándo empieza tu día y tu mes.'), findsOneWidget);
+      await _search(t, 'bogota');
       expect(find.text('America · GMT-5'), findsOneWidget);
     });
 
-    testPage('its button is named "Cambiar zona horaria" and described by the hint', (t) async {
-      final handle = t.ensureSemantics();
+    testPage('its row is named "Zona horaria" for a screen reader', (t) async {
       await _pump(t);
       await _scrollTo(t, 'settings.timezone.change');
-      expect(find.bySemanticsLabel('Cambiar zona horaria'), findsOneWidget);
-      handle.dispose();
+      expect(find.bySemanticsLabel(RegExp(r'Zona horaria[\s\S]*Bogota')), findsOneWidget);
     });
 
     testPage('a search sheet finds a zone by city, without accents; picking saves it', (t) async {
@@ -152,7 +161,6 @@ void main() {
       expect(find.text('Elige tu zona horaria'), findsNothing, reason: 'the sheet closed');
       expect(find.text('Listo: ahora usamos la hora de Madrid.'), findsOneWidget);
       expect(find.text('Madrid'), findsOneWidget);
-      expect(find.text('Europe · GMT+2'), findsOneWidget);
       await t.pump(const Duration(seconds: 10));
     });
 
@@ -348,15 +356,13 @@ void main() {
   group('the currency', () {
     testPage('an empty account can choose: one option for each, with an example amount', (t) async {
       await _pump(t);
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       expect(said('Moneda'), findsWidgets);
       expect(said('Puedes cambiarla hasta tu primer movimiento.'), findsOneWidget);
       expect(find.text('Peso colombiano'), findsOneWidget);
       expect(find.text(r'$50.000 (50 lukas)'), findsOneWidget);
       expect(find.text('Dólar estadounidense'), findsOneWidget);
       expect(find.byKey(const Key('settings.currency.EUR')), findsOneWidget);
-      // The one in use is chosen.
-      await _scrollTo(t, 'settings.currency.COP');
       expect(
         t.getSemantics(find.bySemanticsLabel('Peso colombiano \$50.000 (50 lukas) COP')),
         matchesSemantics(
@@ -374,7 +380,7 @@ void main() {
 
     testPage('choosing one saves it, and everything reads the new currency', (t) async {
       final env = await _pump(t);
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       await t.tap(find.byKey(const Key('settings.currency.USD')));
       await t.pumpAndSettle();
       expect(env.server.patches, [
@@ -388,7 +394,7 @@ void main() {
 
     testPage('choosing the one in use does nothing', (t) async {
       final env = await _pump(t);
-      await _scrollTo(t, 'settings.currency.COP');
+      await _openCurrency(t);
       await t.tap(find.byKey(const Key('settings.currency.COP')));
       await t.pumpAndSettle();
       expect(env.server.patches, isEmpty);
@@ -398,7 +404,7 @@ void main() {
 
     testPage('after the first movement it is refused, in the web\'s words', (t) async {
       final env = await _pump(t, movements: true);
-      await _scrollTo(t, 'settings.currency.locked');
+      await _openCurrency(t);
       expect(said(locked), findsOneWidget);
       expect(find.byKey(const Key('settings.currency.USD')), findsNothing);
       expect(env.server.patches, isEmpty);
@@ -406,7 +412,7 @@ void main() {
 
     testPage('a recurring payment locks it too', (t) async {
       await _pump(t, rules: [rule('rent', 'cat-groceries')]);
-      await _scrollTo(t, 'settings.currency.locked');
+      await _openCurrency(t);
       expect(said(locked), findsOneWidget);
       expect(find.byKey(const Key('settings.currency.USD')), findsNothing);
     });
@@ -414,7 +420,7 @@ void main() {
     testPage('the server has the last word: a 409 turns the choice into the same line', (t) async {
       final env = await _pump(t);
       env.server.lockedByServer = true;
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       await t.tap(find.byKey(const Key('settings.currency.USD')));
       await t.pumpAndSettle();
       expect(said(locked), findsOneWidget);
@@ -427,7 +433,7 @@ void main() {
     testPage('any other failure is said in a toast and the choice stays', (t) async {
       final env = await _pump(t);
       env.server.failure = const HomeFailure(503, code: 'internal_error');
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       await t.tap(find.byKey(const Key('settings.currency.USD')));
       await t.pumpAndSettle();
       expect(
@@ -440,7 +446,7 @@ void main() {
 
     testPage('a currency the app does not offer is not changed from here', (t) async {
       await _pump(t, currency: 'MXN');
-      await _scrollTo(t, 'settings.currency.locked');
+      await _openCurrency(t);
       expect(
         said('Tu moneda es MXN. Ya tienes movimientos o recurrentes, así que se queda así.'),
         findsOneWidget,
@@ -456,15 +462,15 @@ void main() {
       // Open Settings again so it asks again.
       env.settings.container.read(routerProvider).go('/');
       await t.pumpAndSettle();
-      env.settings.container.read(routerProvider).go('/settings');
+      env.settings.container.read(routerProvider).go('/settings/preferences');
       await t.pumpAndSettle();
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       expect(find.byKey(const Key('settings.currency.USD')), findsOneWidget);
     });
 
     testPage('in English, with the web\'s English words', (t) async {
       await _pump(t, locale: const Locale('en'));
-      await _scrollTo(t, 'settings.currency.USD');
+      await _openCurrency(t);
       expect(said('Time and currency'), findsWidgets);
       expect(find.text('Colombian Peso'), findsOneWidget);
       expect(find.text('COP\u00a050,000 (50k)'), findsOneWidget);

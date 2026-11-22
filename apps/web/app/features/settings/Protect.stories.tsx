@@ -318,7 +318,7 @@ export const WithAnEmail: Story = {
   args: { anonymous: false },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await canvas.findByRole("region", { name: "Seguridad" });
+    await canvas.findByRole("navigation", { name: "Ajustes" });
     await expect(canvas.queryByRole("region", { name: "Protege tus datos" })).toBeNull();
   },
 };

@@ -222,9 +222,7 @@
   "progressPasskeyFailed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez.",
   "settingsTitle": "Definições",
   "settingsOpenLabel": "Definições",
-  "settingsAccount": "Conta",
   "settingsGuestAccount": "Estás a usar Wambito sem email.",
-  "settingsPreferences": "Preferências",
   "settingsTheme": "Tema",
   "settingsThemeSystem": "Automático",
   "settingsThemeDay": "Dia",
@@ -237,16 +235,19 @@
   "settingsLanguageIt": "Italiano",
   "settingsLanguagePt": "Português",
   "settingsLanguageHint": "Automático usa o idioma do teu telemóvel.",
-  "settingsSound": "Sons",
   "settingsSoundHint": "Tocam quando registas e quando celebras. A vibração mantém-se igual.",
   "settingsVibration": "Vibração",
   "settingsVibrationHint": "Um toque suave ao registar, deslizar e desfazer.",
   "settingsNotices": "Avisos",
+  "settingsNoticesLine": "O que o Wambito te lembra",
   "settingsDueNotice": "Vence hoje…",
-  "settingsDueNoticeHint": "Às 9:00, um aviso com os pagamentos recorrentes que vencem hoje.",
-  "settingsDueNoticeHintIos": "Por volta das 9:00, um aviso com os pagamentos recorrentes que vencem hoje. O iOS decide a hora exata.",
-  "settingsGuestNotice": "Aviso se não tiveres email",
-  "settingsGuestNoticeHint": "Se passarem 45 dias sem abrires Wambito e não tiveres email, avisamos-te: ao fim de 60 dias sem o abrires, os teus dados são apagados.",
+  "settingsDueNoticeHint": "Às 9:00, os pagamentos que vencem hoje",
+  "settingsDueNoticeFull": "Às 9:00, um aviso com os pagamentos recorrentes que vencem hoje.",
+  "settingsDueNoticeHintIos": "Por volta das 9:00, os pagamentos que vencem hoje",
+  "settingsDueNoticeFullIos": "Por volta das 9:00, um aviso com os pagamentos recorrentes que vencem hoje. O iOS decide a hora exata.",
+  "settingsGuestNotice": "Se não tiveres email",
+  "settingsGuestNoticeHint": "Antes de os teus dados serem apagados",
+  "settingsGuestNoticeFull": "Se passarem 45 dias sem abrires Wambito e não tiveres email, avisamos-te: ao fim de 60 dias sem o abrires, os teus dados são apagados.",
   "noticeAskTitle": "Queres receber avisos?",
   "noticeAskDue": "Assim Wambito pode avisar-te às 9:00 nos dias em que vence um pagamento recorrente.",
   "noticeAskDueIos": "Assim Wambito pode avisar-te por volta das 9:00 nos dias em que vence um pagamento recorrente.",
@@ -254,8 +255,9 @@
   "noticeAskLater": "Agora não",
   "noticeAskAllow": "Permitir avisos",
   "settingsWidget": "Widget",
-  "settingsHideAmount": "Ocultar o valor no widget",
-  "settingsHideAmountHint": "Mostra •••• em vez do que te resta.",
+  "settingsWidgetLine": "Anota a partir do ecrã principal",
+  "settingsHideAmount": "Ocultar o valor",
+  "settingsHideAmountHint": "Mostra •••• em vez do que te resta",
   "widgetCardTitle": "Anota sem abrir a app",
   "widgetCardBody": "Põe o Wambi no ecrã principal: um toque e registas a despesa, ou diz-lho em voz alta.",
   "widgetCardAdd": "Adicionar widget",
@@ -266,12 +268,13 @@
   "widgetStep3": "Procura o Wambito e arrasta-o para o ecrã.",
   "widgetStepsDone": "Percebi",
   "settingsAddWidget": "Adicionar widget",
-  "settingsAddWidgetHint": "Anota a partir do ecrã principal",
+  "settingsAddWidgetHint": "Põe-no no ecrã principal",
   "settingsVoice": "Voz",
+  "settingsVoiceLine": "Dita sem internet",
   "settingsDeleteVoice": "Apagar os modelos de voz",
-  "settingsDeleteVoiceHint": "Liberta espaço no telemóvel. Da próxima vez que ditares, pedimos-te que os descarregues de novo.",
-  "settingsVoicePrecise": "Melhorar a precisão (+{megabytes} MB)",
-  "settingsVoicePreciseHint": "Um modelo mais preciso corrige o que dizes quando acabas. Funciona sem internet.",
+  "settingsDeleteVoiceHint": "Liberta espaço; descarregam-se ao ditar",
+  "settingsVoicePrecise": "Melhorar a precisão",
+  "settingsVoicePreciseLine": "+{megabytes} MB · corrige quando acabas de falar",
   "settingsVoicePreciseFailed": "Não conseguimos descarregar o modelo preciso. Tenta outra vez.",
   "settingsDeleteVoiceTitle": "Apagar os modelos de voz?",
   "settingsDeleteVoiceBody": "Não poderás ditar até os descarregares de novo. O que já registaste não muda.",
@@ -291,14 +294,46 @@
   "settingsServerOffline": "Não responde",
   "settingsServerVersion": "Versão {version}",
   "settingsAbout": "Acerca de",
-  "settingsWeb": "Mais na web",
   "settingsWebHint": "A página de Wambito e o que aí vem.",
   "settingsWebFailed": "Não conseguimos abrir o navegador.",
   "settingsSignedInAs": "Entraste como {email}",
-  "settingsPhone": "Neste telemóvel",
+  "settingsMenuAgents": "Os meus agentes",
+  "settingsMenuAgentsLine": "ChatGPT · Claude · Lumo+ · Grok",
+  "settingsMenuAccount": "Conta e segurança",
+  "settingsMenuAccountLine": "Passkeys, dispositivos, chave",
+  "settingsMenuPreferencesLine": "{language} · {theme} · {currency}",
+  "@settingsMenuPreferencesLine": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      },
+      "theme": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMenuPreferences": "Preferências",
+  "settingsMenuCapture": "Captura",
+  "settingsMenuCaptureLine": "Automática, voz, avisos",
+  "settingsMenuData": "Os teus dados",
+  "settingsMenuDataLine": "Importar, exportar",
+  "settingsMenuMore": "Mais",
+  "settingsMenuMoreLine": "Comentários, servidor, acerca de",
+  "settingsMenuMoreWebLine": "Comentários",
+  "settingsMenuBack": "Voltar a Definições",
+  "settingsMenuBackShort": "Definições",
+  "settingsVersion": "Wambito {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsSoundHintVibrationOff": "Tocam quando registas e quando celebras. A vibração mantém-se igual.",
-  "settingsWebOpen": "Ver a página de Wambito",
-  "settingsAboutOpen": "Licenças e mais",
   "aboutBack": "Voltar às Definições",
   "aboutBackShort": "Definições",
   "settingsSignOut": "Terminar sessão",
@@ -321,7 +356,8 @@
   "licenseNoticeLibyuv": "libyuv (https://chromium.googlesource.com/libyuv/libyuv), dentro da biblioteca nativa de androidx.camera:camera-core {version} (a câmera que lê o QR), sob a licença BSD de três cláusulas.",
   "licenseNoticeJna": "Java Native Access (https://github.com/java-native-access/jna), por onde o Vosk chega à sua biblioteca nativa. Tem licença dupla: Apache 2.0 ou LGPL 2.1. Wambito usa-a com a licença Apache 2.0.",
   "licenseNoticeCanary": "O modelo de voz preciso da captura rápida, Canary-180M flash (https://huggingface.co/nvidia/canary-180m-flash), da NVIDIA, com licença Creative Commons Attribution 4.0 (CC BY 4.0). Não vem na app: é descarregado para o telemóvel se aceitares, e reconhece a voz sem sair de lá. Atribuição: Canary-180M flash by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. É usado convertido para ONNX, sem outras mudanças do Wambito.",
-  "licenseNoticePlump": "Os ícones de início e resumo da barra de baixo são do Plump Free da Streamline (https://www.streamlinehq.com/icons/plump), com licença Creative Commons Attribution 4.0 (CC BY 4.0). Atribuição: Plump Free icons by Streamline, CC BY 4.0. São usados sem alterações, na cor do tema.",
+  "licenseNoticePlump": "Os ícones de início e resumo da barra de baixo são do Plump Free da Streamline (https://www.streamlinehq.com/icons/plump), com licença Creative Commons Attribution 4.0 (CC BY 4.0). Atribuição: Plump Free icons by Streamline, CC BY 4.0. Os ícones das configurações são do Plump Solid Free da Streamline, também CC BY 4.0 (Plump Solid Free icons by Streamline). São usados sem alterações, na cor do tema.",
+  "licenseNoticeBrands": "Os logótipos dos assistentes de IA e das apps de pagamento das Definições: ChatGPT, Claude e Grok são do Streamline Logos Solid Free da Streamline (https://www.streamlinehq.com/icons/logos), com licença Creative Commons Attribution 4.0 (CC BY 4.0), atribuição: Streamline Logos Solid Free icons by Streamline, CC BY 4.0; Google Wallet é do Font Awesome Free 6.5.2 da Fonticons (https://fontawesome.com), CC BY 4.0, atribuição: Font Awesome Free by Fonticons, CC BY 4.0; Revolut é do Simple Icons (https://simpleicons.org), publicado com CC0 1.0 (domínio público); Lumo é o ícone do assistente da Proton, da Proton AG. Os logótipos são marcas dos seus donos e só indicam de que app se fala; são redesenhados numa só cor, a do tema.",
   "licenseNoticeParakeet": "O modelo de voz preciso da captura rápida em italiano e português, Parakeet TDT 0.6B v3 (https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), da NVIDIA, com licença Creative Commons Attribution 4.0 (CC BY 4.0). Não vem na app: é descarregado para o telemóvel se aceitares, e reconhece a voz sem sair de lá. Atribuição: Parakeet TDT 0.6B v3 by NVIDIA, CC BY 4.0, converted to ONNX by the sherpa-onnx project. É usado convertido para ONNX, sem outras mudanças do Wambito.",
   "licenseNoticeSherpa": "sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx), da k2-fsa, com licença Apache 2.0. É o motor que executa o modelo preciso no telemóvel. As suas bibliotecas nativas, libsherpa-onnx-jni.so e libonnxruntime.so, levam dentro as bibliotecas listadas à parte, cada uma com a sua licença.",
   "licenseNoticeOnnxruntime": "ONNX Runtime (https://github.com/microsoft/onnxruntime), da Microsoft, com licença MIT. É a biblioteca nativa libonnxruntime.so dentro do AAR do sherpa-onnx, e faz os cálculos do modelo.",
@@ -471,16 +507,10 @@
   "recurringAdd": "Novo recorrente",
   "importPageTitle": "Traz o teu histórico",
   "importPageLead": "Traz os teus movimentos de outra app.",
-  "settingsDataTitle": "Os teus dados",
-  "settingsImportTitle": "Traz o teu histórico",
   "settingsImportLead": "Importa o que tens no Budge.",
-  "settingsImportAction": "Importar do Budge",
-  "settingsRoadmapOpen": "Ver o que aí vem",
   "settingsTimeAndMoney": "Hora e moeda",
   "settingsTimezoneLabel": "Fuso horário",
   "settingsTimezoneHint": "Com ele sabemos quando começa o teu dia e o teu mês.",
-  "settingsTimezoneChange": "Mudar",
-  "settingsTimezoneChangeLabel": "Mudar fuso horário",
   "settingsTimezoneSheetTitle": "Escolhe o teu fuso horário",
   "settingsTimezoneSearch": "Procura a tua cidade ou país",
   "settingsTimezonePlaceholder": "Lisboa, Portugal, Porto…",
@@ -499,26 +529,25 @@
   "settingsPasskeysUnsupported": "Este telemóvel não permite criar impressões digitais. Continua a entrar com o teu email.",
   "settingsPasskeysListFailed": "Não conseguimos carregar as tuas impressões digitais. Tenta de novo daqui a um momento.",
   "settingsPasskeysDefaultName": "Impressão digital",
-  "settingsPasskeysCreated": "Criada em {date}",
-  "settingsPasskeysSynced": "Sincronizada",
+  "settingsPasskeysCreated": "Desde {date}",
+  "settingsPasskeysSynced": "sincronizada",
   "settingsPasskeysAdd": "Adicionar uma impressão digital",
   "settingsPasskeysAdding": "À espera da tua impressão digital…",
   "settingsPasskeysGuest": "Primeiro guarda o teu progresso com um email; depois poderás adicionar uma impressão digital.",
   "settingsPasskeysAdded": "Pronto: já podes entrar com a impressão digital.",
   "settingsPasskeysAddFailed": "Não conseguimos guardar a tua impressão digital. Tenta outra vez.",
-  "settingsPasskeysRemove": "Eliminar",
   "settingsPasskeysRemoveLabel": "Eliminar a impressão digital criada em {date}",
-  "settingsPasskeysRemoveNamedLabel": "Eliminar {name}, criada em {date}",
+  "settingsPasskeysRemoveNamedLabel": "Eliminar {name}",
   "settingsPasskeysRemoveTitle": "Eliminar esta impressão digital?",
   "settingsPasskeysRemoveBody": "Já não poderás entrar com ela. O teu email continua a funcionar.",
   "settingsPasskeysRemoveConfirm": "Sim, eliminar",
   "settingsPasskeysRemoved": "Eliminámos a impressão digital.",
   "settingsPasskeysRemoveFailed": "Não conseguimos eliminar a impressão digital. Tenta outra vez.",
-  "settingsSecurityTitle": "Segurança",
-  "settingsSecurityLead": "Os teus dados estão cifrados. Estes dispositivos podem abri-los.",
-  "settingsSecurityThisPhone": "Este telemóvel",
+  "settingsSecurityTitle": "Os teus dispositivos",
+  "settingsSecurityLead": "Podem abrir os teus dados cifrados",
+  "settingsSecurityThisPhone": "Este",
   "settingsSecurityUnnamed": "Dispositivo",
-  "settingsSecurityAdded": "Adicionado em {date}",
+  "settingsSecurityAdded": "Desde {date}",
   "settingsSecurityNotVerified": "Não verificado",
   "settingsSecurityLoadFailed": "Não conseguimos carregar os teus dispositivos. Tenta outra vez daqui a pouco.",
   "settingsSecurityRemove": "Remover",
@@ -529,7 +558,6 @@
   "connectDeviceBadCode": "Esse código não corresponde a nenhum pedido. Verifica-o, ou começa de novo no outro dispositivo.",
   "settingsSecurityRecoveryTitle": "Chave de recuperação",
   "settingsSecurityRecoveryLead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto. A anterior deixa de funcionar.",
-  "settingsSecurityNewRecovery": "Nova chave de recuperação",
   "settingsSecurityUnreadable": "{count, plural, =0{Não foi possível ler {count} elementos} =1{Não foi possível ler {count} elemento} other{Não foi possível ler {count} elementos}}",
   "settingsSecurityUnreadableLead": "Foram guardados com uma chave que este telemóvel não tem. Continuam seguros tal como estão.",
   "settingsSecurityMaybeSaved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",
@@ -555,9 +583,7 @@
   "settingsSecurityNewKeySaved": "A tua chave de recuperação nova ficou guardada. A anterior já não funciona.",
   "settingsSecurityNewKeyRotatedElsewhere": "Entretanto, as tuas chaves mudaram noutro dispositivo. Cria a chave nova outra vez.",
   "settingsSecurityNewKeyFailed": "Não conseguimos guardar a chave nova. Tenta outra vez.",
-  "settingsPasskeysUnlocks": "Abre os teus dados",
   "settingsPasskeysLocked": "Não abre os teus dados",
-  "settingsPasskeysTurnOn": "Ativar",
   "settingsPasskeysTurnOnLabel": "Ativar para os teus dados a impressão digital criada em {date}",
   "settingsPasskeysTurnOnNamedLabel": "Ativar {name} para os teus dados",
   "settingsPasskeysTurnedOn": "Feito: esta impressão digital também abre os teus dados.",
@@ -762,8 +788,6 @@
   "settingsExportSaveFailed": "Não conseguimos guardar o ficheiro. Tenta outra vez.",
   "settingsExportShareFailed": "Não encontrámos uma app para partilhar o ficheiro.",
   "settingsAccountDeleteTitle": "Eliminar a tua conta",
-  "settingsAccountDeleteLead": "Apagamos a tua conta e todos os teus movimentos de imediato. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
-  "settingsAccountDeleteAction": "Eliminar a minha conta",
   "settingsAccountDeleteSheetTitle": "Eliminar a tua conta?",
   "settingsAccountDeleteSheetBody": "São apagados de imediato os teus movimentos, categorias, orçamentos, recorrentes e impressões digitais. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
   "settingsAccountDeleteExportFirst": "Descarrega antes os teus dados",
@@ -787,35 +811,177 @@
   "unsentUploaded": "Enviámos {count, plural, =0{os {count} movimentos} =1{o movimento} other{os {count} movimentos}} que registaste sem ligação.",
   "unsentRefused": "Não conseguimos guardar «{name}». Regista-o outra vez.",
   "unsentLabel": "Por enviar",
-  "settingsAssistantsTitle": "Liga o teu assistente",
-  "settingsAssistantsLead": "Usa o Wambito a partir do Claude ou do ChatGPT: regista os teus movimentos e pergunta como vais, a conversar.",
-  "settingsAssistantsUrl": "O endereço do conector",
-  "settingsAssistantsUrlHint": "É igual para todos: ao ligar, entras com a tua conta.",
   "settingsAssistantsCopy": "Copiar",
   "settingsAssistantsCopyLabel": "Copiar o endereço do conector",
   "settingsAssistantsCopied": "Copiámos o endereço.",
-  "settingsAssistantsClaude": "No Claude: Definições → Conectores → Adicionar conector personalizado, e cola o endereço.",
-  "settingsAssistantsChatGpt": "No ChatGPT: Definições → Conectores, se o teu plano o permitir; cria um com este endereço.",
   "settingsAssistantsExamples": "Depois pede-lhe, por exemplo:",
   "settingsAssistantsExampleAdd": "«regista 18 no almoço»",
   "settingsAssistantsExampleAsk": "«como vou este mês?»",
-  "settingsAssistantsConnected": "Assistentes ligados",
-  "settingsAssistantsEmpty": "Ainda não ligaste nenhum assistente.",
   "settingsAssistantsListFailed": "Não conseguimos carregar os teus assistentes. Tenta de novo daqui a um momento.",
   "settingsAssistantsGuest": "Primeiro guarda o teu progresso com um email; depois poderás ligar um assistente.",
-  "settingsAssistantsConnectedOn": "Ligado em {date}",
-  "settingsAssistantsLastUsed": "Último uso em {date}",
-  "settingsAssistantsNeverUsed": "Ainda sem uso",
   "settingsAssistantsRevoke": "Revogar",
   "settingsAssistantsRevokeLabel": "Revogar {name}",
   "settingsAssistantsRevokeTitle": "Revogar {name}?",
   "settingsAssistantsRevokeBody": "Dentro de poucos minutos deixará de ver e registar nas tuas contas. Podes ligá-lo outra vez quando quiseres.",
   "settingsAssistantsRevokeConfirm": "Sim, revogar",
   "settingsAssistantsRevoked": "Revogámos {name}.",
+  "settingsAgentsLead": "Usa o Wambito a partir do teu assistente de IA: regista movimentos e pergunta como estás sem abrir a app.",
+  "@settingsAgentsLead": {
+    "description": "Mis agentes: what connecting an AI app is for."
+  },
+  "settingsAgentsNotConnected": "Por ligar",
+  "@settingsAgentsNotConnected": {
+    "description": "Mis agentes: an app that is not connected."
+  },
+  "settingsAgentsConnect": "Ligar",
+  "@settingsAgentsConnect": {
+    "description": "Mis agentes: the button that opens an app's connect sheet."
+  },
+  "settingsAgentsConnectLabel": "Ligar {name}",
+  "@settingsAgentsConnectLabel": {
+    "description": "Mis agentes: an app's Connect button for screen readers.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsFrom": "De {domain}",
+  "settingsAgentsConnectedLine": "Ligado a {date} · {used}",
+  "@settingsAgentsConnectedLine": {
+    "description": "Mis agentes: when an app was connected and last used.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsUsedToday": "usado hoje",
+  "@settingsAgentsUsedToday": {
+    "description": "Mis agentes: used today."
+  },
+  "settingsAgentsUsedYesterday": "usado ontem",
+  "@settingsAgentsUsedYesterday": {
+    "description": "Mis agentes: used yesterday."
+  },
+  "settingsAgentsUsedOn": "usado a {date}",
+  "@settingsAgentsUsedOn": {
+    "description": "Mis agentes: used on a day.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsNeverUsed": "ainda por usar",
+  "@settingsAgentsNeverUsed": {
+    "description": "Mis agentes: connected but not used yet."
+  },
+  "settingsAgentsAddressTitle": "O endereço do Wambito",
+  "@settingsAgentsAddressTitle": {
+    "description": "Mis agentes: the heading over the connector address."
+  },
+  "settingsAgentsGuestTitle": "Primeiro adiciona um email",
+  "@settingsAgentsGuestTitle": {
+    "description": "Mis agentes: a guest must add an email first."
+  },
+  "settingsAgentsConnectTitle": "Ligar {name}",
+  "@settingsAgentsConnectTitle": {
+    "description": "Mis agentes: the connect sheet's title.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsStep1": "Copia o endereço do conector",
+  "@settingsAgentsStep1": {
+    "description": "Connect sheet: step 1, copy the address."
+  },
+  "settingsAgentsStep2Claude": "No Claude, vai a Definições → Conectores → <b>Adicionar conector personalizado</b> e cola o endereço.",
+  "@settingsAgentsStep2Claude": {
+    "description": "Connect sheet: step 2 for Claude (<b> marks bold)."
+  },
+  "settingsAgentsStep2Chatgpt": "Em <b>chatgpt.com/plugins</b>, toca em <b>+</b> → <b>Add custom MCP server</b>, cola o endereço, escolhe OAuth e toca em <b>Create as a plugin</b>.",
+  "@settingsAgentsStep2Chatgpt": {
+    "description": "Connect sheet: step 2 for ChatGPT (<b> marks bold)."
+  },
+  "settingsAgentsStep2Lumo": "Na app de ambiente de trabalho do Lumo, vai a Settings → Desktop App → Connectors → <b>Add MCP server</b> e cola o endereço.",
+  "@settingsAgentsStep2Lumo": {
+    "description": "Connect sheet: step 2 for Lumo+ (<b> marks bold)."
+  },
+  "settingsAgentsStep2Grok": "Em grok.com, vai a Conectores → <b>Novo conector</b> → Personalizado, e cola o endereço.",
+  "@settingsAgentsStep2Grok": {
+    "description": "Connect sheet: step 2 for Grok (<b> marks bold)."
+  },
+  "settingsAgentsStep3": "O {name} vai pedir-te para entrares: usa a tua conta Wambito e aceita a permissão.",
+  "@settingsAgentsStep3": {
+    "description": "Connect sheet: step 3, sign in.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsOpenClaude": "Abrir o Claude ↗",
+  "@settingsAgentsOpenClaude": {
+    "description": "Connect sheet: opens Claude."
+  },
+  "settingsAgentsOpenChatgpt": "Abrir chatgpt.com ↗",
+  "@settingsAgentsOpenChatgpt": {
+    "description": "Connect sheet: opens chatgpt.com."
+  },
+  "settingsAgentsOpenLumo": "Descarregar o Lumo ↗",
+  "@settingsAgentsOpenLumo": {
+    "description": "Connect sheet: downloads Lumo."
+  },
+  "settingsAgentsOpenGrok": "Abrir o Grok ↗",
+  "@settingsAgentsOpenGrok": {
+    "description": "Connect sheet: opens Grok."
+  },
+  "settingsAgentsNotePlan": "Adiciona-se a partir do site do ChatGPT, não da app móvel; depois usas também no telemóvel. Depende do teu plano, e em cada conversa nova ativa-se a partir do menu +.",
+  "@settingsAgentsNotePlan": {
+    "description": "Connect sheet: a note for ChatGPT."
+  },
+  "settingsAgentsNoteDesktop": "Só a partir da app de ambiente de trabalho do Lumo (macOS, Windows ou Linux).",
+  "@settingsAgentsNoteDesktop": {
+    "description": "Connect sheet: a note for Lumo+."
+  },
+  "settingsAgentsNotePaid": "Os conectores personalizados são dos planos pagos do Grok.",
+  "@settingsAgentsNotePaid": {
+    "description": "Connect sheet: a note for Grok."
+  },
+  "settingsAgentsHelp": "Perdeste-te? Vê o guia passo a passo na <link>ajuda de {company} ↗</link>",
+  "@settingsAgentsHelp": {
+    "description": "Connect sheet: the guide's link (<link> marks it).",
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAgentsDone": "Concluído",
+  "@settingsAgentsDone": {
+    "description": "Connect sheet: closes it."
+  },
+  "settingsAgentsNowConnected": "O {name} ficou ligado.",
+  "@settingsAgentsNowConnected": {
+    "description": "Mis agentes: toast when an app got connected.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "autoCaptureTitle": "Captura automática",
-  "autoCaptureLead": "Regista as tuas despesas e receitas a partir das notificações do Revolut e do Google Wallet.",
+  "autoCaptureLead": "A partir das notificações das tuas apps",
   "autoCaptureActive": "Ativa",
+  "autoCaptureOff": "Desativada",
   "autoCaptureHowLink": "Como funciona?",
+  "autoCaptureHowLine": "O que o Wambito lê e o que sai do telemóvel",
   "autoCaptureHowNext": "Seguinte",
   "autoCaptureHowDone": "Entendido",
   "autoCaptureHowStepOf": "Passo {step} de {total}",
@@ -841,10 +1007,10 @@
   "autoCaptureHowEatingOut": "Restaurante",
   "autoCaptureExplainerConfirm": "Ativar acesso",
   "autoCaptureMissing": "Falta a permissão",
-  "autoCaptureGrant": "Ativar",
+  "autoCaptureGrant": "Dar acesso",
   "autoCaptureStuck": "Não deixa?",
   "autoCaptureStepsTitle": "Definições restritas",
-  "autoCaptureSteps": "1. Toca em Abrir informações da app.\n2. Toca em ⋮ no canto superior direito e escolhe Permitir definições restritas.\n3. Volta aqui e toca em Ativar.",
+  "autoCaptureSteps": "1. Toca em Abrir informações da app.\n2. Toca em ⋮ no canto superior direito e escolhe Permitir definições restritas.\n3. Volta aqui e toca em Dar acesso.",
   "autoCaptureOpenInfo": "Abrir informações da app",
   "homeReviewCount": "{count, plural, =0{0 por rever} =1{1 por rever} other{{count} por rever}}",
   "reviewTitle": "Por rever",
@@ -1057,5 +1223,90 @@
   "signinNoticeBody": "Se não foste tu, remove esse dispositivo agora.",
   "signinNoticeNotMe": "Não fui eu",
   "signinNoticeOk": "OK",
-  "signinNoticeMore": "{count, plural, =0{Mais {count} dispositivos foram adicionados.} =1{Mais {count} dispositivo foi adicionado.} other{Mais {count} dispositivos foram adicionados.}}"
+  "signinNoticeMore": "{count, plural, =0{Mais {count} dispositivos foram adicionados.} =1{Mais {count} dispositivo foi adicionado.} other{Mais {count} dispositivos foram adicionados.}}",
+  "settingsPasskeysLine": "Sem código, com a tua impressão digital ou a tua cara",
+  "@settingsPasskeysLine": {
+    "description": "Settings: the passkeys group's line under its title."
+  },
+  "settingsSecurityRecoveryLine": "Cria uma nova se a perdeste",
+  "@settingsSecurityRecoveryLine": {
+    "description": "Settings: the recovery key row's line."
+  },
+  "settingsSecurityChangeKeysLine": "Cria novas chaves de cifragem",
+  "@settingsSecurityChangeKeysLine": {
+    "description": "Settings: the change keys row's line."
+  },
+  "settingsAccountDeleteLine": "Apaga conta e movimentos",
+  "@settingsAccountDeleteLine": {
+    "description": "Settings: the delete account row's line."
+  },
+  "settingsSecurityNewKeyContinue": "Continuar",
+  "@settingsSecurityNewKeyContinue": {
+    "description": "Settings: continues to a new recovery key, after what it does."
+  },
+  "settingsAppearance": "Aparência",
+  "@settingsAppearance": {
+    "description": "Settings, Preferencias: the group of language and theme."
+  },
+  "settingsSoundTouch": "Som e toque",
+  "@settingsSoundTouch": {
+    "description": "Settings, Preferencias: the group of sound and vibration."
+  },
+  "settingsSoundTitle": "Som",
+  "@settingsSoundTitle": {
+    "description": "Settings, Preferencias: the sound row's name."
+  },
+  "settingsSoundLine": "Um som curto ao registar",
+  "@settingsSoundLine": {
+    "description": "Settings, Preferencias: the sound row's one line (the full sentence is its hint for screen readers)."
+  },
+  "settingsVibrationLine": "Um toque suave ao registar e desfazer",
+  "@settingsVibrationLine": {
+    "description": "Settings, Preferencias: the vibration row's one line (the full sentence is its hint for screen readers)."
+  },
+  "settingsImportRow": "Importar movimentos",
+  "@settingsImportRow": {
+    "description": "Settings, Tus datos: the import row's name."
+  },
+  "settingsImportRowLine": "Do Budge",
+  "@settingsImportRowLine": {
+    "description": "Settings, Tus datos: the import row's one line."
+  },
+  "settingsExportRow": "Descarrega os teus dados",
+  "@settingsExportRow": {
+    "description": "Settings, Tus datos: the export row's name."
+  },
+  "settingsExportRowLine": "Em JSON ou CSV",
+  "@settingsExportRowLine": {
+    "description": "Settings, Tus datos: the export row's one line."
+  },
+  "settingsComingSoonChip": "Em breve",
+  "@settingsComingSoonChip": {
+    "description": "Settings: the chip on a row that an encrypted account cannot use yet."
+  },
+  "settingsFeedbackRowLine": "Diz-nos o que melhorar",
+  "@settingsFeedbackRowLine": {
+    "description": "Settings, Más: the feedback row's one line."
+  },
+  "settingsRoadmapRow": "O que aí vem",
+  "@settingsRoadmapRow": {
+    "description": "Settings, Más: the row that opens the roadmap on the web."
+  },
+  "settingsWebRow": "Abrir o Wambito na web",
+  "@settingsWebRow": {
+    "description": "Settings, Más: the row that opens Wambito's page on the web."
+  },
+  "settingsServerConnected": "Ligado",
+  "@settingsServerConnected": {
+    "description": "Settings, Más: the server row's status when the server answered."
+  },
+  "settingsAboutVersion": "Versão {version}",
+  "@settingsAboutVersion": {
+    "description": "Settings, Más: the about row's line, the app's version.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -142,8 +142,9 @@ void main() {
     tester,
   ) async {
     await _signInWithAMovement(tester, 'mobile-export');
-    GoRouter.of(tester.element(find.byType(HomeScreen))).go('/settings');
-    await _pumpUntil(tester, find.byKey(const Key('settings.export.json')));
+    // Settings → "Tus datos": "Descargar tus datos" opens the export's sheet.
+    GoRouter.of(tester.element(find.byType(HomeScreen))).go('/settings/data');
+    await _tap(tester, 'settings.export');
     await _tap(tester, 'settings.export.json');
 
     // The file is ready: the question asks where it goes.
@@ -164,7 +165,11 @@ void main() {
     // And the page said so, with the name the server gave.
     await _pumpUntil(tester, find.textContaining('wambito-export-'));
 
-    // The CSV, shared: the share sheet comes up with a copy in the app's cache.
+    // The CSV, shared: the share sheet comes up with a copy in the app's cache. The export's sheet
+    // is opened again if the save closed it.
+    if (find.byKey(const Key('settings.export.csv')).evaluate().isEmpty) {
+      await _tap(tester, 'settings.export');
+    }
     await _tap(tester, 'settings.export.csv');
     await _pumpUntil(tester, find.byKey(const Key('settings.export.share')));
     await _tap(tester, 'settings.export.share');

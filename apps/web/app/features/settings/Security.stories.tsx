@@ -208,7 +208,7 @@ const stage = (
     <HomeStage
       onRequest={() => {}}
       mode={extra.mode ?? "local"}
-      path="/app/settings"
+      path="/app/settings/all"
       passkeys={extra.passkeys ?? storyPasskeys({ initial: PASSKEYS })}
       security={fake.security}
       {...(extra.anonymous ? { guest: true } : {})}
@@ -217,8 +217,11 @@ const stage = (
 };
 const fakeOf = (_args: Args) => current as Fake;
 
-const section = async (canvas: Canvas) =>
-  within(await canvas.findByRole("region", { name: "Seguridad" }));
+/** The devices group has rendered; the rows below are all on the page, so it is the canvas. */
+const section = async (canvas: Canvas) => {
+  await canvas.findByRole("group", { name: "Tus dispositivos" });
+  return canvas;
+};
 
 /** Types back the four characters `RecoveryKeySetup` asks for, then Continúa. */
 async function typeBack(key: string) {
@@ -241,25 +244,18 @@ export const Overview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const security = await section(canvas);
-    const items = await security.findAllByRole("listitem");
-    await expect(items).toHaveLength(3);
-    const [own, laptop, forged] = items.map((item) => within(item));
-    await expect(own?.getByText("Chrome on macOS")).toBeVisible();
-    await expect(own?.getByText("Este navegador")).toBeVisible();
-    await expect(own?.queryByRole("button")).toBeNull();
-    await expect(laptop?.getByText("Agregado el 3 oct 2026")).toBeVisible();
-    await expect(laptop?.queryByText("Sin verificar")).toBeNull();
-    await expectTarget(
-      laptop?.getByRole("button", { name: "Quitar Firefox on Linux" }) as HTMLElement,
-    );
-    await expect(forged?.getByText("Sin verificar")).toBeVisible();
-    await expect(forged?.getByRole("button", { name: "Quitar Safari on iOS" })).toBeVisible();
+    const devices = within(security.getByRole("group", { name: "Tus dispositivos" }));
+    await expect(await devices.findByText("Chrome on macOS")).toBeVisible();
+    await expect(devices.getByText("Este")).toBeVisible();
+    await expect(devices.queryByRole("button", { name: /Chrome on macOS/ })).toBeNull();
+    await expect(devices.getByText("Desde el 3 oct 2026")).toBeVisible();
+    await expectTarget(devices.getByRole("button", { name: "Quitar Firefox on Linux" }));
+    await expect(devices.getByText("Desde el 4 oct 2026 · Sin verificar")).toBeVisible();
+    await expect(devices.getByRole("button", { name: "Quitar Safari on iOS" })).toBeVisible();
     await expect(security.queryByText("Edge on Windows")).toBeNull();
-    await expect(security.getByRole("button", { name: "Conectar otro dispositivo" })).toBeVisible();
-    await expect(
-      security.getByRole("button", { name: "Nueva clave de recuperación" }),
-    ).toBeVisible();
-    await expect(security.getByText("No pudimos leer 3 elementos")).toBeVisible();
+    await expect(devices.getByRole("button", { name: "Conectar otro dispositivo" })).toBeVisible();
+    await expect(security.getByRole("button", { name: /^Clave de recuperación/ })).toBeVisible();
+    await expect(devices.getByText(/No pudimos leer 3 elementos/)).toBeVisible();
   },
 };
 
@@ -269,7 +265,7 @@ export const NothingUnreadable: Story = {
   render: (args) => stage(args),
   play: async ({ canvasElement }) => {
     const security = await section(within(canvasElement));
-    await security.findAllByRole("listitem");
+    await security.findByText("Firefox on Linux");
     await expect(security.queryByText(/No pudimos leer/)).toBeNull();
   },
 };
@@ -285,9 +281,9 @@ export const AnonymousAccount: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { level: 1, name: "Ajustes" });
     const area = await section(canvas);
-    await area.findAllByRole("listitem");
+    await area.findByText("Firefox on Linux");
     await expect(security.load).toHaveBeenCalled();
-    await expect(area.getByRole("button", { name: "Nueva clave de recuperación" })).toBeVisible();
+    await expect(area.getByRole("button", { name: /^Clave de recuperación/ })).toBeVisible();
     await userEvent.click(area.getByRole("button", { name: "Conectar otro dispositivo" }));
     await expect(
       await screen.findByRole("dialog", { name: "Conectar otro dispositivo" }),
@@ -299,8 +295,8 @@ export const HiddenInTheLiveApp: Story = {
   render: (args) => stage(args, { mode: "live" }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await canvas.findByRole("region", { name: "Entrar con tu huella" });
-    await expect(canvas.queryByRole("region", { name: "Seguridad" })).toBeNull();
+    await canvas.findByRole("group", { name: "Entrar con tu huella" });
+    await expect(canvas.queryByRole("group", { name: "Tus dispositivos" })).toBeNull();
   },
 };
 
@@ -375,7 +371,7 @@ export const NewRecoveryKey: Story = {
   play: async ({ canvasElement, args }) => {
     const { security, commitNewKey } = fakeOf(args);
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -417,7 +413,7 @@ export const NewRecoveryKeyCancelledTouch: Story = {
   play: async ({ canvasElement, args }) => {
     const { security } = fakeOf(args);
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -458,16 +454,16 @@ export const PasskeysThatUnlock: Story = {
   play: async ({ canvasElement, args }) => {
     const { security } = fakeOf(args);
     const canvas = within(canvasElement);
-    const passkeys = within(await canvas.findByRole("region", { name: "Entrar con tu huella" }));
-    await expect(await passkeys.findByText("Abre tus datos")).toBeVisible();
-    await expect(passkeys.getByText("No abre tus datos")).toBeVisible();
-    await userEvent.click(passkeys.getByRole("button", { name: "Activar Pixel 9 para tus datos" }));
+    const passkeys = within(await canvas.findByRole("group", { name: "Entrar con tu huella" }));
+    await expect(await passkeys.findByText("No abre tus datos")).toBeVisible();
+    await userEvent.click(
+      passkeys.getByRole("button", { name: /^Activar Pixel 9 para tus datos/ }),
+    );
     await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
     await expect(security.evaluatePrf).toHaveBeenCalledWith(["cred-2"]);
     const touched = security.addPasskeyWrap.mock.calls[0]?.[0] as { prf: Uint8Array };
     await expect(touched.prf.every((x) => x === 0)).toBe(true);
-    await waitFor(() => expect(passkeys.getAllByText("Abre tus datos")).toHaveLength(2));
-    await expect(passkeys.queryByText("No abre tus datos")).toBeNull();
+    await waitFor(() => expect(passkeys.queryByText("No abre tus datos")).toBeNull());
   },
 };
 
@@ -478,10 +474,10 @@ export const PasskeyCannotUnlock: Story = {
   play: async ({ canvasElement, args }) => {
     const { security } = fakeOf(args);
     const passkeys = within(
-      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+      await within(canvasElement).findByRole("group", { name: "Entrar con tu huella" }),
     );
     await userEvent.click(
-      await passkeys.findByRole("button", { name: "Activar Pixel 9 para tus datos" }),
+      await passkeys.findByRole("button", { name: /^Activar Pixel 9 para tus datos/ }),
     );
     await expect(await passkeys.findByRole("alert")).toHaveTextContent(
       "El proveedor de esta huella no puede abrir tus datos. Usa tu clave de recuperación o ábrelos desde otro dispositivo.",
@@ -500,7 +496,7 @@ export const AddPasskeyThatUnlocks: Story = {
     const { security } = fakeOf(args);
     const page = within(canvasElement.ownerDocument.body);
     const passkeys = within(
-      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+      await within(canvasElement).findByRole("group", { name: "Entrar con tu huella" }),
     );
     await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
     await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
@@ -510,7 +506,8 @@ export const AddPasskeyThatUnlocks: Story = {
       expect(getComputedStyle(toast.closest(".lk-toast") ?? toast).opacity).toBe("1"),
     );
     await expect(passkeys.queryByText(/no le permite abrir tus datos/)).toBeNull();
-    await waitFor(() => expect(passkeys.getAllByText("Abre tus datos")).toHaveLength(2));
+    await waitFor(() => expect(passkeys.getAllByText(/Desde el/)).toHaveLength(3));
+    await expect(passkeys.getAllByText("No abre tus datos")).toHaveLength(1);
   },
 };
 
@@ -524,7 +521,7 @@ export const AddPasskeyWithoutPrf: Story = {
     const { security } = fakeOf(args);
     const page = within(canvasElement.ownerDocument.body);
     const passkeys = within(
-      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+      await within(canvasElement).findByRole("group", { name: "Entrar con tu huella" }),
     );
     await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
     const notice = await passkeys.findByText(
@@ -554,7 +551,7 @@ export const AddPasskeySecondTouchCancelled: Story = {
     const { security } = fakeOf(args);
     const page = within(canvasElement.ownerDocument.body);
     const passkeys = within(
-      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+      await within(canvasElement).findByRole("group", { name: "Entrar con tu huella" }),
     );
     await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
     const toast = await page.findByText("Listo: ya puedes entrar con tu huella.");
@@ -580,7 +577,7 @@ export const AddPasskeyWrapFails: Story = {
     const { security } = fakeOf(args);
     const page = within(canvasElement.ownerDocument.body);
     const passkeys = within(
-      await within(canvasElement).findByRole("region", { name: "Entrar con tu huella" }),
+      await within(canvasElement).findByRole("group", { name: "Entrar con tu huella" }),
     );
     await userEvent.click(await passkeys.findByRole("button", { name: "Agregar una huella" }));
     await waitFor(() => expect(security.addPasskeyWrap).toHaveBeenCalledTimes(1));
@@ -603,7 +600,7 @@ export const NewKeyWaitsForThePasskeyList: Story = {
   render: (args) => stage(args, { passkeys: loadingPasskeys() }),
   play: async ({ canvasElement }) => {
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const newKey = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -623,7 +620,7 @@ export const NewKeyNotOfferedWhenThePasskeyListFailed: Story = {
       { timeout: 15000 },
     );
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const newKey = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -645,7 +642,7 @@ export const NewRecoveryKeyCommitFails: Story = {
   play: async ({ canvasElement, args }) => {
     const { security, commitNewKey } = fakeOf(args);
     const area = await section(within(canvasElement));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -684,7 +681,7 @@ export const NewRecoveryKeyRotatedElsewhere: Story = {
     const { security } = fakeOf(args);
     const area = await section(within(canvasElement));
     await waitFor(() => expect(security.load).toHaveBeenCalledTimes(1));
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -711,11 +708,11 @@ export const NewRecoveryKeyWithoutPasskeys: Story = {
   play: async ({ canvasElement, args }) => {
     const { security, commitNewKey } = fakeOf(args);
     const canvas = within(canvasElement);
-    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+    await within(await canvas.findByRole("group", { name: "Entrar con tu huella" })).findByText(
       /Aún no tienes/,
     );
     const area = await section(canvas);
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );
@@ -736,11 +733,11 @@ export const NewRecoveryKeyWithoutTouch: Story = {
     stage(args, { passkeys: storyPasskeys({ initial: PASSKEYS, supported: false }) }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await within(await canvas.findByRole("region", { name: "Entrar con tu huella" })).findByText(
+    await within(await canvas.findByRole("group", { name: "Entrar con tu huella" })).findByText(
       "Pixel 9",
     );
     const area = await section(canvas);
-    await userEvent.click(area.getByRole("button", { name: "Nueva clave de recuperación" }));
+    await userEvent.click(area.getByRole("button", { name: /^Clave de recuperación/ }));
     const sheet = within(
       await screen.findByRole("dialog", { name: "Crear una clave de recuperación nueva" }),
     );

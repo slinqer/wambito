@@ -1,15 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { exposeStoryFetch } from "../../.storybook/parity.ts";
 import { ApiProvider } from "../api/ApiProvider.tsx";
 import { CategoryDetail } from "../features/categories/CategoryDetail.tsx";
 import { AppShell } from "../features/home/AppShell.tsx";
 import { Home } from "../features/home/Home.tsx";
+import { SettingsAll } from "../features/home/story-harness.tsx";
 import { Insights } from "../features/insights/Insights.tsx";
 import { RecurringPage } from "../features/recurring/RecurringPage.tsx";
-import { Settings } from "../features/settings/Settings.tsx";
+import { SettingsMenu } from "../features/settings/SettingsMenu.tsx";
 import { AppMessages } from "../i18n/AppMessages.tsx";
 import { type Locale } from "../i18n/format.ts";
 import { IntlProvider, useLocale } from "../i18n/IntlProvider.tsx";
@@ -61,7 +62,8 @@ function DemoStage({ path }: { path: string }) {
                   <Route path="categories/:id" element={<CategoryDetail />} />
                   <Route path="recurring" element={<RecurringPage />} />
                   <Route path="insights" element={<Insights />} />
-                  <Route path="settings" element={<Settings />} />
+                  <Route path="settings" element={<SettingsMenu />} />
+                  <Route path="settings/all" element={<SettingsAll />} />
                 </Route>
               </Routes>
             </ToastProvider>
@@ -141,39 +143,42 @@ export const InsightsInPesos: Story = {
  * are off, each with the note; language, theme, sound and time zone still work.
  */
 export const SettingsOffByDay: Story = {
-  args: { path: "/demo/settings" },
+  args: { path: "/demo/settings/all" },
   globals: { theme: "day", locale: "en" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { name: "Settings", level: 1 });
     // No sign-in happened: the line says whose made-up account this is.
-    await expect(canvas.getByText("You're viewing Valentina's demo.")).toBeVisible();
+    await expect(canvas.getAllByText("You're viewing Valentina's demo.")[0]).toBeVisible();
     await expect(canvas.queryByText(/Signed in as/)).toBeNull();
     const note = "Not available in the demo. Create your account to use it.";
     await expect(canvas.getAllByText(note)).toHaveLength(3);
-    for (const name of [
-      "Download JSON",
-      "Download CSV",
-      "Import from Budge",
-      "Delete my account",
-    ]) {
-      const button = canvas.getByRole("button", { name });
-      await expect(button).toBeDisabled();
-      await expect(button).toHaveAccessibleDescription(note);
+    // import and export are rows with no action in the demo, the note under them
+    for (const name of ["Import transactions", "Download your data"]) {
+      await expect(canvas.getByText(name)).toBeVisible();
+      await expect(canvas.queryByRole("button", { name: new RegExp(`^${name}`) })).toBeNull();
+      await expect(canvas.queryByRole("link", { name: new RegExp(`^${name}`) })).toBeNull();
     }
-    await expect(canvas.getByRole("button", { name: /Add a fingerprint/ })).toBeDisabled();
-    // The assistants' address and steps, but no list: the demo asks the API nothing about them.
-    const assistants = within(canvas.getByRole("region", { name: "Connect your assistant" }));
+    // the passkey and delete rows have no action in the demo; each carries its note
+    await expect(canvas.getByText("Add a fingerprint")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: /Add a fingerprint/ })).toBeNull();
+    await expect(canvas.getByText("Deletes your account and your entries")).toBeVisible();
+    // The four apps to connect and the address, but no grants: the demo asks the API nothing.
+    const assistants = within(canvas.getByRole("region", { name: "Wambito's address" }));
     await expect(
       assistants.getByRole("textbox", { name: "The Wambito address for assistants" }),
     ).toHaveValue(`${window.location.origin}/mcp`);
-    await expect(assistants.queryByText("Your assistants")).toBeNull();
+    await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: /^Revoke/ })).toBeNull();
     await expect(canvas.getByRole("link", { name: "Back to home" })).toHaveAttribute(
       "href",
       "/demo",
     );
     // The language still switches: the demo's profile changes in memory.
-    await userEvent.click(canvas.getByRole("radio", { name: "Español" }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Language/ }));
+    await userEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("radio", { name: "Español" }),
+    );
     await canvas.findByRole("heading", { name: "Ajustes", level: 1 });
   },
 };

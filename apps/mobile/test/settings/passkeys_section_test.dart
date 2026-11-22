@@ -40,7 +40,7 @@ Future<SettingsEnv> _pump(
     homeRepo: FakeHomeRepository(timezone: 'America/Bogota'),
     overrides: [clockProvider.overrideWithValue(() => _now), ...overrides],
   );
-  env.container.read(routerProvider).go('/settings');
+  env.container.read(routerProvider).go('/settings/account');
   await t.pumpAndSettle();
   return env;
 }
@@ -75,17 +75,11 @@ void main() {
       );
       await _scrollTo(t, 'settings.passkeys.add');
       expect(said('Entrar con tu huella'), findsWidgets);
-      expect(
-        said(
-          'Una passkey es una llave guardada en tu teléfono o en tu gestor de contraseñas. Tu huella o tu cara solo la desbloquean, y tu correo sigue funcionando.',
-        ),
-        findsOneWidget,
-      );
+      expect(said('Sin código, con tu huella o tu cara'), findsOneWidget);
       expect(find.text('Huella'), findsOneWidget);
       expect(find.text('Pixel'), findsOneWidget);
-      expect(find.text('Creada el 2 oct 2026'), findsOneWidget);
-      expect(find.text('Creada el 5 oct 2026'), findsOneWidget);
-      expect(find.text('Sincronizada'), findsOneWidget, reason: 'only the synced one');
+      expect(find.text('Desde el 2 oct 2026 · sincronizada'), findsOneWidget);
+      expect(find.text('Desde el 5 oct 2026'), findsOneWidget, reason: 'only the first syncs');
     });
 
     testPage(
@@ -93,7 +87,7 @@ void main() {
       (t) async {
         await _pump(t, keys: [_key('a', at: DateTime.utc(2026, 10, 3, 2))]);
         await _scrollTo(t, 'settings.passkeys.add');
-        expect(find.text('Creada el 2 oct 2026'), findsOneWidget);
+        expect(find.text('Desde el 2 oct 2026'), findsOneWidget);
       },
     );
 
@@ -108,14 +102,20 @@ void main() {
       );
       await _scrollTo(t, 'settings.passkeys.add');
       expect(find.bySemanticsLabel('Eliminar la huella creada el 2 oct 2026'), findsOneWidget);
-      expect(find.bySemanticsLabel('Eliminar Pixel, creada el 5 oct 2026'), findsOneWidget);
+      expect(find.bySemanticsLabel('Eliminar Pixel'), findsOneWidget);
       handle.dispose();
     });
 
     testPage('says there are none, and that the email keeps working', (t) async {
       await _pump(t);
       await _scrollTo(t, 'settings.passkeys.add');
-      expect(said('Aún no tienes ninguna: entras con el código de tu correo.'), findsOneWidget);
+      // What a passkey is goes with the empty line, where the person needs it.
+      expect(
+        said(
+          'Aún no tienes ninguna: entras con el código de tu correo. Una passkey es una llave guardada en tu teléfono o en tu gestor de contraseñas. Tu huella o tu cara solo la desbloquean, y tu correo sigue funcionando.',
+        ),
+        findsOneWidget,
+      );
     });
 
     testPage('says when the list cannot be read', (t) async {
@@ -132,9 +132,8 @@ void main() {
       await _scrollTo(t, 'settings.passkeys.add');
       expect(said('Sign in with your fingerprint'), findsWidgets);
       expect(find.text('Fingerprint'), findsOneWidget);
-      expect(find.text('Created on Oct 2, 2026'), findsOneWidget);
-      expect(find.text('Synced'), findsOneWidget);
-      expect(find.text('ADD A FINGERPRINT'), findsOneWidget);
+      expect(find.text('Since Oct 2, 2026 · synced'), findsOneWidget);
+      expect(find.text('Add a fingerprint'), findsOneWidget);
     });
   });
 
@@ -146,7 +145,7 @@ void main() {
       await t.pumpAndSettle();
       expect(env.passkeys.calls.where((c) => c.startsWith('create')), hasLength(1));
       expect(find.text('Listo: ya puedes entrar con tu huella.'), findsOneWidget);
-      expect(find.textContaining('Creada el'), findsNWidgets(2));
+      expect(find.textContaining('Desde el'), findsNWidgets(2));
       await t.pump(const Duration(seconds: 10));
     });
 
@@ -157,13 +156,13 @@ void main() {
       await _scrollTo(t, 'settings.passkeys.add');
       await t.tap(find.byKey(const Key('settings.passkeys.add')));
       await t.pump();
-      expect(find.text('ESPERANDO TU HUELLA…'), findsOneWidget);
+      expect(find.text('Esperando tu huella…'), findsOneWidget);
       await t.tap(find.byKey(const Key('settings.passkeys.add')), warnIfMissed: false);
       await t.pump();
       gate.complete();
       await t.pumpAndSettle();
       expect(env.passkeys.calls.where((c) => c.startsWith('create')), hasLength(1));
-      expect(find.text('AGREGAR UNA HUELLA'), findsOneWidget);
+      expect(find.text('Agregar una huella'), findsOneWidget);
       await t.pump(const Duration(seconds: 10));
     });
 
@@ -175,7 +174,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.textContaining('Listo'), findsNothing);
       expect(find.textContaining('No pudimos'), findsNothing);
-      expect(find.text('AGREGAR UNA HUELLA'), findsOneWidget);
+      expect(find.text('Agregar una huella'), findsOneWidget);
     });
 
     testPage('a failure says so and can be tried again', (t) async {

@@ -23,20 +23,38 @@ type Story = StoryObj<Spies>;
 
 const NOTE = "Todavía no está disponible con el cifrado de extremo a extremo. Llega pronto.";
 
+/** Through the menu: Tus datos turns import and export off with the note; Mis agentes lists the
+ * apps without it; Cuenta y seguridad keeps deleting the account, without the export. */
 export const Settings: Story = {
   render: (args) => <HomeStage mode="local" path="/app/settings" onRequest={args.onRequest} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { level: 1, name: "Ajustes" });
-    const data = within(await canvas.findByRole("region", { name: "Tus datos" }));
-    await expect(data.getByRole("button", { name: "Importar desde Budge" })).toBeDisabled();
-    await expect(data.getByRole("button", { name: "Descargar JSON" })).toBeDisabled();
-    await expect(data.getByText(NOTE)).toBeVisible();
-    const assistants = within(await canvas.findByRole("region", { name: "Conecta tu asistente" }));
+    const open = async (row: RegExp, heading: string) => {
+      const menu = within(await canvas.findByRole("navigation", { name: "Ajustes" }));
+      await userEvent.click(menu.getByRole("link", { name: row }));
+      await canvas.findByRole("heading", { level: 1, name: heading });
+    };
+    const back = async () => {
+      await userEvent.click(canvas.getByRole("link", { name: "Volver a Ajustes" }));
+      await canvas.findByRole("heading", { level: 1, name: "Ajustes" });
+    };
+
+    await open(/^Tus datos/, "Tus datos");
+    await expect(canvas.queryByRole("link", { name: /^Importar movimientos/ })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: /^Descargar tus datos/ })).toBeNull();
+    await expect(canvas.getByText(NOTE)).toBeVisible();
+    await back();
+
     // an assistant on an encrypted account is listed and revoked here (stage 4); the note is the demo's
-    await expect(assistants.queryByText(NOTE)).toBeNull();
+    await open(/^Mis agentes/, "Mis agentes");
+    await expect(await canvas.findByRole("button", { name: "Conectar Claude" })).toBeVisible();
+    await expect(canvas.queryByText(NOTE)).toBeNull();
+    await back();
+
     // deleting the account is the account's, not its finances: it stays on, without the export
-    const remove = canvas.getByRole("button", { name: "Eliminar mi cuenta" });
+    await open(/^Cuenta y seguridad/, "Cuenta y seguridad");
+    const remove = await canvas.findByRole("button", { name: /^Eliminar tu cuenta/ });
     await expect(remove).toBeEnabled();
     await userEvent.click(remove);
     const sheet = within(await screen.findByRole("dialog", { name: "¿Eliminar tu cuenta?" }));

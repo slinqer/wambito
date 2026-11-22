@@ -1,9 +1,20 @@
 import { expect, type Page, test } from "@playwright/test";
-import { clientIp, type Lang, onboardWithSample, pinClock, signUpNewUser } from "./helpers.ts";
+import {
+  clientIp,
+  freshEmail,
+  type Lang,
+  onboardWithSample,
+  pinClock,
+  readSignInMail,
+  setUpRecoveryKey,
+  signUpNewUser,
+  skipPasskeyOffer,
+} from "./helpers.ts";
 
 /**
  * Italian and European Portuguese run 10-25% longer than Spanish (spec §3): on a 360 px phone the
- * home and Settings screens, the bottom bar, the tabs and the avatar menu must not scroll
+ * home and Settings screens (the menu and every category page, an encrypted account's account
+ * page too), the bottom bar, the tabs and the avatar menu must not scroll
  * sideways, and none of their labels is clipped by its box.
  */
 
@@ -16,7 +27,19 @@ test.use({
 
 const WORDS: Record<
   "it" | "pt",
-  { locale: string; hero: string; tab: string; menu: string; account: string; settings: string }
+  {
+    locale: string;
+    hero: string;
+    tab: string;
+    menu: string;
+    account: string;
+    settings: string;
+    language: string;
+    languageName: string;
+    accountRow: string;
+    back: string;
+    devices: string;
+  }
 > = {
   it: {
     locale: "it-IT",
@@ -25,6 +48,11 @@ const WORDS: Record<
     account: "Il tuo account",
     menu: "Ricorrenti",
     settings: "Impostazioni",
+    language: "Lingua",
+    languageName: "Italiano",
+    accountRow: "Account e sicurezza",
+    back: "Torna a Impostazioni",
+    devices: "I tuoi dispositivi",
   },
   pt: {
     locale: "pt-PT",
@@ -33,6 +61,11 @@ const WORDS: Record<
     account: "A tua conta",
     menu: "Recorrentes",
     settings: "Definições",
+    language: "Idioma",
+    languageName: "Português",
+    accountRow: "Conta e segurança",
+    back: "Voltar a Definições",
+    devices: "Os teus dispositivos",
   },
 };
 
@@ -111,6 +144,61 @@ for (const lang of ["it", "pt"] as const satisfies readonly Lang[]) {
       await expectNoHorizontalOverflow(page, `${lang} settings`);
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await expectNoHorizontalOverflow(page, `${lang} settings, its foot`);
+    });
+
+    test("every category page does not overflow", async ({ page }) => {
+      for (const category of ["agents", "account", "preferences", "data", "more"]) {
+        await page.goto(`/app/settings/${category}`);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.locator(".lk-group").first()).toBeVisible();
+        await expectNoHorizontalOverflow(page, `${lang} settings ${category}`);
+      }
+    });
+
+    test("an encrypted account's account page does not overflow", async ({ browser }) => {
+      test.setTimeout(90_000);
+      // Its own context: the plain user of beforeEach stays in the page fixture.
+      const context = await browser.newContext({
+        viewport: { width: 360, height: 740 },
+        locale: words.locale,
+        timezoneId: "Europe/Madrid",
+        extraHTTPHeaders: { "x-forwarded-for": clientIp() },
+      });
+      const page = await context.newPage();
+      await pinClock(page);
+      // A web sign-up on the e2e stack is born encrypted (NEW_USERS_ENCRYPTED).
+      const email = freshEmail(`overflow-${lang}`);
+      await page.goto("/create-account?lang=es");
+      await page.getByRole("textbox", { name: "Tu correo" }).fill(email);
+      await page.getByRole("button", { name: "Enviar código" }).click();
+      const mail = await readSignInMail(email);
+      await page.getByRole("textbox", { name: "Dígito 1 de 6" }).fill(mail.code);
+      await skipPasskeyOffer(page);
+      await setUpRecoveryKey(page);
+      await page.getByRole("button", { name: "Continuar en el navegador" }).click();
+      await page.getByRole("button", { name: "Entrar directo" }).click();
+      await expect(page).toHaveURL(/\/app$/);
+
+      // The language from Preferencias, then Cuenta y seguridad through the menu (in-app links:
+      // a page load would leave the pinned clock's sheets off-screen).
+      await page.goto("/app/settings/preferences");
+      await page.getByRole("button", { name: /^Idioma/ }).click();
+      await page
+        .getByRole("dialog", { name: "Idioma" })
+        .getByRole("radio", { name: words.languageName })
+        .click();
+      await expect(page.locator("html")).toHaveAttribute("lang", lang);
+      await page.getByRole("link", { name: words.back }).click();
+      await page
+        .getByRole("navigation", { name: words.settings })
+        .getByRole("link", { name: new RegExp(`^${words.accountRow}`) })
+        .click();
+      await expect(page).toHaveURL(/\/app\/settings\/account$/);
+      await expect(page.getByRole("group", { name: words.devices })).toBeVisible();
+      await expectNoHorizontalOverflow(page, `${lang} settings account, encrypted`);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await expectNoHorizontalOverflow(page, `${lang} settings account, encrypted, its foot`);
+      await context.close();
     });
   });
 }

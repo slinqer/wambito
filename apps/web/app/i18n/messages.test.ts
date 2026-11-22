@@ -343,10 +343,10 @@ describe("the admin panel's messages (Spanish and English only, spec §10)", () 
 
 describe("deleting an account promises what is true (backups keep it up to 14 days)", () => {
   const DELETION = {
-    es: "Borramos tu cuenta y todos tus movimientos de inmediato. Las copias de seguridad que los incluyan se borran solas en 14 días.",
-    en: "We delete your account and all your entries right away. Backups that include them delete themselves within 14 days.",
-    it: "Cancelliamo subito il tuo account e tutti i tuoi movimenti. Le copie di sicurezza che li includono si cancellano da sole entro 14 giorni.",
-    pt: "Apagamos a tua conta e todos os teus movimentos de imediato. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
+    es: "Se borran de inmediato tus movimientos, categorías, presupuestos, recurrentes y huellas. Las copias de seguridad que los incluyan se borran solas en 14 días.",
+    en: "Your transactions, categories, budgets, recurring payments and fingerprints are deleted right away. Backups that include them delete themselves within 14 days.",
+    it: "Vengono cancellati subito i tuoi movimenti, categorie, budget, ricorrenze e impronte. Le copie di sicurezza che li includono si cancellano da sole entro 14 giorni.",
+    pt: "São apagados de imediato os teus movimentos, categorias, orçamentos, recorrentes e impressões digitais. As cópias de segurança que os incluem apagam-se sozinhas em 14 dias.",
   } as const;
 
   for (const locale of LANGUAGES) {
@@ -354,7 +354,7 @@ describe("deleting an account promises what is true (backups keep it up to 14 da
       const lines = Object.entries(catalogs[locale]).filter(([key]) =>
         key.startsWith("settings.delete."),
       );
-      expect(catalogs[locale]["settings.delete.lead"]).toBe(DELETION[locale]);
+      expect(catalogs[locale]["settings.delete.sheet_body"]).toBe(DELETION[locale]);
       for (const [key, line] of lines) {
         expect(line, key).not.toMatch(
           /para siempre|recuperarlos|no se puede deshacer|forever|for good|get them back|can't be undone|per sempre|irreversibil|non si può annullare|para sempre|irrevers|não se pode desfazer/i,

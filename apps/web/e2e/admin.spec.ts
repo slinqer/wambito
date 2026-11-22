@@ -66,8 +66,8 @@ test("the admin confirms with a passkey, finds a user by email and suspends them
   await skipPasskeyOffer(page);
   await expect(page).toHaveURL(/\/app$/);
 
-  await page.goto("/app/settings");
-  const keys = page.getByRole("region", { name: "Entrar con tu huella" });
+  await page.goto("/app/settings/account");
+  const keys = page.getByRole("group", { name: "Entrar con tu huella" });
   await keys.getByRole("button", { name: "Agregar una huella" }).click();
   await expect(page.getByRole("status")).toContainText("Listo: ya puedes entrar con tu huella.");
 

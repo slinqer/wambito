@@ -1371,211 +1371,190 @@
     "appTest": "test/parity/passkey_offer_parity_test.dart"
   },
   {
-    "id": "settings-app-sections",
-    "storyId": "manage-settings--app-sections",
+    "id": "settings-menu",
+    "storyId": "settings-parity--menu-night",
     "theme": "night",
     "appTest": "test/parity/settings_parity_test.dart",
     "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye"
+      "The app's menu leaves out Captura (SettingsScreen.webSectionsOnly), and its sign-out and version under the rows; test/settings/goldens has them to review by eye"
     ]
   },
   {
-    "id": "settings-app-sections",
-    "storyId": "manage-settings--app-sections",
+    "id": "settings-menu-day-english",
+    "storyId": "settings-parity--menu-day-english",
     "theme": "day",
     "appTest": "test/parity/settings_parity_test.dart",
-    "maxInk": 2.3,
     "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye",
-      "The web shot was retaken on a newer macOS, whose Chrome smooths the text a little differently and draws a wider ＋ (the system's PingFang): 2.00% of the ink, all glyph edges"
+      "The app's menu leaves out Captura (SettingsScreen.webSectionsOnly), and its sign-out and version under the rows; test/settings/goldens has them to review by eye"
     ]
   },
   {
-    "id": "settings-app-sections-day-english",
-    "storyId": "manage-settings--app-sections-day-english",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart",
-    "maxInk": 2.3,
-    "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye",
-      "The web shot was retaken on a newer macOS, whose Chrome smooths the text a little differently and draws a wider ＋ (the system's PingFang): 2.09% of the ink, all glyph edges"
-    ]
-  },
-  {
-    "id": "settings-app-sections-sound-off",
-    "storyId": "manage-settings--app-sections-sound-off",
+    "id": "settings-menu-italian",
+    "storyId": "settings-parity--menu-italian",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart",
+    "appTest": "test/parity/it_pt_parity_test.dart",
     "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye"
+      "The app's menu leaves out Captura (SettingsScreen.webSectionsOnly), and its sign-out and version under the rows; test/settings/goldens has them to review by eye"
     ]
   },
   {
-    "id": "settings-app-sections-sound-off",
-    "storyId": "manage-settings--app-sections-sound-off",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart",
+    "id": "settings-menu-portuguese",
+    "storyId": "settings-parity--menu-portuguese",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart",
     "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye"
+      "The app's menu leaves out Captura (SettingsScreen.webSectionsOnly), and its sign-out and version under the rows; test/settings/goldens has them to review by eye"
     ]
   },
   {
-    "id": "settings-currency-open",
-    "storyId": "manage-settings--app-sections-currency-open",
+    "id": "settings-agents",
+    "storyId": "settings-parity--agents-night",
     "theme": "night",
     "appTest": "test/parity/settings_parity_test.dart"
   },
   {
-    "id": "settings-currency-open",
-    "storyId": "manage-settings--app-sections-currency-open",
+    "id": "settings-agents-day-english",
+    "storyId": "settings-parity--agents-day-english",
     "theme": "day",
     "appTest": "test/parity/settings_parity_test.dart",
-    "maxInk": 2.3,
+    "maxInk": 2.1,
     "knownDifferences": [
-      "Dark text on the day's light cards: Chrome and Flutter draw the glyph edges a little differently, and this picture has more text in it than the 2% rule leaves room for (docs/mobile/parity.md, Settings)"
+      "By day the text sits to the pixel and what is left is how Chrome and Flutter rasterise the same glyphs (Flutter's dark-on-light text is a little heavier), as on the other day pairs"
     ]
   },
   {
-    "id": "settings-passkeys",
-    "storyId": "manage-settings--app-sections-passkeys",
+    "id": "settings-agents-italian",
+    "storyId": "settings-parity--agents-italian",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart"
+  },
+  {
+    "id": "settings-agents-portuguese",
+    "storyId": "settings-parity--agents-portuguese",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart"
+  },
+  {
+    "id": "settings-account",
+    "storyId": "settings-parity--account-night",
     "theme": "night",
     "appTest": "test/parity/settings_parity_test.dart"
   },
   {
-    "id": "settings-passkeys",
-    "storyId": "manage-settings--app-sections-passkeys",
+    "id": "settings-account-day-english",
+    "storyId": "settings-parity--account-day-english",
+    "theme": "day",
+    "appTest": "test/parity/settings_parity_test.dart"
+  },
+  {
+    "id": "settings-account-italian",
+    "storyId": "settings-parity--account-italian",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart"
+  },
+  {
+    "id": "settings-account-portuguese",
+    "storyId": "settings-parity--account-portuguese",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart"
+  },
+  {
+    "id": "settings-preferences",
+    "storyId": "settings-parity--preferences-night",
+    "theme": "night",
+    "appTest": "test/parity/settings_parity_test.dart",
+    "knownDifferences": [
+      "The app's Preferencias leaves out the phone's vibration row and the language's 'Automático' (PreferencesScreen.webSectionsOnly)"
+    ]
+  },
+  {
+    "id": "settings-preferences-day-english",
+    "storyId": "settings-parity--preferences-day-english",
     "theme": "day",
     "appTest": "test/parity/settings_parity_test.dart",
-    "maxInk": 2.3,
+    "maxInk": 2.5,
     "knownDifferences": [
-      "Dark text on the day's light cards: Chrome and Flutter draw the glyph edges a little differently, and this picture has more text in it than the 2% rule leaves room for (docs/mobile/parity.md, Settings)"
+      "The app's Preferencias leaves out the phone's vibration row and the language's 'Automático' (PreferencesScreen.webSectionsOnly)",
+      "By day the text sits to the pixel and what is left is how Chrome and Flutter rasterise the same glyphs (Flutter's dark-on-light text is a little heavier), as on the other day pairs; the three letter-spaced group labels (11.5px, weight 900) carry most of it: 2.52% of the ink"
+    ]
+  },
+  {
+    "id": "settings-preferences-italian",
+    "storyId": "settings-parity--preferences-italian",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart",
+    "knownDifferences": [
+      "The app's Preferencias leaves out the phone's vibration row and the language's 'Automático' (PreferencesScreen.webSectionsOnly)"
+    ]
+  },
+  {
+    "id": "settings-preferences-portuguese",
+    "storyId": "settings-parity--preferences-portuguese",
+    "theme": "night",
+    "appTest": "test/parity/it_pt_parity_test.dart",
+    "knownDifferences": [
+      "The app's Preferencias leaves out the phone's vibration row and the language's 'Automático' (PreferencesScreen.webSectionsOnly)"
     ]
   },
   {
     "id": "settings-data",
-    "storyId": "manage-settings--app-sections-data",
+    "storyId": "settings-parity--data-night",
     "theme": "night",
     "appTest": "test/parity/settings_parity_test.dart"
   },
   {
-    "id": "settings-data",
-    "storyId": "manage-settings--app-sections-data",
+    "id": "settings-data-day-english",
+    "storyId": "settings-parity--data-day-english",
     "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/settings_parity_test.dart",
+    "maxInk": 2.1,
+    "knownDifferences": [
+      "By day the text sits to the pixel and what is left is how Chrome and Flutter rasterise the same glyphs (Flutter's dark-on-light text is a little heavier), as on the other day pairs"
+    ]
   },
   {
-    "id": "settings-time-zone-sheet",
-    "storyId": "manage-settings--time-zone-sheet-open",
+    "id": "settings-data-italian",
+    "storyId": "settings-parity--data-italian",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/it_pt_parity_test.dart"
   },
   {
-    "id": "settings-time-zone-sheet",
-    "storyId": "manage-settings--time-zone-sheet-open",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-time-zone-current",
-    "storyId": "manage-settings--time-zone-sheet-current",
+    "id": "settings-data-portuguese",
+    "storyId": "settings-parity--data-portuguese",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/it_pt_parity_test.dart"
   },
   {
-    "id": "settings-time-zone-current",
-    "storyId": "manage-settings--time-zone-sheet-current",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-time-zone-no-match",
-    "storyId": "manage-settings--time-zone-no-match",
+    "id": "settings-more",
+    "storyId": "settings-parity--more-night",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/settings_parity_test.dart",
+    "knownDifferences": ["The app's Más leaves out its own rows (MoreScreen.webSectionsOnly)"]
   },
   {
-    "id": "settings-time-zone-no-match",
-    "storyId": "manage-settings--time-zone-no-match",
+    "id": "settings-more-day-english",
+    "storyId": "settings-parity--more-day-english",
     "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/settings_parity_test.dart",
+    "maxInk": 2.2,
+    "knownDifferences": [
+      "The app's Más leaves out its own rows (MoreScreen.webSectionsOnly)",
+      "By day the text sits to the pixel and what is left is how Chrome and Flutter rasterise the same glyphs (Flutter's dark-on-light text is a little heavier), as on the other day pairs"
+    ]
   },
   {
-    "id": "settings-passkey-remove-sheet",
-    "storyId": "manage-settings--passkey-remove-sheet-open",
+    "id": "settings-more-italian",
+    "storyId": "settings-parity--more-italian",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/it_pt_parity_test.dart",
+    "knownDifferences": ["The app's Más leaves out its own rows (MoreScreen.webSectionsOnly)"]
   },
   {
-    "id": "settings-passkey-remove-sheet",
-    "storyId": "manage-settings--passkey-remove-sheet-open",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete",
-    "storyId": "manage-settings--app-sections-delete",
+    "id": "settings-more-portuguese",
+    "storyId": "settings-parity--more-portuguese",
     "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete",
-    "storyId": "manage-settings--app-sections-delete",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-feedback",
-    "storyId": "manage-settings--app-sections-feedback",
-    "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-feedback",
-    "storyId": "manage-settings--app-sections-feedback",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet",
-    "storyId": "manage-settings--delete-sheet-open",
-    "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet",
-    "storyId": "manage-settings--delete-sheet-open",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet-ready",
-    "storyId": "manage-settings--delete-sheet-ready",
-    "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet-ready",
-    "storyId": "manage-settings--delete-sheet-ready",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet-failed",
-    "storyId": "manage-settings--delete-sheet-failed",
-    "theme": "night",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet-failed",
-    "storyId": "manage-settings--delete-sheet-failed",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
-  },
-  {
-    "id": "settings-delete-sheet-day-english",
-    "storyId": "manage-settings--delete-sheet-day-english",
-    "theme": "day",
-    "appTest": "test/parity/settings_parity_test.dart"
+    "appTest": "test/parity/it_pt_parity_test.dart",
+    "knownDifferences": ["The app's Más leaves out its own rows (MoreScreen.webSectionsOnly)"]
   },
   {
     "id": "confirm-sheet-open",
@@ -2016,15 +1995,6 @@
     "appTest": "test/parity/it_pt_parity_test.dart"
   },
   {
-    "id": "settings-app-sections-italian",
-    "storyId": "manage-settings--app-sections-italian",
-    "theme": "night",
-    "appTest": "test/parity/it_pt_parity_test.dart",
-    "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye"
-    ]
-  },
-  {
     "id": "home-transactions-portuguese",
     "storyId": "home-home--transactions-portuguese",
     "theme": "night",
@@ -2035,15 +2005,6 @@
     "storyId": "home-home--more-options-portuguese",
     "theme": "night",
     "appTest": "test/parity/it_pt_parity_test.dart"
-  },
-  {
-    "id": "settings-app-sections-portuguese",
-    "storyId": "manage-settings--app-sections-portuguese",
-    "theme": "night",
-    "appTest": "test/parity/it_pt_parity_test.dart",
-    "knownDifferences": [
-      "The app's pair leaves out its own cards (SettingsScreen.webSectionsOnly) and the language's 'Automático'. test/settings/goldens has the app's own cards to review by eye"
-    ]
   },
   {
     "id": "capture-step-pay",

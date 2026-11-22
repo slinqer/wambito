@@ -130,8 +130,10 @@ const nudgeSync = (page: Page) =>
 
 /** Settings → Security of an open vault. */
 async function openSecurity(page: Page) {
-  await page.goto("/app/settings");
-  await expect(page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
+  await page.goto("/app/settings/account");
+  await expect(
+    page.getByRole("heading", { name: "Cuenta y seguridad", exact: true }),
+  ).toBeVisible();
 }
 
 /**
@@ -320,9 +322,9 @@ test("a passkey unlocks with PRF", async ({ browser }) => {
   await openSecurity(first.page);
   await first.page.getByRole("button", { name: "Agregar una huella" }).click();
   await expect(first.page.getByText("Listo: ya puedes entrar con tu huella.")).toBeVisible();
-  const row = first.page.getByRole("listitem").filter({ hasText: "Creada el" });
-  await expect(row).toHaveCount(1);
-  await expect(row.getByText("Abre tus datos", { exact: true })).toBeVisible();
+  const row = first.page.getByRole("group", { name: "Entrar con tu huella" });
+  await expect(row.getByRole("button", { name: /^Eliminar / })).toHaveCount(1);
+  await expect(row.getByText(/Desde el/)).toHaveCount(1);
   await expect(row.getByText("No abre tus datos")).toHaveCount(0);
   // A passkey that opens the data gets the toast, never the "does not open your data" notice.
   await expect(first.page.getByText(/no le permite abrir tus datos/)).toHaveCount(0);
@@ -381,8 +383,8 @@ test("a passkey without PRF signs in and the recovery key opens the data", async
   );
   await expect(notice).toBeVisible();
   await expect(notice).toHaveAttribute("role", "status");
-  const row = first.page.getByRole("listitem").filter({ hasText: "Creada el" });
-  await expect(row).toHaveCount(1);
+  const row = first.page.getByRole("group", { name: "Entrar con tu huella" });
+  await expect(row.getByRole("button", { name: /^Eliminar / })).toHaveCount(1);
   await expect(row.getByText("No abre tus datos")).toBeVisible();
 
   // -- signed out (the vault is wiped), it signs in with that passkey: no PRF, so Unlock leads ---
@@ -636,7 +638,13 @@ test("a browser closed while two others are removed opens and shows the data", a
   /** The first removes one Chrome browser: one tap, the keys do not change. */
   const removeOne = async () => {
     await nav("Ajustes");
-    await expect(first.page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
+    await first.page
+      .getByRole("navigation", { name: "Ajustes" })
+      .getByRole("link", { name: /^Cuenta y seguridad/ })
+      .click();
+    await expect(
+      first.page.getByRole("heading", { name: "Cuenta y seguridad", exact: true }),
+    ).toBeVisible();
     await first.page
       .getByRole("button", { name: /^Quitar Chrome/ })
       .first()

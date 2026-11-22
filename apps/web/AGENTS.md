@@ -13,7 +13,7 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   build dir `WAMBITO_BUILD_DIR` or `build`), `vite.config.ts` (mascot chunk named `mascot-*`).
 - `app/routes/*` thin route modules; `app/features/<feature>/` screens, models, stories;
   `app/ui/` shared components (interface icons: `Icon.tsx` over `icon-shapes.ts`, which reads
-  `docs/design/system/project/icons/icons.json`; emoji only for categories); `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
+  `docs/design/system/project/icons/icons.json`; brand logos in one colour: `BrandLogo.tsx` over `brands.json` beside it; emoji only for categories); `app/wambi/` the mascot (`app/wambi/experimental/` 3D, never on
   the landing); `app/api/` OpenAPI client; `app/auth/` session and passkeys; `app/demo/` (the seed over a memory store);
   `app/local/` the browser side of the vault; the store contract (`FinanceStore`), the memory
   store, the local backend (`createLocalBackend`: the `/v1` routes over a store, one store
@@ -414,8 +414,9 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   keeps the shared `Takeover`, `RecoveryKeyField`, `PasskeyList`, `keyErrorOf` and `problemOf`); the
   web's "Change keys" (`ChangeKeysSheet`) still rotates; a
   `Takeover` makes the rest of the page `inert`); `PasskeysSection` with
-  `security` shows "Opens your data" / "Does not open your data" and "Turn on" (`evaluatePrf([id])`
-  then `addPasskeyWrap`; `no_prf` names the recovery key and another device). Stories
+  `security` adds, under a passkey whose wrap is missing, a row "Activar <name> para tus datos"
+  ("Does not open your data"; `evaluatePrf([id])` then `addPasskeyWrap`; `no_prf` names the
+  recovery key and another device). Stories
   `Settings/Security`, web-only, not in parity.json; copy under `settings.security.*`.
   "Protect your data" (spec 2026-11-15 section 5.2; `ProtectSection.tsx`, above the passkeys,
   only for a `local` account whose profile `isAnonymous`): `protect-model.ts` `protectStatus({
@@ -454,6 +455,42 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `AccountScreen` + `ActionSheet` (`/admin/users/:id`: the account and its actions; a sheet's
   fields live in the component, so a reason survives re-verification). Stories `Admin/*`,
   web-only, not in parity.json.
+- Settings (`/app/settings`, `/demo/settings`; spec 2026-11-22 settings categories): a menu plus one
+  route per category, `/app/settings/<id>` and `/demo/settings/<id>` (`<id>` = agents, account,
+  preferences, data, more; the phone's `/settings/<id>` adds capture), never one long page. The layout
+  `routes/app.settings.tsx` (an `Outlet`) holds the menu (`_index`: `features/settings/SettingsMenu.tsx`,
+  the protect / add-email block above one `lk-rowcard` row per category, the preferences line live
+  from the language, theme and currency) and one page per category (`$category`:
+  `SettingsCategoryScreen` in `Settings.tsx`, categories from `settings-categories.ts`; an unknown
+  one shows `settings.menu.not_found_*`). Copy under `settings.menu.*`. Stories: `Settings/Menu`;
+  "Mis agentes" (`features/assistants/AgentsScreen.tsx`): the four apps of `agents.ts` (`AGENTS`,
+  `agentFor(grant)`: a grant with a domain is matched by the domain alone (the app's own or a subdomain,
+  at a label boundary, never a substring: "box.ai" is not x.ai; a foreign domain is "other" whatever the name),
+  the name (a whole word) only when there is no domain; "Revocar"
+  revokes every grant of the app, since one app can hold several) with state, "Conectar" (`ConnectAgentSheet.tsx`: Wambi's
+  handshake scene `public/wambi/handshake-<id>.webp`, three steps, help link) or "Revocar", other
+  grants after them with the `chat` icon, the connector address; the list is read again on window
+  focus and a new grant of one of the four toasts once; copy `settings.agents.*`; stories
+  `Settings/Agents`;
+  "Cuenta y seguridad" (`AccountScreen.tsx`: the email, then `PasskeysSection` and `SecuritySection`
+  as `SettingsGroup`s with a `head` (icon tile, title, one line), rows with one line each, the
+  device icon from `deviceIconName`, and `DeleteAccount` as one red row; a plain account has only the
+  passkeys and the delete row; the long explanations live in the sheets the rows open; copy
+  `settings.passkeys.*`, `settings.security.*`, `settings.delete.*`; stories `Settings/Account`);
+  "Preferencias", "Tus datos" and "Más" (`PreferencesScreen.tsx` over `PreferencesSection` and
+  `TimeAndMoneySection`, `DataScreen.tsx`, `MoreScreen.tsx` over `FeedbackSection`): the same
+  groups of one-line rows (the light rows are `SettingsGroup`, `SettingsGroupHead` and `SettingsRow`
+  in `features/settings/parts.tsx`, shown in `Manage/Settings rows`); Idioma and Tema show their value and open a `ChoiceSheet` (today's
+  `Choices`, closes on pick), Zona horaria and Moneda open their pickers in a `Sheet` (the locked
+  currency's line is shown there), "Descargar tus datos" opens the export choices, Comentarios the
+  form; `SettingsRow`'s `description` is a longer sentence read with the row but not drawn (the
+  sound switch, the import row; the phone's twin is `semanticsHint`); copy `settings.prefs.*`, `settings.data.*_row*`,
+  `settings.feedback.row_line`; stories `Settings/Preferences`, `Settings/Data`, `Settings/More`);
+  `Manage/Settings` and `Settings/Security` open `HomeStage` at `/app/settings/all` (story-only route
+  that stacks every category's cards) for their behaviour; `Settings/Parity` (`SettingsParity.stories.tsx`)
+  are the parity stories of the menu and each shared category, with the logos from `brands.json`
+  (the phone's `LkBrandLogo` copy is held equal by a test) (`apps/mobile/test/parity/parity.json`
+  `settings-*`; `HomeStage`'s `agentsOrigin` pins Mis agentes' address for them).
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
   automatic capture works. `app/features/capture/`: `CaptureSteps.tsx` (`CAPTURE_STEPS`,

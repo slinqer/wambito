@@ -7,6 +7,10 @@ Human docs. Live docs are kept current; `superpowers/` is history.
 - `docs/design/system/`: the design system. `docs/design/system/project/tokens.json` is the source
   of all tokens (regenerate: root `AGENTS.md`). `docs/design/system/project/README.md` is the
   brand book; `docs/design/system/project/components/` per-component guidelines and previews.
+  `docs/design/system/project/icons/icons.json` holds the interface icons and `brands.json` beside
+  it the one-colour logos of the AI apps and payment apps Settings shows; the web reads both, the
+  phone keeps a Dart copy of each (`LkBrandLogo`: `apps/mobile/test/ui/lk_brand_logo_test.dart`
+  fails when it drifts from `brands.json`).
 - `docs/brand/`: raster brand art, files `wambi-*`; the app icon and logo as vectors fitted to the
   chosen concept, `wambito-icon.svg` (master, 1024), `-foreground`/`-monochrome` (Android adaptive,
   108 dp), `wambito-logo.svg` and `-logo-dark.svg` (wordmark as outlines), `wambito-icon-preview.png`.
@@ -26,7 +30,9 @@ Human docs. Live docs are kept current; `superpowers/` is history.
   ship byte-identical 512 px copies (`magick … -resize 512x512 -quality 90 -define
   webp:alpha-quality=100`) in `apps/web/public/wambi` and `apps/mobile/assets/wambi`. Make a new
   scene the same way and add it only if on-model (same face, gold, purple limbs, pink sneakers; no
-  text, letters, numbers or logos).
+  text, letters, numbers or logos). Exception, decided by the founder on 2026-11-22: the four
+  `wambi-handshake-<app>` scenes (`<app>` = claude, chatgpt, lumo, grok) show the app's logo as a
+  character; their app copies are `handshake-<app>.webp`.
   `wambi-store-{home,add,voice,review,budget,insights,feature}.webp`: Wambi's poses for the store
   listing images, made the same way; `apps/mobile/tool/store_shots/compose.cjs` uses them
   (`docs/mobile/play.md`).

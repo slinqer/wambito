@@ -49,18 +49,12 @@ Future<({bool session, bool cache, bool widgetFigures, bool voice})> _held(Accou
 
 void main() {
   group('the card', () {
-    testWidgets('is the web\'s danger card at the foot: what goes, and the button', (t) async {
+    testWidgets('is a red row at the foot: its title, one line, and it opens the sheet', (t) async {
       final handle = t.ensureSemantics();
       await pumpAccount(t);
       await scrollToKey(t, 'settings.delete');
-      expect(_said('Eliminar tu cuenta'), findsWidgets);
-      expect(
-        _said(
-          'Borramos tu cuenta y todos tus movimientos de inmediato. Las copias de seguridad que los incluyan se borran solas en 14 días.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('ELIMINAR MI CUENTA'), findsOneWidget);
+      expect(find.text('Borra tu cuenta y tus movimientos'), findsOneWidget);
+      expect(find.text('Eliminar tu cuenta'), findsOneWidget);
       handle.dispose();
     });
 
@@ -520,7 +514,7 @@ void main() {
   });
 
   group('a guest', () {
-    testWidgets('has the card, off, with why: an email comes first', (t) async {
+    testWidgets('has the row, off, with why: an email comes first', (t) async {
       final handle = t.ensureSemantics();
       final env = await pumpAccount(t, guest: true);
       await scrollToKey(t, 'settings.delete');
@@ -528,7 +522,6 @@ void main() {
         _said('Primero guarda tu progreso con un correo; después podrás eliminar tu cuenta.'),
         findsOneWidget,
       );
-      expect(t.widget<PressButton>(find.byKey(const Key('settings.delete'))).onPressed, isNull);
       await t.tap(find.byKey(const Key('settings.delete')), warnIfMissed: false);
       await t.pumpAndSettle();
       expect(find.text('¿Eliminar tu cuenta?'), findsNothing);

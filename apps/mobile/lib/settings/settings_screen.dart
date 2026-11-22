@@ -1,66 +1,38 @@
-// The web's Settings (apps/web/app/features/settings/Settings.tsx): the page's header, its title and
-// who is signed in, and a card per kind of setting, drawn with the web's parts (`parts.tsx`):
-// Preferencias, "Hora y moneda", the passkeys and "Tus datos" (the import links to its page).
-//
-// What the web has and the app does not yet, stays on the web: the export and deleting the account
-// (until their ports land). One card ("Más en la web") links to the web's public pages: the landing
-// and the roadmap. What only the app has (vibration, the two local notices, the widget, the voice
-// models, the server, About, signing out) is drawn in the same style: a card per kind, a muted
-// line on what it is, and the web's switches and buttons.
+// The web's Settings (apps/web/app/features/settings/Settings.tsx), as a menu: the page's title and
+// who is signed in, the urgent block ("Protect your data" or "Guarda tu progreso") and one row per
+// category (`SettingsMenu`), each on its own route (`SettingsCategoryScreen`), then "Cerrar sesión"
+// and the app's version. An offline first run has no menu: only the preferences.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../add/add_sheet.dart';
-import '../api/device.dart';
-import '../api/server_url.dart';
 import '../api/session.dart';
 import '../capture/capture_sheet.dart';
 import '../capture/models_download.dart';
-import '../capture/precise_offer.dart';
-import '../capture/capture_language.dart' show captureLanguage;
-import '../capture_auto/auto_capture_section.dart';
-import '../feedback/feedback.dart';
 import '../home/shell_navigation.dart';
-import '../home/widget_card.dart';
 import '../l10n/app_localizations.dart';
 import '../progress/guest_warning.dart';
-import '../protect/leaving_warning.dart';
-import '../protect/protect_actions.dart' show protectWithRecoveryKey;
 import '../protect/protect_block.dart';
-import '../protect/protect_status.dart' show ProtectStatus, protectStatusProvider;
-import 'security/security_api.dart' show securitySnapshotProvider;
+import '../protect/protect_status.dart' show protectStatusProvider;
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
-import '../ui/confirm_sheet.dart';
 import '../ui/lk_theme.dart';
 import '../ui/manage_page.dart';
 import '../ui/page_header.dart';
 import '../ui/press_button.dart';
-import '../ui/press_link.dart';
-import '../ui/pressable.dart';
-import '../ui/sheet.dart';
-import '../ui/toast.dart';
-import '../ui/web_text_field.dart';
 import '../vault/preview.dart';
 import '../vault/unsynced_sheet.dart';
 import '../vault/vault_providers.dart' show vaultSessionProvider;
-import 'assistants_section.dart';
-import 'delete_account.dart';
-import 'export_settings.dart';
 import 'feedback.dart';
-import 'passkeys_section.dart';
-import 'server_status.dart';
-import 'locale_resolution.dart';
-import 'preferences.dart';
 import 'profile_settings.dart';
-import 'security/security_section.dart';
 import 'settings_parts.dart';
-import 'time_money_section.dart';
-import 'url_opener.dart';
+import 'preferences_screen.dart' show PreferencesGroups;
+import 'leave_guard.dart';
+import 'settings_menu.dart';
 
 /// Whether a voice model is downloaded (so there is something to delete).
 final voiceModelsInstalledProvider = FutureProvider.autoDispose<bool>((ref) async {
@@ -95,87 +67,22 @@ final debugToolsProvider = Provider<bool>((ref) => kDebugMode);
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.webSectionsOnly = false});
 
-  /// Draws only what the web's Settings page also has, as the web draws it: Preferencias with its
-  /// language and theme choices and the sound switch, "Hora y moneda", the passkeys and "Tus datos".
-  /// For the parity pictures of the page, which a story of the web's can only match that far (the
-  /// app's own cards have none).
+  /// Draws only what the web's Settings page also has: the menu without Captura, and no signing
+  /// out. For the parity pictures, which a story of the web's can only match that far (the app's
+  /// own cards have none).
   final bool webSectionsOnly;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-/// How long a guest waits for the protect status before the warning shows without it.
-const _statusWait = Duration(seconds: 4);
-
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  /// Signing out or changing server is under way (the old server is told, if it answers).
+  /// Signing out is under way (the old server is told, if it answers).
   bool _busy = false;
-
-  /// How far the precise model's download is (0 to 1); null when none runs.
-  double? _preciseProgress;
-
-  // -- sign out ------------------------------------------------------------------------------
-
-  /// Warns a guest before [leaving]; true when it may go on. A `preview` guest is asked about its
-  /// way back ([protectStatusProvider]): with a recovery key or a passkey there is no warning; with
-  /// neither, "Protect first" opens the recovery key and nothing is left. When the passkey cannot
-  /// be read (offline) the sheet says so instead of claiming there is none. A `plain` guest (or a
-  /// vault not open) gets today's [warnGuestLeaving].
-  Future<bool> _mayLeave(GuestLeaving leaving) async {
-    if (!ref.read(sessionProvider).isGuest) return true;
-    // Kept alive while the question is asked, so the passkey wraps it read are not fetched again.
-    final hold = ref.listenManual(protectStatusProvider, (_, _) {});
-    try {
-      ProtectStatus? status;
-      var unreadable = false;
-      try {
-        status = await ref.read(protectStatusProvider.future).timeout(_statusWait);
-      } on TimeoutException {
-        // Offline and slow: nothing is known, so the warning shows with the passkey unknown.
-        unreadable = true;
-      } on Object {
-        status = null;
-      }
-      if (!mounted) return false;
-      if (status != null || unreadable) {
-        if (status != null && status.protected) return true;
-        var passkeyUnknown = unreadable;
-        if (!unreadable) {
-          try {
-            await ref.read(securitySnapshotProvider.future).timeout(_statusWait);
-          } on Object {
-            passkeyUnknown = true;
-          }
-        }
-        if (!mounted) return false;
-        final choice = await warnUnprotectedLeaving(
-          context,
-          leaving,
-          passkeyUnknown: passkeyUnknown,
-        );
-        if (!mounted || choice == null) return false;
-        if (choice == UnprotectedChoice.protectFirst) {
-          await protectWithRecoveryKey(context, ref);
-          return false;
-        }
-        return true;
-      }
-    } finally {
-      hold.close();
-    }
-    final choice = await warnGuestLeaving(context, leaving);
-    if (!mounted || choice == null) return false;
-    if (choice == GuestWarning.saveInstead) {
-      unawaited(context.push('/progress'));
-      return false;
-    }
-    return true;
-  }
 
   Future<void> _signOut() async {
     final session = ref.read(sessionProvider.notifier);
-    if (!await _mayLeave(GuestLeaving.signOut) || !mounted) return;
+    if (!await mayLeaveSettings(context, ref, GuestLeaving.signOut) || !mounted) return;
     // A `preview` account with changes not sent yet: sync them first, or sign out anyway.
     if (!await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) return;
     if (!mounted) return;
@@ -187,114 +94,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  // -- server --------------------------------------------------------------------------------
-
-  Future<void> _changeServer() async {
-    final next = await LkSheet.show<Uri>(
-      context,
-      title: AppLocalizations.of(context).settingsServerTitle,
-      children: [_ServerForm(current: ref.read(serverUrlProvider))],
-    );
-    if (!mounted || next == null) return;
-    if (next != ref.read(serverUrlProvider) && !await _mayLeave(GuestLeaving.changeServer)) return;
-    if (!mounted) return;
-    // Another server signs out (and wipes the vault): a `preview` account's changes not sent yet
-    // are asked about first, as at a sign-out.
-    if (next != ref.read(serverUrlProvider) &&
-        !await confirmUnsyncedSignOut(context, ref.read(vaultSessionProvider))) {
-      return;
-    }
-    if (!mounted) return;
-    final toasts = ToastHost.of(context);
-    final l10n = AppLocalizations.of(context);
-    setState(() => _busy = true);
-    try {
-      final changed = await ref.read(serverUrlProvider.notifier).change(next.toString());
-      if (changed) toasts.say(l10n.settingsServerChanged(next.toString()));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  // -- the rest ------------------------------------------------------------------------------
-
-  /// Opens one of the web's public pages in the browser: the landing, or the roadmap. They are
-  /// prerendered per language, Spanish with no prefix and the others under `/en`, `/it` and `/pt`
-  /// (the web's `LANDING_PATH` and `ROADMAP_PATH`).
-  Future<void> _openWeb({bool roadmap = false}) async {
-    final toasts = ToastHost.of(context);
-    final l10n = AppLocalizations.of(context);
-    final server = ref.read(serverUrlProvider);
-    final path = webPagePath(l10n.localeName, roadmap: roadmap);
-    // The Spanish landing is the server's own address, as it always was.
-    final page = path == '/' ? server : server.resolve(path);
-    final opened = await ref.read(urlOpenerProvider).open(page);
-    if (!opened && mounted) toasts.say(l10n.settingsWebFailed, error: true);
-  }
-
-  Future<void> _deleteVoice() async {
-    final toasts = ToastHost.of(context);
-    final l10n = AppLocalizations.of(context);
-    final models = ref.read(modelStoreProvider);
-    final done = await ConfirmSheet.show(
-      context,
-      title: l10n.settingsDeleteVoiceTitle,
-      body: l10n.settingsDeleteVoiceBody,
-      confirmLabel: l10n.settingsDeleteVoiceConfirm,
-      confirmKey: const Key('settings.deleteVoice.confirm'),
-      onConfirm: () async {
-        try {
-          await models.deleteModels();
-        } on Object {
-          // The sheet stays for another try, and says why.
-          toasts.say(l10n.settingsDeleteVoiceFailed, error: true);
-          rethrow;
-        }
-        toasts.say(l10n.settingsDeleteVoiceDone);
-      },
-    );
-    if (done && mounted) {
-      ref.invalidate(voiceModelsInstalledProvider);
-      ref.invalidate(preciseModelInstalledProvider);
-    }
-  }
-
-  /// The precise model's switch: on downloads it (the bar's percentage replaces the hint), off
-  /// deletes it alone; Vosk's model stays.
-  Future<void> _setPrecise(String locale, {required bool on}) async {
-    if (_preciseProgress != null) return;
-    final toasts = ToastHost.of(context);
-    final l10n = AppLocalizations.of(context);
-    final store = ref.read(preciseModelStoreProvider);
-    final offer = ref.read(preciseOfferProvider(locale));
-    try {
-      if (on) {
-        setState(() => _preciseProgress = 0);
-        await store.download(
-          locale,
-          onProgress: (received, total) {
-            if (mounted && total > 0) setState(() => _preciseProgress = received / total);
-          },
-        );
-      } else {
-        await store.deleteModel(locale);
-      }
-      // The switch is the person's answer: on or off, the capture sheet's one-time offer is done.
-      await offer.answer(accepted: on);
-    } on Object {
-      toasts.say(
-        on ? l10n.settingsVoicePreciseFailed : l10n.settingsDeleteVoiceFailed,
-        error: true,
-      );
-    } finally {
-      // Settings may have been left during the download: nothing to refresh then.
-      if (mounted) {
-        setState(() => _preciseProgress = null);
-        ref.invalidate(preciseModelInstalledProvider(locale));
-      }
-    }
-  }
-
   void _back() {
     final router = GoRouter.of(context);
     if (router.canPop()) {
@@ -303,8 +102,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       router.go('/');
     }
   }
-
-  // -- build ---------------------------------------------------------------------------------
 
   /// Where the email in "Entraste como…" comes from; a guest has none, and the line says so.
   String? _signedInAs(AppLocalizations l10n, {required bool guest}) {
@@ -318,82 +115,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
     final guest = ref.watch(sessionProvider.select((s) => s.isGuest));
-    final themeMode = ref.watch(themeModeProvider);
-    final locale = ref.watch(localeOverrideProvider);
-    final server = ref.watch(serverUrlProvider);
-    final sound = ref.watch(soundEnabledProvider);
-    final vibration = ref.watch(vibrationEnabledProvider);
-    final voiceInstalled = ref.watch(voiceModelsInstalledProvider).value ?? false;
-    final voice = captureLanguage(l10n.localeName);
-    final preciseEligible = ref.watch(preciseEligibleProvider(voice)).value ?? false;
-    final preciseInstalled = ref.watch(preciseModelInstalledProvider(voice)).value ?? false;
-    final preciseProgress = _preciseProgress;
     final webOnly = widget.webSectionsOnly;
-    final profile = ref.watch(settingsProfileProvider).value;
     final signedInAs = _signedInAs(l10n, guest: guest && !webOnly);
     final titleStyle = LkText.pageTitle.copyWith(color: colors.ink);
     final signedInStyle = LkText.bodySm.copyWith(color: colors.inkMuted);
-
-    final preferences = SettingsSection(
-      title: l10n.settingsPreferences,
-      children: [
-        Choices<String>(
-          legend: l10n.settingsLanguage,
-          value:
-              locale?.languageCode ??
-              (webOnly ? Localizations.localeOf(context).languageCode : 'auto'),
-          options: [
-            if (!webOnly)
-              Choice('auto', l10n.settingsLanguageAuto, key: const Key('settings.language.auto')),
-            Choice('es', l10n.settingsLanguageEs, key: const Key('settings.language.es')),
-            Choice('en', l10n.settingsLanguageEn, key: const Key('settings.language.en')),
-            Choice('it', l10n.settingsLanguageIt, key: const Key('settings.language.it')),
-            Choice('pt', l10n.settingsLanguagePt, key: const Key('settings.language.pt')),
-          ],
-          onChanged: (code) => unawaited(
-            ref.read(localeOverrideProvider.notifier).set(code == 'auto' ? null : Locale(code)),
-          ),
-        ),
-        Choices<ThemeMode>(
-          legend: l10n.settingsTheme,
-          hint: l10n.settingsThemeHint,
-          value: themeMode,
-          options: [
-            Choice(
-              ThemeMode.system,
-              l10n.settingsThemeSystem,
-              key: const Key('settings.theme.system'),
-            ),
-            Choice(ThemeMode.dark, l10n.settingsThemeNight, key: const Key('settings.theme.night')),
-            Choice(ThemeMode.light, l10n.settingsThemeDay, key: const Key('settings.theme.day')),
-          ],
-          onChanged: (mode) => unawaited(ref.read(themeModeProvider.notifier).set(mode)),
-        ),
-        SettingSwitch(
-          key: const Key('settings.sound'),
-          label: l10n.settingsSound,
-          // The web's line says vibration stays on; here it is a setting of its own.
-          hint: vibration ? l10n.settingsSoundHint : l10n.settingsSoundHintVibrationOff,
-          value: sound,
-          onChanged: (on) => unawaited(ref.read(soundEnabledProvider.notifier).set(on)),
-        ),
-      ],
-    );
     final provisional = ref.watch(sessionProvider.select((s) => s.isProvisional));
     final block = ref.watch(sessionProvider.select((s) => s.provisionalBlock));
+    final header = PageHeader(
+      backLabel: l10n.manageBack,
+      backShort: l10n.manageBackShort,
+      onBack: _back,
+    );
     // An offline first run (lib/local/provisional.dart): no account yet, so only this phone's own
-    // preferences and why the account waits; no sign-in, no server, no account card.
+    // preferences and why the account waits; no menu, no sign-in, no server, no account card.
     if (provisional && !webOnly) {
       return ManagePage(
         current: 'settings',
         onAdd: () => unawaited(openAddSheet(context)),
         onMic: () => unawaited(openCapture(context, listen: true)),
         onNavigate: (to) => navigateFromShell(context, ref, to, current: 'settings'),
-        header: PageHeader(
-          backLabel: l10n.manageBack,
-          backShort: l10n.manageBackShort,
-          onBack: _back,
-        ),
+        header: header,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,20 +152,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-          preferences,
+          const PreferencesGroups(),
         ],
       );
     }
+    final version = ref.watch(appVersionProvider).value;
     return ManagePage(
       current: 'settings',
       onAdd: () => unawaited(openAddSheet(context)),
       onMic: () => unawaited(openCapture(context, listen: true)),
       onNavigate: (to) => navigateFromShell(context, ref, to, current: 'settings'),
-      header: PageHeader(
-        backLabel: l10n.manageBack,
-        backShort: l10n.manageBackShort,
-        onBack: _back,
-      ),
+      header: header,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,376 +190,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-        preferences,
-        if (profile != null) TimeAndMoneySection(profile: profile),
-        PasskeysSection(
-          timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
-          // A `preview` guest adds a passkey here too ("Protect your data" step 2).
-          guest: guest && !webOnly && !ref.watch(isPreviewProvider),
-        ),
-        // An encrypted account's devices and recovery key (Settings → Security), with or without
-        // email. Plain accounts see nothing of it.
-        if (!webOnly && ref.watch(isPreviewProvider))
-          SecuritySection(timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone),
-        // "Conecta tu asistente" (spec §6.2): the web has it too, but its story is not in the parity
-        // pairs yet, so the web-only pictures leave it out.
-        if (!webOnly)
-          AssistantsSection(
-            timeZone: profile?.timezone ?? ref.watch(deviceHintsProvider).timezone,
-            guest: guest,
-          ),
-        // Android only: hidden where the capture channel does not exist.
-        if (!webOnly) const AutoCaptureSection(),
-        // The web's "Tus datos" (Settings.tsx): the import links to its page; the export joins it.
-        SettingsSection(
-          key: const Key('settings.card.data'),
-          title: l10n.settingsDataTitle,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: WambitoTokens.space2,
-              children: [
-                // An encrypted account's data is on the phone: the server's import waits for encryption.
-                if (ref.watch(isPreviewProvider)) ...[
-                  SettingLabel(label: l10n.settingsImportTitle),
-                  const ComingSoonNotice(key: Key('settings.import.comingSoon')),
-                ] else ...[
-                  SettingLabel(label: l10n.settingsImportTitle, hint: l10n.settingsImportLead),
-                  _SelfStart(
-                    child: PressLink.text(
-                      l10n.settingsImportAction,
-                      key: const Key('settings.import'),
-                      tone: PressTone.secondary,
-                      onPressed: () => unawaited(context.push<void>('/import')),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            ExportBlock(guest: guest),
-          ],
-        ),
-        // The web's next card, and its last: in the app it is the page's last, under signing out.
-        const FeedbackSection(),
-        if (webOnly) const DeleteAccountCard(),
-        if (!webOnly) ...[
-          SettingsSection(
-            title: l10n.settingsPhone,
-            children: [
-              SettingSwitch(
-                key: const Key('settings.vibration'),
-                label: l10n.settingsVibration,
-                hint: l10n.settingsVibrationHint,
-                value: vibration,
-                onChanged: (on) => unawaited(ref.read(vibrationEnabledProvider.notifier).set(on)),
-              ),
-              // "Hoy vence…" is computed on the phone for an encrypted account (lib/notices/due_list.dart).
-              SettingSwitch(
-                key: const Key('settings.dueNotice'),
-                label: l10n.settingsDueNotice,
-                hint: defaultTargetPlatform == TargetPlatform.iOS
-                    ? l10n.settingsDueNoticeHintIos
-                    : l10n.settingsDueNoticeHint,
-                value: ref.watch(dueNoticeEnabledProvider),
-                onChanged: (on) => unawaited(ref.read(dueNoticeEnabledProvider.notifier).set(on)),
-              ),
-              // The 45-day guest warning is a `plain` guest's: an encrypted guest is kept 12 or 24
-              // months and never gets it (lib/notices/notice_sync.dart).
-              if (!ref.watch(isPreviewProvider))
-                SettingSwitch(
-                  key: const Key('settings.guestNotice'),
-                  label: l10n.settingsGuestNotice,
-                  hint: l10n.settingsGuestNoticeHint,
-                  value: ref.watch(guestNoticeEnabledProvider),
-                  onChanged: (on) => unawaited(ref.read(guestNoticeEnabledProvider.notifier).set(on)),
-                ),
-              // The widgets are Android's: iOS has none, so no setting about them.
-              if (defaultTargetPlatform == TargetPlatform.android &&
-                  ref.watch(widgetOnHomeProvider).value == false)
-                _AddWidgetRow(key: const Key('settings.addWidget')),
-              if (defaultTargetPlatform == TargetPlatform.android)
-                SettingSwitch(
-                  key: const Key('settings.hideAmount'),
-                  label: l10n.settingsHideAmount,
-                  hint: l10n.settingsHideAmountHint,
-                  value: ref.watch(hideWidgetAmountProvider),
-                  onChanged: (on) => unawaited(ref.read(hideWidgetAmountProvider.notifier).set(on)),
-                ),
-            ],
-          ),
-          if (voiceInstalled)
-            SettingsSection(
-              title: l10n.settingsVoice,
-              lead: l10n.settingsDeleteVoiceHint,
-              children: [
-                // On iOS the voice model is the precise one, and its row above covers it.
-                if (preciseEligible && defaultTargetPlatform != TargetPlatform.iOS)
-                  SettingSwitch(
-                    key: const Key('settings.voicePrecise'),
-                    label: l10n.settingsVoicePrecise(
-                      ((preciseModels[voice]?.bytes ?? 0) / 1e6).round(),
-                    ),
-                    hint: preciseProgress == null
-                        ? l10n.settingsVoicePreciseHint
-                        : l10n.captureDownloading((preciseProgress * 100).floor()),
-                    value: preciseInstalled || preciseProgress != null,
-                    onChanged: (on) => unawaited(_setPrecise(voice, on: on)),
-                  ),
-                _SelfStart(
-                  child: PressButton.text(
-                    l10n.settingsDeleteVoice,
-                    key: const Key('settings.deleteVoice'),
-                    tone: PressTone.secondary,
-                    onPressed: _deleteVoice,
-                  ),
-                ),
-              ],
-            ),
-          SettingsSection(
-            title: l10n.settingsServer,
-            lead: server.toString(),
-            children: [
-              const ServerStatus(),
-              _SelfStart(
-                child: PressButton.text(
-                  l10n.settingsServerChange,
-                  key: const Key('settings.server'),
-                  tone: PressTone.secondary,
-                  onPressed: _busy ? null : _changeServer,
-                ),
-              ),
-            ],
-          ),
-          SettingsSection(
-            title: l10n.settingsWeb,
-            lead: l10n.settingsWebHint,
-            children: [
-              _SelfStart(
-                child: PressLink.text(
-                  l10n.settingsWebOpen,
-                  key: const Key('settings.web'),
-                  tone: PressTone.secondary,
-                  onPressed: _openWeb,
-                ),
-              ),
-              _SelfStart(
-                child: PressLink.text(
-                  l10n.settingsRoadmapOpen,
-                  key: const Key('settings.roadmap'),
-                  tone: PressTone.secondary,
-                  onPressed: () => unawaited(_openWeb(roadmap: true)),
-                ),
-              ),
-            ],
-          ),
-          SettingsSection(
-            title: l10n.settingsAbout,
-            lead: l10n.aboutLegalese,
-            children: [
-              _SelfStart(
-                child: PressButton.text(
-                  l10n.settingsAboutOpen,
-                  key: const Key('settings.about'),
-                  tone: PressTone.secondary,
-                  onPressed: () => context.push('/settings/about'),
-                ),
-              ),
-              if (ref.watch(debugToolsProvider))
-                _SelfStart(
-                  child: PressButton.text(
-                    'PRF probe',
-                    key: const Key('settings.prfProbe'),
-                    tone: PressTone.secondary,
-                    onPressed: () => context.push('/debug/prf'),
-                  ),
-                ),
-            ],
-          ),
-          SettingsSection(
-            title: l10n.settingsSignOut,
-            children: [
-              _SelfStart(
-                child: PressButton(
-                  key: const Key('settings.signOut'),
-                  tone: PressTone.secondary,
-                  onPressed: _busy ? null : _signOut,
-                  child: Text(
-                    LkText.upperCase(l10n.settingsSignOut),
-                    style: TextStyle(color: colors.over),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const DeleteAccountCard(),
-        ],
-      ],
-    );
-  }
-}
-
-/// "Añadir widget": asks the launcher, or shows the steps; there only until a widget is on the home
-/// screen (Android).
-class _AddWidgetRow extends ConsumerWidget {
-  const _AddWidgetRow({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final colors = context.lkColors;
-    return Pressable(
-      label: l10n.settingsAddWidget,
-      hint: l10n.settingsAddWidgetHint,
-      onPressed: () => unawaited(addWidget(context, ref)),
-      builder: (context, state) => ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 44),
-        child: Row(
-          spacing: WambitoTokens.space3,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: WambitoTokens.space1,
-                children: [
-                  Text(l10n.settingsAddWidget, style: LkText.body.copyWith(color: colors.ink)),
-                  Text(
-                    l10n.settingsAddWidgetHint,
-                    style: LkText.fieldLabel.copyWith(
-                      color: colors.inkMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ExcludeSemantics(
-              child: Text('›', style: LkText.label.copyWith(color: colors.inkMuted)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// `className="self-start"`: a button as wide as its label, at the start of its column.
-class _SelfStart extends StatelessWidget {
-  const _SelfStart({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Align(alignment: Alignment.centerLeft, child: child);
-}
-
-/// The server address, asked for in a sheet: [current] to start with. Pops the checked address, or
-/// null. The sheet is `Sheet` as the web's delete-account one is: what it is about, the field with
-/// its label, what is wrong with it, and the ways out.
-class _ServerForm extends StatefulWidget {
-  const _ServerForm({required this.current});
-
-  final Uri current;
-
-  @override
-  State<_ServerForm> createState() => _ServerFormState();
-}
-
-class _ServerFormState extends State<_ServerForm> {
-  late final _field = TextEditingController(text: widget.current.toString());
-  final _focus = FocusNode();
-  bool _invalid = false;
-
-  @override
-  void dispose() {
-    _field.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final url = parseServerUrl(_field.text);
-    if (url == null) {
-      setState(() => _invalid = true);
-      return;
-    }
-    Navigator.of(context).pop(url);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final colors = context.lkColors;
-    final wide = MediaQuery.sizeOf(context).width >= 400;
-    final change = PressButton.text(
-      l10n.settingsServerChange,
-      key: const Key('settings.server.change'),
-      onPressed: _submit,
-    );
-    final cancel = PressButton.text(
-      l10n.cancel,
-      tone: PressTone.ghost,
-      onPressed: () => Navigator.of(context).pop(),
-    );
-    return Padding(
-      padding: const EdgeInsets.only(top: WambitoTokens.space3),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: WambitoTokens.space4,
-        children: [
-          Text(l10n.settingsServerLead, style: LkText.body.copyWith(color: colors.ink)),
+        if (webOnly)
+          SettingsMenu(webSectionsOnly: webOnly)
+        else
+          // Sign out sits 12px under the rows (not the page's 16): the menu, sign out and the
+          // version still show above the bottom bar at 360 x 740.
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: WambitoTokens.space1,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: WambitoTokens.space3,
             children: [
-              Text(l10n.settingsServerField, style: LkText.bodySm.copyWith(color: colors.ink)),
-              WebTextField(
-                controller: _field,
-                focusNode: _focus,
-                fieldKey: const Key('settings.server.field'),
-                label: l10n.settingsServerField,
-                invalid: _invalid,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _submit(),
-                onChanged: (_) {
-                  if (_invalid) setState(() => _invalid = false);
-                },
+              SettingsMenu(webSectionsOnly: webOnly),
+              Column(
+                spacing: WambitoTokens.space2,
+                children: [
+                  Align(
+                    child: PressButton(
+                      key: const Key('settings.signOut'),
+                      tone: PressTone.secondary,
+                      onPressed: _busy ? null : _signOut,
+                      child: Text(
+                        LkText.upperCase(l10n.settingsSignOut),
+                        style: TextStyle(color: colors.over),
+                      ),
+                    ),
+                  ),
+                  if (version != null)
+                    Text(
+                      l10n.settingsVersion(version),
+                      textAlign: TextAlign.center,
+                      style: LkText.fieldLabel.copyWith(color: colors.inkMuted),
+                    ),
+                ],
               ),
             ],
           ),
-          if (_invalid)
-            Semantics(
-              liveRegion: true,
-              container: true,
-              child: Text(
-                l10n.settingsServerInvalid,
-                style: LkText.body.copyWith(color: colors.over),
-              ),
-            ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: PressButton.text(
-              l10n.settingsServerUseDefault,
-              key: const Key('settings.server.default'),
-              tone: PressTone.ghost,
-              onPressed: () => setState(() {
-                _field.text = defaultServerUrl.toString();
-                _invalid = false;
-              }),
-            ),
-          ),
-          if (wide)
-            // The ghost has 8px of padding each side, the primary 24px.
-            flexOneRow(gap: WambitoTokens.space2, items: [(16, cancel), (48, change)])
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: WambitoTokens.space2,
-              children: [change, cancel],
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

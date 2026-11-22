@@ -86,6 +86,7 @@ Future<AccountEnv> pumpAccount(
   WidgetTester t, {
   bool guest = false,
   Locale locale = const Locale('es'),
+  String location = '/settings/account',
 }) async {
   final accounts = FakeAccountRepository();
   final files = FakeFilesChannel();
@@ -129,7 +130,7 @@ Future<AccountEnv> pumpAccount(
   app.flags.putIfAbsent('home.dismissed.user-1.budgets', FakeFlagStore.new).value = true;
   app.flags.putIfAbsent('home.dismissed.user-1.import', FakeFlagStore.new).value = true;
   app.flags.putIfAbsent('home.dismissed.other.budgets', FakeFlagStore.new).value = true;
-  app.router.go('/settings');
+  app.router.go(location);
   await t.pumpAndSettle();
   return AccountEnv(app, accounts, files, platform, cache, widgets);
 }

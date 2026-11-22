@@ -98,6 +98,8 @@ docs/design/system/project/components/Landing/preview.html # money
 docs/design/system/project/tokens.json                     # money
 docs/i18n/it-pt-sample.md                                  # money
 docs/mobile/parity.md                                      # money
+apps/mobile/test/settings/agents_test.dart                 # money
+apps/web/app/features/assistants/AgentsScreen.stories.tsx  # money
 
 # --- history ---
 docs/superpowers/**                                        # history

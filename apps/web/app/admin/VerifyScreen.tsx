@@ -37,7 +37,7 @@ export function VerifyScreen({
           {t("no_passkey.title")}
         </ScreenTitle>
         <p className="text-center text-ink-muted">{t("no_passkey.body")}</p>
-        <PressLink to="/app/settings" className="w-full">
+        <PressLink to="/app/settings/account" className="w-full">
           {t("no_passkey.link")}
         </PressLink>
       </SignInScreen>

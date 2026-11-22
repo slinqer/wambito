@@ -1,4 +1,4 @@
-// Settings' server card says whether the server answers (a green dot that blinks, or a red one)
+// Más' server row says whether the server answers (a green dot that blinks, or a red one)
 // and which version it runs, asking again every 30 seconds while Settings is open.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +22,7 @@ Future<_FakeServer> _pump(WidgetTester tester, {bool pulses = false, _FakeServer
   final fake = server ?? _FakeServer();
   await pumpSettingsApp(
     tester,
-    location: '/settings',
+    location: '/settings/more',
     overrides: [
       serverHealthCheckProvider.overrideWithValue(fake.check),
       serverDotPulsesProvider.overrideWithValue(pulses),
@@ -50,15 +50,21 @@ Color _dot(WidgetTester tester) {
 
 void main() {
   testWidgets('a server that answers: En línea, its version, and a green dot', (tester) async {
+    final handle = tester.ensureSemantics();
     final server = await _pump(tester);
-    expect(find.text('En línea · Versión 0.0.0-dev.abc1234'), findsOneWidget);
+    expect(find.text('Conectado'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('En línea · Versión 0.0.0-dev.abc1234')), findsOneWidget);
     expect(_dot(tester), WambitoColors.night.good);
     expect(server.asked, isNotEmpty);
+    handle.dispose();
   });
 
   testWidgets('a server that names no version: just En línea', (tester) async {
+    final handle = tester.ensureSemantics();
     await _pump(tester, server: _FakeServer()..answer = const ServerHealth(online: true));
-    expect(find.text('En línea'), findsOneWidget);
+    expect(find.text('Conectado'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('En línea')), findsOneWidget);
+    handle.dispose();
   });
 
   testWidgets('a server that does not answer: No responde, and a red dot', (tester) async {
@@ -89,12 +95,15 @@ void main() {
   });
 
   testWidgets('with animations removed the green dot stays still', (tester) async {
+    final handle = tester.ensureSemantics();
     tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(
       disableAnimations: true,
     );
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     await _pump(tester, pulses: true);
-    expect(find.text('En línea · Versión 0.0.0-dev.abc1234'), findsOneWidget);
+    expect(find.text('Conectado'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('En línea · Versión 0.0.0-dev.abc1234')), findsOneWidget);
     expect(tester.hasRunningAnimations, isFalse);
+    handle.dispose();
   });
 }

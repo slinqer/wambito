@@ -255,7 +255,7 @@ void main() {
       final env = await _pump(
         tester,
         platform: allowed(),
-        location: '/settings',
+        location: '/settings/capture',
         overrides: _previewWith(_Vault(backend)),
       );
       env.platform.clear();
@@ -381,7 +381,7 @@ void main() {
     });
 
     testWidgets('the switch in settings stops it, and turning it on again brings it back', (tester) async {
-      final env = await _pump(tester, platform: allowed(), backend: withRule(), location: '/settings');
+      final env = await _pump(tester, platform: allowed(), backend: withRule(), location: '/settings/capture');
       env.platform.clear();
 
       await _tap(tester, 'settings.dueNotice');
@@ -467,7 +467,7 @@ void main() {
     });
 
     testWidgets('the switch in settings stops it, and turning it on again brings it back', (tester) async {
-      final env = await _pump(tester, guest: true, location: '/settings');
+      final env = await _pump(tester, guest: true, location: '/settings/capture');
       env.platform.clear();
 
       await _tap(tester, 'settings.guestNotice');
@@ -557,7 +557,7 @@ void main() {
       final env = await _pump(
         tester,
         backend: FakeNoticeBackend(hasRecurring: true),
-        location: '/settings',
+        location: '/settings/capture',
         overrides: [dueNoticeEnabledProvider.overrideWith(_DueOff.new)],
       );
       expect(env.prompt.reasons, isEmpty);

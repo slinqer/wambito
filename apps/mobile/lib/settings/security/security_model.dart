@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../api/auth_api.dart' show PasskeyItem;
 import '../../local/keys.dart' show WrapDto;
+import '../../ui/lk_icon_shapes.dart' show LkIconName;
 
 @immutable
 class DeviceRow {
@@ -104,3 +105,10 @@ bool hasPasskeyWrap(List<WrapDto> wraps, String credentialId) =>
 
 /// Whether any passkey wrap exists.
 bool anyPasskeyWrap(List<WrapDto> wraps) => wraps.any((w) => w.kind == 'passkey' && w.ref != null);
+
+/// `laptop` when a passkey or device name looks like a computer, else `phone` (the web's
+/// `deviceIconName`).
+LkIconName deviceIconFor(String? name) =>
+    RegExp(r'mac|windows|linux|chrome ?os|\bpc\b|laptop', caseSensitive: false).hasMatch(name ?? '')
+    ? LkIconName.laptop
+    : LkIconName.phone;

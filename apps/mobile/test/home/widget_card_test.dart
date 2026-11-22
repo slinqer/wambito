@@ -149,7 +149,7 @@ void main() {
     final pin = FakeWidgetPin(isInstalled: false);
     await pumpSettingsApp(
       tester,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [widgetPinProvider.overrideWithValue(pin)],
     );
     await tester.scrollUntilVisible(
@@ -167,7 +167,7 @@ void main() {
     final pin = FakeWidgetPin(isInstalled: false);
     await pumpSettingsApp(
       tester,
-      location: '/settings',
+      location: '/settings/capture',
       overrides: [widgetPinProvider.overrideWithValue(pin)],
     );
     await tester.scrollUntilVisible(
@@ -181,7 +181,7 @@ void main() {
   });
 
   androidTest('Settings has no Añadir widget once one is added', (tester) async {
-    await pumpSettingsApp(tester, location: '/settings');
+    await pumpSettingsApp(tester, location: '/settings/capture');
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings.hideAmount')),
       200,

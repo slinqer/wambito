@@ -1,28 +1,20 @@
-import { useId, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslations } from "use-intl";
-import { useApi, useApiMode } from "../../api/ApiProvider.tsx";
+import { useApiMode } from "../../api/ApiProvider.tsx";
 import { useMe } from "../../api/queries.ts";
 import { PageHeader } from "../../ui/PageHeader.tsx";
-import { PressButton } from "../../ui/PressButton.tsx";
-import { PressLink } from "../../ui/PressLink.tsx";
-import { AssistantsSection, type CopyText } from "../assistants/AssistantsSection.tsx";
+import { AgentsScreen, type CopyText } from "../assistants/AgentsScreen.tsx";
 import { ManageFrame } from "../categories/CategoryDetail.tsx";
 import { useAppPath } from "../home/app-path.ts";
 import { liveSignOut, type SignOutRequest } from "../home/use-sign-out.ts";
 import { useVaultSession } from "../vault/vault-context.ts";
-import { AddEmail } from "./AddEmail.tsx";
-import { claimEmail } from "./add-email.ts";
-import { DeleteAccount } from "./DeleteAccount.tsx";
-import { FeedbackSection } from "./FeedbackSection.tsx";
-import { PasskeysSection } from "./PasskeysSection.tsx";
-import { PreferencesSection } from "./PreferencesSection.tsx";
-import { ProtectSection } from "./ProtectSection.tsx";
-import { DemoOffNote, SettingLabel, SettingsSection } from "./parts.tsx";
+import { AccountScreen } from "./AccountScreen.tsx";
+import { DataScreen } from "./DataScreen.tsx";
+import { MoreScreen } from "./MoreScreen.tsx";
+import { PreferencesScreen } from "./PreferencesScreen.tsx";
 import { livePasskeys, type PasskeysApi } from "./passkeys.ts";
-import { Takeover } from "./RemoveDeviceSheet.tsx";
-import { SecuritySection } from "./SecuritySection.tsx";
 import { liveSecurity, type SecurityApi } from "./security.ts";
-import { TimeAndMoneySection } from "./TimeAndMoneySection.tsx";
+import { isSettingsCategory, type SettingsCategory } from "./settings-categories.ts";
 import { type SaveFile, saveToDisk, useExport } from "./use-export.ts";
 
 export type { SaveFile } from "./use-export.ts";
@@ -36,145 +28,105 @@ export interface SettingsProps {
   save?: SaveFile;
   /** Copies the assistants' address; the browser's clipboard by default. */
   copy?: CopyText;
+  /** Where "Mis agentes" says the web is served; the page's own origin by default (stories pin it). */
+  agentsOrigin?: string;
   /** An encrypted account's keys (Security); the open vault's by default, stories stand in. */
   security?: SecurityApi;
   /**
    * Stands in for "Protect your data"'s step 3, "Create account (add an email)", which opens
-   * `AddEmail` here by default; stories use it to watch the tap.
+   * `AddEmail` on the menu by default; stories use it to watch the tap.
    */
   onAddEmail?: () => void;
 }
 
 /**
- * Settings (`/app/settings`, spec §2.7): language, theme and sound; time zone, and the currency
- * while it can still change; passkeys; import from Budge and the export; "Conecta tu asistente"
- * (the MCP's address, and the assistants let in); comments and ideas (an
- * email to the founder); and deleting the account. Reached from the avatar menu (phones) and the sidebar (wide screens). In the demo
- * (`/demo/settings`, spec §2.6b) passkeys, import, export and deleting the account are off, each
- * with a note: there is no account behind them. "Conecta tu asistente" keeps its address and
- * steps there, and lists nothing. A preview account (`local` mode) has import and export off
- * with a "not available yet" note; passkeys, the assistants and deleting the account work, and
- * Security lists the devices that open the data; an account without an email (`isAnonymous`) gets
- * "Protect your data" (`ProtectSection`) above them.
+ * An encrypted account's devices and keys (every one, an anonymous account made by the phone too):
+ * the `security` prop (stories) or the open vault's, only in mode `local`; null elsewhere.
  */
-export function Settings({
+export function useSettingsSecurity(securityProp?: SecurityApi): SecurityApi | null {
+  const local = useApiMode() === "local";
+  const session = useVaultSession();
+  const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
+  return local ? (securityProp ?? vaultSecurity) : null;
+}
+
+/** The body of one category's page: the screen that category owns (agents, account, preferences, data, more). */
+export function SettingsCategoryBody({
+  category,
   passkeys = livePasskeys,
   signOut = liveSignOut,
   save = saveToDisk,
   copy,
   security: securityProp,
-  onAddEmail,
-}: SettingsProps) {
-  const t = useTranslations("settings");
-  const tManage = useTranslations("manage");
+  agentsOrigin,
+}: SettingsProps & { category: SettingsCategory }) {
   const me = useMe().data;
   if (!me) throw new Error("Settings renders inside AppShell, which waits for the profile");
   const exporter = useExport(save);
-  const appPath = useAppPath();
-  const mode = useApiMode();
-  const demo = mode === "demo";
-  // A preview account's vault: no export or import yet (passkeys, the assistants and deleting
-  // the account work: they are the account's, not its finances).
-  const local = mode === "local";
-  const session = useVaultSession();
-  const vaultSecurity = useMemo(() => (session ? liveSecurity(session) : null), [session]);
-  // An encrypted account's devices and keys (every one, an anonymous account made by the phone too).
-  const security = local ? (securityProp ?? vaultSecurity) : null;
-  const api = useApi();
-  const claim = useMemo(() => claimEmail(api), [api]);
-  const [addingEmail, setAddingEmail] = useState(false);
-  const dataOffId = useId();
-  const dataOff = demo || local ? dataOffId : undefined;
+  const security = useSettingsSecurity(securityProp);
 
-  return (
-    <ManageFrame>
-      <PageHeader back={{ to: appPath(), label: tManage("back"), short: tManage("back_short") }} />
-      <main className="flex flex-col gap-(--space-4) pb-(--space-4)">
-        <div className="flex flex-col gap-(--space-1)">
-          <h1 className="m-0 font-display text-[28px] font-bold text-ink">{t("title")}</h1>
-          <p className="m-0 break-all text-[14px] text-ink-muted">
-            {/* The demo has no sign-in: say whose made-up account this is. */}
-            {demo ? t("demo_viewing") : t("signed_in_as", { email: me.email })}
-          </p>
-        </div>
-        <PreferencesSection />
-        <TimeAndMoneySection me={me} />
-        {security && me.isAnonymous && (
-          // An account without an email: its checklist first (spec 2026-11-15 section 5.2).
-          <ProtectSection
-            security={security}
-            passkeys={passkeys}
-            profile={me}
-            onAddEmail={onAddEmail ?? (() => setAddingEmail(true))}
-          />
-        )}
-        <PasskeysSection
-          passkeys={passkeys}
+  switch (category) {
+    case "agents":
+      return (
+        <AgentsScreen
           timeZone={me.timezone}
-          off={demo}
-          vaultUserId={local ? me.id : undefined}
-          security={security ?? undefined}
+          {...(copy ? { copy } : {})}
+          {...(agentsOrigin ? { origin: agentsOrigin } : {})}
         />
-        {security && (
-          <SecuritySection security={security} passkeys={passkeys} timeZone={me.timezone} />
-        )}
-        {addingEmail && (
-          <Takeover label={t("add_email.title")}>
-            <AddEmail
-              claim={claim}
-              security={security ?? undefined}
-              onDone={() => setAddingEmail(false)}
-            />
-          </Takeover>
-        )}
-        <SettingsSection title={t("data.title")}>
-          <div className="flex flex-col gap-(--space-2)">
-            <SettingLabel label={t("data.import_title")} hint={t("data.import_lead")} />
-            {demo || local ? (
-              <PressButton
-                variant="secondary"
-                className="self-start"
-                disabled
-                aria-describedby={dataOff}
-              >
-                {t("data.import_action")}
-              </PressButton>
-            ) : (
-              <PressLink to={appPath("/import")} variant="secondary" className="self-start">
-                {t("data.import_action")}
-              </PressLink>
-            )}
-          </div>
-          <div className="flex flex-col gap-(--space-2)">
-            <SettingLabel label={t("data.export_title")} hint={t("data.export_lead")} />
-            <div className="flex flex-wrap gap-(--space-2)">
-              {(["json", "csv"] as const).map((format) => (
-                <PressButton
-                  key={format}
-                  variant="secondary"
-                  disabled={demo || local || exporter.busy !== null}
-                  aria-describedby={dataOff}
-                  aria-busy={exporter.busy === format || undefined}
-                  onClick={() => void exporter.run(format)}
-                >
-                  {t(format === "json" ? "data.export_json" : "data.export_csv")}
-                </PressButton>
-              ))}
-            </div>
-          </div>
-          {(demo || local) && <DemoOffNote id={dataOffId} local={local} />}
-        </SettingsSection>
-        <AssistantsSection timeZone={me.timezone} {...(copy ? { copy } : {})} />
-        <FeedbackSection />
-        <DeleteAccount
-          email={me.email}
-          {...(demo ? {} : { userId: me.id })}
+      );
+    case "account":
+      return (
+        <AccountScreen
+          passkeys={passkeys}
+          security={security}
           signOut={signOut}
           onExport={(format) => void exporter.run(format)}
           exporting={exporter.busy !== null}
-          off={demo}
-          canExport={!local}
         />
+      );
+    case "preferences":
+      return <PreferencesScreen me={me} />;
+    case "data":
+      return <DataScreen onExport={(format) => exporter.run(format)} exporting={exporter.busy} />;
+    case "more":
+      return <MoreScreen />;
+  }
+}
+
+/**
+ * One category's page (`/app/settings/:category`, `/demo/settings/:category`): a back link to the
+ * menu, the category's name and its cards. In the demo passkeys, import, export and deleting the
+ * account are off, each with a note; a preview account (`local` mode) has import and export off.
+ * An unknown category is the page's own "not found", with the way back to the menu.
+ */
+export function SettingsCategoryScreen({
+  category,
+  ...props
+}: SettingsProps & { category: string }) {
+  const t = useTranslations("settings");
+  const appPath = useAppPath();
+  const back = { to: appPath("/settings"), label: t("menu.back"), short: t("menu.back_short") };
+  if (!isSettingsCategory(category)) {
+    return (
+      <ManageFrame>
+        <PageHeader back={back} />
+        <main className="lk-hero flex flex-col gap-(--space-2)">
+          <h1 className="m-0 font-display text-[22px] font-bold text-ink">
+            {t("menu.not_found_title")}
+          </h1>
+          <p className="m-0 text-[14px] font-bold text-ink-muted">{t("menu.not_found_lead")}</p>
+        </main>
+      </ManageFrame>
+    );
+  }
+  return (
+    <ManageFrame>
+      <PageHeader back={back} />
+      <main className="flex flex-col gap-(--space-4) pb-(--space-4)">
+        <h1 className="m-0 font-display text-[28px] font-bold text-ink">
+          {t(`menu.${category}.title`)}
+        </h1>
+        <SettingsCategoryBody category={category} {...props} />
       </main>
     </ManageFrame>
   );

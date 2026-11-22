@@ -99,7 +99,7 @@ void main() {
     final handle = t.ensureSemantics();
     await pumpPasskeys(t);
     // cred-1 has a wrap, cred-2 has none
-    expect(find.text('Opens your data'), findsOneWidget);
+    // only the one that does not open the data says so, on its "Turn on" row
     expect(find.text('Does not open your data'), findsOneWidget);
     expect(find.byKey(const Key('settings.passkeys.turnOn.pk-1')), findsNothing);
     expect(find.byKey(const Key('settings.passkeys.turnOn.pk-2')), findsOneWidget);
@@ -124,7 +124,6 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    expect(find.text('Opens your data'), findsNothing);
     expect(find.text('Does not open your data'), findsNothing);
     expect(find.byKey(const Key('settings.passkeys.turnOn.pk-1')), findsNothing);
   });

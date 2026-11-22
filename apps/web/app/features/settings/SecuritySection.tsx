@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
+import { Icon } from "../../ui/Icon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { Sheet } from "../../ui/Sheet.tsx";
 import { useToast } from "../../ui/Toast.tsx";
@@ -9,7 +10,7 @@ import { FieldError } from "../sign-in/SignInScreen.tsx";
 import { ApproveDevice } from "../vault/ApproveDevice.tsx";
 import { RecoveryKeySetup } from "../vault/RecoveryKeySetup.tsx";
 import { formatDay, PASSKEYS_KEY } from "./PasskeysSection.tsx";
-import { SettingLabel, SettingsSection } from "./parts.tsx";
+import { SettingsGroup, SettingsRow } from "./parts.tsx";
 import type { PasskeysApi } from "./passkeys.ts";
 import {
   type KeyError,
@@ -23,14 +24,15 @@ import {
   Takeover,
 } from "./RemoveDeviceSheet.tsx";
 import { changeKeys, codeOf, SECURITY_KEY, type SecurityApi } from "./security.ts";
-import { type DeviceRow, deviceRows } from "./security-model.ts";
+import { type DeviceRow, deviceIconName, deviceRows } from "./security-model.ts";
 
 /**
- * Settings → Security for an encrypted account (stage 2b Task 8; mode `local`). This browser and the other devices that open the data (label, added date; "Not verified" when
- * an attestation fails), each other one with "Remove" (one tap, `RemoveDeviceSheet`: the wrap goes, the keys stay);
- * "Connect another device" (`ApproveDevice`: it approves a new device); "New recovery key" (confirmed by the current key or a
- * passkey touch, then `RecoveryKeySetup`); "Change keys" (a rotation that removes no device,
- * typed recovery key; it disconnects assistants); and how many records could not be read, when any.
+ * Cuenta y seguridad's encrypted part (mode `local`), as light rows: a "Tus dispositivos" group
+ * (this browser with the "Este" chip, the others with a trash button that opens `RemoveDeviceSheet`:
+ * the wrap goes, the keys stay; "Conectar otro dispositivo" opens `ApproveDevice`; the unreadable
+ * count when above 0) and a group with "Clave de recuperación" (confirmed by the current key or a
+ * passkey touch, then `RecoveryKeySetup`) and "Cambiar claves" (a rotation that removes no device,
+ * typed recovery key; it disconnects assistants).
  */
 export function SecuritySection({
   security,
@@ -72,39 +74,73 @@ export function SecuritySection({
   const deviceItem = (row: DeviceRow) => {
     const name = row.label ?? t("unnamed");
     const added = day(row.createdAt);
+    const line = [
+      added ? t("added", { date: added }) : null,
+      row.verified ? null : t("not_verified"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
-      <li key={row.id} className="lk-rowcard justify-between">
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-[15px] font-bold text-ink">{name}</span>
-          <span className="flex flex-wrap gap-x-(--space-2) text-[13px] text-ink-muted">
-            {row.thisBrowser && <span className="font-bold text-ink">{t("this_browser")}</span>}
-            {added && <span>{t("added", { date: added })}</span>}
-            {!row.verified && <span className="font-bold text-over">{t("not_verified")}</span>}
-          </span>
-        </span>
-        {row.removable && (
-          <PressButton
-            variant="ghost"
-            size="sm"
-            className="flex-none"
-            aria-label={t("remove_label", { name })}
-            onClick={() => setRemoving(row)}
-          >
-            {t("remove")}
-          </PressButton>
-        )}
-      </li>
+      <SettingsRow
+        key={row.id}
+        icon={<Icon name={deviceIconName(row.label)} size={20} />}
+        title={name}
+        {...(line ? { line } : {})}
+        trailing={
+          row.thisBrowser
+            ? { kind: "chip", text: t("this_browser") }
+            : row.removable
+              ? {
+                  kind: "trash",
+                  label: t("remove_label", { name }),
+                  onPress: () => setRemoving(row),
+                }
+              : { kind: "none" }
+        }
+      />
     );
   };
 
-  const approve = (
+  return (
     <>
-      <div className="flex flex-col gap-(--space-2)">
-        <SettingLabel label={t("connect")} hint={t("connect_lead")} />
-        <PressButton variant="secondary" className="self-start" onClick={() => setApproving(true)}>
-          {t("connect")}
-        </PressButton>
-      </div>
+      <SettingsGroup
+        head={{ icon: <Icon name="phone" size={22} />, title: t("title"), line: t("lead") }}
+      >
+        {snapshot.isError && (
+          <p className="m-0 px-(--space-1) py-(--space-2) text-[14px] text-ink-muted">
+            {t("load_failed")}
+          </p>
+        )}
+        {rows?.thisBrowser && deviceItem(rows.thisBrowser)}
+        {rows?.others.map(deviceItem)}
+        <SettingsRow
+          icon={<Icon name="plus" size={20} />}
+          title={t("connect")}
+          trailing={{ kind: "none" }}
+          onPress={() => setApproving(true)}
+        />
+        {unreadable > 0 && (
+          <p className="m-0 px-(--space-1) py-(--space-2) text-[13px] text-ink-muted">
+            {t("unreadable", { count: unreadable })}. {t("unreadable_lead")}
+          </p>
+        )}
+      </SettingsGroup>
+      <SettingsGroup>
+        <SettingsRow
+          icon={<Icon name="key" size={20} />}
+          title={t("recovery_title")}
+          line={t("recovery_line")}
+          trailing={{ kind: "chevron" }}
+          onPress={() => setNewKey(true)}
+        />
+        <SettingsRow
+          icon={<Icon name="key" size={20} />}
+          title={t("change_keys")}
+          line={t("change_keys_line")}
+          trailing={{ kind: "chevron" }}
+          onPress={() => setChanging(true)}
+        />
+      </SettingsGroup>
       {approving && (
         <Takeover label={t("connect")}>
           <ApproveDevice
@@ -117,36 +153,6 @@ export function SecuritySection({
             }}
           />
         </Takeover>
-      )}
-    </>
-  );
-
-  return (
-    <SettingsSection title={t("title")} lead={t("lead")}>
-      <div className="flex flex-col gap-(--space-2)" aria-busy={snapshot.isPending || undefined}>
-        {snapshot.isError && <p className="m-0 text-[14px] text-ink-muted">{t("load_failed")}</p>}
-        {rows && (
-          <ul className="m-0 flex list-none flex-col gap-(--space-2) p-0">
-            {rows.thisBrowser && deviceItem(rows.thisBrowser)}
-            {rows.others.map(deviceItem)}
-          </ul>
-        )}
-      </div>
-      {approve}
-      <div className="flex flex-col gap-(--space-2)">
-        <SettingLabel label={t("recovery_title")} hint={t("recovery_lead")} />
-        <PressButton variant="secondary" className="self-start" onClick={() => setNewKey(true)}>
-          {t("new_recovery")}
-        </PressButton>
-      </div>
-      <div className="flex flex-col gap-(--space-2)">
-        <SettingLabel label={t("change_keys")} hint={t("change_keys_body")} />
-        <PressButton variant="secondary" className="self-start" onClick={() => setChanging(true)}>
-          {t("change_keys")}
-        </PressButton>
-      </div>
-      {unreadable > 0 && (
-        <SettingLabel label={t("unreadable", { count: unreadable })} hint={t("unreadable_lead")} />
       )}
       <RemoveDeviceSheet
         device={removing}
@@ -171,7 +177,7 @@ export function SecuritySection({
         onClose={() => setNewKey(false)}
         onChanged={changed}
       />
-    </SettingsSection>
+    </>
   );
 }
 
@@ -326,6 +332,7 @@ function NewRecoveryKeySheet({
   return (
     <Sheet open={open} onClose={close} title={t("title")}>
       <form noValidate className="flex flex-col gap-(--space-4) pt-(--space-3)" onSubmit={withKey}>
+        <p className="m-0 text-[15px] text-ink">{tSecurity("recovery_lead")}</p>
         <p className="m-0 text-[15px] text-ink">
           {t(plain ? "body_no_passkeys" : canTouch ? "body" : "body_no_touch")}
         </p>

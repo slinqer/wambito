@@ -138,7 +138,7 @@ Future<void> showSigninNotice(BuildContext context, WidgetRef ref) async {
   await _keep(store, userId, all);
   if (answer != _Answer.notMe || !context.mounted) return;
   if (fresh.length > 1) {
-    unawaited(ref.read(routerProvider).push<void>('/settings'));
+    unawaited(ref.read(routerProvider).push<void>('/settings/account'));
     return;
   }
   final row = rows.others.firstWhere((r) => r.id == fresh.single.id);

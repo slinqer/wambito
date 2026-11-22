@@ -1,4 +1,4 @@
-import { Settings } from "../features/settings/Settings.tsx";
+import { Outlet } from "react-router";
 import { screenMeta } from "../i18n/screen-meta.ts";
 
 /** Spanish in the app; in the demo (which reuses this module), the demo's language. */
@@ -6,9 +6,10 @@ export const meta = ({ location }: { location: { pathname: string; search: strin
   screenMeta("settings", location);
 
 /**
- * `/app/settings`: language, theme, sound, time zone, currency, passkeys, import, export and
- * deleting the account. Signed in and onboarded: the `/app` layout checks it.
+ * `/app/settings`: the layout of Settings. Its index is the menu of categories and each category
+ * is its own page (`app.settings._index.tsx`, `app.settings.$category.tsx`). Signed in and
+ * onboarded: the `/app` layout checks it.
  */
 export default function Route() {
-  return <Settings />;
+  return <Outlet />;
 }

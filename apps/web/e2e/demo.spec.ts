@@ -36,9 +36,9 @@ const LANG = {
     home: "Inicio",
     off: "En el demo esto no está disponible. Crea tu cuenta para usarlo.",
     viewing: "Estás viendo el demo de Valentina.",
-    exportJson: "Descargar JSON",
-    deleteAccount: "Eliminar mi cuenta",
-    importAction: "Importar desde Budge",
+    exportRow: "Descargar tus datos",
+    deleteAccount: "Eliminar tu cuenta",
+    importRow: "Importar movimientos",
   },
   en: {
     landing: "/en",
@@ -65,9 +65,9 @@ const LANG = {
     home: "Home",
     off: "Not available in the demo. Create your account to use it.",
     viewing: "You're viewing Valentina's demo.",
-    exportJson: "Download JSON",
-    deleteAccount: "Delete my account",
-    importAction: "Import from Budge",
+    exportRow: "Download your data",
+    deleteAccount: "Delete your account",
+    importRow: "Import transactions",
   },
 } as const;
 
@@ -215,12 +215,32 @@ test("es: every demo screen keeps its links in /demo, and settings turns off wha
   await expect(page).toHaveTitle("Demo · Ajustes · Wambito");
   await expect(page.getByText(l.viewing)).toBeVisible();
   await expect(page.getByText(/Entraste como/)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: l.exportJson })).toBeDisabled();
-  await expect(page.getByRole("button", { name: l.deleteAccount })).toBeDisabled();
-  await expect(page.getByRole("link", { name: l.importAction })).toHaveCount(0);
-  await expect(page.getByText(l.off)).toHaveCount(3);
   await expectLinksStayInDemo(page);
   await expectNoAxeViolations(page);
+  // The demo's menu is the app's, under /demo: each category has its own page there.
+  const menu = page.getByRole("navigation", { name: l.settings }).getByRole("link");
+  await expect(menu).toHaveCount(5);
+  await menu.nth(3).click();
+  await expect(page).toHaveURL(/\/demo\/settings\/data$/);
+  // Both rows are drawn but do nothing in the demo (the note says why).
+  await expect(page.getByText(l.exportRow, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(`^${l.exportRow}`) })).toHaveCount(0);
+  await expect(page.getByText(l.importRow, { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`^${l.importRow}`) })).toHaveCount(0);
+  await expect(page.getByText(l.off)).toHaveCount(1);
+  await expectLinksStayInDemo(page);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/demo\/settings$/);
+  await menu.nth(1).click();
+  await expect(page).toHaveURL(/\/demo\/settings\/account$/);
+  // the row has no action in the demo (a note says why)
+  await expect(page.getByRole("button", { name: l.deleteAccount })).toHaveCount(0);
+  await expect(page.getByText(l.deleteAccount, { exact: true })).toBeVisible();
+  await expect(page.getByText(l.off)).toHaveCount(2);
+  await expectLinksStayInDemo(page);
+  await expectNoAxeViolations(page);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/demo\/settings$/);
 
   // Back home from settings.
   await page.getByRole("navigation").getByRole("link", { name: l.home }).click();

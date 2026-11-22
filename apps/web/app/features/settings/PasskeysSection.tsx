@@ -1,17 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { intlTag, type Locale } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import type { PasskeyPrf } from "../../local/prf.ts";
 import { ConfirmSheet } from "../../ui/ConfirmSheet.tsx";
-import { FingerprintIcon } from "../../ui/FingerprintIcon.tsx";
-import { PressButton } from "../../ui/PressButton.tsx";
+import { Icon } from "../../ui/Icon.tsx";
 import { useToast } from "../../ui/Toast.tsx";
-import { DemoOffNote, SettingsSection } from "./parts.tsx";
+import { DemoOffNote, SettingsGroup, SettingsRow } from "./parts.tsx";
 import type { PasskeyItem, PasskeysApi } from "./passkeys.ts";
 import { codeOf, SECURITY_KEY, type SecurityApi } from "./security.ts";
-import { passkeyRows } from "./security-model.ts";
+import { deviceIconName, passkeyRows } from "./security-model.ts";
 
 export const PASSKEYS_KEY = ["passkeys"] as const;
 
@@ -169,108 +168,91 @@ export function PasskeysSection({
     await qc.invalidateQueries({ queryKey: PASSKEYS_KEY });
   };
 
+  const head = {
+    icon: <Icon name="fingerprint" size={22} />,
+    title: t("title"),
+    line: t("line"),
+  };
+  const note = "m-0 px-(--space-1) py-(--space-2) text-[14px] text-ink-muted";
+
   if (off) {
     return (
-      <SettingsSection title={t("title")} lead={t("lead")}>
-        <PressButton variant="secondary" className="self-start" disabled aria-describedby={offId}>
-          <FingerprintIcon />
-          {t("add")}
-        </PressButton>
+      <SettingsGroup head={head}>
+        <SettingsRow
+          icon={<Icon name="plus" size={20} />}
+          title={t("add")}
+          trailing={{ kind: "none" }}
+        />
         <DemoOffNote id={offId} />
-      </SettingsSection>
+      </SettingsGroup>
     );
   }
 
   return (
-    <SettingsSection title={t("title")} lead={t("lead")}>
-      <div className="flex flex-col gap-(--space-2)" aria-busy={list.isPending || undefined}>
-        {list.isError && <p className="m-0 text-[14px] text-ink-muted">{t("list_failed")}</p>}
-        {list.data?.length === 0 && <p className="m-0 text-[14px] text-ink">{t("empty")}</p>}
-        {list.data && list.data.length > 0 && (
-          <ul className="m-0 flex list-none flex-col gap-(--space-2) p-0">
-            {rows.map((item) => (
-              <li key={item.id} className="lk-rowcard flex-wrap justify-between">
-                <span className="flex min-w-0 items-center gap-(--space-3)">
-                  <span className="flex-none text-brand-glow" aria-hidden="true">
-                    <FingerprintIcon />
-                  </span>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-[15px] font-bold text-ink">
-                      {item.name ?? t("default_name")}
-                    </span>
-                    <span className="flex flex-wrap gap-x-(--space-2) text-[13px] text-ink-muted">
-                      <span>{t("created", { date: day(item) })}</span>
-                      {item.synced && <span>{t("synced")}</span>}
-                      {item.unlocks === true && <span>{t("unlocks")}</span>}
-                      {item.unlocks === false && (
-                        <span className="font-bold text-ink">{t("locked")}</span>
-                      )}
-                    </span>
-                  </span>
-                </span>
-                {item.unlocks === false && (
-                  <PressButton
-                    variant="secondary"
-                    size="sm"
-                    className="flex-none"
-                    disabled={turningOn !== null}
-                    aria-busy={turningOn === item.id || undefined}
-                    aria-describedby={noPrf === item.id ? noPrfId : undefined}
-                    aria-label={
-                      item.name
-                        ? t("turn_on_named_label", { name: item.name })
-                        : t("turn_on_label", { date: day(item) })
-                    }
-                    onClick={() => void turnOn(item)}
-                  >
-                    {t("turn_on")}
-                  </PressButton>
-                )}
-                <PressButton
-                  variant="ghost"
-                  size="sm"
-                  className="flex-none"
-                  aria-label={
-                    item.name
-                      ? t("remove_named_label", { name: item.name, date: day(item) })
-                      : t("remove_label", { date: day(item) })
-                  }
-                  onClick={() => {
+    <>
+      <SettingsGroup head={head}>
+        {list.isError && <p className={note}>{t("list_failed")}</p>}
+        {list.data?.length === 0 && (
+          <p className={note}>
+            {t("empty")} {t("lead")}
+          </p>
+        )}
+        {rows.map((item) => {
+          const date = day(item);
+          return (
+            <Fragment key={item.id}>
+              <SettingsRow
+                icon={<Icon name={deviceIconName(item.name)} size={20} />}
+                title={item.name ?? t("default_name")}
+                line={`${t("created", { date })}${item.synced ? ` · ${t("synced")}` : ""}`}
+                trailing={{
+                  kind: "trash",
+                  label: item.name
+                    ? t("remove_named_label", { name: item.name })
+                    : t("remove_label", { date }),
+                  onPress: () => {
                     setRemoving(item);
                     setConfirmOpen(true);
-                  }}
-                >
-                  {t("remove")}
-                </PressButton>
-                {noPrf === item.id && (
-                  <p id={noPrfId} role="alert" className="m-0 w-full text-[14px] text-over">
-                    {t("turn_on_no_prf")}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
+                  },
+                }}
+              />
+              {item.unlocks === false && (
+                <SettingsRow
+                  icon={<Icon name="key" size={20} />}
+                  title={
+                    item.name
+                      ? t("turn_on_named_label", { name: item.name })
+                      : t("turn_on_label", { date })
+                  }
+                  line={t("locked")}
+                  trailing={{ kind: "chevron" }}
+                  {...(turningOn === null ? { onPress: () => void turnOn(item) } : {})}
+                />
+              )}
+              {noPrf === item.id && (
+                <p id={noPrfId} role="alert" className="m-0 w-full text-[14px] text-over">
+                  {t("turn_on_no_prf")}
+                </p>
+              )}
+            </Fragment>
+          );
+        })}
+        {supported ? (
+          <SettingsRow
+            icon={<Icon name="plus" size={20} />}
+            title={adding ? t("adding") : t("add")}
+            trailing={{ kind: "none" }}
+            {...(adding ? {} : { onPress: () => void add() })}
+          />
+        ) : (
+          <p className={note}>{t("unsupported")}</p>
         )}
-      </div>
-      {supported ? (
-        <PressButton
-          variant="secondary"
-          className="self-start"
-          disabled={adding}
-          aria-busy={adding || undefined}
-          onClick={() => void add()}
-        >
-          <FingerprintIcon />
-          {adding ? t("adding") : t("add")}
-        </PressButton>
-      ) : (
-        <p className="m-0 text-[14px] text-ink-muted">{t("unsupported")}</p>
-      )}
-      {addedWithoutWrap && (
-        <p role="status" className="lk-rowcard m-0 text-[15px] text-ink">
-          {t("add_no_prf")}
-        </p>
-      )}
+        {addedWithoutWrap && (
+          <p role="status" className={`${note} text-ink`}>
+            {t("add_no_prf")}
+          </p>
+        )}
+      </SettingsGroup>
       <ConfirmSheet
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -279,6 +261,6 @@ export function PasskeysSection({
         confirmLabel={t("remove_confirm")}
         onConfirm={remove}
       />
-    </SettingsSection>
+    </>
   );
 }

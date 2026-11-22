@@ -17,6 +17,8 @@ import 'package:wambito/feedback/stored_flag.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/l10n/app_localizations.dart';
 import 'package:wambito/settings/assistants_repository.dart';
+import 'package:wambito/settings/category_cards.dart';
+import 'package:wambito/settings/settings_categories.dart';
 import 'package:wambito/settings/settings_screen.dart';
 import 'package:wambito/settings/server_status.dart';
 
@@ -26,18 +28,20 @@ import '../support/parity.dart';
 import 'fakes.dart';
 import 'harness.dart' show DeletableModelStore;
 
-/// What Settings has that the web's has not, to review by eye: the guest's "Guarda tu progreso", the
-/// phone's own switches (vibration, the two notices, the widget), the voice models, the server,
-/// "Más en la web", About and signing out. They are drawn with the web's parts (`SettingsSection`,
-/// `SettingSwitch`, `PressButton`), in the web's settings style, so the web has no story of them and
-/// the parity pairs (`settings-app-sections*`) cannot compare them. The sheets the guest dialogs
-/// became (the sign-out warning, the claim offer) and the server's sheet are here too.
+/// What Settings has that the web's has not, to review by eye: the menu with Captura, the guest's
+/// "Guarda tu progreso", signing out and the version; the Captura page (the phone's own switches,
+/// the voice models, the notices, the widget); Más with the server, the roadmap, the web and About;
+/// Preferencias with vibration and "Automático". They are drawn with the web's parts
+/// (`SettingsGroup`, `SettingsRow`, `PressButton`), so the web has no story of them and the parity
+/// pairs (`settings-*` in test/parity) leave them out. The sheets the guest dialogs became (the
+/// sign-out warning, the claim offer), the server's sheet and the voice models' question are here
+/// too.
 ///
 /// The goldens are the Mac's pixels, tagged `golden`; update them with
 /// `flutter test --update-goldens test/settings/settings_golden_test.dart`.
 
-/// The whole page, taller than a phone, so one picture shows every card.
-const _page = Size(412, 4000);
+/// A page taller than a phone, so one picture shows all of it.
+const _page = Size(412, 1600);
 
 List<Override> _overrides({required bool guest}) {
   final token = guest ? 'guest-token-0' : 'email-token-0';
@@ -64,6 +68,7 @@ Future<void> _golden(
   required bool guest,
   Size size = _page,
   double textScale = 1,
+  SettingsCategory? category,
   Future<void> Function(WidgetTester t)? act,
 }) async {
   await t.runAsync(loadParityFonts);
@@ -87,7 +92,9 @@ Future<void> _golden(
           supportedLocales: AppLocalizations.supportedLocales,
           debugShowCheckedModeBanner: false,
           builder: (context, child) => withAppHosts(child!, animateToastBar: false),
-          home: const SettingsScreen(),
+          home: category == null
+              ? const SettingsScreen()
+              : SettingsCategoryScreen(category: category),
         ),
       ),
     );
@@ -109,38 +116,44 @@ Future<void> _golden(
 
 void main() {
   for (final theme in ['night', 'day']) {
-    testWidgets('Settings, a guest, with every card of the app ($theme)', (t) async {
+    testWidgets('the menu, a guest: Guarda tu progreso, Captura, signing out ($theme)', (t) async {
       await _golden(t, 'settings_guest', theme, guest: true);
     });
 
-    testWidgets('Settings, with an email ($theme)', (t) async {
+    testWidgets('the menu, with an email ($theme)', (t) async {
       await _golden(t, 'settings_email', theme, guest: false);
     });
 
-    // The phone's font at 130 %: the three-way rows (language, theme) keep "Automático" whole.
-    testWidgets('Settings\' three-way rows at text scale 1.3 ($theme)', (t) async {
+    testWidgets('Captura: the phone\'s own switches and the voice models ($theme)', (t) async {
+      await _golden(t, 'settings_capture', theme, guest: false, category: SettingsCategory.capture);
+    });
+
+    testWidgets('Más: the server, the roadmap, the web and About ($theme)', (t) async {
+      await _golden(t, 'settings_more', theme, guest: false, category: SettingsCategory.more);
+    });
+
+    // The phone's font at 130 %: Idioma keeps "Automático" whole, on one line.
+    testWidgets('Preferencias at text scale 1.3 ($theme)', (t) async {
       await _golden(
         t,
-        'settings_three_way_scale_1_3',
+        'settings_preferences_scale_1_3',
         theme,
         guest: false,
         size: parityViewSize,
         textScale: 1.3,
+        category: SettingsCategory.preferences,
       );
-      for (final key in ['settings.language.auto', 'settings.theme.system']) {
-        final word = find.byKey(Key(key));
-        expect(word, findsOneWidget);
-        // One line: like the web's (a word is never broken at a letter, and the grid column does
-        // not grow), "Automático" is wider than the room its padding leaves and spills into it.
-        final paragraph = t.renderObject<RenderParagraph>(word);
+      final words = find.text('Automático');
+      expect(words, findsWidgets);
+      for (final word in words.evaluate()) {
+        final paragraph = word.renderObject! as RenderParagraph;
         expect(
           paragraph
               .getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 10))
               .length,
           1,
-          reason: key,
         );
-        expect(paragraph.size.height, lessThan(30), reason: key);
+        expect(paragraph.size.height, lessThan(30));
       }
     });
 
@@ -151,6 +164,7 @@ void main() {
         theme,
         guest: false,
         size: parityViewSize,
+        category: SettingsCategory.more,
         act: (t) async {
           await t.scrollUntilVisible(find.byKey(const Key('settings.server')), 200);
           await t.tap(find.byKey(const Key('settings.server')));
@@ -166,6 +180,7 @@ void main() {
         theme,
         guest: false,
         size: parityViewSize,
+        category: SettingsCategory.capture,
         act: (t) async {
           await t.scrollUntilVisible(find.byKey(const Key('settings.deleteVoice')), 200);
           await t.tap(find.byKey(const Key('settings.deleteVoice')));
@@ -191,7 +206,7 @@ void main() {
   }
 
   // The claim offer (a guest who typed an email) is asked from the email screen: here it opens
-  // over Settings' page to be drawn.
+  // over Settings' menu to be drawn.
   for (final theme in ['night', 'day']) {
     testWidgets('the guest\'s offer to save their progress ($theme)', (t) async {
       await _golden(

@@ -31,7 +31,7 @@ void main() {
       final accounts = FakeAccountRepository();
       await pumpSettingsApp(
         t,
-        location: '/settings',
+        location: '/settings/data',
         overrides: [
           ...previewOpen(),
           accountRepositoryProvider.overrideWithValue(accounts),
@@ -39,7 +39,11 @@ void main() {
         ],
       );
       await _show(t, 'settings.export.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
+      expect(
+        t.getSemantics(find.byKey(const Key('settings.export.comingSoon'))).hint,
+        'Próximamente con cifrado',
+      );
+      expect(find.text('Próximamente'), findsWidgets);
       expect(find.byKey(const Key('settings.export.json')), findsNothing);
       expect(find.byKey(const Key('settings.export.csv')), findsNothing);
       expect(accounts.exports, isEmpty);
@@ -47,8 +51,11 @@ void main() {
     });
 
     testWidgets('a plain account keeps both buttons', (t) async {
-      await pumpAccount(t);
-      await _show(t, 'settings.export.json');
+      await pumpAccount(t, location: '/settings/data');
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('settings.export.json')), findsOneWidget);
+      expect(find.byKey(const Key('settings.export.csv')), findsOneWidget);
       expect(find.byKey(const Key('settings.export.comingSoon')), findsNothing);
     });
   });
@@ -56,9 +63,11 @@ void main() {
   group('import', () {
     testWidgets('Settings shows the notice in place of the link to the import', (t) async {
       final handle = t.ensureSemantics();
-      await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
-      await _show(t, 'settings.import.comingSoon');
-      expect(said('Próximamente con cifrado'), findsWidgets);
+      await pumpSettingsApp(t, location: '/settings/data', overrides: previewOpen());
+      expect(
+        t.getSemantics(find.byKey(const Key('settings.import.comingSoon'))).hint,
+        'Próximamente con cifrado',
+      );
       expect(find.byKey(const Key('settings.import')), findsNothing);
       handle.dispose();
     });
@@ -82,7 +91,7 @@ void main() {
   group('due notice', () {
     testWidgets('Settings shows the "Hoy vence…" switch, computed on the phone', (t) async {
       final handle = t.ensureSemantics();
-      await pumpSettingsApp(t, location: '/settings', overrides: previewOpen());
+      await pumpSettingsApp(t, location: '/settings/capture', overrides: previewOpen());
       await _show(t, 'settings.dueNotice');
       expect(find.byKey(const Key('settings.dueNotice.comingSoon')), findsNothing);
       handle.dispose();
@@ -94,7 +103,7 @@ void main() {
       final assistants = FakeAssistantsRepository();
       await pumpSettingsApp(
         t,
-        location: '/settings',
+        location: '/settings/agents',
         overrides: <Override>[
           ...previewOpen(),
           assistantsRepositoryProvider.overrideWithValue(assistants),

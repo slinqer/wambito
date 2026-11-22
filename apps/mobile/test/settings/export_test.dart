@@ -15,8 +15,15 @@ import 'account_harness.dart';
 
 Finder _said(String text) => find.bySemanticsLabel(text);
 
+/// Opens the sheet of export choices from its row.
+Future<void> _openSheet(WidgetTester t) async {
+  await scrollToKey(t, 'settings.export');
+  await t.tap(find.byKey(const Key('settings.export')));
+  await t.pumpAndSettle();
+}
+
 Future<void> _tapExport(WidgetTester t, String format) async {
-  await scrollToKey(t, 'settings.export.$format');
+  await _openSheet(t);
   await t.tap(find.byKey(Key('settings.export.$format')));
   await t.pumpAndSettle();
 }
@@ -25,10 +32,10 @@ void main() {
   group('the buttons', () {
     testWidgets('are the web\'s: under the import, JSON and CSV, with what each gives', (t) async {
       final handle = t.ensureSemantics();
-      await pumpAccount(t);
-      await scrollToKey(t, 'settings.export.json');
+      await pumpAccount(t, location: '/settings/data');
+      await _openSheet(t);
       expect(_said('Tus datos'), findsWidgets);
-      expect(_said('Descarga tus datos'), findsOneWidget);
+      expect(_said('Descarga tus datos'), findsWidgets);
       expect(
         _said('Todo en JSON, o tus movimientos en CSV para abrirlos en Excel o Google Sheets.'),
         findsOneWidget,
@@ -41,8 +48,8 @@ void main() {
     });
 
     testWidgets('are in English, with the web\'s words', (t) async {
-      await pumpAccount(t, locale: const Locale('en'));
-      await scrollToKey(t, 'settings.export.json');
+      await pumpAccount(t, location: '/settings/data', locale: const Locale('en'));
+      await _openSheet(t);
       expect(find.text('DOWNLOAD JSON'), findsOneWidget);
       expect(find.text('DOWNLOAD CSV'), findsOneWidget);
     });
@@ -52,7 +59,7 @@ void main() {
     testWidgets('JSON asks the server for JSON, then offers to save or share the file by name', (
       t,
     ) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       await _tapExport(t, 'json');
       expect(env.accounts.exports, [ExportFormat.json]);
       expect(find.text('Tu archivo está listo'), findsOneWidget);
@@ -67,7 +74,7 @@ void main() {
     testWidgets(
       '"Guardar en el teléfono" gives the bytes, the name and the type to the save picker',
       (t) async {
-        final env = await pumpAccount(t);
+        final env = await pumpAccount(t, location: '/settings/data');
         await _tapExport(t, 'json');
         await t.tap(find.byKey(const Key('settings.export.save')));
         await t.pumpAndSettle();
@@ -84,7 +91,7 @@ void main() {
     );
 
     testWidgets('CSV is asked as CSV and saved as text/csv', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       await _tapExport(t, 'csv');
       expect(env.accounts.exports, [ExportFormat.csv]);
       await t.tap(find.byKey(const Key('settings.export.save')));
@@ -97,18 +104,18 @@ void main() {
     });
 
     testWidgets('closing the save picker says nothing and leaves the page as it was', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.files.saveAnswer = false;
       await _tapExport(t, 'json');
       await t.tap(find.byKey(const Key('settings.export.save')));
       await t.pumpAndSettle();
       expect(env.files.saved, hasLength(1));
       expect(find.textContaining('Listo: guardamos'), findsNothing);
-      expect(find.byKey(const Key('settings.export.json')), findsOneWidget);
+      expect(find.byKey(const Key('settings.export')), findsOneWidget);
     });
 
     testWidgets('a save that fails says so, in a toast', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.files.saveFailure = const FilesFailure(FilesFailureKind.unreadable);
       await _tapExport(t, 'json');
       await t.tap(find.byKey(const Key('settings.export.save')));
@@ -120,7 +127,7 @@ void main() {
 
   group('sharing', () {
     testWidgets('"Compartir" hands the file to the share sheet', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       await _tapExport(t, 'csv');
       await t.tap(find.byKey(const Key('settings.export.share')));
       await t.pumpAndSettle();
@@ -134,7 +141,7 @@ void main() {
     });
 
     testWidgets('a phone with nothing to share with says so', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.files.shareFailure = const FilesFailure(FilesFailureKind.unavailable);
       await _tapExport(t, 'json');
       await t.tap(find.byKey(const Key('settings.export.share')));
@@ -146,7 +153,7 @@ void main() {
 
   group('when it does not go', () {
     testWidgets('a cancelled question saves and shares nothing', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       await _tapExport(t, 'json');
       await t.tap(find.text('CANCELAR'));
       await t.pumpAndSettle();
@@ -156,7 +163,7 @@ void main() {
     });
 
     testWidgets('a failed export is the web\'s toast, and no file', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.accounts.exportFailure = const HomeFailure(503, code: 'internal_error');
       await _tapExport(t, 'json');
       expect(
@@ -165,7 +172,9 @@ void main() {
       );
       expect(find.text('Tu archivo está listo'), findsNothing);
       expect(env.files.saved, isEmpty);
-      // The buttons are back for another try.
+      // The buttons are back for another try: the row opens the sheet again.
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
       expect(
         t.widget<PressButton>(find.byKey(const Key('settings.export.json'))).onPressed,
         isNotNull,
@@ -180,7 +189,7 @@ void main() {
     testWidgets('a 401 is a session the server no longer knows: signed out, as everywhere else', (
       t,
     ) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.accounts.exportFailure = const HomeFailure(401);
       await _tapExport(t, 'json');
       expect(env.app.stored, isNull);
@@ -191,7 +200,7 @@ void main() {
     });
 
     testWidgets('offline says so', (t) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.accounts.exportFailure = const HomeFailure(0);
       await _tapExport(t, 'csv');
       expect(find.text('Sin conexión. Revisa tu internet e inténtalo de nuevo.'), findsOneWidget);
@@ -201,11 +210,22 @@ void main() {
     testWidgets('while one is being prepared both buttons are off, and a second tap asks nothing', (
       t,
     ) async {
-      final env = await pumpAccount(t);
+      final env = await pumpAccount(t, location: '/settings/data');
       env.accounts.holdExport = Completer<void>();
-      await scrollToKey(t, 'settings.export.json');
+      await _openSheet(t);
       await t.tap(find.byKey(const Key('settings.export.json')));
-      await t.pump();
+      await t.pumpAndSettle();
+      // The sheet closed on the pick; opened again, both buttons are off.
+      await t.tap(find.byKey(const Key('settings.export')));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<PressButton>(find.byKey(const Key('settings.export.json'))).onPressed,
+        isNull,
+      );
+      expect(
+        t.widget<PressButton>(find.byKey(const Key('settings.export.csv'))).onPressed,
+        isNull,
+      );
       await t.tap(find.byKey(const Key('settings.export.json')), warnIfMissed: false);
       await t.tap(find.byKey(const Key('settings.export.csv')), warnIfMissed: false);
       await t.pump();
@@ -219,8 +239,8 @@ void main() {
   group('a guest', () {
     testWidgets('sees both buttons off, with why: an email comes first', (t) async {
       final handle = t.ensureSemantics();
-      final env = await pumpAccount(t, guest: true);
-      await scrollToKey(t, 'settings.export.json');
+      final env = await pumpAccount(t, location: '/settings/data', guest: true);
+      await _openSheet(t);
       expect(
         _said('Primero guarda tu progreso con un correo; después podrás descargar tus datos.'),
         findsOneWidget,

@@ -85,7 +85,7 @@ export const VerifyNoPasskey: Story = {
     ).toBeVisible();
     await expect(within(canvas.getByRole("main")).queryByRole("button")).toBeNull();
     const link = canvas.getByRole("link", { name: "Ir a ajustes" });
-    await expect(link).toHaveAttribute("href", "/app/settings");
+    await expect(link).toHaveAttribute("href", "/app/settings/account");
     await expectTarget(link);
   },
 };
