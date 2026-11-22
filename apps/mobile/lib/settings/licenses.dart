@@ -96,12 +96,16 @@ String _textAssetFor(AndroidLibrary library) {
 
 /// The licences Flutter does not collect by itself, as [LicenseEntry]s (texts read from [bundle],
 /// notices in [l10n]'s language).
-Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l10n) async* {
+Stream<LicenseEntry> extraLicenseEntries(
+  AssetBundle bundle,
+  AppLocalizations l10n,
+) async* {
   Future<String> load(String asset) => bundle.loadString(asset);
 
   final apache = await load(_apache);
   final libraries = parseLibraries(await load(_libraries));
-  AndroidLibrary? find(String id) => libraries.where((l) => l.id == id).firstOrNull;
+  AndroidLibrary? find(String id) =>
+      libraries.where((l) => l.id == id).firstOrNull;
   String name(AndroidLibrary library) => '${library.id} ${library.version}';
 
   // iOS has no Vosk, JNA or their libraries: only the precise model's runtime below.
@@ -112,7 +116,9 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       ('vosk-model-small-it-0.22', l10n.settingsLanguageIt),
       ('vosk-model-small-pt-0.3', l10n.settingsLanguagePt),
     ]) {
-      yield LicenseEntryWithLineBreaks([model], '${l10n.licenseNoticeModel(language)}\n\n$apache');
+      yield LicenseEntryWithLineBreaks([
+        model,
+      ], '${l10n.licenseNoticeModel(language)}\n\n$apache');
     }
 
     final vosk = find(_vosk);
@@ -123,18 +129,20 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       yield LicenseEntryWithLineBreaks([
         'OpenBLAS 0.3.20',
       ], '${l10n.licenseNoticeOpenBlas}\n\n${await load(_openBlas)}');
-      yield LicenseEntryWithLineBreaks([
-        'CLAPACK 3.2.1',
-      ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
+      yield LicenseEntryWithLineBreaks(
+        ['CLAPACK 3.2.1'],
+        '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}',
+      );
     }
     // CameraX's core (the QR scanner's camera) ships libimage_processing_util_jni.so, which converts and
     // rotates camera frames with libyuv, statically linked (no libyuv import, only the JNI entry points
     // and the CPU-feature probe; androidx camera-core 1.6.2's AAR): its BSD-3-Clause text and notice.
     final camera = find(_camera);
     if (camera != null) {
-      yield LicenseEntryWithLineBreaks([
-        'libyuv',
-      ], '${l10n.licenseNoticeLibyuv(camera.version)}\n\n${await load(_libyuv)}');
+      yield LicenseEntryWithLineBreaks(
+        ['libyuv'],
+        '${l10n.licenseNoticeLibyuv(camera.version)}\n\n${await load(_libyuv)}',
+      );
     }
     final jna = find(_jna);
     if (jna != null) {
@@ -178,7 +186,9 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       ('Boost.Mp11', l10n.licenseNoticeMp11, _boost),
       ('Eigen', l10n.licenseNoticeEigen, _eigen),
     ]) {
-      yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
+      yield LicenseEntryWithLineBreaks([
+        name,
+      ], '$notice\n\n${await load(asset)}');
     }
     yield LicenseEntryWithLineBreaks([
       'kaldi-native-fbank 1.22.4',
@@ -194,19 +204,25 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       ('darts-clone 0.32', l10n.licenseNoticeDarts, _darts),
       ('kissfft', l10n.licenseNoticeKissfft, _kissfft),
     ]) {
-      yield LicenseEntryWithLineBreaks([name], '$notice\n\n${await load(asset)}');
+      yield LicenseEntryWithLineBreaks([
+        name,
+      ], '$notice\n\n${await load(asset)}');
     }
   }
-  // The two tab icons from Plump Free (docs/design/system/project/icons/icons.json).
+  // The two tab icons from Plump Free and the settings icons from Plump Solid Free
+  // (docs/design/system/project/icons/icons.json).
   yield LicenseEntryWithLineBreaks([
     'Plump Free, Streamline',
+    'Plump Solid Free, Streamline',
   ], '${l10n.licenseNoticePlump}\n\n${await load(_ccBy)}');
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};
   final groups = <String, List<AndroidLibrary>>{};
   // iOS ships none of the Android libraries.
   final android = defaultTargetPlatform != TargetPlatform.iOS;
-  for (final library in libraries.where((l) => android && !handled.contains(l.id))) {
+  for (final library in libraries.where(
+    (l) => android && !handled.contains(l.id),
+  )) {
     (groups[_textAssetFor(library)] ??= []).add(library);
   }
   for (final MapEntry(key: asset, value: group) in groups.entries) {
@@ -225,7 +241,12 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
       l10n.licenseNoticeFontRoleDisplay,
       _fredokaOfl,
     ),
-    ('Nunito', 'https://github.com/googlefonts/nunito', l10n.licenseNoticeFontRoleText, _nunitoOfl),
+    (
+      'Nunito',
+      'https://github.com/googlefonts/nunito',
+      l10n.licenseNoticeFontRoleText,
+      _nunitoOfl,
+    ),
   ]) {
     yield LicenseEntryWithLineBreaks([
       name,
@@ -236,7 +257,9 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
   yield LicenseEntryWithLineBreaks([
     'Wambito feedback sounds',
   ], '${l10n.licenseNoticeSounds}\n\n$agpl');
-  yield LicenseEntryWithLineBreaks(['Wambito'], '${l10n.licenseNoticeApp}\n\n$agpl');
+  yield LicenseEntryWithLineBreaks([
+    'Wambito',
+  ], '${l10n.licenseNoticeApp}\n\n$agpl');
 }
 
 var _registered = false;
@@ -244,8 +267,8 @@ var _language = const Locale('es');
 
 /// The language the notices are written in when the licence page opens. About sets it from the
 /// app's own language just before showing the page.
-void setLicenseLanguage(Locale locale) =>
-    _language = AppLocalizations.supportedLocales.contains(Locale(locale.languageCode))
+void setLicenseLanguage(Locale locale) => _language =
+    AppLocalizations.supportedLocales.contains(Locale(locale.languageCode))
     ? Locale(locale.languageCode)
     : const Locale('es');
 

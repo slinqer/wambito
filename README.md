@@ -75,6 +75,6 @@ You can run your own Wambito on a Linux server: the same Docker stack that serve
 
 [AGPL-3.0](LICENSE). If you offer a modified Wambito as a service, you must publish your changes.
 
-The home and summary tab icons are [Plump Free](https://www.streamlinehq.com/icons/plump) by
-Streamline, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); the other interface
+The home and summary tab icons are [Plump Free](https://www.streamlinehq.com/icons/plump), and the
+settings icons Plump Solid Free, both by Streamline, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); the other interface
 icons are Wambito's own (`docs/design/system/project/icons/icons.json`).
