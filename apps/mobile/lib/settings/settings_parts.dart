@@ -9,6 +9,7 @@ import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/pixel_snap.dart';
 import '../ui/pressable.dart';
@@ -503,4 +504,284 @@ class CssBlinkLines extends StatelessWidget {
     style: style,
     child: BlinkLine(style: style, child: child),
   );
+}
+
+/// What a [SettingsRow] shows at its end (the web's `Trailing`).
+sealed class RowTrailing {
+  const RowTrailing();
+}
+
+/// A chevron, with a muted value before it when there is one.
+class RowChevron extends RowTrailing {
+  const RowChevron({this.value});
+
+  final String? value;
+}
+
+/// A switch: the whole row is the switch.
+class RowSwitch extends RowTrailing {
+  const RowSwitch({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+}
+
+/// A small pill of text ("este dispositivo").
+class RowChip extends RowTrailing {
+  const RowChip(this.text);
+
+  final String text;
+}
+
+/// Its own button, named by [label], that removes what the row stands for.
+class RowTrash extends RowTrailing {
+  const RowTrash({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+}
+
+/// Nothing at the end.
+class RowNone extends RowTrailing {
+  const RowNone();
+}
+
+/// A light group of rows (the web's `SettingsGroup`, app.css `.lk-group`): `surface-row` with a 2px
+/// `stroke`, `radius-lg` and `edge-sm`, padding 10/12, an optional small uppercase label and a 2px
+/// `stroke` line between rows, none above the first.
+class SettingsGroup extends StatelessWidget {
+  const SettingsGroup({super.key, this.label, required this.rows});
+
+  final String? label;
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final lk = context.lk;
+    final colors = lk.colors;
+    final label = this.label;
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: label,
+      child: SnappedDecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceRow,
+          borderRadius: LkSurface.radius(LkRadius.lg),
+          border: Border.all(color: colors.stroke, width: 2),
+          boxShadow: LkSurface.edgeShadow(lk, LkEdge.sm),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (label != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+                  child: ExcludeSemantics(
+                    child: Text(
+                      label.toUpperCase(),
+                      style: LkText.label.copyWith(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 11.5 * 0.06,
+                        color: colors.inkMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0)
+                  Container(
+                    key: const ValueKey('settings-row-divider'),
+                    height: 2,
+                    color: colors.stroke,
+                  ),
+                rows[i],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of a [SettingsGroup] (the web's `SettingsRow`): an icon in a 32px box, a title with an
+/// optional muted line (one line each, ellipsis) and a [RowTrailing]. A [RowSwitch] row is one
+/// switch named by its title; a [RowTrash] row has its own button, and the rest of the row is
+/// pressable only with [onTap]; [danger] colours the title and icon with `over`.
+class SettingsRow extends StatelessWidget {
+  const SettingsRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.line,
+    required this.trailing,
+    this.onTap,
+    this.danger = false,
+  });
+
+  final Widget icon;
+  final String title;
+  final String? line;
+  final RowTrailing trailing;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  Widget _body(BuildContext context, {required Widget? end}) {
+    final colors = context.lkColors;
+    final line = this.line;
+    final tint = danger ? colors.over : colors.inkMuted;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 9, 0, 9),
+        child: Row(
+          spacing: 12,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: Center(
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: tint),
+                  child: icon,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 2,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: LkText.cardTitle.copyWith(color: danger ? colors.over : colors.ink),
+                  ),
+                  if (line != null)
+                    Text(
+                      line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: LkText.fieldLabel.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.inkMuted,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            ?end,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pressable(BuildContext context, Widget child) {
+    final colors = context.lkColors;
+    return Pressable(
+      onPressed: onTap,
+      builder: (context, state) => RingBox(
+        radius: state.focusVisible ? LkSurface.radius(LkRadius.md) : null,
+        color: colors.focus,
+        offset: 2,
+        child: Opacity(opacity: state.pressed ? 0.7 : 1, child: child),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lkColors;
+    final t = trailing;
+    switch (t) {
+      case RowSwitch():
+        return Pressable(
+          onPressed: () => t.onChanged(!t.value),
+          toggled: t.value,
+          label: title,
+          hint: line,
+          builder: (context, state) => RingBox(
+            radius: state.focusVisible ? LkSurface.radius(LkRadius.md) : null,
+            color: colors.focus,
+            offset: 2,
+            child: _body(
+              context,
+              end: Transform.scale(scale: 0.85, child: LkSwitch(value: t.value)),
+            ),
+          ),
+        );
+      case RowTrash():
+        final main = _body(context, end: null);
+        return Row(
+          spacing: 4,
+          children: [
+            Expanded(child: onTap == null ? main : _pressable(context, main)),
+            Pressable(
+              onPressed: t.onTap,
+              label: t.label,
+              builder: (context, state) => RingBox(
+                radius: state.focusVisible ? LkSurface.radius(LkRadius.md) : null,
+                color: colors.focus,
+                offset: 0,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Opacity(
+                      opacity: state.pressed ? 0.7 : 1,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: colors.surfaceSunken,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: LkIcon(LkIconName.trash, size: 18, color: colors.over),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      case RowChevron():
+        final value = t.value;
+        final end = Row(
+          spacing: 6,
+          children: [
+            if (value != null) Text(value, style: LkText.label.copyWith(color: colors.inkMuted)),
+            LkIcon(LkIconName.chevronRight, size: 16, color: colors.inkMuted),
+          ],
+        );
+        final body = _body(context, end: end);
+        return onTap == null ? body : _pressable(context, body);
+      case RowChip():
+        final end = DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceSunken,
+            borderRadius: BorderRadius.circular(WambitoTokens.radiusPill),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(t.text, style: LkText.label.copyWith(fontSize: 11, color: colors.inkMuted)),
+          ),
+        );
+        final body = _body(context, end: end);
+        return onTap == null ? body : _pressable(context, body);
+      case RowNone():
+        final body = _body(context, end: null);
+        return onTap == null ? body : _pressable(context, body);
+    }
+  }
 }

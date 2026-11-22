@@ -1,6 +1,8 @@
 import { type ReactNode, useId } from "react";
+import { Link } from "react-router";
 import { useTranslations } from "use-intl";
 import { cx } from "../../ui/cx.ts";
+import { Icon } from "../../ui/Icon.tsx";
 
 /** A card of settings named by its heading (so it is a landmark region). */
 export function SettingsSection({
@@ -176,5 +178,154 @@ export function SettingSwitch({
         <span className="lk-switch-thumb" />
       </span>
     </button>
+  );
+}
+
+/** What a [SettingsRow] shows at its end. */
+export type Trailing =
+  | { kind: "chevron"; value?: ReactNode }
+  | { kind: "switch"; checked: boolean; onChange(value: boolean): void }
+  | { kind: "chip"; text: string }
+  | { kind: "trash"; label: string; onPress(): void }
+  | { kind: "none" };
+
+/**
+ * A light group of rows (a settings category's list): `surface-row` with a 2px stroke, an optional
+ * small uppercase label, rows divided by a 2px line. Named by its label when it has one.
+ */
+export function SettingsGroup({ label, children }: { label?: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <div role="group" aria-labelledby={label ? id : undefined} className="lk-group">
+      {label && (
+        <div id={id} className="lk-group-label">
+          {label}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One row of a [SettingsGroup]: an icon, a title with an optional muted line, and a trailing part.
+ * A `switch` row is one switch named by its title; a `trash` row has its own button; `onPress` or
+ * `href` make the rest of the row a button or a link (http(s) opens in a new tab).
+ */
+export function SettingsRow({
+  icon,
+  title,
+  line,
+  trailing,
+  onPress,
+  href,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  line?: string;
+  trailing: Trailing;
+  onPress?: () => void;
+  href?: string;
+  tone?: "danger";
+}) {
+  const titleId = useId();
+  const lineId = useId();
+  const danger = tone === "danger";
+  const lead = (
+    <>
+      <span
+        className={cx("lk-row-icon", danger ? "text-over" : "text-ink-muted")}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      <span className="lk-row-text">
+        <span id={titleId} className={cx("lk-row-title", danger ? "text-over" : "text-ink")}>
+          {title}
+        </span>
+        {line && (
+          <span id={lineId} className="lk-row-line text-ink-muted">
+            {line}
+          </span>
+        )}
+      </span>
+    </>
+  );
+
+  if (trailing.kind === "switch") {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={trailing.checked}
+        aria-labelledby={titleId}
+        aria-describedby={line ? lineId : undefined}
+        onClick={() => trailing.onChange(!trailing.checked)}
+        className="lk-row lk-switch-row"
+      >
+        {lead}
+        <span className="lk-switch lk-row-switch" aria-hidden="true">
+          <span className="lk-switch-thumb" />
+        </span>
+      </button>
+    );
+  }
+
+  const press = (children: ReactNode) => {
+    if (href !== undefined) {
+      return /^https?:\/\//.test(href) ? (
+        <a href={href} target="_blank" rel="noreferrer" className="lk-row lk-row-press">
+          {children}
+        </a>
+      ) : (
+        <Link to={href} className="lk-row lk-row-press">
+          {children}
+        </Link>
+      );
+    }
+    if (onPress) {
+      return (
+        <button type="button" onClick={onPress} className="lk-row lk-row-press">
+          {children}
+        </button>
+      );
+    }
+    return <div className="lk-row">{children}</div>;
+  };
+
+  if (trailing.kind === "trash") {
+    return (
+      <div className="lk-row-split">
+        <div className="lk-row-split-main">{press(lead)}</div>
+        <button
+          type="button"
+          aria-label={trailing.label}
+          onClick={trailing.onPress}
+          className="lk-row-trash text-over"
+        >
+          <span className="lk-row-trash-box">
+            <Icon name="trash" size={18} />
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  const end =
+    trailing.kind === "chevron" ? (
+      <span className="lk-row-end text-ink-muted">
+        {trailing.value !== undefined && <span className="lk-row-value">{trailing.value}</span>}
+        <Icon name="chevron-right" size={16} />
+      </span>
+    ) : trailing.kind === "chip" ? (
+      <span className="lk-row-chip text-ink-muted">{trailing.text}</span>
+    ) : null;
+
+  return press(
+    <>
+      {lead}
+      {end}
+    </>,
   );
 }
