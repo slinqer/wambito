@@ -136,9 +136,7 @@
             "icon": null,
             "uri": "https://chatgpt.com",
             "domain": "chatgpt.com",
-            "scopes": [
-              "finance:read"
-            ],
+            "scopes": ["finance:read"],
             "connectedAt": "2026-10-05T09:00:00.000Z",
             "lastUsedAt": null
           },
@@ -148,11 +146,7 @@
             "icon": null,
             "uri": "https://claude.ai",
             "domain": "claude.ai",
-            "scopes": [
-              "finance:read",
-              "finance:write",
-              "offline_access"
-            ],
+            "scopes": ["finance:read", "finance:write", "offline_access"],
             "connectedAt": "2026-10-02T09:00:00.000Z",
             "lastUsedAt": "2026-10-20T18:30:00.000Z"
           }
