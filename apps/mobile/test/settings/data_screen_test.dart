@@ -16,9 +16,9 @@ void main() {
   testWidgets('the two rows, with their one line each', (t) async {
     await pumpAccount(t, location: '/settings/data');
     expect(find.text('Importar movimientos'), findsOneWidget);
-    expect(find.text('Desde el CSV de tu banco'), findsOneWidget);
+    expect(find.text('Desde Budge'), findsOneWidget);
     expect(find.text('Descargar tus datos'), findsOneWidget);
-    expect(find.text('Un CSV con todo lo que anotaste'), findsOneWidget);
+    expect(find.text('En JSON o CSV'), findsOneWidget);
     // The choices are not on the page: they are in the sheet.
     expect(_row('settings.export.json'), findsNothing);
     final import = t.widget<SettingsRow>(_row('settings.import'));

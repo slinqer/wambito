@@ -846,6 +846,7 @@
       }
     }
   },
+  "settingsAgentsFrom": "De {domain}",
   "settingsAgentsConnectedLine": "Ligado a {date} · {used}",
   "@settingsAgentsConnectedLine": {
     "description": "Mis agentes: when an app was connected and last used.",
@@ -1267,7 +1268,7 @@
   "@settingsImportRow": {
     "description": "Settings, Tus datos: the import row's name."
   },
-  "settingsImportRowLine": "Do CSV do teu banco",
+  "settingsImportRowLine": "Do Budge",
   "@settingsImportRowLine": {
     "description": "Settings, Tus datos: the import row's one line."
   },
@@ -1275,7 +1276,7 @@
   "@settingsExportRow": {
     "description": "Settings, Tus datos: the export row's name."
   },
-  "settingsExportRowLine": "Um CSV com tudo o que registaste",
+  "settingsExportRowLine": "Em JSON ou CSV",
   "@settingsExportRowLine": {
     "description": "Settings, Tus datos: the export row's one line."
   },

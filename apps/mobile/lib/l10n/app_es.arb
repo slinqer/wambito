@@ -3694,6 +3694,15 @@
       }
     }
   },
+  "settingsAgentsFrom": "Desde {domain}",
+  "@settingsAgentsFrom": {
+    "description": "Settings, Mis agentes: where an unknown client comes from, before when it was connected.",
+    "placeholders": {
+      "domain": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAgentsConnectedLine": "Conectado el {date} · {used}",
   "@settingsAgentsConnectedLine": {
     "description": "Mis agentes: when an app was connected and last used.",
@@ -4925,7 +4934,7 @@
   "@settingsImportRow": {
     "description": "Settings, Tus datos: the import row's name."
   },
-  "settingsImportRowLine": "Desde el CSV de tu banco",
+  "settingsImportRowLine": "Desde Budge",
   "@settingsImportRowLine": {
     "description": "Settings, Tus datos: the import row's one line."
   },
@@ -4933,7 +4942,7 @@
   "@settingsExportRow": {
     "description": "Settings, Tus datos: the export row's name."
   },
-  "settingsExportRowLine": "Un CSV con todo lo que anotaste",
+  "settingsExportRowLine": "En JSON o CSV",
   "@settingsExportRowLine": {
     "description": "Settings, Tus datos: the export row's one line."
   },

@@ -830,9 +830,9 @@
       "export_csv": "Scarica CSV",
       "exported": "Fatto: abbiamo scaricato {file}.",
       "import_row": "Importa movimenti",
-      "import_row_line": "Dal CSV della tua banca",
+      "import_row_line": "Da Budge",
       "export_row": "Scarica i tuoi dati",
-      "export_row_line": "Un CSV con tutto quello che hai annotato",
+      "export_row_line": "In JSON o CSV",
       "soon": "In arrivo"
     },
     "feedback": {
@@ -882,6 +882,7 @@
       "connect": "Collega",
       "connect_label": "Collega {name}",
       "connected_line": "Collegato il {date} · {used}",
+      "from": "Da {domain}",
       "used_today": "usato oggi",
       "used_yesterday": "usato ieri",
       "used_on": "usato il {date}",

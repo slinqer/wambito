@@ -37,10 +37,10 @@ export const ImportAndExport: Story = {
     await expect(await canvas.findByRole("heading", { level: 1, name: "Tus datos" })).toBeVisible();
     const link = canvas.getByRole("link", { name: /^Importar movimientos/ });
     await expect(link).toHaveAttribute("href", "/app/import");
-    await expect(link).toHaveTextContent("Desde el CSV de tu banco");
+    await expect(link).toHaveTextContent("Desde Budge");
     await expect(link).toHaveAccessibleDescription("Importa lo que llevas en Budge.");
     const row = canvas.getByRole("button", { name: /^Descargar tus datos/ });
-    await expect(row).toHaveTextContent("Un CSV con todo lo que anotaste");
+    await expect(row).toHaveTextContent("En JSON o CSV");
     await userEvent.click(row);
     const sheet = within(await screen.findByRole("dialog", { name: "Descarga tus datos" }));
     await userEvent.click(sheet.getByRole("button", { name: "Descargar CSV" }));

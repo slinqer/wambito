@@ -830,9 +830,9 @@
       "export_csv": "Download CSV",
       "exported": "Done: we downloaded {file}.",
       "import_row": "Import transactions",
-      "import_row_line": "From your bank's CSV",
+      "import_row_line": "From Budge",
       "export_row": "Download your data",
-      "export_row_line": "A CSV with everything you logged",
+      "export_row_line": "As JSON or CSV",
       "soon": "Coming soon"
     },
     "feedback": {
@@ -882,6 +882,7 @@
       "connect": "Connect",
       "connect_label": "Connect {name}",
       "connected_line": "Connected on {date} · {used}",
+      "from": "From {domain}",
       "used_today": "used today",
       "used_yesterday": "used yesterday",
       "used_on": "used on {date}",
