@@ -34,6 +34,25 @@ void main() {
       }
     });
 
+    test('on Android the androidx libraries are listed', () async {
+      final packages = [for (final e in await _extras()) ...e.packages];
+      expect(packages.where((p) => p.startsWith('androidx.')), isNotEmpty);
+    });
+
+    test('on iOS the Vosk and JNA entries are gone and sherpa-onnx stays', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final packages = [for (final e in await _extras()) ...e.packages];
+      expect(packages.where((p) => p.startsWith('sherpa-onnx ')), hasLength(1));
+      expect(packages.where((p) => p.startsWith('onnxruntime')), hasLength(1));
+      expect(packages.where((p) => p.toLowerCase().contains('vosk')), isEmpty);
+      for (final gone in ['OpenBLAS 0.3.20', 'CLAPACK 3.2.1', 'libffi 3.4.4', 'libyuv']) {
+        expect(packages, isNot(contains(gone)));
+      }
+      expect(packages.where((p) => p.startsWith('JNA')), isEmpty);
+      expect(packages.where((p) => p.startsWith('androidx.')), isEmpty);
+    });
+
     test('the Plump icons are credited to Streamline, with the CC BY 4.0 text', () async {
       for (final language in ['es', 'en', 'it', 'pt']) {
         final entries = await _extras(language);

@@ -42,9 +42,13 @@ job in `ci.yml`. The Android side is `release.md`.
 8. **Local builds.** Copy `apps/mobile/ios/Flutter/Signing.xcconfig.example` to
    `Signing.xcconfig` (same folder, git-ignored) and put your team id there. The team id never goes
    in the repo: `scripts/check-ios-signing.sh` fails CI on one in the Xcode project.
+   Then, once after cloning, run `apps/mobile/scripts/fetch-sherpa-onnx-ios.sh`: it installs the
+   voice runtime (sherpa-onnx, from this repo's release `ios-sherpa-onnx-2.0.1`) in
+   `apps/mobile/ios/third_party/sherpa-onnx` (git-ignored), and every Xcode or `flutter build ios`
+   build stops with a message naming it until it is there. `swift test` does not need it.
 9. **A free personal team** (no paid account yet) cannot sign Associated Domains, so the build
    fails on `Runner.entitlements`. Build without them for your own iPhone, from `apps/mobile/ios`,
-   with an empty entitlements plist kept outside the repo
+   with the voice runtime fetched (step 8) and an empty entitlements plist kept outside the repo
    (`<plist version="1.0"><dict/></plist>`):
    `xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination
    'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_ENTITLEMENTS=<that file> build`,
@@ -58,7 +62,7 @@ job in `ci.yml`. The Android side is `release.md`.
    is what starts the workflow, so do it after the Android APK is checked). The tagged commit's
    `pubspec.yaml` version (`X.Y.Z+<base code>`) is the iOS version and build number; App Store
    Connect refuses a build number it has already seen.
-2. The `iOS release` workflow installs the App Store profile, archives and exports with manual
+2. The `iOS release` workflow fetches the voice runtime, installs the App Store profile, archives and exports with manual
    distribution signing, and uploads the build with the API key (`altool`, which is on Apple's
    deprecation path; Transporter or the App Store Connect API replace it when it stops working).
    Nothing is printed of the secrets, and the
@@ -101,8 +105,9 @@ job in `ci.yml`. The Android side is `release.md`.
   User Content** (notes and categories), **Contact Info, Email Address** (the sign-in email; a guest
   has none) and **Identifiers, User ID** (the account id). The data is stored encrypted end to end;
   say so in the privacy policy link, which is the web app's.
-- **Required-reason APIs.** UserDefaults (reason CA92.1) and file timestamps (reason C617.1) are
-  declared in the same file; no answer is needed in the console.
+- **Required-reason APIs.** UserDefaults (reason CA92.1), file timestamps (reason C617.1) and disk
+  space (reason E174.1: the free space checked before a voice model download) are declared in the
+  same file; no answer is needed in the console.
 
 ## When it fails
 

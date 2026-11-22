@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,6 +83,7 @@ Future<_Env> _pump(
   bool eligible = false,
   bool voskInstalled = false,
   FakeFlagStore? offerFlag,
+  bool ios = false,
 }) async {
   final server = FakeHomeRepository(
     categoryList: [
@@ -109,7 +111,8 @@ Future<_Env> _pump(
     overrides: [
       captureRepositoryProvider.overrideWithValue(capture),
       speechEngineProvider.overrideWithValue(engine),
-      modelStoreProvider.overrideWithValue(models),
+      // On iOS the app's model store is the precise one, as the provider itself returns.
+      modelStoreProvider.overrideWithValue(ios ? precise : models),
       preciseModelStoreProvider.overrideWithValue(precise),
       preciseEligibleProvider.overrideWith((ref, locale) async => eligible),
       batchSavedFeedbackProvider.overrideWithValue(celebrated.add),
@@ -463,6 +466,43 @@ void main() {
     expect(env.models.downloads, 1);
     expect(env.engine.listens, 2);
     expect(find.text('GUARDAR 2'), findsOneWidget);
+  });
+
+  group('on iOS the precise model is the only one', () {
+    const noModel = SpeechFailure(SpeechFailureKind.noModel);
+
+    // The framework checks the override is back before tearDown runs, so the tests reset it.
+    void ios() {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    }
+
+    void reset() => debugDefaultTargetPlatformOverride = null;
+
+    testWidgets('a phone that does not qualify types, with the no-engine note and no offer', (
+      tester,
+    ) async {
+      ios();
+      final env = await _pump(tester, locale: const Locale('it'), ios: true);
+      await _open(tester);
+      expect(find.byKey(const Key('capture.offer.download')), findsNothing);
+      expect(find.byKey(const Key('capture.field')), findsOneWidget);
+      expect(find.byKey(const Key('capture.note')), findsOneWidget);
+      expect(env.engine.listens, 0);
+      reset();
+    });
+
+    testWidgets('a phone that qualifies, with no model yet: the offer shows Canary\'s size', (
+      tester,
+    ) async {
+      ios();
+      final env = await _pump(tester, failure: noModel, eligible: true, ios: true);
+      await _open(tester);
+      final mb = (preciseModels['es']!.bytes / 1e6).round();
+      expect(find.text('DESCARGAR $mb MB'), findsOneWidget);
+      expect(env.precise.downloads, 0);
+      reset();
+    });
   });
 
   group('the precise model (canary)', () {

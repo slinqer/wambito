@@ -61,3 +61,4 @@ app.*.map.json
 
 # iOS signing team id (copy ios/Flutter/Signing.xcconfig.example).
 ios/Flutter/Signing.xcconfig
+ios/third_party/

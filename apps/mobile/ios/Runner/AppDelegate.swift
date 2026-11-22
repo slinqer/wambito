@@ -14,6 +14,7 @@ import WambitoNative
   private var passkeyChannel: PasskeyChannel?
   private var scannerChannel: ScannerChannel?
   private var noticesChannel: NoticesChannel?
+  private var voiceChannel: VoiceChannel?
   private var backgroundChannel: BackgroundChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
@@ -57,6 +58,7 @@ import WambitoNative
     passkeyChannel = PasskeyChannel(messenger: messenger)
     scannerChannel = ScannerChannel(messenger: messenger)
     noticesChannel = NoticesChannel(messenger: messenger)
+    voiceChannel = VoiceChannel(messenger: messenger)
     backgroundChannel = BackgroundChannel(messenger: messenger)
     BackgroundChannel.app = backgroundChannel
     if let url = tappedBeforeChannel, let launchChannel {

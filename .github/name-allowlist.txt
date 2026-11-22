@@ -22,6 +22,7 @@ apps/mobile/test/capture/capture_layout_test.dart  # money
 apps/mobile/test/capture/capture_preview_test.dart  # money
 apps/mobile/test/capture/capture_sheet_test.dart  # money
 apps/mobile/test/capture/grammar_test.dart  # money
+apps/mobile/test/capture/precise_engine_test.dart  # money
 apps/mobile/test/capture/parser_helpers_test.dart  # money
 apps/mobile/lib/money/format.dart                           # money
 apps/mobile/test/money/format_test.dart                     # money
@@ -40,6 +41,7 @@ apps/mobile/test/settings/assistants_section_test.dart      # money
 apps/mobile/test/settings/time_money_test.dart              # money
 apps/mobile/test/tooling/android_strings_test.dart          # money
 apps/mobile/test/ui/amount_field_test.dart                  # money
+apps/mobile/ios/WambitoNative/Tests/WambitoNativeTests/LiveDecodeTests.swift  # money
 apps/mobile/fastlane/metadata/android/es-ES/changelogs/*    # money
 apps/mobile/fastlane/metadata/android/es-ES/full_description.txt  # money
 apps/mobile/fastlane/metadata/android/es-419/changelogs/*    # money

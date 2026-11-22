@@ -71,7 +71,7 @@ expect fail "kotlin lacks a channel (names android)" "channel wambito/beta"
 
 reset
 rm "$work/m/ios/Runner/A.swift"
-printf '%s\n' 'wambito/alpha  # ios-impossible' 'wambito/beta  # ios-part-two' >"$work/allow.txt"
+printf '%s\n' 'wambito/alpha  # ios-impossible' 'wambito/beta  # android-only' >"$work/allow.txt"
 expect pass "allowlisted channels are skipped" ""
 
 reset

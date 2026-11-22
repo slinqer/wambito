@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models_download.dart';
+import 'precise_engine.dart';
 import 'voice_channel.dart';
 import 'vosk_engine.dart';
 
@@ -59,11 +61,17 @@ class SpeechFailure implements Exception {
   String toString() => 'SpeechFailure(${kind.name}${detail == null ? '' : ', $detail'})';
 }
 
-/// The phone's speech engine.
+/// The phone's speech engine: the precise model alone on iOS (precise_engine.dart), Vosk with the
+/// optional precise pass on Android.
 final speechEngineProvider = Provider<SpeechEngine>(
-  (ref) => VoskEngine(
-    channel: ref.watch(voiceChannelProvider),
-    models: ref.watch(modelStoreProvider),
-    precise: ref.watch(preciseModelStoreProvider),
-  ),
+  (ref) => defaultTargetPlatform == TargetPlatform.iOS
+      ? PreciseEngine(
+          channel: ref.watch(voiceChannelProvider),
+          models: ref.watch(modelStoreProvider),
+        )
+      : VoskEngine(
+          channel: ref.watch(voiceChannelProvider),
+          models: ref.watch(modelStoreProvider),
+          precise: ref.watch(preciseModelStoreProvider),
+        ),
 );

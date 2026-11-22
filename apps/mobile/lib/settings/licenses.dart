@@ -104,42 +104,47 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
   AndroidLibrary? find(String id) => libraries.where((l) => l.id == id).firstOrNull;
   String name(AndroidLibrary library) => '${library.id} ${library.version}';
 
-  for (final (model, language) in [
-    ('vosk-model-small-es-0.42', l10n.settingsLanguageEs),
-    ('vosk-model-small-en-us-0.15', l10n.settingsLanguageEn),
-    ('vosk-model-small-it-0.22', l10n.settingsLanguageIt),
-    ('vosk-model-small-pt-0.3', l10n.settingsLanguagePt),
-  ]) {
-    yield LicenseEntryWithLineBreaks([model], '${l10n.licenseNoticeModel(language)}\n\n$apache');
-  }
+  // iOS has no Vosk, JNA or their libraries: only the precise model's runtime below.
+  if (defaultTargetPlatform != TargetPlatform.iOS) {
+    for (final (model, language) in [
+      ('vosk-model-small-es-0.42', l10n.settingsLanguageEs),
+      ('vosk-model-small-en-us-0.15', l10n.settingsLanguageEn),
+      ('vosk-model-small-it-0.22', l10n.settingsLanguageIt),
+      ('vosk-model-small-pt-0.3', l10n.settingsLanguagePt),
+    ]) {
+      yield LicenseEntryWithLineBreaks([model], '${l10n.licenseNoticeModel(language)}\n\n$apache');
+    }
 
-  final vosk = find(_vosk);
-  if (vosk != null) {
-    yield LicenseEntryWithLineBreaks([
-      'vosk-android ${vosk.version}',
-    ], '${l10n.licenseNoticeVosk}\n\n$apache');
-    yield LicenseEntryWithLineBreaks([
-      'OpenBLAS 0.3.20',
-    ], '${l10n.licenseNoticeOpenBlas}\n\n${await load(_openBlas)}');
-    yield LicenseEntryWithLineBreaks([
-      'CLAPACK 3.2.1',
-    ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
-  }
-  // CameraX's core (the QR scanner's camera) ships libimage_processing_util_jni.so, which converts and
-  // rotates camera frames with libyuv, statically linked (no libyuv import, only the JNI entry points
-  // and the CPU-feature probe; androidx camera-core 1.6.2's AAR): its BSD-3-Clause text and notice.
-  final camera = find(_camera);
-  if (camera != null) {
-    yield LicenseEntryWithLineBreaks([
-      'libyuv',
-    ], '${l10n.licenseNoticeLibyuv(camera.version)}\n\n${await load(_libyuv)}');
-  }
-  final jna = find(_jna);
-  if (jna != null) {
-    yield LicenseEntryWithLineBreaks(['JNA ${jna.version}'], '${l10n.licenseNoticeJna}\n\n$apache');
-    yield LicenseEntryWithLineBreaks([
-      'libffi 3.4.4',
-    ], '${l10n.licenseNoticeLibffi}\n\n${await load(_libffi)}');
+    final vosk = find(_vosk);
+    if (vosk != null) {
+      yield LicenseEntryWithLineBreaks([
+        'vosk-android ${vosk.version}',
+      ], '${l10n.licenseNoticeVosk}\n\n$apache');
+      yield LicenseEntryWithLineBreaks([
+        'OpenBLAS 0.3.20',
+      ], '${l10n.licenseNoticeOpenBlas}\n\n${await load(_openBlas)}');
+      yield LicenseEntryWithLineBreaks([
+        'CLAPACK 3.2.1',
+      ], '${l10n.licenseNoticeClapack}\n\n${await load(_clapack)}\n\n${await load(_libf2c)}');
+    }
+    // CameraX's core (the QR scanner's camera) ships libimage_processing_util_jni.so, which converts and
+    // rotates camera frames with libyuv, statically linked (no libyuv import, only the JNI entry points
+    // and the CPU-feature probe; androidx camera-core 1.6.2's AAR): its BSD-3-Clause text and notice.
+    final camera = find(_camera);
+    if (camera != null) {
+      yield LicenseEntryWithLineBreaks([
+        'libyuv',
+      ], '${l10n.licenseNoticeLibyuv(camera.version)}\n\n${await load(_libyuv)}');
+    }
+    final jna = find(_jna);
+    if (jna != null) {
+      yield LicenseEntryWithLineBreaks([
+        'JNA ${jna.version}',
+      ], '${l10n.licenseNoticeJna}\n\n$apache');
+      yield LicenseEntryWithLineBreaks([
+        'libffi 3.4.4',
+      ], '${l10n.licenseNoticeLibffi}\n\n${await load(_libffi)}');
+    }
   }
   // The precise voice model's runtime is in the build (not in the F-Droid one): sherpa-onnx, the
   // Canary and Parakeet models it runs, and the libraries inside the AAR's two native libraries.
@@ -199,7 +204,9 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};
   final groups = <String, List<AndroidLibrary>>{};
-  for (final library in libraries.where((l) => !handled.contains(l.id))) {
+  // iOS ships none of the Android libraries.
+  final android = defaultTargetPlatform != TargetPlatform.iOS;
+  for (final library in libraries.where((l) => android && !handled.contains(l.id))) {
     (groups[_textAssetFor(library)] ??= []).add(library);
   }
   for (final MapEntry(key: asset, value: group) in groups.entries) {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/capture/models_download.dart';
@@ -49,6 +50,13 @@ void main() {
     canary.installed = false;
     eligible = false;
     expect(await offer().shouldOffer(), isFalse);
+  });
+
+  test('on iOS there is no Vosk to improve: no offer, and nothing joins a Vosk download', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(await offer().shouldOffer(), isFalse);
+    expect(await offer().wantsWithVosk(), isFalse);
   });
 
   test('a flag store that throws means no offer, not a crash', () async {

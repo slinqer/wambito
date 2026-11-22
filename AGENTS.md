@@ -62,7 +62,8 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   removal, a new recovery key; `phone_first_e2e_test.dart`, the first run without email, a merge, a
   recovery-key sign-in, a web QR approved) against the real API, and `psql` finds no plain text in
   `records` and no merged guest's user row.
-- `ios` (same filter; macOS runner): pub get, the signing guard and its test
+- `ios` (same filter; macOS runner): pub get, `fetch-sherpa-onnx-ios.sh` (tested by
+  `test-fetch-sherpa-onnx-ios.sh`; needs the release `ios-sherpa-onnx-2.0.1`), the signing guard and its test
   (`apps/mobile/scripts/check-ios-signing.sh`), `swift test` on `ios/WambitoNative`,
   `flutter build ios --release --no-codesign`.
 - `iOS release` (`ios-release.yml`, on a `mobile-v*` tag, environment `app-store`): archive, export
@@ -77,7 +78,7 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   folder glob.
 - Channel guard (`ci.yml` `check`): `scripts/check-channels.sh` fails when a `wambito/*` channel or a
   method Dart calls is missing from `apps/mobile` Kotlin or Swift, unless `.github/channel-allowlist.txt`
-  has `<channel>  # <reason>` (`ios-impossible`, `ios-part-two`, `android-only`); tested by
+  has `<channel>  # <reason>` (`ios-impossible`, `android-only`); tested by
   `scripts/test-check-channels.sh`. Fix the missing native side, never widen the allowlist.
 - Dockerfile guard (`ci.yml` `check`): `scripts/check-dockerfile-workspaces.sh` fails when a
   `workspace:` dependency (transitive) of `apps/api` or `apps/mcp` is not copied in its

@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/capture/engine/voice_channel.dart';
@@ -585,6 +586,29 @@ void main() {
         expect(await container.read(preciseEligibleProvider('es').future), isTrue);
         expect(platform.asked, 2);
       });
+    });
+  });
+
+  group('on iOS', () {
+    setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.iOS);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('the model store is the precise one: Canary for es, Parakeet for it', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final store = container.read(modelStoreProvider);
+      expect(identical(store, container.read(preciseModelStoreProvider)), isTrue);
+      expect(store.modelFor('es'), preciseModels['es']);
+      expect(store.modelFor('it'), preciseModels['it']);
+      expect(store.modelFor('es')!.name, contains('canary'));
+      expect(store.modelFor('it')!.name, contains('parakeet'));
+    });
+
+    test('on Android it is still Vosk\'s', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      expect(container.read(modelStoreProvider).modelFor('es'), voiceModels['es']);
     });
   });
 }

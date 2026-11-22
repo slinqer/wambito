@@ -134,6 +134,18 @@ abstract interface class VoicePlatform implements ModelFiles {
     String? language,
   });
 
+  /// iOS: loads the precise model at [precisePath] for [language] in the background; true once it
+  /// is. Never opens the microphone.
+  Future<bool> warmUpPrecise({required String precisePath, required String language});
+
+  /// iOS: whether the precise model is loaded and the microphone is allowed.
+  Future<bool> isWarmPrecise({required String precisePath, required String language});
+
+  /// iOS: records into the precise model alone, with live partials while recording and the
+  /// rewritten sentence after [stop] ([VoiceRefining], [VoiceRefined] or [VoiceRefineFailed],
+  /// then [VoiceDone]). Never sends [VoiceResult]; a failure is a [VoiceError] with no [VoiceDone].
+  Stream<VoiceEvent> startPrecise({required String precisePath, required String language});
+
   /// Stops recording: the final results follow, then [VoiceDone].
   Future<void> stop();
 }
@@ -187,6 +199,32 @@ class VoiceChannel implements VoicePlatform {
         _args(modelPath, precisePath: precisePath, language: language),
       ) ??
       false;
+
+  @override
+  Future<bool> warmUpPrecise({required String precisePath, required String language}) async =>
+      await _methods.invokeMethod<bool>('warmUp', {
+        'precisePath': precisePath,
+        'language': language,
+      }) ??
+      false;
+
+  @override
+  Future<bool> isWarmPrecise({required String precisePath, required String language}) async =>
+      await _methods.invokeMethod<bool>('isWarm', {
+        'precisePath': precisePath,
+        'language': language,
+      }) ??
+      false;
+
+  @override
+  Stream<VoiceEvent> startPrecise({required String precisePath, required String language}) async* {
+    await _dropStaleEvents();
+    yield* _events
+        .receiveBroadcastStream({'precisePath': precisePath, 'language': language})
+        .map(VoiceEvent.fromMap)
+        .where((e) => e != null)
+        .cast<VoiceEvent>();
+  }
 
   /// The channel's arguments; the precise ones only when there is a precise model.
   static Map<String, Object> _args(
