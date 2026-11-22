@@ -223,7 +223,11 @@ const ROADMAP = {
     columns: [
       {
         label: "En construcción",
-        items: ["Captura automática de las notificaciones de tu banco", "En F-Droid y Google Play"],
+        items: [
+          "Captura automática de las notificaciones de tu banco",
+          "iPhone: anota tus pagos con Apple Pay",
+          "En F-Droid y Google Play",
+        ],
       },
       {
         label: "Próximo",
@@ -273,7 +277,11 @@ const ROADMAP = {
     columns: [
       {
         label: "Being built",
-        items: ["Automatic capture of your bank's notifications", "On F-Droid and Google Play"],
+        items: [
+          "Automatic capture of your bank's notifications",
+          "iPhone: log your Apple Pay payments",
+          "On F-Droid and Google Play",
+        ],
       },
       {
         label: "Next",
@@ -323,7 +331,11 @@ const ROADMAP = {
     columns: [
       {
         label: "In costruzione",
-        items: ["Cattura automatica delle notifiche della tua banca", "Su F-Droid e Google Play"],
+        items: [
+          "Cattura automatica delle notifiche della tua banca",
+          "iPhone: annota i tuoi pagamenti con Apple Pay",
+          "Su F-Droid e Google Play",
+        ],
       },
       {
         label: "Prossimo",
@@ -373,7 +385,11 @@ const ROADMAP = {
     columns: [
       {
         label: "Em construção",
-        items: ["Captura automática das notificações do teu banco", "No F-Droid e no Google Play"],
+        items: [
+          "Captura automática das notificações do teu banco",
+          "iPhone: regista os teus pagamentos com Apple Pay",
+          "No F-Droid e no Google Play",
+        ],
       },
       {
         label: "A seguir",
