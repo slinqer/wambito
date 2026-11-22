@@ -97,6 +97,11 @@ flutter:
     - assets/wambi/capture-step3.webp
     - assets/wambi/capture-step4.webp
     - assets/wambi/capture-step5.webp
+    # The "Conectar <app>" sheet's handshake scenes (apps/web/public/wambi/handshake-*.webp).
+    - assets/wambi/handshake-claude.webp
+    - assets/wambi/handshake-chatgpt.webp
+    - assets/wambi/handshake-lumo.webp
+    - assets/wambi/handshake-grok.webp
     # The web's feedback sounds (apps/web/app/feedback/sounds), original work; see assets/sounds/README.md.
     # SoundChannel.kt plays them with Android's SoundPool.
     - assets/sounds/expense-saved.mp3
