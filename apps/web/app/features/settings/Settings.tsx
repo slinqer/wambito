@@ -50,7 +50,7 @@ export function useSettingsSecurity(securityProp?: SecurityApi): SecurityApi | n
   return local ? (securityProp ?? vaultSecurity) : null;
 }
 
-/** The cards of one category (what its page holds; later tasks redraw them one by one). */
+/** The body of one category's page: the screen that category owns (agents, account, preferences, data, more). */
 export function SettingsCategoryBody({
   category,
   passkeys = livePasskeys,
@@ -60,15 +60,9 @@ export function SettingsCategoryBody({
   security: securityProp,
   agentsOrigin,
 }: SettingsProps & { category: SettingsCategory }) {
-  const t = useTranslations("settings");
   const me = useMe().data;
   if (!me) throw new Error("Settings renders inside AppShell, which waits for the profile");
   const exporter = useExport(save);
-  const appPath = useAppPath();
-  const mode = useApiMode();
-  // A preview account's vault: no export or import yet (passkeys, the assistants and deleting
-  // the account work: they are the account's, not its finances).
-  const local = mode === "local";
   const security = useSettingsSecurity(securityProp);
 
   switch (category) {
