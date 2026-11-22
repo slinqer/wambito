@@ -654,6 +654,32 @@
   "settings": {
     "meta_title": "Settings · Wambito",
     "title": "Settings",
+    "menu": {
+      "agents": {
+        "title": "My agents",
+        "line": "ChatGPT · Claude · Lumo+ · Grok"
+      },
+      "account": {
+        "title": "Account and security",
+        "line": "Passkeys, devices, key"
+      },
+      "preferences": {
+        "title": "Preferences",
+        "line": "{language} · {theme} · {currency}"
+      },
+      "data": {
+        "title": "Your data",
+        "line": "Import, export"
+      },
+      "more": {
+        "title": "More",
+        "line": "Feedback"
+      },
+      "back": "Back to Settings",
+      "back_short": "Settings",
+      "not_found_title": "We couldn't find that section",
+      "not_found_lead": "Settings has no such page. Go back to the menu to pick one."
+    },
     "signed_in_as": "Signed in as {email}",
     "preferences": "Preferences",
     "theme_hint": "Automatic follows your phone's setting.",

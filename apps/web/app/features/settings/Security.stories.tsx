@@ -208,7 +208,7 @@ const stage = (
     <HomeStage
       onRequest={() => {}}
       mode={extra.mode ?? "local"}
-      path="/app/settings"
+      path="/app/settings/all"
       passkeys={extra.passkeys ?? storyPasskeys({ initial: PASSKEYS })}
       security={fake.security}
       {...(extra.anonymous ? { guest: true } : {})}

@@ -13,26 +13,32 @@ import {
   todayIn,
 } from "@wambito/core";
 import { type ReactNode, useState } from "react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
+import { useTranslations } from "use-intl";
 import { OCTOBER_2026 } from "../../../../../packages/core/test/fixtures/october-2026.ts";
 import { exposeStoryFetch } from "../../../.storybook/parity.ts";
-import { ApiProvider } from "../../api/ApiProvider.tsx";
+import { ApiProvider, useApiMode } from "../../api/ApiProvider.tsx";
+import { useMe } from "../../api/queries.ts";
 import type { ApiMode } from "../../api/scope.ts";
 import type { PasskeyOutcome } from "../../auth/passkey.ts";
 import { AppMessages } from "../../i18n/AppMessages.tsx";
 import type { Locale } from "../../i18n/format.ts";
 import { IntlProvider, useLocale } from "../../i18n/IntlProvider.tsx";
+import { PageHeader } from "../../ui/PageHeader.tsx";
 import { ToastProvider } from "../../ui/Toast.tsx";
 import type { Assistant } from "../assistants/queries.ts";
 import { CategoriesRedirect } from "../categories/CategoriesRedirect.tsx";
-import { CategoryDetail } from "../categories/CategoryDetail.tsx";
+import { CategoryDetail, ManageFrame } from "../categories/CategoryDetail.tsx";
 import { Insights } from "../insights/Insights.tsx";
 import { RecurringPage } from "../recurring/RecurringPage.tsx";
 import { Search } from "../search/Search.tsx";
 import type { PasskeyItem, PasskeysApi } from "../settings/passkeys.ts";
-import { Settings } from "../settings/Settings.tsx";
+import { SettingsCategoryBody, SettingsCategoryScreen } from "../settings/Settings.tsx";
+import { SettingsMenu } from "../settings/SettingsMenu.tsx";
 import type { SecurityApi } from "../settings/security.ts";
+import { settingsCategories } from "../settings/settings-categories.ts";
 import { AppShell } from "./AppShell.tsx";
+import { useAppPath } from "./app-path.ts";
 import { Home } from "./Home.tsx";
 import { clearHomeStorage } from "./home-storage.ts";
 import type { SignOutRequest } from "./use-sign-out.ts";
@@ -881,6 +887,39 @@ export function storyPasskeys({
   };
 }
 
+type StorySettingsProps = Omit<Parameters<typeof SettingsCategoryScreen>[0], "category">;
+
+function SettingsCategoryRoute(props: StorySettingsProps) {
+  const { category = "" } = useParams();
+  return <SettingsCategoryScreen category={category} {...props} />;
+}
+
+/** Stories only: the five categories' cards one after another under one "Ajustes" heading. */
+export function SettingsAll(props: StorySettingsProps) {
+  const t = useTranslations("settings");
+  const tManage = useTranslations("manage");
+  const appPath = useAppPath();
+  const me = useMe().data;
+  return (
+    <ManageFrame>
+      <PageHeader back={{ to: appPath(), label: tManage("back"), short: tManage("back_short") }} />
+      <main className="flex flex-col gap-(--space-4) pb-(--space-4)">
+        <div className="flex flex-col gap-(--space-1)">
+          <h1 className="m-0 font-display text-[28px] font-bold text-ink">{t("title")}</h1>
+          <p className="m-0 break-all text-[14px] text-ink-muted">
+            {useApiMode() === "demo"
+              ? t("demo_viewing")
+              : t("signed_in_as", { email: me?.email ?? "" })}
+          </p>
+        </div>
+        {settingsCategories().map((category) => (
+          <SettingsCategoryBody key={category} category={category} {...props} />
+        ))}
+      </main>
+    </ManageFrame>
+  );
+}
+
 export interface HomeStageProps extends HomeApiOptions {
   /** Stands in for Better Auth's sign-out; by default it succeeds. */
   signOut?: SignOutRequest;
@@ -928,6 +967,13 @@ export function HomeStage({
   });
   const [reloads, setReloads] = useState(0);
   const shell = (screen: ReactNode) => <AppShell>{screen}</AppShell>;
+  const settingsProps = {
+    passkeys,
+    signOut,
+    save: (blob: Blob, filename: string) => onSave(filename, blob),
+    copy: onCopy,
+    ...(security ? { security } : {}),
+  };
   return (
     <IntlProvider locale={locale} onLocaleChange={setLocale}>
       <AppMessages>
@@ -951,15 +997,21 @@ export function HomeStage({
                 <Route
                   path="/app/settings"
                   element={shell(
-                    <Settings
+                    <SettingsMenu
                       passkeys={passkeys}
-                      signOut={signOut}
-                      save={(blob, filename) => onSave(filename, blob)}
-                      copy={onCopy}
                       {...(security ? { security } : {})}
                       {...(onAddEmail ? { onAddEmail } : {})}
                     />,
                   )}
+                />
+                {/* Stories only: every category's cards on one page, as Settings was before the menu. */}
+                <Route
+                  path="/app/settings/all"
+                  element={shell(<SettingsAll {...settingsProps} />)}
+                />
+                <Route
+                  path="/app/settings/:category"
+                  element={shell(<SettingsCategoryRoute {...settingsProps} />)}
                 />
                 <Route
                   path="/sign-in"

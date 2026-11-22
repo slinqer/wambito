@@ -215,12 +215,27 @@ test("es: every demo screen keeps its links in /demo, and settings turns off wha
   await expect(page).toHaveTitle("Demo · Ajustes · Wambito");
   await expect(page.getByText(l.viewing)).toBeVisible();
   await expect(page.getByText(/Entraste como/)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: l.exportJson })).toBeDisabled();
-  await expect(page.getByRole("button", { name: l.deleteAccount })).toBeDisabled();
-  await expect(page.getByRole("link", { name: l.importAction })).toHaveCount(0);
-  await expect(page.getByText(l.off)).toHaveCount(3);
   await expectLinksStayInDemo(page);
   await expectNoAxeViolations(page);
+  // The demo's menu is the app's, under /demo: each category has its own page there.
+  const menu = page.getByRole("navigation", { name: l.settings }).getByRole("link");
+  await expect(menu).toHaveCount(5);
+  await menu.nth(3).click();
+  await expect(page).toHaveURL(/\/demo\/settings\/data$/);
+  await expect(page.getByRole("button", { name: l.exportJson })).toBeDisabled();
+  await expect(page.getByRole("link", { name: l.importAction })).toHaveCount(0);
+  await expect(page.getByText(l.off)).toHaveCount(1);
+  await expectLinksStayInDemo(page);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/demo\/settings$/);
+  await menu.nth(1).click();
+  await expect(page).toHaveURL(/\/demo\/settings\/account$/);
+  await expect(page.getByRole("button", { name: l.deleteAccount })).toBeDisabled();
+  await expect(page.getByText(l.off)).toHaveCount(2);
+  await expectLinksStayInDemo(page);
+  await expectNoAxeViolations(page);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/demo\/settings$/);
 
   // Back home from settings.
   await page.getByRole("navigation").getByRole("link", { name: l.home }).click();

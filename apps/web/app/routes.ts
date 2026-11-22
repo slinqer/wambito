@@ -64,7 +64,11 @@ export default [
             route("recurring", "routes/app.recurring.tsx"),
             route("insights", "routes/app.insights.tsx"),
             route("search", "routes/app.search.tsx"),
-            route("settings", "routes/app.settings.tsx"),
+            // The menu of categories, and one page per category.
+            route("settings", "routes/app.settings.tsx", [
+              index("routes/app.settings._index.tsx"),
+              route(":category", "routes/app.settings.$category.tsx"),
+            ]),
           ]),
         ]),
         // The admin panel (admin panel spec §3): its own layout, with the app's API client and its
@@ -85,7 +89,12 @@ export default [
           route("recurring", "routes/app.recurring.tsx", { id: "demo-recurring" }),
           route("insights", "routes/app.insights.tsx", { id: "demo-insights" }),
           route("search", "routes/app.search.tsx", { id: "demo-search" }),
-          route("settings", "routes/app.settings.tsx", { id: "demo-settings" }),
+          route("settings", "routes/app.settings.tsx", { id: "demo-settings" }, [
+            index("routes/app.settings._index.tsx", { id: "demo-settings-index" }),
+            route(":category", "routes/app.settings.$category.tsx", {
+              id: "demo-settings-category",
+            }),
+          ]),
         ]),
       ]),
 ] satisfies RouteConfig;

@@ -130,7 +130,7 @@ const nudgeSync = (page: Page) =>
 
 /** Settings → Security of an open vault. */
 async function openSecurity(page: Page) {
-  await page.goto("/app/settings");
+  await page.goto("/app/settings/account");
   await expect(page.getByRole("heading", { name: "Seguridad" })).toBeVisible();
 }
 

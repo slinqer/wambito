@@ -654,6 +654,32 @@
   "settings": {
     "meta_title": "Ajustes · Wambito",
     "title": "Ajustes",
+    "menu": {
+      "agents": {
+        "title": "Mis agentes",
+        "line": "ChatGPT · Claude · Lumo+ · Grok"
+      },
+      "account": {
+        "title": "Cuenta y seguridad",
+        "line": "Passkeys, dispositivos, clave"
+      },
+      "preferences": {
+        "title": "Preferencias",
+        "line": "{language} · {theme} · {currency}"
+      },
+      "data": {
+        "title": "Tus datos",
+        "line": "Importar, exportar"
+      },
+      "more": {
+        "title": "Más",
+        "line": "Comentarios"
+      },
+      "back": "Volver a Ajustes",
+      "back_short": "Ajustes",
+      "not_found_title": "No encontramos esa sección",
+      "not_found_lead": "Ajustes no tiene esa página. Vuelve al menú para elegir una."
+    },
     "signed_in_as": "Entraste como {email}",
     "preferences": "Preferencias",
     "theme_hint": "Automático sigue el modo de tu teléfono.",

@@ -73,7 +73,7 @@ const stage = (args: Spies, extra: Partial<Parameters<typeof HomeStage>[0]> = {}
     onSave={args.onSave}
     signOut={args.signOut}
     onCopy={args.onCopy}
-    path="/app/settings"
+    path="/app/settings/all"
     {...extra}
   />
 );

@@ -454,6 +454,14 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `AccountScreen` + `ActionSheet` (`/admin/users/:id`: the account and its actions; a sheet's
   fields live in the component, so a reason survives re-verification). Stories `Admin/*`,
   web-only, not in parity.json.
+- Settings (`/app/settings`, `/demo/settings`; spec 2026-11-22 settings categories): the layout
+  `routes/app.settings.tsx` (an `Outlet`) holds the menu (`_index`: `features/settings/SettingsMenu.tsx`,
+  the protect / add-email block above one `lk-rowcard` row per category, the preferences line live
+  from the language, theme and currency) and one page per category (`$category`:
+  `SettingsCategoryScreen` in `Settings.tsx`, categories from `settings-categories.ts`; an unknown
+  one shows `settings.menu.not_found_*`). Copy under `settings.menu.*`. Stories: `Settings/Menu`;
+  the older `Settings/*` stories open `HomeStage` at `/app/settings/all` (story-only route that
+  stacks every category's cards) until their categories are redrawn.
 - `/automatic-capture` (+ `/en|it|pt/automatic-capture`; `routes.ts`, prerendered like the privacy
   pages; paths in `app/site/paths.ts`: `AUTOMATIC_CAPTURE_PATH`, SitePage `automaticCapture`): how
   automatic capture works. `app/features/capture/`: `CaptureSteps.tsx` (`CAPTURE_STEPS`,

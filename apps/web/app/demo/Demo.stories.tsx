@@ -7,9 +7,10 @@ import { ApiProvider } from "../api/ApiProvider.tsx";
 import { CategoryDetail } from "../features/categories/CategoryDetail.tsx";
 import { AppShell } from "../features/home/AppShell.tsx";
 import { Home } from "../features/home/Home.tsx";
+import { SettingsAll } from "../features/home/story-harness.tsx";
 import { Insights } from "../features/insights/Insights.tsx";
 import { RecurringPage } from "../features/recurring/RecurringPage.tsx";
-import { Settings } from "../features/settings/Settings.tsx";
+import { SettingsMenu } from "../features/settings/SettingsMenu.tsx";
 import { AppMessages } from "../i18n/AppMessages.tsx";
 import { type Locale } from "../i18n/format.ts";
 import { IntlProvider, useLocale } from "../i18n/IntlProvider.tsx";
@@ -61,7 +62,8 @@ function DemoStage({ path }: { path: string }) {
                   <Route path="categories/:id" element={<CategoryDetail />} />
                   <Route path="recurring" element={<RecurringPage />} />
                   <Route path="insights" element={<Insights />} />
-                  <Route path="settings" element={<Settings />} />
+                  <Route path="settings" element={<SettingsMenu />} />
+                  <Route path="settings/all" element={<SettingsAll />} />
                 </Route>
               </Routes>
             </ToastProvider>
@@ -141,7 +143,7 @@ export const InsightsInPesos: Story = {
  * are off, each with the note; language, theme, sound and time zone still work.
  */
 export const SettingsOffByDay: Story = {
-  args: { path: "/demo/settings" },
+  args: { path: "/demo/settings/all" },
   globals: { theme: "day", locale: "en" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

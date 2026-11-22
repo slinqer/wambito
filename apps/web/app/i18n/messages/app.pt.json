@@ -654,6 +654,32 @@
   "settings": {
     "meta_title": "Definições · Wambito",
     "title": "Definições",
+    "menu": {
+      "agents": {
+        "title": "Os meus agentes",
+        "line": "ChatGPT · Claude · Lumo+ · Grok"
+      },
+      "account": {
+        "title": "Conta e segurança",
+        "line": "Passkeys, dispositivos, chave"
+      },
+      "preferences": {
+        "title": "Preferências",
+        "line": "{language} · {theme} · {currency}"
+      },
+      "data": {
+        "title": "Os teus dados",
+        "line": "Importar, exportar"
+      },
+      "more": {
+        "title": "Mais",
+        "line": "Comentários"
+      },
+      "back": "Voltar a Definições",
+      "back_short": "Definições",
+      "not_found_title": "Não encontrámos essa secção",
+      "not_found_lead": "As Definições não têm essa página. Volta ao menu para escolher uma."
+    },
     "signed_in_as": "Entraste como {email}",
     "preferences": "Preferências",
     "theme_hint": "Automático segue o modo do teu telemóvel.",
