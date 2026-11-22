@@ -619,16 +619,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				INFOPLIST_FILE = Runner/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
@@ -647,6 +637,16 @@
 					"-framework",
 					onnxruntime,
 				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				INFOPLIST_FILE = Runner/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wambito.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -658,7 +658,6 @@
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
@@ -667,6 +666,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
 				);
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -683,23 +683,15 @@
 		331C8089294A63A400263BE5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+				);
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
-				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -714,6 +706,14 @@
 		331C808A294A63A400263BE5 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+				);
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -843,6 +843,24 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+					"-framework",
+					SherpaOnnxC,
+					"-framework",
+					onnxruntime,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -852,42 +870,6 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lc++",
-					"-framework",
-					SherpaOnnxC,
-					"-framework",
-					onnxruntime,
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
-				);
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
-					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lc++",
-					"-framework",
-					SherpaOnnxC,
-					"-framework",
-					onnxruntime,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wambito.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -902,6 +884,24 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64",
+				);
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator",
+					"$(PROJECT_DIR)/third_party/sherpa-onnx/onnxruntime.xcframework/ios-arm64_x86_64-simulator",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+					"-framework",
+					SherpaOnnxC,
+					"-framework",
+					onnxruntime,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
