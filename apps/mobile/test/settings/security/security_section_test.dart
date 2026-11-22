@@ -180,6 +180,31 @@ void main() {
     expect(lock.asked, 1);
   });
 
+  testWidgets('the new key sheet says the old key stops working, before anything else', (t) async {
+    final handle = t.ensureSemantics();
+    await pumpSection(t, FakeSecurity(), FakeLock(LockCheck.passed));
+    await tapKey(t, 'security.newKey');
+    expect(
+      find.bySemanticsLabel(
+        'Make a new one if you lost it or someone else may have seen it. The old one stops working.',
+      ),
+      findsOneWidget,
+    );
+    handle.dispose();
+  });
+
+  testWidgets('cancelling the new key sheet asks for no screen lock and makes no key', (t) async {
+    final security = FakeSecurity();
+    final lock = FakeLock(LockCheck.passed);
+    await pumpSection(t, security, lock);
+    await tapKey(t, 'security.newKey');
+    await t.tap(find.text('CANCEL'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('security.newKey.continue')), findsNothing);
+    expect(lock.reasons, isEmpty);
+    expect(security.calls, isEmpty);
+  });
+
   testWidgets('"Connect another device" opens its screen, which closes back', (t) async {
     final security = FakeSecurity();
     await pumpSection(t, security, FakeLock(LockCheck.passed));

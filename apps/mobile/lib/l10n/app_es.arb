@@ -2398,7 +2398,7 @@
     "description": "Connect another device: the typed code matches no web sign-in and no device to approve."
   },
   "settingsSecurityRecoveryTitle": "Clave de recuperación",
-  "settingsSecurityRecoveryLead": "Crea una nueva si la perdiste o si alguien más pudo verla.",
+  "settingsSecurityRecoveryLead": "Crea una nueva si la perdiste o si alguien más pudo verla. La anterior deja de funcionar.",
   "settingsSecurityUnreadable": "{count, plural, =1{No pudimos leer {count} elemento} other{No pudimos leer {count} elementos}}",
   "@settingsSecurityUnreadable": {
     "description": "Settings → Security: how many records could not be read.",

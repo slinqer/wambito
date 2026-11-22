@@ -7,12 +7,19 @@ import 'package:wambito/settings/settings_categories.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/api/auth_api.dart' show PasskeyItem;
 import 'package:wambito/l10n/app_localizations.dart';
+import 'package:wambito/security/screen_lock.dart';
+import 'package:wambito/settings/security/security_api.dart';
+import 'package:wambito/settings/settings_parts.dart' show SettingsRow;
 import 'package:wambito/ui/toast.dart';
+import 'package:wambito/vault/preview.dart' show isPreviewProvider;
 
 import '../add/fakes.dart';
+import '../entry/fakes.dart';
 import '../home/home_harness.dart';
 import '../settings/harness.dart';
+import '../settings/security/fake_security.dart';
 
 /// Words a person typed (the fakes' category names), which are cut off in every language.
 const _data = {'Supermercado', 'Hogar', 'Arriendo'};
@@ -210,6 +217,66 @@ void main() {
           expect(tester.takeException(), isNull);
         });
       }
+
+      testWidgets('an encrypted account\'s account page has no overflow and rows of one line', (
+        tester,
+      ) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final auth = FakeAuthApi()
+          ..passkeyItems.add(
+            PasskeyItem(
+              id: 'pk-1',
+              credentialId: 'cred-2',
+              name: 'Pixel 8',
+              createdAt: DateTime.utc(2026, 11, 3),
+              synced: true,
+            ),
+          );
+        await pumpSettingsApp(
+          tester,
+          locale: locale,
+          location: '/settings/account',
+          auth: auth,
+          passkeysSupported: true,
+          overrides: [
+            isPreviewProvider.overrideWithValue(true),
+            // the passkey has no wrap, so its "Turn on" row shows too
+            securityApiProvider.overrideWithValue(FakeSecurity(snapshotOf(unreadable: 3))),
+            screenLockProvider.overrideWithValue(FakeLock(LockCheck.passed)),
+          ],
+        );
+        tester.view
+          ..physicalSize = const Size(360, 640)
+          ..devicePixelRatio = 1;
+        await tester.pumpAndSettle();
+        final walked = <String>{};
+        for (var i = 0; i < 40; i++) {
+          expect(tester.takeException(), isNull, reason: 'overflow on screen $i');
+          for (final element in find.byType(SettingsRow).evaluate()) {
+            final key = element.widget.key;
+            walked.add('$key');
+            final box = element.renderObject! as RenderBox;
+            expect(box.size.height, lessThanOrEqualTo(76), reason: '$key');
+          }
+          final scrollable = find.byType(Scrollable).first;
+          final before = tester.state<ScrollableState>(scrollable).position.pixels;
+          await tester.drag(scrollable, const Offset(0, -300));
+          await tester.pumpAndSettle();
+          final after = tester.state<ScrollableState>(scrollable).position.pixels;
+          if (after == before) break;
+        }
+        for (final name in [
+          'security.connect',
+          'security.newKey',
+          'security.changeKeys',
+          'settings.passkeys.turnOn.pk-1',
+          'settings.delete',
+        ]) {
+          expect(walked.any((k) => k.contains(name)), isTrue, reason: '$name was walked');
+        }
+        expect(tester.takeException(), isNull);
+      });
 
       testWidgets('the capture sheet keeps its words whole', (tester) async {
         await _pump(tester, locale);

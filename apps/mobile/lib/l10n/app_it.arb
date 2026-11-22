@@ -563,7 +563,7 @@
   "connectDeviceCodeLabel": "Codice dell'altro dispositivo",
   "connectDeviceBadCode": "Quel codice non corrisponde a nessuna richiesta. Controllalo, o ricomincia sull'altro dispositivo.",
   "settingsSecurityRecoveryTitle": "Chiave di recupero",
-  "settingsSecurityRecoveryLead": "Creane una nuova se l'hai persa o se qualcun altro potrebbe averla vista.",
+  "settingsSecurityRecoveryLead": "Creane una nuova se l'hai persa o se qualcun altro potrebbe averla vista. Quella vecchia smette di funzionare.",
   "settingsSecurityUnreadable": "{count, plural, =1{Non è stato possibile leggere {count} elemento} other{Non è stato possibile leggere {count} elementi}}",
   "settingsSecurityUnreadableLead": "Sono stati salvati con una chiave che questo telefono non ha. Restano al sicuro così come sono.",
   "settingsSecurityMaybeSaved": "Potrebbe essere già stata salvata: conserva questa nuova chiave finché non dice che è pronta.",

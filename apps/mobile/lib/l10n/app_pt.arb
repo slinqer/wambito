@@ -563,7 +563,7 @@
   "connectDeviceCodeLabel": "Código do outro dispositivo",
   "connectDeviceBadCode": "Esse código não corresponde a nenhum pedido. Verifica-o, ou começa de novo no outro dispositivo.",
   "settingsSecurityRecoveryTitle": "Chave de recuperação",
-  "settingsSecurityRecoveryLead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto.",
+  "settingsSecurityRecoveryLead": "Cria uma nova se a perdeste ou se outra pessoa a pode ter visto. A anterior deixa de funcionar.",
   "settingsSecurityUnreadable": "{count, plural, =0{Não foi possível ler {count} elementos} =1{Não foi possível ler {count} elemento} other{Não foi possível ler {count} elementos}}",
   "settingsSecurityUnreadableLead": "Foram guardados com uma chave que este telemóvel não tem. Continuam seguros tal como estão.",
   "settingsSecurityMaybeSaved": "Pode ter ficado guardada: guarda esta chave nova até indicar que está concluído.",

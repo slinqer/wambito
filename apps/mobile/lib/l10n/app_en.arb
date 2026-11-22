@@ -1504,7 +1504,7 @@
   "connectDeviceCodeLabel": "Code from the other device",
   "connectDeviceBadCode": "That code does not match any request. Check it, or start again on the other device.",
   "settingsSecurityRecoveryTitle": "Recovery key",
-  "settingsSecurityRecoveryLead": "Make a new one if you lost it or someone else may have seen it.",
+  "settingsSecurityRecoveryLead": "Make a new one if you lost it or someone else may have seen it. The old one stops working.",
   "settingsSecurityUnreadable": "{count, plural, =1{Could not read {count} item} other{Could not read {count} items}}",
   "settingsSecurityUnreadableLead": "They were saved with a key this phone does not have. They are kept safe as they are.",
   "settingsSecurityMaybeSaved": "It may have been saved: keep this new key until it says it is done.",
