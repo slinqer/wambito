@@ -663,7 +663,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   /// The cards for an account that skipped the setup (the web's `Nudges`), budgets first: one for
   /// an account without a budget on any category, one for an account with no movements at all to
-  /// bring its history in. Each is gone once put away ("Ahora no", kept on this phone).
+  /// bring its history in. Each is gone once put away ("Ahora no", kept on this phone). Two are
+  /// side by side, one in view ([NudgeCarousel]), so they do not push the movements down.
   Widget? _nudges(HomeData data, AppLocalizations l10n) {
     final categories = data.categories.values.where((c) => !c.archived).toList();
     final noBudgets =
@@ -683,10 +684,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       container: true,
       explicitChildNodes: true,
       label: l10n.homeNudgesLabel,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: WambitoTokens.space2,
-        children: [
+      child: NudgeCarousel(
+        cards: [
           if (showBudgets)
             NudgeCard(
               key: const Key('home.nudge.budgets'),
