@@ -1,0 +1,4 @@
+- Settings opens on a short menu of categories, with icons.
+- My agents comes first: connect ChatGPT, Claude, Lumo+ or Grok step by step and see which ones are connected.
+- The app version shows on the Settings screen.
+- Fixed: the app could stop showing new movements after an automatic capture in the background.

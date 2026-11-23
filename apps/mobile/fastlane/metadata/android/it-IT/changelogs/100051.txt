@@ -1,0 +1,4 @@
+- Le impostazioni si aprono su un breve menu di categorie, con icone.
+- I miei agenti viene per primo: collega ChatGPT, Claude, Lumo+ o Grok passo dopo passo e vedi quali sono collegati.
+- La versione dell'app si vede nella schermata delle impostazioni.
+- Corretto: l'app poteva smettere di mostrare nuovi movimenti dopo una cattura automatica in background.

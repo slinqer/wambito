@@ -1,0 +1,4 @@
+- Los ajustes abren en un menú corto de categorías, con iconos.
+- Mis agentes va primero: conecta ChatGPT, Claude, Lumo+ o Grok paso a paso y mira cuáles están conectados.
+- La versión de la app se ve en la pantalla de ajustes.
+- Arreglado: la app podía dejar de mostrar movimientos nuevos tras una captura automática en segundo plano.
