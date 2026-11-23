@@ -70,9 +70,10 @@ enum SyncTask {
         end(true)
         return
       }
-      HeadlessRunner.run(entrypoint: "syncMain") { outcome in
+      HeadlessRunner.run(entrypoint: "syncMain") { outcome, _ in
         if outcome == "changed" { BackgroundChannel.app?.vaultChanged() }
-        end(SyncPlan.succeeded(outcome))
+        // Payments a cut-off run left in the capture queue go out with the sync.
+        CaptureRun.send { _ in end(SyncPlan.succeeded(outcome)) }
       }
     }
   }

@@ -19,7 +19,8 @@ import org.json.JSONObject
  *    is never sent anywhere in clear (D23).
  */
 class CaptureQueueChannel(private val context: Context, messenger: BinaryMessenger) {
-    private val channel = MethodChannel(messenger, CaptureChannel.NAME)
+    // CaptureChannel.NAME, written out so scripts/check-channels.sh finds takeQueued/ackQueued here.
+    private val channel = MethodChannel(messenger, "wambito/capture")
 
     init {
         channel.setMethodCallHandler(::handle)

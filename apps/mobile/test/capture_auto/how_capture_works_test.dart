@@ -202,7 +202,7 @@ void main() {
     await _pump(t);
     await _show(t, const Key('autoCapture.how'));
     final link = t.getRect(find.byKey(const Key('autoCapture.how')));
-    for (final source in CaptureSource.values) {
+    for (final source in const AutoCaptureStatus(access: true, sources: {}).offered) {
       final row = t.getRect(find.byKey(Key('autoCapture.${source.wire}')));
       expect(link.top, greaterThanOrEqualTo(row.bottom), reason: source.wire);
     }

@@ -137,10 +137,13 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
         line: l10n.autoCaptureLead,
       ),
       rows: [
-        for (final source in CaptureSource.values)
+        for (final source in status.offered)
           SettingsRow(
             key: Key('autoCapture.${source.wire}'),
-            icon: LkBrandLogo(source.brand, size: 20, color: tint),
+            icon: switch (source.brand) {
+              final brand? => LkBrandLogo(brand, size: 20, color: tint),
+              null => LkIcon(LkIconName.coin, size: 20, color: tint),
+            },
             title: source.label,
             line: status.isOn(source) ? l10n.autoCaptureActive : l10n.autoCaptureOff,
             trailing: RowSwitch(

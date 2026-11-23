@@ -34,7 +34,7 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const Key('autoCapture.comingSoon')), findsNothing);
-    for (final source in CaptureSource.values) {
+    for (final source in const AutoCaptureStatus(access: true, sources: {}).offered) {
       expect(find.byKey(Key('autoCapture.${source.wire}')), findsOneWidget);
     }
   });

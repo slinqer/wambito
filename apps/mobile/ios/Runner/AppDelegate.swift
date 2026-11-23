@@ -16,6 +16,7 @@ import WambitoNative
   private var noticesChannel: NoticesChannel?
   private var voiceChannel: VoiceChannel?
   private var backgroundChannel: BackgroundChannel?
+  private var captureChannel: CaptureChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
   // The notification centre keeps its delegate weakly too.
@@ -60,6 +61,7 @@ import WambitoNative
     noticesChannel = NoticesChannel(messenger: messenger)
     voiceChannel = VoiceChannel(messenger: messenger)
     backgroundChannel = BackgroundChannel(messenger: messenger)
+    captureChannel = CaptureChannel(messenger: messenger)
     BackgroundChannel.app = backgroundChannel
     if let url = tappedBeforeChannel, let launchChannel {
       tappedBeforeChannel = nil

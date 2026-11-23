@@ -4,9 +4,9 @@ import Flutter
 /// on Android (BackgroundChannel.kt):
 ///
 ///  * `finished({outcome, captured})` -> nil: the headless run ended. On the headless engine
-///    [onFinished] is handed the outcome (HeadlessRunner); on the app's engine there is none and it
-///    is accepted and dropped. `captured` is never read here: iOS has no capture queue, and nothing
-///    on this side sends anything, whatever the outcome.
+///    [onFinished] is handed the outcome and the answers of the captures it saved (HeadlessRunner,
+///    CaptureRun); on the app's engine there is none and it is accepted and dropped. Nothing on this
+///    side sends anything, whatever the outcome.
 ///  * `vaultChanged()`, native -> Dart: a background run changed the vault file; see
 ///    [vaultChanged].
 final class BackgroundChannel {
@@ -15,13 +15,15 @@ final class BackgroundChannel {
 
   private let channel: FlutterMethodChannel
 
-  init(messenger: FlutterBinaryMessenger, onFinished: ((String) -> Void)? = nil) {
+  init(messenger: FlutterBinaryMessenger, onFinished: ((String, [[String: Any]]) -> Void)? = nil) {
     channel = FlutterMethodChannel(name: "wambito/background", binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       switch call.method {
       case "finished":
         let arguments = call.arguments as? [String: Any]
-        onFinished?(arguments?["outcome"] as? String ?? "failed")
+        onFinished?(
+          arguments?["outcome"] as? String ?? "failed",
+          arguments?["captured"] as? [[String: Any]] ?? [])
         result(nil)
       default:
         result(FlutterMethodNotImplemented)

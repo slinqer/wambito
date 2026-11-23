@@ -43,6 +43,10 @@
 		B7C8D9E0F1A2B3C4000002D1 /* VoiceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000002D0 /* VoiceModelTests.swift */; };
 		B7C8D9E0F1A2B3C4000002D3 /* voice-es.wav in Resources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000002D2 /* voice-es.wav */; };
 		B7C8D9E0F1A2B3C4000002D5 /* voice-pt.wav in Resources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4000002D4 /* voice-pt.wav */; };
+		B7C8D9E0F1A2B3C40000CA02 /* CaptureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C40000CA01 /* CaptureSettings.swift */; };
+		B7C8D9E0F1A2B3C40000CA04 /* CaptureQueueChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C40000CA03 /* CaptureQueueChannel.swift */; };
+		B7C8D9E0F1A2B3C40000CA06 /* CaptureRun.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C40000CA05 /* CaptureRun.swift */; };
+		B7C8D9E0F1A2B3C40000CA08 /* CaptureChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C40000CA07 /* CaptureChannel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -119,6 +123,10 @@
 		B7C8D9E0F1A2B3C4000002D0 /* VoiceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModelTests.swift; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000002D2 /* voice-es.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "voice-es.wav"; sourceTree = "<group>"; };
 		B7C8D9E0F1A2B3C4000002D4 /* voice-pt.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "voice-pt.wav"; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C40000CA01 /* CaptureSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSettings.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C40000CA03 /* CaptureQueueChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQueueChannel.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C40000CA05 /* CaptureRun.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRun.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C40000CA07 /* CaptureChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +152,17 @@
 				B7C8D9E0F1A2B3C4000002C6 /* VoiceRun.swift */,
 			);
 			path = Voice;
+			sourceTree = "<group>";
+		};
+		B7C8D9E0F1A2B3C40000CA00 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				B7C8D9E0F1A2B3C40000CA07 /* CaptureChannel.swift */,
+				B7C8D9E0F1A2B3C40000CA05 /* CaptureRun.swift */,
+				B7C8D9E0F1A2B3C40000CA03 /* CaptureQueueChannel.swift */,
+				B7C8D9E0F1A2B3C40000CA01 /* CaptureSettings.swift */,
+			);
+			path = Capture;
 			sourceTree = "<group>";
 		};
 		B7C8D9E0F1A2B3C4000000B2 /* Background */ = {
@@ -284,6 +303,7 @@
 				B7C8D9E0F1A2B3C400000062 /* Files */,
 				B7C8D9E0F1A2B3C400000084 /* Notices */,
 				B7C8D9E0F1A2B3C4000000B2 /* Background */,
+				B7C8D9E0F1A2B3C40000CA00 /* Capture */,
 				B7C8D9E0F1A2B3C400000072 /* Passkeys */,
 				B7C8D9E0F1A2B3C400000104 /* Scanner */,
 				B7C8D9E0F1A2B3C400000022 /* Haptics */,
@@ -497,6 +517,10 @@
 				B7C8D9E0F1A2B3C4000000B1 /* BackgroundChannel.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000C3 /* HeadlessRunner.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000C1 /* SyncTask.swift in Sources */,
+				B7C8D9E0F1A2B3C40000CA08 /* CaptureChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C40000CA06 /* CaptureRun.swift in Sources */,
+				B7C8D9E0F1A2B3C40000CA04 /* CaptureQueueChannel.swift in Sources */,
+				B7C8D9E0F1A2B3C40000CA02 /* CaptureSettings.swift in Sources */,
 				B7C8D9E0F1A2B3C400000083 /* NoticePoster.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A1 /* DueTask.swift in Sources */,
 				B7C8D9E0F1A2B3C4000000A3 /* KeychainSession.swift in Sources */,

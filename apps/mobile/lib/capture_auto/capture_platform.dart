@@ -10,29 +10,57 @@ import '../ui/lk_brand_logo.dart' show LkBrand;
 
 import '../background/queued_capture.dart';
 
-/// The sources automatic capture reads, by the wire name the Android side uses.
+/// The sources automatic capture reads, by the wire name the native side uses.
 enum CaptureSource {
   revolut('revolut', 'Revolut', LkBrand.revolut),
-  googleWallet('google_wallet', 'Google Wallet', LkBrand.googleWallet);
+  googleWallet('google_wallet', 'Google Wallet', LkBrand.googleWallet),
+
+  /// The iPhone's Apple Pay payments, through the Shortcuts action (no Apple logo is drawn).
+  appleWallet('apple_wallet', 'Apple Pay', null);
 
   const CaptureSource(this.wire, this.label, this.brand);
 
   final String wire;
 
-  /// Its logo.
-  final LkBrand brand;
+  /// Its logo, or null for a generic icon.
+  final LkBrand? brand;
 
   /// The app's own name: the same in every language.
   final String label;
 }
 
-/// What Android says about automatic capture: whether the notification access is granted, and the
-/// sources the person switched on (wire names, see [CaptureSource]).
+/// What the phone says about automatic capture: whether the notification access is granted, the
+/// sources the person switched on and the ones this phone has (wire names, see [CaptureSource]).
+/// The iPhone also says whether a payment ever arrived and its iOS version.
 class AutoCaptureStatus {
-  const AutoCaptureStatus({required this.access, required this.sources});
+  const AutoCaptureStatus({
+    required this.access,
+    required this.sources,
+    this.available = androidSources,
+    this.configured = false,
+    this.iosMajor,
+  });
+
+  /// What Android reads when it does not say.
+  static const androidSources = {'revolut', 'google_wallet'};
 
   final bool access;
   final Set<String> sources;
+
+  /// The sources this phone can read.
+  final Set<String> available;
+
+  /// iPhone: a payment arrived through the Shortcuts action at least once.
+  final bool configured;
+
+  /// iPhone: the major iOS version; null on Android.
+  final int? iosMajor;
+
+  /// This phone's sources, in [CaptureSource] order.
+  List<CaptureSource> get offered => [
+    for (final source in CaptureSource.values)
+      if (available.contains(source.wire)) source,
+  ];
 
   bool isOn(CaptureSource source) => sources.contains(source.wire);
 
@@ -40,10 +68,21 @@ class AutoCaptureStatus {
 
   @override
   bool operator ==(Object other) =>
-      other is AutoCaptureStatus && other.access == access && _same(other.sources, sources);
+      other is AutoCaptureStatus &&
+      other.access == access &&
+      _same(other.sources, sources) &&
+      _same(other.available, available) &&
+      other.configured == configured &&
+      other.iosMajor == iosMajor;
 
   @override
-  int get hashCode => Object.hash(access, Object.hashAllUnordered(sources));
+  int get hashCode => Object.hash(
+    access,
+    Object.hashAllUnordered(sources),
+    Object.hashAllUnordered(available),
+    configured,
+    iosMajor,
+  );
 
   static bool _same(Set<String> a, Set<String> b) => a.length == b.length && a.containsAll(b);
 }
@@ -116,9 +155,16 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
     final raw = await _call<Map<Object?, Object?>>('status');
     if (raw == null) return null;
     final sources = raw['sources'];
+    final available = raw['available'];
+    final iosMajor = raw['iosMajor'];
     return AutoCaptureStatus(
       access: raw['access'] == 'granted',
       sources: {if (sources is List) ...sources.whereType<String>()},
+      available: available is List
+          ? {...available.whereType<String>()}
+          : AutoCaptureStatus.androidSources,
+      configured: raw['configured'] == true,
+      iosMajor: iosMajor is int ? iosMajor : null,
     );
   }
 

@@ -5,5 +5,4 @@
 # Reasons:
 #   ios-impossible  iOS has no API for it (notification capture).
 #   android-only    debug test hooks that exist on Android only.
-wambito/capture  # ios-impossible
 wambito/test  # android-only

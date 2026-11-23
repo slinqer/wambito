@@ -42,6 +42,31 @@ void main() {
     expect(missing?.anyOn, isFalse);
   });
 
+  test('the iPhone says which sources it has, whether one arrived and its iOS version', () async {
+    const platform = ChannelAutoCapturePlatform();
+    answer = (_) => {
+      'access': 'granted',
+      'sources': ['apple_wallet'],
+      'available': ['apple_wallet'],
+      'configured': true,
+      'iosMajor': 27,
+    };
+    final status = await platform.status();
+    expect(status?.available, {'apple_wallet'});
+    expect(status?.configured, isTrue);
+    expect(status?.iosMajor, 27);
+    expect(status?.isOn(CaptureSource.appleWallet), isTrue);
+  });
+
+  test('Android lists no sources: they are Revolut and Google Wallet', () async {
+    const platform = ChannelAutoCapturePlatform();
+    answer = (_) => {'access': 'granted', 'sources': <String>[]};
+    final status = await platform.status();
+    expect(status?.available, {'revolut', 'google_wallet'});
+    expect(status?.configured, isFalse);
+    expect(status?.iosMajor, isNull);
+  });
+
   test('switching a source, opening the screens and clearing the queue go by name', () async {
     const platform = ChannelAutoCapturePlatform();
     answer = (call) => call.method.startsWith('open') ? true : null;
