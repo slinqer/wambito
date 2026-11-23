@@ -35,10 +35,11 @@ enum CaptureRun {
         return
       }
       running = true
+      store.startRun()
       HeadlessRunner.run(entrypoint: "captureMain", budget: budget) { outcome, captured in
+        // Only what this run took and left unsaved counts (not a payment queued meanwhile).
         if outcome == "done" || outcome == "changed" {
-          let left = store.take(userId: owner).captures.compactMap { $0["key"] as? String }
-          _ = store.refuse(keys: left, limit: CaptureQueueStore.maxRefusals)
+          _ = store.refuseUnsaved(limit: CaptureQueueStore.maxRefusals)
         }
         let answers = captured.compactMap(CaptureAnswer.parse)
         if answers.contains(where: { !$0.merged }) { CaptureSettings.markConfigured() }

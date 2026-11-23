@@ -16,6 +16,20 @@ public final class CaptureQueueStore {
     var owner: String?
     var confirms: [String] = []
     var refusals: [String: Int] = [:]
+    /// The keys the run in progress took (only those count a refusal).
+    var taken: [String] = []
+
+    init() {}
+
+    /// Every field may be missing: a file from another version keeps its payments.
+    init(from decoder: Decoder) throws {
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      items = try c.decodeIfPresent([Item].self, forKey: .items) ?? []
+      owner = try c.decodeIfPresent(String.self, forKey: .owner)
+      confirms = try c.decodeIfPresent([String].self, forKey: .confirms) ?? []
+      refusals = try c.decodeIfPresent([String: Int].self, forKey: .refusals) ?? [:]
+      taken = try c.decodeIfPresent([String].self, forKey: .taken) ?? []
+    }
   }
 
   private struct Item: Codable {
@@ -69,6 +83,29 @@ public final class CaptureQueueStore {
       ]
     }
     return (captures, state.owner == userId ? state.confirms : [])
+  }
+
+  /// A run of `captureMain` begins: nothing is taken yet.
+  public func startRun() {
+    update { $0.taken = [] }
+  }
+
+  /// [take] for the headless engine: the keys handed out are remembered for [refuseUnsaved].
+  public func takeForRun(userId: String) -> (captures: [[String: Any]], confirms: [String]) {
+    let taken = take(userId: userId)
+    let keys = taken.captures.compactMap { $0["key"] as? String }
+    update { state in state.taken = Array(Set(state.taken).union(keys)) }
+    return taken
+  }
+
+  /// A finished run left unsaved some of what it took: each counts one refusal (Android's
+  /// `before ∩ left`); a payment queued meanwhile, or another account's, is not counted. Returns the
+  /// keys dropped now.
+  public func refuseUnsaved(limit: Int) -> [String] {
+    let taken = read().taken
+    let dropped = refuse(keys: taken, limit: limit)
+    update { $0.taken = [] }
+    return dropped
   }
 
   public func isEmpty(userId: String) -> Bool {

@@ -136,3 +136,64 @@ final class CaptureQueueStoreTests: XCTestCase {
     #endif
   }
 }
+
+final class CaptureQueueRunTests: XCTestCase {
+  private var file: URL!
+  private let coffee = WalletPayment(cents: 1_800_000, currency: "COP", merchant: "Juan Valdez")
+
+  override func setUp() {
+    file = FileManager.default.temporaryDirectory
+      .appendingPathComponent("queue-\(UUID().uuidString)")
+      .appendingPathComponent("wambito.capture.queue.json")
+  }
+
+  override func tearDown() {
+    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+  }
+
+  func testOnlyWhatTheRunTookIsRefused() {
+    let queue = CaptureQueueStore(file: file)
+    queue.adopt(userId: "u1", from: nil)
+    let taken = queue.add(coffee, capturedAt: Date(), source: "apple_wallet")
+    queue.startRun()
+    _ = queue.takeForRun(userId: "u1")
+    // A payment queued while the run goes on was never tried: this run refuses only the first.
+    let later = queue.add(coffee, capturedAt: Date(), source: "apple_wallet")
+    XCTAssertEqual(queue.refuseUnsaved(limit: CaptureQueueStore.maxRefusals), [])
+    for _ in 2..<CaptureQueueStore.maxRefusals {
+      queue.startRun()
+      _ = queue.takeForRun(userId: "u1")
+      XCTAssertEqual(queue.refuseUnsaved(limit: CaptureQueueStore.maxRefusals), [])
+    }
+    queue.startRun()
+    _ = queue.takeForRun(userId: "u1")
+    // The eighth run drops the first payment; the later one was tried once less, so it stays.
+    XCTAssertEqual(queue.refuseUnsaved(limit: CaptureQueueStore.maxRefusals), [taken])
+    XCTAssertEqual(queue.take(userId: "u1").captures.compactMap { $0["key"] as? String }, [later])
+  }
+
+  func testARunOfAnotherAccountRefusesNothing() {
+    let queue = CaptureQueueStore(file: file)
+    queue.adopt(userId: "u1", from: nil)
+    _ = queue.add(coffee, capturedAt: Date(), source: "apple_wallet")
+    for _ in 0..<(CaptureQueueStore.maxRefusals * 2) {
+      queue.startRun()
+      _ = queue.takeForRun(userId: "someone-else")
+      XCTAssertEqual(queue.refuseUnsaved(limit: CaptureQueueStore.maxRefusals), [])
+    }
+    XCTAssertFalse(queue.isEmpty(userId: "u1"))
+  }
+
+  func testAFileFromAnOlderVersionKeepsItsPayments() throws {
+    try FileManager.default.createDirectory(
+      at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let old = """
+      {"items":[{"key":"k1","kind":"expense","amount":100,"currency":"COP","merchant":"A",\
+      "capturedAt":"2026-11-23T00:00:00.000Z","source":"apple_wallet","user":"u1"}],"owner":"u1"}
+      """
+    try Data(old.utf8).write(to: file)
+    let queue = CaptureQueueStore(file: file)
+    queue.addConfirm("tx1")
+    XCTAssertEqual(queue.take(userId: "u1").captures.compactMap { $0["key"] as? String }, ["k1"])
+  }
+}

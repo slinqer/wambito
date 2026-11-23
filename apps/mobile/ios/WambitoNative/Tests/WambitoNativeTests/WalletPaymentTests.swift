@@ -41,4 +41,11 @@ final class WalletPaymentTests: XCTestCase {
     XCTAssertNil(
       WalletPayment.read(amount: Decimal(Int64.max / 100) + 1, currencyCode: "COP", merchant: "A"))
   }
+
+  func testALongMerchantIsClippedToWhatTheBackendTakes() {
+    let long = String(repeating: "á", count: 130)
+    XCTAssertEqual(
+      WalletPayment.read(amount: 1, currencyCode: "COP", merchant: long)?.merchant,
+      String(repeating: "á", count: 120))
+  }
 }

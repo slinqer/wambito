@@ -72,7 +72,12 @@ enum SyncTask {
       }
       HeadlessRunner.run(entrypoint: "syncMain") { outcome, _ in
         if outcome == "changed" { BackgroundChannel.app?.vaultChanged() }
-        // Payments a cut-off run left in the capture queue go out with the sync.
+        // Payments a cut-off run left in the capture queue go out with the sync, unless the task
+        // already ended (expired): nothing may start after `setTaskCompleted`.
+        guard SyncPlan.sendsCaptures(after: outcome, mayStart: once.mayStart) else {
+          end(SyncPlan.succeeded(outcome))
+          return
+        }
         CaptureRun.send { _ in end(SyncPlan.succeeded(outcome)) }
       }
     }

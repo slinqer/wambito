@@ -28,3 +28,12 @@ final class SyncPlanTests: XCTestCase {
     }
   }
 }
+
+final class SyncPlanCaptureTests: XCTestCase {
+  func testAnExpiredTaskSendsNoCaptures() {
+    XCTAssertFalse(SyncPlan.sendsCaptures(after: "expired", mayStart: true))
+    XCTAssertFalse(SyncPlan.sendsCaptures(after: "changed", mayStart: false))
+    XCTAssertTrue(SyncPlan.sendsCaptures(after: "changed", mayStart: true))
+    XCTAssertTrue(SyncPlan.sendsCaptures(after: "busy", mayStart: true))
+  }
+}

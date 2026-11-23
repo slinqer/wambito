@@ -25,7 +25,7 @@ final class CaptureQueueChannel {
       guard let userId = arguments?["userId"] as? String else {
         return FlutterError(code: "bad_args", message: "userId", details: nil)
       }
-      let taken = store.take(userId: userId)
+      let taken = store.takeForRun(userId: userId)
       return ["captures": taken.captures, "confirms": taken.confirms]
     case "ackQueued":
       store.ack(

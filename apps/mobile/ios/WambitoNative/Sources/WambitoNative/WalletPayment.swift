@@ -16,6 +16,9 @@ public struct WalletPayment: Equatable {
     self.merchant = merchant
   }
 
+  /// The longest merchant the local `POST /v1/captures` takes (`lib/local/captures.dart`).
+  public static let merchantMax = 120
+
   /// The payment, or nil when the amount is not positive, has more than two decimals or does not
   /// fit, the currency is not three letters, or the merchant is empty.
   public static func read(amount: Decimal, currencyCode: String?, merchant: String?) -> WalletPayment? {
@@ -32,6 +35,8 @@ public struct WalletPayment: Equatable {
         raiseOnUnderflow: false, raiseOnDivideByZero: false))
     guard whole == hundredths else { return nil }
     guard whole.compare(NSDecimalNumber(value: Int64.max)) != .orderedDescending else { return nil }
-    return WalletPayment(cents: whole.int64Value, currency: code, merchant: name)
+    // Clipped, never refused: a longer name would fail every save and be dropped.
+    return WalletPayment(
+      cents: whole.int64Value, currency: code, merchant: String(name.prefix(merchantMax)))
   }
 }
