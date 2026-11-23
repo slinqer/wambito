@@ -7,3 +7,7 @@
 "notice_guest" = "Your data will be deleted in 15 days if you don't add your email. If you delete the app, you lose them too.";
 "scanner_hint" = "Point the camera at the QR on the new device.";
 "scanner_close" = "Turn off the camera";
+"capture_noted" = "Noted %@ at %@ · %@, OK?";
+"capture_noted_fallback" = "Noted %@ at %@ · %@, which category?";
+"capture_confirm" = "OK";
+"capture_change" = "Change";

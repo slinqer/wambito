@@ -7,3 +7,7 @@
 "notice_guest" = "Os teus dados serão apagados dentro de 15 dias se não adicionares o teu email. Se apagares a app, perdes os dados na mesma.";
 "scanner_hint" = "Aponta a câmara para o QR do dispositivo novo.";
 "scanner_close" = "Desligar a câmara";
+"capture_noted" = "Anotei %@ em %@ · %@, certo?";
+"capture_noted_fallback" = "Anotei %@ em %@ · %@, que categoria?";
+"capture_confirm" = "Certo";
+"capture_change" = "Alterar";
