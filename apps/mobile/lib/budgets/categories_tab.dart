@@ -4,7 +4,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/gen/wambito_api.dart';
@@ -12,13 +11,17 @@ import '../categories/categories_actions.dart';
 import '../categories/category_sheet.dart';
 import '../home/category_look.dart';
 import '../home/home_repository.dart';
+import '../home/home_widgets.dart' show DashedBorderPainter;
 import '../l10n/app_localizations.dart';
+import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/budget_bar.dart';
 import '../ui/category_row.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
+import '../ui/pressable.dart';
 import '../ui/segmented_control.dart';
 import '../ui/toast.dart';
 
@@ -111,38 +114,22 @@ class CategoriesTab extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: WambitoTokens.space2,
       children: [
-        _SwitchAndAdd(
-          switcher: SegmentedControl<CategoryKindEnum>(
-            label: l10n.categoriesKindLabel,
-            value: kind,
-            options: [
-              SegmentOption(
-                CategoryKindEnum.expense,
-                l10n.categoriesExpenses,
-                key: const Key('categories.kind.expense'),
-              ),
-              SegmentOption(
-                CategoryKindEnum.income,
-                l10n.categoriesIncome,
-                key: const Key('categories.kind.income'),
-              ),
-            ],
-            onChanged: onKind,
-          ),
-          add: PressButton(
-            key: const Key('categories.add'),
-            size: PressSize.sm,
-            semanticLabel: l10n.categoriesAdd,
-            onPressed: () => unawaited(openCategorySheet(context)),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: WambitoTokens.space2,
-              children: [
-                const ExcludeSemantics(child: Text('＋')),
-                Text(LkText.upperCase(l10n.categoriesAdd)),
-              ],
+        SegmentedControl<CategoryKindEnum>(
+          label: l10n.categoriesKindLabel,
+          value: kind,
+          options: [
+            SegmentOption(
+              CategoryKindEnum.expense,
+              l10n.categoriesExpenses,
+              key: const Key('categories.kind.expense'),
             ),
-          ),
+            SegmentOption(
+              CategoryKindEnum.income,
+              l10n.categoriesIncome,
+              key: const Key('categories.kind.income'),
+            ),
+          ],
+          onChanged: onKind,
         ),
         if (active.isEmpty)
           Text(
@@ -151,6 +138,7 @@ class CategoriesTab extends ConsumerWidget {
           )
         else
           for (final category in active) _row(l10n, category, lines[category.id], income),
+        _AddRow(label: l10n.categoriesAdd, onAdd: () => unawaited(openCategorySheet(context))),
         if (archived.isNotEmpty)
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -240,73 +228,58 @@ class CategoriesTab extends ConsumerWidget {
   }
 }
 
-/// `flex flex-wrap items-center gap-(--space-2)` holding the switch (`min-w-[200px] flex-1`) and the
-/// button: side by side when the switch keeps its 200px, otherwise the switch takes the whole row
-/// and the button sits under it, at the start.
-class _SwitchAndAdd extends MultiChildRenderObjectWidget {
-  _SwitchAndAdd({required Widget switcher, required Widget add}) : super(children: [switcher, add]);
+/// "Nueva categoría" after the categories (and before the archived ones): a dashed row as wide as
+/// them, its name written, so the page's one purple + stays the add-a-movement button. Making a
+/// category is rare, so it waits where the list ends; with no category of the kind it sits right
+/// under the line that says so. At least 48px tall, a thumb's target on both phones.
+class _AddRow extends StatelessWidget {
+  const _AddRow({required this.label, required this.onAdd});
+
+  final String label;
+  final VoidCallback onAdd;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderSwitchAndAdd();
-}
-
-class _SwitchAndAddData extends ContainerBoxParentData<RenderBox> {}
-
-class _RenderSwitchAndAdd extends RenderBox
-    with
-        ContainerRenderObjectMixin<RenderBox, _SwitchAndAddData>,
-        RenderBoxContainerDefaultsMixin<RenderBox, _SwitchAndAddData> {
-  static const _minSwitch = 200.0;
-  static const _gap = WambitoTokens.space2;
-
-  @override
-  void setupParentData(RenderBox child) {
-    if (child.parentData is! _SwitchAndAddData) child.parentData = _SwitchAndAddData();
+  Widget build(BuildContext context) {
+    final lk = context.lk;
+    final colors = lk.colors;
+    final radius = LkSurface.radius(LkRadius.lg);
+    return Pressable(
+      key: const Key('categories.add'),
+      onPressed: onAdd,
+      label: label,
+      builder: (context, state) => RingBox(
+        radius: state.focusVisible ? radius : null,
+        color: colors.focus,
+        child: CustomPaint(
+          foregroundPainter: DashedBorderPainter(
+            color: colors.stroke,
+            radius: WambitoTokens.radiusLg,
+            width: 2,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            constraints: const BoxConstraints(minHeight: 52),
+            padding: const EdgeInsets.symmetric(
+              horizontal: WambitoTokens.space3,
+              vertical: WambitoTokens.space2,
+            ),
+            decoration: BoxDecoration(
+              color: state.pressed ? colors.surfaceRow : const Color(0x00000000),
+              borderRadius: radius,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: WambitoTokens.space2,
+              children: [
+                LkIcon(LkIconName.plus, size: 20, color: colors.ink),
+                Flexible(
+                  child: Text(label, style: LkText.cardTitle.copyWith(color: colors.ink)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
-
-  RenderBox get _switch => firstChild!;
-  RenderBox get _add => childAfter(firstChild!)!;
-
-  @override
-  Size computeDryLayout(BoxConstraints constraints) {
-    final width = constraints.maxWidth;
-    final add = _add.getDryLayout(BoxConstraints(maxWidth: width));
-    if (_minSwitch + _gap + add.width <= width) {
-      final sw = _switch.getDryLayout(BoxConstraints.tightFor(width: width - _gap - add.width));
-      return Size(width, sw.height > add.height ? sw.height : add.height);
-    }
-    final sw = _switch.getDryLayout(BoxConstraints.tightFor(width: width));
-    return Size(width, sw.height + _gap + add.height);
-  }
-
-  @override
-  void performLayout() {
-    final width = constraints.maxWidth;
-    _add.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
-    final addSize = _add.size;
-    final switchData = _switch.parentData! as _SwitchAndAddData;
-    final addData = _add.parentData! as _SwitchAndAddData;
-    if (_minSwitch + _gap + addSize.width <= width) {
-      _switch.layout(
-        BoxConstraints.tightFor(width: width - _gap - addSize.width),
-        parentUsesSize: true,
-      );
-      final height = _switch.size.height > addSize.height ? _switch.size.height : addSize.height;
-      switchData.offset = Offset(0, (height - _switch.size.height) / 2);
-      addData.offset = Offset(width - addSize.width, (height - addSize.height) / 2);
-      size = Size(width, height);
-    } else {
-      _switch.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
-      switchData.offset = Offset.zero;
-      addData.offset = Offset(0, _switch.size.height + _gap);
-      size = Size(width, _switch.size.height + _gap + addSize.height);
-    }
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) => defaultPaint(context, offset);
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
-      defaultHitTestChildren(result, position: position);
 }

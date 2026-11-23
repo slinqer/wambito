@@ -129,10 +129,40 @@ void main() {
       expect(find.text('Gastos'), findsOneWidget);
       expect(find.text('Ingresos'), findsOneWidget);
       expect(find.byKey(const Key('categories.add')), findsOneWidget);
-      expect(find.text('NUEVA CATEGORÍA'), findsOneWidget);
       expect(
         [for (final r in tester.widgetList<CategoryRow>(find.byType(CategoryRow))) r.name],
         ['Hogar', 'Supermercado'],
+      );
+    });
+
+    testBudgets('Nueva categoría is a row after the categories, and the switch has the whole row', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpCategories(tester);
+      await openBudgetsTab(tester);
+
+      final add = find.byKey(const Key('categories.add'));
+      expect(find.descendant(of: add, matching: find.text('Nueva categoría')), findsOneWidget);
+      expect(tester.getSemantics(add).label, 'Nueva categoría');
+      final addBox = tester.getRect(add);
+      expect(addBox.height, greaterThanOrEqualTo(48));
+      final last = tester.getRect(find.byType(CategoryRow).last);
+      expect(addBox.top, greaterThan(last.bottom), reason: 'after the categories');
+      expect(addBox.width, closeTo(last.width, 1), reason: 'as wide as a row');
+      final expense = tester.getRect(find.byKey(const Key('categories.kind.expense')));
+      final income = tester.getRect(find.byKey(const Key('categories.kind.income')));
+      expect(income.right - expense.left, closeTo(last.width, 12), reason: 'the switch fills it');
+    });
+
+    testBudgets('Nueva categoría comes before Archivadas', (tester) async {
+      await pumpCategories(tester, home: monthWithArchived());
+      await openBudgetsTab(tester);
+      expect(
+        tester.getRect(find.byKey(const Key('categories.add'))).bottom,
+        lessThan(tester.getRect(find.byKey(const Key('categories.fold'))).top),
       );
     });
 
@@ -175,6 +205,11 @@ void main() {
       await tester.tap(find.byKey(const Key('categories.kind.income')));
       await tester.pumpAndSettle();
       expect(find.text('Aún no tienes categorías de este tipo.'), findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(const Key('categories.add'))).top,
+        greaterThan(tester.getRect(find.text('Aún no tienes categorías de este tipo.')).bottom),
+        reason: 'the way to make the first one, under the line',
+      );
     });
 
     testBudgets('there is no Archivadas while nothing is archived', (tester) async {
@@ -278,7 +313,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Spending'), findsOneWidget);
       expect(find.text('Income'), findsOneWidget);
-      expect(find.text('NEW CATEGORY'), findsOneWidget);
+      expect(tester.getSemantics(find.byKey(const Key('categories.add'))).label, 'New category');
       expect(find.text('ARCHIVED (1)'), findsOneWidget);
       await openFold(tester);
       expect(row('Gimnasio Archived'), findsOneWidget);
@@ -292,7 +327,11 @@ void main() {
       await openBudgetsTab(tester);
       await openNewCategory(tester);
 
-      expect(find.text('Nueva categoría'), findsOneWidget, reason: 'the sheet\'s title');
+      expect(
+        find.text('Nueva categoría'),
+        findsNWidgets(2),
+        reason: 'the row and the sheet\'s title',
+      );
       expect(find.text('Nombre'), findsOneWidget);
       expect(find.text('Tipo'), findsOneWidget);
       expect(find.text('Ícono'), findsOneWidget);
@@ -458,7 +497,7 @@ void main() {
       await tester.tap(find.text('Categories'));
       await tester.pumpAndSettle();
       await openNewCategory(tester);
-      expect(find.text('New category'), findsOneWidget);
+      expect(find.text('New category'), findsNWidgets(2), reason: 'the row and the sheet\'s title');
       expect(find.text('Name'), findsOneWidget);
       expect(find.text('Type'), findsOneWidget);
       expect(find.text('Icon'), findsOneWidget);
