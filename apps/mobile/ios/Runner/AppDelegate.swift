@@ -16,6 +16,7 @@ import WambitoNative
   private var noticesChannel: NoticesChannel?
   private var voiceChannel: VoiceChannel?
   private var backgroundChannel: BackgroundChannel?
+  private var captureChannel: CaptureChannel?
   // Flutter keeps scene delegates weakly: held here for the life of the app.
   private var launchScenes: LaunchSceneHandler?
   // The notification centre keeps its delegate weakly too.
@@ -32,6 +33,10 @@ import WambitoNative
     let taps = NoticeTaps { [weak self] url in self?.openNotice(url) }
     noticeTaps = taps
     UNUserNotificationCenter.current().delegate = taps
+    // The capture notification's buttons, and who posts it after a run (Capture/).
+    CaptureNotices.register()
+    CaptureRun.announce = { CaptureNotices.announce($0) }
+    CaptureRun.test = { CaptureNotices.test(body: $0) }
     DueTask.register()
     SyncTask.register()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -60,6 +65,7 @@ import WambitoNative
     noticesChannel = NoticesChannel(messenger: messenger)
     voiceChannel = VoiceChannel(messenger: messenger)
     backgroundChannel = BackgroundChannel(messenger: messenger)
+    captureChannel = CaptureChannel(messenger: messenger)
     BackgroundChannel.app = backgroundChannel
     if let url = tappedBeforeChannel, let launchChannel {
       tappedBeforeChannel = nil
@@ -87,9 +93,11 @@ import WambitoNative
   }
 }
 
-/// The two notices' taps and their showing while the app is open. A tap opens the notice's link
-/// (`userInfo["link"]`: `due` -> `wambito://due`, `progress` -> `wambito://progress`), as the
-/// notice's tap intent does on Android; with the app in front the notice still shows, as there.
+/// The notices' taps and their showing while the app is open. A tap opens the notice's link
+/// (`userInfo["link"]`: `due` -> `wambito://due`, `progress` -> `wambito://progress`,
+/// `review/<id>` -> `wambito://review/<id>`), as the notice's tap intent does on Android; with the
+/// app in front the notice still shows, as there. A capture notification's **Bien** confirms it
+/// (CaptureNotices.confirm); its **Cambiar** is a tap.
 final class NoticeTaps: NSObject, UNUserNotificationCenterDelegate {
   private let open: (URL) -> Void
 
@@ -106,7 +114,15 @@ final class NoticeTaps: NSObject, UNUserNotificationCenterDelegate {
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    let url = LaunchLinks.noticeTap(response.notification.request.content.userInfo)
+    let userInfo = response.notification.request.content.userInfo
+    // **Bien** on a capture notification confirms it in the background, without opening the app.
+    if response.actionIdentifier == CaptureNotices.confirmAction,
+      let transactionId = userInfo["transactionId"] as? String
+    {
+      CaptureNotices.confirm(transactionId) { completionHandler() }
+      return
+    }
+    let url = LaunchLinks.noticeTap(userInfo)
     DispatchQueue.main.async { [open] in
       if let url { open(url) }
       completionHandler()

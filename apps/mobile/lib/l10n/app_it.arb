@@ -1308,5 +1308,31 @@
         "type": "String"
       }
     }
-  }
+  },
+  "autoCaptureIosLead": "Dai tuoi pagamenti con Apple Pay",
+  "autoCaptureConfigured": "Configurata",
+  "autoCaptureNotConfigured": "Da configurare",
+  "autoCaptureSetup": "Configura in Comandi",
+  "autoCaptureSetupLine": "Installa il comando o crealo passo passo",
+  "autoCaptureTest": "Prova",
+  "autoCaptureTestLine": "Ti mostriamo l'avviso di un pagamento",
+  "autoCaptureTestMerchant": "Prova di Wambito",
+  "autoCaptureTestNotice": "Così arriva ogni pagamento: «{merchant} · {category}, va bene?»",
+  "autoCaptureTestSent": "Fatto: guarda l'avviso in alto",
+  "autoCaptureTestNoNotices": "Attiva gli avvisi di Wambito per vederlo",
+  "autoCaptureRemove": "Togli l'automazione in Comandi",
+  "autoCaptureIosPayBody": "Paghi con Apple Pay come sempre e Comandi passa il pagamento a Wambito.",
+  "autoCaptureIosReadsTitle": "Si salva sul tuo telefono",
+  "autoCaptureIosReadsBody": "Comandi gli dà solo l'importo, l'esercente e il nome della carta. Si salva cifrato: nessun altro lo legge.",
+  "autoCaptureIosNextBody": "Oggi funziona con i tuoi pagamenti con Apple Pay; i pagamenti con la carta fisica non passano da Wallet. Aggiungeremo altre banche col tempo.",
+  "autoCaptureIosDisclosure": "Wambito riceve da Comandi l'importo, l'esercente e la carta dei tuoi pagamenti con Apple Pay, e li salva cifrati sul tuo telefono.",
+  "walletSetupTitle": "Configura in Comandi",
+  "walletSetupStep1": "Tocca Installa il comando e aggiungilo in Comandi.",
+  "walletSetupStep2": "Apri il comando e tocca Modifica.",
+  "walletSetupStep3": "Tocca il riquadro «L'automazione è disattivata» e attivala.",
+  "walletSetupStep4": "Paga una volta con l'iPhone sbloccato. Da lì funziona da solo.",
+  "walletSetupInstall": "Installa il comando",
+  "walletSetupGuide": "1. Apri Comandi e vai su Automazione.\n2. Tocca + e scegli Transazione.\n3. Scegli le tue carte ed Esegui subito, poi Avanti.\n4. Cerca l'azione «Registra pagamento Wallet» di Wambito.\n5. In Importo, Esercente e Carta scegli i dati della Transazione.\n6. Tocca Fine.",
+  "walletSetupOpenShortcuts": "Apri Comandi",
+  "walletSetupFinishTitle": "Manca un passo"
 }

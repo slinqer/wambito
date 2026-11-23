@@ -22,16 +22,28 @@ enum CaptureHowStep { pay, reads, decide, learns, next }
 
 /// Opens the steps. With [askAccess] (the first switch on) the last step ends with "Activar
 /// acceso" and the answer is true when the person goes on; otherwise it ends with "Entendido".
-/// Closing the sheet answers false.
+/// Closing the sheet answers false. With [iphone] the words are the iPhone's (Apple Pay through
+/// Shortcuts) and the first switch on ends with "Configurar en Atajos" instead, or with "Instalar el
+/// atajo" when [installShortcut] (the ready-made shortcut can be installed).
 ///
 /// The pages scroll with the sheet; the dots and the button (and, on the last step, the disclosure
 /// right above it) stay at the sheet's bottom, always in view.
-Future<bool> showHowCaptureWorks(BuildContext context, {required bool askAccess}) async {
+Future<bool> showHowCaptureWorks(
+  BuildContext context, {
+  required bool askAccess,
+  bool iphone = false,
+  bool installShortcut = false,
+}) async {
   final l10n = AppLocalizations.of(context);
   final go = await LkSheet.show<bool>(
     context,
     title: askAccess ? l10n.autoCaptureTitle : l10n.autoCaptureHowLink,
-    wrap: (sheet) => HowCaptureWorks(askAccess: askAccess, child: sheet),
+    wrap: (sheet) => HowCaptureWorks(
+      askAccess: askAccess,
+      iphone: iphone,
+      installShortcut: installShortcut,
+      child: sheet,
+    ),
     children: const [_HowPages()],
     stuck: const [_HowFooter()],
   );
@@ -41,10 +53,22 @@ Future<bool> showHowCaptureWorks(BuildContext context, {required bool askAccess}
 /// Holds the steps' state (the page in view) for the sheet it wraps: the pages in its body and the
 /// dots and button in its stuck footer.
 class HowCaptureWorks extends StatefulWidget {
-  const HowCaptureWorks({super.key, required this.askAccess, required this.child});
+  const HowCaptureWorks({
+    super.key,
+    required this.askAccess,
+    this.iphone = false,
+    this.installShortcut = false,
+    required this.child,
+  });
 
   /// The last step asks for notification access ("Activar acceso") instead of "Entendido".
   final bool askAccess;
+
+  /// The iPhone's words: Apple Pay through Shortcuts.
+  final bool iphone;
+
+  /// On the iPhone, the last button installs the ready-made shortcut.
+  final bool installShortcut;
 
   /// The sheet.
   final Widget child;
@@ -143,14 +167,18 @@ class _HowPages extends StatelessWidget {
       child: _Tallest(
         children: [
           for (final step in CaptureHowStep.values)
-            CaptureHowStepView(step: step, compact: compact),
+            CaptureHowStepView(step: step, compact: compact, iphone: how.widget.iphone),
           PageView.builder(
             controller: how._controller,
             itemCount: CaptureHowStep.values.length,
             onPageChanged: how._turned,
             itemBuilder: (context, page) => Align(
               alignment: Alignment.topCenter,
-              child: CaptureHowStepView(step: CaptureHowStep.values[page], compact: compact),
+              child: CaptureHowStepView(
+                step: CaptureHowStep.values[page],
+                compact: compact,
+                iphone: how.widget.iphone,
+              ),
             ),
           ),
         ],
@@ -184,7 +212,7 @@ class _HowFooter extends StatelessWidget {
           maintainAnimation: true,
           maintainState: true,
           child: CssParagraph(
-            l10n.autoCaptureHowDisclosure,
+            how.widget.iphone ? l10n.autoCaptureIosDisclosure : l10n.autoCaptureHowDisclosure,
             key: last ? const Key('autoCapture.how.disclosure') : null,
             // Three lines, what is read and what leaves the phone: the label's size keeps them
             // within the room a short phone has under the steps.
@@ -198,7 +226,13 @@ class _HowFooter extends StatelessWidget {
             onPressed: () => how._go(page + 1),
           )
         else ...[
-          if (how.widget.askAccess)
+          if (how.widget.askAccess && how.widget.iphone)
+            PressButton.text(
+              how.widget.installShortcut ? l10n.walletSetupInstall : l10n.autoCaptureSetup,
+              key: const Key('autoCapture.setup.start'),
+              onPressed: () => Navigator.of(context).pop(true),
+            )
+          else if (how.widget.askAccess)
             PressButton.text(
               l10n.autoCaptureExplainerConfirm,
               key: const Key('autoCapture.explainer.confirm'),
@@ -218,9 +252,12 @@ class _HowFooter extends StatelessWidget {
 
 /// One step: its scene (decoration), title, body and, for most, its demo.
 class CaptureHowStepView extends StatelessWidget {
-  const CaptureHowStepView({super.key, required this.step, this.compact});
+  const CaptureHowStepView({super.key, required this.step, this.compact, this.iphone = false});
 
   final CaptureHowStep step;
+
+  /// The iPhone's words for the steps that differ (paying, what is read, what comes).
+  final bool iphone;
 
   /// The compact step (a smaller scene beside the words); null decides by [compactBelow].
   final bool? compact;
@@ -234,10 +271,19 @@ class CaptureHowStepView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
     final (title, body) = switch (step) {
+      CaptureHowStep.pay when iphone => (l10n.autoCaptureHowPayTitle, l10n.autoCaptureIosPayBody),
       CaptureHowStep.pay => (l10n.autoCaptureHowPayTitle, l10n.autoCaptureHowPayBody),
+      CaptureHowStep.reads when iphone => (
+        l10n.autoCaptureIosReadsTitle,
+        l10n.autoCaptureIosReadsBody,
+      ),
       CaptureHowStep.reads => (l10n.autoCaptureHowReadsTitle, l10n.autoCaptureHowReadsBody),
       CaptureHowStep.decide => (l10n.autoCaptureHowDecideTitle, l10n.autoCaptureHowDecideBody),
       CaptureHowStep.learns => (l10n.autoCaptureHowLearnsTitle, l10n.autoCaptureHowLearnsBody),
+      CaptureHowStep.next when iphone => (
+        l10n.autoCaptureHowNextTitle,
+        l10n.autoCaptureIosNextBody,
+      ),
       CaptureHowStep.next => (l10n.autoCaptureHowNextTitle, l10n.autoCaptureHowNextBody),
     };
     final demo = switch (step) {

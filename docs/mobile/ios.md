@@ -78,8 +78,8 @@ job in `ci.yml`. The Android side is `release.md`.
 - **The `wambito.sync` task.** `Info.plist` lists `wambito.sync` (and `wambito.notice.due`) in
   `BGTaskSchedulerPermittedIdentifiers`, with `fetch` in `UIBackgroundModes`. For an encrypted
   (`preview`) account the app schedules a `BGAppRefreshTask` named `wambito.sync` (every 4 hours at
-  the earliest) that runs the sync in a headless Flutter engine for up to 25 seconds, with no
-  capture queue and nothing sent in clear. A plain account schedules none. iOS decides when it runs
+  the earliest) that runs the sync in a headless Flutter engine for up to 25 seconds, then sends
+  what the capture queue still holds (Apple Pay payments a cut-off run left), nothing in clear. A plain account schedules none. iOS decides when it runs
   (it may be hours later, or never on Low Power Mode), so the app also syncs when opened. Removing
   or renaming the identifier needs a migration: a pending request for a name that is no longer
   listed makes `BGTaskScheduler` throw.
@@ -90,6 +90,26 @@ job in `ci.yml`. The Android side is `release.md`.
   a sensitive operation (removing a device, making a new recovery key, showing it); the face never leaves
   the phone. A phone with no screen lock asks the current recovery key instead (`confirmSensitive`).
   Keep the three texts in step with the App Privacy answers below.
+
+## The Wallet shortcut (automatic capture)
+
+The app ships the Shortcuts action "Anotar pago de Wallet" (`ios/Runner/Capture/`); the Transaction
+automation that calls it is either built by the person with the in-app guide or installed ready-made
+from an iCloud link on iOS 27 (spec `docs/superpowers/specs/2026-11-22-ios-wallet-capture-design.md`).
+To make or remake that link, on an iPhone with iOS 27 and the current Wambito installed:
+
+1. Shortcuts → new shortcut, named "Anotar pago de Wallet".
+2. Add the automation **Transacción**: all cards, every category, **Confirm Before Run off**.
+3. Add Wambito's action **Anotar pago de Wallet**; set Monto, Comercio and Tarjeta to the trigger's
+   Amount, Merchant and Card. Nothing else in the shortcut.
+4. Share → Copy iCloud Link, and paste it in `walletShortcutUrl`
+   (`apps/mobile/lib/capture_auto/wallet_setup.dart`). While it is empty the app shows the guide;
+   once set, switching Apple Pay on for the first time on iOS 27 opens the link directly.
+5. Check it on a second phone: install from the link, Edit, turn the automation on, pay once with the
+   phone unlocked; the payment shows in Wambito "por revisar · de Apple Wallet".
+
+Renaming the action, its type (`LogWalletPaymentIntent`) or its parameters breaks every installed
+shortcut silently: never do it.
 
 ## Answers App Store Connect asks
 

@@ -59,6 +59,8 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
                     result.success(CaptureQueueChannel.take(activity, userId))
                 }
             }
+            // The iPhone's Shortcuts setup ("Probar", "Abrir Atajos"): nothing on Android.
+            "test", "openShortcuts" -> result.success(false)
             // On sign-out: captures of the account that left must not be sent for the next one.
             "clearQueue" -> {
                 CaptureQueue(activity).clear()

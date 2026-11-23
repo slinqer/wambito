@@ -1,0 +1,6 @@
+/* The Shortcuts action "Anotar pago de Wallet" (Capture/LogWalletPaymentIntent.swift). */
+"wallet.intent.title" = "Registar pagamento da Wallet";
+"wallet.intent.description" = "Guarda no Wambito um pagamento com Apple Pay, para reveres depois.";
+"wallet.intent.amount" = "Montante";
+"wallet.intent.merchant" = "Comerciante";
+"wallet.intent.card" = "Cartão";

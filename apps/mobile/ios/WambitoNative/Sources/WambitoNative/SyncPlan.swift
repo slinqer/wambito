@@ -18,4 +18,10 @@ public enum SyncPlan {
   public static func succeeded(_ outcome: String) -> Bool {
     outcome == "done" || outcome == "changed" || outcome == "busy"
   }
+
+  /// Whether the task may go on to send the capture queue after the sync: never once it expired
+  /// (the task is completed; an engine started then would be suspended holding the vault lease).
+  public static func sendsCaptures(after outcome: String, mayStart: Bool) -> Bool {
+    mayStart && outcome != "expired"
+  }
 }

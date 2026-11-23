@@ -3,7 +3,7 @@
 Android and iOS, both `com.wambito.app`. No Play Services or Firebase (`scripts/check-no-google.sh`);
 deps pinned, free-licensed (`scripts/check-licenses.sh`). Setup, emulator, JDK 17:
 `docs/mobile/setup.md`. Release and signing: `docs/mobile/release.md`; iOS: `docs/mobile/ios.md`.
-iOS has no automatic capture or widgets (see "iOS" below); its voice is the precise engine only.
+iOS has no widgets; its automatic capture is Apple Pay payments through a Shortcuts action (see "iOS" below); its voice is the precise engine only.
 
 ## Dart entry points (`lib/`)
 
@@ -25,6 +25,16 @@ iOS has no automatic capture or widgets (see "iOS" below); its voice is the prec
   web copies (`test/tooling/capture_scenes_test.dart`). Tests: `test/l10n/capture_copy_test.dart`
   (no language words; app copy equals web copy), parity pairs in
   `test/parity/capture_how_parity_test.dart`.
+  On the iPhone (`status().iosMajor` set, `available` = `apple_wallet`) the section has one row, Apple Pay
+  (`autoCapture.apple_wallet`, line "Configurada" / "Sin configurar" from `configured`), then `autoCapture.setup`
+  ("Configurar en Atajos": `wallet_setup.dart` `showWalletSetup`, the four steps and `walletSetup.install` on iOS 27
+  once `walletShortcutUrl` holds the iCloud link, else the hand-made guide `walletSetup.guide` and
+  `walletSetup.openShortcuts`), `autoCapture.test` ("Probar": notice permission, then `testCapture(body)`, nothing
+  saved) and, after switching it off, `autoCapture.remove` (opens Shortcuts); the how-it-works sheet takes
+  `iphone: true` (the `autoCaptureIos*` words, ending with `autoCapture.setup.start`). When the shortcut is
+  installable (`walletInstallable`: iOS 27 and `walletShortcutUrlProvider` not empty) the first switch on's last
+  button reads "Instalar el atajo", opens the link straight away and leaves `showWalletFinish`
+  (`walletSetup.finish`, "Falta un paso": open it, Edit, turn the automation on) for the return.
   `capture_platform.dart` wraps the `wambito/capture` channel (`autoCapturePlatformProvider`; no channel ⇒ `status()` null ⇒ the section
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
   (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue); a merge passes
@@ -191,7 +201,7 @@ iOS has no automatic capture or widgets (see "iOS" below); its voice is the prec
   handler), budget or `expirationHandler`, all on the main thread) and ends with `setTaskCompleted` once (`TaskOnce`
   in `WambitoNative`: an expiration before the start keeps the engine from starting); `BackgroundChannel` hands `finished`'s outcome to it and sends
   `vaultChanged` to the app's engine (`BackgroundChannel.app`). `setEncryptionMode {mode, owner}` schedules or
-  cancels it (`AccountMode.owner`, `wambito.encryption.owner`). iOS has no capture queue and sends nothing natively.
+  cancels it (`AccountMode.owner`, `wambito.encryption.owner`). iOS's capture queue is `Capture/` (below); it sends nothing natively either: `captureMain` does.
 - `lib/vault/`: the gate on screen. `vault_gate.dart` is `vault-gate.ts` (state machine over injected
   deps), `vault_providers.dart` wires it (`vaultGateProvider`, `vaultSessionProvider`,
   `unlockPasskeyOfferedProvider`, `forgetVaultProvider`, `staleVaultsProvider`), `encryption_mode.dart`
@@ -558,6 +568,20 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
     only the precise model: Dart's `PreciseEngine` (`lib/capture/engine/precise_engine.dart`) is the
     engine there, `modelStoreProvider` is the precise store, the precise offer and switch are off,
     voice needs `preciseEligibleProvider`, and the licences list only what iOS ships.
+  - `Capture/` (spec `2026-11-22-ios-wallet-capture-design.md`): `LogWalletPaymentIntent` ("Anotar pago de
+    Wallet", iOS 17+, in `WambitoShortcuts: AppShortcutsProvider`; parameters `amount` (`IntentCurrencyAmount`),
+    `merchant`, `card`; words in `{es,en,it,pt}.lproj/Localizable.strings`, the default table: the Shortcuts editor reads only that one) queues the payment
+    (`WalletPayment.read` → `CaptureQueueStore`, `wambito.capture.queue.json` in Application Support, readable after
+    first unlock, out of backups; an item queued with no session goes to the next sign-in) unless the switch is off
+    (`CaptureSettings`, UserDefaults `wambito.capture.sources`, unset = on; `wambito.capture.configured`), then
+    `CaptureRun.send` runs `captureMain` in `HeadlessRunner` (one run at a time; a finished run refuses what it left,
+    8 times then dropped) and `CaptureNotices` posts the silent "¿bien?" (category `wambito.capture`, actions
+    `wambito.capture.ok` = Bien, confirmed in the background by `NoticeTaps`, and `wambito.capture.change`; id
+    `wambito.capture.<txId>`). `CaptureChannel` is the app's `wambito/capture` (`status` with `available`,
+    `configured`, `iosMajor`; `setSource`, `sendQueued`, `clearQueue`, `takeQueued`, `ackQueued`, `dismiss`,
+    `keepOnly`, `test`, `openShortcuts`), `CaptureQueueChannel` the headless engine's; `SyncTask` sends the queue
+    after each sync. Pure parts (`WalletPayment`, `CaptureQueueStore`, `CaptureMoney` = Android's `formatMoney`,
+    `CaptureAnswer`) live in `WambitoNative` with tests.
   - Words of the notices: `{es,en,it,pt}.lproj/Notices.strings`, generated from the Android
     `strings.xml` by `dart run scripts/gen-ios-strings.dart` (CI fails when stale; the scanner's two words too), so both phones say
     the same words. `InfoPlist.strings` are the permission texts. `PrivacyInfo.xcprivacy` and
@@ -581,8 +605,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
 - Native channels on both phones: `scripts/check-channels.sh` (repo root; CI `check`) fails when a
   channel or method Dart calls is missing from the Kotlin or the Swift side; what one phone cannot
   have is listed with a reason in `.github/channel-allowlist.txt` (`ios-impossible`, `android-only`).
-- iOS lacks, by design: automatic capture (`wambito/capture`, no API for it), widgets (the setting
-  is hidden on iOS), and Vosk's live voice (iOS has the precise engine only). Dart hides them when the channel
+- iOS lacks, by design: reading other apps' notifications (capture is Apple Pay through Shortcuts only),
+  widgets (the setting is hidden on iOS), and Vosk's live voice (iOS has the precise engine only). Dart hides them when the channel
   or platform is absent.
 - sherpa-onnx for iOS: `scripts/build-sherpa-onnx-ios.sh` (macOS, cmake on PATH; run once by hand)
   builds `sherpa-onnx-ios-2.0.1.zip` with upstream's `build-ios.sh`; it lives in the release

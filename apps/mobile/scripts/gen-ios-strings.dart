@@ -29,6 +29,12 @@ const keys = [
   // The QR scanner's camera screen (ios/Runner/Scanner/ScannerViewController.swift), read from the same table.
   'scanner_hint',
   'scanner_close',
+  // The capture notification (ios/Runner/Capture/CaptureNotices.swift): money, merchant and category,
+  // in that order in every language (`%1$s`..`%3$s` become `%@`).
+  'capture_noted',
+  'capture_noted_fallback',
+  'capture_confirm',
+  'capture_change',
 ];
 
 final _entry = RegExp(r'<string\s+name="([^"]+)"[^>]*>(.*?)</string>', dotAll: true);

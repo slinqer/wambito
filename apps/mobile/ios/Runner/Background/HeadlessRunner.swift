@@ -1,14 +1,14 @@
 import Flutter
 import Foundation
 
-/// One Dart entry point (`syncMain`) in a headless Flutter engine, the iOS side of
+/// One Dart entry point (`syncMain`, `captureMain`) in a headless Flutter engine, the iOS side of
 /// `HeadlessRunner.kt`. The engine ends exactly once, on whichever comes first: Dart's `finished`,
 /// the [budget], or [abort] (the task's `expirationHandler`); [run]'s completion is called once, on
 /// the main thread, with the outcome: `finished`'s, or `timeout`, `expired`, `busy` (a run is
-/// already going) or `failed` (the engine did not start).
+/// already going) or `failed` (the engine did not start), and the answers of the captures the run
+/// saved (`finished`'s `captured`; empty otherwise).
 ///
-/// Everything touching the engine happens on the main thread. Nothing here sends anything: the
-/// outcome is only a word.
+/// Everything touching the engine happens on the main thread. Nothing here sends anything.
 final class HeadlessRunner {
   /// The run in progress, if any (main thread only).
   private static var current: HeadlessRunner?
@@ -16,18 +16,20 @@ final class HeadlessRunner {
   private var engine: FlutterEngine?
   private var background: BackgroundChannel?
   private var notices: NoticesChannel?
+  private var capture: CaptureQueueChannel?
   private var timer: DispatchWorkItem?
-  private var completion: ((String) -> Void)?
+  private var completion: ((String, [[String: Any]]) -> Void)?
 
   private init() {}
 
   /// Starts the run; callable from any thread.
   static func run(
-    entrypoint: String, budget: TimeInterval = 25, completion: @escaping (String) -> Void
+    entrypoint: String, budget: TimeInterval = 25,
+    completion: @escaping (String, [[String: Any]]) -> Void
   ) {
     onMain {
       guard current == nil else {
-        completion("busy")
+        completion("busy", [])
         return
       }
       let runner = HeadlessRunner()
@@ -48,7 +50,8 @@ final class HeadlessRunner {
   }
 
   private func start(
-    entrypoint: String, budget: TimeInterval, completion: @escaping (String) -> Void
+    entrypoint: String, budget: TimeInterval,
+    completion: @escaping (String, [[String: Any]]) -> Void
   ) {
     self.completion = completion
     let engine = FlutterEngine(name: "wambito.background", project: nil, allowHeadlessExecution: true)
@@ -59,19 +62,20 @@ final class HeadlessRunner {
     }
     GeneratedPluginRegistrant.register(with: engine)
     let messenger = engine.binaryMessenger
-    background = BackgroundChannel(messenger: messenger) { [weak self] outcome in
+    background = BackgroundChannel(messenger: messenger) { [weak self] outcome, captured in
       // Not inside the engine's own `finished` handler: destroying the engine there would tear it
       // down under the call that is still answering. The next turn of the main queue ends it.
-      DispatchQueue.main.async { self?.finish(outcome) }
+      DispatchQueue.main.async { self?.finish(outcome, captured: captured) }
     }
     notices = NoticesChannel(messenger: messenger)
+    capture = CaptureQueueChannel(messenger: messenger)
     let item = DispatchWorkItem { [weak self] in self?.finish("timeout") }
     timer = item
     DispatchQueue.main.asyncAfter(deadline: .now() + budget, execute: item)
   }
 
   /// The one end: later calls (a `finished` after the budget, say) do nothing.
-  private func finish(_ outcome: String) {
+  private func finish(_ outcome: String, captured: [[String: Any]] = []) {
     guard let completion else { return }
     self.completion = nil
     timer?.cancel()
@@ -79,9 +83,11 @@ final class HeadlessRunner {
     background?.close()
     background = nil
     notices = nil
+    capture?.close()
+    capture = nil
     engine?.destroyContext()
     engine = nil
     if HeadlessRunner.current === self { HeadlessRunner.current = nil }
-    completion(outcome)
+    completion(outcome, captured)
   }
 }

@@ -7,3 +7,7 @@
 "notice_guest" = "I tuoi dati verranno cancellati tra 15 giorni se non aggiungi la tua email. Se elimini l'app, li perdi comunque.";
 "scanner_hint" = "Inquadra con la fotocamera il QR del nuovo dispositivo.";
 "scanner_close" = "Spegni la fotocamera";
+"capture_noted" = "Ho annotato %@ da %@ · %@, va bene?";
+"capture_noted_fallback" = "Ho annotato %@ da %@ · %@, quale categoria?";
+"capture_confirm" = "Va bene";
+"capture_change" = "Cambia";
