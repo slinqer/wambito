@@ -13,6 +13,7 @@ import '../feedback/stored_flag.dart';
 import '../l10n/app_localizations.dart';
 import '../notices/notice_platform.dart';
 import '../settings/settings_parts.dart';
+import '../settings/url_opener.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
@@ -89,13 +90,20 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
 
   Future<void> _toggle(CaptureSource source, bool on) async {
     final iosMajor = _status?.iosMajor;
+    final shortcutUrl = ref.read(walletShortcutUrlProvider);
+    final install = iosMajor != null && walletInstallable(iosMajor, shortcutUrl);
     var explainedNow = false;
     if (on) {
       final explained = ref.read(autoCaptureExplainedProvider.notifier);
       await explained.ready;
       if (!mounted) return;
       if (!ref.read(autoCaptureExplainedProvider)) {
-        final go = await showHowCaptureWorks(context, askAccess: true, iphone: iosMajor != null);
+        final go = await showHowCaptureWorks(
+          context,
+          askAccess: true,
+          iphone: iosMajor != null,
+          installShortcut: install,
+        );
         if (!go || !mounted) return;
         await explained.set(true);
         explainedNow = true;
@@ -106,7 +114,14 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
     await _refresh();
     if (iosMajor != null) {
       // The iPhone has no access to grant: the automation is what makes it work.
-      if (explainedNow && mounted) await showWalletSetup(context, iosMajor: iosMajor);
+      if (!explainedNow || !mounted) return;
+      if (install) {
+        // Straight to Shortcuts; what is left waits here for the return.
+        unawaited(ref.read(urlOpenerProvider).open(Uri.parse(shortcutUrl)));
+        await showWalletFinish(context);
+      } else {
+        await showWalletSetup(context, iosMajor: iosMajor, shortcutUrl: shortcutUrl);
+      }
       return;
     }
     if (on && _status?.access == false) await _openAccess();
@@ -222,7 +237,13 @@ class _AutoCaptureSectionState extends ConsumerState<AutoCaptureSection>
             title: l10n.autoCaptureSetup,
             line: l10n.autoCaptureSetupLine,
             trailing: const RowChevron(),
-            onTap: () => unawaited(showWalletSetup(context, iosMajor: iosMajor)),
+            onTap: () => unawaited(
+              showWalletSetup(
+                context,
+                iosMajor: iosMajor,
+                shortcutUrl: ref.read(walletShortcutUrlProvider),
+              ),
+            ),
           ),
           SettingsRow(
             key: const Key('autoCapture.test'),

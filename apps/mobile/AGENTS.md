@@ -31,7 +31,10 @@ iOS has no widgets; its automatic capture is Apple Pay payments through a Shortc
   once `walletShortcutUrl` holds the iCloud link, else the hand-made guide `walletSetup.guide` and
   `walletSetup.openShortcuts`), `autoCapture.test` ("Probar": notice permission, then `testCapture(body)`, nothing
   saved) and, after switching it off, `autoCapture.remove` (opens Shortcuts); the how-it-works sheet takes
-  `iphone: true` (the `autoCaptureIos*` words, ending with `autoCapture.setup.start`).
+  `iphone: true` (the `autoCaptureIos*` words, ending with `autoCapture.setup.start`). When the shortcut is
+  installable (`walletInstallable`: iOS 27 and `walletShortcutUrlProvider` not empty) the first switch on's last
+  button reads "Instalar el atajo", opens the link straight away and leaves `showWalletFinish`
+  (`walletSetup.finish`, "Falta un paso": open it, Edit, turn the automation on) for the return.
   `capture_platform.dart` wraps the `wambito/capture` channel (`autoCapturePlatformProvider`; no channel ⇒ `status()` null ⇒ the section
   hides); `SessionController.signOut`/`accountDeleted` call its `clearQueue()`, and every sign-in
   (`_signedIn`) and a start the server confirms call `sendQueued(userId)` (a 401 keeps the queue); a merge passes

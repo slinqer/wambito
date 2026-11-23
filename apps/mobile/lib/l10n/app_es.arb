@@ -5082,5 +5082,9 @@
   "walletSetupOpenShortcuts": "Abrir Atajos",
   "@walletSetupOpenShortcuts": {
     "description": "iPhone setup: the button that opens the Shortcuts app."
+  },
+  "walletSetupFinishTitle": "Falta un paso",
+  "@walletSetupFinishTitle": {
+    "description": "iPhone setup, iOS 27: the sheet shown after the shortcut's link opened, with what is left (open it, Edit, turn the automation on)."
   }
 }

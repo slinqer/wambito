@@ -103,7 +103,8 @@ To make or remake that link, on an iPhone with iOS 27 and the current Wambito in
 3. Add Wambito's action **Anotar pago de Wallet**; set Monto, Comercio and Tarjeta to the trigger's
    Amount, Merchant and Card. Nothing else in the shortcut.
 4. Share → Copy iCloud Link, and paste it in `walletShortcutUrl`
-   (`apps/mobile/lib/capture_auto/wallet_setup.dart`). While it is empty the app shows the guide.
+   (`apps/mobile/lib/capture_auto/wallet_setup.dart`). While it is empty the app shows the guide;
+   once set, switching Apple Pay on for the first time on iOS 27 opens the link directly.
 5. Check it on a second phone: install from the link, Edit, turn the automation on, pay once with the
    phone unlocked; the payment shows in Wambito "por revisar · de Apple Wallet".
 

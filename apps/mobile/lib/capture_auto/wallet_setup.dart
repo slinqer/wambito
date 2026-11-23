@@ -1,7 +1,7 @@
 // "Configurar en Atajos" on the iPhone (spec 2026-11-22-ios-wallet-capture-design.md, section 3.4):
 // on iOS 27, once the ready-made shortcut has an iCloud link, four steps and "Instalar el atajo";
 // before iOS 27 (or without the link) the guide to build the Transaction automation by hand, and
-// "Abrir Atajos".
+// "Abrir Atajos". After the first switch on installs the shortcut, [showWalletFinish] says what is left.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -22,8 +22,15 @@ import 'capture_platform.dart';
 /// until the founder shares it from an iPhone (docs/mobile/ios.md); while empty the guide shows.
 const walletShortcutUrl = '';
 
+/// [walletShortcutUrl], replaced in tests.
+final walletShortcutUrlProvider = Provider<String>((ref) => walletShortcutUrl);
+
 /// The first iOS whose shared shortcuts keep their automation.
 const _installableFrom = 27;
+
+/// Whether an iPhone on [iosMajor] can install the ready-made shortcut from [shortcutUrl].
+bool walletInstallable(int iosMajor, String shortcutUrl) =>
+    iosMajor >= _installableFrom && shortcutUrl.isNotEmpty;
 
 /// Opens the setup sheet for an iPhone on [iosMajor]. [shortcutUrl] is [walletShortcutUrl] (tests
 /// pass another).
@@ -33,7 +40,7 @@ Future<void> showWalletSetup(
   String shortcutUrl = walletShortcutUrl,
 }) async {
   final l10n = AppLocalizations.of(context);
-  final install = iosMajor >= _installableFrom && shortcutUrl.isNotEmpty;
+  final install = walletInstallable(iosMajor, shortcutUrl);
   await LkSheet.show<void>(
     context,
     title: l10n.walletSetupTitle,
@@ -46,6 +53,72 @@ Future<void> showWalletSetup(
   );
 }
 
+/// What is left once the shortcut's link opened (the first switch on goes there straight): open it,
+/// Edit, turn the automation on, pay once. Shown while Shortcuts is in front, so it is there on return.
+Future<void> showWalletFinish(BuildContext context) async {
+  final l10n = AppLocalizations.of(context);
+  await LkSheet.show<void>(
+    context,
+    title: l10n.walletSetupFinishTitle,
+    children: const [KeyedSubtree(key: Key('walletSetup.finish'), child: _FinishSteps())],
+  );
+}
+
+class _FinishSteps extends ConsumerWidget {
+  const _FinishSteps();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: WambitoTokens.space3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: WambitoTokens.space3,
+        children: [
+          _Steps([l10n.walletSetupStep2, l10n.walletSetupStep3, l10n.walletSetupStep4]),
+          const SizedBox(height: WambitoTokens.space2),
+          PressButton.text(
+            l10n.walletSetupOpenShortcuts,
+            key: const Key('walletSetup.openShortcuts'),
+            onPressed: () => unawaited(ref.read(autoCapturePlatformProvider).openShortcuts()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Numbered steps, one paragraph each.
+class _Steps extends StatelessWidget {
+  const _Steps(this.steps);
+
+  final List<String> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lkColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: WambitoTokens.space3,
+      children: [
+        for (final (i, step) in steps.indexed)
+          Row(
+            key: Key('walletSetup.step${i + 1}'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: WambitoTokens.space3,
+            children: [
+              Text('${i + 1}.', style: LkText.step.copyWith(color: colors.brand)),
+              Expanded(
+                child: CssParagraph(step, style: LkText.body.copyWith(color: colors.ink)),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
 class _InstallSteps extends ConsumerWidget {
   const _InstallSteps({required this.url});
 
@@ -54,31 +127,18 @@ class _InstallSteps extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final colors = context.lkColors;
-    final steps = [
-      l10n.walletSetupStep1,
-      l10n.walletSetupStep2,
-      l10n.walletSetupStep3,
-      l10n.walletSetupStep4,
-    ];
     return Padding(
       padding: const EdgeInsets.only(top: WambitoTokens.space3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: WambitoTokens.space3,
         children: [
-          for (final (i, step) in steps.indexed)
-            Row(
-              key: Key('walletSetup.step${i + 1}'),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: WambitoTokens.space3,
-              children: [
-                Text('${i + 1}.', style: LkText.step.copyWith(color: colors.brand)),
-                Expanded(
-                  child: CssParagraph(step, style: LkText.body.copyWith(color: colors.ink)),
-                ),
-              ],
-            ),
+          _Steps([
+            l10n.walletSetupStep1,
+            l10n.walletSetupStep2,
+            l10n.walletSetupStep3,
+            l10n.walletSetupStep4,
+          ]),
           const SizedBox(height: WambitoTokens.space2),
           PressButton.text(
             l10n.walletSetupInstall,

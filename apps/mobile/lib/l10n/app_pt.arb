@@ -1333,5 +1333,6 @@
   "walletSetupStep4": "Paga uma vez com o iPhone desbloqueado. A partir daí funciona sozinho.",
   "walletSetupInstall": "Instalar o atalho",
   "walletSetupGuide": "1. Abre os Atalhos e vai a Automação.\n2. Toca em + e escolhe Transação.\n3. Escolhe os teus cartões e Executar imediatamente, depois Seguinte.\n4. Procura a ação «Registar pagamento da Wallet» do Wambito.\n5. Em Montante, Comerciante e Cartão escolhe os dados da Transação.\n6. Toca em OK.",
-  "walletSetupOpenShortcuts": "Abrir os Atalhos"
+  "walletSetupOpenShortcuts": "Abrir os Atalhos",
+  "walletSetupFinishTitle": "Falta um passo"
 }

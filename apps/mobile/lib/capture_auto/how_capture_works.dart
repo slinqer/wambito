@@ -23,7 +23,8 @@ enum CaptureHowStep { pay, reads, decide, learns, next }
 /// Opens the steps. With [askAccess] (the first switch on) the last step ends with "Activar
 /// acceso" and the answer is true when the person goes on; otherwise it ends with "Entendido".
 /// Closing the sheet answers false. With [iphone] the words are the iPhone's (Apple Pay through
-/// Shortcuts) and the first switch on ends with "Configurar en Atajos" instead.
+/// Shortcuts) and the first switch on ends with "Configurar en Atajos" instead, or with "Instalar el
+/// atajo" when [installShortcut] (the ready-made shortcut can be installed).
 ///
 /// The pages scroll with the sheet; the dots and the button (and, on the last step, the disclosure
 /// right above it) stay at the sheet's bottom, always in view.
@@ -31,12 +32,18 @@ Future<bool> showHowCaptureWorks(
   BuildContext context, {
   required bool askAccess,
   bool iphone = false,
+  bool installShortcut = false,
 }) async {
   final l10n = AppLocalizations.of(context);
   final go = await LkSheet.show<bool>(
     context,
     title: askAccess ? l10n.autoCaptureTitle : l10n.autoCaptureHowLink,
-    wrap: (sheet) => HowCaptureWorks(askAccess: askAccess, iphone: iphone, child: sheet),
+    wrap: (sheet) => HowCaptureWorks(
+      askAccess: askAccess,
+      iphone: iphone,
+      installShortcut: installShortcut,
+      child: sheet,
+    ),
     children: const [_HowPages()],
     stuck: const [_HowFooter()],
   );
@@ -50,6 +57,7 @@ class HowCaptureWorks extends StatefulWidget {
     super.key,
     required this.askAccess,
     this.iphone = false,
+    this.installShortcut = false,
     required this.child,
   });
 
@@ -58,6 +66,9 @@ class HowCaptureWorks extends StatefulWidget {
 
   /// The iPhone's words: Apple Pay through Shortcuts.
   final bool iphone;
+
+  /// On the iPhone, the last button installs the ready-made shortcut.
+  final bool installShortcut;
 
   /// The sheet.
   final Widget child;
@@ -217,7 +228,7 @@ class _HowFooter extends StatelessWidget {
         else ...[
           if (how.widget.askAccess && how.widget.iphone)
             PressButton.text(
-              l10n.autoCaptureSetup,
+              how.widget.installShortcut ? l10n.walletSetupInstall : l10n.autoCaptureSetup,
               key: const Key('autoCapture.setup.start'),
               onPressed: () => Navigator.of(context).pop(true),
             )

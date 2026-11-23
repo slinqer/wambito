@@ -2530,5 +2530,6 @@
   "walletSetupStep4": "Pay once with the iPhone unlocked. From then on it works by itself.",
   "walletSetupInstall": "Install the shortcut",
   "walletSetupGuide": "1. Open Shortcuts and go to Automation.\n2. Tap + and choose Transaction.\n3. Choose your cards and Run Immediately, then Next.\n4. Find Wambito's “Log Wallet payment” action.\n5. For Amount, Merchant and Card pick the Transaction's details.\n6. Tap Done.",
-  "walletSetupOpenShortcuts": "Open Shortcuts"
+  "walletSetupOpenShortcuts": "Open Shortcuts",
+  "walletSetupFinishTitle": "One step left"
 }

@@ -1333,5 +1333,6 @@
   "walletSetupStep4": "Paga una volta con l'iPhone sbloccato. Da lì funziona da solo.",
   "walletSetupInstall": "Installa il comando",
   "walletSetupGuide": "1. Apri Comandi e vai su Automazione.\n2. Tocca + e scegli Transazione.\n3. Scegli le tue carte ed Esegui subito, poi Avanti.\n4. Cerca l'azione «Registra pagamento Wallet» di Wambito.\n5. In Importo, Esercente e Carta scegli i dati della Transazione.\n6. Tocca Fine.",
-  "walletSetupOpenShortcuts": "Apri Comandi"
+  "walletSetupOpenShortcuts": "Apri Comandi",
+  "walletSetupFinishTitle": "Manca un passo"
 }
