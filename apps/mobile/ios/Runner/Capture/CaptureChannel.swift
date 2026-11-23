@@ -14,7 +14,7 @@ import WambitoNative
 ///  * `takeQueued({userId})` / `ackQueued({keys, confirms})`: as the headless engine's.
 ///  * `dismiss({ids})` / `keepOnly({ids, before})` -> nil: the capture notifications of transactions
 ///    confirmed elsewhere go.
-///  * `test` -> true: "Probar", a notification as a payment would post, nothing saved.
+///  * `test({body})` -> true: "Probar", [body] posted as a payment's notification, nothing saved.
 final class CaptureChannel {
   private let channel: FlutterMethodChannel
   private let store: CaptureQueueStore
@@ -74,7 +74,11 @@ final class CaptureChannel {
       }
       result(nil)
     case "test":
-      CaptureRun.test()
+      guard let body = arguments?["body"] as? String, !body.isEmpty else {
+        result(FlutterError(code: "bad_args", message: "body", details: nil))
+        return
+      }
+      CaptureRun.test(body)
       result(true)
     default:
       let answer = CaptureQueueChannel.answer(call, store: store)

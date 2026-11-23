@@ -13,9 +13,9 @@ enum CaptureRun {
   private static var waiting: [(String) -> Void] = []
   private static var running = false
 
-  /// "Probar": what a payment's notification looks like, with nothing queued or saved (set at
-  /// launch with [announce]).
-  static var test: () -> Void = {}
+  /// "Probar": posts [body] as a payment's notification would look, with nothing queued or saved
+  /// (set at launch with [announce]).
+  static var test: (String) -> Void = { _ in }
 
   /// Runs `captureMain` when the queue has something for its owner; [completion] gets the outcome
   /// (`empty` when there was nothing to save), on the main thread. A call made while a run is going
