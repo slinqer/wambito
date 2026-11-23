@@ -4491,18 +4491,9 @@
   "@protectTitle": {
     "description": "Settings: the block that offers ways back to the data for an account without email."
   },
-  "protectLead": "Tus datos viven cifrados en este teléfono. Si lo pierdes, con esto vuelves a abrirlos.",
+  "protectLead": "Para no perder tus datos, aunque pierdas este teléfono.",
   "@protectLead": {
     "description": "Settings → Protect your data: what the block is for."
-  },
-  "protectCount": "{done} de 2",
-  "@protectCount": {
-    "description": "Settings → Protect your data: how many of the two ways back are done.",
-    "placeholders": {
-      "done": {
-        "type": "int"
-      }
-    }
   },
   "protectRecoveryTitle": "Clave de recuperación",
   "@protectRecoveryTitle": {
@@ -4547,6 +4538,26 @@
   "protectDone": "Listo",
   "@protectDone": {
     "description": "Settings → Protect your data: a step that is done."
+  },
+  "protectStepTodo": "Pendiente",
+  "@protectStepTodo": {
+    "description": "Settings \u2192 Protect your data: a step still to do, at the end of its row."
+  },
+  "protectPasskeyRow": "Huella",
+  "@protectPasskeyRow": {
+    "description": "Settings \u2192 Protect your data: the passkey step's row on Android."
+  },
+  "protectPasskeyRowIos": "Face ID",
+  "@protectPasskeyRowIos": {
+    "description": "Settings \u2192 Protect your data: the passkey step's row on the iPhone."
+  },
+  "protectPasskeyLeadIos": "Tu gestor de contraseñas la guarda. Con Face ID vuelves a entrar, con tus datos abiertos.",
+  "@protectPasskeyLeadIos": {
+    "description": "Settings \u2192 Protect your data: what the passkey step is, on the iPhone (read by the screen reader)."
+  },
+  "protectEmailLeadIos": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque no tengas Face ID.",
+  "@protectEmailLeadIos": {
+    "description": "Settings \u2192 Protect your data: what adding an email is for, on the iPhone (read by the screen reader)."
   },
   "protectKeySaved": "Tu clave de recuperación quedó guardada. Guárdala donde no se pierda.",
   "@protectKeySaved": {

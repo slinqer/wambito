@@ -232,10 +232,19 @@ class _ProtectCardState extends ConsumerState<ProtectCard> {
                   ),
                 ],
               ),
+              // As the other home cards: the way in first, "Not now" at the end.
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 spacing: WambitoTokens.space2,
                 children: [
+                  Flexible(
+                    child: PressButton.text(
+                      l10n.protectCardGo,
+                      key: const Key('protect.cardGo'),
+                      size: PressSize.sm,
+                      onPressed: _busy ? null : () => unawaited(_go()),
+                    ),
+                  ),
                   PressButton.text(
                     l10n.protectCardLater,
                     key: const Key('protect.cardLater'),
@@ -244,12 +253,6 @@ class _ProtectCardState extends ConsumerState<ProtectCard> {
                     onPressed: _busy
                         ? null
                         : () => unawaited(ref.read(protectCardProvider.notifier).dismiss()),
-                  ),
-                  PressButton.text(
-                    l10n.protectCardGo,
-                    key: const Key('protect.cardGo'),
-                    size: PressSize.sm,
-                    onPressed: _busy ? null : () => unawaited(_go()),
                   ),
                 ],
               ),

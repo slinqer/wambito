@@ -10,7 +10,8 @@ import '../theme/tokens.g.dart';
 import '../vault/preview.dart' show isPreviewProvider;
 
 /// What the face button's menu on home holds, as the web's does (`HomeHeader`'s sections):
-/// Recurrentes, Categorías and Ajustes, and, for a guest, "Guarda tu progreso" first. Each closes
+/// Recurrentes, Categorías and Ajustes, and, for a guest, "Guarda tu progreso" first ("Crear tu
+/// cuenta" for a `preview` guest). Each closes
 /// the menu and goes there. The web's Categorías is its categories page; the app has none, its
 /// categories are home's Categorías tab, so that is shown.
 class HomeMenuLinks extends ConsumerWidget {
@@ -22,9 +23,12 @@ class HomeMenuLinks extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    // A `preview` guest has the home card and Settings' block instead (ruling 21).
-    final guest =
-        ref.watch(sessionProvider.select((s) => s.isGuest)) && !ref.watch(isPreviewProvider);
+    final anyGuest = ref.watch(sessionProvider.select((s) => s.isGuest));
+    final preview = ref.watch(isPreviewProvider);
+    // A `plain` guest saves their progress; a `preview` guest creates their account (adding an
+    // email, the last step of "Protect your data"). Both lead to /progress.
+    final guest = anyGuest && !preview;
+    final createAccount = anyGuest && preview;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -34,6 +38,15 @@ class HomeMenuLinks extends ConsumerWidget {
           HomeMenuLink(
             key: const Key('home.saveProgress'),
             label: l10n.progressTitle,
+            onPressed: () {
+              close();
+              context.push('/progress');
+            },
+          ),
+        if (createAccount)
+          HomeMenuLink(
+            key: const Key('home.createAccount'),
+            label: l10n.protectEmailTitle,
             onPressed: () {
               close();
               context.push('/progress');

@@ -426,12 +426,16 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   (`protectEmailTitle`, `protectEmailLead`, `progressPreviewBody`) and has no passkey section. A `plain` guest's claim
   and email_taken are today's. Tests: `test/entry/claim_preview_test.dart`. `confirmSensitive(noKeyYet:)`: with no screen lock and no
   saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
-  Settings (keys `protect.block`, `protect.count` "N of 2" while neither step is done, `protect.recovery`,
-  `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`); a `preview`
-  guest has no `settings.saveProgress`, and no `home.saveProgress` in home's menu (ruling 21). Tests: `test/protect/`
+  Settings (keys `protect.block` (one short line, no count), `protect.recovery`,
+  `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`; one
+  `SettingsRow` per step, "To do" + chevron or a check, key `<step>.done` once done; the passkey row is Face ID on
+  the iPhone, the fingerprint elsewhere); a `preview`
+  guest has no `settings.saveProgress`; home's menu has `home.createAccount` ("Crear tu cuenta", to `/progress`) instead
+  of `home.saveProgress` (this replaced ruling 21's "nothing in the menu"). Tests: `test/protect/`
   (`fakes.dart`: `FakeVault` on a memory store).
-  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, before `WidgetCard`, which waits while it
-  shows; buttons `protect.cardGo` = step 1, `protect.cardLater`). `protectCardProvider` is true while
+  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, the first card of home's carousel
+  (`NudgeCarousel` in `home_widgets.dart`, key `home.nudges`, dots `home.nudges.dot.<i>`, before the budgets and import
+  cards); `WidgetCard` waits while it shows; buttons `protect.cardGo` = step 1, then `protect.cardLater`). `protectCardProvider` is true while
   `protectStatusProvider` says no step is done and `protectCardDue` says so: first after 7 days since `firstOpen`
   (written at the first evaluation) or 20 live transactions in the vault, then 14 days after the first "Not now",
   30 after the second, every 30 after that. State (`ProtectCardState`: `firstOpen`, `lastDismissed`, `dismissals`)
