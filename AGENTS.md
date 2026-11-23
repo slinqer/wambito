@@ -123,6 +123,11 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
 - Commits: Conventional Commits, repo style `feat(area): …`, `fix(android): …`, `docs: …`, a
   lowercase sentence. Never a `Co-Authored-By` line. Stage by path, never `git add -A`.
 - Whoever changes an area's structure, commands or conventions updates its `AGENTS.md`.
+- Screens map in Figma: <https://www.figma.com/design/hx1vS9HGI9zzeaOdAcyiif> ("Wambito — pantallas
+  y flujo"), one page each for web, mobile and the admin panel, screens joined by flow arrows. Whoever
+  adds, removes or changes a screen, a route or the flow between screens (web, phone or admin) updates
+  that file in the same change, with the Figma MCP (`use_figma`); if Figma is not connected, say so
+  in the PR so someone updates it.
 
 ## Production
 
