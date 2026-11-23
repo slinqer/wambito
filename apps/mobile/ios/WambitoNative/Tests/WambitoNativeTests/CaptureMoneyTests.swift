@@ -46,3 +46,13 @@ final class CaptureMoneyTests: XCTestCase {
     XCTAssertEqual(CaptureMoney.format(cents: 5000000, currency: "CLP", language: "it"), "50.000\(nbsp)CLP")
   }
 }
+
+final class CaptureLanguageTests: XCTestCase {
+  func testTheAppsLanguageThenThePhonesThenSpanish() {
+    XCTAssertEqual(CaptureMoney.language(app: "it", phone: "en"), "it")
+    XCTAssertEqual(CaptureMoney.language(app: nil, phone: "en"), "en")
+    XCTAssertEqual(CaptureMoney.language(app: "de", phone: "pt"), "pt")
+    XCTAssertEqual(CaptureMoney.language(app: nil, phone: "fr"), "es")
+    XCTAssertEqual(CaptureMoney.language(app: nil, phone: nil), "es")
+  }
+}

@@ -50,6 +50,15 @@ public enum CaptureMoney {
     return out
   }
 
+  /// The notification's language, as Android's `CaptureText.languageOf`: the app's (the notices'
+  /// setting) when it speaks it, else the phone's when the app speaks it, else Spanish.
+  public static func language(app: String?, phone: String?) -> String {
+    let spoken: Set<String> = ["es", "en", "it", "pt"]
+    if let app, spoken.contains(app) { return app }
+    if let phone, spoken.contains(phone) { return phone }
+    return "es"
+  }
+
   /// [cents] (hundredths) in [currency] for [language] ("es", "en", "it" or "pt").
   public static func format(cents: Int64, currency: String, language: String) -> String {
     let comma = commaLanguage(language)

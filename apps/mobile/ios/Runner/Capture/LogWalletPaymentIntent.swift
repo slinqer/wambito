@@ -11,20 +11,20 @@ import WambitoNative
 /// at them; renaming breaks every one silently).
 @available(iOS 17, *)
 struct LogWalletPaymentIntent: AppIntent {
-  static let title = LocalizedStringResource("wallet.intent.title", table: "AppIntents")
+  static let title = LocalizedStringResource("wallet.intent.title")
   static let description = IntentDescription(
-    LocalizedStringResource("wallet.intent.description", table: "AppIntents"))
+    LocalizedStringResource("wallet.intent.description"))
   static let openAppWhenRun = false
   static let isDiscoverable = true
 
-  @Parameter(title: LocalizedStringResource("wallet.intent.amount", table: "AppIntents"))
+  @Parameter(title: LocalizedStringResource("wallet.intent.amount"))
   var amount: IntentCurrencyAmount
 
-  @Parameter(title: LocalizedStringResource("wallet.intent.merchant", table: "AppIntents"))
+  @Parameter(title: LocalizedStringResource("wallet.intent.merchant"))
   var merchant: String
 
   /// Only for the person's eyes in Shortcuts: never stored.
-  @Parameter(title: LocalizedStringResource("wallet.intent.card", table: "AppIntents"))
+  @Parameter(title: LocalizedStringResource("wallet.intent.card"))
   var card: String?
 
   func perform() async throws -> some IntentResult {
@@ -50,7 +50,7 @@ struct WambitoShortcuts: AppShortcutsProvider {
     AppShortcut(
       intent: LogWalletPaymentIntent(),
       phrases: ["\(.applicationName) wallet"],
-      shortTitle: LocalizedStringResource("wallet.intent.title", table: "AppIntents"),
+      shortTitle: LocalizedStringResource("wallet.intent.title"),
       systemImageName: "creditcard"
     )
   }

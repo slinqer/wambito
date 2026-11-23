@@ -27,6 +27,12 @@ server keeps them only as ciphertext it cannot read.
   memory, during each request, with a key the assistant carries; it never stores that key or any
   plaintext. Revoking it cuts it at once. The assistant's company handles what it reads under its
   own policy.
+- **Automatic capture (off until you turn it on):** on Android, Wambito reads only the
+  notifications of the apps you choose (Revolut, Google Wallet); on the iPhone it reads no
+  notification: the Shortcuts Transaction automation, if you set it up with Wambito's “Log Wallet
+  payment” action, hands it the amount and currency, the merchant and the card's name of each Apple
+  Pay payment. Either way the text is processed on the phone and only the transaction leaves it,
+  end-to-end encrypted; the card's name is not stored.
 - **Guests (no email):** stored encrypted like everyone else; deleted after 12 months unused, or 24
   months when protected with a recovery key or a passkey.
 - **What we don't do:** we don't sell your data, show ads, run trackers or analytics, or share it

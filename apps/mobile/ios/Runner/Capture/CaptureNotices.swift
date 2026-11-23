@@ -13,9 +13,12 @@ enum CaptureNotices {
   static let confirmAction = "wambito.capture.ok"
   static let changeAction = "wambito.capture.change"
 
-  /// The language the app last told the native side (the notices' setting), else the phone's.
-  private static var language: String? {
-    UserDefaults.standard.string(forKey: DueSettings.languageKey)
+  /// The app's language (the notices' setting), else the phone's, else Spanish: words and money
+  /// in the same one.
+  private static var language: String {
+    CaptureMoney.language(
+      app: UserDefaults.standard.string(forKey: DueSettings.languageKey),
+      phone: Locale.preferredLanguages.first.map { String($0.prefix(2)) })
   }
 
   /// The categories with their two buttons; called at launch (and again costs nothing).
@@ -60,7 +63,7 @@ enum CaptureNotices {
     let body = answer.noted(
       template: NoticePoster.text("capture_noted", language: language),
       fallbackTemplate: NoticePoster.text("capture_noted_fallback", language: language),
-      language: language ?? "es")
+      language: language)
     post(id: answer.id, body: body, category: category, center: center)
   }
 
