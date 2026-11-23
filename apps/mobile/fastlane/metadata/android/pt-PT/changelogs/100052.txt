@@ -1,0 +1,4 @@
+- As definições abrem num menu curto de categorias, com ícones.
+- Os meus agentes vem primeiro: liga o ChatGPT, o Claude, o Lumo+ ou o Grok passo a passo e vê quais estão ligados.
+- A versão da app aparece no ecrã das definições.
+- Corrigido: a app podia deixar de mostrar movimentos novos após uma captura automática em segundo plano.
