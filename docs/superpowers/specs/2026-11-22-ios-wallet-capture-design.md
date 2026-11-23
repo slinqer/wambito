@@ -1,14 +1,15 @@
 # Wambito: automatic capture on iOS (v1: Apple Pay payments through Wallet)
 
 - **Date:** 2026-11-22
-- **Status:** draft for review.
+- **Status:** approved 2026-11-23 (the installable shortcut of decision 6 added that day).
 - **Follows:** `2026-11-04-automatic-capture-design.md` (Android, Revolut and Google Wallet) and
   `2026-11-11-ios-base-design.md`, which left capture out of iOS (`wambito/capture  # ios-impossible`).
 - **Founder decisions (2026-11-22, in conversation):**
   1. iOS gets automatic capture, starting with **Apple Pay payments made with cards in Apple
      Wallet**, through the Shortcuts **Transaction** automation.
-  2. Wambito **ships its own Shortcuts action** (an App Intent), so the person installs no shortcut
-     file; the app guides the few taps of the automation, which iOS does not let an app create.
+  2. Wambito **ships its own Shortcuts action** (an App Intent). The automation that calls it is
+     either installed ready-made (decision 6) or built by the person with the app's guide; iOS does
+     not let an app create an automation itself.
   3. **Bank SMS and email** (the Shortcuts Message and Email triggers) come in a later spec, on the
      same action, with parsers per bank.
   4. **Encrypted accounts only.** Plain (unencrypted) accounts no longer exist; their code is
@@ -17,6 +18,18 @@
      entitlement from Apple; nothing in Colombia), forwarding email to a Wambito inbox (the server
      would read the text: against end-to-end encryption), the SMS filter extension (unknown senders
      only, cannot store), open-banking aggregators (server side, paid).
+- **Founder decisions (2026-11-23, in conversation):**
+  6. **On iOS 27 the automation is installed ready-made**: Wambito offers an iCloud shortcut link
+     whose shortcut carries the Transaction automation and the Wambito action (iOS 27 keeps an
+     automation inside a shared shortcut). The person installs it, taps Editar, turns the
+     automation on, and pays once with the phone unlocked. Prior art: Lukas by JotaTech
+     (`lukas.jotatech.org/es/apple-pay`), the same four steps. **iOS 17 to 26** keep the guide of
+     section 3.4. The founder makes the shortcut on his iPhone and shares its iCloud link; until
+     the link exists the app shows only the guide.
+  7. **Wallet first, Revolut later.** iOS 27 also has a Notification trigger (an app's
+     notifications, optionally filtered by text), so Revolut can be read from its notifications on
+     iOS in a later spec, with a parser like Android's. Nothing about Revolut here.
+  8. Out for now: saving where the person paid (a location permission), which Lukas does.
 
 ## 1. Why and goal
 
@@ -46,9 +59,14 @@ Immediately" must be on, so the automation never asks).
    `AppShortcutsProvider`, so the action appears in Shortcuts as soon as the app is installed. The
    automation passes the trigger's fields to it. Runs in the background without opening the app.
    Setup: about five taps in Shortcuts, guided by the app.
+   **Plus, on iOS 27 (chosen, decision 6):** an iCloud link to a ready-made shortcut whose
+   Transaction automation calls this same action. Installing it replaces the guide's taps with
+   import, Editar, turn the automation on. The action stays the only place a payment enters
+   Wambito, so the shortcut holds no logic of its own.
 2. **A shared iCloud shortcut that opens a `wambito://` link.** Nothing to build natively, but the
-   person installs a shortcut file, the app opens on every payment (or the link carries the
-   payment in a URL), and it breaks when Apple changes the gallery rules. Worse on every count.
+   app opens on every payment (or the link carries the payment in a URL), and nothing runs with
+   the app closed. Rejected; a shared shortcut that calls the App Intent (above) keeps the one-tap
+   install without these costs.
 3. **FinanceKit.** The official API for Wallet transactions, but only for Apple's own US cards and
    UK connected accounts, behind an entitlement. Not usable in Colombia; revisit if Apple widens it.
 
@@ -125,8 +143,17 @@ All new Swift lives in `apps/mobile/ios/Runner/Capture/`.
 - The **"¿Cómo funciona?"** sheet (`how_capture_works.dart`) gets an iOS variant: what is read
   (amount, merchant, card name of Apple Pay payments, nothing else), that it is processed on the
   phone, what is stored, that it does not see payments with the physical card. It ends with
-  **"Configurar en Atajos"**.
-- **Guide** (a sheet with steps and one screenshot-like illustration per step, copy only, no
+  **"Configurar en Atajos"**, which opens the iOS 27 steps or the guide, by the iOS version.
+- **iOS 27 steps** (a sheet, like Lukas's page): 1 **"Instalar el atajo"** opens the shortcut's
+  iCloud link (`https://www.icloud.com/shortcuts/<id>`) in Shortcuts, add it; 2 open it and tap
+  **Editar**; 3 tap the box "La automatización está desactivada" and turn it on; 4 pay once with
+  the phone unlocked, after which it runs locked. One illustration per step (copy only, no Apple
+  screenshots). The link is one Dart constant (`walletShortcutUrl`), empty until the founder
+  shares the shortcut; while it is empty, iOS 27 shows the guide below instead. The shortcut is a
+  single Transaction automation (all cards, no confirmation before running) whose only action is
+  "Anotar pago de Wallet" with Monto, Comercio and Tarjeta set to the trigger's fields; how to
+  build and share it is written in `docs/mobile/ios.md`, so a new version can be made again.
+- **Guide** for iOS 17 to 26 (and iOS 27 without a link) (a sheet with steps and one screenshot-like illustration per step, copy only, no
   Apple screenshots): open Atajos → Automatización → **+** → **Transacción** → choose the cards →
   **Ejecutar de inmediato** → **Siguiente** → action **"Anotar pago de Wallet"** (Wambito) → set
   Monto, Comercio and Tarjeta to the trigger's fields if Shortcuts did not fill them → Listo. A
@@ -207,7 +234,15 @@ On the founder's iPhone, with a throwaway App Intent build:
 4. How much background time `perform()` gets, and whether a headless Flutter engine starts in it.
 5. That "Ejecutar de inmediato" runs with the phone locked and the app not running.
 
-Each answer goes back into this spec before the plan is written.
+6. That the shared iOS 27 shortcut (decision 6) arrives with its automation, runs without asking,
+   and fires for every card, or what the person must still pick.
+
+Changed 2026-11-23: these no longer block the plan. The simulator run (7.1) settled item 4, and
+Lukas's shipping shortcut (7.2) shows item 6 works. The plan builds the amount reading for every
+form Shortcuts is known to give (a currency amount, a number, text such as "$18.000" or
+"COP 18.000,00"), so item 1 only adds test cases. Items 1, 2, 3, 5 and 6 are checked on the
+founder's iPhone before the iOS capture is released, and any answer that changes a step goes back
+into this spec and the guide.
 
 ### 7.1 Simulator results (2026-11-22)
 
@@ -238,3 +273,14 @@ with fixed values (18000, "Cafe de prueba"), with Wambito not running.
   `google_wallet` (the local backend rejects unknown sources) and the currency `COP`.
 
 Items 1, 2, 3 (the trigger's fields), 5 and the shared-automation question wait for the iPhone.
+
+### 7.2 Prior art: Lukas's Apple Pay shortcut (2026-11-23)
+
+Lukas by JotaTech (`lukas.jotatech.org/es/apple-pay`, read 2026-11-23) ships one iCloud shortcut
+link for iOS 27 ("Se abre en la app Atajos de tu iPhone · iOS 27") and a separate one with
+other steps for iOS 26 and earlier. Its iOS 27 steps: import the shortcut, open it and tap Editar,
+tap the box "Automation is turned off" and turn it on, make the first payment with the phone
+unlocked (after that it runs without unlocking). It names no card choice and no run-mode switch.
+So on iOS 27 a shared shortcut keeps its payment automation, off until the person turns it on.
+Its page also lists bank shortcuts on iOS 27's Notification trigger (decision 7).
+
