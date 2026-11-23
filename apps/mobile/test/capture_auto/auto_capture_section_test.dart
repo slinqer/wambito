@@ -7,6 +7,9 @@ import 'package:wambito/capture_auto/auto_capture_section.dart';
 import 'package:wambito/capture_auto/capture_platform.dart';
 import 'package:wambito/capture_auto/how_capture_works.dart';
 
+import 'package:wambito/notices/notice_platform.dart';
+
+import '../notices/fakes.dart';
 import '../settings/harness.dart';
 import 'fakes.dart';
 
@@ -156,5 +159,96 @@ void main() {
     await _show(t, const Key('autoCapture.revolut'));
 
     expect(said('Automatic capture'), findsWidgets);
+  });
+
+  group('on the iPhone', () {
+    testWidgets('only Apple Pay, configured or not, and no Android rows', (t) async {
+      await _pump(t, platform: FakeAutoCapturePlatform.iphone(configured: true));
+      await _show(t, const Key('autoCapture.apple_wallet'));
+      expect(find.byKey(const Key('autoCapture.revolut')), findsNothing);
+      expect(find.byKey(const Key('autoCapture.google_wallet')), findsNothing);
+      expect(find.text('Apple Pay'), findsOneWidget);
+      expect(find.text('Configurada'), findsOneWidget);
+      expect(find.byKey(const Key('autoCapture.missing')), findsNothing);
+      expect(find.byKey(const Key('autoCapture.grant')), findsNothing);
+    });
+
+    testWidgets('on but no payment yet says it is not set up', (t) async {
+      await _pump(t, platform: FakeAutoCapturePlatform.iphone());
+      await _show(t, const Key('autoCapture.apple_wallet'));
+      expect(find.text('Sin configurar'), findsOneWidget);
+    });
+
+    testWidgets('Configurar en Atajos opens the setup sheet', (t) async {
+      await _pump(t, platform: FakeAutoCapturePlatform.iphone());
+      await _show(t, const Key('autoCapture.setup'));
+      await t.tap(find.byKey(const Key('autoCapture.setup')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('walletSetup.sheet')), findsOneWidget);
+    });
+
+    testWidgets('Probar asks for notices, then posts the sample notification', (t) async {
+      final fake = FakeAutoCapturePlatform.iphone();
+      final notices = FakeNoticePlatform();
+      await pumpSettingsApp(
+        t,
+        locale: const Locale('es'),
+        location: '/settings/capture',
+        overrides: [
+          autoCapturePlatformProvider.overrideWithValue(fake),
+          noticePlatformProvider.overrideWithValue(notices),
+        ],
+      );
+      await _show(t, const Key('autoCapture.test'));
+      await t.tap(find.byKey(const Key('autoCapture.test')));
+      await t.pumpAndSettle();
+      expect(fake.testBodies, hasLength(1));
+      expect(fake.testBodies.single, contains('Prueba de Wambito'));
+      expect(notices.callsNamed('requestPermission'), hasLength(1));
+      expect(find.text('Listo: mira el aviso arriba'), findsOneWidget);
+    });
+
+    testWidgets('the first switch on explains it for Apple Pay and goes to the setup', (t) async {
+      final (_, fake) = await _pump(t, platform: FakeAutoCapturePlatform.iphone(on: false));
+      await _show(t, const Key('autoCapture.apple_wallet'));
+      await t.tap(find.byKey(const Key('autoCapture.apple_wallet')));
+      await t.pumpAndSettle();
+      expect(find.byType(HowCaptureWorks), findsOneWidget);
+      for (var i = 0; i < 4; i++) {
+        await t.ensureVisible(find.byKey(const Key('autoCapture.how.next')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const Key('autoCapture.how.next')));
+        await t.pumpAndSettle();
+      }
+      expect(said('Apple Pay'), findsWidgets);
+      expect(find.byKey(const Key('autoCapture.explainer.confirm')), findsNothing);
+      await t.ensureVisible(find.byKey(const Key('autoCapture.setup.start')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('autoCapture.setup.start')));
+      await t.pumpAndSettle();
+      expect(fake.callsNamed('setSource'), ['setSource apple_wallet true']);
+      expect(fake.callsNamed('openAccessSettings'), isEmpty);
+      expect(find.byKey(const Key('walletSetup.sheet')), findsOneWidget);
+    });
+
+    testWidgets('switching it off offers to remove the automation in Shortcuts', (t) async {
+      final (_, fake) = await _pump(t, platform: FakeAutoCapturePlatform.iphone(configured: true));
+      await _show(t, const Key('autoCapture.apple_wallet'));
+      await t.tap(find.byKey(const Key('autoCapture.apple_wallet')));
+      await t.pumpAndSettle();
+      expect(fake.callsNamed('setSource'), ['setSource apple_wallet false']);
+      await _show(t, const Key('autoCapture.remove'));
+      await t.tap(find.byKey(const Key('autoCapture.remove')));
+      await t.pumpAndSettle();
+      expect(fake.callsNamed('openShortcuts'), hasLength(1));
+    });
+
+    testWidgets('Android has no iPhone rows', (t) async {
+      await _pump(t, platform: FakeAutoCapturePlatform(sources: {'revolut'}, access: true));
+      await _show(t, const Key('autoCapture.how'));
+      expect(find.byKey(const Key('autoCapture.setup')), findsNothing);
+      expect(find.byKey(const Key('autoCapture.test')), findsNothing);
+      expect(find.byKey(const Key('autoCapture.apple_wallet')), findsNothing);
+    });
   });
 }

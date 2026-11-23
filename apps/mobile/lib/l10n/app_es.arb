@@ -4974,5 +4974,113 @@
         "type": "String"
       }
     }
+  },
+  "autoCaptureIosLead": "Desde tus pagos con Apple Pay",
+  "@autoCaptureIosLead": {
+    "description": "Settings, iPhone: what automatic capture is for."
+  },
+  "autoCaptureConfigured": "Configurada",
+  "@autoCaptureConfigured": {
+    "description": "Settings, iPhone: the Apple Pay row's line once a payment arrived."
+  },
+  "autoCaptureNotConfigured": "Sin configurar",
+  "@autoCaptureNotConfigured": {
+    "description": "Settings, iPhone: the Apple Pay row's line while on and no payment arrived yet."
+  },
+  "autoCaptureSetup": "Configurar en Atajos",
+  "@autoCaptureSetup": {
+    "description": "Settings, iPhone: the row that opens the setup steps; also the how-it-works sheet's last button."
+  },
+  "autoCaptureSetupLine": "Instala el atajo o créalo paso a paso",
+  "@autoCaptureSetupLine": {
+    "description": "Settings, iPhone: the setup row's line."
+  },
+  "autoCaptureTest": "Probar",
+  "@autoCaptureTest": {
+    "description": "Settings, iPhone: the row that posts a sample notification."
+  },
+  "autoCaptureTestLine": "Te mostramos el aviso de un pago",
+  "@autoCaptureTestLine": {
+    "description": "Settings, iPhone: the test row's line."
+  },
+  "autoCaptureTestMerchant": "Prueba de Wambito",
+  "@autoCaptureTestMerchant": {
+    "description": "The sample notification's merchant."
+  },
+  "autoCaptureTestNotice": "Así llega cada pago: «{merchant} · {category}, ¿bien?»",
+  "@autoCaptureTestNotice": {
+    "description": "The sample notification's text; nothing is saved.",
+    "placeholders": {
+      "merchant": {
+        "type": "String"
+      },
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "autoCaptureTestSent": "Listo: mira el aviso arriba",
+  "@autoCaptureTestSent": {
+    "description": "Toast after Probar."
+  },
+  "autoCaptureTestNoNotices": "Activa los avisos de Wambito para verlo",
+  "@autoCaptureTestNoNotices": {
+    "description": "Toast when notices are not allowed."
+  },
+  "autoCaptureRemove": "Quita la automatización en Atajos",
+  "@autoCaptureRemove": {
+    "description": "Settings, iPhone: shown while Apple Pay is off; opens Shortcuts."
+  },
+  "autoCaptureIosPayBody": "Pagas con Apple Pay como siempre y Atajos le pasa el pago a Wambito.",
+  "@autoCaptureIosPayBody": {
+    "description": "How it works, iPhone: step 1's body."
+  },
+  "autoCaptureIosReadsTitle": "Se guarda en tu teléfono",
+  "@autoCaptureIosReadsTitle": {
+    "description": "How it works, iPhone: step 2's title."
+  },
+  "autoCaptureIosReadsBody": "Atajos solo le da el monto, el comercio y el nombre de la tarjeta. Se guarda cifrado: nadie más lo lee.",
+  "@autoCaptureIosReadsBody": {
+    "description": "How it works, iPhone: step 2's body."
+  },
+  "autoCaptureIosNextBody": "Hoy funciona con tus pagos con Apple Pay; los pagos con la tarjeta física no pasan por Wallet. Agregaremos más bancos con el tiempo.",
+  "@autoCaptureIosNextBody": {
+    "description": "How it works, iPhone: step 5's body."
+  },
+  "autoCaptureIosDisclosure": "Wambito recibe de Atajos el monto, el comercio y la tarjeta de tus pagos con Apple Pay, y los guarda cifrados en tu teléfono.",
+  "@autoCaptureIosDisclosure": {
+    "description": "How it works, iPhone: the disclosure on the last step."
+  },
+  "walletSetupTitle": "Configurar en Atajos",
+  "@walletSetupTitle": {
+    "description": "iPhone setup sheet: title."
+  },
+  "walletSetupStep1": "Toca Instalar el atajo y agrégalo en Atajos.",
+  "@walletSetupStep1": {
+    "description": "iPhone setup, iOS 27: step 1."
+  },
+  "walletSetupStep2": "Abre el atajo y toca Editar.",
+  "@walletSetupStep2": {
+    "description": "iPhone setup, iOS 27: step 2. The button's name as iOS shows it."
+  },
+  "walletSetupStep3": "Toca el recuadro «La automatización está desactivada» y actívala.",
+  "@walletSetupStep3": {
+    "description": "iPhone setup, iOS 27: step 3."
+  },
+  "walletSetupStep4": "Paga una vez con el iPhone desbloqueado. Desde ahí funciona solo.",
+  "@walletSetupStep4": {
+    "description": "iPhone setup, iOS 27: step 4."
+  },
+  "walletSetupInstall": "Instalar el atajo",
+  "@walletSetupInstall": {
+    "description": "iPhone setup, iOS 27: the button that opens the shortcut's iCloud link."
+  },
+  "walletSetupGuide": "1. Abre Atajos y ve a Automatización.\n2. Toca + y elige Transacción.\n3. Elige tus tarjetas y Ejecutar de inmediato, luego Siguiente.\n4. Busca la acción «Anotar pago de Wallet» de Wambito.\n5. En Monto, Comercio y Tarjeta elige los datos de la Transacción.\n6. Toca Listo.",
+  "@walletSetupGuide": {
+    "description": "iPhone setup before iOS 27 (or without the link): the steps to build the automation by hand, with iOS's own words."
+  },
+  "walletSetupOpenShortcuts": "Abrir Atajos",
+  "@walletSetupOpenShortcuts": {
+    "description": "iPhone setup: the button that opens the Shortcuts app."
   }
 }

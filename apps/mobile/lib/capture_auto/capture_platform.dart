@@ -105,6 +105,13 @@ abstract interface class AutoCapturePlatform {
   /// Forgets the captures waiting to be sent (on sign-out: they belong to the old account).
   Future<void> clearQueue();
 
+  /// iPhone, "Probar": posts [body] as a payment's notification would look; nothing is saved.
+  /// Whether it was posted (false on Android).
+  Future<bool> testCapture(String body);
+
+  /// iPhone: opens the Shortcuts app; whether it opened (false on Android).
+  Future<bool> openShortcuts();
+
   /// [userId] signed in: the queue becomes theirs (captures queued for another account, or for no
   /// known one, are dropped) and what is left is sent. [from] is an account whose data [userId]
   /// takes over (a merge, or a merge called off): its captures are re-tagged and its "Bien"
@@ -180,6 +187,12 @@ class ChannelAutoCapturePlatform implements AutoCapturePlatform {
 
   @override
   Future<void> clearQueue() => _call<void>('clearQueue');
+
+  @override
+  Future<bool> testCapture(String body) async => await _call<bool>('test', {'body': body}) ?? false;
+
+  @override
+  Future<bool> openShortcuts() async => await _call<bool>('openShortcuts') ?? false;
 
   @override
   Future<void> sendQueued(String userId, {String? from}) =>

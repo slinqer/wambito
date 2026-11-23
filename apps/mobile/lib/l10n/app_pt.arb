@@ -1308,5 +1308,30 @@
         "type": "String"
       }
     }
-  }
+  },
+  "autoCaptureIosLead": "Dos seus pagamentos com Apple Pay",
+  "autoCaptureConfigured": "Configurada",
+  "autoCaptureNotConfigured": "Por configurar",
+  "autoCaptureSetup": "Configurar nos Atalhos",
+  "autoCaptureSetupLine": "Instale o atalho ou crie-o passo a passo",
+  "autoCaptureTest": "Testar",
+  "autoCaptureTestLine": "Mostramos o aviso de um pagamento",
+  "autoCaptureTestMerchant": "Teste do Wambito",
+  "autoCaptureTestNotice": "Assim chega cada pagamento: «{merchant} · {category}, certo?»",
+  "autoCaptureTestSent": "Pronto: veja o aviso em cima",
+  "autoCaptureTestNoNotices": "Ative os avisos do Wambito para vê-lo",
+  "autoCaptureRemove": "Remova a automação nos Atalhos",
+  "autoCaptureIosPayBody": "Paga com Apple Pay como sempre e os Atalhos passam o pagamento ao Wambito.",
+  "autoCaptureIosReadsTitle": "Fica guardado no seu telemóvel",
+  "autoCaptureIosReadsBody": "Os Atalhos só lhe dão o valor, o estabelecimento e o nome do cartão. Fica cifrado: mais ninguém o lê.",
+  "autoCaptureIosNextBody": "Hoje funciona com os seus pagamentos com Apple Pay; os pagamentos com o cartão físico não passam pela Wallet. Vamos juntar mais bancos com o tempo.",
+  "autoCaptureIosDisclosure": "O Wambito recebe dos Atalhos o valor, o estabelecimento e o cartão dos seus pagamentos com Apple Pay, e guarda-os cifrados no seu telemóvel.",
+  "walletSetupTitle": "Configurar nos Atalhos",
+  "walletSetupStep1": "Toque em Instalar o atalho e adicione-o nos Atalhos.",
+  "walletSetupStep2": "Abra o atalho e toque em Editar.",
+  "walletSetupStep3": "Toque no quadro «A automação está desativada» e ative-a.",
+  "walletSetupStep4": "Pague uma vez com o iPhone desbloqueado. A partir daí funciona sozinho.",
+  "walletSetupInstall": "Instalar o atalho",
+  "walletSetupGuide": "1. Abra os Atalhos e vá a Automação.\n2. Toque em + e escolha Transação.\n3. Escolha os seus cartões e Executar imediatamente, depois Seguinte.\n4. Procure a ação «Registar pagamento da Wallet» do Wambito.\n5. Em Valor, Estabelecimento e Cartão escolha os dados da Transação.\n6. Toque em OK.",
+  "walletSetupOpenShortcuts": "Abrir os Atalhos"
 }

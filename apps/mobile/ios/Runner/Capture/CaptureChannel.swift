@@ -15,6 +15,7 @@ import WambitoNative
 ///  * `dismiss({ids})` / `keepOnly({ids, before})` -> nil: the capture notifications of transactions
 ///    confirmed elsewhere go.
 ///  * `test({body})` -> true: "Probar", [body] posted as a payment's notification, nothing saved.
+///  * `openShortcuts` -> whether the Shortcuts app opened.
 final class CaptureChannel {
   private let channel: FlutterMethodChannel
   private let store: CaptureQueueStore
@@ -73,6 +74,12 @@ final class CaptureChannel {
         center.removeDeliveredNotifications(withIdentifiers: gone)
       }
       result(nil)
+    case "openShortcuts":
+      guard let url = URL(string: "shortcuts://") else {
+        result(false)
+        return
+      }
+      UIApplication.shared.open(url) { result($0) }
     case "test":
       guard let body = arguments?["body"] as? String, !body.isEmpty else {
         result(FlutterError(code: "bad_args", message: "body", details: nil))

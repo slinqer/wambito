@@ -2505,5 +2505,30 @@
         "type": "String"
       }
     }
-  }
+  },
+  "autoCaptureIosLead": "From your Apple Pay payments",
+  "autoCaptureConfigured": "Set up",
+  "autoCaptureNotConfigured": "Not set up",
+  "autoCaptureSetup": "Set up in Shortcuts",
+  "autoCaptureSetupLine": "Install the shortcut or build it step by step",
+  "autoCaptureTest": "Try it",
+  "autoCaptureTestLine": "See the notice a payment brings",
+  "autoCaptureTestMerchant": "Wambito test",
+  "autoCaptureTestNotice": "This is how each payment arrives: “{merchant} · {category}, OK?”",
+  "autoCaptureTestSent": "Done: look at the notice above",
+  "autoCaptureTestNoNotices": "Turn on Wambito's notices to see it",
+  "autoCaptureRemove": "Remove the automation in Shortcuts",
+  "autoCaptureIosPayBody": "You pay with Apple Pay as usual and Shortcuts hands the payment to Wambito.",
+  "autoCaptureIosReadsTitle": "It is saved on your phone",
+  "autoCaptureIosReadsBody": "Shortcuts only gives it the amount, the merchant and the card's name. It is saved encrypted: nobody else reads it.",
+  "autoCaptureIosNextBody": "Today it works with your Apple Pay payments; payments with the physical card do not go through Wallet. We will add more banks over time.",
+  "autoCaptureIosDisclosure": "Wambito gets the amount, the merchant and the card of your Apple Pay payments from Shortcuts, and saves them encrypted on your phone.",
+  "walletSetupTitle": "Set up in Shortcuts",
+  "walletSetupStep1": "Tap Install the shortcut and add it in Shortcuts.",
+  "walletSetupStep2": "Open the shortcut and tap Edit.",
+  "walletSetupStep3": "Tap the box “Automation is turned off” and turn it on.",
+  "walletSetupStep4": "Pay once with the iPhone unlocked. From then on it works by itself.",
+  "walletSetupInstall": "Install the shortcut",
+  "walletSetupGuide": "1. Open Shortcuts and go to Automation.\n2. Tap + and choose Transaction.\n3. Choose your cards and Run Immediately, then Next.\n4. Find Wambito's “Log Wallet payment” action.\n5. For Amount, Merchant and Card pick the Transaction's details.\n6. Tap Done.",
+  "walletSetupOpenShortcuts": "Open Shortcuts"
 }
