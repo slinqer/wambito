@@ -12,6 +12,7 @@ import 'budget_bar.dart';
 import 'css_text.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
+import 'tile_glyph.dart';
 
 /// One category in the budget list: a tinted glyph tile, the name and the budget, the status in
 /// words (`Quedan 46,33 €` / `Te pasaste 14,12 €` / `Sin presupuesto`) and a small bar. Status is
@@ -134,7 +135,7 @@ class CategoryRow extends StatelessWidget {
                       color: Color.lerp(colors.surfaceSunken, tint, 0.45),
                       borderRadius: LkSurface.radius(LkRadius.sm),
                     ),
-                    child: Text(glyph, style: LkText.tileGlyph.copyWith(color: colors.ink)),
+                    child: TileGlyph(glyph, color: colors.ink),
                   ),
                 ),
                 Expanded(

@@ -20,6 +20,7 @@ import '../parser/parse.dart' as p;
 import 'capture_card_editor.dart';
 import 'capture_preview.dart';
 import '../../ui/lk_icons.dart';
+import '../../ui/tile_glyph.dart';
 
 /// The glyph in the tile of a card with no category yet.
 const noCategoryGlyph = '🏷️';
@@ -52,7 +53,7 @@ class CaptureTile extends StatelessWidget {
           color: colors.surfaceSunken,
           borderRadius: LkSurface.radius(LkRadius.sm),
         ),
-        child: Text(glyph, style: LkText.tileGlyph.copyWith(color: colors.ink)),
+        child: TileGlyph(glyph, color: colors.ink),
       ),
     );
   }
