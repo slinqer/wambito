@@ -206,6 +206,7 @@ void main() {
     ) async {
       final env = await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
       expect(find.byKey(const Key('home.nudge.import')), findsOneWidget);
+      await _nextNudge(tester);
       expect(find.text('Trae tu historial'), findsOneWidget);
       expect(
         find.text('Importa lo que llevas en Budge y empieza con tus números de verdad.'),
@@ -217,12 +218,40 @@ void main() {
       expect(find.byKey(const Key('import.page')), findsOneWidget);
     });
 
-    testWidgets('after the budgets card, as the web orders them', (tester) async {
+    testWidgets('after the budgets card, side by side: a swipe shows the next one', (tester) async {
       await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
-      expect(
-        tester.getTopLeft(find.byKey(const Key('home.nudge.budgets'))).dy,
-        lessThan(tester.getTopLeft(find.byKey(const Key('home.nudge.import'))).dy),
+      final budgets = tester.getRect(find.byKey(const Key('home.nudge.budgets')));
+      final import = tester.getRect(find.byKey(const Key('home.nudge.import')));
+      expect(import.top, budgets.top, reason: 'one row, not one under the other');
+      expect(import.left, greaterThanOrEqualTo(budgets.right), reason: 'to its right');
+      final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(import.left, greaterThan(screen - 16), reason: 'only its edge peeks in');
+      expect(find.byKey(const Key('home.nudges.dot.0')), findsOneWidget);
+      expect(find.byKey(const Key('home.nudges.dot.1')), findsOneWidget);
+
+      await _nextNudge(tester);
+      final shown = tester.getRect(find.byKey(const Key('home.nudge.import')));
+      expect(shown.left, closeTo(budgets.left, 1), reason: 'where the first one was');
+    });
+
+    testWidgets('a card has its words across it and its buttons under them', (tester) async {
+      await pumpSettingsApp(tester, homeRepo: _withMovements());
+      final card = find.byKey(const Key('home.nudge.budgets'));
+      final lead = tester.getRect(
+        find.text(
+          'Así Wambito te avisa antes de que te pases. Toca una categoría y ponle un monto.',
+        ),
       );
+      final go = tester.getRect(find.text('IR A CATEGORÍAS'));
+      final later = tester.getRect(
+        find.bySemanticsLabel('Ahora no: Ponle presupuesto a tus categorías'),
+      );
+      expect(go.top, greaterThan(lead.bottom));
+      expect(later.top, greaterThan(lead.bottom));
+      expect(later.center.dy, closeTo(go.center.dy, 2), reason: 'side by side');
+      expect(later.left, greaterThan(go.right));
+      expect(lead.width, greaterThan(tester.getRect(card).width * 0.8), reason: 'the whole card');
+      expect(find.byKey(const Key('home.nudges.dot.0')), findsNothing, reason: 'one card, no dots');
     });
 
     testWidgets('an account with movements has no import card', (tester) async {
@@ -239,6 +268,7 @@ void main() {
 
     testWidgets('"Ahora no" puts it away for good, and the budgets card stays', (tester) async {
       final env = await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
+      await _nextNudge(tester);
       await tester.tap(find.bySemanticsLabel('Ahora no: Trae tu historial'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('home.nudge.import')), findsNothing);
@@ -255,6 +285,7 @@ void main() {
 
     testWidgets('in English', (tester) async {
       await pumpSettingsApp(tester, locale: const Locale('en'), homeRepo: FakeHomeRepository());
+      await _nextNudge(tester);
       expect(find.text('Bring your history'), findsOneWidget);
       expect(find.text('BRING MY HISTORY'), findsOneWidget);
     });
@@ -296,7 +327,11 @@ void main() {
     });
 
     testWidgets('in English they are the English pages', (tester) async {
-      final env = await pumpSettingsApp(tester, locale: const Locale('en'), location: '/settings/more');
+      final env = await pumpSettingsApp(
+        tester,
+        locale: const Locale('en'),
+        location: '/settings/more',
+      );
       await _scrollTo(tester, find.byKey(const Key('settings.web')));
       await tester.tap(find.byKey(const Key('settings.web')));
       await tester.pumpAndSettle();
@@ -306,4 +341,10 @@ void main() {
       expect(env.opener.opened.map((u) => u.path), ['/en', '/en/roadmap']);
     });
   });
+}
+
+/// Swipes the home cards to the next one.
+Future<void> _nextNudge(WidgetTester tester) async {
+  await tester.fling(find.byKey(const Key('home.nudges')), const Offset(-300, 0), 1000);
+  await tester.pumpAndSettle();
 }

@@ -14,6 +14,7 @@ import '../ui/input_box.dart';
 import '../ui/lk_theme.dart';
 import 'budget_input.dart';
 import 'note_text.dart';
+import '../ui/tile_glyph.dart';
 
 /// A spending category as the list shows it.
 class BudgetCategory {
@@ -328,7 +329,7 @@ class _BudgetRowState extends State<BudgetRow> {
                   color: Color.lerp(colors.surfaceSunken, category.tint, 0.45),
                   borderRadius: LkSurface.radius(LkRadius.sm),
                 ),
-                child: Text(category.glyph, style: LkText.tileGlyph.copyWith(color: colors.ink)),
+                child: TileGlyph(category.glyph, color: colors.ink),
               ),
             ),
           ),

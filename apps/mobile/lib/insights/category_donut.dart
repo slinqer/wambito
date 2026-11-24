@@ -18,6 +18,7 @@ import 'charts.dart';
 import 'insights_controller.dart';
 import 'insights_model.dart';
 import 'parts.dart';
+import '../ui/tile_glyph.dart';
 
 /// The donut's size, in px (`SIZE`).
 const donutSize = 200.0;
@@ -422,7 +423,7 @@ class CategoryTile extends StatelessWidget {
           color: tileGround(colors, tint),
           borderRadius: BorderRadius.circular(WambitoTokens.radiusSm),
         ),
-        child: Text(glyph, style: LkText.tileGlyph.copyWith(color: colors.ink)),
+        child: TileGlyph(glyph, color: colors.ink),
       ),
     );
   }

@@ -15,6 +15,7 @@ import 'pending_badge.dart';
 import 'pressable.dart';
 import 'swipe_row.dart';
 import 'lk_icons.dart';
+import 'tile_glyph.dart';
 
 /// Whether a transaction is paid or still to be.
 enum TransactionRowStatus { paid, pending }
@@ -166,7 +167,7 @@ class _TransactionRowState extends State<TransactionRow> {
                             color: colors.surfaceSunken,
                             borderRadius: LkSurface.radius(LkRadius.sm),
                           ),
-                          child: Text(glyph, style: LkText.tileGlyph.copyWith(color: colors.ink)),
+                          child: TileGlyph(glyph, color: colors.ink),
                         ),
                       ),
                       Expanded(

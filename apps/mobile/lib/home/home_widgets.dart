@@ -273,35 +273,39 @@ class NudgeCard extends StatelessWidget {
           child: Padding(
             // `padding: var(--space-3)` inside the 2px border.
             padding: const EdgeInsets.all(WambitoTokens.space3 + 2),
-            child: Row(
-              spacing: WambitoTokens.space3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: WambitoTokens.space1,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: WambitoTokens.space1,
-                    children: [
-                      Semantics(
-                        header: true,
-                        child: Text(title, style: LkText.cardTitle.copyWith(color: colors.ink)),
-                      ),
-                      Text(lead, style: LkText.cardLead.copyWith(color: colors.inkMuted)),
-                      PressButton.text(
+                Semantics(
+                  header: true,
+                  child: Text(title, style: LkText.cardTitle.copyWith(color: colors.ink)),
+                ),
+                Text(lead, style: LkText.cardLead.copyWith(color: colors.inkMuted)),
+                const SizedBox(height: WambitoTokens.space1),
+                // The words have the card's whole width; the two buttons sit under them, the way
+                // to it first and "Ahora no" at the end.
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  spacing: WambitoTokens.space2,
+                  children: [
+                    Flexible(
+                      child: PressButton.text(
                         actionLabel,
                         tone: PressTone.secondary,
                         size: PressSize.sm,
                         link: true,
                         onPressed: onAction,
                       ),
-                    ],
-                  ),
-                ),
-                PressButton.text(
-                  l10n.notNow,
-                  tone: PressTone.ghost,
-                  size: PressSize.sm,
-                  semanticLabel: l10n.homeNudgeDismiss(title),
-                  onPressed: onDismiss,
+                    ),
+                    PressButton.text(
+                      l10n.notNow,
+                      tone: PressTone.ghost,
+                      size: PressSize.sm,
+                      semanticLabel: l10n.homeNudgeDismiss(title),
+                      onPressed: onDismiss,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -310,6 +314,144 @@ class NudgeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The home cards side by side, one in view: a swipe shows the next, and dots under them say how
+/// many there are and which is showing. One card is just the card. As tall as the tallest card, so
+/// the page under it does not jump while swiping; a card put away leaves the others in place.
+class NudgeCarousel extends StatefulWidget {
+  const NudgeCarousel({super.key, required this.cards});
+
+  final List<Widget> cards;
+
+  @override
+  State<NudgeCarousel> createState() => _NudgeCarouselState();
+}
+
+class _NudgeCarouselState extends State<NudgeCarousel> {
+  static const _gap = WambitoTokens.space2;
+  final _controller = ScrollController();
+  int _page = 0;
+  double _pageWidth = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_pageWidth == 0) return;
+    final page = (_controller.offset / _pageWidth).round().clamp(0, widget.cards.length - 1);
+    if (page != _page) setState(() => _page = page);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = widget.cards;
+    if (cards.length == 1) return cards.single;
+    final colors = context.lkColors;
+    final page = _page.clamp(0, cards.length - 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: WambitoTokens.space2,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            // A page is a card and the gap after it: a turn lands the next card where the first
+            // one was. Not clipped, so the cards' edges show, and the next one peeks in at the
+            // screen's edge.
+            _pageWidth = width + _gap;
+            return SingleChildScrollView(
+              key: const Key('home.nudges'),
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              physics: _CardSnap(_pageWidth),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: _gap,
+                  children: [for (final card in cards) SizedBox(width: width, child: card)],
+                ),
+              ),
+            );
+          },
+        ),
+        ExcludeSemantics(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 6,
+            children: [
+              for (var i = 0; i < cards.length; i++)
+                AnimatedContainer(
+                  key: Key('home.nudges.dot.$i'),
+                  duration: const Duration(milliseconds: 200),
+                  width: i == page ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i == page ? colors.ink : colors.stroke,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Snaps a horizontal scroll to whole cards of [pageWidth] (card plus gap), as [PageScrollPhysics]
+/// does to whole viewports: a fling goes to the next card, a slow drag to the nearest.
+class _CardSnap extends ScrollPhysics {
+  const _CardSnap(this.pageWidth, {super.parent});
+
+  final double pageWidth;
+
+  @override
+  _CardSnap applyTo(ScrollPhysics? ancestor) => _CardSnap(pageWidth, parent: buildParent(ancestor));
+
+  double _target(ScrollMetrics position, double velocity) {
+    final still = toleranceFor(position).velocity;
+    var page = position.pixels / pageWidth;
+    if (velocity < -still) {
+      page -= 0.5;
+    } else if (velocity > still) {
+      page += 0.5;
+    }
+    return (page.roundToDouble() * pageWidth).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+  }
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    if ((velocity <= 0 && position.pixels <= position.minScrollExtent) ||
+        (velocity >= 0 && position.pixels >= position.maxScrollExtent)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final target = _target(position, velocity);
+    if ((target - position.pixels).abs() < toleranceFor(position).distance) return null;
+    return ScrollSpringSimulation(
+      spring,
+      position.pixels,
+      target,
+      velocity,
+      tolerance: toleranceFor(position),
+    );
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
 }
 
 /// A dashed border as Blink draws one: each straight side is its own dashed line, starting with a

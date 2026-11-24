@@ -44,6 +44,7 @@ import '../ui/transaction_row.dart';
 import 'budget_sheet.dart';
 import 'categories_tab.dart';
 import 'category_detail_controller.dart';
+import '../ui/tile_glyph.dart';
 
 /// The widest the content grows on a big screen (the web's `max-w-[480px]`, padding included).
 const _maxContentWidth = 480.0;
@@ -431,10 +432,7 @@ class _DetailViewState extends ConsumerState<_DetailView> {
                   color: Color.lerp(colors.surfaceSunken, look.tint, 0.45),
                   borderRadius: LkSurface.radius(LkRadius.sm),
                 ),
-                child: Text(
-                  look.glyph,
-                  style: LkText.tileGlyph.copyWith(fontSize: 24, color: colors.ink),
-                ),
+                child: TileGlyph(look.glyph, size: 24, color: colors.ink),
               ),
             ),
             Expanded(

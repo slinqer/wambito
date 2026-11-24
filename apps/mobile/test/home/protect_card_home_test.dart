@@ -65,6 +65,31 @@ void main() {
     expect(find.byKey(card), findsNothing);
   });
 
+  testWidgets('it leads the carousel, the other cards after it, its buttons under the words', (
+    t,
+  ) async {
+    final (vault, cards) = await vaultSeen(t, days: 8);
+    await pumpHome(
+      t,
+      FakeHomeRepository(),
+      overrides: [
+        vaultSessionProvider.overrideWithValue(vault),
+        protectCardStoreProvider.overrideWithValue(cards),
+        protectStatusProvider.overrideWith((ref) async => _status()),
+      ],
+    );
+    final protect = t.getRect(find.byKey(card));
+    final next = t.getRect(find.byKey(const Key('home.nudge.import')));
+    expect(next.top, protect.top, reason: 'side by side');
+    expect(next.left, greaterThan(protect.right), reason: 'after it');
+    expect(find.byKey(const Key('home.nudges.dot.0')), findsOneWidget);
+
+    final go = t.getRect(find.byKey(const Key('protect.cardGo')));
+    final later = t.getRect(find.byKey(const Key('protect.cardLater')));
+    expect(later.left, greaterThan(go.right), reason: 'the way in first, Not now at the end');
+    expect(later.center.dy, closeTo(go.center.dy, 2));
+  });
+
   testWidgets('the card is not due in the first days with few movements', (t) async {
     final (vault, cards) = await vaultSeen(t, days: 2);
     await pumpHome(

@@ -1,8 +1,10 @@
 // Settings' "Protect your data" block (phone-first spec 5.2), at the top for a `preview` account
 // without an email: the recovery key, the passkey (only where the phone reports passkey support) and
-// adding an email. It says "N of 2" until one of the first two is done, then stays as a quiet list.
+// adding an email, one settings row each (a check once done), under one short line: a list done at
+// one's own pace, no count. On the iPhone the passkey is Face ID, elsewhere the fingerprint.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,10 +12,9 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../settings/settings_parts.dart';
 import '../theme/text_styles.dart';
-import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
+import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
-import '../ui/press_button.dart';
 import 'protect_actions.dart';
 import 'protect_status.dart';
 
@@ -40,37 +41,36 @@ class _ProtectBlockState extends ConsumerState<ProtectBlock> {
     }
   }
 
+  /// One step as one settings row: its icon and name, then "To do" and a chevron (the row does the
+  /// step) or a check once it is done. What the step is for is read, not drawn.
   Widget _step({
+    required String actionKey,
+    required LkIconName icon,
     required String title,
     required String lead,
     required bool done,
-    required String actionKey,
-    required String actionLabel,
     required VoidCallback onPressed,
-    Widget? note,
   }) {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: WambitoTokens.space2,
-      children: [
-        SettingLabel(label: title, hint: lead),
-        ?note,
-        if (done)
-          Text(
-            l10n.protectDone,
-            key: Key('$actionKey.done'),
-            style: LkText.fieldLabel.copyWith(color: colors.ink, fontWeight: FontWeight.w700),
-          )
-        else
-          PressButton.text(
-            actionLabel,
-            key: Key(actionKey),
-            tone: PressTone.secondary,
-            onPressed: _busy ? null : onPressed,
-          ),
-      ],
+    return SettingsRow(
+      key: Key(done ? '$actionKey.done' : actionKey),
+      icon: LkIcon(icon, size: 20, color: colors.inkMuted),
+      title: title,
+      semanticsHint: lead,
+      trailing: done
+          ? RowCustom(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 4,
+                children: [
+                  LkIcon(LkIconName.check, size: 16, color: colors.ink),
+                  Text(l10n.protectDone, style: LkText.label.copyWith(color: colors.ink)),
+                ],
+              ),
+            )
+          : RowChevron(value: l10n.protectStepTodo),
+      onTap: done || _busy ? null : onPressed,
     );
   }
 
@@ -80,69 +80,70 @@ class _ProtectBlockState extends ConsumerState<ProtectBlock> {
     if (status == null) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
+    final iphone = defaultTargetPlatform == TargetPlatform.iOS;
+    final passkeyNote = _addedWithoutPrf && !status.passkey
+        ? Semantics(
+            liveRegion: true,
+            container: true,
+            child: CssParagraph(
+              l10n.settingsPasskeysAddNoPrf,
+              key: const Key('protect.passkeyAddNoPrf'),
+              style: LkText.fieldLabel.copyWith(color: colors.ink),
+            ),
+          )
+        : status.passkeyWithoutPrf && !status.passkey
+        ? CssParagraph(
+            l10n.protectPasskeyNoPrf,
+            key: const Key('protect.passkeyNoPrf'),
+            style: LkText.fieldLabel.copyWith(color: colors.over),
+          )
+        : null;
     return SettingsSection(
       key: const Key('protect.block'),
       title: l10n.protectTitle,
       lead: l10n.protectLead,
       children: [
-        if (!status.protected)
-          Text(
-            l10n.protectCount(status.done),
-            key: const Key('protect.count'),
-            style: LkText.fieldLabel.copyWith(color: colors.inkMuted, fontWeight: FontWeight.w700),
-          ),
-        _step(
-          title: l10n.protectRecoveryTitle,
-          lead: l10n.protectRecoveryLead,
-          done: status.recoveryKey,
-          actionKey: 'protect.recovery',
-          actionLabel: l10n.protectRecoveryGo,
-          onPressed: () => unawaited(_run(() => protectWithRecoveryKey(context, ref))),
-        ),
-        if (status.passkeyOffered)
-          _step(
-            title: l10n.protectPasskeyTitle,
-            lead: l10n.protectPasskeyLead,
-            done: status.passkey,
-            actionKey: 'protect.passkey',
-            actionLabel: l10n.protectPasskeyGo,
-            onPressed: () => unawaited(
-              _run(() async {
-                setState(() => _addedWithoutPrf = false);
-                await protectWithPasskey(
-                  context,
-                  ref,
-                  onNoPrf: () {
-                    if (mounted) setState(() => _addedWithoutPrf = true);
-                  },
-                );
-              }),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _step(
+              actionKey: 'protect.recovery',
+              icon: LkIconName.key,
+              title: l10n.protectRecoveryTitle,
+              lead: l10n.protectRecoveryLead,
+              done: status.recoveryKey,
+              onPressed: () => unawaited(_run(() => protectWithRecoveryKey(context, ref))),
             ),
-            note: _addedWithoutPrf && !status.passkey
-                ? Semantics(
-                    liveRegion: true,
-                    container: true,
-                    child: CssParagraph(
-                      l10n.settingsPasskeysAddNoPrf,
-                      key: const Key('protect.passkeyAddNoPrf'),
-                      style: LkText.fieldLabel.copyWith(color: colors.ink),
-                    ),
-                  )
-                : status.passkeyWithoutPrf && !status.passkey
-                ? CssParagraph(
-                    l10n.protectPasskeyNoPrf,
-                    key: const Key('protect.passkeyNoPrf'),
-                    style: LkText.fieldLabel.copyWith(color: colors.over),
-                  )
-                : null,
-          ),
-        _step(
-          title: l10n.protectEmailTitle,
-          lead: l10n.protectEmailLead,
-          done: false,
-          actionKey: 'protect.email',
-          actionLabel: l10n.protectEmailGo,
-          onPressed: () => unawaited(context.push('/progress')),
+            if (status.passkeyOffered)
+              _step(
+                actionKey: 'protect.passkey',
+                icon: iphone ? LkIconName.shield : LkIconName.fingerprint,
+                title: iphone ? l10n.protectPasskeyRowIos : l10n.protectPasskeyRow,
+                lead: iphone ? l10n.protectPasskeyLeadIos : l10n.protectPasskeyLead,
+                done: status.passkey,
+                onPressed: () => unawaited(
+                  _run(() async {
+                    setState(() => _addedWithoutPrf = false);
+                    await protectWithPasskey(
+                      context,
+                      ref,
+                      onNoPrf: () {
+                        if (mounted) setState(() => _addedWithoutPrf = true);
+                      },
+                    );
+                  }),
+                ),
+              ),
+            ?passkeyNote,
+            _step(
+              actionKey: 'protect.email',
+              icon: LkIconName.user,
+              title: l10n.protectEmailTitle,
+              lead: iphone ? l10n.protectEmailLeadIos : l10n.protectEmailLead,
+              done: false,
+              onPressed: () => unawaited(context.push('/progress')),
+            ),
+          ],
         ),
       ],
     );

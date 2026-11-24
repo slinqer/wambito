@@ -256,7 +256,7 @@ void main() {
       },
     );
 
-    testWidgets('a preview guest\'s home menu has no Guarda tu progreso (ruling 21)', (
+    testWidgets('a preview guest\'s home menu offers Crear tu cuenta first, to /progress', (
       tester,
     ) async {
       await pumpSettingsApp(
@@ -265,8 +265,16 @@ void main() {
         overrides: [isPreviewProvider.overrideWithValue(true)],
       );
       await openAccountMenu(tester);
-      expect(find.byKey(const Key('home.settings')), findsOneWidget);
       expect(find.byKey(const Key('home.saveProgress')), findsNothing);
+      final create = find.byKey(const Key('home.createAccount'));
+      expect(find.descendant(of: create, matching: find.text('Crear tu cuenta')), findsOneWidget);
+      expect(
+        tester.getTopLeft(create).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('home.recurring'))).dy),
+      );
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('progress.email')), findsOneWidget, reason: '/progress');
     });
 
     testWidgets('someone with an email sees no Guarda tu progreso anywhere', (tester) async {
@@ -274,6 +282,7 @@ void main() {
       await openAccountMenu(tester);
       expect(find.byKey(const Key('home.settings')), findsOneWidget);
       expect(find.byKey(const Key('home.saveProgress')), findsNothing);
+      expect(find.byKey(const Key('home.createAccount')), findsNothing);
 
       await tester.tap(find.byKey(const Key('home.settings')));
       await tester.pumpAndSettle();
@@ -316,7 +325,7 @@ void main() {
         ],
       );
       expect(find.byKey(const Key('protect.block')), findsOneWidget);
-      expect(find.byKey(const Key('protect.count')), findsOneWidget);
+      expect(find.byKey(const Key('protect.recovery')), findsOneWidget);
       expect(find.byKey(const Key('settings.saveProgress')), findsNothing);
     });
 

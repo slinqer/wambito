@@ -1,5 +1,6 @@
 // Settings' "Protect your data" block (phone-first spec 5.2): "N of 2" until a first step is done,
 // then a quiet list; the passkey step only with passkey support; the no-PRF sentence.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,10 +11,14 @@ import 'package:wambito/protect/protect_status.dart';
 import 'package:wambito/settings/passkeys_settings.dart';
 import 'package:wambito/settings/security/security_api.dart';
 import 'package:wambito/theme/theme.dart';
+import 'package:wambito/settings/settings_parts.dart';
 import 'package:wambito/ui/css_text.dart';
+import 'package:wambito/ui/lk_icon_shapes.dart';
+import 'package:wambito/ui/press_button.dart';
 import 'package:wambito/ui/toast.dart';
 
 import '../settings/security/fake_security.dart' show FakeSecurity;
+import '../support/icons.dart';
 import '../support/fonts.dart';
 import '../support/ui_app.dart';
 import 'fakes.dart' show FakeSettingsPasskeys;
@@ -60,12 +65,10 @@ Future<void> pumpBlock(
 void main() {
   setUpAll(loadAppFonts);
 
-  testWidgets('shows 0 of 2 until a first step is done, then a quiet list without the count', (
-    t,
-  ) async {
+  testWidgets('the three steps, each done on its own, with no count to keep', (t) async {
     await pumpBlock(t, statusOf());
     expect(find.byKey(const Key('protect.block')), findsOneWidget);
-    expect(find.text('0 of 2'), findsOneWidget);
+    expect(find.byKey(const Key('protect.count')), findsNothing, reason: 'the checks say it');
     expect(find.byKey(const Key('protect.recovery')), findsOneWidget);
     expect(find.byKey(const Key('protect.passkey')), findsOneWidget);
     expect(find.byKey(const Key('protect.email')), findsOneWidget);
@@ -81,6 +84,50 @@ void main() {
     expect(find.byKey(const Key('protect.count')), findsNothing);
     expect(find.byKey(const Key('protect.passkey.done')), findsOneWidget);
     expect(find.byKey(const Key('protect.recovery')), findsOneWidget);
+  });
+
+  testWidgets('each step is one row: its name, and To do or a check', (t) async {
+    await pumpBlock(t, statusOf(recoveryKey: true));
+    expect(find.byType(SettingsRow), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('protect.recovery.done')),
+        matching: findIcon(LkIconName.check),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('protect.passkey')), matching: find.text('To do')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('protect.email')), matching: find.text('To do')),
+      findsOneWidget,
+    );
+    expect(find.byType(PressButton), findsNothing, reason: 'rows, not big buttons');
+    expect(t.getSize(find.byKey(const Key('protect.block'))).height, lessThan(360));
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is CssParagraph &&
+            w.text == 'So you never lose your data, even if you lose this phone.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('on the iPhone the passkey is Face ID', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpBlock(t, statusOf());
+    expect(find.text('Face ID'), findsOneWidget);
+    expect(find.textContaining('fingerprint'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('on Android it is the fingerprint', (t) async {
+    await pumpBlock(t, statusOf());
+    expect(find.text('Fingerprint'), findsOneWidget);
   });
 
   testWidgets('the no-PRF line reads protectPasskeyNoPrf', (t) async {
@@ -139,7 +186,6 @@ void main() {
     expect(find.byKey(const Key('protect.passkey')), findsNothing);
     expect(find.byKey(const Key('protect.passkey.done')), findsNothing);
     expect(find.byKey(const Key('protect.recovery')), findsOneWidget);
-    expect(find.text('0 of 2'), findsOneWidget);
   });
 
   testWidgets('nothing at all without a status (plain, email, vault closed)', (t) async {

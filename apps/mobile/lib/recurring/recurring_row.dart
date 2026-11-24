@@ -16,6 +16,7 @@ import '../ui/css_text.dart';
 import '../ui/lk_theme.dart';
 import '../ui/pressable.dart';
 import 'recurring_model.dart';
+import '../ui/tile_glyph.dart';
 
 /// A date as `23 oct 2026` (es) or `Oct 23, 2026` (en): the web's `formatDate`
 /// (`dateStyle: "medium"`, with the dots out). [date] is `YYYY-MM-DD`.
@@ -121,10 +122,7 @@ class RecurringRow extends StatelessWidget {
                       color: Color.lerp(colors.surfaceSunken, look?.tint ?? colors.stroke, 0.45),
                       borderRadius: LkSurface.radius(LkRadius.sm),
                     ),
-                    child: Text(
-                      look?.glyph ?? '🏷️',
-                      style: LkText.tileGlyph.copyWith(color: colors.ink),
-                    ),
+                    child: TileGlyph(look?.glyph ?? '🏷️', color: colors.ink),
                   ),
                 ),
                 Expanded(

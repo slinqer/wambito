@@ -487,6 +487,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final today = data.todayAt(ref.read(clockProvider)());
     final current = today.substring(0, 7);
     final shown = home.shown;
+    final protect = ref.watch(protectCardProvider.select((s) => s.value ?? false));
     final wambi = shown == null ? null : _wambi(l10n, home, shown, today);
     final entries = shown == null
         ? const <_Entry>[]
@@ -570,14 +571,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             const ReviewHomeRow(),
                           // After the first movement, until a widget exists or it is put away.
                           // The account's first movement, in any month; asked only when the card could show.
-                          // "Protect your data" comes first, and the widget card waits while it shows.
-                          if (ref.watch(protectCardProvider.select((s) => s.value ?? false)))
-                            const ProtectCard(key: Key('home.protectCard'))
-                          else if (ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
+                          // The widget card waits while "Protect your data" shows (in the carousel).
+                          if (!protect &&
+                              ref.watch(widgetCardProvider.select((s) => s.value ?? false)) &&
                               (data.items.isNotEmpty ||
                                   ref.watch(hasTransactionsProvider).value == true))
                             const WidgetCard(key: Key('home.widgetCard')),
-                          ?_nudges(shown, l10n),
+                          ?_nudges(shown, l10n, protect: protect),
                         ] else
                           const HomeHeroPlaceholder(),
                       ],
@@ -663,8 +663,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   /// The cards for an account that skipped the setup (the web's `Nudges`), budgets first: one for
   /// an account without a budget on any category, one for an account with no movements at all to
-  /// bring its history in. Each is gone once put away ("Ahora no", kept on this phone).
-  Widget? _nudges(HomeData data, AppLocalizations l10n) {
+  /// bring its history in. Each is gone once put away ("Ahora no", kept on this phone). Two are
+  /// side by side, one in view ([NudgeCarousel]), so they do not push the movements down. "Protect
+  /// your data" leads them while it is due ([protect]).
+  Widget? _nudges(HomeData data, AppLocalizations l10n, {required bool protect}) {
     final categories = data.categories.values.where((c) => !c.archived).toList();
     final noBudgets =
         data.summary.budgetTotal == 0 &&
@@ -678,15 +680,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         data.items.isEmpty &&
         ref.watch(hasTransactionsProvider).value == false &&
         ref.watch(nudgeDismissedProvider(importKey)) == false;
-    if (!showBudgets && !showImport) return null;
+    if (!protect && !showBudgets && !showImport) return null;
     return Semantics(
       container: true,
       explicitChildNodes: true,
       label: l10n.homeNudgesLabel,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: WambitoTokens.space2,
-        children: [
+      child: NudgeCarousel(
+        cards: [
+          if (protect) const ProtectCard(key: Key('home.protectCard')),
           if (showBudgets)
             NudgeCard(
               key: const Key('home.nudge.budgets'),
