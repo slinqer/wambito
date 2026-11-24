@@ -728,35 +728,10 @@ void main() {
       expect(fills, findsNothing);
     });
 
-    testWidgets('an account without budgets gets the web\'s card, which can be put away', (
-      tester,
-    ) async {
-      final repo = monthWithBudgets()..budgetTotal = 0;
-      await pumpHome(tester, repo);
-      expect(find.text('Ponle presupuesto a tus categorías'), findsOneWidget);
-      expect(find.text('IR A CATEGORÍAS'), findsOneWidget);
-
-      await tester.tap(find.text('AHORA NO'));
-      await tester.pumpAndSettle();
-      expect(find.text('Ponle presupuesto a tus categorías'), findsNothing);
-      await leave(tester);
-    });
-
-    testWidgets('no card once a category has a budget', (tester) async {
-      final repo = FakeHomeRepository(
-        categoryList: [category('cat-groceries', 'Supermercado', budget: 100000)],
-        budgetTotal: 100000,
-        items: [tx('a', '2026-10-22', -100)],
-      );
-      await pumpHome(tester, repo);
-      expect(find.text('Ponle presupuesto a tus categorías'), findsNothing);
-    });
-
-    testWidgets('the card\'s button goes to Categorías', (tester) async {
+    testWidgets('an account without budgets gets no card about them', (tester) async {
       await pumpHome(tester, monthWithBudgets()..budgetTotal = 0);
-      await tester.tap(find.text('IR A CATEGORÍAS'));
-      await tester.pumpAndSettle();
-      expect(find.text('Café'), findsNothing, reason: 'the list of movements is not showing');
+      expect(find.text('Ponle presupuesto a tus categorías'), findsNothing);
+      expect(find.text('IR A CATEGORÍAS'), findsNothing);
     });
 
     testWidgets('the bottom bar has Inicio, ＋, the 🎤 and Análisis', (tester) async {

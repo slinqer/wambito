@@ -243,7 +243,11 @@ class NudgeCard extends StatelessWidget {
     required this.actionLabel,
     required this.onAction,
     required this.onDismiss,
+    this.top,
   });
+
+  /// Over the title: the agents card's logos.
+  final Widget? top;
 
   final String title;
   final String lead;
@@ -277,11 +281,15 @@ class NudgeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: WambitoTokens.space1,
               children: [
+                if (top != null) ...[top!, const SizedBox(height: WambitoTokens.space1)],
                 Semantics(
                   header: true,
                   child: Text(title, style: LkText.cardTitle.copyWith(color: colors.ink)),
                 ),
                 Text(lead, style: LkText.cardLead.copyWith(color: colors.inkMuted)),
+                // Down to the card's foot: in the carousel every card is as tall as the tallest, and
+                // the buttons line up at the bottom of each.
+                const Spacer(),
                 const SizedBox(height: WambitoTokens.space1),
                 // The words have the card's whole width; the two buttons sit under them, the way
                 // to it first and "Ahora no" at the end.
@@ -355,7 +363,8 @@ class _NudgeCarouselState extends State<NudgeCarousel> {
   @override
   Widget build(BuildContext context) {
     final cards = widget.cards;
-    if (cards.length == 1) return cards.single;
+    // Bounded like the carousel's, so a card's spacer has a height to fill.
+    if (cards.length == 1) return IntrinsicHeight(child: cards.single);
     final colors = context.lkColors;
     final page = _page.clamp(0, cards.length - 1);
     return Column(

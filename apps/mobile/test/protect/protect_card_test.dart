@@ -1,4 +1,4 @@
-// When home's "Protect your data" card is due (phone-first spec 5.2): 7 days or 20 movements, then
+// When home's "Protect your data" card is due (phone-first spec 5.2): 7 days or 10 movements, then
 // 14, then every 30.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/protect/protect_card.dart';
@@ -11,16 +11,16 @@ void main() {
 
   final fresh = ProtectCardState(firstOpen: firstOpen);
 
-  test('not due at 6 days and 19 movements', () {
-    expect(due(fresh, day(6), movements: 19), isFalse);
+  test('not due at 6 days and 9 movements', () {
+    expect(due(fresh, day(6), movements: 9), isFalse);
   });
 
   test('due at 7 days', () {
     expect(due(fresh, day(7)), isTrue);
   });
 
-  test('due on day 1 at 20 movements', () {
-    expect(due(fresh, day(1), movements: 20), isTrue);
+  test('due on day 1 at 10 movements', () {
+    expect(due(fresh, day(1), movements: 10), isTrue);
   });
 
   test('dismissed on day 10: not due on day 23, due on day 24', () {

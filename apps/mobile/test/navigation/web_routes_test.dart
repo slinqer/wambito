@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/server_url.dart';
+import 'package:wambito/capture_auto/capture_platform.dart';
 import 'package:wambito/home/home_screen.dart';
+import 'package:wambito/settings/assistants_repository.dart';
 import 'package:wambito/ui/bottom_bar.dart';
 import 'package:wambito/ui/category_row.dart';
+import 'package:wambito/ui/lk_brand_logo.dart';
 import 'package:wambito/ui/press_button.dart';
 
 import '../budgets/budgets_test.dart' show pumpBudgets;
 import '../budgets/fakes.dart';
+import '../capture_auto/fakes.dart';
 import '../home/fakes.dart';
 import '../home/fixtures.dart';
+import '../settings/fakes.dart' show FakeAssistantsRepository;
 import '../settings/harness.dart';
 
 /// Every page of the web (apps/web/app/routes.ts) has its place in the app, and is reached the way
@@ -201,51 +206,153 @@ void main() {
   });
 
   group('the home cards', () {
+    testWidgets('capture first, then the history, then an agent; no budgets card', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        homeRepo: FakeHomeRepository(),
+        overrides: [autoCapturePlatformProvider.overrideWithValue(FakeAutoCapturePlatform())],
+      );
+      final capture = tester.getRect(find.byKey(const Key('home.nudge.capture')));
+      final import = tester.getRect(find.byKey(const Key('home.nudge.import')));
+      final agents = tester.getRect(find.byKey(const Key('home.nudge.agents')));
+      expect(import.top, capture.top, reason: 'one row, not one under the other');
+      expect(import.left, greaterThanOrEqualTo(capture.right), reason: 'to its right');
+      expect(agents.left, greaterThan(import.right));
+      final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(import.left, greaterThan(screen - 16), reason: 'only its edge peeks in');
+      expect(find.byKey(const Key('home.nudges.dot.2')), findsOneWidget);
+      expect(find.byKey(const Key('home.nudge.budgets')), findsNothing);
+      expect(find.text('Ponle presupuesto a tus categorías'), findsNothing);
+
+      await _nextNudge(tester);
+      final shown = tester.getRect(find.byKey(const Key('home.nudge.import')));
+      expect(shown.left, closeTo(capture.left, 1), reason: 'where the first one was');
+    });
+
+    testWidgets('the capture card leads to Captura automática', (tester) async {
+      final env = await pumpSettingsApp(
+        tester,
+        homeRepo: _withMovements(),
+        overrides: [autoCapturePlatformProvider.overrideWithValue(FakeAutoCapturePlatform())],
+      );
+      expect(find.text('Captura automática'), findsOneWidget);
+      expect(find.text('Wambi agrega tus gastos por ti, sin escribir nada.'), findsOneWidget);
+      await tester.tap(find.text('ACTIVAR CAPTURA'));
+      await tester.pumpAndSettle();
+      expect(_location(env), '/settings/capture');
+    });
+
+    testWidgets('no capture card once a source reads with access', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        homeRepo: _withMovements(),
+        overrides: [
+          autoCapturePlatformProvider.overrideWithValue(
+            FakeAutoCapturePlatform(access: true, sources: {'revolut'}),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('home.nudge.capture')), findsNothing);
+    });
+
+    testWidgets('the capture card stays while the notifications cannot be read', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        homeRepo: _withMovements(),
+        overrides: [
+          autoCapturePlatformProvider.overrideWithValue(
+            FakeAutoCapturePlatform(sources: {'revolut'}),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('home.nudge.capture')), findsOneWidget, reason: 'no access yet');
+    });
+
+    testWidgets('no capture card once Apple Pay sent a payment', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        homeRepo: _withMovements(),
+        overrides: [
+          autoCapturePlatformProvider.overrideWithValue(
+            FakeAutoCapturePlatform.iphone(configured: true),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('home.nudge.capture')), findsNothing);
+    });
+
+    testWidgets('a phone with no capture has no capture card', (tester) async {
+      await pumpSettingsApp(tester, homeRepo: _withMovements());
+      expect(find.byKey(const Key('home.nudge.capture')), findsNothing);
+      expect(find.byKey(const Key('home.nudge.agents')), findsOneWidget);
+    });
+
+    testWidgets('the agent card shows ChatGPT, Claude and Grok and leads to Mis agentes', (
+      tester,
+    ) async {
+      final env = await pumpSettingsApp(tester, homeRepo: _withMovements());
+      final card = find.byKey(const Key('home.nudge.agents'));
+      final logos = tester
+          .widgetList<LkBrandLogo>(find.descendant(of: card, matching: find.byType(LkBrandLogo)))
+          .map((logo) => logo.brand)
+          .toList();
+      expect(logos, [LkBrand.chatgpt, LkBrand.claude, LkBrand.grok]);
+      await tester.tap(find.text('CONECTAR UN AGENTE'));
+      await tester.pumpAndSettle();
+      expect(_location(env), '/settings/agents');
+    });
+
+    testWidgets('no agent card once an agent is connected', (tester) async {
+      await pumpSettingsApp(
+        tester,
+        homeRepo: _withMovements(),
+        overrides: [
+          assistantsRepositoryProvider.overrideWithValue(
+            FakeAssistantsRepository([
+              ConnectedAssistant(
+                clientId: 'claude',
+                name: 'Claude',
+                domain: 'claude.ai',
+                connectedAt: DateTime.utc(2026, 10, 1),
+              ),
+            ]),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('home.nudge.agents')), findsNothing);
+    });
+
+    testWidgets('a guest\'s Mis agentes offers to create the account first', (tester) async {
+      final env = await pumpSettingsApp(tester, guest: true, location: '/settings/agents');
+      await tester.tap(find.byKey(const Key('settings.agents.createAccount')));
+      await tester.pumpAndSettle();
+      expect(_location(env), '/progress');
+    });
+
     testWidgets('an account with no movements is offered the import, as the web does', (
       tester,
     ) async {
       final env = await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
       expect(find.byKey(const Key('home.nudge.import')), findsOneWidget);
-      await _nextNudge(tester);
       expect(find.text('Trae tu historial'), findsOneWidget);
       expect(
         find.text('Importa lo que llevas en Budge y empieza con tus números de verdad.'),
         findsOneWidget,
       );
-      await tester.tap(find.text('TRAER MI HISTORIAL'));
+      await tester.tap(find.text('IMPORTAR'));
       await tester.pumpAndSettle();
       expect(_location(env), '/import');
       expect(find.byKey(const Key('import.page')), findsOneWidget);
     });
 
-    testWidgets('after the budgets card, side by side: a swipe shows the next one', (tester) async {
-      await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
-      final budgets = tester.getRect(find.byKey(const Key('home.nudge.budgets')));
-      final import = tester.getRect(find.byKey(const Key('home.nudge.import')));
-      expect(import.top, budgets.top, reason: 'one row, not one under the other');
-      expect(import.left, greaterThanOrEqualTo(budgets.right), reason: 'to its right');
-      final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-      expect(import.left, greaterThan(screen - 16), reason: 'only its edge peeks in');
-      expect(find.byKey(const Key('home.nudges.dot.0')), findsOneWidget);
-      expect(find.byKey(const Key('home.nudges.dot.1')), findsOneWidget);
-
-      await _nextNudge(tester);
-      final shown = tester.getRect(find.byKey(const Key('home.nudge.import')));
-      expect(shown.left, closeTo(budgets.left, 1), reason: 'where the first one was');
-    });
-
     testWidgets('a card has its words across it and its buttons under them', (tester) async {
       await pumpSettingsApp(tester, homeRepo: _withMovements());
-      final card = find.byKey(const Key('home.nudge.budgets'));
+      final card = find.byKey(const Key('home.nudge.agents'));
       final lead = tester.getRect(
-        find.text(
-          'Así Wambito te avisa antes de que te pases. Toca una categoría y ponle un monto.',
-        ),
+        find.descendant(of: card, matching: find.textContaining('cuánto llevas gastado')),
       );
-      final go = tester.getRect(find.text('IR A CATEGORÍAS'));
-      final later = tester.getRect(
-        find.bySemanticsLabel('Ahora no: Ponle presupuesto a tus categorías'),
-      );
+      final go = tester.getRect(find.text('CONECTAR UN AGENTE'));
+      final later = tester.getRect(find.bySemanticsLabel('Ahora no: Conecta tu asistente de IA'));
       expect(go.top, greaterThan(lead.bottom));
       expect(later.top, greaterThan(lead.bottom));
       expect(later.center.dy, closeTo(go.center.dy, 2), reason: 'side by side');
@@ -256,7 +363,7 @@ void main() {
 
     testWidgets('an account with movements has no import card', (tester) async {
       await pumpSettingsApp(tester, homeRepo: _withMovements());
-      expect(find.byKey(const Key('home.nudge.budgets')), findsOneWidget);
+      expect(find.byKey(const Key('home.nudge.agents')), findsOneWidget);
       expect(find.byKey(const Key('home.nudge.import')), findsNothing);
     });
 
@@ -266,17 +373,16 @@ void main() {
       expect(find.byKey(const Key('home.nudge.import')), findsNothing);
     });
 
-    testWidgets('"Ahora no" puts it away for good, and the budgets card stays', (tester) async {
+    testWidgets('"Ahora no" puts it away for good, and the agent card stays', (tester) async {
       final env = await pumpSettingsApp(tester, homeRepo: FakeHomeRepository());
-      await _nextNudge(tester);
       await tester.tap(find.bySemanticsLabel('Ahora no: Trae tu historial'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('home.nudge.import')), findsNothing);
-      expect(find.byKey(const Key('home.nudge.budgets')), findsOneWidget);
+      expect(find.byKey(const Key('home.nudge.agents')), findsOneWidget);
       expect(env.flags.keys.any((k) => k.endsWith('.import')), isTrue);
     });
 
-    testWidgets('no answer about the movements, no card', (tester) async {
+    testWidgets('no answer about the movements, no import card', (tester) async {
       final home = FakeHomeRepository();
       home.failures['hasTransactions'] = Exception('offline');
       await pumpSettingsApp(tester, homeRepo: home);
@@ -285,9 +391,10 @@ void main() {
 
     testWidgets('in English', (tester) async {
       await pumpSettingsApp(tester, locale: const Locale('en'), homeRepo: FakeHomeRepository());
-      await _nextNudge(tester);
       expect(find.text('Bring your history'), findsOneWidget);
-      expect(find.text('BRING MY HISTORY'), findsOneWidget);
+      expect(find.text('IMPORT'), findsOneWidget);
+      await _nextNudge(tester);
+      expect(find.text('Connect your AI assistant'), findsOneWidget);
     });
   });
 

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/gen/wambito_api.dart';
 import 'package:wambito/budgets/budgets_repository.dart';
+import 'package:wambito/home/nudges.dart' show agentsNudgeProvider;
 import 'package:wambito/home/home_cache.dart';
 import 'package:wambito/home/home_controller.dart';
 import 'package:wambito/home/home_repository.dart';
@@ -61,6 +62,8 @@ Future<Env> pumpBudgets(
       budgetsRepositoryProvider.overrideWithValue(fake),
       clockProvider.overrideWithValue(() => now ?? testNow),
       wambiVariantProvider.overrideWithValue(() => 1),
+      // Not about home's cards: the agents card would push the categories under the bar.
+      agentsNudgeProvider.overrideWith((ref) async => false),
       widgetSnapshotWriterProvider.overrideWithValue(
         (summary, {required currency, required locale, required timezone}) async =>
             snapshots.add(summary),

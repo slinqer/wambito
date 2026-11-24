@@ -307,17 +307,29 @@
   "@homeNudgesLabel": {
     "description": "Screen-reader name of the cards that help an account without budgets get started."
   },
-  "homeNudgeBudgetsTitle": "Ponle presupuesto a tus categorías",
-  "@homeNudgeBudgetsTitle": {
-    "description": "Home: title of the card for an account without budgets."
+  "homeNudgeCaptureTitle": "Captura automática",
+  "@homeNudgeCaptureTitle": {
+    "description": "Home card: turn on automatic capture (title)."
   },
-  "homeNudgeBudgetsLead": "Así Wambito te avisa antes de que te pases. Toca una categoría y ponle un monto.",
-  "@homeNudgeBudgetsLead": {
-    "description": "Home: the card's explanation."
+  "homeNudgeCaptureLead": "Wambi agrega tus gastos por ti, sin escribir nada.",
+  "@homeNudgeCaptureLead": {
+    "description": "Home card: what automatic capture does, on both phones."
   },
-  "homeNudgeBudgetsAction": "Ir a Categorías",
-  "@homeNudgeBudgetsAction": {
-    "description": "Home: the card's button, which opens the budgets tab."
+  "homeNudgeCaptureAction": "Activar captura",
+  "@homeNudgeCaptureAction": {
+    "description": "Home card: the button that opens Settings \u2192 Capture."
+  },
+  "homeNudgeAgentsTitle": "Conecta tu asistente de IA",
+  "@homeNudgeAgentsTitle": {
+    "description": "Home card: connect an AI assistant (title)."
+  },
+  "homeNudgeAgentsLead": "Pregúntale cuánto llevas gastado o pídele que anote un gasto.",
+  "@homeNudgeAgentsLead": {
+    "description": "Home card: what an AI assistant can do with Wambito."
+  },
+  "homeNudgeAgentsAction": "Conectar un agente",
+  "@homeNudgeAgentsAction": {
+    "description": "Home card: the button that opens Mis agentes."
   },
   "homeNudgeDismiss": "Ahora no: {title}",
   "@homeNudgeDismiss": {
@@ -2123,7 +2135,7 @@
   "@homeNudgeImportLead": {
     "description": "Home: the import card's explanation."
   },
-  "homeNudgeImportAction": "Traer mi historial",
+  "homeNudgeImportAction": "Importar",
   "@homeNudgeImportAction": {
     "description": "Home: the import card's button, which opens the import."
   },
@@ -4487,38 +4499,6 @@
   "@screenLockBusy": {
     "description": "Sensitive operation without a screen lock: while the key is tried."
   },
-  "protectTitle": "Protege tus datos",
-  "@protectTitle": {
-    "description": "Settings: the block that offers ways back to the data for an account without email."
-  },
-  "protectLead": "Para no perder tus datos, aunque pierdas este teléfono.",
-  "@protectLead": {
-    "description": "Settings → Protect your data: what the block is for."
-  },
-  "protectRecoveryTitle": "Clave de recuperación",
-  "@protectRecoveryTitle": {
-    "description": "Settings → Protect your data: step 1."
-  },
-  "protectRecoveryLead": "Una clave que guardas tú. Con ella entras y abres tus datos en cualquier teléfono.",
-  "@protectRecoveryLead": {
-    "description": "Settings → Protect your data: what the recovery key does."
-  },
-  "protectRecoveryGo": "Crear mi clave",
-  "@protectRecoveryGo": {
-    "description": "Settings → Protect your data: makes and shows the recovery key."
-  },
-  "protectPasskeyTitle": "Entrar con tu huella",
-  "@protectPasskeyTitle": {
-    "description": "Settings → Protect your data: step 2."
-  },
-  "protectPasskeyLead": "Tu gestor de contraseñas la guarda. Una huella y vuelves a entrar, con tus datos abiertos.",
-  "@protectPasskeyLead": {
-    "description": "Settings → Protect your data: what the passkey does."
-  },
-  "protectPasskeyGo": "Agregar mi huella",
-  "@protectPasskeyGo": {
-    "description": "Settings → Protect your data: adds a passkey that opens the data."
-  },
   "protectPasskeyNoPrf": "Esta llave de acceso te deja entrar, pero no puede abrir tus datos. Agrega una clave de recuperación.",
   "@protectPasskeyNoPrf": {
     "description": "Settings → Protect your data: a passkey was added but the password manager gave no PRF (spec 5.2, fixed sentence)."
@@ -4530,34 +4510,6 @@
   "protectEmailLead": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque pierdas la huella.",
   "@protectEmailLead": {
     "description": "Settings → Protect your data: what an email adds."
-  },
-  "protectEmailGo": "Agregar mi correo",
-  "@protectEmailGo": {
-    "description": "Settings → Protect your data: opens adding an email."
-  },
-  "protectDone": "Listo",
-  "@protectDone": {
-    "description": "Settings → Protect your data: a step that is done."
-  },
-  "protectStepTodo": "Pendiente",
-  "@protectStepTodo": {
-    "description": "Settings \u2192 Protect your data: a step still to do, at the end of its row."
-  },
-  "protectPasskeyRow": "Huella",
-  "@protectPasskeyRow": {
-    "description": "Settings \u2192 Protect your data: the passkey step's row on Android."
-  },
-  "protectPasskeyRowIos": "Face ID",
-  "@protectPasskeyRowIos": {
-    "description": "Settings \u2192 Protect your data: the passkey step's row on the iPhone."
-  },
-  "protectPasskeyLeadIos": "Tu gestor de contraseñas la guarda. Con Face ID vuelves a entrar, con tus datos abiertos.",
-  "@protectPasskeyLeadIos": {
-    "description": "Settings \u2192 Protect your data: what the passkey step is, on the iPhone (read by the screen reader)."
-  },
-  "protectEmailLeadIos": "Con tu correo entras desde la web, usas los asistentes y vuelves aunque no tengas Face ID.",
-  "@protectEmailLeadIos": {
-    "description": "Settings \u2192 Protect your data: what adding an email is for, on the iPhone (read by the screen reader)."
   },
   "protectKeySaved": "Tu clave de recuperación quedó guardada. Guárdala donde no se pierda.",
   "@protectKeySaved": {
@@ -4578,6 +4530,26 @@
   "protectCardGo": "Crear mi clave",
   "@protectCardGo": {
     "description": "Home: the protect card's button that starts the recovery key."
+  },
+  "settingsMenuAccountUnprotected": "Sin proteger",
+  "@settingsMenuAccountUnprotected": {
+    "description": "Settings menu: Cuenta y seguridad's line while no way back to the data exists."
+  },
+  "protectCardBodyPasskey": "Tus datos viven solo en este teléfono. Activa la huella y vuelves a abrirlos aunque cambies de teléfono.",
+  "@protectCardBodyPasskey": {
+    "description": "Home's protect card on Android: what the fingerprint (passkey) is for."
+  },
+  "protectCardBodyFaceId": "Tus datos viven solo en este teléfono. Activa Face ID y vuelves a abrirlos aunque cambies de teléfono.",
+  "@protectCardBodyFaceId": {
+    "description": "Home's protect card on the iPhone: what Face ID (passkey) is for."
+  },
+  "protectCardGoPasskey": "Activar huella",
+  "@protectCardGoPasskey": {
+    "description": "Home's protect card button on Android: adds a passkey."
+  },
+  "protectCardGoFaceId": "Activar Face ID",
+  "@protectCardGoFaceId": {
+    "description": "Home's protect card button on the iPhone: adds a passkey."
   },
   "protectCardLater": "Ahora no",
   "@protectCardLater": {

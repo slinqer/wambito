@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../protect/protect_status.dart' show protectStatusProvider;
 import '../l10n/app_localizations.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
@@ -199,7 +200,11 @@ class SettingsMenu extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     String lineOf(SettingsCategory category) => switch (category) {
       SettingsCategory.agents => l10n.settingsMenuAgentsLine,
-      SettingsCategory.account => l10n.settingsMenuAccountLine,
+      // Until a way back to the data exists (a `preview` guest), said here and nowhere louder.
+      SettingsCategory.account =>
+        ref.watch(protectStatusProvider.select((s) => s.value?.protected == false))
+            ? l10n.settingsMenuAccountUnprotected
+            : l10n.settingsMenuAccountLine,
       SettingsCategory.preferences => _preferencesLine(context, ref, l10n),
       SettingsCategory.capture => l10n.settingsMenuCaptureLine,
       SettingsCategory.data => l10n.settingsMenuDataLine,

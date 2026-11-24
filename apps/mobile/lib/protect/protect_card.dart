@@ -1,10 +1,12 @@
 // Home's "Protect your data" nudge (phone-first spec 5.2): for a `preview` guest with neither way
-// back done, first after 7 days or 20 movements, then 14 days after the first "Not now", 30 after
+// back done, first after 7 days or 10 movements, then 14 days after the first "Not now", 30 after
 // the second and every 30 after that. It is kept per account on this phone (`home.protect.<user id>`,
-// JSON); the first evaluation writes `firstOpen`. Step 1 is the recovery key, as in Settings.
+// JSON); the first evaluation writes `firstOpen`. Its way in is a passkey where the phone has them
+// (Face ID on the iPhone, the fingerprint elsewhere: one touch), else the recovery key.
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,6 +21,7 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/lk_theme.dart';
 import '../ui/press_button.dart';
+import '../ui/toast.dart';
 import '../vault/vault_providers.dart' show vaultSessionProvider;
 import 'protect_actions.dart';
 import 'protect_status.dart';
@@ -53,7 +56,7 @@ class ProtectCardState {
 }
 
 /// How many movements make the card due before its first week is out.
-const protectCardMovements = 20;
+const protectCardMovements = 10;
 
 /// Whether the card is due: none dismissed yet, 7 days since the first open or [movements] of 20;
 /// one dismissal, 14 days since it; two or more, 30 days since the last.
@@ -177,11 +180,23 @@ class ProtectCard extends ConsumerStatefulWidget {
 class _ProtectCardState extends ConsumerState<ProtectCard> {
   var _busy = false;
 
-  Future<void> _go() async {
+  /// The way in: the passkey where the phone has them (one touch: Face ID, the fingerprint), else
+  /// the recovery key. A passkey that cannot open the data keeps the card and says so.
+  Future<void> _go({required bool passkey}) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await protectWithRecoveryKey(context, ref);
+      if (passkey) {
+        final l10n = AppLocalizations.of(context);
+        final toasts = ToastHost.maybeOf(context);
+        await protectWithPasskey(
+          context,
+          ref,
+          onNoPrf: () => toasts?.say(l10n.settingsPasskeysAddNoPrf),
+        );
+      } else {
+        await protectWithRecoveryKey(context, ref);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -191,6 +206,20 @@ class _ProtectCardState extends ConsumerState<ProtectCard> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
+    final passkey = ref.watch(
+      protectStatusProvider.select((s) => s.value?.passkeyOffered ?? false),
+    );
+    final iphone = defaultTargetPlatform == TargetPlatform.iOS;
+    final body = !passkey
+        ? l10n.protectCardBody
+        : iphone
+        ? l10n.protectCardBodyFaceId
+        : l10n.protectCardBodyPasskey;
+    final go = !passkey
+        ? l10n.protectCardGo
+        : iphone
+        ? l10n.protectCardGoFaceId
+        : l10n.protectCardGoPasskey;
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -223,26 +252,24 @@ class _ProtectCardState extends ConsumerState<ProtectCard> {
                             style: LkText.cardTitle.copyWith(color: colors.ink),
                           ),
                         ),
-                        Text(
-                          l10n.protectCardBody,
-                          style: LkText.cardLead.copyWith(color: colors.inkMuted),
-                        ),
+                        Text(body, style: LkText.cardLead.copyWith(color: colors.inkMuted)),
                       ],
                     ),
                   ),
                 ],
               ),
-              // As the other home cards: the way in first, "Not now" at the end.
+              // At the card's foot, and as the other home cards: the way in first, "Not now" last.
+              const Spacer(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 spacing: WambitoTokens.space2,
                 children: [
                   Flexible(
                     child: PressButton.text(
-                      l10n.protectCardGo,
+                      go,
                       key: const Key('protect.cardGo'),
                       size: PressSize.sm,
-                      onPressed: _busy ? null : () => unawaited(_go()),
+                      onPressed: _busy ? null : () => unawaited(_go(passkey: passkey)),
                     ),
                   ),
                   PressButton.text(

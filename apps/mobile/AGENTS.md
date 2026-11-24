@@ -408,7 +408,7 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   the key again; `canLeave: false` keeps `RecoverySetupPage` until saved) then `markRecoveryKeySaved` (settings record
   in one store transaction, then a sync; Settings → Security's "New recovery key" marks it too);
   `protectWithPasskey` (`SettingsPasskeys.add(prf:)`; with `onNoPrf`, a passkey that itself gave no PRF is kept and
-  the block says `settingsPasskeysAddNoPrf` under the step as text that stays, not the "added" toast). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
+  the caller says `settingsPasskeysAddNoPrf` (home's card in a toast), not the "added" toast). `afterClaim(context, ref)` (spec 7.1, ruling 20): after a
   `preview` guest's claim, `protectWithRecoveryKey(canLeave: false)` when the settings record's `recoveryKeySavedAt`
   is null (read from the vault, never `protectStatusProvider`, which is null once the account has an email), then
   `SessionController.offerPasskey()` (`offerPasskeyFor` when `PasskeyOffer.dueFor` says so): the only passkey offer
@@ -425,19 +425,23 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `MergeController.cancel()`; no changes nothing. The preview `/progress` says what an email adds
   (`protectEmailTitle`, `protectEmailLead`, `progressPreviewBody`) and has no passkey section. A `plain` guest's claim
   and email_taken are today's. Tests: `test/entry/claim_preview_test.dart`. `confirmSensitive(noKeyYet:)`: with no screen lock and no
-  saved key there is nothing to type, so it goes on (ruling 3). `protect_block.dart`: `ProtectBlock` at the top of
-  Settings (keys `protect.block` (one short line, no count), `protect.recovery`,
-  `protect.passkey` only with passkey support, `protect.passkeyNoPrf`, `protect.email` → `/progress`; one
-  `SettingsRow` per step, "To do" + chevron or a check, key `<step>.done` once done; the passkey row is Face ID on
-  the iPhone, the fingerprint elsewhere); a `preview`
+  saved key there is nothing to type, so it goes on (ruling 3). Settings has no "Protect your data" block: a `preview` guest's ways back (passkeys,
+  recovery key, email) are in Cuenta y seguridad, whose menu row (`settings.menu.account`) says
+  `settingsMenuAccountUnprotected` ("Sin proteger") while `protectStatusProvider` says nothing is done; a `preview`
   guest has no `settings.saveProgress`; home's menu has `home.createAccount` ("Crear tu cuenta", to `/progress`) instead
   of `home.saveProgress` (this replaced ruling 21's "nothing in the menu"). Tests: `test/protect/`
   (`fakes.dart`: `FakeVault` on a memory store).
-  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, the first card of home's carousel
-  (`NudgeCarousel` in `home_widgets.dart`, key `home.nudges`, dots `home.nudges.dot.<i>`, before the budgets and import
-  cards); `WidgetCard` waits while it shows; buttons `protect.cardGo` = step 1, then `protect.cardLater`). `protectCardProvider` is true while
+  `protect_card.dart`: home's nudge (`ProtectCard`, key `home.protectCard`, the last card of home's carousel:
+  `NudgeCarousel` in `home_widgets.dart`, key `home.nudges`, dots `home.nudges.dot.<i>`; its cards, in order, are
+  `home.nudge.capture` (`captureNudgeProvider` in `home/nudges.dart`: Android until a source is on with notification
+  access, the iPhone until `configured`; none without the capture channel; opens `/settings/capture`),
+  `home.nudge.import` (no movements at all) and `home.nudge.agents` (ChatGPT, Claude and Grok logos;
+  `agentsNudgeProvider`: a guest, or no grant listed; opens `/settings/agents`, whose guest view has
+  `settings.agents.createAccount` to `/progress`), each put away by "Ahora no" (`Nudge`, `home.dismissed.<user>.<id>`),
+  asked again on resume and back from its screen); `WidgetCard` waits while it shows; buttons `protect.cardGo` = a passkey where the phone has them (`protectWithPasskey`: "Activar Face ID" on the iPhone,
+  "Activar huella" elsewhere), else the recovery key, then `protect.cardLater`). `protectCardProvider` is true while
   `protectStatusProvider` says no step is done and `protectCardDue` says so: first after 7 days since `firstOpen`
-  (written at the first evaluation) or 20 live transactions in the vault, then 14 days after the first "Not now",
+  (written at the first evaluation) or 10 live transactions in the vault, then 14 days after the first "Not now",
   30 after the second, every 30 after that. State (`ProtectCardState`: `firstOpen`, `lastDismissed`, `dismissals`)
   is JSON in secure storage `home.protect.<userId>` (`ProtectCardStore`; tests use memory). `leaving_warning.dart`:
   `warnUnprotectedLeaving` (keys `unprotected.protectFirst`, `unprotected.signOutConfirm`, `unprotected.serverConfirm`),

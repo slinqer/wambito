@@ -301,32 +301,48 @@ void main() {
     testWidgets('a plain guest still sees Guarda tu progreso and no Protect block', (tester) async {
       await pumpSettingsApp(tester, guest: true, location: '/settings');
       expect(find.byKey(const Key('settings.saveProgress')), findsOneWidget);
-      expect(find.byKey(const Key('protect.block')), findsNothing);
+      expect(find.text('Sin proteger'), findsNothing);
     });
 
-    testWidgets('a preview guest sees Protect your data at the top instead of Guarda tu progreso', (
+    Future<void> pumpPreviewGuest(WidgetTester tester, {required bool protected}) =>
+        pumpSettingsApp(
+          tester,
+          guest: true,
+          location: '/settings',
+          overrides: [
+            isPreviewProvider.overrideWithValue(true),
+            securityApiProvider.overrideWithValue(FakeSecurity()),
+            protectStatusProvider.overrideWith(
+              (ref) async => ProtectStatus(
+                recoveryKey: false,
+                passkey: protected,
+                passkeyOffered: true,
+                passkeyWithoutPrf: false,
+              ),
+            ),
+          ],
+        );
+
+    testWidgets('a preview guest gets no block, only Sin proteger on Cuenta y seguridad', (
       tester,
     ) async {
-      await pumpSettingsApp(
-        tester,
-        guest: true,
-        location: '/settings',
-        overrides: [
-          isPreviewProvider.overrideWithValue(true),
-          securityApiProvider.overrideWithValue(FakeSecurity()),
-          protectStatusProvider.overrideWith(
-            (ref) async => const ProtectStatus(
-              recoveryKey: false,
-              passkey: false,
-              passkeyOffered: true,
-              passkeyWithoutPrf: false,
-            ),
-          ),
-        ],
-      );
-      expect(find.byKey(const Key('protect.block')), findsOneWidget);
-      expect(find.byKey(const Key('protect.recovery')), findsOneWidget);
+      await pumpPreviewGuest(tester, protected: false);
+      expect(find.byKey(const Key('protect.block')), findsNothing);
       expect(find.byKey(const Key('settings.saveProgress')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('settings.menu.account')),
+          matching: find.text('Sin proteger'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('once a way back exists, Cuenta y seguridad says what is in it again', (
+      tester,
+    ) async {
+      await pumpPreviewGuest(tester, protected: true);
+      expect(find.text('Sin proteger'), findsNothing);
     });
 
     testWidgets('in English', (tester) async {

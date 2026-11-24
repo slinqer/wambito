@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/server_url.dart';
 import '../api/session.dart';
@@ -25,7 +26,7 @@ import '../ui/css_text.dart';
 import '../ui/lk_brand_logo.dart';
 import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
-import '../ui/press_button.dart' show PressTone;
+import '../ui/press_button.dart' show PressButton, PressTone;
 import '../ui/toast.dart';
 import '../vault/vault_providers.dart' show vaultGateProvider;
 import 'agents.dart';
@@ -167,6 +168,12 @@ class _AgentsScreenState extends ConsumerState<AgentsScreen> with WidgetsBinding
           CssParagraph(
             l10n.settingsAssistantsGuest,
             style: LkText.bodySm.copyWith(color: context.lkColors.ink),
+          ),
+          // Not a dead end: the email is one tap away.
+          PressButton.text(
+            l10n.protectEmailTitle,
+            key: const Key('settings.agents.createAccount'),
+            onPressed: () => unawaited(context.push('/progress')),
           ),
         ],
       );
