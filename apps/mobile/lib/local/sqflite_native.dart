@@ -16,8 +16,10 @@ const sqflitePluginChannel = MethodChannel('com.tekartik.sqflite');
 /// keeps the file's write lock until the process ends: every read of the app then fails with
 /// `database is locked`. Its transaction is rolled back, then it is closed.
 ///
-/// Only while this takes the vault's lease (holder `app`): a live run holds it (renewed by its sync),
-/// so then nothing is touched; and no new run can start while the connections close. A plugin that
+/// Only under the vault's lease (holder `app`): taken here, or already held by this engine (the
+/// app's sync takes it before its writes, which are the first to meet the lock). A live run holds
+/// it (renewed by its sync), so then nothing is touched; and no new run can start while the
+/// connections close. A plugin that
 /// cannot list its connections (another platform's) closes nothing.
 Future<int> closeOrphanVaultConnections(
   String userId, {
@@ -26,7 +28,9 @@ Future<int> closeOrphanVaultConnections(
 }) async {
   final dir = directory ?? await defaultVaultDirectory();
   final lease = await tryLease(userId, holder: 'app', directory: dir);
-  if (lease == null) return 0;
+  // Taken already by this engine (the app's own sync, whose write met the lock): ours to use, and
+  // left to its holder to release.
+  if (lease == null && !await leaseHeldHere(userId, holder: 'app', directory: dir)) return 0;
   try {
     final path = p.join(dir, vaultFileName(userId));
     final info = await channel.invokeMethod<Object?>('debug', {'cmd': 'get'});
@@ -60,6 +64,6 @@ Future<int> closeOrphanVaultConnections(
   } on MissingPluginException {
     return 0;
   } finally {
-    await lease.release();
+    await lease?.release();
   }
 }

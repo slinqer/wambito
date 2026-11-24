@@ -84,7 +84,7 @@ iOS has no widgets; its automatic capture is Apple Pay payments through a Shortc
   operations go through one queue; SQLite's own `busy_timeout` is short (`vaultBusyTimeout`, 100 ms) and the
   store waits up to 5 s in Dart between tries, as on Android every connection of the process shares sqflite's
   native threads; once that wait fails, the app's store (not a `background` one) asks
-  `closeOrphanVaultConnections` (`sqflite_native.dart`: under the vault lease, rolls back and closes the
+  `closeOrphanVaultConnections` (`sqflite_native.dart`: under the vault lease, or the `app` lease this engine already holds (its own sync, `leaseHeldHere`), rolls back and closes the
   `singleInstance: false` connections of its vault that a destroyed headless engine left open in sqflite's
   process-wide map) and tries once more; device test `integration_test/vault_lock_test.dart`; keys are not in
   it, they live in secure storage; tests use
