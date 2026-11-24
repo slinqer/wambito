@@ -96,8 +96,9 @@ class AccountDeletion {
       await _step(() => _ref.read(passkeyOfferProvider).forget(id));
       await _step(() => _ref.read(unlockHintProvider).forget(id));
       await _step(() => _ref.read(onboardingDraftStoreProvider).clear(id));
-      for (final nudge in Nudge.values) {
-        await _step(() => _ref.read(flagStoreProvider('home.dismissed.$id.${nudge.id}')).clear());
+      // `budgets` is the card home no longer shows: its old answer goes too.
+      for (final nudge in [...Nudge.values.map((n) => n.id), 'budgets']) {
+        await _step(() => _ref.read(flagStoreProvider('home.dismissed.$id.$nudge')).clear());
       }
     }
     await _step(_ref.read(modelStoreProvider).deleteModels);

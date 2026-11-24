@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 import 'package:go_router/go_router.dart';
 
 import '../add/add_repository.dart' show TransactionPatch;
@@ -26,6 +27,7 @@ import '../theme/text_styles.dart';
 import '../theme/theme.dart';
 import '../theme/tokens.g.dart';
 import '../ui/app_shell.dart';
+import '../ui/lk_brand_logo.dart';
 import '../ui/lk_theme.dart';
 import '../ui/wambi_bubble.dart';
 import '../ui/press_button.dart';
@@ -232,6 +234,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       unawaited(_controller.refresh());
       ref.invalidate(hasTransactionsProvider);
       ref.invalidate(reviewProvider);
+      // A source switched on, or an agent connected, outside the app.
+      ref.invalidate(captureNudgeProvider);
+      ref.invalidate(agentsNudgeProvider);
     }
   }
 
@@ -661,42 +666,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  /// The cards for an account that skipped the setup (the web's `Nudges`), budgets first: one for
-  /// an account without a budget on any category, one for an account with no movements at all to
-  /// bring its history in. Each is gone once put away ("Ahora no", kept on this phone). Two are
-  /// side by side, one in view ([NudgeCarousel]), so they do not push the movements down. "Protect
-  /// your data" leads them while it is due ([protect]).
+  /// Home's carousel, what matters most after installing, in order: turning on automatic capture,
+  /// bringing a history (an account with no movements at all), connecting an AI assistant; then
+  /// "Protect your data" while it is due ([protect]). Each is gone once done or put away ("Ahora
+  /// no", kept on this phone). Side by side, one in view ([NudgeCarousel]), so they do not push the
+  /// movements down.
   Widget? _nudges(HomeData data, AppLocalizations l10n, {required bool protect}) {
-    final categories = data.categories.values.where((c) => !c.archived).toList();
-    final noBudgets =
-        data.summary.budgetTotal == 0 &&
-        categories.any((c) => c.kind == CategoryKindEnum.expense) &&
-        categories.every((c) => c.currentBudget == null);
-    final budgetsKey = nudgeKey(data.userId, Nudge.budgets);
-    final importKey = nudgeKey(data.userId, Nudge.import);
-    final showBudgets = noBudgets && ref.watch(nudgeDismissedProvider(budgetsKey)) == false;
+    bool shown(Nudge nudge) =>
+        ref.watch(nudgeDismissedProvider(nudgeKey(data.userId, nudge))) == false;
+    void dismiss(Nudge nudge) => unawaited(
+      ref.read(nudgeDismissedProvider(nudgeKey(data.userId, nudge)).notifier).dismiss(),
+    );
+    final showCapture =
+        ref.watch(captureNudgeProvider.select((s) => s.value ?? false)) && shown(Nudge.capture);
     // Movements on screen settle it; otherwise the account is asked (any month counts).
     final showImport =
         data.items.isEmpty &&
         ref.watch(hasTransactionsProvider).value == false &&
-        ref.watch(nudgeDismissedProvider(importKey)) == false;
-    if (!protect && !showBudgets && !showImport) return null;
+        shown(Nudge.import);
+    final showAgents =
+        ref.watch(agentsNudgeProvider.select((s) => s.value ?? false)) && shown(Nudge.agents);
+    if (!showCapture && !showImport && !showAgents && !protect) return null;
     return Semantics(
       container: true,
       explicitChildNodes: true,
       label: l10n.homeNudgesLabel,
       child: NudgeCarousel(
         cards: [
-          if (protect) const ProtectCard(key: Key('home.protectCard')),
-          if (showBudgets)
+          if (showCapture)
             NudgeCard(
-              key: const Key('home.nudge.budgets'),
-              title: l10n.homeNudgeBudgetsTitle,
-              lead: l10n.homeNudgeBudgetsLead,
-              actionLabel: l10n.homeNudgeBudgetsAction,
-              onAction: _showBudgets,
-              onDismiss: () =>
-                  unawaited(ref.read(nudgeDismissedProvider(budgetsKey).notifier).dismiss()),
+              key: const Key('home.nudge.capture'),
+              title: l10n.homeNudgeCaptureTitle,
+              lead: l10n.homeNudgeCaptureLead,
+              actionLabel: l10n.homeNudgeCaptureAction,
+              onAction: () => unawaited(_openAndRecheck('/settings/capture', captureNudgeProvider)),
+              onDismiss: () => dismiss(Nudge.capture),
             ),
           if (showImport)
             NudgeCard(
@@ -705,12 +709,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               lead: l10n.homeNudgeImportLead,
               actionLabel: l10n.homeNudgeImportAction,
               onAction: _openImport,
-              onDismiss: () =>
-                  unawaited(ref.read(nudgeDismissedProvider(importKey).notifier).dismiss()),
+              onDismiss: () => dismiss(Nudge.import),
             ),
+          if (showAgents)
+            NudgeCard(
+              key: const Key('home.nudge.agents'),
+              top: Row(
+                spacing: WambitoTokens.space2,
+                children: [
+                  for (final brand in const [LkBrand.chatgpt, LkBrand.claude, LkBrand.grok])
+                    ExcludeSemantics(
+                      child: LkBrandLogo(brand, size: 22, color: context.lkColors.ink),
+                    ),
+                ],
+              ),
+              title: l10n.homeNudgeAgentsTitle,
+              lead: l10n.homeNudgeAgentsLead,
+              actionLabel: l10n.homeNudgeAgentsAction,
+              onAction: () => unawaited(_openAndRecheck('/settings/agents', agentsNudgeProvider)),
+              onDismiss: () => dismiss(Nudge.agents),
+            ),
+          if (protect) const ProtectCard(key: Key('home.protectCard')),
         ],
       ),
     );
+  }
+
+  /// A card's button: opens [path], and back from it asks [check] again (the step may be done).
+  Future<void> _openAndRecheck(String path, ProviderOrFamily check) async {
+    await context.push<void>(path);
+    if (mounted) ref.invalidate(check);
   }
 
   /// Why what is on screen may be old: no answer at all, or a failed refresh with the network up;

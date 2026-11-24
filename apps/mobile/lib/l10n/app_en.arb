@@ -118,17 +118,29 @@
   "@homeNudgesLabel": {
     "description": "Screen-reader name of the cards that help an account without budgets get started."
   },
-  "homeNudgeBudgetsTitle": "Give your categories a budget",
-  "@homeNudgeBudgetsTitle": {
-    "description": "Home: title of the card for an account without budgets."
+  "homeNudgeCaptureTitle": "Automatic capture",
+  "@homeNudgeCaptureTitle": {
+    "description": "Home card: turn on automatic capture (title)."
   },
-  "homeNudgeBudgetsLead": "That way Wambito warns you before you overspend. Tap a category and give it an amount.",
-  "@homeNudgeBudgetsLead": {
-    "description": "Home: the card's explanation."
+  "homeNudgeCaptureLead": "Wambi adds your expenses for you, no typing.",
+  "@homeNudgeCaptureLead": {
+    "description": "Home card: what automatic capture does, on both phones."
   },
-  "homeNudgeBudgetsAction": "Go to Categories",
-  "@homeNudgeBudgetsAction": {
-    "description": "Home: the card's button, which opens the budgets tab."
+  "homeNudgeCaptureAction": "Turn on capture",
+  "@homeNudgeCaptureAction": {
+    "description": "Home card: the button that opens Settings \u2192 Capture."
+  },
+  "homeNudgeAgentsTitle": "Connect your AI assistant",
+  "@homeNudgeAgentsTitle": {
+    "description": "Home card: connect an AI assistant (title)."
+  },
+  "homeNudgeAgentsLead": "Ask it how much you have spent, or tell it to log an expense.",
+  "@homeNudgeAgentsLead": {
+    "description": "Home card: what an AI assistant can do with Wambito."
+  },
+  "homeNudgeAgentsAction": "Connect an agent",
+  "@homeNudgeAgentsAction": {
+    "description": "Home card: the button that opens Mis agentes."
   },
   "homeNudgeDismiss": "Not now: {title}",
   "@homeNudgeDismiss": {
@@ -1443,7 +1455,7 @@
   "homeMenuCategories": "Categories",
   "homeNudgeImportTitle": "Bring your history",
   "homeNudgeImportLead": "Import what you have in Budge and start with your real numbers.",
-  "homeNudgeImportAction": "Bring my history",
+  "homeNudgeImportAction": "Import",
   "recurringTitle": "Recurring",
   "recurringAdd": "New recurring",
   "importPageTitle": "Bring your history",
@@ -2335,29 +2347,19 @@
   "screenLockLead": "This phone has no screen lock. Type your current recovery key to continue.",
   "screenLockSubmit": "Confirm",
   "screenLockBusy": "Checking…",
-  "protectTitle": "Protect your data",
-  "protectLead": "So you never lose your data, even if you lose this phone.",
-  "protectRecoveryTitle": "Recovery key",
-  "protectRecoveryLead": "A key you keep. With it you sign in and open your data on any phone.",
-  "protectRecoveryGo": "Make my key",
-  "protectPasskeyTitle": "Sign in with your fingerprint",
-  "protectPasskeyLead": "Your password manager keeps it. One touch and you are back in, with your data open.",
-  "protectPasskeyGo": "Add my fingerprint",
   "protectPasskeyNoPrf": "This passkey can sign you in but cannot open your data. Add a recovery key.",
   "protectEmailTitle": "Create your account",
   "protectEmailLead": "With your email you sign in on the web, use the assistants and get back in even without your fingerprint.",
-  "protectEmailGo": "Add my email",
-  "protectDone": "Done",
-  "protectStepTodo": "To do",
-  "protectPasskeyRow": "Fingerprint",
-  "protectPasskeyRowIos": "Face ID",
-  "protectPasskeyLeadIos": "Your password manager keeps it. With Face ID you are back in, with your data open.",
-  "protectEmailLeadIos": "With your email you sign in on the web, use the assistants and get back in even without Face ID.",
   "protectKeySaved": "Your recovery key is saved. Keep it where it will not get lost.",
   "protectLockReason": "Confirm it's you to make your recovery key",
   "protectCardTitle": "Protect your data",
   "protectCardBody": "Your data lives only on this phone. Make a recovery key so you do not lose it if the phone is lost.",
   "protectCardGo": "Make my key",
+  "settingsMenuAccountUnprotected": "Not protected",
+  "protectCardBodyPasskey": "Your data lives only on this phone. Turn on your fingerprint and open it again even on a new phone.",
+  "protectCardBodyFaceId": "Your data lives only on this phone. Turn on Face ID and open it again even on a new phone.",
+  "protectCardGoPasskey": "Turn on fingerprint",
+  "protectCardGoFaceId": "Turn on Face ID",
   "protectCardLater": "Not now",
   "unprotectedSignOutTitle": "Sign out with no way back?",
   "unprotectedSignOutBody": "You have not saved a recovery key. If you sign out, your data is deleted from this phone and nobody can open it again.",

@@ -112,7 +112,7 @@ void main() {
       await _show(t, 'settings.assistants.copy');
       expect(find.byKey(const Key('settings.assistants.comingSoon')), findsNothing);
       expect(find.byKey(const Key('settings.assistants.url')), findsOneWidget);
-      expect(assistants.lists, 1);
+      expect(assistants.lists, isPositive, reason: 'Mis agentes asks (home\'s agents card too)');
     });
   });
 }

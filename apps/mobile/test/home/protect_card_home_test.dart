@@ -1,5 +1,6 @@
 // Home's "Protect your data" card (phone-first spec 5.2) in front of a vault: it shows while neither
 // step is done and goes once one is; it keeps off the add button; "Not now" is kept across a restart.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/crypto/records.dart' show RecordType;
@@ -22,12 +23,13 @@ class _MemoryCardStore implements ProtectCardStore {
   Future<void> write(String userId, ProtectCardState state) async => states[userId] = state;
 }
 
-ProtectStatus _status({bool recoveryKey = false, bool passkey = false}) => ProtectStatus(
-  recoveryKey: recoveryKey,
-  passkey: passkey,
-  passkeyOffered: true,
-  passkeyWithoutPrf: false,
-);
+ProtectStatus _status({bool recoveryKey = false, bool passkey = false, bool offered = true}) =>
+    ProtectStatus(
+      recoveryKey: recoveryKey,
+      passkey: passkey,
+      passkeyOffered: offered,
+      passkeyWithoutPrf: false,
+    );
 
 void main() {
   const card = Key('home.protectCard');
@@ -65,9 +67,7 @@ void main() {
     expect(find.byKey(card), findsNothing);
   });
 
-  testWidgets('it leads the carousel, the other cards after it, its buttons under the words', (
-    t,
-  ) async {
+  testWidgets('it comes last in the carousel, its buttons under the words', (t) async {
     final (vault, cards) = await vaultSeen(t, days: 8);
     await pumpHome(
       t,
@@ -79,15 +79,67 @@ void main() {
       ],
     );
     final protect = t.getRect(find.byKey(card));
-    final next = t.getRect(find.byKey(const Key('home.nudge.import')));
-    expect(next.top, protect.top, reason: 'side by side');
-    expect(next.left, greaterThan(protect.right), reason: 'after it');
-    expect(find.byKey(const Key('home.nudges.dot.0')), findsOneWidget);
+    final before = t.getRect(find.byKey(const Key('home.nudge.import')));
+    expect(protect.top, before.top, reason: 'side by side');
+    expect(protect.left, greaterThan(before.right), reason: 'after the others');
 
     final go = t.getRect(find.byKey(const Key('protect.cardGo')));
     final later = t.getRect(find.byKey(const Key('protect.cardLater')));
     expect(later.left, greaterThan(go.right), reason: 'the way in first, Not now at the end');
     expect(later.center.dy, closeTo(go.center.dy, 2));
+  });
+
+  testWidgets('its way in is the fingerprint, one touch; Face ID on the iPhone', (t) async {
+    final (vault, cards) = await vaultSeen(t, days: 8);
+    Future<void> pump() => pumpHome(
+      t,
+      withMovement(),
+      overrides: [
+        vaultSessionProvider.overrideWithValue(vault),
+        protectCardStoreProvider.overrideWithValue(cards),
+        protectStatusProvider.overrideWith((ref) async => _status()),
+      ],
+    );
+    await pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('protect.cardGo')),
+        matching: find.text('ACTIVAR HUELLA'),
+      ),
+      findsOneWidget,
+    );
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await t.pumpWidget(const SizedBox());
+    await pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('protect.cardGo')),
+        matching: find.text('ACTIVAR FACE ID'),
+      ),
+      findsOneWidget,
+    );
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('without passkeys on the phone its way in is the recovery key', (t) async {
+    final (vault, cards) = await vaultSeen(t, days: 8);
+    await pumpHome(
+      t,
+      withMovement(),
+      overrides: [
+        vaultSessionProvider.overrideWithValue(vault),
+        protectCardStoreProvider.overrideWithValue(cards),
+        protectStatusProvider.overrideWith((ref) async => _status(offered: false)),
+      ],
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('protect.cardGo')),
+        matching: find.text('CREAR MI CLAVE'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the card is not due in the first days with few movements', (t) async {

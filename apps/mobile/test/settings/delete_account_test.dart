@@ -241,6 +241,8 @@ void main() {
       await _confirm(t);
       expect(await env.app.flags['home.dismissed.user-1.budgets']!.read(), isNull);
       expect(await env.app.flags['home.dismissed.user-1.import']!.read(), isNull);
+      expect(await env.app.flags['home.dismissed.user-1.capture']!.read(), isNull);
+      expect(await env.app.flags['home.dismissed.user-1.agents']!.read(), isNull);
       expect(await env.app.flags['home.dismissed.other.budgets']!.read(), isTrue);
     });
 
