@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:wambito/crypto/records.dart' show RecordType;
 import 'package:wambito/local/sqlite_store.dart';
+import 'package:wambito/local/vault_lock.dart';
 
 /// The app's vault connection and a headless run's connection in one process, on sqflite's real
 /// native side (one map of connections and one pool of threads for every engine). On a phone, a run
@@ -35,6 +36,26 @@ void main() {
     final sw = Stopwatch()..start();
     expect(await app.list(RecordType.transaction), isEmpty);
     expect(sw.elapsed, lessThan(const Duration(seconds: 1)));
+    await app.close();
+  }, timeout: const Timeout(Duration(minutes: 1)));
+
+  test('the app recovers while its own sync holds the lease', () async {
+    // On a phone the app's sync takes the lease first and its write meets the orphan's lock: the
+    // recovery must go on under that lease, or the vault stays locked until the process ends.
+    final app = await SqliteStore.open('eva', directory: dir.path);
+    final bg = await SqliteStore.open('eva', directory: dir.path, background: true);
+    final inside = Completer<void>();
+    final orphan = bg.transaction((tx) async {
+      await tx.get(RecordType.category, 'x');
+      inside.complete();
+      await Completer<void>().future;
+    });
+    unawaited(orphan.then((_) {}, onError: (Object _) {}));
+    await inside.future;
+
+    final sync = await tryLease('eva', holder: 'app', directory: dir.path);
+    expect(await app.list(RecordType.transaction), isEmpty);
+    await sync!.release();
     await app.close();
   }, timeout: const Timeout(Duration(minutes: 1)));
 

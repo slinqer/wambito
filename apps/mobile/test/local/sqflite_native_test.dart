@@ -118,6 +118,37 @@ void main() {
       await live!.release();
     });
 
+    test('closes them while this engine holds the lease itself (the app\'s own sync)', () async {
+      // On a phone the app's sync takes the lease, then its first write meets the orphan's lock and
+      // asks for recovery: the lease is taken, but by this very engine, so no run can be alive.
+      databases = {
+        '1': {'path': vault('ana'), 'singleInstance': false},
+      };
+      final mine = await tryLease('ana', holder: 'app', directory: dir.path);
+      final closed = await closeOrphanVaultConnections(
+        'ana',
+        directory: dir.path,
+        channel: channel,
+      );
+      expect(closed, 1);
+      // The sync's lease is still its own: recovery neither released nor replaced it.
+      expect(await mine!.renew(), isTrue);
+      expect(await tryLease('ana', holder: 'background', directory: dir.path), isNull);
+      await mine.release();
+    });
+
+    test('an app lease this engine released, then a run took, is not its own', () async {
+      databases = {
+        '1': {'path': vault('ana'), 'singleInstance': false},
+      };
+      final mine = await tryLease('ana', holder: 'app', directory: dir.path);
+      await mine!.release();
+      final run = await tryLease('ana', holder: 'background', directory: dir.path);
+      expect(await closeOrphanVaultConnections('ana', directory: dir.path, channel: channel), 0);
+      expect(calls, isEmpty);
+      await run!.release();
+    });
+
     test('a plugin that cannot list its connections closes nothing', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
         channel,

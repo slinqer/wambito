@@ -34,8 +34,13 @@ final _random = Random.secure();
 String _token() =>
     List.generate(16, (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
 
+/// The leases this isolate (one Flutter engine) holds and has not released, by lock file path.
+final _heldHere = <String, Set<_Lease>>{};
+
 class _Lease implements VaultLease {
-  _Lease(this._path, this._token, this._holder, this._ttl, this._clock);
+  _Lease(this._path, this._token, this._holder, this._ttl, this._clock) {
+    _heldHere.putIfAbsent(_path, () => {}).add(this);
+  }
 
   final String _path;
   final String _token;
@@ -71,10 +76,19 @@ class _Lease implements VaultLease {
     }
   }
 
+  /// Whether the lock file still holds this lease, live. Reads only: the expiry is not extended.
+  bool get _live {
+    if (_released) return false;
+    final content = _read(File(_path));
+    return content?.token == _token &&
+        content!.expiresAt - _releaseMargin.inMilliseconds > _clock().millisecondsSinceEpoch;
+  }
+
   @override
   Future<void> release() async {
     if (_released) return;
     _released = true;
+    _heldHere[_path]?.remove(this);
     try {
       final file = File(_path);
       // Only the file that is still ours, and only while the lease is live: from its expiry on a
@@ -192,6 +206,15 @@ Future<VaultLease?> tryLease(
     return null;
   }
   return null;
+}
+
+/// Whether this isolate (this engine) holds a live lease of [userId]'s vault for [holder]. The
+/// app's sync holds its lease while its store waits for a lock: a recovery that needs the lease
+/// (`closeOrphanVaultConnections`) can go on under it, as no other engine can hold it meanwhile.
+Future<bool> leaseHeldHere(String userId, {required String holder, String? directory}) async {
+  final dir = directory ?? await defaultVaultDirectory();
+  final leases = _heldHere[p.join(dir, vaultLockFileName(userId))];
+  return leases != null && leases.any((l) => l._holder == holder && l._live);
 }
 
 /// A claim older than this belongs to a taker that is gone.
