@@ -18,10 +18,13 @@ const LOCALES = [
   {
     locale: "es",
     path: "/",
-    headline: "Tus lukas, por fin claras.",
+    headline: "Wambi organiza tus lukas por ti.",
     highlight: "lukas🇨🇴",
     annotation: "¡Gratis, y siempre lo será!",
-    lead: "Deja de anotar a mano: Wambi lee tus pagos y lleva la cuenta por ti.",
+    lead: "La app de gastos que no tienes que usar.",
+    description:
+      "La app de gastos que no tienes que usar. Actívala una vez y sigue gastando como siempre.",
+    stopLogging: "Deja de anotar a mano: Wambi lee tus pagos y lleva la cuenta por ti.",
     oldLead: "Wambi te acompaña para que cuidar tu plata dé gusto.",
     removedDescription: "Anota un gasto en segundos y mira en qué se va cada luka.",
     newTab: "(se abre en una pestaña nueva)",
@@ -29,6 +32,8 @@ const LOCALES = [
     openSourcePerk: "Código abierto",
     removedQuestions: ["¿En qué se me va la plata?", "¿Cuánto me cuesta vivir?"],
     cta: "Crear cuenta",
+    download: "Descargar la app",
+    iosCta: "Empezar en la web",
     demoCta: "Demo",
     soon: "Pronto",
     ways: ["App para Android", "App para iOS"],
@@ -54,15 +59,18 @@ const LOCALES = [
     how: "Cómo funciona",
     questions: "Preguntas",
     other: { name: "English", path: "/en", lang: "en" },
-    titlePart: "La app que lleva tus gastos por ti",
+    titlePart: "La app de gastos que no tienes que usar",
   },
   {
     locale: "en",
     path: "/en",
-    headline: "Your money, finally clear.",
+    headline: "Wambi sorts out your money for you.",
     highlight: "money",
     annotation: "Free, and it always will be!",
-    lead: "Stop logging by hand: Wambi reads your payments and keeps count for you.",
+    lead: "The expense app you don't have to use.",
+    description:
+      "The expense app you don't have to use. Turn it on once and keep spending as usual.",
+    stopLogging: "Stop logging by hand: Wambi reads your payments and keeps count for you.",
     oldLead: "Wambi keeps you company, so looking after your money feels good.",
     removedDescription: "Log an expense in seconds and see where every buck goes.",
     newTab: "(opens in a new tab)",
@@ -70,6 +78,8 @@ const LOCALES = [
     openSourcePerk: "Open source",
     removedQuestions: ["Where does all my money go?", "How much does living cost me?"],
     cta: "Create account",
+    download: "Download the app",
+    iosCta: "Start on the web",
     demoCta: "Demo",
     soon: "Soon",
     ways: ["Android app", "iOS app"],
@@ -92,15 +102,18 @@ const LOCALES = [
     how: "How it works",
     questions: "Questions",
     other: { name: "Español", path: "/", lang: "es" },
-    titlePart: "The app that tracks your expenses for you",
+    titlePart: "The expense app you don't have to use",
   },
   {
     locale: "it",
     path: "/it",
-    headline: "I tuoi soldi, finalmente chiari.",
+    headline: "Wambi organizza i tuoi soldi per te.",
     highlight: "soldi",
     annotation: "Gratis, e lo sarà sempre!",
-    lead: "Basta annotare a mano: Wambi legge i tuoi pagamenti e tiene il conto per te.",
+    lead: "L'app delle spese che non devi usare.",
+    description:
+      "L'app delle spese che non devi usare. Attivala una volta e continua a spendere come sempre.",
+    stopLogging: "Basta annotare a mano: Wambi legge i tuoi pagamenti e tiene il conto per te.",
     oldLead: "Wambi ti fa compagnia, così prenderti cura dei tuoi soldi è un piacere.",
     removedDescription: "Annota una spesa in pochi secondi e guarda dove va ogni centesimo.",
     newTab: "(si apre in una nuova scheda)",
@@ -108,6 +121,8 @@ const LOCALES = [
     openSourcePerk: "Open source",
     removedQuestions: ["Dove se ne vanno tutti i miei soldi?", "Quanto mi costa vivere?"],
     cta: "Crea un account",
+    download: "Scarica l'app",
+    iosCta: "Inizia sul web",
     demoCta: "Demo",
     soon: "Presto",
     ways: ["App per Android", "App per iOS"],
@@ -130,15 +145,18 @@ const LOCALES = [
     how: "Come funziona",
     questions: "Domande",
     other: { name: "Português", path: "/pt", lang: "pt" },
-    titlePart: "L'app che tiene i conti delle tue spese per te",
+    titlePart: "L'app delle spese che non devi usare",
   },
   {
     locale: "pt",
     path: "/pt",
-    headline: "O teu dinheiro, finalmente claro.",
+    headline: "O Wambi organiza o teu dinheiro por ti.",
     highlight: "dinheiro",
     annotation: "Grátis, e vai ser sempre!",
-    lead: "Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.",
+    lead: "A app de despesas que não tens de usar.",
+    description:
+      "A app de despesas que não tens de usar. Ativa-a uma vez e continua a gastar como sempre.",
+    stopLogging: "Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.",
     oldLead: "O Wambi faz-te companhia para que cuidar do teu dinheiro seja um prazer.",
     removedDescription: "Regista uma despesa em segundos e vê para onde vai cada cêntimo.",
     newTab: "(abre num novo separador)",
@@ -146,6 +164,8 @@ const LOCALES = [
     openSourcePerk: "Código aberto",
     removedQuestions: ["Para onde vai todo o meu dinheiro?", "Quanto me custa viver?"],
     cta: "Criar conta",
+    download: "Descarregar a app",
+    iosCta: "Começar na web",
     demoCta: "Demo",
     soon: "Em breve",
     ways: ["App para Android", "App para iOS"],
@@ -168,7 +188,7 @@ const LOCALES = [
     how: "Como funciona",
     questions: "Perguntas",
     other: { name: "Italiano", path: "/it", lang: "it" },
-    titlePart: "A app que gere as tuas despesas por ti",
+    titlePart: "A app de despesas que não tens de usar",
   },
 ] as const;
 
@@ -736,9 +756,11 @@ for (const l of LOCALES) {
       );
 
       const description = hero.locator(".lk-landing-description");
-      // One sentence about what Wambito does (no more manual logging); the old lines are gone.
-      await expect(description).toHaveText(l.lead);
+      // What Wambito is (the app you don't have to use), then how: turn it on once and keep
+      // spending; the old lines are gone.
+      await expect(description).toHaveText(l.description);
       await expect(hero).not.toContainText(l.oldLead);
+      await expect(hero).not.toContainText(l.stopLogging);
       await expect(description.locator(".lk-landing-lead")).toHaveText(l.lead);
       await expect(hero).not.toContainText(l.removedDescription);
 
@@ -872,19 +894,21 @@ for (const l of LOCALES) {
       );
     });
 
-    test("one primary action: create account → /create-account in this language", async ({
-      page,
-    }) => {
+    test("one primary action: download the app → scrolls to the downloads", async ({ page }) => {
       await page.goto(l.path);
       const hero = page.locator("#hero");
-      const cta = hero.getByRole("link", { name: l.cta });
-      await expect(cta).toHaveAttribute("href", `/create-account?lang=${l.locale}`);
+      await expect(hero.getByRole("link", { name: l.cta })).toHaveCount(0);
+      const cta = hero.getByRole("link", { name: l.download, exact: true });
+      await expect(cta).toHaveAttribute("href", "#ways");
       await expect(cta).toHaveClass(/lk-btn-primary/);
       const box = await cta.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(44);
+      await cta.click();
+      await expect(page).toHaveURL(/#ways$/);
+      await expect(page.locator("#ways h2")).toBeInViewport();
     });
 
-    test("use it your way: Android downloads the APK, iOS is coming soon; no web or agent card", async ({
+    test("use it your way: Android downloads the APK, iOS is coming soon and starts on the web; no agent card", async ({
       page,
     }) => {
       await page.goto(l.path);
@@ -912,7 +936,12 @@ for (const l of LOCALES) {
       await expect(android.locator(".lk-landing-store")).toHaveText(`Google Play${l.soon}`);
       await expect(ios.getByText(l.soon, { exact: true })).toBeVisible();
       await expect(ios.locator(".lk-landing-store")).toHaveText(`App Store${l.soon}`);
-      await expect(ios.getByRole("link")).toHaveCount(0);
+      // Until the iPhone app is out, its one link starts on the web.
+      await expect(ios.getByRole("link")).toHaveCount(1);
+      await expect(ios.getByRole("link", { name: l.iosCta, exact: true })).toHaveAttribute(
+        "href",
+        `/create-account?lang=${l.locale}`,
+      );
       // The agent has its own section (#agent), not a card here.
       await expect(page.locator("#ways [data-logo='claude']")).toHaveCount(0);
     });
@@ -1306,32 +1335,32 @@ test.describe("landing with JavaScript", () => {
       first: "lukas🇨🇴",
       next: "lana🇲🇽",
       flag: "🇲🇽",
-      shown: "Tu lana🇲🇽, por fin clara.",
-      message: "Tus lukas, por fin claras.",
+      shown: "Wambi organiza tu lana🇲🇽 por ti.",
+      message: "Wambi organiza tus lukas por ti.",
     },
     {
       path: "/en",
       first: "money",
       next: "bucks🇺🇸",
       flag: "🇺🇸",
-      shown: "Your bucks🇺🇸, finally clear.",
-      message: "Your money, finally clear.",
+      shown: "Wambi sorts out your bucks🇺🇸 for you.",
+      message: "Wambi sorts out your money for you.",
     },
     {
       path: "/pt",
       first: "dinheiro",
       next: "grana🇧🇷",
       flag: "🇧🇷",
-      shown: "A tua grana🇧🇷, finalmente clara.",
-      message: "O teu dinheiro, finalmente claro.",
+      shown: "O Wambi organiza a tua grana🇧🇷 por ti.",
+      message: "O Wambi organiza o teu dinheiro por ti.",
     },
     {
       path: "/it",
       first: "soldi",
       next: "grana🇮🇹",
       flag: "🇮🇹",
-      shown: "La tua grana🇮🇹, finalmente chiara.",
-      message: "I tuoi soldi, finalmente chiari.",
+      shown: "Wambi organizza la tua grana🇮🇹 per te.",
+      message: "Wambi organizza i tuoi soldi per te.",
     },
   ]) {
     test(`the marker takes turns with what money is called elsewhere (${turn.path})`, async ({
@@ -1364,7 +1393,7 @@ test.describe("landing with JavaScript", () => {
     test.use({ viewport: { width: 320, height: 700 } });
 
     test("a longer word never moves the page: the headline keeps its height", async ({ page }) => {
-      // "Le tue palanche🇮🇹, finalmente chiare." takes two lines more than the soldi one here.
+      // "Wambi organizza le tue palanche🇮🇹 per te." can take more lines than the soldi one here.
       await page.goto("/it");
       const headline = page.getByRole("heading", { level: 1 });
       const height = async () => (await headline.boundingBox())?.height;
@@ -1387,15 +1416,15 @@ test.describe("landing with JavaScript", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "Tus lukas, por fin claras.",
+      "Wambi organiza tus lukas por ti.",
     );
 
     await page.getByRole("contentinfo").getByRole("link", { name: "English" }).click();
     await expect(page).toHaveURL(/\/en$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "Your money, finally clear.",
+      "Wambi sorts out your money for you.",
     );
-    await expect(page).toHaveTitle(/The app that tracks your expenses for you/);
+    await expect(page).toHaveTitle(/The expense app you don't have to use/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${ORIGIN}/en`);
     expect(errors).toEqual([]);
@@ -1428,20 +1457,20 @@ test.describe("landing with JavaScript", () => {
       await expect(footer.getByRole("link", { name })).toHaveAttribute("hreflang", code);
     }
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "I tuoi soldi, finalmente chiari.",
+      "Wambi organizza i tuoi soldi per te.",
     );
 
     await footer.getByRole("link", { name: "Português" }).click();
     await expect(page).toHaveURL(/\/pt$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "O teu dinheiro, finalmente claro.",
+      "O Wambi organiza o teu dinheiro por ti.",
     );
     await expect(page.locator("html")).toHaveAttribute("lang", "pt");
 
     await footer.getByRole("link", { name: "Español" }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "Tus lukas, por fin claras.",
+      "Wambi organiza tus lukas por ti.",
     );
     expect(errors).toEqual([]);
   });

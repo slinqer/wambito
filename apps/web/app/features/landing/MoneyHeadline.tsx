@@ -7,9 +7,9 @@ import { MONEY_WORD_HOLD, MONEY_WORDS, phraseFor, type WordOf } from "./money-wo
 
 /**
  * The headline, with what money is called around the world in this language taking turns on the
- * gold marker ("Tus lukas 🇨🇴" → "Tu lana 🇲🇽" → …, "Your money" → "Your bucks 🇺🇸" → …), each with
- * its country's flag, and the words around it agreeing with each word ("Tu(s)", "clar(a/o)(s)";
- * "O teu"/"A tua", "I tuoi"/"La tua"). Screen readers and search engines get the message as it is
+ * gold marker ("Wambi organiza tus lukas 🇨🇴 por ti" → "… tu lana 🇲🇽 …" → …, "Wambi sorts out your
+ * money" → "… your bucks 🇺🇸 …" → …), each with its country's flag, and the possessive before it
+ * agreeing with each word ("tu(s)"; "o teu"/"a tua", "i tuoi"/"la tua"). Screen readers and search engines get the message as it is
  * (the prerendered first word); the turning words are decorative. It starts turning once hydrated,
  * waits while the tab is hidden, and holds on the first word under reduced motion. Every word's
  * headline is also laid out unseen in the same place, so the headline is as tall as its tallest
@@ -69,24 +69,22 @@ function Words({
   entry: WordOf<Locale>;
   piece: (text: string) => ReactNode;
 }) {
-  const { lead, middle, last } = phraseFor(locale, entry);
+  const { subject, lead, tail } = phraseFor(locale, entry);
   return (
     <>
       <span className="lk-swap-word">
-        {lead[0]}
-        {piece(lead[1])}
+        {subject} <AppTile />
       </span>{" "}
+      {lead[0]}
+      {piece(lead[1])}{" "}
       <span className="lk-swap-word">
         <span className="lk-landing-marker">
           {piece(entry.word)}
           <span className="lk-landing-flag">{piece(entry.flag)}</span>
         </span>
-        ,
       </span>{" "}
-      <AppTile /> {middle}{" "}
       <span className="lk-swap-word">
-        <NoticeTile /> {last[0]}
-        {piece(last[1])}.
+        <NoticeTile /> {tail}.
       </span>
     </>
   );

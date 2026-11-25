@@ -129,9 +129,9 @@
   "landing": {
     "new_tab": "(opens in a new tab)",
     "meta": {
-      "title": "Wambito · The app that tracks your expenses for you",
+      "title": "Wambito · The expense app you don't have to use",
       "description": "It reads your payment notifications and logs each expense automatically. Free and open source.",
-      "image_alt": "Wambi, a smiling gold coin, waves next to the title: Your money, finally clear."
+      "image_alt": "Wambi, a smiling gold coin, waves next to the title: Wambi sorts out your money for you."
     },
     "nav": {
       "label": "Main",
@@ -143,10 +143,11 @@
       "sign_in_soon": "Coming soon"
     },
     "hero": {
-      "headline": "Your <mark>money</mark>, finally clear.",
-      "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
+      "headline": "Wambi sorts out your <mark>money</mark> for you.",
+      "description": "<lead>The expense app you don't have to use.</lead> Turn it on once and keep spending as usual.",
       "cta": "Create account",
       "cta_soon": "Coming soon · Follow on GitHub",
+      "cta_download": "Download the app",
       "cta_demo": "Demo"
     },
     "ways": {
@@ -154,12 +155,14 @@
       "soon": "Soon",
       "android": {
         "title": "Android app",
-        "body": "With a widget to log an expense without opening the app.",
+        "body": "With automatic capture, to log an expense without opening the app.",
         "cta": "From GitHub"
       },
       "ios": {
         "title": "iOS app",
-        "body": "Wambito on your iPhone. We're finishing it."
+        "body": "We're finishing it. Meanwhile, start on the web: when it's out, just sign in and everything will be there.",
+        "body_soon": "Wambito on your iPhone. We're finishing it.",
+        "cta": "Start on the web"
       }
     },
     "how": {

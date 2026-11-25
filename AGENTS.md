@@ -111,6 +111,9 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
   - `apps/mcp/src/api/schema.d.ts`: `pnpm --filter @wambito/mcp api:types`;
   - `apps/mobile/lib/api/gen`: `apps/mobile/scripts/gen-api.sh`;
   - `apps/web/public/email/*` (email images, fonts): `node docs/brand/tools/gen-email-images.cjs`;
+  - `apps/web/public/og-{es,en,it,pt}.png` (the landing's share images, from `landing.hero.headline`
+    and `landing.hero.description`): `pnpm --filter @wambito/web og`, again whenever the hero's
+    copy changes, with `landing.meta` (`apps/web/AGENTS.md` traps);
   - `apps/web/public/landing/*` (the landing's phone screen: the insights screen and its donut, per
     language and theme) and `apps/web/app/features/landing/app-screen.gen.ts`:
     `pnpm --filter @wambito/web landing-screens` with the web dev server up; run it again when the

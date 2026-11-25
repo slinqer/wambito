@@ -72,9 +72,9 @@ describe("Italian and Portuguese pages", () => {
     const it = landingMeta("it");
     const pt = landingMeta("pt");
     expect(it).toContainEqual({
-      title: "Wambito · L'app che tiene i conti delle tue spese per te",
+      title: "Wambito · L'app delle spese che non devi usare",
     });
-    expect(pt).toContainEqual({ title: "Wambito · A app que gere as tuas despesas por ti" });
+    expect(pt).toContainEqual({ title: "Wambito · A app de despesas que não tens de usar" });
     expect(metaContent(it, "property", "og:url")).toBe(`${SITE_ORIGIN}/it`);
     expect(metaContent(pt, "property", "og:url")).toBe(`${SITE_ORIGIN}/pt`);
     expect(metaContent(it, "property", "og:image")).toBe(`${SITE_ORIGIN}/og-it.png`);

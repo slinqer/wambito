@@ -643,8 +643,11 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `WAMBITO_BUILD_DIR=build-personal`.
 - The landing's doors (`features/landing/links.ts`): `appLinkProps(locale, door, landingOnly?,
   appOrigin?)` with `door` `"create"` (`/create-account?lang=`: the hero's and the closing's
-  primary "Crear cuenta" / "Create account" and the agent's "connect" button) or `"sign-in"`
-  (`/sign-in?lang=`: the header's "Entrar"); "Demo" stays beside the hero's primary. The same in
+  primary "Crear cuenta" / "Create account", the iOS card's "Empezar en la web" and the agent's
+  "connect" button) or `"sign-in"` (`/sign-in?lang=`: the header's "Entrar"). The hero's primary
+  is "Descargar la app" (`landing.hero.cta_download`), a plain `#ways` anchor to the downloads,
+  with "Demo" beside it; coming soon it is `cta_soon` to GitHub, and the iOS card drops its web
+  button (`ios.body_soon`). The same in
   every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
   (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
 
@@ -666,12 +669,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `app/features/landing/money-words.ts` / `MoneyHeadline.tsx` hold money words per language: edit
   with care.
 - The landing header must fit one row at 320px in every language (e2e checks it).
-- The landing's copy is repeated outside the page: `landing.meta` (title and description, the
-  `<title>` and the share text, `features/landing/seo.ts`), and the share images
-  `public/og-{es,en,it,pt}.png`, drawn by `scripts/og/og.html` from `landing.hero.headline` and
-  `landing.hero.description`. When the hero or what the landing promises changes, rewrite
-  `landing.meta` in all four languages and run `pnpm --filter @wambito/web og` (it fails on a
-  key the template reads that is gone); look at the four images before committing.
+- The landing's copy is repeated outside the page: `landing.meta` (title, description and
+  `image_alt`: the `<title>`, the share text and the share image's alt, `features/landing/seo.ts`)
+  and the share images `public/og-{es,en,it,pt}.png`, drawn by `scripts/og/og.html` from
+  `landing.hero.headline` and `landing.hero.description` (its `[data-copy]` keys). Every change
+  to either of those keys, to `og.html` or `render.ts`, or to what the landing promises, in any
+  language, ships in the same commit with: `pnpm --filter @wambito/web og` (it fails on a key the
+  template reads that is gone), `landing.meta` rewritten in all four languages (`image_alt`
+  quotes the headline), and the four images looked at before committing. The headline's rotating
+  words (`money-words.ts`) are not in the images: the first word only, from the catalog.
 - Landing HTML must not link files named after the mascot module (hence `mascot-*`).
 - Storybook story titles are the parity ids in `apps/mobile/test/parity/parity.json`.
 - Built e2e suites run without JavaScript by default; the dev e2e fails in global-setup without

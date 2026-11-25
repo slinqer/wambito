@@ -36,11 +36,16 @@ export const Page: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "Tus lukas, por fin claras.",
+      "Wambi organiza tus lukas por ti.",
     );
+    // The hero leads to the downloads; the closing still creates an account.
+    await expect(
+      within(canvasElement.querySelector("#hero") as HTMLElement).getByRole("link", {
+        name: "Descargar la app",
+      }),
+    ).toHaveAttribute("href", "#ways");
     const ctas = canvas.getAllByRole("link", { name: "Crear cuenta" });
     await expect(ctas.map((link) => link.getAttribute("href"))).toEqual([
-      "/create-account?lang=es",
       "/create-account?lang=es",
     ]);
     await expect(canvas.getByRole("link", { name: "Entrar" })).toHaveAttribute(
@@ -60,9 +65,13 @@ export const PageDayEnglish: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "Your money, finally clear.",
+      "Wambi sorts out your money for you.",
     );
-    await expect(canvas.getAllByRole("link", { name: "Create account" })[0]).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "Download the app" })).toHaveAttribute(
+      "href",
+      "#ways",
+    );
+    await expect(canvas.getByRole("link", { name: "Create account" })).toHaveAttribute(
       "href",
       "/create-account?lang=en",
     );
@@ -81,9 +90,17 @@ export const HeroSection: Story = {
     await expect(canvasElement.querySelectorAll("s")).toHaveLength(0);
     await expect(canvas.queryByText("¡Gratis, y siempre lo será!")).toBeNull();
     const headline = canvas.getByRole("heading", { level: 1 });
-    await expect(headline).toHaveAccessibleName("Tus lukas, por fin claras.");
+    await expect(headline).toHaveAccessibleName("Wambi organiza tus lukas por ti.");
     await expect(headline.querySelector(".lk-landing-marker")).toHaveTextContent("lukas");
     await expect(headline.querySelector(".lk-landing-flag")).toHaveTextContent("🇨🇴");
+    // The line under it: the app you don't have to use, then how.
+    const description = canvasElement.querySelector(".lk-landing-description");
+    await expect(description?.querySelector(".lk-landing-lead")).toHaveTextContent(
+      "La app de gastos que no tienes que usar.",
+    );
+    await expect(description).toHaveTextContent(
+      "La app de gastos que no tienes que usar. Actívala una vez y sigue gastando como siempre.",
+    );
     // No perks line under the actions any more (free, open source, no passwords).
     await expect(canvasElement.querySelector(".lk-landing-perks")).toBeNull();
     await expect(canvas.queryByRole("link", { name: /Código abierto/ })).toBeNull();
@@ -94,7 +111,10 @@ export const HeroSection: Story = {
       "href",
       "/demo?lang=es",
     );
-    const cta = canvas.getByRole("link", { name: "Crear cuenta" });
+    // The primary action scrolls down to the downloads ("Úsalo como prefieras").
+    const cta = canvas.getByRole("link", { name: "Descargar la app" });
+    await expect(cta).toHaveAttribute("href", "#ways");
+    await expect(cta).toHaveClass("lk-btn-primary");
     await expectEdge(cta, 6);
     await expectTarget(cta);
     await userEvent.tab();
@@ -138,24 +158,25 @@ function headlineTurns(first: string, next: string, flag: string, shown: string)
 export const HeadlineEnglish: Story = {
   render: () => <Hero />,
   globals: { locale: "en" },
-  play: headlineTurns("money", "bucks", "🇺🇸", "Your bucks🇺🇸, finally clear."),
+  play: headlineTurns("money", "bucks", "🇺🇸", "Wambi sorts out your bucks🇺🇸 for you."),
 };
 
 export const HeadlinePortuguese: Story = {
   render: () => <Hero />,
   globals: { locale: "pt" },
-  play: headlineTurns("dinheiro", "grana", "🇧🇷", "A tua grana🇧🇷, finalmente clara."),
+  play: headlineTurns("dinheiro", "grana", "🇧🇷", "O Wambi organiza a tua grana🇧🇷 por ti."),
 };
 
 export const HeadlineItalian: Story = {
   render: () => <Hero />,
   globals: { locale: "it" },
-  play: headlineTurns("soldi", "grana", "🇮🇹", "La tua grana🇮🇹, finalmente chiara."),
+  play: headlineTurns("soldi", "grana", "🇮🇹", "Wambi organizza la tua grana🇮🇹 per te."),
 };
 
 /**
  * Android downloads the APK from GitHub (Google Play coming soon), iOS is coming soon on the App
- * Store; no web card, and no agent card (the agent has its own section).
+ * Store, with "Empezar en la web" meanwhile (signing in on the phone later finds everything); no
+ * web card, and no agent card (the agent has its own section).
  */
 export const UseItYourWaySection: Story = {
   render: () => <UseItYourWay />,
@@ -177,7 +198,16 @@ export const UseItYourWaySection: Story = {
     await expect(apk).not.toHaveAttribute("target");
     // No "other versions" link: the stores are button-shaped, not links.
     await expect(canvas.queryByRole("link", { name: /Otras versiones/ })).toBeNull();
-    await expect(canvas.getAllByRole("link")).toHaveLength(1);
+    // iPhone: start on the web now; when the app is out, signing in is all it takes.
+    const ios = canvasElement.querySelectorAll("#ways li")[1] as HTMLElement;
+    await expect(ios).toHaveTextContent(
+      "La estamos terminando. Mientras tanto, empieza en la web: cuando salga, solo inicias sesión y ahí estará todo.",
+    );
+    const web = within(ios).getByRole("link", { name: "Empezar en la web" });
+    await expect(web).toHaveAttribute("href", "/create-account?lang=es");
+    await expect(web).toHaveClass("lk-btn-secondary");
+    await expectTarget(web);
+    await expect(canvas.getAllByRole("link")).toHaveLength(2);
     await expect(canvas.queryByText("Claude / ChatGPT")).toBeNull();
     // Each card shows its brands' logos, decorative: the heading already names them.
     const logos = [...canvasElement.querySelectorAll("#ways li")].map((card) =>

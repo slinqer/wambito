@@ -129,9 +129,9 @@
   "landing": {
     "new_tab": "(se abre en una pestaña nueva)",
     "meta": {
-      "title": "Wambito · La app que lleva tus gastos por ti",
+      "title": "Wambito · La app de gastos que no tienes que usar",
       "description": "Lee las notificaciones de tus pagos y anota cada gasto automáticamente. Gratis y de código abierto.",
-      "image_alt": "Wambi, una moneda de oro sonriente, saluda junto al título: Tus lukas, por fin claras."
+      "image_alt": "Wambi, una moneda de oro sonriente, saluda junto al título: Wambi organiza tus lukas por ti."
     },
     "nav": {
       "label": "Principal",
@@ -143,10 +143,11 @@
       "sign_in_soon": "Muy pronto"
     },
     "hero": {
-      "headline": "Tus <mark>lukas</mark>, por fin claras.",
-      "description": "<lead>Deja de anotar a mano: Wambi lee tus pagos y lleva la cuenta por ti.</lead>",
+      "headline": "Wambi organiza tus <mark>lukas</mark> por ti.",
+      "description": "<lead>La app de gastos que no tienes que usar.</lead> Actívala una vez y sigue gastando como siempre.",
       "cta": "Crear cuenta",
       "cta_soon": "Muy pronto · Síguelo en GitHub",
+      "cta_download": "Descargar la app",
       "cta_demo": "Demo"
     },
     "ways": {
@@ -154,12 +155,14 @@
       "soon": "Pronto",
       "android": {
         "title": "App para Android",
-        "body": "Con un widget para anotar un gasto sin abrir la app.",
+        "body": "Con captura automática, para anotar un gasto sin abrir la app.",
         "cta": "Desde GitHub"
       },
       "ios": {
         "title": "App para iOS",
-        "body": "Wambito en tu iPhone. La estamos terminando."
+        "body": "La estamos terminando. Mientras tanto, empieza en la web: cuando salga, solo inicias sesión y ahí estará todo.",
+        "body_soon": "Wambito en tu iPhone. La estamos terminando.",
+        "cta": "Empezar en la web"
       }
     },
     "how": {
