@@ -642,14 +642,15 @@ account deletion page (prerendered, es/en/it/pt; `app/features/legal/`), the sig
   `VITE_SITE_URL` sets canonical/sitemap (default `https://wambito.test`). The VPS builds with
   `WAMBITO_BUILD_DIR=build-personal`.
 - The landing's doors (`features/landing/links.ts`): `appLinkProps(locale, door, landingOnly?,
-  appOrigin?)` with `door` `"create"` (`/create-account?lang=`: the hero's and the closing's
-  primary "Crear cuenta" / "Create account", the iOS card's "Empezar en la web" and the agent's
-  "connect" button) or `"sign-in"` (`/sign-in?lang=`: the header's "Entrar"). The hero's primary
-  is "Descargar la app" (`landing.hero.cta_download`), a plain `#ways` anchor to the downloads,
-  with "Demo" beside it; coming soon it is `cta_soon` to GitHub, and the iOS card drops its web
-  button (`ios.body_soon`). The same in
-  every build. Landing-only: `VITE_APP_URL` prefixes the origin; without it both lead to GitHub
-  (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta`, `landing.nav.sign_in`.
+  appOrigin?)` with `door` `"create"` (`/create-account?lang=`: only the iOS card's "Empezar en la
+  web") or `"sign-in"` (`/sign-in?lang=`: the header's "Entrar"). The hero's primary "Descargar la
+  app" (`landing.hero.cta_download`), the agent's "Conecta tu agente" and the closing's big button
+  are `DownloadLink`s (`features/landing/DownloadLink.tsx`): plain `#ways` anchors down to the
+  downloads; "Demo" stays beside the hero's primary. Coming soon, the hero and the closing are
+  `cta_soon` to GitHub, the agent's button is left out, and the iOS card drops its web button
+  (`ios.body_soon`). Landing-only: `VITE_APP_URL` prefixes the origin; without it the doors lead to
+  GitHub (coming soon, labels `cta_soon` / `sign_in_soon`). Labels: `landing.hero.cta_download`,
+  `landing.nav.sign_in`.
 
 - Landing analytics (`app/features/analytics/`, PostHog, only with consent): `consent.ts` is the
   consent model (stored choice, withdrawal); `config.ts` `SITE_ANALYTICS_CONFIG` reads

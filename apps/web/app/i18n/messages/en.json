@@ -198,7 +198,7 @@
     },
     "agent": {
       "title": "Your agent analyzes your spending.",
-      "body": "Connect Claude or ChatGPT to Wambito and ask it anything about your money. It only sees what you allow.",
+      "body": "Connect Claude, ChatGPT or your favorite agent and give Wambi superpowers: ask it anything about your money. It only sees what you allow.",
       "cta": "Connect your agent",
       "note": "Free, from Settings",
       "demo": {
@@ -207,7 +207,6 @@
         "categories": {
           "restaurants": "Restaurants",
           "leisure": "Leisure",
-          "subscriptions": "Subscriptions",
           "groceries": "Groceries",
           "transport": "Transport"
         },
@@ -215,15 +214,20 @@
           "question": "How much did I spend on <b>Uber</b> this month?",
           "answer": "This month you've spent <b>{amount}</b> on Uber, over {count} rides: {more} more than last month."
         },
-        "budgets": {
-          "question": "How are my <b>budgets</b> doing?",
-          "answer": "Leisure is on track. You've used {percent} of <b>restaurants</b> with {days} days to go: {left} left.",
-          "of": "{spent} of {limit}"
+        "subscriptions": {
+          "question": "Read my <b>emails</b> and add the subscriptions I pay for.",
+          "thinking": "Looking for receipts in your email…",
+          "used": "Read your email and saved to Wambito",
+          "answer": "I found <b>{count} subscriptions</b> in your emails and added them as recurring payments: {total} a month.",
+          "every": "Monthly, on {day}",
+          "added": "Added"
         },
         "top": {
           "question": "Where did most of my money go <b>this month</b>?",
           "answer": "<b>Groceries</b> weigh the most: {amount}, {percent} of your spending. Restaurants come next."
-        }
+        },
+        "previous": "Previous example",
+        "next": "Next example"
       }
     },
     "capture": {

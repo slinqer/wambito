@@ -198,7 +198,7 @@
     },
     "agent": {
       "title": "Tu agente analiza tus gastos.",
-      "body": "Conecta Claude o ChatGPT a Wambito y pregúntale lo que quieras sobre tu plata. Solo ve lo que tú le autorizas.",
+      "body": "Conecta Claude, ChatGPT o tu agente favorito y dale superpoderes a Wambi: pregúntale lo que quieras sobre tu plata. Solo ve lo que tú le autorizas.",
       "cta": "Conecta tu agente",
       "note": "Gratis, desde Ajustes",
       "demo": {
@@ -207,7 +207,6 @@
         "categories": {
           "restaurants": "Restaurantes",
           "leisure": "Ocio",
-          "subscriptions": "Suscripciones",
           "groceries": "Supermercado",
           "transport": "Transporte"
         },
@@ -215,15 +214,20 @@
           "question": "¿Cuánto me gasté en <b>Uber</b> este mes?",
           "answer": "Este mes llevas <b>{amount}</b> en Uber, en {count} viajes: {more} más que el mes pasado."
         },
-        "budgets": {
-          "question": "¿Cómo van mis <b>presupuestos</b>?",
-          "answer": "Vas bien en ocio. En <b>restaurantes</b> ya usaste el {percent} y quedan {days} días del mes: te quedan {left}.",
-          "of": "{spent} de {limit}"
+        "subscriptions": {
+          "question": "Lee mis <b>correos</b> y agrega las suscripciones que pago.",
+          "thinking": "Buscando recibos en tu correo…",
+          "used": "Leyó tu correo y guardó en Wambito",
+          "answer": "Encontré <b>{count} suscripciones</b> en tus correos y las agregué como pagos recurrentes: {total} al mes.",
+          "every": "Cada mes, el {day}",
+          "added": "Agregada"
         },
         "top": {
           "question": "¿En qué se me fue más plata <b>este mes</b>?",
           "answer": "Lo que más pesa es el <b>supermercado</b>: {amount}, el {percent} de tus gastos. Le siguen los restaurantes."
-        }
+        },
+        "previous": "Ejemplo anterior",
+        "next": "Siguiente ejemplo"
       }
     },
     "capture": {

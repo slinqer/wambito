@@ -38,16 +38,24 @@ export const Page: Story = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Wambi organiza tus lukas por ti.",
     );
-    // The hero leads to the downloads; the closing still creates an account.
-    await expect(
-      within(canvasElement.querySelector("#hero") as HTMLElement).getByRole("link", {
-        name: "Descargar la app",
-      }),
-    ).toHaveAttribute("href", "#ways");
-    const ctas = canvas.getAllByRole("link", { name: "Crear cuenta" });
-    await expect(ctas.map((link) => link.getAttribute("href"))).toEqual([
+    // The hero, the agent's "connect" and the closing all lead to the downloads; the only way to
+    // create an account from here is the iOS card's "Empezar en la web".
+    for (const section of ["#hero", "#closing"]) {
+      await expect(
+        within(canvasElement.querySelector(section) as HTMLElement).getByRole("link", {
+          name: "Descargar la app",
+        }),
+      ).toHaveAttribute("href", "#ways");
+    }
+    await expect(canvas.getByRole("link", { name: /Conecta tu agente/ })).toHaveAttribute(
+      "href",
+      "#ways",
+    );
+    await expect(canvas.queryByRole("link", { name: "Crear cuenta" })).toBeNull();
+    await expect(canvas.getByRole("link", { name: "Empezar en la web" })).toHaveAttribute(
+      "href",
       "/create-account?lang=es",
-    ]);
+    );
     await expect(canvas.getByRole("link", { name: "Entrar" })).toHaveAttribute(
       "href",
       "/sign-in?lang=es",
@@ -67,11 +75,9 @@ export const PageDayEnglish: Story = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveAccessibleName(
       "Wambi sorts out your money for you.",
     );
-    await expect(canvas.getByRole("link", { name: "Download the app" })).toHaveAttribute(
-      "href",
-      "#ways",
-    );
-    await expect(canvas.getByRole("link", { name: "Create account" })).toHaveAttribute(
+    const downloads = canvas.getAllByRole("link", { name: "Download the app" });
+    await expect(downloads.map((link) => link.getAttribute("href"))).toEqual(["#ways", "#ways"]);
+    await expect(canvas.getByRole("link", { name: "Start on the web" })).toHaveAttribute(
       "href",
       "/create-account?lang=en",
     );
@@ -273,8 +279,9 @@ export const AutomaticCaptureSection: Story = {
 };
 
 /**
- * Your agent: the heading, the way in and the two assistants' logos, and a chat whose three
- * examples take turns while it is on screen: Uber this month, the budgets, where the money went.
+ * Your agent: the heading, the way in and the four agents' logos (the app's own, as in "Mis
+ * agentes"), and a chat whose three examples take turns while it is on screen: Uber this month,
+ * the subscriptions it finds in your email and adds, where the money went.
  */
 export const AgentDemoSection: Story = {
   render: () => <AgentDemo pace={0.1} />,
@@ -283,17 +290,23 @@ export const AgentDemoSection: Story = {
     await expect(canvas.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Tu agente analiza tus gastos.",
     );
+    // Connecting starts with the app: it leads to the downloads.
     await expect(canvas.getByRole("link", { name: /Conecta tu agente/ })).toHaveAttribute(
       "href",
-      "/create-account?lang=es",
+      "#ways",
     );
-    const logos = [...canvasElement.querySelectorAll("[data-logo]")].map((logo) =>
-      logo.getAttribute("data-logo"),
+    // The four agents "Mis agentes" connects, with the app's logos; the line names two and "your favorite".
+    const logos = [...canvasElement.querySelectorAll("[data-brand]")].map((logo) =>
+      logo.getAttribute("data-brand"),
     );
-    await expect(logos).toEqual(["claude", "openai"]);
+    await expect(logos).toEqual(["claude", "chatgpt", "lumo", "grok"]);
+    await expect(canvasElement.querySelector(".lk-landing-split-text > p")).toHaveTextContent(
+      "Conecta Claude, ChatGPT o tu agente favorito y dale superpoderes a Wambi: pregúntale lo que quieras sobre tu plata. Solo ve lo que tú le autorizas.",
+    );
     const chat = canvasElement.querySelector<HTMLElement>(".lk-landing-chat");
     if (!chat) throw new Error("no chat");
-    await expect(chat).toHaveAttribute("aria-hidden", "true");
+    // The conversation is an illustration; the arrows under it are real buttons.
+    await expect(chat.querySelector(".lk-landing-chat-log")).toHaveAttribute("aria-hidden", "true");
     // In view, three examples take turns, each with its question, Wambito thinking, then its answer.
     const answer = (example: string) =>
       waitFor(
@@ -310,16 +323,40 @@ export const AgentDemoSection: Story = {
     await expect(chat.querySelectorAll(".lk-landing-chat-card li")).toHaveLength(3);
     await expect(chat.querySelector(".lk-landing-shimmer")).toBeNull();
     await expect(chat.querySelectorAll(".lk-landing-chat-dots > .is-on")).toHaveLength(1);
-    await answer("budgets");
-    await expect(chat).toHaveTextContent("¿Cómo van mis presupuestos?");
-    await expect(chat.querySelectorAll(".lk-landing-chat-card .lk-bar")).toHaveLength(3);
-    // Near its limit (85%), restaurants' bar is yellow.
-    await expect(chat.querySelector(".lk-landing-budget .lk-bar")).toHaveClass("is-near");
+    await answer("subscriptions");
+    await expect(chat).toHaveTextContent("Lee mis correos y agrega las suscripciones que pago.");
+    // It read the email and saved them in Wambito as recurring payments.
+    await expect(chat).toHaveTextContent("Leyó tu correo y guardó en Wambito");
+    await expect(chat).toHaveTextContent(
+      "Encontré 4 suscripciones en tus correos y las agregué como pagos recurrentes: $160.000 al mes.",
+    );
+    const subscriptions = chat.querySelectorAll(".lk-landing-chat-card li");
+    await expect(
+      [...subscriptions].map(
+        (row) => row.querySelector(".lk-landing-bill-name")?.firstChild?.textContent,
+      ),
+    ).toEqual(["Netflix", "Spotify", "YouTube Premium", "iCloud+"]);
+    await expect(chat.querySelectorAll(".lk-landing-chat-card .lk-landing-added")).toHaveLength(4);
+    // Each subscription shows its app's real logo on the brand's colour.
+    const marks = [...chat.querySelectorAll(".lk-landing-chat-card [data-logo]")].map((logo) =>
+      logo.getAttribute("data-logo"),
+    );
+    await expect(marks).toEqual(["netflix", "spotify", "youtube", "icloud"]);
     await answer("top");
     await expect(chat).toHaveTextContent("¿En qué se me fue más plata este mes?");
     await expect(chat.querySelectorAll(".lk-landing-column")).toHaveLength(4);
     // Then round again.
     await answer("uber");
+    // The arrows move between the examples by hand.
+    const next = canvas.getByRole("button", { name: "Siguiente ejemplo" });
+    const previous = canvas.getByRole("button", { name: "Ejemplo anterior" });
+    await expectTarget(next);
+    await userEvent.click(next);
+    await answer("subscriptions");
+    await userEvent.click(previous);
+    await answer("uber");
+    await userEvent.click(previous);
+    await answer("top");
   },
 };
 
@@ -628,13 +665,13 @@ export const ScrollReveal: Story = {
 };
 
 /**
- * Hover halo: with a mouse over "Crear cuenta", the light follows the pointer inside the button and
+ * Hover halo: with a mouse over "Descargar la app", the light follows the pointer inside the button and
  * the halo around it leans toward that side.
  */
 export const ButtonHalo: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const [cta] = canvas.getAllByRole("link", { name: "Crear cuenta" });
+    const [cta] = canvas.getAllByRole("link", { name: "Descargar la app" });
     if (!cta) throw new Error("no primary action");
     const box = cta.getBoundingClientRect();
     cta.dispatchEvent(

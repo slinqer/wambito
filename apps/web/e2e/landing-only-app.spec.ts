@@ -96,17 +96,14 @@ for (const l of LOCALES) {
       ]);
     });
 
-    test("the hero leads to the downloads, the closing opens the app's create-account page", async ({
-      page,
-    }) => {
+    test("the hero and the closing lead to the downloads", async ({ page }) => {
       await page.goto(l.path);
-      const download = page.locator("#hero").getByRole("link", { name: l.download, exact: true });
-      await expect(download).toHaveAttribute("href", "#ways");
-      await expect(download).toHaveClass(/lk-btn-primary/);
-      const link = page.locator("#closing").getByRole("link", { name: l.cta, exact: true });
-      await expectAppLink(link, l.locale, "create-account");
-      await expect(link).toHaveClass(/lk-btn-primary/);
-      await expect(link).not.toHaveClass(/is-soon/);
+      for (const section of ["#hero", "#closing"]) {
+        const download = page.locator(section).getByRole("link", { name: l.download });
+        await expect(download).toHaveAttribute("href", "#ways");
+        await expect(download).toHaveClass(/lk-btn-primary/);
+        await expect(download).not.toHaveClass(/is-soon/);
+      }
     });
 
     test("the header's sign-in opens the app, beside the day/night switch", async ({ page }) => {
@@ -170,12 +167,10 @@ for (const l of LOCALES) {
       const toApp = hrefs.filter((href) =>
         /(^|\/)(sign-in|create-account|app|welcome)(\/|\?|#|$)/.test(href),
       );
-      // Hero, the agent's "connect" and closing create an account; the header signs in.
+      // The iOS card's "start on the web" creates an account; the header signs in. The hero, the
+      // agent's "connect" and the closing lead to the downloads.
       expect(toApp.sort()).toEqual(
-        [
-          ...Array(3).fill(`${APP}/create-account?lang=${l.locale}`),
-          `${APP}/sign-in?lang=${l.locale}`,
-        ].sort(),
+        [`${APP}/create-account?lang=${l.locale}`, `${APP}/sign-in?lang=${l.locale}`].sort(),
       );
     });
 
@@ -263,8 +258,9 @@ for (const l of LOCALES) {
         await expect(
           page.locator("#hero").getByRole("link", { name: l.download, exact: true }),
         ).toHaveAttribute("href", "#ways");
-        const link = page.locator("#closing").getByRole("link", { name: l.cta, exact: true });
-        await expect(link).toHaveAttribute("href", `${APP}/create-account?lang=${l.locale}`);
+        await expect(
+          page.locator("#closing").getByRole("link", { name: l.download }),
+        ).toHaveAttribute("href", "#ways");
         expect(errors).toEqual([]);
       });
     });

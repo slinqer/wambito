@@ -6,6 +6,7 @@ import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
 import { AgentDemo } from "./AgentDemo.tsx";
 import { AutomaticCapture } from "./AutomaticCapture.tsx";
+import { DownloadLink } from "./DownloadLink.tsx";
 import { Faq } from "./Faq.tsx";
 import { Footer } from "./Footer.tsx";
 import { Hero } from "./Hero.tsx";
@@ -32,8 +33,9 @@ export function seatHalves(label: string): [string, string] {
 
 /**
  * The last nudge: a big title, where Wambito comes from (or, before the app opens, that it is being
- * built in the open), and one big "Crear cuenta" with Wambi sitting in its middle, resting, eyes
- * closed (`docs/brand/wambi-resting.webp`): the label splits around him, "CREAR CUENTA", and his
+ * built in the open), and one big "Descargar la app" (down to the downloads; before the app opens,
+ * GitHub) with Wambi sitting in its middle, resting, eyes closed (`docs/brand/wambi-resting.webp`):
+ * the label splits around him, "DESCARGAR LA APP", and his
  * legs hang in the gap. He is a picture on top of the button that lets the pointer through: the
  * whole button stays pressable under him, and its name is the label as it reads.
  */
@@ -43,19 +45,28 @@ function Closing() {
   const app = appLinkProps(locale, "create");
   // Honest about where the app is: not open yet, or open to everyone.
   const closingBody = COMING_SOON ? "closing.body_soon" : "closing.body";
-  const [before, after] = seatHalves(t(COMING_SOON ? "hero.cta_soon" : "hero.cta"));
+  const [before, after] = seatHalves(t(COMING_SOON ? "hero.cta_soon" : "hero.cta_download"));
+  const label = (
+    <>
+      <span className="lk-landing-seat-before">{before}</span>{" "}
+      <span className="lk-landing-seat-gap" aria-hidden="true" />
+      <span className="lk-landing-seat-after">{after}</span>
+    </>
+  );
   return (
     <section id="closing" className="lk-landing-section" aria-labelledby="closing-title">
       <div className="lk-landing-closing">
         <h2 id="closing-title">{t("closing.title")}</h2>
         <p>{t(closingBody)}</p>
         <div className="lk-landing-seat">
-          <PressLink {...app} className={cx("lk-landing-seat-cta", COMING_SOON && "is-soon")}>
-            <span className="lk-landing-seat-before">{before}</span>{" "}
-            <span className="lk-landing-seat-gap" aria-hidden="true" />
-            <span className="lk-landing-seat-after">{after}</span>
-            <NewTabHint target={app.target} />
-          </PressLink>
+          {COMING_SOON ? (
+            <PressLink {...app} className="lk-landing-seat-cta is-soon">
+              {label}
+              <NewTabHint target={app.target} />
+            </PressLink>
+          ) : (
+            <DownloadLink className="lk-landing-seat-cta">{label}</DownloadLink>
+          )}
           <span
             className="lk-landing-spot is-closing"
             data-wambi-spot="closing"

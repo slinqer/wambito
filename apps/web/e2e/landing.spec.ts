@@ -954,7 +954,10 @@ for (const l of LOCALES) {
       await expect(chat).toHaveAttribute("data-phase", "done");
       await expect(chat).toContainText("Uber");
       await expect(chat.locator(".lk-landing-chat-card li")).toHaveCount(3);
-      await expect(page.locator("#agent [data-logo]")).toHaveCount(2);
+      // The four agents "Mis agentes" connects, with the app's logos.
+      await expect(page.locator("#agent [data-brand]")).toHaveCount(4);
+      // "Connect your agent" starts with the app: down to the downloads.
+      await expect(page.locator("#agent .lk-landing-agent-cta a")).toHaveAttribute("href", "#ways");
       await expect(page.locator("#spreadsheet")).toHaveCount(0);
     });
 
@@ -1165,7 +1168,8 @@ for (const l of LOCALES) {
       const cta = page.locator("#closing .lk-landing-seat-cta");
       await cta.scrollIntoViewIfNeeded();
       await expect(page.locator("#closing a")).toHaveCount(1);
-      await expect(cta).toHaveAccessibleName(new RegExp(`^${l.cta}`));
+      await expect(cta).toHaveAccessibleName(new RegExp(`^${l.download}`));
+      await expect(cta).toHaveAttribute("href", "#ways");
       const [seat, wambi] = [await cta.boundingBox(), await closing.boundingBox()];
       if (!seat || !wambi) throw new Error("no closing seat");
       // Big enough to read as the page's sign-off: at least 150px, even on a phone.

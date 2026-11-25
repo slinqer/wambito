@@ -2,6 +2,7 @@ import { useTranslations } from "use-intl";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
+import { DownloadLink } from "./DownloadLink.tsx";
 import { appLinkProps, demoLinkProps } from "./links.ts";
 import { MoneyHeadline } from "./MoneyHeadline.tsx";
 import { NewTabHint } from "./NewTabHint.tsx";
@@ -35,12 +36,7 @@ export function Hero() {
                 <NewTabHint target={app.target} />
               </PressLink>
             ) : (
-              <a
-                href="#ways"
-                className="lk-btn lk-btn-primary inline-flex min-h-11 min-w-11 items-center justify-center gap-(--space-2) no-underline"
-              >
-                {t("cta_download")}
-              </a>
+              <DownloadLink>{t("cta_download")}</DownloadLink>
             )}
             {demo && (
               <PressLink {...demo} variant="secondary">

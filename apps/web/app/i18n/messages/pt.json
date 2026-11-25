@@ -198,7 +198,7 @@
     },
     "agent": {
       "title": "O teu agente analisa as tuas despesas.",
-      "body": "Liga o Claude ou o ChatGPT ao Wambito e pergunta-lhe o que quiseres sobre o teu dinheiro. Só vê o que tu autorizas.",
+      "body": "Liga o Claude, o ChatGPT ou o teu agente favorito e dá superpoderes ao Wambi: pergunta-lhe o que quiseres sobre o teu dinheiro. Só vê o que tu autorizas.",
       "cta": "Liga o teu agente",
       "note": "Grátis, nas Definições",
       "demo": {
@@ -207,7 +207,6 @@
         "categories": {
           "restaurants": "Restaurantes",
           "leisure": "Lazer",
-          "subscriptions": "Subscrições",
           "groceries": "Supermercado",
           "transport": "Transportes"
         },
@@ -215,15 +214,20 @@
           "question": "Quanto gastei em <b>Uber</b> este mês?",
           "answer": "Este mês já gastaste <b>{amount}</b> em Uber, em {count} viagens: mais {more} do que no mês passado."
         },
-        "budgets": {
-          "question": "Como vão os meus <b>orçamentos</b>?",
-          "answer": "O lazer vai bem. Nos <b>restaurantes</b> já usaste {percent} e faltam {days} dias: restam-te {left}.",
-          "of": "{spent} de {limit}"
+        "subscriptions": {
+          "question": "Lê os meus <b>emails</b> e adiciona as subscrições que pago.",
+          "thinking": "À procura de recibos no teu email…",
+          "used": "Leu o teu email e guardou no Wambito",
+          "answer": "Encontrei <b>{count} subscrições</b> nos teus emails e adicionei-as como pagamentos recorrentes: {total} por mês.",
+          "every": "Todos os meses, a {day}",
+          "added": "Adicionada"
         },
         "top": {
           "question": "Onde gastei mais <b>este mês</b>?",
           "answer": "O que mais pesa é o <b>supermercado</b>: {amount}, {percent} das tuas despesas. Seguem-se os restaurantes."
-        }
+        },
+        "previous": "Exemplo anterior",
+        "next": "Exemplo seguinte"
       }
     },
     "capture": {
