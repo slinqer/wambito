@@ -129,9 +129,9 @@
   "landing": {
     "new_tab": "(abre num novo separador)",
     "meta": {
-      "title": "Wambito · A app que gere as tuas despesas por ti",
+      "title": "Wambito · A app de despesas que não tens de usar",
       "description": "Lê as notificações dos teus pagamentos e regista cada despesa automaticamente. Grátis e de código aberto.",
-      "image_alt": "Wambi, uma moeda de ouro sorridente, acena junto ao título: O teu dinheiro, finalmente claro."
+      "image_alt": "Wambi, uma moeda de ouro sorridente, acena junto ao título: O Wambi organiza o teu dinheiro por ti."
     },
     "nav": {
       "label": "Principal",
@@ -143,10 +143,11 @@
       "sign_in_soon": "Em breve"
     },
     "hero": {
-      "headline": "O teu <mark>dinheiro</mark>, finalmente claro.",
-      "description": "<lead>Deixa de registar à mão: o Wambi lê os teus pagamentos e faz as contas por ti.</lead>",
+      "headline": "O Wambi organiza o teu <mark>dinheiro</mark> por ti.",
+      "description": "<lead>A app de despesas que não tens de usar.</lead> Ativa-a uma vez e continua a gastar como sempre.",
       "cta": "Criar conta",
       "cta_soon": "Em breve · Segue no GitHub",
+      "cta_download": "Descarregar a app",
       "cta_demo": "Demo"
     },
     "ways": {
@@ -154,12 +155,14 @@
       "soon": "Em breve",
       "android": {
         "title": "App para Android",
-        "body": "Com um widget para registares uma despesa sem abrir a app.",
+        "body": "Com captura automática, para registares uma despesa sem abrir a app.",
         "cta": "Do GitHub"
       },
       "ios": {
         "title": "App para iOS",
-        "body": "O Wambito no teu iPhone. Estamos a terminá-la."
+        "body": "Estamos a terminá-la. Entretanto, começa na web: quando sair, basta iniciares sessão e estará tudo lá.",
+        "body_soon": "O Wambito no teu iPhone. Estamos a terminá-la.",
+        "cta": "Começar na web"
       }
     },
     "how": {
@@ -195,7 +198,7 @@
     },
     "agent": {
       "title": "O teu agente analisa as tuas despesas.",
-      "body": "Liga o Claude ou o ChatGPT ao Wambito e pergunta-lhe o que quiseres sobre o teu dinheiro. Só vê o que tu autorizas.",
+      "body": "Liga o Claude, o ChatGPT ou o teu agente favorito e dá superpoderes ao Wambi: pergunta-lhe o que quiseres sobre o teu dinheiro. Só vê o que tu autorizas.",
       "cta": "Liga o teu agente",
       "note": "Grátis, nas Definições",
       "demo": {
@@ -204,7 +207,6 @@
         "categories": {
           "restaurants": "Restaurantes",
           "leisure": "Lazer",
-          "subscriptions": "Subscrições",
           "groceries": "Supermercado",
           "transport": "Transportes"
         },
@@ -212,15 +214,20 @@
           "question": "Quanto gastei em <b>Uber</b> este mês?",
           "answer": "Este mês já gastaste <b>{amount}</b> em Uber, em {count} viagens: mais {more} do que no mês passado."
         },
-        "budgets": {
-          "question": "Como vão os meus <b>orçamentos</b>?",
-          "answer": "O lazer vai bem. Nos <b>restaurantes</b> já usaste {percent} e faltam {days} dias: restam-te {left}.",
-          "of": "{spent} de {limit}"
+        "subscriptions": {
+          "question": "Lê os meus <b>emails</b> e adiciona as subscrições que pago.",
+          "thinking": "À procura de recibos no teu email…",
+          "used": "Leu o teu email e guardou no Wambito",
+          "answer": "Encontrei <b>{count} subscrições</b> nos teus emails e adicionei-as como pagamentos recorrentes: {total} por mês.",
+          "every": "Todos os meses, a {day}",
+          "added": "Adicionada"
         },
         "top": {
           "question": "Onde gastei mais <b>este mês</b>?",
           "answer": "O que mais pesa é o <b>supermercado</b>: {amount}, {percent} das tuas despesas. Seguem-se os restaurantes."
-        }
+        },
+        "previous": "Exemplo anterior",
+        "next": "Exemplo seguinte"
       }
     },
     "capture": {

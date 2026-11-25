@@ -128,7 +128,18 @@
   .lk-landing-agent-logo {
     width: 34px;
     height: 34px;
-    fill: var(--ink);
+    color: var(--ink);
+  }
+  /* A subscription the agent added: its amount, and "Added" under it in the good colour. */
+  .lk-landing-added {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+  }
+  .lk-landing-added-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--good);
   }
   /* The chat: the question on the right, Wambito's side on the left, as in a real assistant. */
   .lk-landing-chat {
@@ -146,10 +157,45 @@
     min-height: 360px;
   }
   /* Which of the three examples is showing. */
+  /* Under the chat: the previous arrow, the dots, the next arrow. */
+  .lk-landing-chat-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+  .lk-landing-chat-arrow {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease;
+  }
+  .lk-landing-chat-arrow:hover {
+    color: var(--ink);
+    background: var(--surface-sunken);
+  }
+  .lk-landing-chat-arrow:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
   .lk-landing-chat-dots {
     display: flex;
     justify-content: center;
     gap: var(--space-2);
+  }
+  /* A subscription's tile: its app's mark in white on the brand's colour. */
+  .lk-landing-brand-tile svg {
+    width: 58%;
+    height: 58%;
+    fill: #fff;
   }
   .lk-landing-chat-dots > span {
     width: 8px;
@@ -281,18 +327,7 @@
   .lk-landing-chat[data-phase="answer"] .lk-landing-chat-answer > :nth-child(3) {
     animation-delay: 300ms;
   }
-  /* The budgets' bars load from empty, one after the other; the columns grow from the floor. */
-  .lk-landing-chat[data-phase="answer"] .lk-bar > span {
-    transform-origin: left center;
-    animation: lk-landing-fill 1200ms cubic-bezier(0.25, 0.7, 0.3, 1) both;
-    animation-delay: calc(500ms + var(--lk-i, 0) * 250ms);
-  }
-  .lk-landing-chat[data-phase="answer"] .lk-landing-budget:nth-child(2) {
-    --lk-i: 1;
-  }
-  .lk-landing-chat[data-phase="answer"] .lk-landing-budget:nth-child(3) {
-    --lk-i: 2;
-  }
+  /* The columns grow from the floor. */
   .lk-landing-chat[data-phase="answer"] .lk-landing-column {
     animation: lk-landing-grow 900ms cubic-bezier(0.25, 0.7, 0.3, 1) both;
     animation-delay: calc(500ms + var(--lk-i, 0) * 150ms);
@@ -1048,13 +1083,6 @@
   }
   [data-theme="day"] .lk-landing-screen.is-day {
     display: block;
-  }
-  .lk-landing-budget {
-    display: grid;
-    gap: 6px;
-  }
-  .lk-landing-budget .lk-rowtop {
-    font-size: 14px;
   }
   .lk-landing-arrow {
     width: 28px;

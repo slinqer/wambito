@@ -1,9 +1,11 @@
 import { useTranslations } from "use-intl";
+import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
 import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
 import { BRAND_LOGOS, type BrandLogoName } from "./brand-logos.ts";
-import { ANDROID_APK_HREF } from "./links.ts";
+import { ANDROID_APK_HREF, appLinkProps } from "./links.ts";
+import { NewTabHint } from "./NewTabHint.tsx";
 
 /** A bare brand mark beside a label (a button, a store), decorative: the label names it. */
 function Mark({ name }: { name: BrandLogoName }) {
@@ -42,12 +44,16 @@ function Logo({ name, tone }: { name: BrandLogoName; tone?: "good" }) {
 /**
  * Where to get Wambito: the Android app as a direct APK download from the GitHub release, beside
  * Google Play (coming soon), and the iOS app (coming soon on the App Store), each store shaped
- * like a button. Your agent has its own section
+ * like a button. Until the iPhone app is out, its card offers "Empezar en la web" (create an
+ * account): signing in on the phone later finds everything there. Without an app to open (coming
+ * soon) that button and its line are left out. Your agent has its own section
  * above (`AgentDemo.tsx`). In the landing-only release the GitHub download is left out, unless
  * `VITE_APP_URL` says where the app lives.
  */
 export function UseItYourWay() {
   const t = useTranslations("landing.ways");
+  const { locale } = useLocale();
+  const web = appLinkProps(locale, "create");
   return (
     <section id="ways" className="lk-landing-section" aria-labelledby="ways-title">
       <div className="lk-landing-section-head">
@@ -75,8 +81,14 @@ export function UseItYourWay() {
             <Logo name="apple" />
             <h3>{t("ios.title")}</h3>
           </div>
-          <p>{t("ios.body")}</p>
+          <p>{t(COMING_SOON ? "ios.body_soon" : "ios.body")}</p>
           <div className="lk-landing-card-foot lk-landing-stores">
+            {COMING_SOON ? null : (
+              <PressLink {...web} variant="secondary" size="sm">
+                {t("ios.cta")}
+                <NewTabHint target={web.target} />
+              </PressLink>
+            )}
             <Store name="appstore" label="App Store" soon={t("soon")} />
           </div>
         </li>

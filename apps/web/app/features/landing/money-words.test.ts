@@ -43,63 +43,63 @@ describe("MONEY_WORDS", () => {
     });
   }
 
-  it("Spanish agrees in gender and number with every word", () => {
+  it("Spanish agrees the possessive in number with every word", () => {
     expect(headlines("es")).toEqual([
-      "Tus lukas, por fin claras.",
-      "Tu lana, por fin clara.",
-      "Tu guita, por fin clara.",
-      "Tu pasta, por fin clara.",
-      "Tu plata, por fin clara.",
-      "Tus chavos, por fin claros.",
-      "Tu pisto, por fin claro.",
-      "Tus cuartos, por fin claros.",
-      "Tus reales, por fin claros.",
+      "Wambi organiza tus lukas por ti.",
+      "Wambi organiza tu lana por ti.",
+      "Wambi organiza tu guita por ti.",
+      "Wambi organiza tu pasta por ti.",
+      "Wambi organiza tu plata por ti.",
+      "Wambi organiza tus chavos por ti.",
+      "Wambi organiza tu pisto por ti.",
+      "Wambi organiza tus cuartos por ti.",
+      "Wambi organiza tus reales por ti.",
     ]);
     expect(forms("es")).toEqual([
-      "Tu x, por fin claro.",
-      "Tu x, por fin clara.",
-      "Tus x, por fin claros.",
-      "Tus x, por fin claras.",
+      "Wambi organiza tu x por ti.",
+      "Wambi organiza tu x por ti.",
+      "Wambi organiza tus x por ti.",
+      "Wambi organiza tus x por ti.",
     ]);
   });
 
   it("English has nothing to agree", () => {
     expect(headlines("en")).toEqual([
-      "Your money, finally clear.",
-      "Your bucks, finally clear.",
-      "Your quid, finally clear.",
-      "Your loonies, finally clear.",
+      "Wambi sorts out your money for you.",
+      "Wambi sorts out your bucks for you.",
+      "Wambi sorts out your quid for you.",
+      "Wambi sorts out your loonies for you.",
     ]);
   });
 
-  it("Portuguese agrees the article, the possessive and the adjective", () => {
+  it("Portuguese agrees the article and the possessive", () => {
     expect(headlines("pt")).toEqual([
-      "O teu dinheiro, finalmente claro.",
-      "A tua grana, finalmente clara.",
-      "O teu guito, finalmente claro.",
-      "O teu kumbu, finalmente claro.",
+      "O Wambi organiza o teu dinheiro por ti.",
+      "O Wambi organiza a tua grana por ti.",
+      "O Wambi organiza o teu guito por ti.",
+      "O Wambi organiza o teu kumbu por ti.",
     ]);
     expect(forms("pt")).toEqual([
-      "O teu x, finalmente claro.",
-      "A tua x, finalmente clara.",
-      "Os teus x, finalmente claros.",
-      "As tuas x, finalmente claras.",
+      "O Wambi organiza o teu x por ti.",
+      "O Wambi organiza a tua x por ti.",
+      "O Wambi organiza os teus x por ti.",
+      "O Wambi organiza as tuas x por ti.",
     ]);
   });
 
-  it("Italian agrees the article, the possessive and the adjective", () => {
+  it("Italian agrees the article and the possessive", () => {
     expect(headlines("it")).toEqual([
-      "I tuoi soldi, finalmente chiari.",
-      "La tua grana, finalmente chiara.",
-      "I tuoi schei, finalmente chiari.",
-      "Le tue palanche, finalmente chiare.",
-      "I tuoi franchi, finalmente chiari.",
+      "Wambi organizza i tuoi soldi per te.",
+      "Wambi organizza la tua grana per te.",
+      "Wambi organizza i tuoi schei per te.",
+      "Wambi organizza le tue palanche per te.",
+      "Wambi organizza i tuoi franchi per te.",
     ]);
     expect(forms("it")).toEqual([
-      "Il tuo x, finalmente chiaro.",
-      "La tua x, finalmente chiara.",
-      "I tuoi x, finalmente chiari.",
-      "Le tue x, finalmente chiare.",
+      "Wambi organizza il tuo x per te.",
+      "Wambi organizza la tua x per te.",
+      "Wambi organizza i tuoi x per te.",
+      "Wambi organizza le tue x per te.",
     ]);
   });
 });

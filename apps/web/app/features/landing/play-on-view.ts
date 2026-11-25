@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * A landing illustration that plays on a loop, for one or several examples that take turns: while
@@ -22,6 +22,8 @@ export function useRotatingPlay<Step extends string>(
     phase: "done",
   });
   const timeline = useRef(steps);
+  // Jumps to an example: plays it from its question when the timeline runs, else shows its answer.
+  const jump = useRef((index: number) => setState({ index, phase: "done" }));
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
@@ -57,12 +59,21 @@ export function useRotatingPlay<Step extends string>(
       { threshold },
     );
     observer.observe(el);
+    jump.current = (index) => {
+      started = true;
+      play(index);
+    };
     return () => {
       observer.disconnect();
       stop();
+      jump.current = (index) => setState({ index, phase: "done" });
     };
   }, [count, hold, pace, threshold]);
-  return { ref, ...state };
+  const go = useCallback(
+    (index: number) => jump.current(((index % count) + count) % count),
+    [count],
+  );
+  return { ref, ...state, go };
 }
 
 /**

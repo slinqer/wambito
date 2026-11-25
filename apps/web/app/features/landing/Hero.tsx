@@ -1,17 +1,18 @@
 import { useTranslations } from "use-intl";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
-import { cx } from "../../ui/cx.ts";
 import { PressLink } from "../../ui/PressLink.tsx";
+import { DownloadLink } from "./DownloadLink.tsx";
 import { appLinkProps, demoLinkProps } from "./links.ts";
 import { MoneyHeadline } from "./MoneyHeadline.tsx";
 import { NewTabHint } from "./NewTabHint.tsx";
 
 /**
  * The headline with "lukas" ("money", "dinheiro", "soldi") on a gold marker, taking turns with what
- * money is called elsewhere, one line about what Wambito does, one primary action, "Crear cuenta"
- * (`/create-account`), and "Pruébalo sin cuenta" (the demo) beside it. Without an app to open
- * (landing-only, coming soon) there is no demo either, so only the primary action shows.
+ * money is called elsewhere, one line about what Wambito does, one primary action, "Descargar la
+ * app", which scrolls down to the downloads (`#ways`, "Úsalo como prefieras"), and "Demo" beside
+ * it. Without an app to open (landing-only, coming soon) there is nothing to download and no demo
+ * either, so only "Muy pronto · Síguelo en GitHub" shows.
  */
 export function Hero() {
   const t = useTranslations("landing.hero");
@@ -29,10 +30,14 @@ export function Hero() {
         </p>
         <div className="lk-landing-cta">
           <div className="lk-landing-cta-actions">
-            <PressLink {...app} className={cx(COMING_SOON && "is-soon")}>
-              {t(COMING_SOON ? "cta_soon" : "cta")}
-              <NewTabHint target={app.target} />
-            </PressLink>
+            {COMING_SOON ? (
+              <PressLink {...app} className="is-soon">
+                {t("cta_soon")}
+                <NewTabHint target={app.target} />
+              </PressLink>
+            ) : (
+              <DownloadLink>{t("cta_download")}</DownloadLink>
+            )}
             {demo && (
               <PressLink {...demo} variant="secondary">
                 {t("cta_demo")}

@@ -1,10 +1,10 @@
 import type { Locale } from "../../i18n/format.ts";
 
 /**
- * What money is called around the world in each language, for the headline's marker ("Tus lukas,
- * por fin claras." → "Tu lana, por fin clara." → …, "Your money, finally clear." → "Your bucks,
- * finally clear." → …). In Spanish, Portuguese and Italian each word carries its gender and
- * number, so the words around it agree with it. The first is the prerendered one: it must match
+ * What money is called around the world in each language, for the headline's marker ("Wambi
+ * organiza tus lukas por ti." → "Wambi organiza tu lana por ti." → …, "Wambi sorts out your money
+ * for you." → "… your bucks …" → …). In Spanish, Portuguese and Italian each word carries its
+ * gender and number, so the possessive before it agrees with it. The first is the prerendered one: it must match
  * the `landing.hero.headline` message.
  */
 export interface MoneyWord {
@@ -60,40 +60,32 @@ export const MONEY_WORDS: { readonly [L in Locale]: Words<WordOf<L>> } = {
 export const MONEY_WORD_HOLD = 2800;
 
 /**
- * The headline around a word, in pieces: before it, what stays and what agrees with it ("Tu" +
- * "s", "" + "I tuoi"); after its comma, the words that never change ("por fin"); and the last
- * word, what stays and what agrees ("clar" + "as"), before the full stop.
+ * The headline around a word, in pieces: who does it ("Wambi", "O Wambi"); what does not change
+ * and what agrees before the word ("organiza tu" + "s", "organizza " + "i tuoi"); and what comes
+ * after it ("por ti"), before the full stop.
  */
 export interface Phrase {
+  subject: string;
   lead: readonly [string, string];
-  middle: string;
-  last: readonly [string, string];
-}
-
-/** "a"/"o" and "s": Spanish and Portuguese endings. */
-function ending({ plural, feminine }: GenderedWord): string {
-  return (feminine ? "a" : "o") + (plural ? "s" : "");
+  tail: string;
 }
 
 const PHRASES: { readonly [L in Locale]: (word: WordOf<L>) => Phrase } = {
   es: (word) => ({
-    lead: ["Tu", word.plural ? "s" : ""],
-    middle: "por fin",
-    last: ["clar", ending(word)],
+    subject: "Wambi",
+    lead: ["organiza tu", word.plural ? "s" : ""],
+    tail: "por ti",
   }),
-  en: () => ({ lead: ["Your", ""], middle: "finally", last: ["clear", ""] }),
-  pt: (word) => ({
-    lead: [
-      "",
-      word.feminine ? (word.plural ? "As tuas" : "A tua") : word.plural ? "Os teus" : "O teu",
-    ],
-    middle: "finalmente",
-    last: ["clar", ending(word)],
+  en: () => ({ subject: "Wambi", lead: ["sorts out your", ""], tail: "for you" }),
+  pt: ({ plural, feminine }) => ({
+    subject: "O Wambi",
+    lead: ["organiza ", feminine ? (plural ? "as tuas" : "a tua") : plural ? "os teus" : "o teu"],
+    tail: "por ti",
   }),
   it: ({ plural, feminine }) => ({
-    lead: ["", feminine ? (plural ? "Le tue" : "La tua") : plural ? "I tuoi" : "Il tuo"],
-    middle: "finalmente",
-    last: ["chiar", feminine ? (plural ? "e" : "a") : plural ? "i" : "o"],
+    subject: "Wambi",
+    lead: ["organizza ", feminine ? (plural ? "le tue" : "la tua") : plural ? "i tuoi" : "il tuo"],
+    tail: "per te",
   }),
 };
 
@@ -104,6 +96,6 @@ export function phraseFor<L extends Locale>(locale: L, word: WordOf<L>): Phrase 
 
 /** The whole headline for a word, as it reads. */
 export function headlineFor<L extends Locale>(locale: L, word: WordOf<L>): string {
-  const { lead, middle, last } = phraseFor(locale, word);
-  return `${lead.join("")} ${word.word}, ${middle} ${last.join("")}.`;
+  const { subject, lead, tail } = phraseFor(locale, word);
+  return `${subject} ${lead.join("")} ${word.word} ${tail}.`;
 }

@@ -129,9 +129,9 @@
   "landing": {
     "new_tab": "(si apre in una nuova scheda)",
     "meta": {
-      "title": "Wambito · L'app che tiene i conti delle tue spese per te",
+      "title": "Wambito · L'app delle spese che non devi usare",
       "description": "Legge le notifiche dei tuoi pagamenti e annota ogni spesa in automatico. Gratis e open source.",
-      "image_alt": "Wambi, una moneta d'oro sorridente, saluta accanto al titolo: I tuoi soldi, finalmente chiari."
+      "image_alt": "Wambi, una moneta d'oro sorridente, saluta accanto al titolo: Wambi organizza i tuoi soldi per te."
     },
     "nav": {
       "label": "Principale",
@@ -143,10 +143,11 @@
       "sign_in_soon": "Presto"
     },
     "hero": {
-      "headline": "I tuoi <mark>soldi</mark>, finalmente chiari.",
-      "description": "<lead>Basta annotare a mano: Wambi legge i tuoi pagamenti e tiene il conto per te.</lead>",
+      "headline": "Wambi organizza i tuoi <mark>soldi</mark> per te.",
+      "description": "<lead>L'app delle spese che non devi usare.</lead> Attivala una volta e continua a spendere come sempre.",
       "cta": "Crea un account",
       "cta_soon": "Presto · Seguilo su GitHub",
+      "cta_download": "Scarica l'app",
       "cta_demo": "Demo"
     },
     "ways": {
@@ -154,12 +155,14 @@
       "soon": "Presto",
       "android": {
         "title": "App per Android",
-        "body": "Con un widget per annotare una spesa senza aprire l'app.",
+        "body": "Con la cattura automatica, per annotare una spesa senza aprire l'app.",
         "cta": "Da GitHub"
       },
       "ios": {
         "title": "App per iOS",
-        "body": "Wambito sul tuo iPhone. La stiamo finendo."
+        "body": "La stiamo finendo. Intanto inizia sul web: quando esce, ti basta accedere e troverai tutto lì.",
+        "body_soon": "Wambito sul tuo iPhone. La stiamo finendo.",
+        "cta": "Inizia sul web"
       }
     },
     "how": {
@@ -195,7 +198,7 @@
     },
     "agent": {
       "title": "Il tuo agente analizza le tue spese.",
-      "body": "Collega Claude o ChatGPT a Wambito e chiedigli quello che vuoi sui tuoi soldi. Vede solo quello che autorizzi tu.",
+      "body": "Collega Claude, ChatGPT o il tuo agente preferito e dai superpoteri a Wambi: chiedigli quello che vuoi sui tuoi soldi. Vede solo quello che autorizzi tu.",
       "cta": "Collega il tuo agente",
       "note": "Gratis, dalle Impostazioni",
       "demo": {
@@ -204,7 +207,6 @@
         "categories": {
           "restaurants": "Ristoranti",
           "leisure": "Svago",
-          "subscriptions": "Abbonamenti",
           "groceries": "Spesa",
           "transport": "Trasporti"
         },
@@ -212,15 +214,20 @@
           "question": "Quanto ho speso in <b>Uber</b> questo mese?",
           "answer": "Questo mese hai speso <b>{amount}</b> in Uber, in {count} corse: {more} in più del mese scorso."
         },
-        "budgets": {
-          "question": "Come vanno i miei <b>budget</b>?",
-          "answer": "Lo svago va bene. Per i <b>ristoranti</b> hai già usato il {percent} e mancano {days} giorni: ti restano {left}.",
-          "of": "{spent} su {limit}"
+        "subscriptions": {
+          "question": "Leggi le mie <b>email</b> e aggiungi gli abbonamenti che pago.",
+          "thinking": "Cerco ricevute nella tua email…",
+          "used": "Ha letto la tua email e salvato in Wambito",
+          "answer": "Ho trovato <b>{count} abbonamenti</b> nelle tue email e li ho aggiunti come pagamenti ricorrenti: {total} al mese.",
+          "every": "Ogni mese, il {day}",
+          "added": "Aggiunto"
         },
         "top": {
           "question": "Dove sono andati più soldi <b>questo mese</b>?",
           "answer": "La voce più pesante è la <b>spesa</b>: {amount}, il {percent} delle tue uscite. Seguono i ristoranti."
-        }
+        },
+        "previous": "Esempio precedente",
+        "next": "Esempio successivo"
       }
     },
     "capture": {

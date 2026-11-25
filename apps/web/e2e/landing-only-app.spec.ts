@@ -23,6 +23,8 @@ const LOCALES = [
     locale: "es",
     path: "/",
     cta: "Crear cuenta",
+    download: "Descargar la app",
+    iosCta: "Empezar en la web",
     demoCta: "Demo",
     navCta: "Entrar",
     soon: "Pronto",
@@ -38,6 +40,8 @@ const LOCALES = [
     locale: "en",
     path: "/en",
     cta: "Create account",
+    download: "Download the app",
+    iosCta: "Start on the web",
     demoCta: "Demo",
     navCta: "Sign in",
     soon: "Soon",
@@ -92,15 +96,13 @@ for (const l of LOCALES) {
       ]);
     });
 
-    test("the hero and closing calls to action open the app's create-account page", async ({
-      page,
-    }) => {
+    test("the hero and the closing lead to the downloads", async ({ page }) => {
       await page.goto(l.path);
       for (const section of ["#hero", "#closing"]) {
-        const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-        await expectAppLink(link, l.locale, "create-account");
-        await expect(link).toHaveClass(/lk-btn-primary/);
-        await expect(link).not.toHaveClass(/is-soon/);
+        const download = page.locator(section).getByRole("link", { name: l.download });
+        await expect(download).toHaveAttribute("href", "#ways");
+        await expect(download).toHaveClass(/lk-btn-primary/);
+        await expect(download).not.toHaveClass(/is-soon/);
       }
     });
 
@@ -115,14 +117,22 @@ for (const l of LOCALES) {
       await expect(nav.getByRole("button").last()).toBeVisible();
     });
 
-    test("Android downloads the APK; iOS stays soon; no web or agent card", async ({ page }) => {
+    test("Android downloads the APK; iOS stays soon and starts on the web; no agent card", async ({
+      page,
+    }) => {
       await page.goto(l.path);
       const ways = page.locator("#ways").getByRole("listitem");
       await expect(ways).toHaveCount(2);
       for (const name of l.others) {
         const card = ways.filter({ has: page.getByRole("heading", { name }) });
         await expect(card.getByText(l.soon, { exact: true })).toBeVisible();
-        await expect(card.getByRole("link")).toHaveCount(0);
+        // Its one link starts on the web, on the app's origin.
+        await expect(card.getByRole("link")).toHaveCount(1);
+        await expectAppLink(
+          card.getByRole("link", { name: l.iosCta, exact: true }),
+          l.locale,
+          "create-account",
+        );
       }
       const android = ways.filter({ has: page.getByRole("heading", { name: l.androidTitle }) });
       await expect(android.getByRole("link", { name: l.androidCta, exact: true })).toHaveAttribute(
@@ -157,12 +167,10 @@ for (const l of LOCALES) {
       const toApp = hrefs.filter((href) =>
         /(^|\/)(sign-in|create-account|app|welcome)(\/|\?|#|$)/.test(href),
       );
-      // Hero, the agent's "connect" and closing create an account; the header signs in.
+      // The iOS card's "start on the web" creates an account; the header signs in. The hero, the
+      // agent's "connect" and the closing lead to the downloads.
       expect(toApp.sort()).toEqual(
-        [
-          ...Array(3).fill(`${APP}/create-account?lang=${l.locale}`),
-          `${APP}/sign-in?lang=${l.locale}`,
-        ].sort(),
+        [`${APP}/create-account?lang=${l.locale}`, `${APP}/sign-in?lang=${l.locale}`].sort(),
       );
     });
 
@@ -247,10 +255,12 @@ for (const l of LOCALES) {
         await page.waitForLoadState("networkidle");
         await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
         await expectNoA11yViolations(page);
-        for (const section of ["#hero", "#closing"]) {
-          const link = page.locator(section).getByRole("link", { name: l.cta, exact: true });
-          await expect(link).toHaveAttribute("href", `${APP}/create-account?lang=${l.locale}`);
-        }
+        await expect(
+          page.locator("#hero").getByRole("link", { name: l.download, exact: true }),
+        ).toHaveAttribute("href", "#ways");
+        await expect(
+          page.locator("#closing").getByRole("link", { name: l.download }),
+        ).toHaveAttribute("href", "#ways");
         expect(errors).toEqual([]);
       });
     });

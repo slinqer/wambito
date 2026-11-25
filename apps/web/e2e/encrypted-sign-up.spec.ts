@@ -10,7 +10,7 @@ import {
 
 /**
  * A new person signs up on the web with the API's NEW_USERS_ENCRYPTED on (the e2e stack's
- * setting), so the account is born encrypted: the landing's "Crear cuenta", an email code, the
+ * setting), so the account is born encrypted: the landing's "Empezar en la web" (the iOS card), an email code, the
  * recovery key, "Install the app" (Android, then continue in the browser) and the onboarding's
  * welcome. `GET /v1/me` reports the account as `preview`. The plain-app specs seed plain users
  * instead (`signUpNewUser`, `seed:e2e-plain-user`).
@@ -30,7 +30,7 @@ test("a web sign-up is born encrypted: recovery key, the app, then the welcome",
   const email = freshEmail("born");
 
   await page.goto("/");
-  await page.locator("#hero").getByRole("link", { name: "Crear cuenta" }).click();
+  await page.locator("#ways").getByRole("link", { name: "Empezar en la web" }).click();
   await expect(page).toHaveURL(/\/create-account(\?|$)/);
   await expect(page.getByRole("heading", { name: "Crea tu cuenta" })).toBeVisible();
   await page.getByRole("textbox", { name: "Tu correo" }).fill(email);

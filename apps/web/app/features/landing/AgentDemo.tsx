@@ -1,17 +1,18 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslations } from "use-intl";
+import { formatMoney } from "../../i18n/format.ts";
 import { useLocale } from "../../i18n/IntlProvider.tsx";
 import { COMING_SOON } from "../../site/config.ts";
+import { BrandLogo, type BrandName } from "../../ui/BrandLogo.tsx";
 import { cx } from "../../ui/cx.ts";
-import { PressLink } from "../../ui/PressLink.tsx";
+import { Icon } from "../../ui/Icon.tsx";
 import { BRAND_LOGOS, type BrandLogoName } from "./brand-logos.ts";
-import { useDemoMoney } from "./demo-money.ts";
-import { appLinkProps } from "./links.ts";
-import { NewTabHint } from "./NewTabHint.tsx";
+import { DownloadLink } from "./DownloadLink.tsx";
+import { DEMO_CURRENCY, demoCents, useDemoMoney } from "./demo-money.ts";
 import { useRotatingPlay } from "./play-on-view.ts";
 
 /**
- * Invented figures for the three examples, November 2026, in euro cents (`useDemoMoney` shows
+ * Invented figures and names for the three examples, November 2026, in euro cents (`useDemoMoney` shows
  * them in the language's demo currency).
  */
 const UBER = {
@@ -25,14 +26,20 @@ const UBER = {
     { day: 6, cents: 1520 },
   ],
 } as const;
-const BUDGETS = {
-  daysLeft: 14,
-  rows: [
-    { key: "restaurants", spent: 17000, limit: 20000 },
-    { key: "leisure", spent: 6000, limit: 12000 },
-    { key: "subscriptions", spent: 3800, limit: 4500 },
-  ],
-} as const;
+/** What it finds in the email and adds as recurring payments, by the day each one is charged. */
+const SUBSCRIPTIONS: readonly {
+  name: string;
+  logo: BrandLogoName;
+  /** The brand's colour, the tile under its white mark. */
+  color: string;
+  day: number;
+  cents: number;
+}[] = [
+  { name: "Netflix", logo: "netflix", color: "#e50914", day: 3, cents: 1299 },
+  { name: "Spotify", logo: "spotify", color: "#1db954", day: 9, cents: 1099 },
+  { name: "YouTube Premium", logo: "youtube", color: "#ff0000", day: 15, cents: 1199 },
+  { name: "iCloud+", logo: "icloud", color: "#3693f3", day: 22, cents: 399 },
+];
 const TOP = {
   // Largest first; the chart's columns are sized against the first one.
   rows: [
@@ -45,11 +52,12 @@ const TOP = {
 const DEMO_MONTH = { year: 2026, month: 10 } as const;
 
 /** The examples, in the order they take turns. */
-const EXAMPLES = ["uber", "budgets", "top"] as const;
+const EXAMPLES = ["uber", "subscriptions", "top"] as const;
 type Example = (typeof EXAMPLES)[number];
 
 /**
- * Each example's steps, ms after it starts: the question pops in, Wambito reads the transactions,
+ * Each example's steps, ms after it starts: the question pops in, the agent reads (the transactions,
+ * or the email),
  * then the answer, which stays `HOLD` ms before the next question. `idle` is empty; `done` is the
  * first example's still final state, which the page prerenders and keeps without JavaScript and
  * under reduced motion.
@@ -63,16 +71,8 @@ const HOLD = 6500;
 type Phase = (typeof STEPS)[number][0] | "idle" | "done";
 const ORDER: Phase[] = ["idle", "ask", "think", "answer", "done"];
 
-/** A budget is near its limit from 80% spent: its bar and figure turn yellow, as in the app. */
-const NEAR = 0.8;
-
-function Logo({ name }: { name: BrandLogoName }) {
-  return (
-    <svg className="lk-landing-agent-logo" viewBox="0 0 24 24" data-logo={name} aria-hidden="true">
-      <path d={BRAND_LOGOS[name]} />
-    </svg>
-  );
-}
+/** The four agents "Mis agentes" connects, with the app's own logos (`brands.json`). */
+const AGENT_LOGOS: readonly BrandName[] = ["claude", "chatgpt", "lumo", "grok"];
 
 function useFormat() {
   const { locale } = useLocale();
@@ -116,40 +116,42 @@ function UberAnswer() {
   );
 }
 
-/** "How are my budgets doing?": a bar per budget filling up to what is spent, and a summary. */
-function BudgetsAnswer() {
-  const t = useTranslations("landing.agent.demo");
-  const { money, percent } = useFormat();
-  const [first] = BUDGETS.rows;
+/**
+ * "Read my emails and add the subscriptions I pay for": what it found, each one added as a
+ * recurring payment on the day it is charged, and what they cost a month together.
+ */
+function SubscriptionsAnswer() {
+  const t = useTranslations("landing.agent.demo.subscriptions");
+  const { money } = useFormat();
+  const { locale } = useLocale();
+  // The sum of the amounts as shown (pesos round each one), so the rows add up to it.
+  const total = formatMoney(
+    SUBSCRIPTIONS.reduce((sum, row) => sum + demoCents(locale, row.cents), 0),
+    DEMO_CURRENCY[locale].currency,
+    locale,
+  );
   return (
     <>
-      <p>
-        {t.rich("budgets.answer", {
-          b: bold,
-          percent: percent(first.spent / first.limit),
-          days: BUDGETS.daysLeft,
-          left: money(first.limit - first.spent),
-        })}
-      </p>
-      <div className="lk-landing-chat-card">
-        {BUDGETS.rows.map((row) => {
-          const share = row.spent / row.limit;
-          const near = share >= NEAR;
-          return (
-            <div key={row.key} className="lk-landing-budget">
-              <div className="lk-rowtop">
-                <span>{t(`categories.${row.key}`)}</span>
-                <span className={cx("lk-status", near && "is-near")}>
-                  {t("budgets.of", { spent: money(row.spent), limit: money(row.limit) })}
-                </span>
-              </div>
-              <div className={cx("lk-bar", near && "is-near")}>
-                <span style={{ width: `${Math.round(share * 100)}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <p>{t.rich("answer", { b: bold, count: SUBSCRIPTIONS.length, total })}</p>
+      <ul className="lk-landing-chat-card">
+        {SUBSCRIPTIONS.map((row) => (
+          <li key={row.name} className="lk-landing-demo-row">
+            <span className="lk-tile lk-landing-brand-tile" style={{ background: row.color }}>
+              <svg viewBox="0 0 24 24" data-logo={row.logo} aria-hidden="true">
+                <path d={BRAND_LOGOS[row.logo]} />
+              </svg>
+            </span>
+            <span className="lk-landing-bill-name">
+              {row.name}
+              <span className="lk-landing-chat-date">{t("every", { day: row.day })}</span>
+            </span>
+            <span className="lk-landing-added">
+              <span className="lk-amount">{money(-row.cents)}</span>
+              <span className="lk-landing-added-tag">✓ {t("added")}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -184,27 +186,30 @@ function TopAnswer() {
 
 const ANSWERS: Record<Example, () => ReactNode> = {
   uber: UberAnswer,
-  budgets: BudgetsAnswer,
+  subscriptions: SubscriptionsAnswer,
   top: TopAnswer,
 };
 
 /**
- * "Your agent analyzes your spending": on one side the heading, a line, the way in (the
- * app, where Settings → Assistants connects Claude or ChatGPT) and the two assistants' logos; on
- * the other a chat that plays three examples in turn while it is on screen (`useRotatingPlay`):
- * how much went on Uber this month, how the budgets are doing (bars filling up), and where most of
- * the money went (a column chart). The dots under it say which one is showing. The chat is an
+ * "Your agent analyzes your spending": on one side the heading, a line, the way in ("Conecta
+ * tu agente" leads to the downloads: the app, where "Mis agentes" connects Claude, ChatGPT, Lumo or Grok) and their logos; on the other
+ * a chat that plays three examples in turn while it is on screen (`useRotatingPlay`): how much
+ * went on Uber this month, the subscriptions it finds in your email and adds as recurring
+ * payments (with the agent's own email access), and where most of the money went (a column chart). The dots under it say which one is showing. The chat is an
  * illustration (hidden from assistive technology): the heading and the line say what it shows.
  * `pace` scales the timing (stories only).
  */
 export function AgentDemo({ pace = 1 }: { pace?: number }) {
   const t = useTranslations("landing.agent");
   const { locale } = useLocale();
-  const app = appLinkProps(locale, "create");
-  const { ref, index, phase } = useRotatingPlay(EXAMPLES.length, STEPS, HOLD, { pace });
+  const { ref, index, phase, go } = useRotatingPlay(EXAMPLES.length, STEPS, HOLD, { pace });
   const example = EXAMPLES[index] ?? "uber";
   const Answer = ANSWERS[example];
   const shown = (from: Phase) => ORDER.indexOf(phase) >= ORDER.indexOf(from);
+  // Reading the email says so; the others read the transactions.
+  const reads = example === "subscriptions";
+  const thinking = reads ? "demo.subscriptions.thinking" : "demo.thinking";
+  const used = reads ? "demo.subscriptions.used" : "demo.used";
 
   return (
     <section id="agent" className="lk-landing-section" aria-labelledby="agent-title">
@@ -214,16 +219,16 @@ export function AgentDemo({ pace = 1 }: { pace?: number }) {
           <p>{t("body")}</p>
           {!COMING_SOON && (
             <div className="lk-landing-agent-cta">
-              <PressLink {...app} variant="secondary" size="sm">
+              <DownloadLink variant="secondary" size="sm">
                 {t("cta")}
-                <NewTabHint target={app.target} />
-              </PressLink>
+              </DownloadLink>
               <span className="lk-landing-agent-note">{t("note")}</span>
             </div>
           )}
           <div className="lk-landing-agent-logos">
-            <Logo name="claude" />
-            <Logo name="openai" />
+            {AGENT_LOGOS.map((name) => (
+              <BrandLogo key={name} name={name} size={34} className="lk-landing-agent-logo" />
+            ))}
           </div>
         </div>
         <div
@@ -231,9 +236,8 @@ export function AgentDemo({ pace = 1 }: { pace?: number }) {
           className="lk-landing-panel lk-landing-chat"
           data-phase={phase}
           data-example={example}
-          aria-hidden="true"
         >
-          <div className="lk-landing-chat-log">
+          <div className="lk-landing-chat-log" aria-hidden="true">
             {shown("ask") && (
               <p className="lk-landing-chat-ask">
                 {t.rich(`demo.${example}.question`, { b: bold })}
@@ -242,7 +246,7 @@ export function AgentDemo({ pace = 1 }: { pace?: number }) {
             {phase === "think" && (
               <p className="lk-landing-chat-status">
                 <img src="/favicon.svg" alt="" width={20} height={20} />
-                <span className="lk-landing-shimmer">{t("demo.thinking")}</span>
+                <span className="lk-landing-shimmer">{t(thinking)}</span>
               </p>
             )}
             {shown("answer") && (
@@ -251,17 +255,35 @@ export function AgentDemo({ pace = 1 }: { pace?: number }) {
               <div className="lk-landing-chat-answer" data-ph-mask>
                 <p className="lk-landing-chat-status is-done">
                   <img src="/favicon.svg" alt="" width={20} height={20} />
-                  {t("demo.used")}
+                  {t(used)}
                 </p>
                 <Answer />
               </div>
             )}
           </div>
-          <span className="lk-landing-chat-dots">
-            {EXAMPLES.map((name) => (
-              <span key={name} className={cx(name === example && "is-on")} />
-            ))}
-          </span>
+          <div className="lk-landing-chat-nav">
+            <button
+              type="button"
+              className="lk-landing-chat-arrow"
+              aria-label={t("demo.previous")}
+              onClick={() => go(index - 1)}
+            >
+              <Icon name="chevron-left" size={18} />
+            </button>
+            <span className="lk-landing-chat-dots" aria-hidden="true">
+              {EXAMPLES.map((name) => (
+                <span key={name} className={cx(name === example && "is-on")} />
+              ))}
+            </span>
+            <button
+              type="button"
+              className="lk-landing-chat-arrow"
+              aria-label={t("demo.next")}
+              onClick={() => go(index + 1)}
+            >
+              <Icon name="chevron-right" size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </section>

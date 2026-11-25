@@ -129,9 +129,9 @@
   "landing": {
     "new_tab": "(opens in a new tab)",
     "meta": {
-      "title": "Wambito · The app that tracks your expenses for you",
+      "title": "Wambito · The expense app you don't have to use",
       "description": "It reads your payment notifications and logs each expense automatically. Free and open source.",
-      "image_alt": "Wambi, a smiling gold coin, waves next to the title: Your money, finally clear."
+      "image_alt": "Wambi, a smiling gold coin, waves next to the title: Wambi sorts out your money for you."
     },
     "nav": {
       "label": "Main",
@@ -143,10 +143,11 @@
       "sign_in_soon": "Coming soon"
     },
     "hero": {
-      "headline": "Your <mark>money</mark>, finally clear.",
-      "description": "<lead>Stop logging by hand: Wambi reads your payments and keeps count for you.</lead>",
+      "headline": "Wambi sorts out your <mark>money</mark> for you.",
+      "description": "<lead>The expense app you don't have to use.</lead> Turn it on once and keep spending as usual.",
       "cta": "Create account",
       "cta_soon": "Coming soon · Follow on GitHub",
+      "cta_download": "Download the app",
       "cta_demo": "Demo"
     },
     "ways": {
@@ -154,12 +155,14 @@
       "soon": "Soon",
       "android": {
         "title": "Android app",
-        "body": "With a widget to log an expense without opening the app.",
+        "body": "With automatic capture, to log an expense without opening the app.",
         "cta": "From GitHub"
       },
       "ios": {
         "title": "iOS app",
-        "body": "Wambito on your iPhone. We're finishing it."
+        "body": "We're finishing it. Meanwhile, start on the web: when it's out, just sign in and everything will be there.",
+        "body_soon": "Wambito on your iPhone. We're finishing it.",
+        "cta": "Start on the web"
       }
     },
     "how": {
@@ -195,7 +198,7 @@
     },
     "agent": {
       "title": "Your agent analyzes your spending.",
-      "body": "Connect Claude or ChatGPT to Wambito and ask it anything about your money. It only sees what you allow.",
+      "body": "Connect Claude, ChatGPT or your favorite agent and give Wambi superpowers: ask it anything about your money. It only sees what you allow.",
       "cta": "Connect your agent",
       "note": "Free, from Settings",
       "demo": {
@@ -204,7 +207,6 @@
         "categories": {
           "restaurants": "Restaurants",
           "leisure": "Leisure",
-          "subscriptions": "Subscriptions",
           "groceries": "Groceries",
           "transport": "Transport"
         },
@@ -212,15 +214,20 @@
           "question": "How much did I spend on <b>Uber</b> this month?",
           "answer": "This month you've spent <b>{amount}</b> on Uber, over {count} rides: {more} more than last month."
         },
-        "budgets": {
-          "question": "How are my <b>budgets</b> doing?",
-          "answer": "Leisure is on track. You've used {percent} of <b>restaurants</b> with {days} days to go: {left} left.",
-          "of": "{spent} of {limit}"
+        "subscriptions": {
+          "question": "Read my <b>emails</b> and add the subscriptions I pay for.",
+          "thinking": "Looking for receipts in your email…",
+          "used": "Read your email and saved to Wambito",
+          "answer": "I found <b>{count} subscriptions</b> in your emails and added them as recurring payments: {total} a month.",
+          "every": "Monthly, on {day}",
+          "added": "Added"
         },
         "top": {
           "question": "Where did most of my money go <b>this month</b>?",
           "answer": "<b>Groceries</b> weigh the most: {amount}, {percent} of your spending. Restaurants come next."
-        }
+        },
+        "previous": "Previous example",
+        "next": "Next example"
       }
     },
     "capture": {

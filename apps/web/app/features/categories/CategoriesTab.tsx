@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useTranslations } from "use-intl";
 import { CategoryRow } from "../../ui/CategoryRow.tsx";
 import { categoryLook } from "../../ui/category-look.ts";
+import { Icon } from "../../ui/Icon.tsx";
 import { PressButton } from "../../ui/PressButton.tsx";
 import { SegmentedControl } from "../../ui/SegmentedControl.tsx";
 import { useAppPath } from "../home/app-path.ts";
@@ -27,7 +28,8 @@ const NO_LINE = { budget: null, spent: 0, remaining: null, state: "ok" } as cons
  * Home's Categorías tab: where categories are managed (founder decision 2026-10-24; there is no
  * separate page). A Gastos | Ingresos switch; one row per category of that kind, opening its
  * detail (a spending category with its month's budget bar, an income one with "Ingreso"); "Nueva
- * categoría"; and the archived ones of that kind folded at the end, each with "Restaurar". An
+ * categoría", a dashed row after them (under the empty line when there are none), as on the phone;
+ * and the archived ones of that kind folded at the end, each with "Restaurar". An
  * archived spending category that has spending in the month on screen is one of the rows instead,
  * noted "archivada" (`categoryLists`). Renaming,
  * the icon and colour, and archiving are in the detail.
@@ -53,23 +55,15 @@ export function CategoriesTab({ summary, categories, currency, month }: Categori
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-(--space-2)">
-        <div className="min-w-[200px] flex-1">
-          <SegmentedControl<CategoryKind>
-            label={t("kind_label")}
-            value={kind}
-            options={[
-              { value: "expense", label: t("expenses") },
-              { value: "income", label: t("income") },
-            ]}
-            onChange={setKind}
-          />
-        </div>
-        <PressButton size="sm" onClick={sheets.startCreate}>
-          <span aria-hidden="true">＋</span>
-          {t("add")}
-        </PressButton>
-      </div>
+      <SegmentedControl<CategoryKind>
+        label={t("kind_label")}
+        value={kind}
+        options={[
+          { value: "expense", label: t("expenses") },
+          { value: "income", label: t("income") },
+        ]}
+        onChange={setKind}
+      />
       {rows.length === 0 ? (
         <p className="m-0 text-[14px] font-bold text-ink-muted">
           {kind === "expense" ? tHome("no_expense_categories") : t("none_of_kind")}
@@ -97,6 +91,12 @@ export function CategoriesTab({ summary, categories, currency, month }: Categori
           );
         })
       )}
+      {/* After the categories (and before the archived ones), as on the phone: a dashed row as
+          wide as them, so the page's one purple + stays the add-a-movement button. */}
+      <button type="button" className="lk-add-row" onClick={sheets.startCreate}>
+        <Icon name="plus" size={20} />
+        {t("add")}
+      </button>
       {archived.length > 0 && (
         <div className="flex flex-col gap-(--space-2)">
           <PressButton
