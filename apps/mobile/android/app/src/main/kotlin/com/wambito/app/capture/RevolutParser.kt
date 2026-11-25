@@ -14,12 +14,17 @@ object RevolutParser : BankParser {
     /** A line: the words before the amount and the word before the merchant, if any. */
     private class Line(lead: String, preposition: String, merchantRequired: Boolean = false) {
         val regex = Regex(
-            "^$EMOJI(?i:$lead)$SPACE${Money.PATTERN}" +
+            "^$EMOJI(?i:$lead)$SPACE${Money.PATTERN}$ORIGINAL" +
                 "(?:$SPACE(?i:$preposition)$SPACE(\\S.*?))${if (merchantRequired) "" else "?"}$EMOJI$",
         )
     }
 
     private const val SPACE = "[${Money.SPACES}]+"
+
+    // A payment in another currency, seen: "Pagou 10,97 € (11,99 US$) em <merchant>". The bracket
+    // holds what the merchant charged; the amount before it is what left the account, the one kept.
+    // No capture group, so the merchant's group number does not move.
+    private const val ORIGINAL = "(?:$SPACE\\([^()]*\\))?"
 
     // Emoji, symbols and spaces: anything but a letter or a digit.
     private const val EMOJI = "[^\\p{L}\\p{N}]*"
@@ -29,7 +34,8 @@ object RevolutParser : BankParser {
     private val LINES = listOf(
         // pt-PT card payment, seen: "🛒 Gastou 12,50 €".
         Line("Gastou", "em"),
-        // pt-PT Revolut Pay, seen: "💳 pagou €9.28 em <merchant>".
+        // pt-PT Revolut Pay, seen: "💳 pagou €9.28 em <merchant>"; an online payment in dollars,
+        // seen: "🛍️ Pagou 10,97 € (11,99 US$) em <merchant>".
         Line("pagou", "em", merchantRequired = true),
         // Italian, from another project's capture: "Hai pagato 10 € presso <merchant> 🚗".
         Line("Hai pagato|Hai speso", "presso"),
