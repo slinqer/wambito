@@ -133,7 +133,17 @@ export const Budgets: Story = {
       "aria-selected",
       "true",
     );
-    await expectTarget(panel.getByRole("button", { name: "Nueva categoría" }));
+    // As on the phone: the switch takes its whole row, and "Nueva categoría" is a dashed row
+    // after the categories, so the page's one purple + stays the add-a-movement button.
+    const add = panel.getByRole("button", { name: "Nueva categoría" });
+    await expectTarget(add);
+    await expect(add).toHaveClass("lk-add-row");
+    await expect(add).not.toHaveClass("lk-btn-primary");
+    const rows = panel.getAllByRole("button", { name: /Quedan|Te pasaste|Sin presupuesto/ });
+    const last = rows.at(-1);
+    if (!last) throw new Error("no category rows");
+    await expect(last.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await expect(add.getBoundingClientRect().height).toBeGreaterThanOrEqual(52);
     await expect(panel.queryByRole("button", { name: /^Archivadas/ })).toBeNull();
     await expect(panel.queryByRole("button", { name: /^Salario/ })).toBeNull();
     // Wambi talks about the month: the worst category first, except on its last day, when he
