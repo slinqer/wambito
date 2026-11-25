@@ -37,12 +37,12 @@ test("the landing and the roadmap, in every language", async ({ page }) => {
   // The landing's own run (landing.spec.ts) adds axe's best practices; so does this one.
   const tags = [...WCAG_TAGS, "best-practice"];
   for (const [path, heading] of [
-    ["/", /Tus lukas/],
-    ["/en", /Your money/],
+    ["/", /Wambi organiza tus lukas/],
+    ["/en", /Wambi sorts out your money/],
     ["/roadmap", /.+/],
     ["/en/roadmap", /.+/],
-    ["/it", /I tuoi soldi/],
-    ["/pt", /O teu dinheiro/],
+    ["/it", /Wambi organizza i tuoi soldi/],
+    ["/pt", /O Wambi organiza o teu dinheiro/],
     ["/it/roadmap", /.+/],
     ["/pt/roadmap", /.+/],
   ] as const) {
