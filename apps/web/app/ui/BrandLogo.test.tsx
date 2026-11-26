@@ -10,6 +10,7 @@ const NAMES = [
   "grok",
   "revolut",
   "google-wallet",
+  "activobank",
 ] as const satisfies readonly BrandName[];
 
 describe("brand logos render in one colour", () => {

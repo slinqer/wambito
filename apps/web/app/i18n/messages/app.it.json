@@ -51,7 +51,7 @@
     "nudge_import_action": "Porta il mio storico",
     "sign_out_failed": "Non siamo riusciti a farti uscire. Riprova.",
     "nudge_budgets_action": "Vai a Categorie",
-    "review_mark": "{source, select, revolut{da rivedere · da Revolut} google_wallet{da rivedere · da Google Wallet} apple_wallet{da rivedere · da Apple Wallet} other{da rivedere}}",
+    "review_mark": "{source, select, revolut{da rivedere · da Revolut} google_wallet{da rivedere · da Google Wallet} apple_wallet{da rivedere · da Apple Wallet} activobank{da rivedere · da ActivoBank} other{da rivedere}}",
     "review_filter": "Da rivedere · {count}",
     "review_ok": "Va bene",
     "review_ok_label": "Va bene: {name}",

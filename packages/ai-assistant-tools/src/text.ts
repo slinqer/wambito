@@ -53,6 +53,7 @@ const SOURCES: Record<CaptureSource, string> = {
   revolut: "Revolut",
   google_wallet: "Google Wallet",
   apple_wallet: "Apple Wallet",
+  activobank: "ActivoBank",
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

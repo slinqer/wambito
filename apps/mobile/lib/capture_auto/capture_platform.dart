@@ -12,8 +12,12 @@ import '../background/queued_capture.dart';
 
 /// The sources automatic capture reads, by the wire name the native side uses.
 enum CaptureSource {
-  revolut('revolut', 'Revolut', LkBrand.revolut),
+  // Google Wallet first: the source most people have.
   googleWallet('google_wallet', 'Google Wallet', LkBrand.googleWallet),
+  revolut('revolut', 'Revolut', LkBrand.revolut),
+
+  /// ActivoBank (Portugal): money sent.
+  activobank('activobank', 'ActivoBank', LkBrand.activobank),
 
   /// The iPhone's Apple Pay payments, through the Shortcuts action (no Apple logo is drawn).
   appleWallet('apple_wallet', 'Apple Pay', null);
@@ -42,7 +46,7 @@ class AutoCaptureStatus {
   });
 
   /// What Android reads when it does not say.
-  static const androidSources = {'revolut', 'google_wallet'};
+  static const androidSources = {'revolut', 'google_wallet', 'activobank'};
 
   final bool access;
   final Set<String> sources;

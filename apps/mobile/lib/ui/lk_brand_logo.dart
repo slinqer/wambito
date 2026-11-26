@@ -2,7 +2,8 @@
 // file, the phone this copy, and test/ui/lk_brand_logo_test.dart fails when the two differ. Change
 // the JSON first, then this file the same way. chatgpt, claude and grok are Streamline Logos Solid
 // Free by Streamline (CC BY 4.0), revolut is Simple Icons (CC0), google-wallet is Font Awesome Free
-// (CC BY 4.0) and lumo is Proton's icon flattened to one colour; all credited in About's licences.
+// (CC BY 4.0), activobank is ActivoBank's AB mark from its own wordmark (Banco ActivoBank S.A.) and lumo
+// is Proton's icon flattened to one colour; all credited in About's licences.
 import 'package:flutter/widgets.dart';
 
 import 'svg_path.dart';
@@ -14,7 +15,8 @@ enum LkBrand {
   lumo('lumo'),
   grok('grok'),
   revolut('revolut'),
-  googleWallet('google-wallet');
+  googleWallet('google-wallet'),
+  activobank('activobank');
 
   const LkBrand(this.id);
   final String id;
@@ -83,6 +85,16 @@ const lkBrandLogos = <LkBrand, LkBrandShape>{
   LkBrand.googleWallet: LkBrandShape('0 0 448 448', [
     LkBrandPath(
       'M158.1437 97.384c36.848 59.388 62.916 110.838 82.614 159.25 -8.134 33.124 -18.424 65.17 -30.674 96.334 -12.936 -51.254 -25.97 -99.274 -54.88 -145.53 6.37 -35.672 2.254 -72.128 2.94 -110.054Zm-46.55 71.736h-91.336c-6.37 0 -10.29 7.35 -6.37 12.446 41.356 53.214 70.266 115.444 89.866 183.554h101.43c-15.876 -68.306 -37.926 -131.026 -80.85 -189.63 -2.94 -3.92 -7.84 -6.37 -12.74 -6.37Zm46.844 -86.24c67.13 105.84 127.4 229.81 135.436 360.64h111.426c-11.76 -135.24 -67.032 -259.7 -140.336 -360.64h-106.526Zm246.764 -67.13c-1.764 -6.664 -8.036 -11.27 -14.896 -11.27h-86.534c-5.194 0 -8.82 4.9 -7.644 10.094 12.936 45.57 21.854 93.59 25.97 143.08 47.236 84.476 78.106 174.734 88.788 265.384 15.484 -59.29 24.794 -130.83 24.794 -198.94 0 -72.128 -11.858 -142.198 -30.478 -208.348Z',
+    ),
+  ]),
+  LkBrand.activobank: LkBrandShape('0 -5.84 59.48 59.48', [
+    LkBrandPath(
+      'M18.0478 0.0147C18.9835 0.0147 19.8541 0.6191 20.0556 1.4912L27.207 28.7421L27.2734 29.1454V45.7245C27.2734 46.9326 26.3383 47.8044 25.2012 47.8046H22.4599C21.3922 47.8046 20.4551 46.9327 20.4551 45.7245V32.7704H6.8193V45.7245C6.8193 46.9326 5.8823 47.8044 4.8135 47.8046H2.0723C0.9361 47.8046 0 46.9327 0 45.7245V29.1454L0.0674 28.7421L7.2197 1.4912C7.4202 0.6192 8.2889 0.0147 9.2246 0.0147H18.0478ZM7.8877 25.9911H19.3857L14.4385 6.7939H12.8359L7.8877 25.9911Z',
+      evenOdd: true,
+    ),
+    LkBrandPath(
+      'M47.1794 0C53.5984 0 58.7474 5.1029 58.7474 11.5497V15.6454C58.7474 18.7326 57.6114 21.4173 55.7374 23.4999C58.0134 25.6477 59.4834 28.7366 59.4834 32.0937V36.1894C59.4834 42.5689 54.2674 47.8056 47.9154 47.8056H36.2794C35.2114 47.8052 34.2734 46.932 34.2734 45.7255V1.9482C34.2734 0.8728 35.2104 0.0004 36.2794 0H47.1794ZM41.0934 40.957H47.9154C50.5234 40.957 52.6624 38.8756 52.6624 36.1894V32.0937C52.6624 29.4076 50.5234 27.3261 47.9154 27.3261H41.0934V40.957ZM41.0934 20.4784H47.1794C49.8554 20.4784 51.9264 18.2629 51.9264 15.6454V11.5497C51.9264 8.9298 49.8554 6.7822 47.1794 6.7822H41.0934V20.4784Z',
+      evenOdd: true,
     ),
   ]),
 };

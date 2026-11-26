@@ -9,6 +9,7 @@ import 'package:wambito/capture_auto/how_capture_works.dart';
 import 'package:wambito/capture_auto/wallet_setup.dart';
 
 import 'package:wambito/notices/notice_platform.dart';
+import 'package:wambito/ui/lk_brand_logo.dart';
 
 import '../notices/fakes.dart';
 import '../settings/harness.dart';
@@ -83,11 +84,28 @@ void main() {
     await t.pumpAndSettle();
     expect(env.container.read(autoCaptureExplainedProvider), isTrue);
 
+    await _show(t, const Key('autoCapture.google_wallet'));
     await t.tap(find.byKey(const Key('autoCapture.google_wallet')));
     await t.pumpAndSettle();
 
     expect(find.byType(HowCaptureWorks), findsNothing);
     expect(fake.sources, {'revolut', 'google_wallet'});
+  });
+
+  testWidgets('ActivoBank has its own switch, with its logo', (t) async {
+    final (_, fake) = await _pump(t);
+    await _show(t, const Key('autoCapture.activobank'));
+    expect(said('ActivoBank'), findsWidgets);
+    expect(
+      find.byWidgetPredicate((w) => w is LkBrandLogo && w.brand == LkBrand.activobank),
+      findsOneWidget,
+    );
+    await t.tap(find.byKey(const Key('autoCapture.activobank')));
+    await t.pumpAndSettle();
+    await _toLastStep(t);
+    await t.tap(find.byKey(const Key('autoCapture.explainer.confirm')));
+    await t.pumpAndSettle();
+    expect(fake.sources, {'activobank'});
   });
 
   testWidgets('closing the steps changes nothing', (t) async {
@@ -133,7 +151,7 @@ void main() {
     await _show(t, const Key('autoCapture.google_wallet'));
 
     expect(find.text('Activa'), findsOneWidget);
-    expect(find.text('Apagada'), findsOneWidget);
+    expect(find.text('Apagada'), findsNWidgets(2));
     expect(find.byKey(const Key('autoCapture.missing')), findsNothing);
   });
 

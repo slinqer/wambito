@@ -209,6 +209,7 @@ Stream<LicenseEntry> extraLicenseEntries(AssetBundle bundle, AppLocalizations l1
     'Font Awesome Free 6.5.2, Fonticons',
     'Simple Icons',
     'Lumo, Proton AG',
+    'ActivoBank, Banco ActivoBank S.A.',
   ], '${l10n.licenseNoticeBrands}\n\n${await load(_ccBy)}');
   // The rest, one entry per licence text: every library under what its own POM declares.
   const handled = {_vosk, _jna, _sherpa};

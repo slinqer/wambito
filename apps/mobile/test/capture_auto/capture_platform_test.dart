@@ -58,13 +58,21 @@ void main() {
     expect(status?.isOn(CaptureSource.appleWallet), isTrue);
   });
 
-  test('Android lists no sources: they are Revolut and Google Wallet', () async {
+  test('Android lists no sources: they are Revolut, Google Wallet and ActivoBank', () async {
     const platform = ChannelAutoCapturePlatform();
     answer = (_) => {'access': 'granted', 'sources': <String>[]};
     final status = await platform.status();
-    expect(status?.available, {'revolut', 'google_wallet'});
+    expect(status?.available, {'revolut', 'google_wallet', 'activobank'});
     expect(status?.configured, isFalse);
     expect(status?.iosMajor, isNull);
+  });
+
+  test('Android offers Google Wallet first, then Revolut and ActivoBank', () {
+    expect(const AutoCaptureStatus(access: true, sources: {}).offered, [
+      CaptureSource.googleWallet,
+      CaptureSource.revolut,
+      CaptureSource.activobank,
+    ]);
   });
 
   test('switching a source, opening the screens and clearing the queue go by name', () async {

@@ -12,7 +12,7 @@ export 'schemas.dart' show Json;
 
 /// The capture sources (`CAPTURE_SOURCES` of capture-sources.ts). Only a new capture is checked
 /// against them; a stored transaction keeps any source text, as in records.ts.
-const captureSources = ['revolut', 'google_wallet', 'apple_wallet'];
+const captureSources = ['revolut', 'google_wallet', 'apple_wallet', 'activobank'];
 
 final _text = fString();
 final _timestamp = fString();

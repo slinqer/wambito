@@ -51,7 +51,7 @@
     "nudge_import_action": "Trazer o meu histórico",
     "sign_out_failed": "Não conseguimos terminar a tua sessão. Tenta de novo.",
     "nudge_budgets_action": "Ir para Categorias",
-    "review_mark": "{source, select, revolut{por rever · do Revolut} google_wallet{por rever · do Google Wallet} apple_wallet{por rever · do Apple Wallet} other{por rever}}",
+    "review_mark": "{source, select, revolut{por rever · do Revolut} google_wallet{por rever · do Google Wallet} apple_wallet{por rever · do Apple Wallet} activobank{por rever · do ActivoBank} other{por rever}}",
     "review_filter": "Por rever · {count}",
     "review_ok": "Certo",
     "review_ok_label": "Certo: {name}",

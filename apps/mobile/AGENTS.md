@@ -523,7 +523,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   (`CaptureHooks` replaces the session and the notifier in tests). The notification text is never
   queued, sent or logged. `CaptureListener` (a `NotificationListenerService`) reads only the packages
   enabled in `CaptureSettings` (prefs `wambito.capture.sources`), hands them to `BankParsers` (`RevolutParser`
-  and `GoogleWalletParser`, expenses only in pt, it, en and es, one strict line per language and
+  and `GoogleWalletParser`, expenses only in pt, it, en and es; `ActivoBankParser`, money sent in pt (its title,
+  merchant "ActivoBank": the notification names no recipient); one strict line per language and
   payment kind, sharing `Money` (comma or point decimal, any thousands separator); each line says
   where it comes from: seen on our phone (pt), another project's capture or tests (it, en) or nothing
   yet (es), so a new language needs a real sample; income returns null until samples exist; a parser

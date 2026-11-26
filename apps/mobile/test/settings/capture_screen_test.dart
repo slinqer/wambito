@@ -49,7 +49,8 @@ void main() {
     expect(find.text('Desde las notificaciones de tus apps'), findsOneWidget);
     expect(find.text('Revolut'), findsOneWidget);
     expect(find.text('Google Wallet'), findsOneWidget);
-    expect(find.text('Apagada'), findsNWidgets(2));
+    expect(find.text('ActivoBank'), findsOneWidget);
+    expect(find.text('Apagada'), findsNWidgets(3));
     expect(find.text('¿Cómo funciona?'), findsOneWidget);
     await _show(t, const Key('settings.hideAmount'));
     expect(find.text('Voz'), findsOneWidget);
@@ -74,11 +75,11 @@ void main() {
     final fake = FakeAutoCapturePlatform(access: true, sources: {'google_wallet'});
     await _pump(t, platform: fake);
     expect(find.text('Activa'), findsOneWidget);
-    expect(find.text('Apagada'), findsOneWidget);
+    expect(find.text('Apagada'), findsNWidgets(2));
     await t.tap(find.byKey(const Key('autoCapture.google_wallet')));
     await t.pumpAndSettle();
     expect(fake.sources, isEmpty);
-    expect(find.text('Apagada'), findsNWidgets(2));
+    expect(find.text('Apagada'), findsNWidgets(3));
   });
 
   testWidgets('the first switch on still shows the steps', (t) async {
