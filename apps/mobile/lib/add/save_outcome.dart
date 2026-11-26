@@ -9,6 +9,8 @@ import '../home/home_controller.dart';
 import '../home/home_repository.dart';
 import '../l10n/app_localizations.dart';
 import '../money/format.dart';
+import '../privacy/hide_amounts.dart';
+import '../privacy/masked_money.dart';
 import '../offline/pending_saves.dart';
 import '../recurring/recurring_repository.dart';
 import '../review/review_controller.dart';
@@ -57,8 +59,10 @@ void toastCreated({
   required Future<void> Function(BuildContext context, Transaction tx) nameIt,
 }) {
   final locale = l10n.localeName;
-  final amount = formatMoney(created.amount.abs(), currency, locale);
-  final hint = lukasHint(created.amount, locale, currency: currency);
+  // Home's eye closed: the toast says what was saved, never how much (nor its lukas).
+  final hidden = container.read(amountsHiddenProvider);
+  final amount = shownMoney(hidden, created.amount.abs(), currency, locale);
+  final hint = hidden ? null : lukasHint(created.amount, locale, currency: currency);
   final line = kind == Kind.income
       ? l10n.addSavedIncome(categoryName, amount)
       : l10n.addSavedExpense(categoryName, amount);

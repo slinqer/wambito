@@ -14,6 +14,7 @@ import '../home/fakes.dart';
 import '../home/fixtures.dart';
 import '../settings/harness.dart';
 import 'fakes.dart';
+import '../support/amounts.dart';
 
 /// The review inbox (`/review`, `/review/<id>`) in the whole app, against fakes of the server.
 /// "Today" is whatever the app clock says; the rows' dates only need to be in one month.
@@ -250,5 +251,14 @@ void main() {
     await _pump(tester, locale: const Locale('en'));
     expect(find.text('to review · from Revolut'), findsOneWidget);
     expect(find.text('CONFIRM ALL'), findsOneWidget);
+  });
+
+  testWidgets('with home\'s eye closed, the inbox shows no amount', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final env = await _pump(tester);
+    await closeEye(tester, env.container);
+    expect(find.text('Cafe Juan'), findsOneWidget);
+    expectNoAmounts(tester);
+    semantics.dispose();
   });
 }

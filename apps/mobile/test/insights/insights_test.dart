@@ -25,6 +25,7 @@ import '../home/home_harness.dart' show testNow;
 import '../settings/harness.dart';
 import '../support/page_gradient.dart';
 import 'fakes.dart';
+import '../support/amounts.dart';
 
 /// Análisis in the whole app (the real router, home under it) against fakes of the server. How it
 /// looks is the parity pairs' business (test/parity/insights_parity_test.dart) and the charts'
@@ -606,5 +607,16 @@ void main() {
         expect(measureTickName(key), closeTo(value, 0.02), reason: key);
       }
     });
+  });
+
+  testWidgets('with home\'s eye closed, Análisis shows no amount, not even on the axis', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final env = await pumpInsights(tester);
+    await closeEye(tester, env.settings.container);
+    expectNoAmounts(tester);
+    expect(find.textContaining(RegExp(r'\d+(,\d)?\s?(mil|M|k)\b')), findsNothing);
+    semantics.dispose();
   });
 }

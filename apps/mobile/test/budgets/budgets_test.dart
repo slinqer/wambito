@@ -25,6 +25,7 @@ import 'fakes.dart';
 import 'package:wambito/ui/lk_icons.dart';
 
 import '../support/icons.dart';
+import '../support/amounts.dart';
 
 /// Categorías, a category's detail and the budget sheet, in the whole app (the real router, home
 /// under the detail) against fakes of the server. How they look is the parity pairs' business
@@ -607,5 +608,23 @@ void main() {
       expect(pageGradient(tester).top, -50);
       expect(pageGradient(tester).height, short.height);
     });
+  });
+
+  testWidgets('with home\'s eye closed, categories and their budgets show no amount', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final env = await pumpBudgets(tester);
+    await closeEye(tester, env.settings.container);
+    expectNoAmounts(tester);
+    semantics.dispose();
+  });
+
+  testWidgets('with home\'s eye closed, a category\'s detail shows no amount', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final env = await pumpBudgets(tester, location: '/categories/cat-groceries');
+    await closeEye(tester, env.settings.container);
+    expectNoAmounts(tester);
+    semantics.dispose();
   });
 }

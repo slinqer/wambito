@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../api/gen/wambito_api.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
@@ -16,6 +15,7 @@ import 'chart_geometry.dart';
 import 'charts.dart';
 import 'insights_model.dart';
 import 'parts.dart';
+import '../privacy/masked_money.dart';
 
 /// The chart's height, in px (`HEIGHT`).
 const trendHeight = 190.0;
@@ -71,7 +71,7 @@ class _TrendChartState extends State<TrendChart> {
     final locale = l10n.localeName;
     final reduce = reducedMotion(context);
     final phrase = periodPhrase(l10n, widget.range ?? widget.period, widget.current);
-    String money(int cents) => formatMoney(cents, widget.currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, widget.currency, locale);
     final months = widget.report?.months.toList() ?? const <TrendReportMonthsInner>[];
     final empty = months.every((m) => m.income == 0 && m.expenses == 0);
     String name(String month) => capitalize(monthLabel(month, widget.current, locale), locale);
@@ -153,7 +153,9 @@ class _TrendChartState extends State<TrendChart> {
                               height: trendHeight,
                               animate: !reduce,
                               duration: WambitoTokens.durationHop,
-                              formatTick: (cents) => compactAmount(cents, locale),
+                              // Home's eye closed: the axis keeps its lines, not its figures.
+                              formatTick: (cents) =>
+                                  hiddenAmountsOf(context) ? '' : compactAmount(cents, locale),
                               onSweep: widget.onSpin,
                             ),
                           ),

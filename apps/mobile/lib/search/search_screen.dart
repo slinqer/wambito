@@ -36,6 +36,7 @@ import '../ui/web_text_field.dart';
 import 'search_controller.dart';
 import 'search_repository.dart';
 import '../ui/lk_icons.dart';
+import '../privacy/masked_money.dart';
 
 /// How a tapped result is edited; tests replace it.
 final searchOpenEditProvider = Provider<Future<void> Function(BuildContext, Transaction)>(
@@ -285,8 +286,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: Text(
               l10n.searchTotals(
                 totals.count,
-                formatMoney(totals.expense, data.currency, locale),
-                formatMoney(totals.income, data.currency, locale),
+                shownMoney(hiddenAmountsOf(context), totals.expense, data.currency, locale),
+                shownMoney(hiddenAmountsOf(context), totals.income, data.currency, locale),
               ),
               key: const Key('search.totals'),
               style: LkText.bodySm.copyWith(fontWeight: FontWeight.w700, color: colors.inkMuted),
@@ -300,7 +301,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               DayWhen.upcoming => l10n.homeDayUpcoming(formatDay(group.date, locale)),
               DayWhen.past => formatDay(group.date, locale),
             },
-            total: formatMoney(
+            total: shownMoney(
+              hiddenAmountsOf(context),
               group.total,
               data.currency,
               locale,

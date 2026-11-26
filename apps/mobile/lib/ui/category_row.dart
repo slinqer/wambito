@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
@@ -13,6 +12,7 @@ import 'css_text.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
 import 'tile_glyph.dart';
+import '../privacy/masked_money.dart';
 
 /// One category in the budget list: a tinted glyph tile, the name and the budget, the status in
 /// words (`Quedan 46,33 €` / `Te pasaste 14,12 €` / `Sin presupuesto`) and a small bar. Status is
@@ -78,7 +78,7 @@ class CategoryRow extends StatelessWidget {
     final lk = context.lk;
     final colors = lk.colors;
     final locale = Localizations.localeOf(context).languageCode;
-    String money(int cents) => formatMoney(cents, currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, currency, locale);
 
     final line = this.line;
     final budget = line == null ? this.budget : null;

@@ -18,6 +18,7 @@ import '../ui/press_button.dart';
 import '../ui/sheet.dart';
 import '../ui/toast.dart';
 import 'category_detail_controller.dart';
+import '../privacy/masked_money.dart';
 
 /// What the budget sheet says when saving fails: the server's own words for the cases the web's
 /// catalogue has (`errors.<code>`), and the generic ones otherwise.
@@ -124,6 +125,7 @@ class _BudgetForm extends ChangeNotifier {
       return;
     }
     final navigator = Navigator.of(context);
+    final hidden = hiddenAmountsOf(context);
     saving = true;
     notifyListeners();
     try {
@@ -136,8 +138,8 @@ class _BudgetForm extends ChangeNotifier {
     }
     // Closed meanwhile (a drag down): the budget was still saved, and it says so.
     if (!_closed) navigator.pop();
-    final money = formatMoney(cents, currency, locale);
-    final hint = lukasHint(cents, locale, currency: currency);
+    final money = shownMoney(hidden, cents, currency, locale);
+    final hint = hidden ? null : lukasHint(cents, locale, currency: currency);
     toasts.say(l10n.budgetSheetSaved(categoryName, hint == null ? money : '$money $hint'));
   }
 }

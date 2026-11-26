@@ -20,6 +20,7 @@ import '../home/fakes.dart';
 import '../home/fixtures.dart';
 import '../notices/fakes.dart';
 import 'fakes.dart';
+import '../support/amounts.dart';
 
 /// The recurring payments page and its sheets, in the whole app (the real router) against fakes of
 /// the server. How they look is the parity pairs' business (test/parity/recurring_parity_test.dart);
@@ -168,9 +169,7 @@ void main() {
       expect(find.bySemanticsLabel(RegExp(r'Next: Oct 25, 2026')), findsOneWidget);
     });
 
-    testBudgets('with none, Wambi says what goes here and the add button is there', (
-      tester,
-    ) async {
+    testBudgets('with none, Wambi says what goes here and the add button is there', (tester) async {
       await pumpRecurring(tester);
       expect(find.textContaining('Aquí van tus pagos fijos'), findsOneWidget);
       expect(find.byKey(const Key('recurring.add')), findsOneWidget);
@@ -776,5 +775,17 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 10));
     });
+  });
+
+  testWidgets('with home\'s eye closed, recurring payments show no amount', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final env = await pumpRecurring(
+      tester,
+      rules: [rule('spotify', 'cat-groceries', name: 'Spotify', day: 25)],
+    );
+    await closeEye(tester, env.app.settings.container);
+    expect(find.text('Spotify'), findsOneWidget);
+    expectNoAmounts(tester);
+    semantics.dispose();
   });
 }

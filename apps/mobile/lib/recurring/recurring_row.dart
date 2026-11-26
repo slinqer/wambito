@@ -17,6 +17,7 @@ import '../ui/lk_theme.dart';
 import '../ui/pressable.dart';
 import 'recurring_model.dart';
 import '../ui/tile_glyph.dart';
+import '../privacy/masked_money.dart';
 
 /// A date as `23 oct 2026` (es) or `Oct 23, 2026` (en): the web's `formatDate`
 /// (`dateStyle: "medium"`, with the dots out). [date] is `YYYY-MM-DD`.
@@ -72,7 +73,8 @@ class RecurringRow extends StatelessWidget {
         ? null
         : categoryLook(icon: category!.icon, color: category!.color);
     final income = rule.amount > 0;
-    final money = formatMoney(
+    final money = shownMoney(
+      hiddenAmountsOf(context),
       rule.amount,
       currency,
       locale,
