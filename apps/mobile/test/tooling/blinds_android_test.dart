@@ -8,12 +8,13 @@ void main() {
   final source = File('android/app/src/main/kotlin/com/wambito/app/haptics/Blinds.kt')
       .readAsStringSync();
 
-  String kotlinOf(HapticPattern pattern) =>
-      'HapticSpec(listOf(${pattern.waveform.map((ms) => '${ms}L').join(', ')}), listOf(' +
-      pattern.primitives
-          .map((s) => 'PrimitiveStep("${s.name}", ${s.scale}f, ${s.delayMs})')
-          .join(', ') +
-      '))';
+  String kotlinOf(HapticPattern pattern) {
+    final waveform = pattern.waveform.map((ms) => '${ms}L').join(', ');
+    final steps = pattern.primitives
+        .map((s) => 'PrimitiveStep("${s.name}", ${s.scale}f, ${s.delayMs})')
+        .join(', ');
+    return 'HapticSpec(listOf($waveform), listOf($steps))';
+  }
 
   test('Blinds.kt plays the patterns Dart plays', () {
     expect(
