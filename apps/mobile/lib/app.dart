@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,7 @@ import 'launch/launch_links.dart';
 import 'l10n/app_localizations.dart';
 import 'merge/merge_controller.dart';
 import 'notices/notice_sync.dart';
+import 'privacy/masked_money.dart';
 import 'router.dart';
 import 'settings/locale_resolution.dart';
 import 'settings/preferences.dart';
@@ -84,8 +86,10 @@ class WambitoApp extends ConsumerWidget {
       // The sign-in notice is registered last of the start and resume hooks (after the seen ping;
       // not sequenced after it): once the vault is Ready, over home, it says which devices signed
       // in since the last look.
-      builder: (context, child) => SigninNoticeHost(
-        child: withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+      builder: (context, child) => HiddenAmountsScope(
+        child: SigninNoticeHost(
+          child: withAppHosts(child!, animateToastBar: ref.watch(toastBarAnimatesProvider)),
+        ),
       ),
       routerConfig: ref.watch(routerProvider),
       debugShowCheckedModeBanner: false,
