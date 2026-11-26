@@ -73,8 +73,19 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
+    // A developer's side-by-side build (-Pwambito.dev=true, debug only): its own application id and
+    // name, so it installs next to the store app on a real phone without replacing it (a debug
+    // signature cannot update a release, and uninstalling would delete that phone's vault).
+    // Never set by CI or the release scripts.
+    val devBuild = project.findProperty("wambito.dev")?.toString()?.toBoolean() == true
+    defaultConfig.manifestPlaceholders["appLabel"] = "Wambito"
+
     buildTypes {
         debug {
+            if (devBuild) {
+                applicationIdSuffix = ".dev"
+                manifestPlaceholders["appLabel"] = "Wambito Dev"
+            }
             // Debug builds also carry x86_64, so the CI emulator (scripts/run-integration-tests.sh on
             // an AOSP x86_64 image, which has no ARM translation) can install them. vosk-android and
             // JNA ship x86_64 libraries. Release builds stay ARM only, above.

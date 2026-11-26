@@ -40,7 +40,7 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:label="Wambito"
+        android:label="${appLabel}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- The QR scanner's camera screen (scanner/ScannerActivity.kt). Not exported: only the app's own
@@ -163,7 +163,7 @@
         <service
             android:name=".capture.CaptureListener"
             android:exported="true"
-            android:label="Wambito"
+            android:label="${appLabel}"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService"/>
