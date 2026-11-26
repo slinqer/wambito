@@ -14,7 +14,6 @@ import '../home/home_controller.dart';
 import '../home/home_repository.dart';
 import '../home/saved_feedback.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../offline/pending_saves.dart';
 import '../ui/toast.dart';
 import 'capture_language.dart';
@@ -26,6 +25,8 @@ import 'models_download.dart';
 import 'precise_offer.dart';
 import 'parser/parse.dart' as p;
 import 'preview/capture_preview.dart';
+import '../privacy/masked_money.dart';
+import '../privacy/hide_amounts.dart';
 
 /// What a 🎤 link can ask of the capture sheet that is open.
 abstract interface class CaptureLinkTarget {
@@ -587,7 +588,12 @@ class CaptureSheetState extends ConsumerState<CaptureSheet>
         toasts: toasts,
         l10n: l10n,
         saved: saved,
-        total: formatMoney(total, data.currency, l10n.localeName),
+        total: shownMoney(
+          container.read(amountsHiddenProvider),
+          total,
+          data.currency,
+          l10n.localeName,
+        ),
       );
     } on HomeFailure catch (error) {
       if (error.unauthorized) {

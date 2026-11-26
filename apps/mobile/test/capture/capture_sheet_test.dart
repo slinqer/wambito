@@ -24,6 +24,7 @@ import '../home/fixtures.dart';
 import '../home/home_harness.dart';
 import '../settings/fakes.dart' show FakeFlagStore;
 import 'fakes.dart';
+import '../support/amounts.dart';
 
 const _sentence = 'gasté 15 mil en almuerzo y 3 lukas en uber';
 
@@ -238,6 +239,19 @@ void main() {
     await tester.tap(find.byKey(const Key('capture.save')));
     await tester.pumpAndSettle();
     expect(env.capture.calls.single, endsWith('Almuerzo:1500000,Café:950000'));
+    await _letTimersEnd(tester);
+  });
+
+  testWidgets('with home\'s eye closed, the celebration says how many but not how much', (
+    tester,
+  ) async {
+    await _pump(tester);
+    await closeEye(tester, ProviderScope.containerOf(tester.element(find.byType(MaterialApp))));
+    await _open(tester);
+    await _pickCategory(tester, 0, 'cat-food');
+    await tester.tap(find.byKey(const Key('capture.save')));
+    await tester.pumpAndSettle();
+    expect(find.text('¡Listo! 2 movimientos por ••••'), findsOneWidget);
     await _letTimersEnd(tester);
   });
 
