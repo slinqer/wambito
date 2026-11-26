@@ -9,7 +9,12 @@ import 'settings_store.dart';
 /// language. They are read once at start (main.dart's `bootstrap`), so the first screen is already
 /// in the right colours and the first request already goes to the right server.
 class InitialSettings {
-  const InitialSettings({required this.serverUrl, required this.themeMode, this.locale});
+  const InitialSettings({
+    required this.serverUrl,
+    required this.themeMode,
+    this.locale,
+    this.hideAmounts = false,
+  });
 
   /// The defaults: the Wambito server, night (spec section 6.2), and the phone's own language
   /// (Spanish, English, Italian or Portuguese; Spanish for any other).
@@ -20,6 +25,9 @@ class InitialSettings {
 
   /// A language the person picked (one of [appLanguages]), or null to follow the phone.
   final Locale? locale;
+
+  /// Home's eye was left closed: every amount starts hidden, from the first frame.
+  final bool hideAmounts;
 
   /// What [store] holds. A value nobody understands, or a store that cannot be read, gives the
   /// default for that setting.
@@ -44,6 +52,7 @@ class InitialSettings {
         final code? when appLanguages.contains(code) => Locale(code),
         _ => null,
       },
+      hideAmounts: await get(hideAmountsKey) == 'on',
     );
   }
 }

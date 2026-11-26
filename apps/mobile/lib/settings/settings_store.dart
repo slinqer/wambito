@@ -32,3 +32,6 @@ final settingsStoreProvider = Provider<SettingsStore>((ref) => const SecureSetti
 const serverUrlKey = 'setting.server';
 const themeModeKey = 'setting.theme';
 const localeKey = 'setting.locale';
+
+/// The app eye on home (`on` hides every amount on screen). A persistent name.
+const hideAmountsKey = 'setting.app.hideAmounts';
