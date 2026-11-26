@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/feedback/feedback.dart';
+import 'package:wambito/ui/lk_icons.dart';
 import 'package:wambito/ui/swipe_row.dart';
 
 import '../feedback/fakes.dart';
@@ -100,5 +101,27 @@ void main() {
     await _end(gesture);
     await t.pumpAndSettle();
     expect(platform.haptics.sublist(before), isEmpty);
+  });
+
+  testWidgets('the actions draw the app\'s icons, not emoji', (t) async {
+    await pumpFelt(t, _row());
+    final gesture = await _drag(t, -90);
+    await _end(gesture);
+    await t.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate((w) => w is LkIcon && w.name == LkIconName.trash),
+      findsOneWidget,
+    );
+    expect(find.text('🗑'), findsNothing);
+    await t.tapAt(const Offset(5, 5));
+    await t.pumpAndSettle();
+    final right = await _drag(t, 90);
+    await _end(right);
+    await t.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate((w) => w is LkIcon && w.name == LkIconName.pencil),
+      findsOneWidget,
+    );
+    expect(find.text('✎'), findsNothing);
   });
 }

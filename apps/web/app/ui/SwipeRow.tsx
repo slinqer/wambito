@@ -16,6 +16,7 @@ import { useTranslations } from "use-intl";
 import { feedback } from "../feedback/feedback.ts";
 import { cx } from "./cx.ts";
 import { armedSide, gestureOwner, rowOffset, rowRelease, SWIPE_ROW_ATTRIBUTE } from "./gesture.ts";
+import { Icon } from "./Icon.tsx";
 import { durationToken, GESTURE, SPRINGS, useReducedMotionPreference } from "./motion-tokens.ts";
 import { useAxisDrag } from "./use-axis-drag.ts";
 
@@ -289,7 +290,10 @@ export function SwipeRow({ children, onDelete, right, enter = false }: SwipeRowP
           onClick={() => (side === "left" ? void remove() : runRight())}
         >
           <span aria-hidden="true" className="lk-swipe-glyph">
-            {side === "left" ? "🗑" : right?.kind === "paid" ? "✓" : "✎"}
+            <Icon
+              name={side === "left" ? "trash" : right?.kind === "paid" ? "check" : "pencil"}
+              size={18}
+            />
           </span>
           {label}
         </button>

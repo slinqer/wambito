@@ -15,6 +15,7 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import 'lk_theme.dart';
 import 'swipe_rules.dart';
+import 'lk_icons.dart';
 
 /// What swiping a row to the right does: "Editar", or "Pagado" on a pending row.
 enum SwipeRightKind { edit, paid }
@@ -619,7 +620,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     final background = left ? colors.over : (paid ? colors.good : colors.brand);
     final foreground = left ? colors.bg : (paid ? colors.bg : colors.onBrand);
     final label = left ? widget.deleteLabel : widget.right!.label;
-    final glyph = left ? '🗑' : (paid ? '✓' : '✎');
+    final glyph = left ? LkIconName.trash : (paid ? LkIconName.check : LkIconName.pencil);
     final armed = _armed == side;
     return Positioned.fill(
       // `.lk-swipe-side`: its own rounded corners, clipped to them.
@@ -655,7 +656,11 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
                           scale: armed ? 1.35 : 1,
                           duration: _reduceMotion ? Duration.zero : WambitoTokens.durationPress,
                           curve: Curves.ease,
-                          child: Text(glyph, style: LkText.swipeGlyph.copyWith(color: foreground)),
+                          child: LkIcon(
+                            glyph,
+                            size: LkText.swipeGlyph.fontSize!,
+                            color: foreground,
+                          ),
                         ),
                         BlinkLine(
                           style: LkText.swipeAction,

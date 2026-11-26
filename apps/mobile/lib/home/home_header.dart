@@ -200,7 +200,14 @@ class _Avatar extends StatelessWidget {
             ),
             ringRadius: state.focusVisible ? radius : null,
             ringColor: colors.focus,
-            child: LkIcon(icon, size: 22, color: colors.ink),
+            // A button that opens a menu shows the outline icon while closed, the solid one open,
+            // as the bottom bar's tabs do.
+            child: LkIcon(
+              icon,
+              size: 22,
+              color: colors.ink,
+              variant: open == false ? LkIconVariant.outline : LkIconVariant.filled,
+            ),
           );
         },
       ),
