@@ -12,11 +12,14 @@ object WidgetChoice {
     const val VIBRATION_KEY = "wambito.widget.vibration"
 
     /** The choice: its key, else the snapshot's (before the app copied it), else hidden. */
-    fun hideAmount(context: Context): Boolean =
+    fun hideAmount(context: Context): Boolean = hideAmount(context, WidgetSnapshot.read(context)?.hideAmount ?: true)
+
+    /** The choice: its key, else [fallback] (the snapshot being drawn). */
+    fun hideAmount(context: Context, fallback: Boolean): Boolean =
         when (WidgetSnapshot.preferences(context).getString(HIDE_AMOUNT_KEY, null)) {
             "on" -> true
             "off" -> false
-            else -> WidgetSnapshot.read(context)?.hideAmount ?: true
+            else -> fallback
         }
 
     /** Keeps [hidden] and puts it in the snapshot, the figures as they were. */

@@ -302,4 +302,17 @@ class WidgetModelTest {
         assertEquals("Mostrar montos", hidden.eyeLabel)
         assertEquals("Show amounts", figures(snapshot(hideAmount = true, locale = "en")).eyeLabel)
     }
+
+    @Test
+    fun `the widget's own key decides, even when a late app write left the snapshot behind`() {
+        val prefs = WidgetSnapshot.preferences(context)
+        prefs.edit().putString(WidgetChoice.HIDE_AMOUNT_KEY, "on").commit()
+        try {
+            val model = figures(snapshot(hideAmount = false))
+            assertEquals(true, model.hidden)
+            assertEquals("••••", model.amount)
+        } finally {
+            prefs.edit().remove(WidgetChoice.HIDE_AMOUNT_KEY).commit()
+        }
+    }
 }

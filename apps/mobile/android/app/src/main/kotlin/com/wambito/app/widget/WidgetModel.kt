@@ -109,7 +109,8 @@ fun widgetModel(context: Context, snapshot: WidgetSnapshot?, now: Instant, zone:
     val current = month == YearMonth.from(now.atZone(snapshot.zone(zone)))
     val budgets = snapshot.budgetTotal > 0
     val over = budgets && snapshot.remaining < 0
-    val hidden = snapshot.hideAmount
+    // The widget's own key, which its eye writes, wins over a snapshot an app write left behind.
+    val hidden = WidgetChoice.hideAmount(context, snapshot.hideAmount)
     val label = when {
         // Hidden, nothing tells how the month goes: not "Te pasaste", not even "Te quedan".
         hidden -> if (current) strings.getString(R.string.widget_hidden_label) else name
