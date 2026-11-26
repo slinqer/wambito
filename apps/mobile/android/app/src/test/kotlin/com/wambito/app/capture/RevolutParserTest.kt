@@ -48,6 +48,18 @@ class RevolutParserTest {
     }
 
     @Test
+    fun `a payment in another currency counts the account's amount, not the one in brackets`() {
+        // Seen: "🛍️ Pagou 10,97 € (11,99 US$) em <merchant>", an online payment in dollars.
+        assertEquals(
+            expense(1097, "Loja Sol"),
+            parse("Loja Sol", "🛍️ Pagou 10,97 € (11,99 US$) em Loja Sol\nSaldo de EUR: 53,80 €"),
+        )
+        assertEquals(expense(1097, "Loja Sol"), parse("Revolut", "🛍️ Pagou 10,97 € (11,99 US$) em Loja Sol"))
+        assertEquals(expense(1097, "Loja Sol"), parse("Loja Sol", "Gastou 10,97 € (11,99 US$)"))
+        assertEquals(expense(450, "Moon Cafe"), parse("Moon Cafe", "You spent €4.50 (\$5.20) at Moon Cafe"))
+    }
+
+    @Test
     fun `a Revolut Pay line without the merchant or the currency is not read`() {
         assertNull(parse("Loja Sol", "💳 pagou €9.28"))
         assertNull(parse("Loja Sol", "💳 pagou 9.28 em Loja Sol"))
