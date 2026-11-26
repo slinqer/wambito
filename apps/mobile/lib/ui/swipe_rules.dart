@@ -4,6 +4,7 @@
 import 'dart:math' as math;
 
 import '../theme/tokens.g.dart';
+import '../feedback/feedback_event.dart';
 
 /// The feel of the swipes, tuned on the web by hand on a 390 px phone (Task 12c). Durations are
 /// the design tokens ([WambitoTokens]); these are the rest: distances, speeds and springs.
@@ -41,6 +42,21 @@ abstract final class SwipeFeel {
   /// The spring of a row snapping open, shut, or back after its action: stiffness, damping.
   static const rowStiffness = 520.0;
   static const rowDamping = 38.0;
+
+  /// The spring of a row coming home (let go short, Borrar closed, after Editar): underdamped, so it
+  /// runs a few px past its place and back, the bounce the person feels.
+  static const rowHomeDamping = 26.0;
+
+  /// px between two notches of the crown: a tick each time the row crosses one.
+  static const detent = 20.0;
+
+  /// Two ticks never come closer than this: a fast flick skips notches instead of buzzing.
+  static const detentGap = Duration(milliseconds: 25);
+
+  /// A notch's tick at rest and at the threshold; on the way home it is [detentReturn] of that.
+  static const detentLight = 0.25;
+  static const detentFirm = 0.6;
+  static const detentReturn = 0.6;
 
   /// The spring of a row flying off the screen when deleted (or back in after Deshacer).
   static const rowOutStiffness = 600.0;
@@ -133,3 +149,17 @@ RowRelease rowRelease({
   }
   return RowRelease.close;
 }
+
+/// The notch [offset] px is past (negative to the left): a tick plays when it changes.
+int notchOf(double offset) => (offset / SwipeFeel.detent).truncate();
+
+/// How firm a notch's tick is at [offset]: [SwipeFeel.detentLight] at rest, rising to
+/// [SwipeFeel.detentFirm] at the threshold, and no firmer past it.
+double detentScale(double offset, double width) {
+  final reach = width * SwipeFeel.rowThreshold;
+  final t = reach <= 0 ? 1.0 : (offset.abs() / reach).clamp(0.0, 1.0);
+  return SwipeFeel.detentLight + (SwipeFeel.detentFirm - SwipeFeel.detentLight) * t;
+}
+
+/// One notch of the crown at [scale]: a tick, or a 5 ms buzz on motors without primitives.
+HapticPattern detentPattern(double scale) => HapticPattern([5], [HapticPrimitive('tick', scale)]);

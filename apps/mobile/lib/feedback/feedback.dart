@@ -42,6 +42,16 @@ final feedbackProvider = Provider<void Function(FeedbackEvent event)>((ref) {
   return run;
 });
 
+/// Plays [pattern] on the motor, for a feel that is not one fixed event (the swipe's notches, whose
+/// tick grows with the distance). Quiet while the vibration setting is off or not yet known.
+final hapticProvider = Provider<void Function(HapticPattern pattern)>((ref) {
+  final platform = ref.watch(feedbackPlatformProvider);
+  ref.read(vibrationEnabledProvider);
+  return (pattern) {
+    if (_vibrationOn(ref)) _quietly(() => platform.vibrate(pattern));
+  };
+});
+
 bool _soundOn(Ref ref) {
   try {
     return ref.read(soundEnabledProvider.notifier).playable;
@@ -92,6 +102,15 @@ void Function(FeedbackEvent event) feedbackOf(BuildContext context) {
 }
 
 extension FeedbackContext on BuildContext {
+  /// [hapticProvider] for a widget that is not a `ConsumerWidget`; nothing without a scope.
+  void haptic(HapticPattern pattern) {
+    try {
+      ProviderScope.containerOf(this, listen: false).read(hapticProvider)(pattern);
+    } on Object {
+      // No scope: no feel.
+    }
+  }
+
   /// [feedbackProvider] for a widget that is not a `ConsumerWidget`. Without a `ProviderScope`
   /// (a bare widget test) it does nothing.
   void feedback(FeedbackEvent event) {

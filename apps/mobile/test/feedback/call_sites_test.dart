@@ -27,7 +27,16 @@ class _Env {
   final FakeFeedbackPlatform platform;
   final HomeHarness harness;
 
-  List<List<int>> get waveforms => [for (final p in platform.haptics) p.waveform];
+  /// What vibrated, by waveform, leaving out the swipe's crown (its notches and its bounce), which
+  /// test/ui/swipe_feel_test.dart covers.
+  List<List<int>> get waveforms => [
+    for (final p in platform.haptics)
+      if (!_crown(p)) p.waveform,
+  ];
+
+  static bool _crown(HapticPattern p) =>
+      identical(p, hapticPatterns[FeedbackEvent.swipeBounced]) ||
+      (p.waveform.length == 1 && p.waveform.single == 5);
 
   /// The haptics of what happened (a save, a limit, Deshacer), without the touch of the bar's
   /// buttons and the sheets' landing and shutting around them.
