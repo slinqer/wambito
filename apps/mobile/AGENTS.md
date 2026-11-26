@@ -403,7 +403,7 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   frame; one per phone, survives sign-out). `masked_money.dart`: `hiddenAmount` (`••••`), `shownMoney(hidden, …)`,
   `hiddenAmountsOf(context)` and `HiddenAmountsScope` (at the app's root, in `app.dart`'s builder and the test harnesses):
   `Money` masks itself and every on-screen amount inside a sentence goes through `shownMoney` (chart axis ticks are
-  blank and lukas hints dropped while hidden); typed amounts, the capture preview, the currency sample and the demos
+  blank and the thousands hint dropped while hidden); typed amounts, the capture preview, the currency sample and the demos
   never mask. `hide_amounts_button.dart`: the eye after home's hero figure (`home.hideAmounts`), with the
   `amountsHidden` / `amountsShown` blinds. Tests: `test/support/amounts.dart` (`expectNoAmounts`, `closeEye`) and a
   closed-eye test in each screen's own test file. The widget's eye is apart (below, `widget/`).

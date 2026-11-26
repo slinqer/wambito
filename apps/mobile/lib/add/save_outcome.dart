@@ -59,7 +59,7 @@ void toastCreated({
   required Future<void> Function(BuildContext context, Transaction tx) nameIt,
 }) {
   final locale = l10n.localeName;
-  // Home's eye closed: the toast says what was saved, never how much (nor its lukas).
+  // Home's eye closed: the toast says what was saved, never how much (nor its thousands hint).
   final hidden = container.read(amountsHiddenProvider);
   final amount = shownMoney(hidden, created.amount.abs(), currency, locale);
   final hint = hidden ? null : lukasHint(created.amount, locale, currency: currency);
