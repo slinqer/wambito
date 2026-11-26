@@ -112,6 +112,9 @@ class HomeEvent {
   final String month;
 }
 
+/// How long home keeps the month that was on screen while another one loads.
+const monthGrace = Duration(milliseconds: 300);
+
 class HomeState {
   const HomeState({
     this.data,
@@ -142,6 +145,12 @@ class HomeState {
     final data = this.data;
     return data != null && (month == null || data.month == month) ? data : null;
   }
+
+  /// What home draws: [shown], or, for the first moments ([monthGrace]) while another month loads
+  /// ([holding]), the month that was on screen, so a quick load only changes the figures and nothing
+  /// blinks through the loading state. Past that, the loading state: figures of one month under
+  /// another month's name never linger.
+  HomeData? onScreen({required bool holding}) => shown ?? (loading && holding ? data : null);
 
   /// A load is under way and nothing of it is on screen yet: the first one, or another month.
   final bool loading;

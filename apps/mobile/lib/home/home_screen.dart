@@ -114,6 +114,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  /// [monthGrace] after another month was asked for, until it arrives.
+  Timer? _grace;
+  var _graceOver = false;
+
   /// Events up to this one happened before home opened: they are old news.
   late final int _since = ref.read(homeProvider).event?.id ?? 0;
 
@@ -223,6 +227,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _celebrateTimer?.cancel();
+    _grace?.cancel();
     _thumb.dispose();
     _scroll.dispose();
     super.dispose();
@@ -450,6 +455,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Another month asked for: the one on screen stays for [monthGrace], then gives way.
+    ref.listen(homeProvider.select((s) => s.loading && s.shown == null), (_, waiting) {
+      _grace?.cancel();
+      if (_graceOver) setState(() => _graceOver = false);
+      if (waiting) {
+        _grace = Timer(monthGrace, () {
+          if (mounted) setState(() => _graceOver = true);
+        });
+      }
+    });
     ref.listen(homeProvider.select((s) => s.event), (_, next) => _onEvent(next));
     // A batch from quick capture has no event of its own to talk about: he just celebrates.
     ref.listen(celebrationProvider, (_, _) => _celebrate());
@@ -503,7 +518,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // last month, whether or not the refresh worked.
     final today = data.todayAt(ref.read(clockProvider)());
     final current = today.substring(0, 7);
-    final shown = home.shown;
+    final shown = home.onScreen(holding: !_graceOver);
     final protect = ref.watch(protectCardProvider.select((s) => s.value ?? false));
     final wambi = shown == null ? null : _wambi(l10n, home, shown, today);
     final entries = shown == null

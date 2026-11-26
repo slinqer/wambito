@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/home/home_controller.dart' show monthGrace;
 import 'package:wambito/api/gen/wambito_api.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/home_screen.dart' show HomeView;
@@ -620,14 +621,17 @@ void main() {
       expect(find.text('Sin conexión. Revisa tu internet e inténtalo de nuevo.'), findsNothing);
     });
 
-    testWidgets('while another month loads, no figures of the month before show', (tester) async {
+    testWidgets('a slow month: past the grace, no figures of the month before show', (
+      tester,
+    ) async {
       final repo = threeMonths();
       await pumpHome(tester, repo);
       final gate = Completer<void>();
       repo.holdSummary = gate;
       await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      // A quick load would have arrived by now: past the grace the month before gives way.
+      await tester.pump(monthGrace + const Duration(milliseconds: 50));
       expect(find.text('Septiembre'), findsOneWidget);
       expect(find.text('Café'), findsNothing);
       expect(find.textContaining('Te quedan'), findsNothing);
