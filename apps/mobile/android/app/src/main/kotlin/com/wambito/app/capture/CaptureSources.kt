@@ -4,6 +4,7 @@ package com.wambito.app.capture
 enum class CaptureSource(val wire: String, val packageName: String) {
     REVOLUT("revolut", "com.revolut.revolut"),
     GOOGLE_WALLET("google_wallet", "com.google.android.apps.walletnfcrel"),
+    ACTIVOBANK("activobank", "wit.android.bcpBankingApp.activoBank"),
     ;
 
     companion object {

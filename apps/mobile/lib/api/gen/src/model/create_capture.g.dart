@@ -37,6 +37,8 @@ const CreateCaptureSource_Enum _$createCaptureSourceEnum_googleWallet =
     const CreateCaptureSource_Enum._('googleWallet');
 const CreateCaptureSource_Enum _$createCaptureSourceEnum_appleWallet =
     const CreateCaptureSource_Enum._('appleWallet');
+const CreateCaptureSource_Enum _$createCaptureSourceEnum_activobank =
+    const CreateCaptureSource_Enum._('activobank');
 
 CreateCaptureSource_Enum _$createCaptureSourceEnumValueOf(String name) {
   switch (name) {
@@ -46,6 +48,8 @@ CreateCaptureSource_Enum _$createCaptureSourceEnumValueOf(String name) {
       return _$createCaptureSourceEnum_googleWallet;
     case 'appleWallet':
       return _$createCaptureSourceEnum_appleWallet;
+    case 'activobank':
+      return _$createCaptureSourceEnum_activobank;
     default:
       throw ArgumentError(name);
   }
@@ -56,6 +60,7 @@ final BuiltSet<CreateCaptureSource_Enum> _$createCaptureSourceEnumValues =
       _$createCaptureSourceEnum_revolut,
       _$createCaptureSourceEnum_googleWallet,
       _$createCaptureSourceEnum_appleWallet,
+      _$createCaptureSourceEnum_activobank,
     ]);
 
 Serializer<CreateCaptureKindEnum> _$createCaptureKindEnumSerializer =
@@ -101,11 +106,13 @@ class _$CreateCaptureSource_EnumSerializer
     'revolut': 'revolut',
     'googleWallet': 'google_wallet',
     'appleWallet': 'apple_wallet',
+    'activobank': 'activobank',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'revolut': 'revolut',
     'google_wallet': 'googleWallet',
     'apple_wallet': 'appleWallet',
+    'activobank': 'activobank',
   };
 
   @override

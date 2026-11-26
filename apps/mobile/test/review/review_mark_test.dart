@@ -31,6 +31,7 @@ void main() {
     expect(reviewMarkOf(_es, _detected('revolut')), 'por revisar · de Revolut');
     expect(reviewMarkOf(_es, _detected('google_wallet')), 'por revisar · de Google Wallet');
     expect(reviewMarkOf(_es, _detected('apple_wallet')), 'por revisar · de Apple Wallet');
+    expect(reviewMarkOf(_es, _detected('activobank')), 'por revisar · de ActivoBank');
   });
 
   test('a source this version does not know still decodes, with the plain mark', () {

@@ -268,13 +268,18 @@ describe("list_transactions", () => {
     expect(pending.structured.items.map((t: { name: string }) => t.name)).toEqual(["Rappi"]);
   });
 
-  it("names Apple Wallet, and leaves out a source it does not know", async () => {
+  it("names Apple Wallet and ActivoBank, and leaves out a source it does not know", async () => {
     const detected = { source: "capture" as const, needsReview: true };
     const { ctx } = setup({
       transactions: (c) => [
         transaction(c.comida, -1800000, "2026-10-30", {
           name: "Juan Valdez",
           captureSource: "apple_wallet",
+          ...detected,
+        }),
+        transaction(c.comida, -410000, "2026-10-28", {
+          name: "ActivoBank",
+          captureSource: "activobank",
           ...detected,
         }),
         transaction(c.comida, -900000, "2026-10-29", {
@@ -286,6 +291,7 @@ describe("list_transactions", () => {
     });
     const all = await call("list_transactions", {}, ctx);
     expect(all.text).toContain("de Apple Wallet");
+    expect(all.text).toContain("de ActivoBank");
     expect(all.text).not.toContain("some_future_bank");
     expect(all.text).not.toContain("de undefined");
     expect(all.structured.items[1]).toMatchObject({

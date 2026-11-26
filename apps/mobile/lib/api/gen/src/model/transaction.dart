@@ -24,7 +24,7 @@ part 'transaction.g.dart';
 /// * [importId]
 /// * [source_]
 /// * [needsReview]
-/// * [captureSource] - Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source
+/// * [captureSource] - Where a detected transaction came from: revolut, google_wallet, apple_wallet, activobank, or a newer source
 /// * [createdAt]
 /// * [updatedAt]
 @BuiltValue()
@@ -67,7 +67,7 @@ abstract class Transaction implements Built<Transaction, TransactionBuilder> {
   @BuiltValueField(wireName: r'needsReview')
   bool get needsReview;
 
-  /// Where a detected transaction came from: revolut, google_wallet, apple_wallet, or a newer source
+  /// Where a detected transaction came from: revolut, google_wallet, apple_wallet, activobank, or a newer source
   @BuiltValueField(wireName: r'captureSource')
   String? get captureSource;
 

@@ -13,7 +13,7 @@ suggested categories, Wambi's messages. No I/O.
   (`FOLD_FROM`/`FOLD_TO`, `foldText`) the API's SQL search uses.
 - `src/wambi-message.ts`: `wambiMessage`, the rule-based lines of the mascot.
 - `src/capture.ts` (+ `src/capture-sources.ts`): automatic capture from bank notifications:
-  `CAPTURE_SOURCES` (`revolut`, `google_wallet`, `apple_wallet`; `isCaptureSource`), `createCaptureSchema`
+  `CAPTURE_SOURCES` (`revolut`, `google_wallet`, `apple_wallet`, `activobank`; `isCaptureSource`), `createCaptureSchema`
   (`POST /v1/captures`, the only place the list is enforced: a stored or returned `captureSource` is any
   text, so a newer client's source never quarantines a record or breaks a generated client),
   `reviewTransactionsSchema` (1–50 ids), `FALLBACK_CATEGORY_NAMES`, `merchantKey` (the merchant

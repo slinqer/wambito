@@ -24,13 +24,14 @@ class BankParsersTest {
     }
 
     @Test
-    fun `registers the revolut and google wallet parsers`() {
+    fun `registers the revolut, google wallet and activobank parsers`() {
         assertEquals(
-            setOf(CaptureSource.REVOLUT, CaptureSource.GOOGLE_WALLET),
+            setOf(CaptureSource.REVOLUT, CaptureSource.GOOGLE_WALLET, CaptureSource.ACTIVOBANK),
             BankParsers.parsers.map { it.source }.toSet(),
         )
         assertSame(RevolutParser, BankParsers.parsers.first { it.source == CaptureSource.REVOLUT })
         assertSame(GoogleWalletParser, BankParsers.parsers.first { it.source == CaptureSource.GOOGLE_WALLET })
+        assertSame(ActivoBankParser, BankParsers.parsers.first { it.source == CaptureSource.ACTIVOBANK })
     }
 
     @Test

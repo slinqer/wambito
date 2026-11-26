@@ -55,5 +55,6 @@ void main() {
   test('the ids are the names of brands.json', () {
     expect(LkBrand.googleWallet.id, 'google-wallet');
     expect(LkBrand.fromId('chatgpt'), LkBrand.chatgpt);
+    expect(LkBrand.fromId('activobank'), LkBrand.activobank);
   });
 }

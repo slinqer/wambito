@@ -12,7 +12,14 @@ interface BrandSource {
 }
 
 /** The AI assistants and payment apps whose logos Settings shows (brands.json; the phone reads the same). */
-export type BrandName = "chatgpt" | "claude" | "lumo" | "grok" | "revolut" | "google-wallet";
+export type BrandName =
+  | "chatgpt"
+  | "claude"
+  | "lumo"
+  | "grok"
+  | "revolut"
+  | "google-wallet"
+  | "activobank";
 
 const LOGOS: Record<BrandName, BrandSource> = source.logos;
 
