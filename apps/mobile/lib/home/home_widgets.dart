@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 
 import '../api/gen/wambito_api.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
+import '../privacy/hide_amounts_button.dart';
+import '../privacy/masked_money.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
@@ -49,7 +50,8 @@ class HomeHero extends StatelessWidget {
     final colors = lk.colors;
     final locale = l10n.localeName;
     final past = pastMonth;
-    String money(int cents) => formatMoney(cents, currency, locale);
+    final hidden = hiddenAmountsOf(context);
+    String money(int cents) => shownMoney(hidden, cents, currency, locale);
     final hasBudget = summary.budgetTotal > 0;
     final over = hasBudget && summary.remaining < 0;
     final label = !hasBudget
@@ -81,14 +83,22 @@ class HomeHero extends StatelessWidget {
                 child: Text(label, style: LkText.heroLabel.copyWith(color: colors.inkMuted)),
               ),
             ),
-            CssLines(
-              style: LkText.amountXl,
-              child: Money(
-                cents: hasBudget ? summary.remaining.abs() : summary.spent,
-                currency: currency,
-                animate: true,
-                style: LkText.amountXl.copyWith(color: amountColor),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: CssLines(
+                    style: LkText.amountXl,
+                    child: Money(
+                      cents: hasBudget ? summary.remaining.abs() : summary.spent,
+                      currency: currency,
+                      animate: true,
+                      style: LkText.amountXl.copyWith(color: amountColor),
+                    ),
+                  ),
+                ),
+                const HideAmountsButton(key: Key('home.hideAmounts')),
+              ],
             ),
             if (hasBudget) ...[
               Padding(
