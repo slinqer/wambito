@@ -11,6 +11,7 @@ import '../api/session.dart' show SessionStore;
 import '../capture_auto/capture_platform.dart';
 import '../feedback/stored_flag.dart' show SecureFlagStore;
 import '../home/home_controller.dart' show languageOfTag;
+import '../home/widget_choice.dart';
 import '../home/widget_snapshot.dart' show HomeWidgetStore;
 import '../home/widget_sync.dart' show widgetTheme;
 import '../local/keys.dart';
@@ -144,7 +145,11 @@ Future<bool> _dueEnabled() async {
 /// cannot be read as hidden.
 Future<bool> _hideAmount() async {
   try {
-    return await const SecureFlagStore('setting.widget.hideAmount').read() ?? false;
+    return await const WidgetPrefsFlagStore(
+          HomeWidgetStore(),
+          legacy: SecureFlagStore('setting.widget.hideAmount'),
+        ).read() ??
+        false;
   } on Object {
     return true;
   }

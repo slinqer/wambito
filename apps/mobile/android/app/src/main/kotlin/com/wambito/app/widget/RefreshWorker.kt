@@ -131,6 +131,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                                 mood = if (figures.worried) "worried" else "happy",
                                 updatedAt = dependencies.clock(),
                                 refreshFailedAt = null,
+                                hideAmount = WidgetChoice.hideAmount(context),
                             ),
                         )
                         "refreshed"
@@ -159,7 +160,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 WidgetSnapshot(
                     signedIn = false,
                     locale = latest?.locale,
-                    hideAmount = latest?.hideAmount ?: false,
+                    hideAmount = WidgetChoice.hideAmount(context),
                     theme = latest?.theme ?: "dark",
                 ),
             )

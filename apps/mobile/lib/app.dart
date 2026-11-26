@@ -43,6 +43,8 @@ class WambitoApp extends ConsumerWidget {
     ref.watch(feedbackProvider);
     // Copies the hide-amount and theme choices into the home-screen widget's snapshot as they change.
     ref.watch(widgetSyncProvider);
+    // Reads the widget's hide choice again on resume: the widget's eye may have changed it.
+    ref.watch(widgetChoiceReloadProvider);
     // Opens the add sheet or quick capture for the widget's ＋ and 🎤 and the Quick Settings tile.
     ref.watch(launchLinksProvider);
     // Loads the speech model in the background (after a first capture), so 🎤 listens at once.

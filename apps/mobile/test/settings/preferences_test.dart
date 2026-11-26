@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/feedback/stored_flag.dart';
 import 'package:wambito/settings/initial_settings.dart';
+import 'package:wambito/home/widget_choice.dart';
+import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/settings/preferences.dart';
 import 'package:wambito/settings/settings_store.dart';
 
 import 'fakes.dart';
+import '../home/fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,12 +18,34 @@ void main() {
     final flags = {
       'the due-today notice': (dueNoticeEnabledProvider, 'setting.notice.due', true),
       'the guest-warning notice': (guestNoticeEnabledProvider, 'setting.notice.guest', true),
-      'hide the amount in the widget': (
-        hideWidgetAmountProvider,
-        'setting.widget.hideAmount',
-        false,
-      ),
     };
+
+    test(
+      'hide the amount in the widget: off until chosen, kept where the widget reads it',
+      () async {
+        final widgetStore = FakeWidgetStore();
+        ProviderContainer make() {
+          final c = ProviderContainer(
+            overrides: [
+              widgetStoreProvider.overrideWithValue(widgetStore),
+              flagStoreProvider.overrideWith((ref, key) => FakeFlagStore()),
+            ],
+          );
+          addTearDown(c.dispose);
+          c.listen(hideWidgetAmountProvider, (_, _) {});
+          return c;
+        }
+
+        final container = make();
+        await container.read(hideWidgetAmountProvider.notifier).ready;
+        expect(container.read(hideWidgetAmountProvider), isFalse);
+        await container.read(hideWidgetAmountProvider.notifier).set(true);
+        expect(widgetStore.saved[widgetHideAmountKey], 'on');
+        final again = make();
+        await again.read(hideWidgetAmountProvider.notifier).ready;
+        expect(again.read(hideWidgetAmountProvider), isTrue, reason: 'read back at the next start');
+      },
+    );
 
     for (final entry in flags.entries) {
       final (provider, key, initial) = entry.value;

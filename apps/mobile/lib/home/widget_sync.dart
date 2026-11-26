@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/device.dart';
 import '../api/gen/wambito_api.dart';
 import '../api/session.dart';
+import '../feedback/vibration_setting.dart';
 import '../local/backend.dart';
 import '../settings/preferences.dart';
 import 'home_controller.dart';
 import 'vault_widget.dart';
+import 'widget_choice.dart';
 import 'widget_snapshot.dart';
 
 /// The language of the widget's words and amounts: the one picked in Settings, else the phone's
@@ -71,12 +73,26 @@ class WidgetSync {
   WidgetStore get _store => _ref.read(widgetStoreProvider);
   bool get _signedIn => _ref.read(sessionProvider).status == SessionStatus.signedIn;
   bool get _hideAmount => _ref.read(hideWidgetAmountProvider);
+
+  /// The widget's hide choice as kept right now (the widget's eye may have changed it while the
+  /// app was away), else the app's copy; one that cannot be read hides.
+  Future<bool> _storedHide() async {
+    try {
+      return await _ref.read(hideWidgetAmountProvider.notifier).store.read() ?? _hideAmount;
+    } on Object {
+      return true;
+    }
+  }
+
   String get _theme => widgetTheme(_ref.read(themeModeProvider));
 
   /// What a `preview` account's widget says while no vault is open (locked, still opening): the
   /// usual "Abre Wambito para empezar", holding no figure.
-  Map<String, Object?> _previewSnapshot() =>
-      signedOutSnapshot(hideAmount: _hideAmount, theme: _theme, locale: widgetLanguage(_ref));
+  Future<Map<String, Object?>> _previewSnapshot() async => signedOutSnapshot(
+    hideAmount: await _storedHide(),
+    theme: _theme,
+    locale: widgetLanguage(_ref),
+  );
 
   /// The account's mode is now known to be `preview` or not. For `preview` the widget gets its
   /// vault's figures once the vault is open ([vaultOpened]); until then a stored snapshot of [userId] stays,
@@ -92,7 +108,7 @@ class WidgetSync {
       if (_closed || !_signedIn || session != _session || !_preview) return;
       if (_backend != null) return _writeVault(session);
       if (userId != null && await _storedOwner() == userId) return;
-      await saveWidgetSnapshot(_store, _previewSnapshot());
+      await saveWidgetSnapshot(_store, await _previewSnapshot());
     });
   }
 
@@ -158,7 +174,7 @@ class WidgetSync {
       userId: userId,
       backend: backend,
       store: _store,
-      hideAmount: _hideAmount,
+      hideAmount: await _storedHide(),
       theme: _theme,
       locale: widgetLanguage(_ref),
       now: _ref.read(clockProvider)(),
@@ -206,7 +222,7 @@ class WidgetSync {
           summary,
           currency: currency,
           locale: language,
-          hideAmount: _hideAmount,
+          hideAmount: await _storedHide(),
           theme: _theme,
           updatedAt: updatedAt,
           timezone: timezone,
@@ -243,20 +259,24 @@ class WidgetSync {
     return _enqueue(() async {
       await _ref.read(hideWidgetAmountProvider.notifier).ready;
       final stored = await _store.read(widgetSnapshotKey);
-      final patched = withChoices(stored, hideAmount: _hideAmount, theme: _theme);
+      final patched = withChoices(stored, hideAmount: await _storedHide(), theme: _theme);
       if (patched == null) {
         // Nothing of this version yet: signed out, the signed-out snapshot carries the choices;
         // signed in, home's next load writes everything.
         if (!_signedIn) {
           await saveWidgetSnapshot(
             _store,
-            signedOutSnapshot(hideAmount: _hideAmount, theme: _theme, locale: widgetLanguage(_ref)),
+            signedOutSnapshot(
+              hideAmount: await _storedHide(),
+              theme: _theme,
+              locale: widgetLanguage(_ref),
+            ),
           );
         } else if (_preview && !_closed && session == _session) {
           if (_backend != null) {
             await _writeVault(session);
           } else {
-            await saveWidgetSnapshot(_store, _previewSnapshot());
+            await saveWidgetSnapshot(_store, await _previewSnapshot());
           }
         }
         return;
@@ -286,5 +306,39 @@ final widgetSyncProvider = Provider<WidgetSync>((ref) {
   ref.listen(themeModeProvider, (previous, next) {
     if (previous != next) unawaited(sync.choicesChanged());
   });
+  // The widget's eye plays the blinds without the app: it reads the vibration switch here.
+  ref.listen(vibrationEnabledProvider, (previous, next) {
+    if (!ref.read(vibrationEnabledProvider.notifier).active && next) return;
+    unawaited(_mirror(ref.read(widgetStoreProvider), widgetVibrationKey, next));
+  }, fireImmediately: true);
   return sync;
 });
+
+Future<void> _mirror(WidgetStore store, String key, bool on) async {
+  try {
+    await store.save(key, on ? 'on' : 'off');
+  } on Object {
+    // The widget keeps what it had.
+  }
+}
+
+/// Back in the app, the widget's choice is read again: the widget's eye may have changed it while
+/// the app was away, and Settings' switch must show it. Watched by the app (app.dart).
+final widgetChoiceReloadProvider = Provider<void>((ref) {
+  final observer = _ResumeObserver(
+    () => unawaited(ref.read(hideWidgetAmountProvider.notifier).reload()),
+  );
+  WidgetsBinding.instance.addObserver(observer);
+  ref.onDispose(() => WidgetsBinding.instance.removeObserver(observer));
+});
+
+class _ResumeObserver with WidgetsBindingObserver {
+  _ResumeObserver(this._onResume);
+
+  final void Function() _onResume;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onResume();
+  }
+}

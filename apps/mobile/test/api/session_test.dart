@@ -27,6 +27,8 @@ class _LoggedWidgetStore extends FakeWidgetStore {
   @override
   Future<void> save(String key, String value) async {
     await super.save(key, value);
+    // Only the snapshot: the widget's choice keys (copied over once) are no figures.
+    if (key != widgetSnapshotKey) return;
     _log.add(value.contains('"signedIn":false') ? 'widget signed out' : 'widget figures');
   }
 

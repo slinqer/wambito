@@ -8,6 +8,7 @@ import 'package:wambito/api/device.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/feedback/stored_flag.dart';
 import 'package:wambito/home/home_controller.dart';
+import 'package:wambito/home/widget_choice.dart';
 import 'package:wambito/home/widget_snapshot.dart';
 import 'package:wambito/home/widget_sync.dart';
 import 'package:wambito/settings/initial_settings.dart';
@@ -195,6 +196,22 @@ void main() {
       await container.read(widgetSyncProvider).idle;
       expect(doc(), {...before, 'hideAmount': false});
       expect(store.updates, greaterThan(updates));
+    },
+  );
+
+  test(
+    'a choice the widget wrote is what the next write uses, not the app\'s stale copy',
+    () async {
+      hide.gate.complete();
+      container = make();
+      await container.read(hideWidgetAmountProvider.notifier).set(false);
+      await container.read(widgetSyncProvider).idle;
+      // The widget's eye, tapped while the app runs in the background: only its key changes.
+      store.saved[widgetHideAmountKey] = 'on';
+      await container
+          .read(widgetSyncProvider)
+          .summaryLoaded(summary(), currency: 'COP', timezone: 'America/Bogota');
+      expect(doc()['hideAmount'], isTrue);
     },
   );
 
@@ -473,7 +490,8 @@ void main() {
       final sync = container.read(widgetSyncProvider);
       await sync.modeChanged(preview: false, userId: 'u1');
       await sync.idle;
-      expect(store.saved, isEmpty);
+      // No snapshot (the widget's own choice key may be copied over meanwhile).
+      expect(store.saved.containsKey(widgetSnapshotKey), isFalse);
       await sync.summaryLoaded(summary(), currency: 'COP', timezone: 'America/Bogota');
       expect(doc()['signedIn'], isTrue);
       expect(doc().containsKey('owner'), isFalse);
