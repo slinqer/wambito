@@ -29,6 +29,8 @@
          TalkBack reads in place of the dots. -->
     <string name="widget_hidden_label">Este mes</string>
     <string name="widget_amount_hidden">Monto oculto</string>
+    <string name="widget_hide_amount">Ocultar montos</string>
+    <string name="widget_show_amount">Mostrar montos</string>
     <!-- The progress bar, read aloud. -->
     <string name="widget_progress">%1$d %% del presupuesto gastado</string>
 

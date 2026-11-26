@@ -291,4 +291,15 @@ class WidgetModelTest {
             ),
         )
     }
+
+    @Test
+    fun `the eye says what a tap does, hide while shown and show while hidden`() {
+        val shown = figures(snapshot())
+        assertEquals(false, shown.hidden)
+        assertEquals("Ocultar montos", shown.eyeLabel)
+        val hidden = figures(snapshot(hideAmount = true))
+        assertEquals(true, hidden.hidden)
+        assertEquals("Mostrar montos", hidden.eyeLabel)
+        assertEquals("Show amounts", figures(snapshot(hideAmount = true, locale = "en")).eyeLabel)
+    }
 }

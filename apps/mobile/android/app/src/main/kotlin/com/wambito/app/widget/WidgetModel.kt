@@ -49,6 +49,10 @@ sealed interface WidgetModel {
         val amountDescription: String? = null,
         /** What TalkBack reads for the progress bar ("25 % del presupuesto gastado"). */
         val progressDescription: String? = null,
+        /** The widget's own hide choice: the eye shows crossed, and a tap shows the amount again. */
+        val hidden: Boolean = false,
+        /** What the eye does when tapped ("Ocultar montos" / "Mostrar montos"). */
+        val eyeLabel: String = "",
     ) : WidgetModel
 }
 
@@ -162,5 +166,7 @@ fun widgetModel(context: Context, snapshot: WidgetSnapshot?, now: Instant, zone:
         progressDescription = progress?.let {
             strings.getString(R.string.widget_progress, kotlin.math.round(it * 100).toInt())
         },
+        hidden = hidden,
+        eyeLabel = strings.getString(if (hidden) R.string.widget_show_amount else R.string.widget_hide_amount),
     )
 }
