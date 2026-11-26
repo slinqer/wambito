@@ -166,7 +166,7 @@ const hapticPatterns = <FeedbackEvent, HapticPattern>{
     [HapticPrimitive('tick', 0.4), HapticPrimitive('click', 0.7, delayMs: 30)],
   ),
   // The turn of a row bouncing home: soft and low, once.
-  FeedbackEvent.swipeBounced: HapticPattern([8], [HapticPrimitive('lowTick', 0.35)]),
+  FeedbackEvent.swipeBounced: HapticPattern([14], [HapticPrimitive('thud', 0.8)]),
   // The blind comes down and shuts: two light ticks gaining weight, then a dull knock.
   FeedbackEvent.amountsHidden: HapticPattern(
     [6, 25, 8, 35, 22],

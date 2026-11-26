@@ -570,13 +570,18 @@ void main() {
   });
 
   group('from home', () {
-    testWidgets('a swipe right on a paid row opens it for editing', (tester) async {
+    testWidgets('a swipe right on a paid row leaves Editar open, and Editar opens it', (
+      tester,
+    ) async {
       await pump(tester, items: [tx('lunch', '2026-10-22', -2800000, name: 'Almuerzo')]);
       await tester.timedDrag(
         find.text('Almuerzo'),
         const Offset(250, 0),
         const Duration(milliseconds: 300),
       );
+      await tester.pumpAndSettle();
+      expect(find.text('Editar movimiento'), findsNothing, reason: 'a swipe alone only opens it');
+      await tester.tap(find.text('EDITAR'));
       await tester.pumpAndSettle();
       expect(find.text('Editar movimiento'), findsOneWidget);
     });

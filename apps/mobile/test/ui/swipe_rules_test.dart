@@ -76,9 +76,11 @@ void main() {
           right: right,
         );
 
-    test('commits right past the threshold, or on a flick', () {
-      expect(release(150, 0), RowRelease.commitRight);
-      expect(release(30, 700), RowRelease.commitRight);
+    test('a long or fast swipe right only opens its action, as Borrar does', () {
+      expect(release(150, 0), RowRelease.openRight);
+      expect(release(300, 0), RowRelease.openRight);
+      expect(release(30, 700), RowRelease.openRight);
+      expect(release(120, 2000), RowRelease.openRight);
     });
 
     test('a long or fast swipe left only opens Borrar', () {
@@ -114,16 +116,16 @@ void main() {
 
     test('light at rest, firm at the threshold, never past it', () {
       const width = 360.0;
-      expect(detentScale(0, width), closeTo(0.25, 1e-9));
-      expect(detentScale(width * SwipeFeel.rowThreshold, width), closeTo(0.6, 1e-9));
-      expect(detentScale(-width, width), closeTo(0.6, 1e-9));
-      expect(detentScale(width * SwipeFeel.rowThreshold / 2, width), closeTo(0.425, 1e-9));
+      expect(detentScale(0, width), closeTo(0.6, 1e-9));
+      expect(detentScale(width * SwipeFeel.rowThreshold, width), closeTo(1.0, 1e-9));
+      expect(detentScale(-width, width), closeTo(1.0, 1e-9));
+      expect(detentScale(width * SwipeFeel.rowThreshold / 2, width), closeTo(0.8, 1e-9));
     });
 
-    test('a detent is one tick at its scale', () {
+    test('a detent is one click at its scale', () {
       final pattern = detentPattern(0.5);
-      expect(pattern.waveform, [5]);
-      expect(pattern.primitives.single.name, 'tick');
+      expect(pattern.waveform, [12]);
+      expect(pattern.primitives.single.name, 'click');
       expect(pattern.primitives.single.scale, 0.5);
     });
 

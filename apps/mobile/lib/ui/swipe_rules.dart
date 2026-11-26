@@ -54,9 +54,9 @@ abstract final class SwipeFeel {
   static const detentGap = Duration(milliseconds: 25);
 
   /// A notch's tick at rest and at the threshold; on the way home it is [detentReturn] of that.
-  static const detentLight = 0.25;
-  static const detentFirm = 0.6;
-  static const detentReturn = 0.6;
+  static const detentLight = 0.6;
+  static const detentFirm = 1.0;
+  static const detentReturn = 0.8;
 
   /// The spring of a row flying off the screen when deleted (or back in after Deshacer).
   static const rowOutStiffness = 600.0;
@@ -113,12 +113,11 @@ Side? armedSide(double offset, double width, double threshold) {
   return offset < 0 ? Side.left : Side.right;
 }
 
-enum RowRelease { commitRight, openLeft, openRight, close }
+enum RowRelease { openLeft, openRight, close }
 
-/// What a released row does. To the right (Editar / Pagado), past the threshold or flicked toward
-/// it, it runs the action. To the left it never deletes by itself: a long or fast swipe, like a
-/// short one past half the action's width, leaves Borrar open and only a tap on it deletes.
-/// Anything less, or a flick back, closes the row.
+/// What a released row does. Neither side runs its action by itself: a long or fast swipe, like a
+/// short one past half the action's width, leaves it open (Borrar to the left, Editar or Pagado to
+/// the right) and only a tap on it runs it. Anything less, or a flick back, closes the row.
 RowRelease rowRelease({
   required double offset,
   required double vx,
@@ -138,11 +137,8 @@ RowRelease rowRelease({
   if (!(side == Side.left ? left : right)) return RowRelease.close;
   final toward = side == Side.left ? vx <= -flick : vx >= flick;
   final back = side == Side.left ? vx >= flick : vx <= -flick;
-  if (side == Side.left) {
-    if (toward || armedSide(offset, width, threshold) == side) return RowRelease.openLeft;
-  } else if (toward || armedSide(offset, width, threshold) == side) {
-    return RowRelease.commitRight;
-  }
+  final open = side == Side.left ? RowRelease.openLeft : RowRelease.openRight;
+  if (toward || armedSide(offset, width, threshold) == side) return open;
   if (back) return RowRelease.close;
   if (offset.abs() >= openWidth / 2) {
     return side == Side.left ? RowRelease.openLeft : RowRelease.openRight;
@@ -161,5 +157,6 @@ double detentScale(double offset, double width) {
   return SwipeFeel.detentLight + (SwipeFeel.detentFirm - SwipeFeel.detentLight) * t;
 }
 
-/// One notch of the crown at [scale]: a tick, or a 5 ms buzz on motors without primitives.
-HapticPattern detentPattern(double scale) => HapticPattern([5], [HapticPrimitive('tick', scale)]);
+/// One notch of the crown at [scale]: a click (firmer than a tick, so it is felt clearly), or a
+/// 12 ms buzz on motors without primitives.
+HapticPattern detentPattern(double scale) => HapticPattern([12], [HapticPrimitive('click', scale)]);

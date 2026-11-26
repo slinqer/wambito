@@ -76,7 +76,7 @@ void main() {
       // Home's eye and the widget's: the blind comes down and shuts, the blind goes up.
       FeedbackEvent.accountPressed: ([10], null),
       FeedbackEvent.segmentChanged: ([6, 30, 12], null),
-      FeedbackEvent.swipeBounced: ([8], null),
+      FeedbackEvent.swipeBounced: ([14], null),
       FeedbackEvent.amountsHidden: ([6, 25, 8, 35, 22], null),
       FeedbackEvent.amountsShown: ([16, 35, 8, 25, 6], null),
       FeedbackEvent.wheelSpun: (

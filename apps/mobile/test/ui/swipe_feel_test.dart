@@ -47,7 +47,7 @@ Future<void> _end(TestGesture gesture) => gesture.up(timeStamp: _at);
 
 List<double> _detentScales(FakeFeedbackPlatform platform) => [
   for (final p in platform.haptics)
-    if (p.waveform.length == 1 && p.waveform.single == 5) p.primitives.single.scale,
+    if (p.waveform.length == 1 && p.waveform.single == 12) p.primitives.single.scale,
 ];
 
 void main() {
@@ -77,7 +77,7 @@ void main() {
     await t.pumpAndSettle();
     final after = platform.haptics.sublist(before);
     expect(after.where((p) => p == hapticPatterns[FeedbackEvent.swipeBounced]).length, 1);
-    expect(after.any((p) => p.waveform.length == 1 && p.waveform.single == 5), isTrue);
+    expect(after.any((p) => p.waveform.length == 1 && p.waveform.single == 12), isTrue);
   });
 
   testWidgets('Borrar left open neither rolls back nor bounces', (t) async {

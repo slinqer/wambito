@@ -557,18 +557,6 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     );
     _x.value = offset;
     _tickNotch(offset, detentScale(offset, _width), time);
-    final side = armedSide(offset, _width, SwipeFeel.rowThreshold);
-    final next = switch (side) {
-      Side.left => null,
-      Side.right when !_hasRight => null,
-      _ => side,
-    };
-    if (next != _armed) {
-      _armed = next;
-      // A tick at the threshold, each way.
-      context.feedback(FeedbackEvent.thresholdCrossed);
-      setState(() {});
-    }
   }
 
   void _onRelease(double dx, double vx) {
@@ -584,8 +572,6 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     );
     _armed = null;
     switch (outcome) {
-      case RowRelease.commitRight:
-        _runRight(velocity: vx);
       case RowRelease.openLeft:
         _opened(Side.left, vx);
       case RowRelease.openRight:
