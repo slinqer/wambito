@@ -29,7 +29,7 @@ import java.time.ZoneId
 /**
  * The widget picker's previews (spec "Picker preview"): the real widget, drawn by Glance with
  * invented figures (octubre, "Te quedan 312,40 €", the eye open, night), into
- * `build/widget-previews/`. `scripts/gen-widget-previews.sh` runs it and copies them to
+ * `apps/mobile/build/widget-previews/`. `scripts/gen-widget-previews.sh` runs it and copies them to
  * `res/drawable-nodpi`; never draw them by hand.
  */
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
@@ -39,7 +39,8 @@ import java.time.ZoneId
 class WidgetPreviewsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val now = Instant.parse("2026-10-22T20:00:00Z")
-    private val out = File("build/widget-previews").apply { mkdirs() }
+    // apps/mobile/build (git-ignored): the tests run in android/app.
+    private val out = File("../../build/widget-previews").apply { mkdirs() }
 
     private fun model(theme: String = "dark", remaining: Long = 31240, hide: Boolean = false) = widgetModel(
         context,
@@ -96,5 +97,9 @@ class WidgetPreviewsTest {
         render("check_medium_day", DpSize(260.dp, 110.dp)) { MediumWidgetContent(model(theme = "light")) }
         render("check_small_hidden", DpSize(180.dp, 60.dp)) { SmallWidgetContent(model(hide = true)) }
         render("check_small_long", DpSize(150.dp, 40.dp)) { SmallWidgetContent(model(remaining = 123456789)) }
+        // A 2×1 on a 4-column One UI grid (cells about 100×93 dp).
+        render("check_small_2x1", DpSize(188.dp, 93.dp)) { SizedWidgetContent(model()) }
+        // A 4×1 on the same grid: Wambi's layout, as its 4×2.
+        render("check_4x1", DpSize(401.dp, 93.dp)) { SizedWidgetContent(model()) }
     }
 }

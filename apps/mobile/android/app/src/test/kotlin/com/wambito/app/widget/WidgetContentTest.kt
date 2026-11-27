@@ -125,6 +125,9 @@ class WidgetContentTest {
         assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(320.dp, 70.dp)))
         assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(220.dp, 40.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(230.dp, 104.dp)))
+        // One UI's 4×1 (401×93 dp) has room for Wambi: the same widget as its 4×2, not the 40 dp row.
+        assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(401.dp, 93.dp)))
+        assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(401.dp, 80.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(320.dp, 180.dp)))
     }
 
@@ -134,7 +137,7 @@ class WidgetContentTest {
         assertEquals(widgetSizeMode, WambitoMediumWidget().sizeMode)
         // A 330 dp medium once got the 220 dp box and its figure was cut.
         assertTrue(widgetSizes.size <= 16)
-        for (height in listOf(40.dp, 100.dp)) {
+        for (height in listOf(40.dp, 88.dp)) {
             val widths = widgetSizes.filter { it.height == height && it.width >= 220.dp }.map { it.width }.sorted()
             assertEquals(220.dp, widths.first())
             assertTrue(widths.last() >= 390.dp)

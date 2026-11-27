@@ -5,7 +5,7 @@
 # any change to the widget's look, with JAVA_HOME set to a JDK 17.
 set -euo pipefail
 cd "$(dirname "$0")/../android"
-out=app/build/widget-previews
+out=../build/widget-previews
 rm -rf "$out"
 ./gradlew :app:testDebugUnitTest --tests 'com.wambito.app.widget.WidgetPreviewsTest' \
   --rerun --console=plain -x compileFlutterBuildDebug

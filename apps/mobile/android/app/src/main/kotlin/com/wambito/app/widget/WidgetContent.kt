@@ -50,15 +50,17 @@ import java.time.ZoneId
 
 /**
  * The layouts, by the box they get. Every one of them has both buttons, 🎤 and ＋, as a 4×1 once
- * lost the 🎤: SMALL (under 220 dp wide, 2×1), ROW (wide and short, 4×1) and MEDIUM (4×2).
+ * lost the 🎤: SMALL (under 220 dp wide, 2×1), ROW (wide and short: a 4×1 on a grid of short rows)
+ * and MEDIUM (4×2, and a 4×1 on a grid of tall rows, like One UI's 93 dp).
  */
 enum class WidgetSize { SMALL, ROW, MEDIUM }
 
 /**
- * The smallest box the medium layout fits: a little under 4×2's 250×110 dp (a 4×2 is about 110 dp
- * tall, so the height stays at 100), for launchers that round down.
+ * The smallest box the medium layout fits: 4 dp of padding above and below its ＋ over 🎤 (81 dp
+ * with their ledges). One UI's 4×1 is 401×93 dp: it gets Wambi and the full-size figure and buttons,
+ * as its 4×2 does, instead of the row made for 40 dp.
  */
-private val mediumBox = DpSize(220.dp, 100.dp)
+private val mediumBox = DpSize(220.dp, 88.dp)
 
 /** The smallest box the row layout fits: as wide as the medium one, but 4×1 short. */
 private val rowBox = DpSize(220.dp, 40.dp)
@@ -415,7 +417,7 @@ fun MediumWidgetContent(model: WidgetModel) {
             .fillMaxSize()
             .background(WidgetPalette.color("surface", theme))
             .cornerRadius(20.dp)
-            .padding(8.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
             .clickable(openApp()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
