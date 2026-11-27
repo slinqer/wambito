@@ -113,12 +113,14 @@ Publish the APKs as a GitHub release on the tag (the landing's "Descargar para A
 
 ```bash
 d=apps/mobile/dist/X.Y.Z
+cp $d/wambito-X.Y.Z-arm64-v8a.apk $d/wambito-arm64-v8a.apk   # the landing's versionless link
 gh release create mobile-vX.Y.Z --repo slinqer/wambito --verify-tag --latest \
   --title "Wambito X.Y.Z (Android)" --notes-file <notes.md> \
-  $d/wambito-X.Y.Z-arm64-v8a.apk $d/wambito-X.Y.Z-armeabi-v7a.apk $d/SHA256SUMS $d/ANDROID_CERT_SHA256.txt
+  $d/wambito-X.Y.Z-arm64-v8a.apk $d/wambito-X.Y.Z-armeabi-v7a.apk $d/SHA256SUMS $d/ANDROID_CERT_SHA256.txt \
+  $d/wambito-arm64-v8a.apk
 ```
 
-The notes are the `en-US` arm64 changelog, which APK to pick, and the certificate's SHA-256. Once the release is up, and not before (the link would 404), raise `ANDROID_VERSION` in `apps/web/app/features/landing/links.ts` and the two URLs in `apps/web/e2e/landing.spec.ts` and `landing-only-app.spec.ts`; merging that deploys the landing. Mark only `mobile-v*` releases as latest, never `voice-models-*`.
+The notes are the `en-US` arm64 changelog, which APK to pick, and the certificate's SHA-256. The landing needs no change: "Descargar para Android" is `releases/latest/download/wambito-arm64-v8a.apk` (`apps/web/app/features/landing/links.ts`), so the arm64 APK must also be uploaded under that versionless name, as above. Mark only `mobile-v*` releases as latest: create every other release (`voice-models-*`, `ios-sherpa-onnx-*`) with `--latest=false`, or the landing's download breaks.
 
 ## The Play bundle
 
