@@ -1,5 +1,6 @@
 package com.wambito.app.widget
 
+import android.util.TypedValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -196,20 +197,36 @@ private fun Figure(model: WidgetModel.Figures, amountSize: Int, labelLines: Int 
         style = TextStyle(color = WidgetPalette.color("inkMuted", theme), fontSize = 12.sp),
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = model.amount,
-            maxLines = 1,
-            modifier = model.amountDescription?.let { description ->
-                GlanceModifier.semantics { contentDescription = description }
-            } ?: GlanceModifier,
-            style = TextStyle(
-                color = WidgetPalette.color("ink", theme),
-                fontSize = amountSize.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
+        FigureImage(model, amountSize, WidgetSize.MEDIUM, model.amountDescription)
         EyeButton(model)
     }
+}
+
+/**
+ * The amount (or ••••) in home's hero face, as a picture tinted `ink` (spec "Widget figure"): [sizeSp]
+ * tall, at most as wide as [layout] leaves it in this box, read aloud as [description] or the amount.
+ */
+@Composable
+private fun FigureImage(model: WidgetModel.Figures, sizeSp: Int, layout: WidgetSize, description: String?) {
+    val context = LocalContext.current
+    val metrics = context.resources.displayMetrics
+    val sizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp.toFloat(), metrics)
+    val room = figureRoom(LocalSize.current, layout)
+    val figure = figureBitmap(
+        model.amount,
+        sizePx,
+        (room.value * metrics.density).toInt(),
+        FigureFont.typeface(context),
+    )
+    Image(
+        provider = ImageProvider(figure.bitmap),
+        contentDescription = description ?: model.amount,
+        modifier = GlanceModifier.size(
+            (figure.bitmap.width / metrics.density).dp,
+            (figure.bitmap.height / metrics.density).dp,
+        ),
+        colorFilter = ColorFilter.tint(WidgetPalette.color("ink", model.theme)),
+    )
 }
 
 /** The widget's eye, right after the amount: hides or shows it without opening the app. */
@@ -217,8 +234,8 @@ private fun Figure(model: WidgetModel.Figures, amountSize: Int, labelLines: Int 
 private fun EyeButton(model: WidgetModel.Figures) {
     Box(
         modifier = GlanceModifier
-            .size(36.dp)
-            .cornerRadius(18.dp)
+            .size(eyeSize)
+            .cornerRadius(eyeSize / 2)
             .semantics { contentDescription = model.eyeLabel }
             .clickable(actionRunCallback<ToggleHideAmount>()),
         contentAlignment = Alignment.Center,
@@ -269,7 +286,13 @@ private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
  * [staleInDescription] (no room for the stale line) the stale text is read aloud with the amount.
  */
 @Composable
-private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription: Boolean, modifier: GlanceModifier) {
+private fun AmountLine(
+    model: WidgetModel.Figures,
+    size: Int,
+    layout: WidgetSize,
+    staleInDescription: Boolean,
+    modifier: GlanceModifier,
+) {
     val stale = model.stale.takeIf { staleInDescription }
     val description = if (stale == null) {
         model.amountDescription
@@ -277,16 +300,7 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription
         listOf(model.amountDescription ?: model.amount, stale).joinToString(", ")
     }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = model.amount,
-            maxLines = 1,
-            modifier = description?.let { GlanceModifier.semantics { contentDescription = it } } ?: GlanceModifier,
-            style = TextStyle(
-                color = WidgetPalette.color("ink", model.theme),
-                fontSize = size.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
+        FigureImage(model, size, layout, description)
         EyeButton(model)
     }
 }
@@ -298,6 +312,7 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription
 @Composable
 private fun LineWidgetContent(
     model: WidgetModel.Figures,
+    layout: WidgetSize,
     showAmount: Boolean,
     staleLine: Boolean,
     padding: Dp,
@@ -317,7 +332,7 @@ private fun LineWidgetContent(
     ) {
         if (showAmount) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                AmountLine(model, amountSize, staleInDescription = !staleLine, modifier = GlanceModifier)
+                AmountLine(model, amountSize, layout, staleInDescription = !staleLine, modifier = GlanceModifier)
                 if (staleLine) Stale(model)
             }
             Spacer(GlanceModifier.width(gap))
@@ -334,7 +349,7 @@ private fun LineWidgetContent(
 fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
-        model as WidgetModel.Figures, showAmount, staleLine = false,
+        model as WidgetModel.Figures, WidgetSize.SMALL, showAmount, staleLine = false,
         padding = 8.dp, amountSize = 14, buttonSize = 36.dp, gap = 4.dp,
     )
 }
@@ -344,7 +359,7 @@ fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
 fun RowWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
-        model as WidgetModel.Figures, showAmount = true, staleLine = true,
+        model as WidgetModel.Figures, WidgetSize.ROW, showAmount = true, staleLine = true,
         padding = 14.dp, amountSize = 20, buttonSize = 40.dp, gap = 8.dp,
     )
 }
