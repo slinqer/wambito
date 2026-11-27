@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's ＋ and 🎤 (widget/WidgetContent.kt LedgeButton): a white rounded square that Glance
+     tints `brand` for the face and `brandEdge` for the ledge under it. A shape, not Glance's
+     cornerRadius, which does nothing before Android 12. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="11dp" />
+</shape>

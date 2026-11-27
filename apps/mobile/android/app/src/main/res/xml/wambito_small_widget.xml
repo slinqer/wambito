@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The small widget (2×1): "Te quedan" and ＋ (widget/WambitoSmallWidget.kt). No periodic update
+<!-- The small widget (2×1): "Te quedan", ＋ and 🎤 (widget/WambitoSmallWidget.kt). No periodic update
      from the launcher: the app and widget/RefreshWorker.kt redraw it. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_small_description"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:previewImage="@drawable/wambi_happy"
+    android:previewImage="@drawable/widget_preview_small"
     android:minWidth="110dp"
     android:minHeight="40dp"
     android:minResizeWidth="110dp"

@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The medium widget (4×2): Wambi, "Te quedan" with its progress bar, the month, ＋ and 🎤
-     (widget/WambitoMediumWidget.kt). -->
+     (widget/WambitoMediumWidget.kt). It resizes down to one row: a short one draws the row layout,
+     One UI's 93 dp one the same layout as 4×2 (WidgetContent.kt widgetSizeFor). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_medium_description"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:previewImage="@drawable/wambi_happy"
+    android:previewImage="@drawable/widget_preview_medium"
     android:minWidth="250dp"
     android:minHeight="110dp"
     android:minResizeWidth="180dp"
-    android:minResizeHeight="110dp"
+    android:minResizeHeight="40dp"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
     android:targetCellHeight="2"

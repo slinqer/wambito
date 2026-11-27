@@ -1,5 +1,6 @@
 package com.wambito.app.widget
 
+import android.util.TypedValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -25,6 +26,7 @@ import androidx.glance.color.ColorProvider
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -48,15 +50,17 @@ import java.time.ZoneId
 
 /**
  * The layouts, by the box they get. Every one of them has both buttons, 🎤 and ＋, as a 4×1 once
- * lost the 🎤: SMALL (under 220 dp wide, 2×1), ROW (wide and short, 4×1) and MEDIUM (4×2).
+ * lost the 🎤: SMALL (under 220 dp wide, 2×1), ROW (wide and short: a 4×1 on a grid of short rows)
+ * and MEDIUM (4×2, and a 4×1 on a grid of tall rows, like One UI's 93 dp).
  */
 enum class WidgetSize { SMALL, ROW, MEDIUM }
 
 /**
- * The smallest box the medium layout fits: a little under 4×2's 250×110 dp (a 4×2 is about 110 dp
- * tall, so the height stays at 100), for launchers that round down.
+ * The smallest box the medium layout fits: 4 dp of padding above and below its ＋ over 🎤 (81 dp
+ * with their ledges). One UI's 4×1 is 401×93 dp: it gets Wambi and the full-size figure and buttons,
+ * as its 4×2 does, instead of the row made for 40 dp.
  */
-private val mediumBox = DpSize(220.dp, 100.dp)
+private val mediumBox = DpSize(220.dp, 88.dp)
 
 /** The smallest box the row layout fits: as wide as the medium one, but 4×1 short. */
 private val rowBox = DpSize(220.dp, 40.dp)
@@ -64,8 +68,25 @@ private val rowBox = DpSize(220.dp, 40.dp)
 /**
  * Both widgets draw the layout that fits the box they really have, not the one they were added
  * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened.
+ *
+ * Responsive hands `LocalSize` the largest of these boxes that fits, not the real one, and the
+ * figure is a picture sized to the room that box leaves (`figureRoom`): with only the four layout
+ * boxes a 330 dp medium got 220 and its figure was cut. So the wide boxes come every 35 dp, at the
+ * row's and the medium's heights: the room is never more than 35 dp short. 15 boxes, under
+ * Android's 16 sized layouts per widget. Exact fits the room to the dp, but Samsung's launcher drew
+ * it narrower than its box.
  */
-val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), DpSize(150.dp, 40.dp), rowBox, mediumBox))
+val widgetSizes: Set<DpSize> = buildSet {
+    add(DpSize(110.dp, 40.dp))
+    add(DpSize(150.dp, 40.dp))
+    add(DpSize(180.dp, 40.dp))
+    for (width in 220..395 step 35) {
+        add(DpSize(width.dp, rowBox.height))
+        add(DpSize(width.dp, mediumBox.height))
+    }
+}
+
+val widgetSizeMode: SizeMode = SizeMode.Responsive(widgetSizes)
 
 /** The layout for a box of [size]: medium when it is wide and tall, row when only wide, else small. */
 fun widgetSizeFor(size: DpSize): WidgetSize = when {
@@ -89,6 +110,7 @@ object WidgetPalette {
         "ink" to (0xFFF3F0FF to 0xFF221A47),
         "inkMuted" to (0xFFB9B2E0 to 0xFF5B5285),
         "brand" to (0xFF7C4DFF to 0xFF7B3DF0),
+        "brandEdge" to (0xFF3F22A3 to 0xFF4A2BBF),
         "onBrand" to (0xFFFFFFFF to 0xFFFFFFFF),
         "stroke" to (0xFF2D2660 to 0xFFE6DEFC),
         "good" to (0xFF7CFFB2 to 0xFF0B7A46),
@@ -126,34 +148,67 @@ private fun openApp(): Action = linkAction(LaunchLinks.HOME)
 private fun linkAction(link: android.net.Uri): Action =
     actionStartActivity(LaunchLinks.intent(LocalContext.current, link))
 
-/** A round button of [size]: ＋ (filled) or 🎤 (outlined in brand, as on home). */
+/**
+ * A ＋ or 🎤 as the app's bottom bar draws them (spec "Widget buttons"): a `brand` rounded square of
+ * [size] with its white icon, standing on a [buttonLedge] of `brandEdge`. Glance has no shadows, so
+ * the ledge is a second square under the face; both are the `widget_button` shape, tinted.
+ */
 @Composable
-private fun RoundButton(
+private fun LedgeButton(
     icon: Int,
     label: String,
-    filled: Boolean,
     theme: WidgetTheme,
     action: Action,
-    size: Dp = 44.dp,
+    size: Dp,
+    iconScale: Float,
 ) {
-    val brand = WidgetPalette.color("brand", theme)
+    val shape = ImageProvider(R.drawable.widget_button)
     Box(
         modifier = GlanceModifier
-            .size(size)
-            .cornerRadius(size / 2)
-            .background(if (filled) brand else WidgetPalette.color("stroke", theme))
+            .width(size)
+            .height(size + buttonLedge)
+            .background(shape, ContentScale.FillBounds, ColorFilter.tint(WidgetPalette.color("brandEdge", theme)))
             .semantics { contentDescription = label }
             .clickable(action),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Image(
-            provider = ImageProvider(icon),
-            contentDescription = null,
-            modifier = GlanceModifier.size(size * 0.55f),
-            colorFilter = ColorFilter.tint(if (filled) WidgetPalette.color("onBrand", theme) else brand),
-        )
+        Box(
+            modifier = GlanceModifier
+                .size(size)
+                .background(shape, ContentScale.FillBounds, ColorFilter.tint(WidgetPalette.color("brand", theme))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                provider = ImageProvider(icon),
+                contentDescription = null,
+                modifier = GlanceModifier.size(size * iconScale),
+                colorFilter = ColorFilter.tint(WidgetPalette.color("onBrand", theme)),
+            )
+        }
     }
 }
+
+/** The ＋ of [buttons]: the larger one, its icon 26/58 of it as on the bar. */
+@Composable
+private fun AddButton(model: WidgetModel.Figures, buttons: ButtonSizes) = LedgeButton(
+    icon = R.drawable.ic_widget_add,
+    label = model.addLabel,
+    theme = model.theme,
+    action = linkAction(LaunchLinks.ADD),
+    size = buttons.add,
+    iconScale = 26f / 58f,
+)
+
+/** The 🎤 of [buttons]: the smaller one, its icon 22/44 of it as on the bar. */
+@Composable
+private fun MicButton(model: WidgetModel.Figures, buttons: ButtonSizes) = LedgeButton(
+    icon = R.drawable.ic_widget_mic,
+    label = model.captureLabel,
+    theme = model.theme,
+    action = linkAction(LaunchLinks.CAPTURE),
+    size = buttons.mic,
+    iconScale = 22f / 44f,
+)
 
 @Composable
 private fun SignedOutContent(model: WidgetModel.SignedOut, face: Boolean) {
@@ -196,20 +251,36 @@ private fun Figure(model: WidgetModel.Figures, amountSize: Int, labelLines: Int 
         style = TextStyle(color = WidgetPalette.color("inkMuted", theme), fontSize = 12.sp),
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = model.amount,
-            maxLines = 1,
-            modifier = model.amountDescription?.let { description ->
-                GlanceModifier.semantics { contentDescription = description }
-            } ?: GlanceModifier,
-            style = TextStyle(
-                color = WidgetPalette.color("ink", theme),
-                fontSize = amountSize.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
+        FigureImage(model, amountSize, WidgetSize.MEDIUM, model.amountDescription)
         EyeButton(model)
     }
+}
+
+/**
+ * The amount (or ••••) in home's hero face, as a picture tinted `ink` (spec "Widget figure"): [sizeSp]
+ * tall, at most as wide as [layout] leaves it in this box, read aloud as [description] or the amount.
+ */
+@Composable
+private fun FigureImage(model: WidgetModel.Figures, sizeSp: Int, layout: WidgetSize, description: String?) {
+    val context = LocalContext.current
+    val metrics = context.resources.displayMetrics
+    val sizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp.toFloat(), metrics)
+    val room = figureRoom(LocalSize.current, layout)
+    val figure = figureBitmap(
+        model.amount,
+        sizePx,
+        (room.value * metrics.density).toInt(),
+        FigureFont.typeface(context),
+    )
+    Image(
+        provider = ImageProvider(figure.bitmap),
+        contentDescription = description ?: model.amount,
+        modifier = GlanceModifier.size(
+            (figure.bitmap.width / metrics.density).dp,
+            (figure.bitmap.height / metrics.density).dp,
+        ),
+        colorFilter = ColorFilter.tint(WidgetPalette.color("ink", model.theme)),
+    )
 }
 
 /** The widget's eye, right after the amount: hides or shows it without opening the app. */
@@ -217,8 +288,8 @@ private fun Figure(model: WidgetModel.Figures, amountSize: Int, labelLines: Int 
 private fun EyeButton(model: WidgetModel.Figures) {
     Box(
         modifier = GlanceModifier
-            .size(36.dp)
-            .cornerRadius(18.dp)
+            .size(eyeSize)
+            .cornerRadius(eyeSize / 2)
             .semantics { contentDescription = model.eyeLabel }
             .clickable(actionRunCallback<ToggleHideAmount>()),
         contentAlignment = Alignment.Center,
@@ -242,26 +313,14 @@ private fun Stale(model: WidgetModel.Figures) {
     )
 }
 
-/** The ＋ and 🎤 pair, side by side, [size] dp each and [gap] apart. */
+/** The ＋ and 🎤 side by side, standing on one line as on the bar. */
 @Composable
-private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
-    RoundButton(
-        icon = R.drawable.ic_widget_add,
-        label = model.addLabel,
-        filled = true,
-        theme = model.theme,
-        action = linkAction(LaunchLinks.ADD),
-        size = size,
-    )
-    Spacer(GlanceModifier.width(gap))
-    RoundButton(
-        icon = R.drawable.ic_widget_mic,
-        label = model.captureLabel,
-        filled = false,
-        theme = model.theme,
-        action = linkAction(LaunchLinks.CAPTURE),
-        size = size,
-    )
+private fun ButtonsRow(model: WidgetModel.Figures, buttons: ButtonSizes) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        AddButton(model, buttons)
+        Spacer(GlanceModifier.width(buttons.gap))
+        MicButton(model, buttons)
+    }
 }
 
 /**
@@ -269,7 +328,13 @@ private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
  * [staleInDescription] (no room for the stale line) the stale text is read aloud with the amount.
  */
 @Composable
-private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription: Boolean, modifier: GlanceModifier) {
+private fun AmountLine(
+    model: WidgetModel.Figures,
+    size: Int,
+    layout: WidgetSize,
+    staleInDescription: Boolean,
+    modifier: GlanceModifier,
+) {
     val stale = model.stale.takeIf { staleInDescription }
     val description = if (stale == null) {
         model.amountDescription
@@ -277,16 +342,7 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription
         listOf(model.amountDescription ?: model.amount, stale).joinToString(", ")
     }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = model.amount,
-            maxLines = 1,
-            modifier = description?.let { GlanceModifier.semantics { contentDescription = it } } ?: GlanceModifier,
-            style = TextStyle(
-                color = WidgetPalette.color("ink", model.theme),
-                fontSize = size.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
+        FigureImage(model, size, layout, description)
         EyeButton(model)
     }
 }
@@ -298,13 +354,13 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription
 @Composable
 private fun LineWidgetContent(
     model: WidgetModel.Figures,
+    layout: WidgetSize,
     showAmount: Boolean,
     staleLine: Boolean,
     padding: Dp,
     amountSize: Int,
-    buttonSize: Dp,
-    gap: Dp,
 ) {
+    val buttons = buttonSizesFor(layout)
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -317,39 +373,39 @@ private fun LineWidgetContent(
     ) {
         if (showAmount) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                AmountLine(model, amountSize, staleInDescription = !staleLine, modifier = GlanceModifier)
+                AmountLine(model, amountSize, layout, staleInDescription = !staleLine, modifier = GlanceModifier)
                 if (staleLine) Stale(model)
             }
-            Spacer(GlanceModifier.width(gap))
+            Spacer(GlanceModifier.width(buttons.gap))
         }
-        ButtonsRow(model, size = buttonSize, gap = gap)
+        ButtonsRow(model, buttons)
     }
 }
 
 /**
- * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 at 36 dp;
+ * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 (32 and 28 dp);
  * no label, no room. Under 150 dp wide ([showAmount] false) only the two buttons.
  */
 @Composable
 fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
-        model as WidgetModel.Figures, showAmount, staleLine = false,
-        padding = 8.dp, amountSize = 14, buttonSize = 36.dp, gap = 4.dp,
+        model as WidgetModel.Figures, WidgetSize.SMALL, showAmount, staleLine = false,
+        padding = 8.dp, amountSize = 14,
     )
 }
 
-/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 at 40 dp. */
+/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 (33 and 28 dp). */
 @Composable
 fun RowWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
-        model as WidgetModel.Figures, showAmount = true, staleLine = true,
-        padding = 14.dp, amountSize = 20, buttonSize = 40.dp, gap = 8.dp,
+        model as WidgetModel.Figures, WidgetSize.ROW, showAmount = true, staleLine = true,
+        padding = 14.dp, amountSize = 20,
     )
 }
 
-/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ and 🎤 (40 dp, so they fit 100 dp). */
+/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ over 🎤 (40 and 32 dp with their ledges, so they fit 100 dp). */
 @Composable
 fun MediumWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = true)
@@ -361,7 +417,7 @@ fun MediumWidgetContent(model: WidgetModel) {
             .fillMaxSize()
             .background(WidgetPalette.color("surface", theme))
             .cornerRadius(20.dp)
-            .padding(8.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
             .clickable(openApp()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -401,24 +457,14 @@ fun MediumWidgetContent(model: WidgetModel) {
             Stale(model)
         }
         Spacer(GlanceModifier.width(10.dp))
-        Column(verticalAlignment = Alignment.CenterVertically) {
-            RoundButton(
-                icon = R.drawable.ic_widget_add,
-                label = model.addLabel,
-                filled = true,
-                theme = theme,
-                action = linkAction(LaunchLinks.ADD),
-                size = 40.dp,
-            )
-            Spacer(GlanceModifier.height(4.dp))
-            RoundButton(
-                icon = R.drawable.ic_widget_mic,
-                label = model.captureLabel,
-                filled = false,
-                theme = theme,
-                action = linkAction(LaunchLinks.CAPTURE),
-                size = 40.dp,
-            )
+        val buttons = buttonSizesFor(WidgetSize.MEDIUM)
+        Column(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AddButton(model, buttons)
+            Spacer(GlanceModifier.height(buttons.gap))
+            MicButton(model, buttons)
         }
     }
 }

@@ -36,6 +36,7 @@ void main() {
       'ink': (night.ink, day.ink),
       'inkMuted': (night.inkMuted, day.inkMuted),
       'brand': (night.brand, day.brand),
+      'brandEdge': (night.brandEdge, day.brandEdge),
       'onBrand': (night.onBrand, day.onBrand),
       'stroke': (night.stroke, day.stroke),
       'good': (night.good, day.good),
@@ -201,5 +202,13 @@ void main() {
     expect(_manifest, contains('android:name=".tile.CaptureTileService"'));
     expect(_manifest, contains('android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"'));
     expect(_manifest, contains('android.service.quicksettings.action.QS_TILE'));
+  });
+
+  test('the widget picker shows each size drawn by scripts/gen-widget-previews.sh', () {
+    for (final size in ['small', 'medium']) {
+      final xml = File('android/app/src/main/res/xml/wambito_${size}_widget.xml').readAsStringSync();
+      expect(xml, contains('android:previewImage="@drawable/widget_preview_$size"'));
+      expect(File('android/app/src/main/res/drawable-nodpi/widget_preview_$size.png').existsSync(), isTrue);
+    }
   });
 }

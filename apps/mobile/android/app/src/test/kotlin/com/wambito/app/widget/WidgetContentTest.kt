@@ -13,6 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.wambito.app.launch.LaunchLinks
 import es.antonborri.home_widget.HomeWidgetGlanceState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -56,7 +57,9 @@ class WidgetContentTest {
             setContext(context)
             provideComposable { SmallWidgetContent(model(snapshot())) }
             onNode(hasText("Te quedan")).assertDoesNotExist()
-            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("$1.500.000")).assertExists()
+            // The figure is an image in the app's face, not a text in the phone's.
+            onNode(hasText("$1.500.000")).assertDoesNotExist()
             onNode(hasContentDescription("Agregar gasto"))
                 .assertHasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.ADD))
             onNode(hasContentDescription("Decir o escribir un gasto"))
@@ -72,7 +75,7 @@ class WidgetContentTest {
             onNode(hasContentDescription("Wambito")).assertExists()
             onNode(hasText("Octubre")).assertExists()
             onNode(hasText("Te quedan")).assertExists()
-            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("$1.500.000")).assertExists()
             onNode(isLinearProgressIndicator(0.25f)).assertExists()
             onNode(hasContentDescription("Agregar gasto"))
                 .assertHasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.ADD))
@@ -96,7 +99,7 @@ class WidgetContentTest {
             setContext(context)
             setAppWidgetSize(DpSize(150.dp, 40.dp))
             provideComposable { SizedWidgetContent(model(snapshot())) }
-            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("$1.500.000")).assertExists()
             onNode(hasContentDescription("Agregar gasto")).assertExists()
             onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
             onNode(hasContentDescription("Wambito")).assertDoesNotExist()
@@ -108,7 +111,7 @@ class WidgetContentTest {
             setContext(context)
             setAppWidgetSize(DpSize(250.dp, 50.dp))
             provideComposable { SizedWidgetContent(model(snapshot())) }
-            onNode(hasText("$1.500.000")).assertExists()
+            onNode(hasContentDescription("$1.500.000")).assertExists()
             onNode(hasContentDescription("Agregar gasto")).assertExists()
             onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
             onNode(hasContentDescription("Wambito")).assertDoesNotExist()
@@ -122,13 +125,24 @@ class WidgetContentTest {
         assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(320.dp, 70.dp)))
         assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(220.dp, 40.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(230.dp, 104.dp)))
+        // One UI's 4×1 (401×93 dp) has room for Wambi: the same widget as its 4×2, not the 40 dp row.
+        assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(401.dp, 93.dp)))
+        assertEquals(WidgetSize.ROW, widgetSizeFor(DpSize(401.dp, 80.dp)))
         assertEquals(WidgetSize.MEDIUM, widgetSizeFor(DpSize(320.dp, 180.dp)))
     }
 
     @Test
-    fun `both widgets use the responsive size mode`() {
+    fun `both widgets are responsive, with a box every 35 dp so the figure is never much short of room`() {
         assertEquals(widgetSizeMode, WambitoSmallWidget().sizeMode)
         assertEquals(widgetSizeMode, WambitoMediumWidget().sizeMode)
+        // A 330 dp medium once got the 220 dp box and its figure was cut.
+        assertTrue(widgetSizes.size <= 16)
+        for (height in listOf(40.dp, 88.dp)) {
+            val widths = widgetSizes.filter { it.height == height && it.width >= 220.dp }.map { it.width }.sorted()
+            assertEquals(220.dp, widths.first())
+            assertTrue(widths.last() >= 390.dp)
+            assertTrue(widths.zipWithNext().all { (a, b) -> b - a <= 35.dp })
+        }
     }
 
     @Test
@@ -159,7 +173,7 @@ class WidgetContentTest {
                 MediumWidgetContent(model(snapshot(remaining = -4200000, spent = 4200000, budgetTotal = 0)))
             }
             onNode(hasText("Gastado este mes")).assertExists()
-            onNode(hasText("$42.000")).assertExists()
+            onNode(hasContentDescription("$42.000")).assertExists()
             onNode(hasText("Te quedan")).assertDoesNotExist()
         }
 
@@ -170,7 +184,7 @@ class WidgetContentTest {
             SmallWidgetContent(model(snapshot(remaining = -4200000, spent = 4200000, budgetTotal = 0)))
         }
         onNode(hasText("Gastado este mes")).assertDoesNotExist()
-        onNode(hasText("$42.000")).assertExists()
+        onNode(hasContentDescription("$42.000")).assertExists()
     }
 
     @Test
@@ -184,7 +198,7 @@ class WidgetContentTest {
                 setContext(context)
                 provideComposable { draw(model(WidgetSnapshot(signedIn = false, locale = "es"))) }
                 onNode(hasText("Abre Wambito para empezar")).assertExists()
-                onNode(hasText("$")).assertDoesNotExist()
+                onNode(hasContentDescription("$")).assertDoesNotExist()
                 onNode(hasContentDescription("Agregar gasto")).assertDoesNotExist()
             }
         }
@@ -198,7 +212,7 @@ class WidgetContentTest {
                 model(snapshot(updatedAt = now.minusSeconds(3600)).copy(refreshFailedAt = now.minusSeconds(60))),
             )
         }
-        onNode(hasText("$1.500.000")).assertExists()
+        onNode(hasContentDescription("$1.500.000")).assertExists()
         onNode(hasText("hace un rato")).assertExists()
     }
 
@@ -209,7 +223,7 @@ class WidgetContentTest {
     fun `offline, row - the stale text sits under the amount`() = runGlanceAppWidgetUnitTest {
         setContext(context)
         provideComposable { RowWidgetContent(offline()) }
-        onNode(hasText("$1.500.000")).assertExists()
+        onNode(hasContentDescription("$1.500.000")).assertExists()
         onNode(hasText("hace un rato")).assertExists()
     }
 
@@ -227,7 +241,7 @@ class WidgetContentTest {
             setContext(context)
             setAppWidgetSize(DpSize(110.dp, 40.dp))
             provideComposable { SizedWidgetContent(model(snapshot())) }
-            onNode(hasText("$1.500.000")).assertDoesNotExist()
+            onNode(hasContentDescription("$1.500.000")).assertDoesNotExist()
             onNode(hasContentDescription("Agregar gasto")).assertExists()
             onNode(hasContentDescription("Decir o escribir un gasto")).assertExists()
             onNode(hasStartActivityClickAction(LaunchLinks.intent(context, LaunchLinks.HOME))).assertExists()
@@ -253,9 +267,9 @@ class WidgetContentTest {
             runGlanceAppWidgetUnitTest {
                 setContext(context)
                 provideComposable { draw(model(over)) }
-                onNode(hasText("••••")).assertExists()
+                onNode(hasText("••••")).assertDoesNotExist()
                 onNode(hasContentDescription("Monto oculto")).assertExists()
-                onNode(hasText("$")).assertDoesNotExist()
+                onNode(hasContentDescription("$")).assertDoesNotExist()
                 onNode(hasText("Te pasaste")).assertDoesNotExist()
                 onNode(hasText("Te quedan")).assertDoesNotExist()
                 if (hasLabel) onNode(hasText("Este mes")).assertExists() else onNode(hasText("Este mes")).assertDoesNotExist()
@@ -291,7 +305,7 @@ class WidgetContentTest {
                 setAppWidgetSize(box)
                 setState(HomeWidgetGlanceState(prefs))
                 provideComposable { StoredWidgetContent() }
-                onNode(hasText("$1.500.000")).assertExists()
+                onNode(hasContentDescription("$1.500.000")).assertExists()
             }
         }
 
@@ -306,8 +320,8 @@ class WidgetContentTest {
                 setState(HomeWidgetGlanceState(prefs))
                 provideComposable { StoredWidgetContent() }
                 onNode(hasText("Abre Wambito para empezar")).assertExists()
-                onNode(hasText("$1.500.000")).assertDoesNotExist()
-                onNode(hasText("$")).assertDoesNotExist()
+                onNode(hasContentDescription("$1.500.000")).assertDoesNotExist()
+                onNode(hasContentDescription("$")).assertDoesNotExist()
             }
         }
 
@@ -322,7 +336,7 @@ class WidgetContentTest {
                 setState(HomeWidgetGlanceState(prefs))
                 provideComposable { StoredWidgetContent() }
                 onNode(hasText("Abre Wambito para empezar")).assertExists()
-                onNode(hasText("$1.500.000")).assertDoesNotExist()
+                onNode(hasContentDescription("$1.500.000")).assertDoesNotExist()
             }
         }
     }
