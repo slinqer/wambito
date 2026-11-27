@@ -52,8 +52,8 @@ class FigureBitmapTest {
     fun `the room the figure gets in each layout`() {
         // Small: 8 dp padding each side, the eye (36), a 4 dp gap and the buttons (＋ 32, 4, 🎤 28).
         assertEquals(170.dp - 16.dp - 36.dp - 4.dp - 64.dp, figureRoom(DpSize(170.dp, 60.dp), WidgetSize.SMALL))
-        // Row: 14 dp padding each side, the eye, an 8 dp gap and the buttons (＋ 34, 8, 🎤 28).
-        assertEquals(300.dp - 28.dp - 36.dp - 8.dp - 70.dp, figureRoom(DpSize(300.dp, 60.dp), WidgetSize.ROW))
+        // Row: 14 dp padding each side, the eye, an 8 dp gap and the buttons (＋ 33, 8, 🎤 28).
+        assertEquals(300.dp - 28.dp - 36.dp - 8.dp - 69.dp, figureRoom(DpSize(300.dp, 60.dp), WidgetSize.ROW))
         // Medium: 8 dp padding, Wambi (64) and 10 on each side of the text, the eye, the ＋ column (40).
         assertEquals(250.dp - 16.dp - 64.dp - 20.dp - 36.dp - 40.dp, figureRoom(DpSize(250.dp, 110.dp), WidgetSize.MEDIUM))
         assertEquals(0.dp, figureRoom(DpSize(60.dp, 40.dp), WidgetSize.SMALL))

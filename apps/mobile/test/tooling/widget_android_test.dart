@@ -36,6 +36,7 @@ void main() {
       'ink': (night.ink, day.ink),
       'inkMuted': (night.inkMuted, day.inkMuted),
       'brand': (night.brand, day.brand),
+      'brandEdge': (night.brandEdge, day.brandEdge),
       'onBrand': (night.onBrand, day.onBrand),
       'stroke': (night.stroke, day.stroke),
       'good': (night.good, day.good),

@@ -82,7 +82,10 @@ fun figureBitmap(text: String, sizePx: Float, maxWidthPx: Int, typeface: Typefac
 /** The eye after the figure. */
 val eyeSize = 36.dp
 
-/** The ＋ and 🎤 of each layout: their faces, the ledge under them and the gap between them. */
+/**
+ * The ＋ and 🎤 of each layout: their faces and the gap between them. With the ledge, each fits its
+ * box's height: 36 dp in the 40 dp small and row (2 dp padding), 84 dp in the medium column.
+ */
 data class ButtonSizes(val add: Dp, val mic: Dp, val gap: Dp)
 
 /** The ledge under every button face, `brandEdge`, as the app's bottom bar draws it. */
@@ -90,7 +93,7 @@ val buttonLedge = 3.dp
 
 fun buttonSizesFor(layout: WidgetSize): ButtonSizes = when (layout) {
     WidgetSize.SMALL -> ButtonSizes(add = 32.dp, mic = 28.dp, gap = 4.dp)
-    WidgetSize.ROW -> ButtonSizes(add = 34.dp, mic = 28.dp, gap = 8.dp)
+    WidgetSize.ROW -> ButtonSizes(add = 33.dp, mic = 28.dp, gap = 8.dp)
     WidgetSize.MEDIUM -> ButtonSizes(add = 40.dp, mic = 32.dp, gap = 3.dp)
 }
 

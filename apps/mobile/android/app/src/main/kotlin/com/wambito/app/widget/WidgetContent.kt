@@ -26,6 +26,7 @@ import androidx.glance.color.ColorProvider
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -90,6 +91,7 @@ object WidgetPalette {
         "ink" to (0xFFF3F0FF to 0xFF221A47),
         "inkMuted" to (0xFFB9B2E0 to 0xFF5B5285),
         "brand" to (0xFF7C4DFF to 0xFF7B3DF0),
+        "brandEdge" to (0xFF3F22A3 to 0xFF4A2BBF),
         "onBrand" to (0xFFFFFFFF to 0xFFFFFFFF),
         "stroke" to (0xFF2D2660 to 0xFFE6DEFC),
         "good" to (0xFF7CFFB2 to 0xFF0B7A46),
@@ -127,34 +129,67 @@ private fun openApp(): Action = linkAction(LaunchLinks.HOME)
 private fun linkAction(link: android.net.Uri): Action =
     actionStartActivity(LaunchLinks.intent(LocalContext.current, link))
 
-/** A round button of [size]: ＋ (filled) or 🎤 (outlined in brand, as on home). */
+/**
+ * A ＋ or 🎤 as the app's bottom bar draws them (spec "Widget buttons"): a `brand` rounded square of
+ * [size] with its white icon, standing on a [buttonLedge] of `brandEdge`. Glance has no shadows, so
+ * the ledge is a second square under the face; both are the `widget_button` shape, tinted.
+ */
 @Composable
-private fun RoundButton(
+private fun LedgeButton(
     icon: Int,
     label: String,
-    filled: Boolean,
     theme: WidgetTheme,
     action: Action,
-    size: Dp = 44.dp,
+    size: Dp,
+    iconScale: Float,
 ) {
-    val brand = WidgetPalette.color("brand", theme)
+    val shape = ImageProvider(R.drawable.widget_button)
     Box(
         modifier = GlanceModifier
-            .size(size)
-            .cornerRadius(size / 2)
-            .background(if (filled) brand else WidgetPalette.color("stroke", theme))
+            .width(size)
+            .height(size + buttonLedge)
+            .background(shape, ContentScale.FillBounds, ColorFilter.tint(WidgetPalette.color("brandEdge", theme)))
             .semantics { contentDescription = label }
             .clickable(action),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Image(
-            provider = ImageProvider(icon),
-            contentDescription = null,
-            modifier = GlanceModifier.size(size * 0.55f),
-            colorFilter = ColorFilter.tint(if (filled) WidgetPalette.color("onBrand", theme) else brand),
-        )
+        Box(
+            modifier = GlanceModifier
+                .size(size)
+                .background(shape, ContentScale.FillBounds, ColorFilter.tint(WidgetPalette.color("brand", theme))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                provider = ImageProvider(icon),
+                contentDescription = null,
+                modifier = GlanceModifier.size(size * iconScale),
+                colorFilter = ColorFilter.tint(WidgetPalette.color("onBrand", theme)),
+            )
+        }
     }
 }
+
+/** The ＋ of [buttons]: the larger one, its icon 26/58 of it as on the bar. */
+@Composable
+private fun AddButton(model: WidgetModel.Figures, buttons: ButtonSizes) = LedgeButton(
+    icon = R.drawable.ic_widget_add,
+    label = model.addLabel,
+    theme = model.theme,
+    action = linkAction(LaunchLinks.ADD),
+    size = buttons.add,
+    iconScale = 26f / 58f,
+)
+
+/** The 🎤 of [buttons]: the smaller one, its icon 22/44 of it as on the bar. */
+@Composable
+private fun MicButton(model: WidgetModel.Figures, buttons: ButtonSizes) = LedgeButton(
+    icon = R.drawable.ic_widget_mic,
+    label = model.captureLabel,
+    theme = model.theme,
+    action = linkAction(LaunchLinks.CAPTURE),
+    size = buttons.mic,
+    iconScale = 22f / 44f,
+)
 
 @Composable
 private fun SignedOutContent(model: WidgetModel.SignedOut, face: Boolean) {
@@ -259,26 +294,14 @@ private fun Stale(model: WidgetModel.Figures) {
     )
 }
 
-/** The ＋ and 🎤 pair, side by side, [size] dp each and [gap] apart. */
+/** The ＋ and 🎤 side by side, standing on one line as on the bar. */
 @Composable
-private fun ButtonsRow(model: WidgetModel.Figures, size: Dp, gap: Dp) {
-    RoundButton(
-        icon = R.drawable.ic_widget_add,
-        label = model.addLabel,
-        filled = true,
-        theme = model.theme,
-        action = linkAction(LaunchLinks.ADD),
-        size = size,
-    )
-    Spacer(GlanceModifier.width(gap))
-    RoundButton(
-        icon = R.drawable.ic_widget_mic,
-        label = model.captureLabel,
-        filled = false,
-        theme = model.theme,
-        action = linkAction(LaunchLinks.CAPTURE),
-        size = size,
-    )
+private fun ButtonsRow(model: WidgetModel.Figures, buttons: ButtonSizes) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        AddButton(model, buttons)
+        Spacer(GlanceModifier.width(buttons.gap))
+        MicButton(model, buttons)
+    }
 }
 
 /**
@@ -317,9 +340,8 @@ private fun LineWidgetContent(
     staleLine: Boolean,
     padding: Dp,
     amountSize: Int,
-    buttonSize: Dp,
-    gap: Dp,
 ) {
+    val buttons = buttonSizesFor(layout)
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -335,14 +357,14 @@ private fun LineWidgetContent(
                 AmountLine(model, amountSize, layout, staleInDescription = !staleLine, modifier = GlanceModifier)
                 if (staleLine) Stale(model)
             }
-            Spacer(GlanceModifier.width(gap))
+            Spacer(GlanceModifier.width(buttons.gap))
         }
-        ButtonsRow(model, size = buttonSize, gap = gap)
+        ButtonsRow(model, buttons)
     }
 }
 
 /**
- * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 at 36 dp;
+ * Small (2×1): the amount on one line (stale text in its description), then ＋ and 🎤 (32 and 28 dp);
  * no label, no room. Under 150 dp wide ([showAmount] false) only the two buttons.
  */
 @Composable
@@ -350,21 +372,21 @@ fun SmallWidgetContent(model: WidgetModel, showAmount: Boolean = true) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
         model as WidgetModel.Figures, WidgetSize.SMALL, showAmount, staleLine = false,
-        padding = 8.dp, amountSize = 14, buttonSize = 36.dp, gap = 4.dp,
+        padding = 8.dp, amountSize = 14,
     )
 }
 
-/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 at 40 dp. */
+/** Row (4×1): the amount on one line with the stale line under it, then ＋ and 🎤 (33 and 28 dp). */
 @Composable
 fun RowWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = false)
     LineWidgetContent(
         model as WidgetModel.Figures, WidgetSize.ROW, showAmount = true, staleLine = true,
-        padding = 14.dp, amountSize = 20, buttonSize = 40.dp, gap = 8.dp,
+        padding = 14.dp, amountSize = 20,
     )
 }
 
-/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ and 🎤 (40 dp, so they fit 100 dp). */
+/** Medium (4×2): Wambi's face, the month, "Te quedan" with its progress bar, ＋ over 🎤 (40 and 32 dp with their ledges, so they fit 100 dp). */
 @Composable
 fun MediumWidgetContent(model: WidgetModel) {
     if (model is WidgetModel.SignedOut) return SignedOutContent(model, face = true)
@@ -416,24 +438,14 @@ fun MediumWidgetContent(model: WidgetModel) {
             Stale(model)
         }
         Spacer(GlanceModifier.width(10.dp))
-        Column(verticalAlignment = Alignment.CenterVertically) {
-            RoundButton(
-                icon = R.drawable.ic_widget_add,
-                label = model.addLabel,
-                filled = true,
-                theme = theme,
-                action = linkAction(LaunchLinks.ADD),
-                size = 40.dp,
-            )
-            Spacer(GlanceModifier.height(4.dp))
-            RoundButton(
-                icon = R.drawable.ic_widget_mic,
-                label = model.captureLabel,
-                filled = false,
-                theme = theme,
-                action = linkAction(LaunchLinks.CAPTURE),
-                size = 40.dp,
-            )
+        val buttons = buttonSizesFor(WidgetSize.MEDIUM)
+        Column(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AddButton(model, buttons)
+            Spacer(GlanceModifier.height(buttons.gap))
+            MicButton(model, buttons)
         }
     }
 }
