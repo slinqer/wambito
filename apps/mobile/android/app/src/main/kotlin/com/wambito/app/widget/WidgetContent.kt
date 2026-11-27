@@ -17,6 +17,7 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
@@ -194,18 +195,41 @@ private fun Figure(model: WidgetModel.Figures, amountSize: Int, labelLines: Int 
         maxLines = labelLines,
         style = TextStyle(color = WidgetPalette.color("inkMuted", theme), fontSize = 12.sp),
     )
-    Text(
-        text = model.amount,
-        maxLines = 1,
-        modifier = model.amountDescription?.let { description ->
-            GlanceModifier.semantics { contentDescription = description }
-        } ?: GlanceModifier,
-        style = TextStyle(
-            color = WidgetPalette.color("ink", theme),
-            fontSize = amountSize.sp,
-            fontWeight = FontWeight.Bold,
-        ),
-    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = model.amount,
+            maxLines = 1,
+            modifier = model.amountDescription?.let { description ->
+                GlanceModifier.semantics { contentDescription = description }
+            } ?: GlanceModifier,
+            style = TextStyle(
+                color = WidgetPalette.color("ink", theme),
+                fontSize = amountSize.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+        )
+        EyeButton(model)
+    }
+}
+
+/** The widget's eye, right after the amount: hides or shows it without opening the app. */
+@Composable
+private fun EyeButton(model: WidgetModel.Figures) {
+    Box(
+        modifier = GlanceModifier
+            .size(36.dp)
+            .cornerRadius(18.dp)
+            .semantics { contentDescription = model.eyeLabel }
+            .clickable(actionRunCallback<ToggleHideAmount>()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            provider = ImageProvider(if (model.hidden) R.drawable.ic_widget_eye_off else R.drawable.ic_widget_eye),
+            contentDescription = null,
+            modifier = GlanceModifier.size(20.dp),
+            colorFilter = ColorFilter.tint(WidgetPalette.color("inkMuted", model.theme)),
+        )
+    }
 }
 
 @Composable
@@ -252,16 +276,19 @@ private fun AmountLine(model: WidgetModel.Figures, size: Int, staleInDescription
     } else {
         listOf(model.amountDescription ?: model.amount, stale).joinToString(", ")
     }
-    Text(
-        text = model.amount,
-        maxLines = 1,
-        modifier = description?.let { modifier.semantics { contentDescription = it } } ?: modifier,
-        style = TextStyle(
-            color = WidgetPalette.color("ink", model.theme),
-            fontSize = size.sp,
-            fontWeight = FontWeight.Bold,
-        ),
-    )
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = model.amount,
+            maxLines = 1,
+            modifier = description?.let { GlanceModifier.semantics { contentDescription = it } } ?: GlanceModifier,
+            style = TextStyle(
+                color = WidgetPalette.color("ink", model.theme),
+                fontSize = size.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+        )
+        EyeButton(model)
+    }
 }
 
 /**

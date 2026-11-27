@@ -130,7 +130,10 @@ void main() {
   });
 
   test('the app is Wambito on the phone', () {
-    expect(_manifest, contains('android:label="Wambito"'));
+    // The label is a placeholder: Wambito, or "Wambito Dev" for the opt-in side-by-side build.
+    expect(_manifest, contains('android:label="\${appLabel}"'));
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    expect(gradle, contains('manifestPlaceholders["appLabel"] = "Wambito"'));
     expect(_kotlin('../launch/LaunchLinks.kt'), contains('SCHEME = "wambito"'));
   });
 

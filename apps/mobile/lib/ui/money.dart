@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
+import '../l10n/app_localizations.dart';
 import '../money/format.dart';
+import '../privacy/masked_money.dart';
 import '../theme/tokens.g.dart';
 
 /// An amount in the app's language (`562,92 €` / `€562.92`) with tabular figures: the web's
@@ -97,6 +99,13 @@ class _MoneyState extends State<Money> with SingleTickerProviderStateMixin {
     final style = (widget.style ?? const TextStyle()).copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    // Home's eye closed: one masked word, no count, read as "amount hidden".
+    if (hiddenAmountsOf(context)) {
+      return Semantics(
+        label: AppLocalizations.of(context).amountHidden,
+        child: ExcludeSemantics(child: Text(hiddenAmount, style: style)),
+      );
+    }
     final last = formatMoney(widget.cents, widget.currency, locale);
     if (!widget.animate) return Text(last, style: style);
     return Semantics(

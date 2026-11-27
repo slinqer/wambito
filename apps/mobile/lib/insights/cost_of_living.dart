@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../api/gen/wambito_api.dart';
 import '../home/category_look.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
@@ -15,6 +14,7 @@ import '../ui/money.dart';
 import 'category_donut.dart' show CategoryTile;
 import 'insights_model.dart';
 import 'parts.dart';
+import '../privacy/masked_money.dart';
 
 /// "¿Cuánto me cuesta vivir?" (spec §2.7, §4.2): what a normal month costs, as the average
 /// monthly spending over the last six complete months, split into fixed (categories with a
@@ -49,7 +49,7 @@ class CostOfLiving extends StatelessWidget {
     final locale = l10n.localeName;
     final data = report;
     final empty = noHistory || (data != null && (data.total <= 0 || data.categories.isEmpty));
-    String money(int cents) => formatMoney(cents, currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, currency, locale);
     return InsightCard(
       title: l10n.insightsLivingTitle,
       order: order,

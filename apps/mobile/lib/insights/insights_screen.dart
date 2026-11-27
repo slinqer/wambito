@@ -19,7 +19,6 @@ import '../home/screen_error.dart';
 import '../home/home_widgets.dart' show QuietSpinner;
 import '../home/shell_navigation.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/app_shell.dart';
@@ -36,6 +35,7 @@ import 'insights_controller.dart';
 import 'insights_model.dart';
 import 'parts.dart';
 import 'trend_chart.dart';
+import '../privacy/masked_money.dart';
 
 /// The widest the content grows on a big screen (the web's `max-w-[480px]`, padding included).
 const _maxContentWidth = 480.0;
@@ -146,7 +146,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final period = periodOf(end, state.span);
     final locale = l10n.localeName;
     final colors = context.lkColors;
-    String money(int cents) => formatMoney(cents, data.currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, data.currency, locale);
 
     // Wambi speaks about the answer he has, with its own period: never a new month's name with
     // an old month's figures.

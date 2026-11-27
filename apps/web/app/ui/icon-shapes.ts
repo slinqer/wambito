@@ -47,6 +47,7 @@ export const ICON_NAMES = [
   "calendar",
   "widget",
   "eye-off",
+  "eye",
   "globe",
   "moon",
   "volume",

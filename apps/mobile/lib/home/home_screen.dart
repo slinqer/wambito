@@ -18,6 +18,7 @@ import '../capture/capture_sheet.dart';
 import '../feedback/feedback.dart';
 import '../l10n/app_localizations.dart';
 import '../money/format.dart';
+import '../privacy/masked_money.dart';
 import '../offline/pending_saves.dart';
 import '../review/review_controller.dart';
 import '../review/review_home_row.dart';
@@ -322,6 +323,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final toasts = ToastHost.of(context);
     final l10n = AppLocalizations.of(context);
     final data = ref.read(homeProvider).data;
+    final hidden = hiddenAmountsOf(context);
     if (isUnsent(tx)) {
       final container = ProviderScope.containerOf(context);
       final queue = ref.read(pendingSavesProvider.notifier);
@@ -329,7 +331,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (mounted) ref.read(feedbackProvider)(FeedbackEvent.paid);
         if (data != null) {
           toasts.say(
-            l10n.transactionPaid(tx.name, formatMoney(tx.amount, data.currency, l10n.localeName)),
+            l10n.transactionPaid(
+              tx.name,
+              shownMoney(hidden, tx.amount, data.currency, l10n.localeName),
+            ),
           );
         }
         return;
@@ -351,7 +356,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mounted) ref.read(feedbackProvider)(FeedbackEvent.paid);
     if (data != null) {
       toasts.say(
-        l10n.transactionPaid(tx.name, formatMoney(tx.amount, data.currency, l10n.localeName)),
+        l10n.transactionPaid(
+          tx.name,
+          shownMoney(hidden, tx.amount, data.currency, l10n.localeName),
+        ),
       );
     }
   }
@@ -394,6 +402,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final worried = data.summary.categories.any(
       (c) => c.state != SummaryCategoriesInnerStateEnum.ok,
     );
+    // Home's eye closed: Wambi says the amounts are hidden instead of reading one out.
+    if (hiddenAmountsOf(context)) {
+      return (message: l10n.homeWambiHidden, mood: worried ? WambiMood.worried : WambiMood.happy);
+    }
     // Figures of an earlier month that could not be brought up to date (a cache opened after the
     // month changed): Wambi says so, and never talks about "this month" or a month that just
     // closed as if it were live.
@@ -798,7 +810,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           'day-${group.date}',
           () => DayHeading(
             label: label,
-            total: formatMoney(
+            total: shownMoney(
+              hiddenAmountsOf(context),
               group.total,
               data.currency,
               locale,

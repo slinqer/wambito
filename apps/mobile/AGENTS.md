@@ -398,6 +398,15 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `DueWorker` (`preview` or `unknown` ⇒ no API call (`RefreshWorker` asks the headless sync); absent = an install from before the vault ⇒ as
   before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
   screens pass `previewOpen()` (`test/support/preview_account.dart`).
+- `lib/privacy/`: home's eye (spec `2026-11-26-hide-amounts-design.md`). `hide_amounts.dart`: `amountsHiddenProvider`
+  (`HideAmounts`, secure-storage key `setting.app.hideAmounts`, read into `InitialSettings.hideAmounts` before the first
+  frame; one per phone, survives sign-out). `masked_money.dart`: `hiddenAmount` (`••••`), `shownMoney(hidden, …)`,
+  `hiddenAmountsOf(context)` and `HiddenAmountsScope` (at the app's root, in `app.dart`'s builder and the test harnesses):
+  `Money` masks itself and every on-screen amount inside a sentence goes through `shownMoney` (chart axis ticks are
+  blank and the thousands hint dropped while hidden); typed amounts, the capture preview, the currency sample and the demos
+  never mask. `hide_amounts_button.dart`: the eye after home's hero figure (`home.hideAmounts`), with the
+  `amountsHidden` / `amountsShown` blinds. Tests: `test/support/amounts.dart` (`expectNoAmounts`, `closeEye`) and a
+  closed-eye test in each screen's own test file. The widget's eye is apart (below, `widget/`).
 - `lib/protect/`: "Protect your data" (phone-first spec 5.2) for a `preview` account without email. `protect_status.dart`:
   `ProtectStatus` (`recoveryKey`, `passkey`, `passkeyOffered`, `passkeyWithoutPrf`, `done`, `protected`) and
   `protectStatusProvider` (null unless `preview`, anonymous and the vault open; read again on every vault commit);
@@ -507,7 +516,13 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `wambito://signin?`, the pairing one by default; `ScannerPrefixTest`) goes back, via `EXTRA_PREFIXES`. CameraX 1.6.2 (camera2, lifecycle) and ZXing core 3.5.4 are pinned exactly; no `camera-view` (it brings media3
   and Guava): the preview is a `TextureView` fed by a hand-written `SurfaceProvider`; never `camera-mlkit-vision`, ML Kit or
   `mobile_scanner` (`check-no-google.sh`). camera-core's bundled libyuv has its BSD-3 notice in About. Its two words are `scanner_hint` / `scanner_close` in `strings.xml`.
-- `widget/`: Glance widgets via home_widget; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
+- `widget/`: Glance widgets via home_widget; the widget's own hide choice is `WidgetChoice.kt` (keys
+  `wambito.widget.hideAmount` and the mirrored vibration switch `wambito.widget.vibration` in `HomeWidgetPreferences`;
+  Dart's `lib/home/widget_choice.dart` `WidgetPrefsFlagStore` copies the old secure key `setting.widget.hideAmount` once,
+  unreadable = hidden), written by Settings' switch and by the widget's eye (`ToggleHideAmount.kt`, a Glance
+  `ActionCallback`: flips it, plays `haptics/Blinds.kt` through `haptics/Haptics.kt` unless vibration is off, redraws;
+  `test/tooling/blinds_android_test.dart` keeps the blinds equal to Dart's); every snapshot writer reads the key at
+  write time and the app reloads it on resume (`widgetChoiceReloadProvider`); `notices/`: WorkManager `DueWorker`/`GuestWorker`,
   local notices only. The 45-day guest warning is a `plain` guest's: for a `preview` account `NoticeSync` cancels it,
   `GuestWorker` posts nothing and Settings hides its switch (an encrypted guest is kept 12 or 24 months). A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)
@@ -649,6 +664,10 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   (`signin-*` masters) ends with the "Sign in with my recovery key" link; the web's story gets it with the web
   delivery of phone-first accounts.
 - Kotlin: `cd android && JAVA_HOME=<JDK 17> ./gradlew :app:testDebugUnitTest --console=plain`.
+- On a real phone that has the store app: `flutter build apk --debug --android-project-arg=wambito.dev=true` builds
+  `com.wambito.app.dev` ("Wambito Dev"), which installs next to it (a debug build cannot update a release, and
+  uninstalling would delete that phone's vault); with `adb reverse tcp:3000 tcp:3000` and
+  `--dart-define=WAMBITO_SERVER=http://localhost:3000` it uses the local stack. Never set by CI or the release scripts.
 - iOS (macOS, Xcode): `swift test --package-path ios/WambitoNative`; unsigned build `flutter build ios
   --release --no-codesign`; `scripts/check-ios-signing.sh`, `scripts/test-check-ios-signing.sh`;
   `dart run scripts/gen-ios-strings.dart` after changing a notice string; `../../scripts/check-channels.sh`.
@@ -773,7 +792,8 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   the slang lives in `lib/capture/parser/`, `lib/capture/engine/`, `lib/money/format.dart` and the ARBs.
 - Persistent state on phones: prefs file names, WorkManager unique names (`wambito.widget.refresh`,
   `wambito.widget.midnight`, `wambito.notice.due`, `wambito.notice.guest`, `wambito.capture.send`,
-  `wambito.capture.confirm.<id>`; the old shared `wambito.capture.confirm` chain is only cancelled,
+  `wambito.capture.confirm.<id>`; secure-storage key `setting.app.hideAmounts`; widget prefs keys
+  `wambito.widget.hideAmount` and `wambito.widget.vibration`; the old shared `wambito.capture.confirm` chain is only cancelled,
   at every Bien; prefs `wambito.capture.queue`, `wambito.capture.sources`; secure-storage keys `wambito.widgetCard.closed`, `home.protect.<userId>` and `wambito.protect.<userId>.keyAfterClaim` and `wambito.vault.<userId>.seenDevices`; channel
   `wambito.capture`; listener class `com.wambito.app.capture.CaptureListener`), widget receiver classes
   (renaming removes placed widgets), the snapshot key. Changing any needs a migration. Stage 3b added:

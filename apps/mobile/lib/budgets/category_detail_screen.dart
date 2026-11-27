@@ -45,6 +45,7 @@ import 'budget_sheet.dart';
 import 'categories_tab.dart';
 import 'category_detail_controller.dart';
 import '../ui/tile_glyph.dart';
+import '../privacy/masked_money.dart';
 
 /// The widest the content grows on a big screen (the web's `max-w-[480px]`, padding included).
 const _maxContentWidth = 480.0;
@@ -358,6 +359,7 @@ class _DetailViewState extends ConsumerState<_DetailView> {
   Future<void> _pay(Transaction tx) async {
     final toasts = ToastHost.of(context);
     final l10n = AppLocalizations.of(context);
+    final hidden = hiddenAmountsOf(context);
     try {
       await _controller.markPaid(tx);
     } on HomeFailure catch (failure) {
@@ -366,7 +368,10 @@ class _DetailViewState extends ConsumerState<_DetailView> {
     }
     if (mounted) ref.read(feedbackProvider)(FeedbackEvent.paid);
     toasts.say(
-      l10n.transactionPaid(tx.name, formatMoney(tx.amount, widget.currency, l10n.localeName)),
+      l10n.transactionPaid(
+        tx.name,
+        shownMoney(hidden, tx.amount, widget.currency, l10n.localeName),
+      ),
     );
   }
 
@@ -595,7 +600,7 @@ class _BudgetCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final colors = context.lkColors;
     final locale = l10n.localeName;
-    String money(int cents) => formatMoney(cents, currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, currency, locale);
     final monthName = monthInSentence(month, locale);
     final budget = line?.budget;
     final spent = line?.spent ?? 0;
@@ -732,7 +737,7 @@ class _IncomeCard extends StatelessWidget {
       child: Text(
         l10n.categoryReceived(
           monthInSentence(month, l10n.localeName),
-          formatMoney(total ?? 0, currency, l10n.localeName),
+          shownMoney(hiddenAmountsOf(context), total ?? 0, currency, l10n.localeName),
         ),
         style: style.copyWith(color: colors.good),
       ),
@@ -817,7 +822,8 @@ class _Movements extends StatelessWidget {
         for (final group in groupByDay(items, today)) ...[
           DayHeading(
             label: dayHeadingLabel(l10n, group),
-            total: formatMoney(
+            total: shownMoney(
+              hiddenAmountsOf(context),
               group.total,
               currency,
               locale,

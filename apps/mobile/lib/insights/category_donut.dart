@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import '../api/gen/wambito_api.dart';
 import '../home/category_look.dart';
 import '../l10n/app_localizations.dart';
-import '../money/format.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import '../ui/css_text.dart';
@@ -19,6 +18,7 @@ import 'insights_controller.dart';
 import 'insights_model.dart';
 import 'parts.dart';
 import '../ui/tile_glyph.dart';
+import '../privacy/masked_money.dart';
 
 /// The donut's size, in px (`SIZE`).
 const donutSize = 200.0;
@@ -77,7 +77,7 @@ class CategoryDonut extends StatelessWidget {
     final shownStatus = range?.status ?? status;
     final phrase = periodPhrase(l10n, range?.period ?? period, current);
     final what = _what(l10n, shownKind, shownStatus);
-    String money(int cents) => formatMoney(cents, currency, locale);
+    String money(int cents) => shownMoney(hiddenAmountsOf(context), cents, currency, locale);
     final items = report?.items.toList() ?? const <CategoryReportItemsInner>[];
     final shares = sharesOf([for (final item in items) item.total]);
 

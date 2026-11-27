@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../feedback/stored_flag.dart';
+import '../home/widget_choice.dart';
+import '../home/widget_snapshot.dart';
 import 'initial_settings.dart';
 import 'settings_store.dart';
 
@@ -49,8 +51,13 @@ final guestNoticeEnabledProvider = NotifierProvider<GuestNoticeEnabled, bool>(
 
 /// "Hide the amount in the widget": the widget shows "••••" in place of "Te quedan".
 class HideWidgetAmount extends StoredFlag {
+  /// In the widget's preferences, where the widget's eye writes it too (lib/home/widget_choice.dart);
+  /// copied once from the secure-storage key it had before.
   @override
-  FlagStore get store => ref.read(flagStoreProvider('setting.widget.hideAmount'));
+  FlagStore get store => WidgetPrefsFlagStore(
+    ref.read(widgetStoreProvider),
+    legacy: ref.read(flagStoreProvider('setting.widget.hideAmount')),
+  );
 
   @override
   bool get initial => false;

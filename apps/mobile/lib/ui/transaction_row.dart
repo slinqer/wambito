@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../money/format.dart';
+import '../privacy/masked_money.dart';
 import '../theme/surfaces.dart';
 import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
@@ -100,7 +101,8 @@ class _TransactionRowState extends State<TransactionRow> {
     final locale = Localizations.localeOf(context).languageCode;
     final title = name.trim().isEmpty ? categoryName : name.trim();
     final income = amount > 0;
-    final money = formatMoney(
+    final money = shownMoney(
+      hiddenAmountsOf(context),
       amount,
       currency,
       locale,

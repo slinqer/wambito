@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/privacy/masked_money.dart';
 import 'package:wambito/add/add_repository.dart';
 import 'package:wambito/feedback/stored_flag.dart';
 import 'package:wambito/api/gen/wambito_api.dart';
@@ -118,17 +119,19 @@ Future<HomeHarness> pumpHome(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => withAppHosts(
-          textScale == 1
-              ? child!
-              : MediaQuery(
-                  data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
-                  child: child!,
-                ),
-          // Tests settle the frames: a running time bar, or a celebration, would wait out its stay
-          // (test/feedback/celebration_test.dart has the celebration's own).
-          animateToastBar: false,
-          celebrate: false,
+        builder: (context, child) => HiddenAmountsScope(
+          child: withAppHosts(
+            textScale == 1
+                ? child!
+                : MediaQuery(
+                    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+                    child: child!,
+                  ),
+            // Tests settle the frames: a running time bar, or a celebration, would wait out its stay
+            // (test/feedback/celebration_test.dart has the celebration's own).
+            animateToastBar: false,
+            celebrate: false,
+          ),
         ),
         home: HomeScreen(
           onEdit: withEdit ? edited.add : null,

@@ -76,6 +76,17 @@ abstract class StoredFlag extends Notifier<bool> {
   /// Completes once the kept choice has been read back (or found unreadable).
   Future<void> get ready => _ready;
 
+  /// Reads the kept choice again: someone else may have changed it (the widget's eye, while the app
+  /// was away). A store that cannot be read keeps the value as it is.
+  Future<void> reload() async {
+    try {
+      final kept = await store.read();
+      if (kept != null && ref.mounted) state = kept;
+    } on Object {
+      // Unreadable: the value stands.
+    }
+  }
+
   /// Turns the setting on or off, and keeps the choice. A store that cannot be written only means
   /// the choice is forgotten at the next start.
   Future<void> set(bool on) async {

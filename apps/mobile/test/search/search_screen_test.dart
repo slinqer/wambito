@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/gen/wambito_api.dart';
@@ -11,6 +10,7 @@ import 'package:wambito/search/search_screen.dart';
 import '../home/fakes.dart';
 import '../home/fixtures.dart';
 import '../settings/harness.dart';
+import '../support/amounts.dart';
 
 /// The server's search over a list of transactions: filters like the API, pages of [pageSize],
 /// totals over every match. Records every call.
@@ -239,5 +239,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(env.router.routerDelegate.currentConfiguration.last.matchedLocation, '/search');
     expect(find.byKey(const Key('search.field')), findsOneWidget);
+  });
+
+  testWidgets('with home\'s eye closed, no amount shows: rows, day totals and the totals line', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final (_, env) = await _pump(tester);
+    await _type(tester, 'cafe');
+    await closeEye(tester, env.container);
+    expect(find.text('Cafe Juan'), findsOneWidget, reason: 'names stay');
+    expectNoAmounts(tester);
+    semantics.dispose();
   });
 }

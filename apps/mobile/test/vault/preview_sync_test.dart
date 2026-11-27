@@ -167,7 +167,7 @@ void main() {
     expect(native.writes.last, 'plain');
     expect(capture.callsNamed('clearQueue'), isEmpty);
     expect(capture.callsNamed('sendQueued'), isEmpty);
-    expect(widget.saved, isEmpty);
+    expect(widget.saved.containsKey(widgetSnapshotKey), isFalse);
   });
 
   test('a mode not learned yet is written as unknown, then replaced by the real one', () async {

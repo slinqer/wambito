@@ -56,6 +56,12 @@ enum FeedbackEvent {
   /// a wheel spinning down, one tick per notch as it slows, and a click as it stops where the
   /// figures settle.
   wheelSpun,
+
+  /// Home's eye (or the widget's) closed: the blind comes down and shuts.
+  amountsHidden,
+
+  /// The eye opened again: the blind goes up.
+  amountsShown,
 }
 
 /// One step of the Android haptic composition: a `PRIMITIVE_CLICK`, `PRIMITIVE_TICK`,
@@ -143,6 +149,24 @@ const hapticPatterns = <FeedbackEvent, HapticPattern>{
   // starts and as each notch passes, further apart as it slows (the times easeOut crosses each
   // twelfth), and a full click where it stops. Each pause is the gap after an 8 ms tick; the ticks
   // are firm (it is a heavy wheel) and soften a little as it slows.
+  // The blind comes down and shuts: two light ticks gaining weight, then a dull knock.
+  FeedbackEvent.amountsHidden: HapticPattern(
+    [6, 25, 8, 35, 22],
+    [
+      HapticPrimitive('tick', 0.4),
+      HapticPrimitive('tick', 0.6, delayMs: 25),
+      HapticPrimitive('thud', 0.9, delayMs: 35),
+    ],
+  ),
+  // The blind goes up, the mirror: a soft low knock, then lighter and lighter, nothing final.
+  FeedbackEvent.amountsShown: HapticPattern(
+    [16, 35, 8, 25, 6],
+    [
+      HapticPrimitive('lowTick', 0.6),
+      HapticPrimitive('tick', 0.5, delayMs: 35),
+      HapticPrimitive('tick', 0.3, delayMs: 25),
+    ],
+  ),
   FeedbackEvent.wheelSpun: HapticPattern(
     [8, 18, 8, 20, 8, 21, 8, 22, 8, 24, 8, 25, 8, 27, 8, 30, 8, 34, 8, 39, 8, 50, 8, 114, 20],
     [

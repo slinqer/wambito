@@ -35,6 +35,22 @@ Future<void> started(ProviderContainer container) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('the blinds are mirrors: down gains weight and shuts, up starts low and lightens', () {
+    List<(String, double, int)> steps(FeedbackEvent event) => [
+      for (final step in hapticPatterns[event]!.primitives) (step.name, step.scale, step.delayMs),
+    ];
+    expect(steps(FeedbackEvent.amountsHidden), [
+      ('tick', 0.4, 0),
+      ('tick', 0.6, 25),
+      ('thud', 0.9, 35),
+    ]);
+    expect(steps(FeedbackEvent.amountsShown), [
+      ('lowTick', 0.6, 0),
+      ('tick', 0.5, 35),
+      ('tick', 0.3, 25),
+    ]);
+  });
+
   group('events', () {
     // The web's patterns (apps/web/app/feedback/feedback.ts), in ms: vibrate, pause, vibrate...
     // Sounds are the web's too; gestures only vibrate there, and so here.
@@ -57,6 +73,9 @@ void main() {
       FeedbackEvent.micReleased: ([6], null),
       FeedbackEvent.sheetOpened: ([18, 50, 6], null),
       FeedbackEvent.sheetClosed: ([16], null),
+      // Home's eye and the widget's: the blind comes down and shuts, the blind goes up.
+      FeedbackEvent.amountsHidden: ([6, 25, 8, 35, 22], null),
+      FeedbackEvent.amountsShown: ([16, 35, 8, 25, 6], null),
       FeedbackEvent.wheelSpun: (
         [8, 18, 8, 20, 8, 21, 8, 22, 8, 24, 8, 25, 8, 27, 8, 30, 8, 34, 8, 39, 8, 50, 8, 114, 20],
         null,

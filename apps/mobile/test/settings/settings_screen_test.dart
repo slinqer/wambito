@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/home/widget_snapshot.dart';
+import 'package:wambito/home/widget_choice.dart';
 import 'package:wambito/api/session.dart';
 import 'package:wambito/capture/models_download.dart';
 import 'package:wambito/feedback/feedback.dart';
@@ -465,7 +467,10 @@ void main() {
       expect(env.container.read(hideWidgetAmountProvider), isTrue);
       expect(env.flags['setting.notice.due']?.value, isFalse);
       expect(env.flags['setting.notice.guest']?.value, isFalse);
-      expect(env.flags['setting.widget.hideAmount']?.value, isTrue);
+      expect(
+        (env.container.read(widgetStoreProvider) as FakeWidgetStore).saved[widgetHideAmountKey],
+        'on',
+      );
     });
   });
 

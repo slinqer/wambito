@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/add/add_sheet.dart';
 import 'package:wambito/api/gen/wambito_api.dart';
@@ -13,6 +14,7 @@ import '../home/fakes.dart';
 import '../home/fixtures.dart';
 import '../home/home_harness.dart';
 import 'fakes.dart';
+import '../support/amounts.dart';
 
 /// Home in front of a server whose money is [currency], with the add sheet's repository on top of
 /// the same movements.
@@ -220,6 +222,20 @@ void main() {
   });
 
   group('saving', () {
+    testWidgets('with home\'s eye closed, the toast says what was saved but not how much', (
+      tester,
+    ) async {
+      await pump(tester);
+      await closeEye(tester, ProviderScope.containerOf(tester.element(find.byType(MaterialApp))));
+      await openSheet(tester);
+      await tapKeys(tester, '25000');
+      await tester.tap(find.byKey(const Key('add.save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Gasto en Supermercado: ••••'), findsOneWidget);
+      expect(find.textContaining('lukas'), findsNothing);
+      await letTimersEnd(tester);
+    });
+
     testWidgets('closes the sheet, shows the row, and offers Deshacer and Ponerle nombre', (
       tester,
     ) async {
