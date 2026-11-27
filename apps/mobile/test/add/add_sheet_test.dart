@@ -1046,6 +1046,11 @@ void main() {
       );
       await tester.tap(find.text('Almuerzo'));
       await tester.pumpAndSettle();
+      // A destructive button: in the delete colour.
+      expect(
+        tester.widget<PressButton>(find.byKey(const Key('add.delete'))).tone,
+        PressTone.danger,
+      );
       await tester.tap(find.byKey(const Key('add.delete')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('add.sheet')), findsNothing);

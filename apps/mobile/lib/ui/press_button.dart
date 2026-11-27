@@ -10,7 +10,9 @@ import 'pressable.dart';
 
 /// Which button: one `primary` per view; `secondary` for the alternative, `ghost` to skip or
 /// dismiss (the web's `variant`).
-enum PressTone { primary, secondary, ghost }
+/// [danger] is a destructive action (Eliminar): the delete colour, like a swiped row's Borrar,
+/// sinking 5px as a primary does.
+enum PressTone { primary, secondary, ghost, danger }
 
 /// The button's size (the web's `size`): `md`, or the smaller `sm`.
 enum PressSize { md, sm }
@@ -86,7 +88,11 @@ class PressButton extends StatelessWidget {
     final sm = size == PressSize.sm;
     final radius = LkSurface.radius(sm ? LkRadius.lg : LkRadius.xl);
     final textStyle = (sm ? LkText.buttonSm : LkText.button).copyWith(
-      color: tone == PressTone.primary ? colors.onBrand : colors.ink,
+      color: switch (tone) {
+        PressTone.primary => colors.onBrand,
+        PressTone.danger => colors.bg,
+        _ => colors.ink,
+      },
       decoration: tone == PressTone.ghost ? TextDecoration.underline : null,
       decorationColor: colors.ink,
     );
@@ -134,6 +140,15 @@ class PressButton extends StatelessWidget {
           case PressTone.ghost:
             decoration = BoxDecoration(borderRadius: radius);
             dy = pressed ? 2 : 0;
+          case PressTone.danger:
+            // Its edge is the delete colour darkened, as the brand's is the brand darkened.
+            final edge = Color.lerp(colors.over, const Color(0xFF000000), 0.35)!;
+            decoration = BoxDecoration(
+              color: colors.over,
+              borderRadius: radius,
+              boxShadow: [BoxShadow(color: edge, offset: Offset(0, pressed ? 1 : 5))],
+            );
+            dy = pressed ? 5 : 0;
         }
         final surface = PressSurface(
           decoration: decoration,

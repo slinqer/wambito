@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/theme/tokens.g.dart';
 import 'package:wambito/ui/press_button.dart';
+import 'package:wambito/ui/pressable.dart';
 import 'package:wambito/ui/press_link.dart';
 
 import '../support/fonts.dart';
@@ -198,5 +200,18 @@ void main() {
       expect(went, 1);
       handle.dispose();
     });
+  });
+
+  testWidgets('the danger tone is the delete colour, its words on it in bg', (t) async {
+    await t.pumpWidget(
+      uiApp(PressButton.text('Eliminar', tone: PressTone.danger, onPressed: () {})),
+    );
+    final colors = WambitoColors.night;
+    final box = t.widget<PressSurface>(find.byType(PressSurface)).decoration;
+    expect(box.color, colors.over);
+    final label = t.widget<RichText>(
+      find.descendant(of: find.byType(PressButton), matching: find.byType(RichText)),
+    );
+    expect(label.text.style?.color, colors.bg);
   });
 }
