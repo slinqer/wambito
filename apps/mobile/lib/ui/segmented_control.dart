@@ -10,6 +10,7 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
+import '../feedback/feedback.dart';
 
 /// One option of a [SegmentedControl].
 class SegmentOption<T> {
@@ -67,6 +68,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
   void _selectAt(int index) {
     final options = widget.options;
     final option = options[(index + options.length) % options.length];
+    if (option.value != widget.value) context.feedback(FeedbackEvent.segmentChanged);
     widget.onChanged(option.value);
     _node(option.value).requestFocus();
   }
@@ -105,6 +107,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
               focusNode: _node(option.value)..skipTraversal = option.value != widget.value,
               onPressed: () {
                 _node(option.value).requestFocus();
+                if (option.value != widget.value) context.feedback(FeedbackEvent.segmentChanged);
                 widget.onChanged(option.value);
               },
             ),

@@ -570,13 +570,18 @@ void main() {
   });
 
   group('from home', () {
-    testWidgets('a swipe right on a paid row opens it for editing', (tester) async {
+    testWidgets('a swipe right on a paid row leaves Editar open, and Editar opens it', (
+      tester,
+    ) async {
       await pump(tester, items: [tx('lunch', '2026-10-22', -2800000, name: 'Almuerzo')]);
       await tester.timedDrag(
         find.text('Almuerzo'),
         const Offset(250, 0),
         const Duration(milliseconds: 300),
       );
+      await tester.pumpAndSettle();
+      expect(find.text('Editar movimiento'), findsNothing, reason: 'a swipe alone only opens it');
+      await tester.tap(find.text('EDITAR'));
       await tester.pumpAndSettle();
       expect(find.text('Editar movimiento'), findsOneWidget);
     });
@@ -1041,6 +1046,11 @@ void main() {
       );
       await tester.tap(find.text('Almuerzo'));
       await tester.pumpAndSettle();
+      // Saving is the main action here: Eliminar is the secondary one, in the delete colour.
+      expect(
+        tester.widget<PressButton>(find.byKey(const Key('add.delete'))).tone,
+        PressTone.dangerSecondary,
+      );
       await tester.tap(find.byKey(const Key('add.delete')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('add.sheet')), findsNothing);

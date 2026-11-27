@@ -60,7 +60,8 @@ class AddFooter extends StatelessWidget {
               PressButton.text(
                 l10n.addDelete,
                 key: const Key('add.delete'),
-                tone: PressTone.secondary,
+                // Saving is the main action here; Eliminar is the secondary, destructive one.
+                tone: PressTone.dangerSecondary,
                 horizontalPadding: WambitoTokens.space4,
                 onPressed: session.saving ? null : session.delete,
               ),

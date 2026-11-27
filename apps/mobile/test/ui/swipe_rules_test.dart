@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/ui/swipe_rules.dart';
 
@@ -74,9 +76,11 @@ void main() {
           right: right,
         );
 
-    test('commits right past the threshold, or on a flick', () {
-      expect(release(150, 0), RowRelease.commitRight);
-      expect(release(30, 700), RowRelease.commitRight);
+    test('a long or fast swipe right only opens its action, as Borrar does', () {
+      expect(release(150, 0), RowRelease.openRight);
+      expect(release(300, 0), RowRelease.openRight);
+      expect(release(30, 700), RowRelease.openRight);
+      expect(release(120, 2000), RowRelease.openRight);
     });
 
     test('a long or fast swipe left only opens Borrar', () {
@@ -98,6 +102,36 @@ void main() {
 
     test('never commits a side without an action', () {
       expect(release(200, 800, right: false), RowRelease.close);
+    });
+  });
+
+  group('the crown', () {
+    test('a notch every 20 px, either way', () {
+      expect(SwipeFeel.detent, 20);
+      expect(notchOf(0), 0);
+      expect(notchOf(19.9), 0);
+      expect(notchOf(20), 1);
+      expect(notchOf(-41), -2);
+    });
+
+    test('light at rest, firm at the threshold, never past it', () {
+      const width = 360.0;
+      expect(detentScale(0, width), closeTo(0.6, 1e-9));
+      expect(detentScale(width * SwipeFeel.rowThreshold, width), closeTo(1.0, 1e-9));
+      expect(detentScale(-width, width), closeTo(1.0, 1e-9));
+      expect(detentScale(width * SwipeFeel.rowThreshold / 2, width), closeTo(0.8, 1e-9));
+    });
+
+    test('a detent is one click at its scale', () {
+      final pattern = detentPattern(0.5);
+      expect(pattern.waveform, [12]);
+      expect(pattern.primitives.single.name, 'click');
+      expect(pattern.primitives.single.scale, 0.5);
+    });
+
+    test('the spring home is underdamped, so it bounces', () {
+      expect(SwipeFeel.rowHomeDamping, lessThan(2 * math.sqrt(SwipeFeel.rowStiffness)));
+      expect(SwipeFeel.detentGap, const Duration(milliseconds: 25));
     });
   });
 }

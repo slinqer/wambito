@@ -199,4 +199,15 @@ void main() {
     expect(t.getSize(find.byKey(const Key('b'))).width, 52 + 168);
     expect(t.getTopLeft(find.byKey(const Key('b'))).dx, 16 + 168 + 8);
   });
+
+  test('snapped columns never come out wider than their room, at any width and density', () {
+    // A Galaxy S25 at its default zoom is 2.8125: the keypad overflowed by 0.178 px there.
+    for (final ratio in [1.0, 2.0, 2.625, 2.75, 2.8125, 3.0, 3.5]) {
+      for (var w = 280.0; w < 460; w += 0.07) {
+        final track = snappedColumns(w, 3, 8, ratio);
+        final total = track[0] + track[1] + track[2] + track[3] + track[4];
+        expect(total, lessThanOrEqualTo(w + 1e-9), reason: 'width $w at $ratio');
+      }
+    }
+  });
 }

@@ -398,6 +398,15 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   `DueWorker` (`preview` or `unknown` ⇒ no API call (`RefreshWorker` asks the headless sync); absent = an install from before the vault ⇒ as
   before); iOS `AccountMode.swift` in `WambitoNative` (UserDefaults), asked by `DueTask`. Tests of such
   screens pass `previewOpen()` (`test/support/preview_account.dart`).
+- Feel (spec `2026-11-26-hide-amounts-design.md`, Haptics): `lib/feedback/feedback_event.dart` holds every event's
+  pattern; phone-only ones besides the ＋/🎤 presses: `pageChanged` (the month picker's arrows), `accountPressed`,
+  `segmentChanged` (inside `SegmentedControl`, only on a person's pick), `swipeBounced` and the blinds.
+  `hapticProvider` / `context.haptic(pattern)` plays a pattern that is not a fixed event: the swipe's crown. A swiped
+  row (`lib/ui/swipe_row.dart`, numbers in `swipe_rules.dart` `SwipeFeel`) clicks once per `detent` (20 px) of travel,
+  firmer toward the threshold (`detentScale`), never closer than `detentGap` (25 ms, by the pointer events' time), rolls
+  back through the notches on the spring home (underdamped `rowHomeDamping`, its overshoot felt once as
+  `swipeBounced`); neither side runs its action by itself any more (`rowRelease` only opens Borrar, Editar or Pagado; a
+  tap runs it). Tests: `test/ui/swipe_feel_test.dart`, `test/support/feel.dart` (`pumpFelt`, `feltEvents`).
 - `lib/privacy/`: home's eye (spec `2026-11-26-hide-amounts-design.md`). `hide_amounts.dart`: `amountsHiddenProvider`
   (`HideAmounts`, secure-storage key `setting.app.hideAmounts`, read into `InitialSettings.hideAmounts` before the first
   frame; one per phone, survives sign-out). `masked_money.dart`: `hiddenAmount` (`••••`), `shownMoney(hidden, …)`,

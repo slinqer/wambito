@@ -8,6 +8,7 @@ import '../theme/text_styles.dart';
 import 'lk_icons.dart';
 import 'lk_theme.dart';
 import 'pressable.dart';
+import '../feedback/feedback.dart';
 
 /// The month [months] away from [month] (`YYYY-MM`), as the web's `addMonths` of @wambito/core.
 String addMonths(String month, int months) {
@@ -54,7 +55,11 @@ class MonthPicker extends StatelessWidget {
           StepButton(
             icon: LkIconName.chevronLeft,
             label: l10n.monthPickerPrevious,
-            onPressed: () => onChange(addMonths(month, -1)),
+            onPressed: () {
+              // One page turned per month moved.
+              context.feedback(FeedbackEvent.pageChanged);
+              onChange(addMonths(month, -1));
+            },
           ),
           // `min-[400px]:min-w-[7.5em]` of the 18px name.
           Flexible(
@@ -75,7 +80,12 @@ class MonthPicker extends StatelessWidget {
           StepButton(
             icon: LkIconName.chevronRight,
             label: l10n.monthPickerNext,
-            onPressed: atMax ? null : () => onChange(addMonths(month, 1)),
+            onPressed: atMax
+                ? null
+                : () {
+                    context.feedback(FeedbackEvent.pageChanged);
+                    onChange(addMonths(month, 1));
+                  },
           ),
         ],
       ),

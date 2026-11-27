@@ -10,6 +10,7 @@ import '../ui/lk_icons.dart';
 import '../ui/lk_theme.dart';
 import '../ui/month_picker.dart';
 import '../ui/pressable.dart';
+import '../feedback/feedback.dart';
 
 /// Home's header, one row: the month (earlier ones browsable, never past [max]) on the left; the
 /// magnifier and the account button on the right, which opens the account menu ([menu]: the
@@ -92,7 +93,12 @@ class _HomeHeaderState extends State<HomeHeader> {
           icon: LkIconName.user,
           label: l10n.homeAccount,
           open: _open,
-          onPressed: widget.menu == null ? null : () => _setOpen(!_open),
+          onPressed: widget.menu == null
+              ? null
+              : () {
+                  context.feedback(FeedbackEvent.accountPressed);
+                  _setOpen(!_open);
+                },
         ),
       ],
     );
@@ -194,7 +200,14 @@ class _Avatar extends StatelessWidget {
             ),
             ringRadius: state.focusVisible ? radius : null,
             ringColor: colors.focus,
-            child: LkIcon(icon, size: 22, color: colors.ink),
+            // A button that opens a menu shows the outline icon while closed, the solid one open,
+            // as the bottom bar's tabs do.
+            child: LkIcon(
+              icon,
+              size: 22,
+              color: colors.ink,
+              variant: open == false ? LkIconVariant.outline : LkIconVariant.filled,
+            ),
           );
         },
       ),

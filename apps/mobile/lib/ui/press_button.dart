@@ -10,7 +10,11 @@ import 'pressable.dart';
 
 /// Which button: one `primary` per view; `secondary` for the alternative, `ghost` to skip or
 /// dismiss (the web's `variant`).
-enum PressTone { primary, secondary, ghost }
+/// [danger] is a destructive action that is the screen's main one: the delete colour, like a
+/// swiped row's Borrar, sinking 5px as a primary does. [dangerSecondary] is a destructive action
+/// beside the main one (Eliminar next to Guardar): a secondary button with its edge and words in
+/// the delete colour.
+enum PressTone { primary, secondary, ghost, danger, dangerSecondary }
 
 /// The button's size (the web's `size`): `md`, or the smaller `sm`.
 enum PressSize { md, sm }
@@ -86,7 +90,12 @@ class PressButton extends StatelessWidget {
     final sm = size == PressSize.sm;
     final radius = LkSurface.radius(sm ? LkRadius.lg : LkRadius.xl);
     final textStyle = (sm ? LkText.buttonSm : LkText.button).copyWith(
-      color: tone == PressTone.primary ? colors.onBrand : colors.ink,
+      color: switch (tone) {
+        PressTone.primary => colors.onBrand,
+        PressTone.danger => colors.bg,
+        PressTone.dangerSecondary => colors.over,
+        _ => colors.ink,
+      },
       decoration: tone == PressTone.ghost ? TextDecoration.underline : null,
       decorationColor: colors.ink,
     );
@@ -123,17 +132,29 @@ class PressButton extends StatelessWidget {
               boxShadow: LkSurface.brandEdge(lk, pressed: pressed),
             );
             dy = pressed ? 5 : 0;
-          case PressTone.secondary:
+          case PressTone.secondary || PressTone.dangerSecondary:
             decoration = BoxDecoration(
               color: colors.surfaceRow,
               borderRadius: radius,
-              border: Border.all(color: colors.controlEdge, width: 2),
+              border: Border.all(
+                color: tone == PressTone.dangerSecondary ? colors.over : colors.controlEdge,
+                width: 2,
+              ),
               boxShadow: pressed ? LkSurface.pressedEdge(lk) : LkSurface.edgeShadow(lk, LkEdge.sm),
             );
             dy = pressed ? 3 : 0;
           case PressTone.ghost:
             decoration = BoxDecoration(borderRadius: radius);
             dy = pressed ? 2 : 0;
+          case PressTone.danger:
+            // Its edge is the delete colour darkened, as the brand's is the brand darkened.
+            final edge = Color.lerp(colors.over, const Color(0xFF000000), 0.35)!;
+            decoration = BoxDecoration(
+              color: colors.over,
+              borderRadius: radius,
+              boxShadow: [BoxShadow(color: edge, offset: Offset(0, pressed ? 1 : 5))],
+            );
+            dy = pressed ? 5 : 0;
         }
         final surface = PressSurface(
           decoration: decoration,

@@ -57,6 +57,15 @@ enum FeedbackEvent {
   /// figures settle.
   wheelSpun,
 
+  /// The account button of home's header was tapped: a small button, quieter than the 🎤.
+  accountPressed,
+
+  /// A segmented switch moved to another option: it slides and snaps into place.
+  segmentChanged,
+
+  /// A swiped row came home past its place and turned back: the bounce.
+  swipeBounced,
+
   /// Home's eye (or the widget's) closed: the blind comes down and shuts.
   amountsHidden,
 
@@ -149,6 +158,15 @@ const hapticPatterns = <FeedbackEvent, HapticPattern>{
   // starts and as each notch passes, further apart as it slows (the times easeOut crosses each
   // twelfth), and a full click where it stops. Each pause is the gap after an 8 ms tick; the ticks
   // are firm (it is a heavy wheel) and soften a little as it slows.
+  // A button smaller and quieter than the 🎤.
+  FeedbackEvent.accountPressed: HapticPattern([10], [HapticPrimitive('click', 0.45)]),
+  // A switch that slides, then snaps.
+  FeedbackEvent.segmentChanged: HapticPattern(
+    [6, 30, 12],
+    [HapticPrimitive('tick', 0.4), HapticPrimitive('click', 0.7, delayMs: 30)],
+  ),
+  // The turn of a row bouncing home: soft and low, once.
+  FeedbackEvent.swipeBounced: HapticPattern([14], [HapticPrimitive('thud', 0.8)]),
   // The blind comes down and shuts: two light ticks gaining weight, then a dull knock.
   FeedbackEvent.amountsHidden: HapticPattern(
     [6, 25, 8, 35, 22],

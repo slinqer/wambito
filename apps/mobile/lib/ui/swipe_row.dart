@@ -15,6 +15,7 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.g.dart';
 import 'lk_theme.dart';
 import 'swipe_rules.dart';
+import 'lk_icons.dart';
 
 /// What swiping a row to the right does: "Editar", or "Pagado" on a pending row.
 enum SwipeRightKind { edit, paid }
@@ -137,8 +138,10 @@ class RowDragRecognizer extends OneSequenceGestureRecognizer {
   /// The gesture just turned sideways: it is a drag from now on.
   VoidCallback? onLock;
 
-  /// Every move: `dx` from where the finger came down.
-  ValueChanged<double>? onMove;
+  /// Every move: `dx` from where the finger came down, at the event's [time] (its time stamp).
+  void Function(double dx, Duration time)? onMove;
+
+  Duration _lastTime = Duration.zero;
 
   /// The drag ended: `vx` is the finger's speed in px/s (0 when it was cancelled).
   void Function(double dx, double vx)? onRelease;
@@ -177,6 +180,7 @@ class RowDragRecognizer extends OneSequenceGestureRecognizer {
     if (event is PointerMoveEvent) {
       _tracker?.addPosition(event.timeStamp, event.position);
       _last = event.position;
+      _lastTime = event.timeStamp;
       final delta = event.position - _origin;
       if (!_locked) {
         switch (lockAxis(delta.dx, delta.dy, SwipeFeel.axisSlop)) {
@@ -192,7 +196,7 @@ class RowDragRecognizer extends OneSequenceGestureRecognizer {
             resolve(GestureDisposition.accepted);
         }
       }
-      if (_accepted) onMove?.call(delta.dx);
+      if (_accepted) onMove?.call(delta.dx, event.timeStamp);
     } else if (event is PointerUpEvent) {
       if (_accepted) {
         final dx = (_last - _origin).dx;
@@ -220,7 +224,7 @@ class RowDragRecognizer extends OneSequenceGestureRecognizer {
     if (pointer != _pointer) return;
     _accepted = true;
     onLock?.call();
-    onMove?.call((_last - _origin).dx);
+    onMove?.call((_last - _origin).dx, _lastTime);
   }
 
   @override
@@ -311,6 +315,14 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
   double _from = 0;
   bool _reduceMotion = false;
 
+  /// The crown: the notch the row was last at, and when its last tick played (frame time).
+  int _notch = 0;
+  Duration? _lastTick;
+
+  /// The spring home: where it started (its side) and whether its bounce was felt.
+  double _homeFrom = 0;
+  bool _bounced = false;
+
   bool get _hasLeft => widget.onDelete != null;
   bool get _hasRight => widget.right != null;
 
@@ -361,16 +373,59 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     if (mounted) widget.onEntered?.call();
   }
 
+  /// A notch's tick when [offset] crossed into another notch, unless one played under
+  /// [SwipeFeel.detentGap] ago (a fast flick skips notches instead of buzzing).
+  void _tickNotch(double offset, double scale, Duration now) {
+    final notch = notchOf(offset);
+    if (notch == _notch) return;
+    _notch = notch;
+    final last = _lastTick;
+    if (last != null && now - last < SwipeFeel.detentGap) return;
+    _lastTick = now;
+    context.haptic(detentPattern(scale));
+  }
+
+  /// Each step of the spring home: the notches roll back, quieter, and the bounce past its place
+  /// is felt once.
+  void _homeStep() {
+    final x = _x.value;
+    _tickNotch(
+      x,
+      detentScale(x, _width) * SwipeFeel.detentReturn,
+      _x.lastElapsedDuration ?? Duration.zero,
+    );
+    // Past its place: the overshoot has begun, and the knock is felt once (a late frame may skip
+    // the turn itself, never the crossing).
+    final past = _homeFrom > 0 ? x < 0 : x > 0;
+    if (!_bounced && past) {
+      _bounced = true;
+      context.feedback(FeedbackEvent.swipeBounced);
+    }
+  }
+
   Future<void> _springTo(double to, {double velocity = 0, bool rowOut = false}) {
     if (_reduceMotion) {
       _x.value = to;
       return Future.value();
     }
+    final home = to == 0 && !rowOut && _x.value != 0;
     final spring = SpringDescription(
       mass: 1,
       stiffness: rowOut ? SwipeFeel.rowOutStiffness : SwipeFeel.rowStiffness,
-      damping: rowOut ? SwipeFeel.rowOutDamping : SwipeFeel.rowDamping,
+      damping: rowOut
+          ? SwipeFeel.rowOutDamping
+          : home
+          ? SwipeFeel.rowHomeDamping
+          : SwipeFeel.rowDamping,
     );
+    if (home) {
+      _homeFrom = _x.value;
+      _bounced = false;
+      _notch = notchOf(_x.value);
+      // The spring's own clock starts at zero: its ticks are spaced on it alone.
+      _lastTick = null;
+      _x.addListener(_homeStep);
+    }
     return _x
         .animateWith(
           SpringSimulation(
@@ -384,10 +439,12 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
         .orCancel
         .then((_) {
           // The spring stops within half a pixel of its target: rest exactly on it.
+          if (home) _x.removeListener(_homeStep);
           if (mounted) _x.value = to;
         })
         .catchError((Object _) {
           // Another touch or spring took the row over.
+          if (home) _x.removeListener(_homeStep);
         });
   }
 
@@ -473,6 +530,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     _width = box?.size.width ?? _width;
     _from = _x.value;
     _armed = null;
+    _notch = notchOf(_x.value);
     return true;
   }
 
@@ -489,7 +547,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     return box == null ? Offset.zero : box.localToGlobal(box.size.center(Offset.zero));
   }
 
-  void _onMove(double dx) {
+  void _onMove(double dx, Duration time) {
     final offset = rowOffset(
       start: _from,
       dx: dx,
@@ -499,18 +557,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
       right: _hasRight,
     );
     _x.value = offset;
-    final side = armedSide(offset, _width, SwipeFeel.rowThreshold);
-    final next = switch (side) {
-      Side.left => null,
-      Side.right when !_hasRight => null,
-      _ => side,
-    };
-    if (next != _armed) {
-      _armed = next;
-      // A tick at the threshold, each way.
-      context.feedback(FeedbackEvent.thresholdCrossed);
-      setState(() {});
-    }
+    _tickNotch(offset, detentScale(offset, _width), time);
   }
 
   void _onRelease(double dx, double vx) {
@@ -526,8 +573,6 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     );
     _armed = null;
     switch (outcome) {
-      case RowRelease.commitRight:
-        _runRight(velocity: vx);
       case RowRelease.openLeft:
         _opened(Side.left, vx);
       case RowRelease.openRight:
@@ -575,7 +620,7 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
     final background = left ? colors.over : (paid ? colors.good : colors.brand);
     final foreground = left ? colors.bg : (paid ? colors.bg : colors.onBrand);
     final label = left ? widget.deleteLabel : widget.right!.label;
-    final glyph = left ? '🗑' : (paid ? '✓' : '✎');
+    final glyph = left ? LkIconName.trash : (paid ? LkIconName.check : LkIconName.pencil);
     final armed = _armed == side;
     return Positioned.fill(
       // `.lk-swipe-side`: its own rounded corners, clipped to them.
@@ -611,7 +656,11 @@ class _SwipeRowState extends State<SwipeRow> with TickerProviderStateMixin {
                           scale: armed ? 1.35 : 1,
                           duration: _reduceMotion ? Duration.zero : WambitoTokens.durationPress,
                           curve: Curves.ease,
-                          child: Text(glyph, style: LkText.swipeGlyph.copyWith(color: foreground)),
+                          child: LkIcon(
+                            glyph,
+                            size: LkText.swipeGlyph.fontSize!,
+                            color: foreground,
+                          ),
                         ),
                         BlinkLine(
                           style: LkText.swipeAction,

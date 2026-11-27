@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/home/home_controller.dart' show monthGrace;
 import 'package:wambito/api/gen/wambito_api.dart';
 import 'package:wambito/home/home_repository.dart';
 import 'package:wambito/home/home_screen.dart' show HomeView;
@@ -26,6 +27,13 @@ Future<void> swipe(WidgetTester tester, Finder row, double dx, {int ms = 300}) a
 Future<void> swipeDelete(WidgetTester tester, Finder row) async {
   await swipe(tester, row, -250);
   await tester.tap(find.text('BORRAR'));
+  await tester.pumpAndSettle();
+}
+
+/// A payment: swipe [row] right, then tap Pagado (a swipe alone only opens it).
+Future<void> swipePay(WidgetTester tester, Finder row, {String label = 'PAGADO'}) async {
+  await swipe(tester, row, 250);
+  await tester.tap(find.text(label));
   await tester.pumpAndSettle();
 }
 
@@ -256,7 +264,7 @@ void main() {
       await pumpHome(tester, repo, size: tallPhone);
       expect(find.text('PENDIENTE'), findsOneWidget);
 
-      await swipe(tester, find.text('Arriendo'), 250);
+      await swipePay(tester, find.text('Arriendo'));
       expect(repo.calls, contains('markPaid rent'));
       expect(repo.items.firstWhere((t) => t.id == 'rent').status, TransactionStatusEnum.paid);
       expect(find.text('PENDIENTE'), findsNothing);
@@ -287,9 +295,14 @@ void main() {
       expect(find.text('Sin conexión. Revisa tu internet e inténtalo de nuevo.'), findsOneWidget);
     });
 
-    testWidgets('swipe right on a paid row edits it, when there is an editor', (tester) async {
+    testWidgets('swipe right on a paid row leaves Editar open, and Editar edits it', (
+      tester,
+    ) async {
       final harness = await pumpHome(tester, monthWithBudgets(), withEdit: true);
       await swipe(tester, find.text('Café'), 250);
+      expect(harness.edited, isEmpty, reason: 'a swipe alone only opens it');
+      await tester.tap(find.text('EDITAR'));
+      await tester.pumpAndSettle();
       expect(harness.edited.map((t) => t.id), ['coffee']);
       expect(find.text('Café'), findsOneWidget);
     });
@@ -407,7 +420,7 @@ void main() {
       await pumpHome(tester, monthWithBudgets(), size: tallPhone);
       expect(find.textContaining('Vas muy bien'), findsOneWidget);
 
-      await swipe(tester, find.text('Arriendo'), 250);
+      await swipePay(tester, find.text('Arriendo'));
       expect(find.textContaining('«Arriendo»'), findsOneWidget);
       expect(find.textContaining('Pagaste «Arriendo»: \$500.000'), findsOneWidget);
       expect(find.textContaining('Vas muy bien'), findsNothing);
@@ -423,6 +436,8 @@ void main() {
     testWidgets('in English the event line is English too', (tester) async {
       await pumpHome(tester, monthWithBudgets(), locale: const Locale('en'), size: tallPhone);
       await swipe(tester, find.text('Arriendo'), 250);
+      await tester.tap(find.text('PAID'));
+      await tester.pumpAndSettle();
       expect(find.textContaining('You paid “Arriendo”: COP\u00a0500,000'), findsOneWidget);
       await endEvent(tester);
     });
@@ -606,14 +621,17 @@ void main() {
       expect(find.text('Sin conexión. Revisa tu internet e inténtalo de nuevo.'), findsNothing);
     });
 
-    testWidgets('while another month loads, no figures of the month before show', (tester) async {
+    testWidgets('a slow month: past the grace, no figures of the month before show', (
+      tester,
+    ) async {
       final repo = threeMonths();
       await pumpHome(tester, repo);
       final gate = Completer<void>();
       repo.holdSummary = gate;
       await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      // A quick load would have arrived by now: past the grace the month before gives way.
+      await tester.pump(monthGrace + const Duration(milliseconds: 50));
       expect(find.text('Septiembre'), findsOneWidget);
       expect(find.text('Café'), findsNothing);
       expect(find.textContaining('Te quedan'), findsNothing);
@@ -675,7 +693,7 @@ void main() {
     ) async {
       final repo = monthWithBudgets();
       await pumpHome(tester, repo, size: tallPhone);
-      await swipe(tester, find.text('Arriendo'), 250);
+      await swipePay(tester, find.text('Arriendo'));
       expect(find.textContaining('Pagaste «Arriendo»'), findsOneWidget);
       await tester.tap(findIcon(LkIconName.chevronLeft));
       await tester.pumpAndSettle();

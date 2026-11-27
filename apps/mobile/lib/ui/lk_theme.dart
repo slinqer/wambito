@@ -82,6 +82,10 @@ List<double> snappedColumns(double width, int count, double gap, double ratio) {
   double snap(double value) => (value * ratio).round() / ratio;
   final lefts = [for (var i = 0; i < count; i++) snap(i * (column + gap))];
   final rights = [for (var i = 0; i < count; i++) snap(i * (column + gap) + column)];
+  // The last edge never passes the room: rounded up it would overflow by a fraction of a pixel
+  // (0.178 px on a 2.8125 phone), so it goes down to the device pixel inside.
+  final room = (width * ratio).floorToDouble() / ratio;
+  if (rights[count - 1] > room) rights[count - 1] = room;
   return [
     for (var i = 0; i < count; i++) rights[i] - lefts[i],
     for (var i = 0; i < count - 1; i++) lefts[i + 1] - rights[i],

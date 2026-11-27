@@ -79,6 +79,9 @@ export const ShortSwipeStaysOpen: Story = {
     await expect(canvas.queryByRole("button", { name: "Borrar" })).toBeNull();
     await fingerDrag(row, { dx: -70, steps: 12, stepMs: 24 });
     const remove = await canvas.findByRole("button", { name: "Borrar" });
+    // The action draws the app's icon, not an emoji.
+    await expect(remove.querySelector(".lk-swipe-glyph svg")).not.toBeNull();
+    await expect(remove.textContent).not.toContain("🗑");
     await waitFor(() => expect(translateX(faceOf(row))).toBeCloseTo(-88, 0), SETTLE);
     await expect(args.onDelete).not.toHaveBeenCalled();
 

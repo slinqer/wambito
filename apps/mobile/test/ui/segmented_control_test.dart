@@ -3,10 +3,12 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/feedback/feedback.dart';
 import 'package:wambito/ui/segmented_control.dart';
 
 import '../support/fonts.dart';
 import '../support/ui_app.dart';
+import '../support/feel.dart';
 
 /// `SegmentedControl`'s behaviour, as apps/web/app/ui/SegmentedControl.tsx and its stories define
 /// it. How it looks is test/parity/segmented_control_parity_test.dart's job.
@@ -137,5 +139,25 @@ void main() {
     // 300 wide, 3px padding and a 3px gap: each option is (300 - 6 - 3) / 2 = 145.5 wide.
     expect(half.dx - start.dx, closeTo(0.5 * (145.5 + 3), 0.01));
     expect(end.dx - start.dx, closeTo(145.5 + 3, 0.01));
+  });
+
+  testWidgets(
+    'picking another option slides and snaps; the selected one or a change from code is silent',
+    (t) async {
+      final platform = await pumpFelt(t, uiApp(_Host(log: [])));
+      await t.tap(find.text('BUDGETS'));
+      await t.pumpAndSettle();
+      expect(platform.haptics, isEmpty, reason: 'already selected');
+      await t.tap(find.text('TRANSACTIONS'));
+      await t.pumpAndSettle();
+      expect(feltEvents(platform), [FeedbackEvent.segmentChanged]);
+    },
+  );
+
+  testWidgets('with vibration off, a switch is silent', (t) async {
+    final platform = await pumpFelt(t, uiApp(_Host(log: [])), vibration: false);
+    await t.tap(find.text('TRANSACTIONS'));
+    await t.pumpAndSettle();
+    expect(platform.haptics, isEmpty);
   });
 }

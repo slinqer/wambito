@@ -27,7 +27,16 @@ class _Env {
   final FakeFeedbackPlatform platform;
   final HomeHarness harness;
 
-  List<List<int>> get waveforms => [for (final p in platform.haptics) p.waveform];
+  /// What vibrated, by waveform, leaving out the swipe's crown (its notches and its bounce), which
+  /// test/ui/swipe_feel_test.dart covers.
+  List<List<int>> get waveforms => [
+    for (final p in platform.haptics)
+      if (!_crown(p)) p.waveform,
+  ];
+
+  static bool _crown(HapticPattern p) =>
+      identical(p, hapticPatterns[FeedbackEvent.swipeBounced]) ||
+      (p.waveform.length == 1 && p.waveform.single == 12);
 
   /// The haptics of what happened (a save, a limit, Deshacer), without the touch of the bar's
   /// buttons and the sheets' landing and shutting around them.
@@ -160,6 +169,8 @@ void main() {
     testWidgets('paying a pending row plays the paid sound and haptic', (tester) async {
       final env = await _pump(tester, size: tallPhone);
       await swipe(tester, find.text('Arriendo'), 250);
+      await tester.tap(find.text('PAGADO'));
+      await tester.pumpAndSettle();
       expect(env.platform.sounds, [FeedbackSound.paid]);
       expect(env.waveforms.last, [10, 30, 10, 30, 24]);
       await _endTimers(tester);
@@ -175,7 +186,7 @@ void main() {
       await _endTimers(tester);
     });
 
-    testWidgets('the left side never ticks; the right one ticks each way it crosses the line', (
+    testWidgets('neither side ticks at the line: the crown\'s notches are the drag\'s feel', (
       tester,
     ) async {
       final env = await _pump(tester, size: tallPhone);
@@ -189,20 +200,11 @@ void main() {
       await tester.pumpAndSettle();
 
       final gesture = await tester.startGesture(tester.getCenter(find.text('Arriendo')));
-      await gesture.moveBy(const Offset(30, 0));
+      await gesture.moveBy(const Offset(230, 0));
       await tester.pump();
-      expect(env.waveforms, isEmpty, reason: 'not yet at the line');
-      await gesture.moveBy(const Offset(200, 0));
-      await tester.pump();
-      expect(env.waveforms, [
-        [10],
-      ]);
       await gesture.moveBy(const Offset(-200, 0));
       await tester.pump();
-      expect(env.waveforms, [
-        [10],
-        [10],
-      ]);
+      expect(env.waveforms, isEmpty, reason: 'nor is Pagado: only a tap runs it');
       await gesture.up();
       await tester.pumpAndSettle();
     });

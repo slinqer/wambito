@@ -43,6 +43,7 @@ export const ICON_NAMES = [
   "laptop",
   "key",
   "trash",
+  "pencil",
   "wand",
   "calendar",
   "widget",

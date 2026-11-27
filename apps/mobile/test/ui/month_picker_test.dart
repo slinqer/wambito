@@ -3,10 +3,12 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wambito/feedback/feedback.dart';
 import 'package:wambito/ui/month_picker.dart';
 
 import '../support/fonts.dart';
 import '../support/ui_app.dart';
+import '../support/feel.dart';
 
 /// `MonthPicker`'s behaviour, as apps/web/app/ui/MonthPicker.tsx and its stories define it. How it
 /// looks is test/parity/month_picker_parity_test.dart's job.
@@ -148,5 +150,21 @@ void main() {
       ),
     );
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('each month moved is one page turned', (t) async {
+    final platform = await pumpFelt(
+      t,
+      uiApp(
+        Row(
+          children: [_Host(initial: '2026-10', log: [])],
+        ),
+      ),
+    );
+    await t.tap(_previous());
+    await t.pumpAndSettle();
+    await t.tap(_previous());
+    await t.pumpAndSettle();
+    expect(feltEvents(platform), [FeedbackEvent.pageChanged, FeedbackEvent.pageChanged]);
   });
 }
