@@ -65,9 +65,12 @@ private val rowBox = DpSize(220.dp, 40.dp)
 
 /**
  * Both widgets draw the layout that fits the box they really have, not the one they were added
- * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened.
+ * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened. Exact, not
+ * Responsive: the figure is a picture sized to the room left in the box (`figureRoom`), and
+ * Responsive hands `LocalSize` its nearest bucket instead (a 330 dp medium got 220, and its figure
+ * was cut). The cost is one drawing per size the launcher reports (portrait and landscape).
  */
-val widgetSizeMode = SizeMode.Responsive(setOf(DpSize(110.dp, 40.dp), DpSize(150.dp, 40.dp), rowBox, mediumBox))
+val widgetSizeMode: SizeMode = SizeMode.Exact
 
 /** The layout for a box of [size]: medium when it is wide and tall, row when only wide, else small. */
 fun widgetSizeFor(size: DpSize): WidgetSize = when {

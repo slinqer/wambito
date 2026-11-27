@@ -128,9 +128,10 @@ class WidgetContentTest {
     }
 
     @Test
-    fun `both widgets use the responsive size mode`() {
-        assertEquals(widgetSizeMode, WambitoSmallWidget().sizeMode)
-        assertEquals(widgetSizeMode, WambitoMediumWidget().sizeMode)
+    fun `both widgets are drawn for their exact box, so the figure gets all the room it has`() {
+        // Responsive hands LocalSize its nearest bucket (a 330 dp medium got 220): the figure was cut.
+        assertEquals(androidx.glance.appwidget.SizeMode.Exact, WambitoSmallWidget().sizeMode)
+        assertEquals(androidx.glance.appwidget.SizeMode.Exact, WambitoMediumWidget().sizeMode)
     }
 
     @Test
