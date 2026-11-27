@@ -12,9 +12,9 @@ import { expect, type Page, test } from "@playwright/test";
 
 const SITE = process.env.VITE_SITE_URL ?? "https://landing-only.example.test";
 const APP = process.env.VITE_APP_URL ?? "https://app.example.test";
-/** The Android download: the arm64 APK of the mobile release. */
+/** The Android download: the arm64 APK of the latest release. */
 const ANDROID_APK_HREF =
-  "https://github.com/slinqer/wambito/releases/download/mobile-v1.0.5/wambito-1.0.5-arm64-v8a.apk";
+  "https://github.com/slinqer/wambito/releases/latest/download/wambito-arm64-v8a.apk";
 
 const CLIENT = fileURLToPath(new URL("../build/client/", import.meta.url));
 

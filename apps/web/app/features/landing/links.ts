@@ -8,16 +8,15 @@ export const DEMO_PATH = "/demo";
 export const GITHUB_HREF = "https://github.com/slinqer/wambito";
 
 /**
- * The Android app the landing offers: the latest `mobile-v*` release on GitHub. Raised after each
- * Android release is published there, never before (the link would 404); `release.md`.
+ * "Descargar para Android": the arm64 APK (nearly every phone in use runs it) of the latest release
+ * on GitHub. GitHub resolves `latest`, so a release needs no landing change; each `mobile-v*`
+ * release carries the APK under this versionless name too, and only those are marked latest
+ * (`release.md`).
  */
-export const ANDROID_VERSION = "1.0.5";
+export const ANDROID_APK_HREF = `${GITHUB_HREF}/releases/latest/download/wambito-arm64-v8a.apk`;
 
-/** "Descargar para Android": the arm64 APK, which nearly every phone in use runs. */
-export const ANDROID_APK_HREF = `${GITHUB_HREF}/releases/download/mobile-v${ANDROID_VERSION}/wambito-${ANDROID_VERSION}-arm64-v8a.apk`;
-
-/** The release page: the 32-bit APK, the checksums and the signing certificate. */
-export const ANDROID_RELEASE_HREF = `${GITHUB_HREF}/releases/tag/mobile-v${ANDROID_VERSION}`;
+/** The latest release's page: the 32-bit APK, the checksums and the signing certificate. */
+export const ANDROID_RELEASE_HREF = `${GITHUB_HREF}/releases/latest`;
 
 /** Google Play listing; null until the app is published there (the install offer hides its button). */
 export const PLAY_HREF: string | null = null;
