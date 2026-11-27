@@ -214,4 +214,18 @@ void main() {
     );
     expect(label.text.style?.color, colors.bg);
   });
+
+  testWidgets('the secondary danger tone is a secondary button in the delete colour', (t) async {
+    await t.pumpWidget(
+      uiApp(PressButton.text('Eliminar', tone: PressTone.dangerSecondary, onPressed: () {})),
+    );
+    final colors = WambitoColors.night;
+    final box = t.widget<PressSurface>(find.byType(PressSurface)).decoration;
+    expect(box.color, colors.surfaceRow);
+    expect((box.border! as Border).top.color, colors.over);
+    final label = t.widget<RichText>(
+      find.descendant(of: find.byType(PressButton), matching: find.byType(RichText)),
+    );
+    expect(label.text.style?.color, colors.over);
+  });
 }

@@ -1046,10 +1046,10 @@ void main() {
       );
       await tester.tap(find.text('Almuerzo'));
       await tester.pumpAndSettle();
-      // A destructive button: in the delete colour.
+      // Saving is the main action here: Eliminar is the secondary one, in the delete colour.
       expect(
         tester.widget<PressButton>(find.byKey(const Key('add.delete'))).tone,
-        PressTone.danger,
+        PressTone.dangerSecondary,
       );
       await tester.tap(find.byKey(const Key('add.delete')));
       await tester.pumpAndSettle();

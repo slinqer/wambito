@@ -10,9 +10,11 @@ import 'pressable.dart';
 
 /// Which button: one `primary` per view; `secondary` for the alternative, `ghost` to skip or
 /// dismiss (the web's `variant`).
-/// [danger] is a destructive action (Eliminar): the delete colour, like a swiped row's Borrar,
-/// sinking 5px as a primary does.
-enum PressTone { primary, secondary, ghost, danger }
+/// [danger] is a destructive action that is the screen's main one: the delete colour, like a
+/// swiped row's Borrar, sinking 5px as a primary does. [dangerSecondary] is a destructive action
+/// beside the main one (Eliminar next to Guardar): a secondary button with its edge and words in
+/// the delete colour.
+enum PressTone { primary, secondary, ghost, danger, dangerSecondary }
 
 /// The button's size (the web's `size`): `md`, or the smaller `sm`.
 enum PressSize { md, sm }
@@ -91,6 +93,7 @@ class PressButton extends StatelessWidget {
       color: switch (tone) {
         PressTone.primary => colors.onBrand,
         PressTone.danger => colors.bg,
+        PressTone.dangerSecondary => colors.over,
         _ => colors.ink,
       },
       decoration: tone == PressTone.ghost ? TextDecoration.underline : null,
@@ -129,11 +132,14 @@ class PressButton extends StatelessWidget {
               boxShadow: LkSurface.brandEdge(lk, pressed: pressed),
             );
             dy = pressed ? 5 : 0;
-          case PressTone.secondary:
+          case PressTone.secondary || PressTone.dangerSecondary:
             decoration = BoxDecoration(
               color: colors.surfaceRow,
               borderRadius: radius,
-              border: Border.all(color: colors.controlEdge, width: 2),
+              border: Border.all(
+                color: tone == PressTone.dangerSecondary ? colors.over : colors.controlEdge,
+                width: 2,
+              ),
               boxShadow: pressed ? LkSurface.pressedEdge(lk) : LkSurface.edgeShadow(lk, LkEdge.sm),
             );
             dy = pressed ? 3 : 0;
