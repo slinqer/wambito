@@ -531,7 +531,13 @@ vault needs Unlock). A guest never has it. `vault_screen.dart` (route `/unlock`)
   unreadable = hidden), written by Settings' switch and by the widget's eye (`ToggleHideAmount.kt`, a Glance
   `ActionCallback`: flips it, plays `haptics/Blinds.kt` through `haptics/Haptics.kt` unless vibration is off, redraws;
   `test/tooling/blinds_android_test.dart` keeps the blinds equal to Dart's); every snapshot writer reads the key at
-  write time and the app reloads it on resume (`widgetChoiceReloadProvider`); `notices/`: WorkManager `DueWorker`/`GuestWorker`,
+  write time and the app reloads it on resume (`widgetChoiceReloadProvider`); the figure is a bitmap in home's hero face (`FigureBitmap.kt`:
+  Fredoka 700 read from the APK's `flutter_assets`, bold system face if missing, white and tinted `ink`, shrunk to
+  `figureRoom` then cut); ＋ and 🎤 are `LedgeButton`s (the `widget_button` shape tinted `brand` over a `brandEdge`
+  ledge; icons `ic_widget_add`/`ic_widget_mic` are `icons.json`'s `plus`/`mic`, kept equal by
+  `test/tooling/widget_icons_test.dart`); the picker previews `res/drawable-nodpi/widget_preview_{small,medium}.png`
+  are drawn by `WidgetPreviewsTest` (Robolectric native graphics) and copied by `scripts/gen-widget-previews.sh`:
+  run it after any change to the widget's look, never hand-edit them; `notices/`: WorkManager `DueWorker`/`GuestWorker`,
   local notices only. The 45-day guest warning is a `plain` guest's: for a `preview` account `NoticeSync` cancels it,
   `GuestWorker` posts nothing and Settings hides its switch (an encrypted guest is kept 12 or 24 months). A `preview` account's "Hoy vence…" is computed in Dart from the vault
   (`lib/notices/due_list.dart`: the app's `NoticeSync` and the headless `due` effect, `lib/background/due_effect.dart`)

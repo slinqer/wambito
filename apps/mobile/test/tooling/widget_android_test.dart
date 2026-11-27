@@ -203,4 +203,12 @@ void main() {
     expect(_manifest, contains('android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"'));
     expect(_manifest, contains('android.service.quicksettings.action.QS_TILE'));
   });
+
+  test('the widget picker shows each size drawn by scripts/gen-widget-previews.sh', () {
+    for (final size in ['small', 'medium']) {
+      final xml = File('android/app/src/main/res/xml/wambito_${size}_widget.xml').readAsStringSync();
+      expect(xml, contains('android:previewImage="@drawable/widget_preview_$size"'));
+      expect(File('android/app/src/main/res/drawable-nodpi/widget_preview_$size.png').existsSync(), isTrue);
+    }
+  });
 }

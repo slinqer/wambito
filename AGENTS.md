@@ -119,6 +119,8 @@ phone. Read the `AGENTS.md` of the area you work in; read code only to confirm.
     `pnpm --filter @wambito/web landing-screens` with the web dev server up; run it again when the
     insights screen changes;
   - Flutter l10n (`app_localizations*.dart`, git-ignored): `flutter pub get`.
+  - `apps/mobile/android/app/src/main/res/drawable-nodpi/widget_preview_*.png` (the widget picker's previews):
+    `apps/mobile/scripts/gen-widget-previews.sh`, again whenever the widget's look changes.
 - Write the failing test first. Everything in English.
 - A change to the API or the MCP (routes, fields, errors, auth, scopes, tools, prompts, limits) adds
   a line under "Unreleased" in the root `CHANGELOG.md`, the server's changelog; a server release
