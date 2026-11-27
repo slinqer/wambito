@@ -1,0 +1,5 @@
+- Hide amounts: the eye on home shows every amount in the app as ••••. The widget has its own eye.
+- Automatic capture reads ActivoBank, and Revolut payments in another currency.
+- Swiping a movement clicks like a watch crown; changing month or tab vibrates too.
+- The widget looks like the app, and the widget picker shows it.
+- Home's cards in a carousel; protect your data with your fingerprint.

@@ -1,0 +1,5 @@
+- Oculta los montos: el ojo de inicio muestra cada monto de la app como ••••. El widget tiene su propio ojo.
+- La captura automática lee ActivoBank y los pagos de Revolut en otra moneda.
+- Deslizar un movimiento hace clic como la corona de un reloj; cambiar de mes o de pestaña también vibra.
+- El widget se ve como la app y el selector de widgets lo muestra.
+- Las tarjetas de inicio en carrusel; protege tus datos con tu huella.

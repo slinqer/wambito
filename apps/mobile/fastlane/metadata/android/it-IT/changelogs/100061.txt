@@ -1,0 +1,5 @@
+- Nascondi gli importi: l'occhio nella home mostra ogni importo dell'app come ••••. Il widget ha il suo occhio.
+- La cattura automatica legge ActivoBank e i pagamenti Revolut in un'altra valuta.
+- Scorrere un movimento scatta come la corona di un orologio; cambiare mese o scheda vibra.
+- Il widget sembra l'app e il selettore dei widget lo mostra.
+- Le schede della home in un carosello; proteggi i tuoi dati con l'impronta.

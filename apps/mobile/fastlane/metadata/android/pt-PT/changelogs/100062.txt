@@ -1,0 +1,5 @@
+- Ocultar montantes: o olho do início mostra cada montante da app como ••••. O widget tem o seu próprio olho.
+- A captura automática lê o ActivoBank e os pagamentos Revolut noutra moeda.
+- Deslizar um movimento estala como a coroa de um relógio; mudar de mês ou de separador também vibra.
+- O widget parece a app e o seletor de widgets mostra-o.
+- Os cartões do início em carrossel; protege os teus dados com a impressão digital.
