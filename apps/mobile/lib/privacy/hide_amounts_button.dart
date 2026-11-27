@@ -9,7 +9,7 @@ import 'hide_amounts.dart';
 
 /// Home's eye, right after the hero figure: hides every amount in the app (the blind comes down)
 /// or shows them again (the blind goes up). An open eye while they show, a crossed one while hidden;
-/// a 48 dp target.
+/// a 48 × 40 dp target, the figure's line.
 class HideAmountsButton extends ConsumerWidget {
   const HideAmountsButton({super.key});
 
@@ -30,8 +30,11 @@ class HideAmountsButton extends ConsumerWidget {
           );
           ref.read(amountsHiddenProvider.notifier).set(!hidden);
         },
-        child: SizedBox.square(
-          dimension: 48,
+        // 48 wide, but only as tall as the hero figure's line (38 px at 1.05): a taller button
+        // would grow the hero and push the first rows down a short phone's screen.
+        child: SizedBox(
+          width: 48,
+          height: 40,
           child: Center(
             child: LkIcon(
               hidden ? LkIconName.eyeOff : LkIconName.eye,

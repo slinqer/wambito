@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wambito/api/server_address.dart';
 import 'package:wambito/feedback/feedback.dart';
+import 'package:wambito/ui/money.dart';
+import 'package:wambito/home/home_widgets.dart';
 import 'package:wambito/settings/initial_settings.dart';
 import 'package:wambito/settings/settings_store.dart';
 
@@ -65,5 +67,16 @@ void main() {
     await _pump(t, hidden: true);
     expectNoAmounts(t);
     semantics.dispose();
+  });
+
+  testWidgets('the eye takes no more height than the figure\'s line: the hero does not grow', (
+    t,
+  ) async {
+    await _pump(t);
+    final eye = t.getSize(find.byKey(const Key('home.hideAmounts')));
+    final figure = t.getSize(
+      find.descendant(of: find.byType(HomeHero), matching: find.byType(Money)),
+    );
+    expect(eye.height, lessThanOrEqualTo(figure.height));
   });
 }
