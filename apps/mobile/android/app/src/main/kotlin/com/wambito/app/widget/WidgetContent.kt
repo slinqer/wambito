@@ -65,12 +65,26 @@ private val rowBox = DpSize(220.dp, 40.dp)
 
 /**
  * Both widgets draw the layout that fits the box they really have, not the one they were added
- * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened. Exact, not
- * Responsive: the figure is a picture sized to the room left in the box (`figureRoom`), and
- * Responsive hands `LocalSize` its nearest bucket instead (a 330 dp medium got 220, and its figure
- * was cut). The cost is one drawing per size the launcher reports (portrait and landscape).
+ * as: a 4×2 box once showed the small layout (no Wambi, no 🎤) until the app was opened.
+ *
+ * Responsive hands `LocalSize` the largest of these boxes that fits, not the real one, and the
+ * figure is a picture sized to the room that box leaves (`figureRoom`): with only the four layout
+ * boxes a 330 dp medium got 220 and its figure was cut. So the wide boxes come every 35 dp, at the
+ * row's and the medium's heights: the room is never more than 35 dp short. 15 boxes, under
+ * Android's 16 sized layouts per widget. Exact fits the room to the dp, but Samsung's launcher drew
+ * it narrower than its box.
  */
-val widgetSizeMode: SizeMode = SizeMode.Exact
+val widgetSizes: Set<DpSize> = buildSet {
+    add(DpSize(110.dp, 40.dp))
+    add(DpSize(150.dp, 40.dp))
+    add(DpSize(180.dp, 40.dp))
+    for (width in 220..395 step 35) {
+        add(DpSize(width.dp, rowBox.height))
+        add(DpSize(width.dp, mediumBox.height))
+    }
+}
+
+val widgetSizeMode: SizeMode = SizeMode.Responsive(widgetSizes)
 
 /** The layout for a box of [size]: medium when it is wide and tall, row when only wide, else small. */
 fun widgetSizeFor(size: DpSize): WidgetSize = when {

@@ -13,6 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.wambito.app.launch.LaunchLinks
 import es.antonborri.home_widget.HomeWidgetGlanceState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -128,10 +129,17 @@ class WidgetContentTest {
     }
 
     @Test
-    fun `both widgets are drawn for their exact box, so the figure gets all the room it has`() {
-        // Responsive hands LocalSize its nearest bucket (a 330 dp medium got 220): the figure was cut.
-        assertEquals(androidx.glance.appwidget.SizeMode.Exact, WambitoSmallWidget().sizeMode)
-        assertEquals(androidx.glance.appwidget.SizeMode.Exact, WambitoMediumWidget().sizeMode)
+    fun `both widgets are responsive, with a box every 35 dp so the figure is never much short of room`() {
+        assertEquals(widgetSizeMode, WambitoSmallWidget().sizeMode)
+        assertEquals(widgetSizeMode, WambitoMediumWidget().sizeMode)
+        // A 330 dp medium once got the 220 dp box and its figure was cut.
+        assertTrue(widgetSizes.size <= 16)
+        for (height in listOf(40.dp, 100.dp)) {
+            val widths = widgetSizes.filter { it.height == height && it.width >= 220.dp }.map { it.width }.sorted()
+            assertEquals(220.dp, widths.first())
+            assertTrue(widths.last() >= 390.dp)
+            assertTrue(widths.zipWithNext().all { (a, b) -> b - a <= 35.dp })
+        }
     }
 
     @Test
